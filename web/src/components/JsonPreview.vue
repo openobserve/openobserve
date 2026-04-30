@@ -1,17 +1,16 @@
 <template>
   <div class="tw:relative">
-    <q-btn
+    <OButton
       v-if="showCopyButton"
-      dense
-      size="sm"
-      no-caps
-      class="tw:absolute! tw:top-0! tw:right-0 tw:z-10 q-px-sm tw:py-[0.35rem]! tw:bg-[var(--o2-tag-grey-2)]!"
+      variant="secondary"
+      size="icon-sm"
+      class="tw:absolute! tw:top-0! tw:right-0 tw:z-10"
       :class="copyButtonClass"
-      icon="content_copy"
       @click="copyToClipboard"
     >
+      <q-icon name="content_copy" />
       <q-tooltip>{{ t("common.copyToClipboard") }}</q-tooltip>
-    </q-btn>
+    </OButton>
     <div class="q-pb-xs flex justify-start items-center q-px-md copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
       <slot name="toolbar" />
@@ -73,12 +72,14 @@ import { copyToClipboard as quasarCopyToClipboard, useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default {
   name: "JsonPreview",
   components: {
     LogsHighLighting,
     ChunkedContent,
+    OButton,
   },
   props: {
     value: {

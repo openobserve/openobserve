@@ -135,6 +135,30 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-focus-ring",
     "tw:disabled:opacity-50",
   ].join(" "),
+  // AI-themed gradient — purple→pink gradient background, white text
+  "ai-gradient": [
+    "tw:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)] tw:text-white tw:border-0",
+    "tw:enabled:hover:shadow-[0_4px_12px_rgba(139,92,246,0.4)]",
+    "tw:enabled:active:opacity-90",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-[#8B5CF6]",
+    "tw:disabled:opacity-40",
+  ].join(" "),
+  // On-dark primary — white background with primary color text, for use on dark gradient panels
+  "on-dark-primary": [
+    "tw:bg-white tw:text-[var(--q-primary)] tw:font-bold tw:border-0 tw:shadow-md",
+    "tw:enabled:hover:shadow-xl",
+    "tw:enabled:active:opacity-90",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-white/50",
+    "tw:disabled:opacity-50",
+  ].join(" "),
+  // On-dark ghost — transparent with white border/text, for use on dark gradient panels
+  "on-dark-ghost": [
+    "tw:bg-transparent tw:text-white tw:border-2 tw:border-white/30",
+    "tw:enabled:hover:bg-white/10 tw:enabled:hover:border-white/50",
+    "tw:enabled:active:opacity-90",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-white/50",
+    "tw:disabled:opacity-50",
+  ].join(" "),
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
