@@ -151,14 +151,14 @@
     <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer">
       <OButton
         variant="outline"
-        size="sm"
+        size="sm-action"
         @click="addcolorBySeries"
         data-test="dashboard-addpanel-config-color-by-series-add-btn"
         >+ Add a new color</OButton
       >
       <OButton
         variant="primary"
-        size="sm"
+        size="sm-action"
         @click="applycolorBySeries"
         :disabled="!isFormValid"
         data-test="dashboard-addpanel-config-color-by-series-apply-btn"

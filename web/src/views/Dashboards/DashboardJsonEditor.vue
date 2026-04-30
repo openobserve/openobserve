@@ -49,17 +49,17 @@
 
     <q-space></q-space>
 
-    <q-card-actions align="right" class="q-pa-md">
+    <q-card-actions align="right" class="q-pa-md tw:gap-2">
       <OButton
-        variant="ghost-primary"
-        size="sm"
+        variant="outline"
+        size="sm-action"
         v-close-popup
         data-test="json-editor-cancel"
         >{{ t("common.cancel") }}</OButton
       >
       <OButton
         variant="primary"
-        size="sm"
+        size="sm-action"
         :loading="saveJsonLoading"
         :disabled="
           !isValidJson || validationErrors.length > 0 || saveJsonLoading
