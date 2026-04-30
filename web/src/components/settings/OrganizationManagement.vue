@@ -39,53 +39,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              :label="t('settings.extendTrial')"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
+            <OButton
+              variant="ghost"
               size="sm"
-              padding="xs"
-              text-color="primary"
+              class="q-ml-xs"
               data-test="otg-management-extend-trial-btn"
               @click.stop="toggleExtendTrialDialog(props.row)"
-            ></q-btn>
-            <q-btn
+            >
+              {{ t("settings.extendTrial") }}
+            </OButton>
+            <OButton
               v-if="props.row.billing_provider === '-'"
-              label="Add Contract"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
+              variant="ghost"
               size="sm"
-              padding="xs"
-              text-color="positive"
+              class="q-ml-xs tw:text-emerald-600"
               data-test="org-management-add-contract-btn"
               @click.stop="toggleContractDialog(props.row, 'create')"
-            ></q-btn>
-            <q-btn
+            >
+              Add Contract
+            </OButton>
+            <OButton
               v-if="props.row.billing_provider === 'no_op'"
-              label="Extend Contract"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
+              variant="ghost"
               size="sm"
-              padding="xs"
-              text-color="positive"
+              class="q-ml-xs tw:text-emerald-600"
               data-test="org-management-extend-contract-btn"
               @click.stop="toggleContractDialog(props.row, 'extend')"
-            ></q-btn>
-            <q-btn
+            >
+              Extend Contract
+            </OButton>
+            <OButton
               v-if="props.row.billing_provider === 'no_op'"
-              label="Revoke"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
+              variant="ghost-destructive"
               size="sm"
-              padding="xs"
-              text-color="negative"
+              class="q-ml-xs"
               data-test="org-management-revoke-contract-btn"
               @click.stop="confirmRevokeContract(props.row)"
-            ></q-btn>
+            >
+              Revoke
+            </OButton>
           </q-td>
         </template>
         <template #top="scope">
@@ -166,30 +158,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
         <q-card-actions align="right" class="text-primary q-mt-md">
-          <q-btn
+          <OButton
             v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('common.cancel')"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-          />
-          <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="`Extend trial by ${extendedTrial} week(s)`"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            @click.stop="
-              updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)
-            "
-          />
+            variant="outline"
+            size="sm-action"
+            class="q-mr-md"
+          >
+            {{ t("common.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
+          >
+            Extend trial by {{ extendedTrial }} week(s)
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -234,32 +217,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right" class="text-primary">
-          <q-btn
+          <OButton
             v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('common.cancel')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-          />
-          <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="
-              contractMode === 'create' ? 'Create Contract' : 'Extend Contract'
-            "
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
+            variant="outline"
+            size="sm-action"
+            class="q-mr-md"
+          >
+            {{ t("common.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
             @click.stop="submitContract"
-          />
+          >
+            {{ contractMode === 'create' ? 'Create Contract' : 'Extend Contract' }}
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>

@@ -39,14 +39,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Refresh -->
         <div>
-          <q-btn
-            :label="t('modelPricing.refresh')"
-            flat
-            class="o2-secondary-button tw:w-[120px] tw:h-[36px]"
-            @click="refreshModels"
+          <OButton
+            variant="outline"
+            size="sm-action"
             :loading="loading"
+            @click="refreshModels"
             data-test="built-in-model-pricing-refresh-btn"
-          />
+          >
+            {{ t("modelPricing.refresh") }}
+          </OButton>
         </div>
       </div>
     </div>
