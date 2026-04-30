@@ -831,18 +831,34 @@ export class LogsPage {
         // Ensure query editor is ready
         await this.ensureQueryEditorReady();
 
-        // Wait for the query button to be visible
-        await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for the query button to be visible and enabled
+        const queryBtn = this.page.locator(this.queryButton);
+        await queryBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await queryBtn.waitFor({ state: 'attached', timeout: 10000 });
+        await this.page.waitForTimeout(1000);
+
+        // Wait for button to be enabled — on cloud, streaming toggle / page
+        // state changes can keep it disabled for several seconds
+        await this.page.waitForFunction(
+            (selector) => {
+                const btn = document.querySelector(selector);
+                return btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true';
+            },
+            this.queryButton,
+            { timeout: 30000 }
+        ).catch(() => {
+            testLogger.debug('Query button did not become enabled within 30s — attempting click anyway');
+        });
         await this.page.waitForTimeout(1000);
 
         // Run + verify; if search returns a transient error (common on cloud
         // when stream indexing is still catching up), retry with backoff.
-        // Without this, downstream actions like clicking interesting fields
-        // become no-ops because the page is in error state.
+        // Also retry when results table never appears (query button may have
+        // been disabled or click was a no-op).
         const errorMessage = this.page.locator(this.errorMessage);
         const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            await this.page.locator(this.queryButton).click();
+            await queryBtn.click();
             await this.page.waitForTimeout(3000);
 
             try {
@@ -852,18 +868,16 @@ export class LogsPage {
                 });
                 return; // results visible — done
             } catch (e) {
-                if (await errorMessage.isVisible().catch(() => false)) {
-                    if (attempt < maxAttempts) {
-                        testLogger.debug(`Query returned error (attempt ${attempt}/${maxAttempts}); retrying after delay`);
-                        // Backoff: 5s, 10s — allows alpha indexing to catch up
-                        await this.page.waitForTimeout(5000 * attempt);
-                        continue;
-                    }
-                    testLogger.debug('Query completed with error message after retries');
+                // Retry on error message or when table never appears — both
+                // are transient on cloud while indexing catches up
+                if (attempt < maxAttempts) {
+                    const hasError = await errorMessage.isVisible().catch(() => false);
+                    const delay = hasError ? 5000 * attempt : 5000;
+                    testLogger.debug(`Query did not return results (attempt ${attempt}/${maxAttempts}, hasError=${hasError}); retrying after ${delay}ms`);
+                    await this.page.waitForTimeout(delay);
                 } else {
-                    await this.page.waitForTimeout(2000);
+                    testLogger.debug('Query exhausted all retries — proceeding without visible results');
                 }
-                return;
             }
         }
     }
@@ -1464,19 +1478,32 @@ export class LogsPage {
         const resultsDropdown = this.page.locator('[data-test="logs-search-result-records-per-page"]');
         await resultsDropdown.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         await resultsDropdown.click({ force: true });
+        // Dropdown uses a QMenu popup — wait for it to appear, then click "10"
         await this.page.waitForTimeout(500);
-        await this.page.getByText('10', { exact: true }).click({ force: true });
-        await this.page.waitForTimeout(3000);
-        // Wait for pagination text — assert "Showing 1 to 10" so we verify the
-        // 10-per-page contract was applied, not just that any pagination renders
-        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 1 to 10', { timeout: 15000 });
+        const option10 = this.page.locator('.q-menu .q-item').filter({ hasText: /^10$/ }).first();
+        await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        await option10.click({ force: true });
+        // Wait for the per-page change to take effect — cloud wildcard queries
+        // can take 5s+ to re-run after changing results-per-page
+        await this.page.waitForTimeout(5000);
+        // Retry the pagination assertion — slow cloud re-runs can miss the first check
+        const searchResult = this.page.locator('[data-test="logs-search-search-result"]');
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 10000 });
+                return;
+            } catch (e) {
+                if (attempt < 3) {
+                    await this.page.waitForTimeout(3000);
+                }
+            }
+        }
+        // Final attempt — let it throw
+        await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 15000 });
     }
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
-        await this.page.locator(this.resultPagination).getByRole('button', { name: resultsPerPage, exact: true }).click();
-        await this.page.waitForTimeout(5000); // Increased wait time for UI update
-        
-        // Use flexible assertions based on the results per page
+        // Derive the expected pattern
         let expectedPattern;
         switch (resultsPerPage) {
             case '2':
@@ -1491,9 +1518,30 @@ export class LogsPage {
             default:
                 expectedPattern = expectedText;
         }
-        
-        // Use a more flexible assertion that checks for the pattern rather than exact text
-        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText(expectedPattern, { timeout: 15000 });
+
+        const searchResult = this.page.locator('[data-test="logs-search-search-result"]');
+        // Quasar pagination buttons can be slow to respond on cloud — retry
+        // the click up to 3 times if the expected text doesn't appear.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            const pageBtn = this.page
+                .locator(this.resultPagination)
+                .locator('button:not(:has(.q-icon))')
+                .filter({ hasText: resultsPerPage })
+                .first();
+            await pageBtn.click({ force: true }).catch(() => {});
+            await this.page.waitForTimeout(3000);
+
+            try {
+                await expect(searchResult).toContainText(expectedPattern, { timeout: 10000 });
+                return; // page advanced successfully
+            } catch (e) {
+                if (attempt < 3) {
+                    testLogger.debug(`Pagination page ${resultsPerPage} click attempt ${attempt} did not advance — retrying`);
+                }
+            }
+        }
+        // Final attempt — let it throw if it still fails
+        await expect(searchResult).toContainText(expectedPattern, { timeout: 15000 });
     }
 
     async pageNotVisible() {

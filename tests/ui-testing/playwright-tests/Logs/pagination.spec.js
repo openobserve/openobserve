@@ -15,18 +15,20 @@ function generateRandomStreamName() {
 
 test.describe("Pagination for logs", () => {
     let pageManager;
+    let streamName;
 
     const orgId = process.env.ORGNAME || "default";
-    const streamName = generateRandomStreamName();
 
     test.beforeEach(async ({ page }) => {
 
+        streamName = generateRandomStreamName();
         pageManager = new PageManager(page);
         await pageManager.loginPage.gotoLoginPage();
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login(); // Login as root user
         await pageManager.ingestionPage.ingestionMultiOrgStream(orgId, streamName);
-        
+        // Wait for stream to be indexed — cloud can take 30-60s
+        await pageManager.logsPage.waitForStreamAvailable(streamName, 120000, 3000);
     });
 
     test("HTTP Pagination for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", async ({ page }) => {
@@ -100,10 +102,8 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", async ({ page }) => {
 
-        // await pageManager.managementPage.goToManagement();
-        // Strategic 2000ms wait for complex operation - this is functionally necessary
+        // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await page.waitForTimeout(2000);
-        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -121,10 +121,8 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('zin*')", async ({ page }) => {
 
-        // await pageManager.managementPage.goToManagement();
-        // Strategic 2000ms wait for complex operation - this is functionally necessary
+        // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await page.waitForTimeout(2000);
-        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -142,10 +140,8 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T1*')", async ({ page }) => {
 
-        // await pageManager.managementPage.goToManagement();
-        // Strategic 2000ms wait for complex operation - this is functionally necessary
+        // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await page.waitForTimeout(2000);
-        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -163,10 +159,8 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:2*')", async ({ page }) => {
 
-        // await pageManager.managementPage.goToManagement();
-        // Strategic 2000ms wait for complex operation - this is functionally necessary
+        // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await page.waitForTimeout(2000);
-        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -184,10 +178,8 @@ test.describe("Pagination for logs", () => {
 
     test("Enable Streaming for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", async ({ page }) => {
 
-        // await pageManager.managementPage.goToManagement();
-        // Strategic 2000ms wait for complex operation - this is functionally necessary
+        // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
         await page.waitForTimeout(2000);
-        // await pageManager.managementPage.checkStreaming();
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
