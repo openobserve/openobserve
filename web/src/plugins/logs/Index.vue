@@ -94,12 +94,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'logs-splitter-icon-expand'
                       : 'logs-splitter-icon-collapse'
                   "
-                  variant="primary"
-                  size="icon-sm"
                   @click="collapseFieldList"
-                >
-                  <template #icon-left>
-                    <q-icon :name="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'" />
+                  ><template #icon-left>
+                    <q-icon
+                      :name="
+                        searchObj.meta.showFields
+                          ? 'chevron_left'
+                          : 'chevron_right'
+                      "
+                    />
                   </template>
                 </OButton>
               </template>
@@ -155,7 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="outline"
                             size="sm-action"
                             data-test="logs-page-result-error-details-btn-result-not-found"
-                            >{{ t("search.functionErrorBtnLabel") }}</OButton>
+                            >{{ t("search.functionErrorBtnLabel") }}</OButton
+                          >
                         </div>
                         <div
                           data-test="logs-search-error-message"
@@ -172,7 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="outline"
                             size="sm-action"
                             data-test="logs-page-result-error-details-btn"
-                            >{{ t("search.histogramErrorBtnLabel") }}</OButton>
+                            >{{ t("search.histogramErrorBtnLabel") }}</OButton
+                          >
                         </div>
                         <div
                           data-test="logs-search-error-20003"
@@ -186,7 +191,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               '/streams?dialog=' +
                               searchObj.data.stream.selectedStream.label
                             "
-                            >Click here</OButton>
+                            >Click here</OButton
+                          >
                           to configure a full text search field to the stream.
                         </div>
                         <q-item-label>{{
@@ -234,7 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="outline"
                           size="sm-action"
                           data-test="logs-page-result-error-details-btn-norecord"
-                          >{{ t("search.functionErrorBtnLabel") }}</OButton><br />
+                          >{{ t("search.functionErrorBtnLabel") }}</OButton
+                        ><br />
                       </h6>
                     </div>
                     <div
@@ -393,7 +400,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               @click="redirectBackToLogs"
-            >{{ t('search.redirect_to_logs_page') }}</OButton>
+              >{{ t("search.redirect_to_logs_page") }}</OButton
+            >
           </div>
         </div>
       </div>
