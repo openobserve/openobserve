@@ -40,13 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
           </q-input>
-          <q-btn
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
+          <OButton
+            class="q-ml-sm"
             data-test="ai-toolsets-add-btn"
-            flat
-            :label="t('aiToolset.add')"
+            variant="primary"
+            size="sm-action"
             @click="addToolset"
-          />
+          >{{ t('aiToolset.add') }}</OButton>
         </div>
       </div>
 
@@ -92,30 +92,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
+            <OButton
               :data-test="`ai-toolset-${props.row.name}-edit`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
+              variant="ghost"
+              size="icon-xs-sq"
               :title="t('common.edit')"
               @click="editToolset(props.row)"
-            />
-            <q-btn
+            >
+              <template #icon-left><Pencil class="tw:size-3.5 tw:shrink-0" /></template>
+            </OButton>
+            <OButton
               :data-test="`ai-toolset-${props.row.name}-delete`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
+              variant="ghost-destructive"
+              size="icon-xs-sq"
               :title="t('common.delete')"
               @click="confirmDeleteToolset(props.row)"
-            />
+            >
+              <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
+            </OButton>
           </q-td>
         </template>
 
@@ -168,6 +162,8 @@ import { useRouter } from "vue-router";
 import { useQuasar, QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Pencil, Trash2 } from "lucide-vue-next";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -189,6 +185,9 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     AddAiToolset,
+    OButton,
+    Pencil,
+    Trash2,
   },
   setup() {
     const store = useStore();
