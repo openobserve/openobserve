@@ -26,10 +26,10 @@ defineSlots<ToggleGroupSlots>();
     :class="[
       'tw:inline-flex tw:items-stretch',
       orientation === 'vertical' ? 'tw:flex-col' : 'tw:flex-row',
-      // Outer border
-      'tw:border tw:border-toggle-border tw:rounded-lg tw:overflow-hidden',
+      // Track: light gray background with inner padding
+      'tw:bg-toggle-track-bg tw:rounded-lg tw:p-0.5',
     ]"
-    @update:model-value="(v) => emit('update:modelValue', v)"
+    @update:model-value="(v) => { if (type === 'single' && !v) return; emit('update:modelValue', v) }"
   >
     <slot />
   </ToggleGroupRoot>

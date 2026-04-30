@@ -16,6 +16,8 @@
     --color-surface-base: var(--color-grey-950);
     --color-surface-panel: var(--color-grey-900);
     --color-surface-overlay: var(--color-grey-800);
+    --color-surface-subtle:       var(--color-grey-800);
+    --color-surface-subtle-hover: var(--color-grey-700);
 
     /* --- Borders --- */
     --color-border-default: var(--color-grey-700);
@@ -73,8 +75,7 @@
     --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
     /* ToggleGroup */
-    --color-toggle-item-hover-bg: var(--color-primary-900);
-    --color-toggle-item-active-bg: var(--color-primary-500);
+    --color-toggle-item-active-bg: var(--color-surface-subtle-hover);
 
     /* Tabs */
     --color-tabs-active-bg: var(--color-primary-800);
