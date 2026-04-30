@@ -1,3 +1,5 @@
+use config::meta::self_reporting::error::{ErrorData, ErrorSource, OrgStorageError};
+
 const CHECK_JOB_INTERVAL_MIN: u64 = 30;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -67,6 +69,15 @@ async fn test_storage_validity() {
                     "org {} has been removed from org storage cache, and will use default storage",
                     provider.org_id
                 );
+                crate::service::self_reporting::publish_error(ErrorData {
+                    _timestamp: chrono::Utc::now().timestamp_micros(),
+                    stream_params: Default::default(),
+                    error_source: ErrorSource::OrgStorage(OrgStorageError {
+                        org_id: provider.org_id.clone(),
+                        error: e.to_string(),
+                    }),
+                })
+                .await;
             } else {
                 log::info!(
                     "successfully validated org storage config for org {}",
