@@ -256,9 +256,7 @@ export const useSearchResponseHandler = () => {
       } else if (response.content?.streaming_aggs) {
         searchObj.data.queryResults = {
           ...response.content.results,
-          took:
-            (searchObj.data?.queryResults?.took || 0) +
-            response.content.results.took,
+          took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
           scan_size:
             (searchObj.data?.queryResults?.scan_size || 0) +
             response.content.results.scan_size,
