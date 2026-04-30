@@ -45,16 +45,14 @@
         <!-- Action Buttons (always present) -->
         <div class="tw:flex tw:gap-2 tw:ml-auto">
           <!-- Main Action Button: Run Query / Ask AI -->
-          <q-btn
+          <OButton
             :data-test="`${dataTestPrefix}-action-btn`"
-            dense
-            flat
-            no-caps
+            :variant="isAIMode ? 'ghost-primary' : 'ghost'"
+            size="sm"
             :title="isAIMode ? aiButtonTooltip : normalButtonTooltip"
             :class="buttonClasses"
-            :color="isAIMode ? 'primary' : undefined"
             :loading="loading"
-            :disable="disabled || (isAIMode && isGenerating)"
+            :disabled="disabled || (isAIMode && isGenerating)"
             @click="handleButtonClick"
           >
             <q-icon
@@ -63,7 +61,7 @@
               class="q-mr-xs"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
-          </q-btn>
+          </OButton>
 
           <!-- Dropdown (optional - for enterprise features) -->
           <template v-if="showDropdown">
@@ -76,19 +74,18 @@
             >
               <!-- Normal Mode: Refresh option -->
               <template v-if="!isAIMode">
-                <q-btn
-                  dense
-                  flat
-                  no-caps
+                <OButton
+                  variant="ghost"
+                  size="sm"
                   :title="t('search.refreshCacheAndRunQuery')"
                   class="q-pa-sm tw:text-[12px]"
                   v-close-popup
                   @click="$emit('refresh')"
-                  :disable="disabled"
+                  :disabled="disabled"
                 >
                   <q-icon name="refresh" class="q-mr-xs" />
                   {{ t('search.refreshCacheAndRunQuery') }}
-                </q-btn>
+                </OButton>
               </template>
 
               <!-- AI Mode: Custom actions (slot) -->
@@ -161,6 +158,7 @@ import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
+import OButton from '@/lib/core/Button/OButton.vue';
 import { getImageURL } from '@/utils/zincutils';
 import config from '@/aws-exports';
 

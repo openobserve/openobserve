@@ -38,25 +38,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="tw:flex tw:items-center tw:justify-between tw:gap-2">
-            <q-btn
+            <OButton
             v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-            :ripple="false"
+            variant="ghost"
+            size="icon-toolbar"
             @click="toggleAIChat"
             data-test="add-regex-pattern-open-close-ai-btn"
-            no-caps
-            :borderless="true"
-            flat
-            dense
-            class="o2-button ai-hover-btn q-px-sm q-py-sm"
+            class="ai-hover-btn"
             :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-            style="border-radius: 6px;"
             @mouseenter="isHovered = true"
             @mouseleave="isHovered = false"
             >
-            <div class="row items-center no-wrap tw:gap-2  ">
+            <div class="row items-center no-wrap tw:gap-2">
                 <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
-            </q-btn>
+            </OButton>
                       <OButton
                         data-test="add-regex-pattern-fullscreen-btn"
                         variant="ghost"

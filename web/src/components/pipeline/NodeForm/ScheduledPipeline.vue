@@ -34,27 +34,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="flex items-center">
-        <q-btn
+        <OButton
           v-if="
             config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
           "
-          :ripple="false"
+          variant="ghost"
+          size="icon-toolbar"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
-          no-caps
-          :borderless="true"
-          flat
-          dense
-          class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
+          class="ai-hover-btn q-mr-sm"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 6px"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
           <div class="row items-center no-wrap tw:gap-2">
             <img :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
-        </q-btn>
+        </OButton>
         <div class="flex items-center app-tabs-container tw:h-[36px] q-mr-sm">
           <AppTabs
             data-test="scheduled-pipeline-tabs"

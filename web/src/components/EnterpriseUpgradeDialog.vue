@@ -107,33 +107,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="hero-actions">
-              <q-btn
+              <OButton
                 v-if="dialogConfig.showPrimaryButton"
-                unelevated
-                :label="dialogConfig.primaryButtonText"
+                variant="on-dark-primary"
+                size="lg"
                 @click="handlePrimaryButtonClick"
-                :icon-right="dialogConfig.primaryButtonIcon"
-                no-caps
                 class="download-btn"
-              />
-              <q-btn
+              >
+                {{ dialogConfig.primaryButtonText }}
+                <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
+                  <q-icon :name="dialogConfig.primaryButtonIcon" />
+                </template>
+              </OButton>
+              <OButton
                 v-if="dialogConfig.showContactSales"
-                flat
-                :label="t('about.enterprise_offer.buttons.contact_sales')"
+                variant="on-dark-ghost"
+                size="lg"
                 @click="contactSales"
-                no-caps
                 class="learn-more-btn"
-                color="white"
-              />
-              <q-btn
+              >
+                {{ t('about.enterprise_offer.buttons.contact_sales') }}
+              </OButton>
+              <OButton
                 v-else
-                flat
-                :label="t('about.enterprise_offer.buttons.learn_more')"
+                variant="on-dark-ghost"
+                size="lg"
                 @click="openDocsLink"
-                no-caps
                 class="learn-more-btn"
-                color="white"
-              />
+              >
+                {{ t('about.enterprise_offer.buttons.learn_more') }}
+              </OButton>
             </div>
           </div>
         </div>

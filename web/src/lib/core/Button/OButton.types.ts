@@ -23,7 +23,13 @@ export type ButtonVariant =
   | "panel-collapse"
   // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
   | "sidebar-button"
-  | "destructive";
+  | "destructive"
+  // AI-themed gradient — purple→pink gradient background, white text (AI send/generate buttons)
+  | "ai-gradient"
+  // Use on dark gradient backgrounds — white background with primary text
+  | "on-dark-primary"
+  // Use on dark gradient backgrounds — transparent with white border/text
+  | "on-dark-ghost";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
