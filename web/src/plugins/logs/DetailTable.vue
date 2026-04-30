@@ -168,133 +168,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="!shouldWrapValues ? 'ellipsis' : ''"
               >
                 <div class="tw:flex tw:items-start tw:gap-2">
-                  <q-btn-dropdown
-                    :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
-                    size="6px"
-                    outlined
-                    filled
-                    dense
-                    class="pointer"
-                    name="'img:' + getImageURL('images/common/add_icon.svg')"
-                  >
-                    <q-list data-test="field-list-modal" class="logs-table-list">
-                      <q-item
-                        clickable
-                        v-close-popup="true"
-                        v-if="
-                          searchObj.data.stream.selectedStreamFields.some(
-                            (item: any) =>
-                              item.name === props.row.field ? item.isSchemaField : '',
-                          )
-                        "
+                  <ODropdown side="bottom" align="start">
+                    <template #trigger>
+                      <OButton
+                        :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label="Add icon"
                       >
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-include-field-btn"
-                            @click="
-                              toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')
-                            "
-                            ><OButton
-                              title="Add to search query"
-                              size="icon-xs"
-                              variant="ghost"
-                              class="q-mr-sm pointer"
-                            ><EqualIcon /></OButton
-                            >{{ t("common.includeSearchTerm") }}</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-
-                      <q-item
-                        clickable
-                        v-close-popup="true"
-                        v-if="
-                          searchObj.data.stream.selectedStreamFields.some(
-                            (item: any) =>
-                              item.name === props.row.field ? item.isSchemaField : '',
-                          )
-                        "
+                        <img :src="getImageURL('images/common/add_icon.svg')" class="tw:size-3" alt="" />
+                      </OButton>
+                    </template>
+                    <ODropdownItem
+                      v-if="
+                        searchObj.data.stream.selectedStreamFields.some(
+                          (item: any) =>
+                            item.name === props.row.field ? item.isSchemaField : '',
+                        )
+                      "
+                      data-test="log-details-include-field-btn"
+                      @select="toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')"
+                    >
+                      <template #icon-left><EqualIcon class="tw:size-4" /></template>
+                      {{ t("common.includeSearchTerm") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      v-if="
+                        searchObj.data.stream.selectedStreamFields.some(
+                          (item: any) =>
+                            item.name === props.row.field ? item.isSchemaField : '',
+                        )
+                      "
+                      data-test="log-details-exclude-field-btn"
+                      @select="toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')"
+                    >
+                      <template #icon-left><NotEqualIcon class="tw:size-4" /></template>
+                      {{ t("common.excludeSearchTerm") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      v-if="!searchObj.data.stream.selectedFields.includes(props.row.field.toString())"
+                      data-test="log-details-include-field-btn"
+                      @select="addFieldToTable(props.row.field.toString())"
+                    >
+                      <template #icon-left><Eye class="tw:size-4" /></template>
+                      {{ t("common.addFieldToTable") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      v-else
+                      data-test="log-details-include-field-btn"
+                      @select="addFieldToTable(props.row.field.toString())"
+                    >
+                      <template #icon-left><EyeOff class="tw:size-4" /></template>
+                      {{ t("common.removeFieldFromTable") }}
+                    </ODropdownItem>
+                    <!-- Cross-link options -->
+                    <template v-if="getCrossLinksForField(props.row.field).length > 0">
+                      <ODropdownSeparator />
+                      <ODropdownItem
+                        v-for="crossLink in getCrossLinksForField(props.row.field)"
+                        :key="crossLink.name"
+                        @select.stop="openCrossLink(crossLink.resolvedUrl)"
                       >
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-exclude-field-btn"
-                            @click="
-                              toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')
-                            "
-                            ><OButton
-                              title="Add to search query"
-                              size="icon-xs"
-                              variant="ghost"
-                              class="q-mr-sm pointer"
-                            ><NotEqualIcon /></OButton
-                            >{{ t("common.excludeSearchTerm") }}</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-
-                      <q-item
-                        v-if="
-                          !searchObj.data.stream.selectedFields.includes(
-                            props.row.field.toString(),
-                          )
-                        "
-                        clickable
-                        v-close-popup="true"
-                      >
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-include-field-btn"
-                            @click="addFieldToTable(props.row.field.toString())"
-                            ><OButton
-                              title="Add to table"
-                              size="icon-xs"
-                              variant="ghost"
-                              class="q-mr-sm pointer"
-                            ><Eye :size="12" /></OButton
-                            >{{ t("common.addFieldToTable") }}</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <q-item v-else clickable v-close-popup="true">
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-include-field-btn"
-                            @click="addFieldToTable(props.row.field.toString())"
-                            ><OButton
-                              title="Remove from table "
-                              size="icon-xs"
-                              variant="ghost"
-                              class="q-mr-sm pointer"
-                            ><EyeOff :size="12" /></OButton
-                            >{{
-                              t("common.removeFieldFromTable")
-                            }}</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <!-- Cross-link options -->
-                      <template v-if="getCrossLinksForField(props.row.field).length > 0">
-                        <q-separator class="q-my-xs" />
-                        <q-item
-                          v-for="crossLink in getCrossLinksForField(props.row.field)"
-                          :key="crossLink.name"
-                          clickable
-                          v-close-popup
-                          @click.stop="openCrossLink(crossLink.resolvedUrl)"
-                        >
-                          <q-item-section>
-                            <q-item-label>
-                              <OButton
-                                size="icon-xs"
-                                variant="ghost"
-                                class="q-mr-sm pointer"
-                              ><ExternalLink :size="12" /></OButton>{{ crossLink.name }}
-                            </q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-list>
-                  </q-btn-dropdown>
+                        <template #icon-left><ExternalLink class="tw:size-4" /></template>
+                        {{ crossLink.name }}
+                      </ODropdownItem>
+                    </template>
+                  </ODropdown>
                   <pre
                     :data-test="`log-detail-${props.row.field}-value`"
                     class="table-pre tw:flex-1"
@@ -505,6 +444,9 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { X, Eye, EyeOff, ExternalLink, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
@@ -519,7 +461,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, X, Eye, EyeOff, ExternalLink, ChevronLeft, ChevronRight },
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, X, Eye, EyeOff, ExternalLink, ChevronLeft, ChevronRight },
   emits: [
     "showPrevDetail",
     "showNextDetail",

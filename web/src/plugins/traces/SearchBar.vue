@@ -205,45 +205,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
             class="tw:h-[29px] tw:w-[1px]"
           />
-          <q-btn-dropdown
+          <ODropdown
             v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
-            flat
-            class="tw:h-[29px] search-button-dropdown o2-color-primary search-button-dropdown-enterprise-border-radius"
-            unelevated
-            dense
+            side="bottom"
+            align="end"
           >
-            <q-list class="tw:min-w-[200px] tw:py-1">
-              <q-item
-                data-test="traces-search-bar-live-mode-toggle-btn"
-                clickable
-                v-close-popup
-                @click="toggleLiveMode"
-                class="tw:text-[12px] tw:rounded-md tw:mx-1"
+            <template #trigger>
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                class="tw:h-[29px] search-button-dropdown o2-color-primary search-button-dropdown-enterprise-border-radius"
               >
-                <q-item-section avatar class="tw:min-w-0 tw:pr-2">
-                  <q-icon
-                    :name="
-                      searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
-                    "
-                    size="16px"
-                    :color="searchObj.meta.liveMode ? 'primary' : ''"
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="tw:font-medium">
-                    {{
-                      searchObj.meta.liveMode
-                        ? t("search.turnOffLiveMode")
-                        : t("search.turnOnLiveMode")
-                    }}
-                  </q-item-label>
-                  <q-item-label caption class="tw:text-[11px]">
-                    {{ t("search.liveModeTooltip") }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
+                <q-icon name="arrow_drop_down" size="18px" />
+              </OButton>
+            </template>
+            <ODropdownItem
+              data-test="traces-search-bar-live-mode-toggle-btn"
+              @select="toggleLiveMode"
+            >
+              <template #icon-left>
+                <q-icon
+                  :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
+                  size="16px"
+                  :color="searchObj.meta.liveMode ? 'primary' : ''"
+                />
+              </template>
+              <span class="tw:font-medium">
+                {{ searchObj.meta.liveMode ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+              </span>
+            </ODropdownItem>
+          </ODropdown>
         </div>
         <OButton
           class="tw:mr-[0.375rem] tw:float-left"
@@ -405,6 +396,8 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { Layers, GitFork, Network, GitBranch, Share2 } from "lucide-vue-next";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -429,6 +422,8 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    ODropdown,
+    ODropdownItem,
     Layers,
     GitFork,
     Network,

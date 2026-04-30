@@ -96,17 +96,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('billing.invoiceHistoryLabel')"
           />
         </OTabs>
-        <!-- <q-btn
+        <!-- <OButton
               data-test="logs-search-field-list-collapse-btn"
-              :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
               :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+              variant="ghost"
+              size="icon-sm"
               :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-              color="primary"
-              size="sm"
-              dense
-              round
               @click="collapseSidebar"
-            /> -->
+            >
+              <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" />
+            </OButton> -->
           </div>
         </div>
 

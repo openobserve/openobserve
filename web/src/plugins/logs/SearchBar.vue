@@ -898,32 +898,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.zoConfig.super_cluster_enabled
               "
             >
-              <q-btn-dropdown
+              <ODropdown
+                side="bottom"
+                align="start"
                 data-test="logs-search-bar-region-btn"
-                class="region-dropdown-btn q-px-xs"
-                :title="t('search.regionTitle')"
-                :label="t('search.region')"
               >
-                <q-input
-                  ref="reginFilterRef"
-                  borderless
-                  dense
-                  clearable
-                  class="tw:mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"
-                  v-model="regionFilter"
-                  :label="t('search.regionFilterMsg')"
-                >
-                </q-input>
-                <q-tree
-                  class="col-12 col-sm-6 q-mx-sm q-mb-sm"
-                  :nodes="store.state.regionInfo"
-                  node-key="label"
-                  :filter="regionFilter"
-                  :filter-method="regionFilterMethod"
-                  tick-strategy="leaf"
-                  v-model:ticked="searchObj.meta.clusters"
-                />
-              </q-btn-dropdown>
+                <template #trigger>
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    class="region-dropdown-btn q-px-xs"
+                    :title="t('search.regionTitle')"
+                  >
+                    {{ t('search.region') }}
+                    <q-icon name="arrow_drop_down" size="18px" class="tw:ml-1" />
+                  </OButton>
+                </template>
+                <div class="tw:p-2 tw:min-w-[240px]">
+                  <q-input
+                    ref="reginFilterRef"
+                    borderless
+                    dense
+                    clearable
+                    class="tw:mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"
+                    v-model="regionFilter"
+                    :label="t('search.regionFilterMsg')"
+                  >
+                  </q-input>
+                  <q-tree
+                    class="col-12 col-sm-6 q-mx-sm q-mb-sm"
+                    :nodes="store.state.regionInfo"
+                    node-key="label"
+                    :filter="regionFilter"
+                    :filter-method="regionFilterMethod"
+                    tick-strategy="leaf"
+                    v-model:ticked="searchObj.meta.clusters"
+                  />
+                </div>
+              </ODropdown>
             </OButtonGroup>
             <div
               v-if="

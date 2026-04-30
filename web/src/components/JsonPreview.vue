@@ -22,22 +22,26 @@
       :key="key"
     >
       <!-- Field dropdown slot: render the button only when the slot is provided -->
-      <q-btn-dropdown
+      <ODropdown
         v-if="hasFieldDropdownSlot"
-        data-test="json-preview-field-dropdown-btn"
-        size="0.5rem"
-        flat
-        outlined
-        filled
-        dense
-        class="q-ml-sm pointer tw:px-0!"
-        :name="'img:' + getImageURL('images/common/add_icon.svg')"
-        aria-label="Add icon"
+        side="bottom"
+        align="start"
       >
-        <q-list class="logs-table-list">
+        <template #trigger>
+          <OButton
+            data-test="json-preview-field-dropdown-btn"
+            size="icon-xs"
+            variant="ghost"
+            class="q-ml-sm"
+            aria-label="Add icon"
+          >
+            <img :src="getImageURL('images/common/add_icon.svg')" class="tw:size-3" alt="" />
+          </OButton>
+        </template>
+        <div class="logs-table-list tw:min-w-[180px]">
           <slot name="field-dropdown" :field="key" :value="value[key]" />
-        </q-list>
-      </q-btn-dropdown>
+        </div>
+      </ODropdown>
 
       <span
         class="tw:pl-[0.625rem]"
@@ -73,6 +77,7 @@ import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default {
   name: "JsonPreview",
@@ -80,6 +85,7 @@ export default {
     LogsHighLighting,
     ChunkedContent,
     OButton,
+    ODropdown,
   },
   props: {
     value: {

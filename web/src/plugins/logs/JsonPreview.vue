@@ -126,173 +126,90 @@
         v-for="(key, index) in Object.keys(value)"
         :key="key"
       >
-        <q-btn-dropdown
+        <ODropdown
           v-if="!hideFieldOptions"
-          data-test="log-details-include-exclude-field-btn"
-          size="0.5rem"
-          flat
-          outlined
-          filled
-          dense
-          class="q-ml-sm pointer"
-          :name="'img:' + getImageURL('images/common/add_icon.svg')"
-          aria-label="Add icon"
+          side="bottom"
+          align="start"
         >
-          <q-list class="logs-table-list">
-            <q-item
-              clickable
-              v-close-popup
-              v-if="
-                !hideSearchTermActions &&
-                searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                  item.name === key ? item.isSchemaField : '',
-                ) &&
-                multiStreamFields.includes(key)
-              "
-              @click.stop="addSearchTerm(key, value[key], 'include')"
-              data-test="log-details-include-field-btn"
+          <template #trigger>
+            <OButton
+              data-test="log-details-include-exclude-field-btn"
+              size="icon-xs"
+              variant="ghost"
+              class="q-ml-sm"
+              aria-label="Add icon"
             >
-              <q-item-section>
-                <q-item-label
-                  ><OButton
-                    title="Add to search query"
-                    size="icon-xs"
-                    variant="ghost"
-                    class="q-mr-sm pointer"
-                  ><EqualIcon /></OButton
-                  >{{ t("common.includeSearchTerm") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-
-            <q-item
-              clickable
-              v-close-popup
-              v-if="
-                !hideSearchTermActions &&
-                searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                  item.name === key ? item.isSchemaField : '',
-                ) &&
-                multiStreamFields.includes(key)
-              "
-              @click.stop="addSearchTerm(key, value[key], 'exclude')"
-              data-test="log-details-exclude-field-btn"
+              <img :src="getImageURL('images/common/add_icon.svg')" class="tw:size-3" alt="" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-if="
+              !hideSearchTermActions &&
+              searchObj.data.stream.selectedStreamFields.some((item: any) =>
+                item.name === key ? item.isSchemaField : '',
+              ) &&
+              multiStreamFields.includes(key)
+            "
+            data-test="log-details-include-field-btn"
+            @select.stop="addSearchTerm(key, value[key], 'include')"
+          >
+            <template #icon-left><EqualIcon class="tw:size-4" /></template>
+            {{ t("common.includeSearchTerm") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="
+              !hideSearchTermActions &&
+              searchObj.data.stream.selectedStreamFields.some((item: any) =>
+                item.name === key ? item.isSchemaField : '',
+              ) &&
+              multiStreamFields.includes(key)
+            "
+            data-test="log-details-exclude-field-btn"
+            @select.stop="addSearchTerm(key, value[key], 'exclude')"
+          >
+            <template #icon-left><NotEqualIcon class="tw:size-4" /></template>
+            {{ t("common.excludeSearchTerm") }}
+          </ODropdownItem>
+          <ODropdownItem
+            data-test="log-details-add-field-btn"
+            @select.stop="addFieldToTable(key)"
+          >
+            <template #icon-left><Eye class="tw:size-4" /></template>
+            {{ addOrRemoveLabel(key) }}
+          </ODropdownItem>
+          <!-- Cross-link options -->
+          <template v-if="getCrossLinksForField(key).length > 0">
+            <ODropdownSeparator />
+            <ODropdownItem
+              v-for="crossLink in getCrossLinksForField(key)"
+              :key="crossLink.name"
+              @select.stop="openCrossLink(crossLink.resolvedUrl)"
             >
-              <q-item-section>
-                <q-item-label
-                  ><OButton
-                    title="Add to search query"
-                    size="icon-xs"
-                    variant="ghost"
-                    class="q-mr-sm pointer"
-                  ><NotEqualIcon /></OButton
-                  >{{ t("common.excludeSearchTerm") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-close-popup
-              @click.stop="addFieldToTable(key)"
-              data-test="log-details-add-field-btn"
-            >
-              <q-item-section>
-                <q-item-label
-                  ><OButton
-                    title="Add field to table"
-                    size="icon-xs"
-                    variant="ghost"
-                    class="q-mr-sm pointer"
-                  ><Eye :size="12" /></OButton
-                  >{{ addOrRemoveLabel(key) }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <!-- Cross-link options -->
-            <template v-if="getCrossLinksForField(key).length > 0">
-              <q-separator class="q-my-xs" />
-              <q-item
-                v-for="crossLink in getCrossLinksForField(key)"
-                :key="crossLink.name"
-                clickable
-                v-close-popup
-                @click.stop="openCrossLink(crossLink.resolvedUrl)"
-              >
-                <q-item-section>
-                  <q-item-label>
-                    <OButton
-                      size="icon-xs"
-                      variant="ghost"
-                      class="q-mr-sm pointer"
-                    ><ExternalLink :size="12" /></OButton>{{ crossLink.name }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
+              <template #icon-left><ExternalLink class="tw:size-4" /></template>
+              {{ crossLink.name }}
+            </ODropdownItem>
+          </template>
+          <ODropdownItem
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            data-test="send-to-ai-chat-btn"
+            @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
+          >
+            <template #icon-left>
+              <q-img height="14px" width="14px" :src="getBtnLogo" />
             </template>
-            <q-item
-              v-if="
-                config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-              "
-              clickable
-              v-close-popup
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="send-to-ai-chat-btn"
-                  @click.stop="
-                    sendToAiChat(
-                      JSON.stringify({
-                        [key]: value[key],
-                      }),
-                    )
-                  "
-                  v-close-popup
-                  ><OButton
-                    title="Send to AI Chat"
-                    size="icon-xs"
-                    variant="ghost"
-                    class="q-mr-sm pointer"
-                  >
-                    <q-img
-                      height="14px"
-                      width="14px"
-                      :src="getBtnLogo"
-                    /> </OButton
-                  >Send to AI Chat</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="
-                config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-              "
-              clickable
-              v-close-popup
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="redirect-to-regex-pattern-btn"
-                  @click.stop="createRegexPatternFromLogs(key, value[key])"
-                  v-close-popup
-                  ><OButton
-                    title="Add field to table"
-                    size="icon-xs"
-                    variant="ghost"
-                    class="q-mr-sm pointer"
-                  >
-                    <q-img
-                      height="14px"
-                      width="14px"
-                      :src="regexIcon"
-                    /> </OButton
-                  >{{
-                    t("regex_patterns.create_regex_pattern_field")
-                  }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-btn-dropdown>
+            Send to AI Chat
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            data-test="redirect-to-regex-pattern-btn"
+            @select.stop="createRegexPatternFromLogs(key, value[key])"
+          >
+            <template #icon-left>
+              <q-img height="14px" width="14px" :src="regexIcon" />
+            </template>
+            {{ t("regex_patterns.create_regex_pattern_field") }}
+          </ODropdownItem>
+        </ODropdown>
 
         <span
           class="q-pl-xs"
@@ -420,6 +337,9 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { Copy, Link, GitBranch, Eye, ExternalLink, AlignLeft, FileJson } from "lucide-vue-next";
 
 export default {
@@ -468,6 +388,9 @@ export default {
     LogsHighLighting,
     ChunkedContent,
     OButton,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
     Copy,
     Link,
     GitBranch,
