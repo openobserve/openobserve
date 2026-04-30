@@ -421,8 +421,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- View mode toggle toolbar -->
         <div class="tw:flex tw:items-center tw:justify-start tw:pb-[0.3rem]">
           <OToggleGroup v-model="attributesViewMode" class="tw:rounded!">
-            <OToggleGroupItem value="json" size="xs">JSON</OToggleGroupItem>
-            <OToggleGroupItem value="table" size="xs">Table</OToggleGroupItem>
+            <OToggleGroupItem value="json" size="xs">
+              <template #icon-left><Braces class="tw:size-3.5 tw:shrink-0" /></template>
+              JSON
+            </OToggleGroupItem>
+            <OToggleGroupItem value="table" size="xs">
+              <template #icon-left><Table2 class="tw:size-3.5 tw:shrink-0" /></template>
+              Table
+            </OToggleGroupItem>
           </OToggleGroup>
         </div>
         <!-- JSON View -->
@@ -939,6 +945,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { Braces, Table2 } from "lucide-vue-next";
 import { cloneDeep } from "lodash-es";
 import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
@@ -1016,6 +1023,8 @@ export default defineComponent({
     OTabPanel,
     OToggleGroup,
     OToggleGroupItem,
+    Braces,
+    Table2,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,

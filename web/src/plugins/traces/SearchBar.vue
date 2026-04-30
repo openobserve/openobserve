@@ -19,58 +19,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row tw:m-0! tw:p-[0.375rem]">
       <div class="float-right col flex items-center">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
-        <div
-          class="button-group logs-visualize-toggle element-box-shadow tw:mr-[0.375rem]"
+        <OToggleGroup
+          :model-value="searchObj.meta.searchMode"
+          @update:model-value="$emit('update:searchMode', $event)"
+          class="tw:mr-[0.375rem]"
         >
-          <div class="row">
-            <div>
-              <q-btn
-                data-test="traces-search-mode-spans-btn"
-                :class="[
-                  'button button-left tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                  searchObj.meta.searchMode === 'spans' ? 'selected' : '',
-                ]"
-                @click="$emit('update:searchMode', 'spans')"
-                no-caps
-                size="sm"
-              >
-                Spans
-                <q-tooltip>Spans</q-tooltip>
-              </q-btn>
-            </div>
-            <div>
-              <q-btn
-                data-test="traces-search-mode-traces-btn"
-                :class="[
-                  'button button-center tw:rounded-none! tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                  searchObj.meta.searchMode === 'traces' ? 'selected' : '',
-                ]"
-                @click="$emit('update:searchMode', 'traces')"
-                no-caps
-                size="sm"
-              >
-                Traces
-                <q-tooltip>Traces</q-tooltip>
-              </q-btn>
-            </div>
-            <div v-if="config.isEnterprise == 'true'">
-              <q-btn
-                data-test="traces-service-graph-toggle"
-                :class="[
-                  'button button-center tw:rounded-none! tw:w-[6.1rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                  searchObj.meta.searchMode === 'service-graph'
-                    ? 'selected'
-                    : '',
-                ]"
-                @click="$emit('update:searchMode', 'service-graph')"
-                no-caps
-                size="sm"
-              >
-                Service Graph
-                <q-tooltip>Service Graph</q-tooltip>
-              </q-btn>
-            </div>
-            <div>
+          <OToggleGroupItem data-test="traces-search-mode-spans-btn" value="spans" size="sm">
+            <template #icon-left><Layers class="tw:size-3.5 tw:shrink-0" /></template>
+            Spans
+          </OToggleGroupItem>
+          <OToggleGroupItem data-test="traces-search-mode-traces-btn" value="traces" size="sm">
+            <template #icon-left><GitFork class="tw:size-3.5 tw:shrink-0" /></template>
+            Traces
+          </OToggleGroupItem>
+          <OToggleGroupItem v-if="config.isEnterprise == 'true'" data-test="traces-service-graph-toggle" value="service-graph" size="sm">
+            <template #icon-left><Network class="tw:size-3.5 tw:shrink-0" /></template>
+            Service Graph
+          </OToggleGroupItem>
+          <div>
               <q-btn
                 data-test="traces-search-mode-services-catalog-btn"
                 :class="[
@@ -87,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip>{{ t("traces.servicesCatalog.tabLabel") }}</q-tooltip>
               </q-btn>
             </div>
-          </div>
-        </div>
+        </OToggleGroup>
 
         <!-- Show search controls only when not on Service Graph or Services Catalog -->
         <template
@@ -335,44 +300,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
           </q-btn>
-          <div class="button-group logs-visualize-toggle element-box-shadow">
-            <div class="row">
-              <div>
-                <q-btn
-                  data-test="service-graph-tree-view-btn"
-                  :class="[
-                    'button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.875rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                    searchObj.meta.serviceGraphVisualizationType === 'tree'
-                      ? 'selected'
-                      : '',
-                  ]"
-                  @click="onServiceGraphVisualizationChange('tree')"
-                  no-caps
-                  size="sm"
-                >
-                  Tree View
-                  <q-tooltip>Tree View</q-tooltip>
-                </q-btn>
-              </div>
-              <div>
-                <q-btn
-                  data-test="service-graph-graph-view-btn"
-                  :class="[
-                    'button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.875rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                    searchObj.meta.serviceGraphVisualizationType === 'graph'
-                      ? 'selected'
-                      : '',
-                  ]"
-                  @click="onServiceGraphVisualizationChange('graph')"
-                  no-caps
-                  size="sm"
-                >
-                  Graph View
-                  <q-tooltip>Graph View</q-tooltip>
-                </q-btn>
-              </div>
-            </div>
-          </div>
+          <OToggleGroup
+            :model-value="searchObj.meta.serviceGraphVisualizationType"
+            @update:model-value="onServiceGraphVisualizationChange($event)"
+          >
+            <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree" size="sm">
+              <template #icon-left><GitBranch class="tw:size-3.5 tw:shrink-0" /></template>
+              Tree View
+            </OToggleGroupItem>
+            <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
+              <template #icon-left><Share2 class="tw:size-3.5 tw:shrink-0" /></template>
+              Graph View
+            </OToggleGroupItem>
+          </OToggleGroup>
           <q-select
             v-model="searchObj.meta.serviceGraphLayoutType"
             :options="serviceGraphLayoutOptions"
@@ -470,7 +410,9 @@ import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { Layers, GitFork, Network, GitBranch, Share2 } from "lucide-vue-next";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -491,7 +433,13 @@ export default defineComponent({
   components: {
     DateTime,
     ShareButton,
-    AppTabs,
+    OToggleGroup,
+    OToggleGroupItem,
+    Layers,
+    GitFork,
+    Network,
+    GitBranch,
+    Share2,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

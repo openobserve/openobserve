@@ -278,14 +278,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex justify-between items-center full-width">
                   <div class="flex items-center">
                     <div class="app-tabs-container">
-                    <app-tabs
+                    <OToggleGroup
                           v-if="isSchemaUDSEnabled"
-                          class="tabs-selection-container"
                           data-test="schema-fields-tabs"
-                          :tabs="tabs"
-                          :active-tab="activeTab"
-                          @update:active-tab="updateActiveTab"
-                        />
+                          :model-value="activeTab"
+                          @update:model-value="updateActiveTab"
+                        >
+                          <OToggleGroupItem
+                            v-if="hasUserDefinedSchema"
+                            value="schemaFields"
+                            size="sm"
+                          >
+                            <template #icon-left><UserCheck class="tw:size-3.5 tw:shrink-0" /></template>
+                            User Defined Schema ({{ indexData.defined_schema_fields.length }})
+                          </OToggleGroupItem>
+                          <OToggleGroupItem value="allFields" size="sm">
+                            <template #icon-left><LayoutList class="tw:size-3.5 tw:shrink-0" /></template>
+                            {{ computedSchemaFieldsName }} ({{ indexData.schema.length }})
+                          </OToggleGroupItem>
+                        </OToggleGroup>
                     </div>
                    
                     <div v-if="hasUserDefinedSchema" class="q-ml-sm">
@@ -1082,8 +1093,9 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
 import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
-
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { UserCheck, LayoutList } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import {
@@ -1121,7 +1133,10 @@ export default defineComponent({
     OTabs, OTab,
     ConfirmDialog,
     StreamFieldsInputs,
-    AppTabs,
+    OToggleGroup,
+    OToggleGroupItem,
+    UserCheck,
+    LayoutList,
     QTablePagination,
     DateTime,
     AssociatedRegexPatterns,
