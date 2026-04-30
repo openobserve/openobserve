@@ -15,19 +15,46 @@
 
 use config::utils::json;
 use o2_enterprise::enterprise::cloud::billings::{
-    self,
-    org_usage::{self, OrgUsageQueryResult},
+    self, MeteringProvider,
+    org_usage::{self, OrgUsageQueryResult, RangeUnit},
 };
 
-use crate::service::self_reporting::search::get_usage;
+use crate::{
+    handler::http::models::billings::GetOrgUsageResponseBody,
+    service::self_reporting::search::get_usage,
+};
 
 pub async fn get_org_usage(
     org_id: &str,
     usage_range: &org_usage::UsageRange,
-) -> Result<Vec<OrgUsageQueryResult>, billings::BillingError> {
+    unit: &str,
+) -> Result<GetOrgUsageResponseBody, billings::BillingError> {
+    let mut cycle_details = None;
+
+    if let Ok(billings) =
+        o2_enterprise::enterprise::cloud::customer_billings::get_by_org_id(org_id).await
+    {
+        // if subscription is present, and stripe is provider , and range is cycle and subscription
+        // id is present, we will try to get the cycle based usage
+        if let Some(b) = billings.first() {
+            if b.provider == MeteringProvider::Stripe
+                && usage_range.unit == RangeUnit::Cycle
+                && let Some(id) = &b.subscription_id
+            {
+                let sub =
+                    o2_enterprise::enterprise::cloud::billings::get_stripe_subscription(id).await?;
+
+                let end = sub.current_period_end;
+                let diff = sub.current_period_end - sub.current_period_start;
+                cycle_details = Some((end, diff));
+                log::info!("using end {end} diff {diff} for org {org_id} for usage query")
+            }
+        }
+    }
+
     // fire the query
     let (sql, start_time, end_time) =
-        org_usage::create_usage_query_sql_and_time_range(org_id, usage_range);
+        org_usage::create_usage_query_sql_and_time_range(org_id, usage_range, cycle_details);
 
     let mut usage_results = get_usage(sql, start_time, end_time, false)
         .await
@@ -37,8 +64,11 @@ pub async fn get_org_usage(
         .filter(|r| r.event.is_billable())
         .collect::<Vec<_>>();
 
-    let (data_retention_query, ..) =
-        org_usage::create_data_retention_usage_sql_and_time_range(org_id, usage_range);
+    let (data_retention_query, ..) = org_usage::create_data_retention_usage_sql_and_time_range(
+        org_id,
+        usage_range,
+        cycle_details,
+    );
 
     let mut data_retention_results = get_usage(data_retention_query, start_time, end_time, false)
         .await
@@ -48,5 +78,13 @@ pub async fn get_org_usage(
         .collect::<Vec<_>>();
 
     usage_results.append(&mut data_retention_results);
-    Ok(usage_results)
+
+    let mut body = GetOrgUsageResponseBody {
+        data: usage_results.into_iter().map(From::from).collect(),
+        range: usage_range.to_string(),
+        start_time,
+        end_time,
+    };
+    body.convert_to_unit(unit);
+    Ok(body)
 }

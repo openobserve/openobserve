@@ -178,6 +178,23 @@ export default defineComponent({
     const showInvoiceTab = computed(() => {
       return billingInfoLoaded.value && billingProvider.value === "stripe";
     });
+    const options = computed(()=>{
+      return billingInfoLoaded.value && billingProvider.value === "stripe" ?
+        [
+          {label: "Current Cycle", value: "1cycle"},
+          {label: "30 Days", value: "30days"},
+          {label: "60 Days", value: "60days"},
+          {label: "3 Months", value: "3months"},
+          {label: "6 Months", value: "6months"},
+        ]
+        :
+        [
+          {label: "30 Days", value: "30days"},
+          {label: "60 Days", value: "60days"},
+          {label: "3 Months", value: "3months"},
+          {label: "6 Months", value: "6months"},
+        ]
+    })
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
       if (showSidebar.value) {
@@ -251,11 +268,7 @@ export default defineComponent({
       getImageURL,
       splitterModel,
       headerBasedOnRoute,
-      options: [
-        {label: "30 Days", value: "30days"},
-        {label: "60 Days", value: "60days"},
-        {label: "3 Months", value: "3months"},
-        {label: "6 Months", value: "6months"}],
+      options,
       usageDate,
       selectUsageDate,
       isUsageRoute,
