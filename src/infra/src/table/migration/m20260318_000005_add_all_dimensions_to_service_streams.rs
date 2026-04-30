@@ -73,6 +73,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260318_000005_add_all_dimensions_to_service_streams");
+        assert_eq!(
+            Migration.name(),
+            "m20260318_000005_add_all_dimensions_to_service_streams"
+        );
     }
 }

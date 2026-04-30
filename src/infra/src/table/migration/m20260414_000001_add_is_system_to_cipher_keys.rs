@@ -62,6 +62,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260414_000001_add_is_system_to_cipher_keys");
+        assert_eq!(
+            Migration.name(),
+            "m20260414_000001_add_is_system_to_cipher_keys"
+        );
     }
 }

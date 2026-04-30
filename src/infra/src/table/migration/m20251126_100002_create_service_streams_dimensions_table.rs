@@ -97,8 +97,8 @@ mod tests {
 
     #[test]
     fn test_org_dimension_value_hash_idx_name() {
-        let sql =
-            create_service_streams_dimensions_org_dimension_value_hash_idx_stmnt().build(SqliteQueryBuilder);
+        let sql = create_service_streams_dimensions_org_dimension_value_hash_idx_stmnt()
+            .build(SqliteQueryBuilder);
         assert!(sql.contains(SERVICE_STREAMS_DIMENSIONS_ORG_DIMENSION_VALUE_HASH_IDX));
     }
 }

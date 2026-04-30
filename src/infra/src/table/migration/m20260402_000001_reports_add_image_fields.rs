@@ -149,6 +149,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260402_000001_reports_add_image_fields");
+        assert_eq!(
+            Migration.name(),
+            "m20260402_000001_reports_add_image_fields"
+        );
     }
 }

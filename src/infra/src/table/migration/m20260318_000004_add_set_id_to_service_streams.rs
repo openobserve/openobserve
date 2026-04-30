@@ -75,6 +75,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260318_000004_add_set_id_to_service_streams");
+        assert_eq!(
+            Migration.name(),
+            "m20260318_000004_add_set_id_to_service_streams"
+        );
     }
 }

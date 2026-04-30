@@ -112,6 +112,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20251218_000001_add_expires_at_to_sessions");
+        assert_eq!(
+            Migration.name(),
+            "m20251218_000001_add_expires_at_to_sessions"
+        );
     }
 }

@@ -106,6 +106,9 @@ mod tests {
 
     #[test]
     fn test_key_idx_constant_value() {
-        assert_eq!(COMPACTOR_MANUAL_JOBS_KEY_IDX, "compactor_manual_jobs_key_idx");
+        assert_eq!(
+            COMPACTOR_MANUAL_JOBS_KEY_IDX,
+            "compactor_manual_jobs_key_idx"
+        );
     }
 }

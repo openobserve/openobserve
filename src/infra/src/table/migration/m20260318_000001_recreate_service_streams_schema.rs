@@ -266,6 +266,9 @@ mod tests {
 
     #[test]
     fn test_service_streams_disambig_gin_idx_constant() {
-        assert_eq!(SERVICE_STREAMS_DISAMBIG_GIN_IDX, "service_streams_disambig_idx");
+        assert_eq!(
+            SERVICE_STREAMS_DISAMBIG_GIN_IDX,
+            "service_streams_disambig_idx"
+        );
     }
 }

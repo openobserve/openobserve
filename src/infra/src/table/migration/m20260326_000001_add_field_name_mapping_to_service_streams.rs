@@ -72,6 +72,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260326_000001_add_field_name_mapping_to_service_streams");
+        assert_eq!(
+            Migration.name(),
+            "m20260326_000001_add_field_name_mapping_to_service_streams"
+        );
     }
 }

@@ -75,6 +75,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20250125_153005_delete_metas_destinations");
+        assert_eq!(
+            Migration.name(),
+            "m20250125_153005_delete_metas_destinations"
+        );
     }
 }

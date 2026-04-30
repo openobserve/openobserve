@@ -159,6 +159,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20250611_000003_populate_reports_scheduled_jobs");
+        assert_eq!(
+            Migration.name(),
+            "m20250611_000003_populate_reports_scheduled_jobs"
+        );
     }
 }

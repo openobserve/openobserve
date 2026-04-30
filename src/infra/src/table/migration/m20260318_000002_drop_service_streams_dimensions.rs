@@ -35,6 +35,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260318_000002_drop_service_streams_dimensions");
+        assert_eq!(
+            Migration.name(),
+            "m20260318_000002_drop_service_streams_dimensions"
+        );
     }
 }

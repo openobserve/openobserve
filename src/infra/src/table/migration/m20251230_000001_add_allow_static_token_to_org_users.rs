@@ -62,6 +62,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20251230_000001_add_allow_static_token_to_org_users");
+        assert_eq!(
+            Migration.name(),
+            "m20251230_000001_add_allow_static_token_to_org_users"
+        );
     }
 }

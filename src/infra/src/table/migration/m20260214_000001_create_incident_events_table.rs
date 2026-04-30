@@ -60,6 +60,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260214_000001_create_incident_events_table");
+        assert_eq!(
+            Migration.name(),
+            "m20260214_000001_create_incident_events_table"
+        );
     }
 }

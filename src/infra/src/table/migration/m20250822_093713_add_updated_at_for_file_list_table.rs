@@ -120,6 +120,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20250822_093713_add_updated_at_for_file_list_table");
+        assert_eq!(
+            Migration.name(),
+            "m20250822_093713_add_updated_at_for_file_list_table"
+        );
     }
 }

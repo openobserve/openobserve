@@ -119,6 +119,9 @@ mod tests {
 
     #[test]
     fn test_new_idx_constant_value() {
-        assert_eq!(NEW_FOLDERS_ORG_TYPE_FOLDER_ID_IDX, "folders_org_type_folder_id_idx");
+        assert_eq!(
+            NEW_FOLDERS_ORG_TYPE_FOLDER_ID_IDX,
+            "folders_org_type_folder_id_idx"
+        );
     }
 }

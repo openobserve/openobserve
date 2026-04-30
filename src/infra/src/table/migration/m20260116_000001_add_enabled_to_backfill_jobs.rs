@@ -62,6 +62,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260116_000001_add_enabled_to_backfill_jobs");
+        assert_eq!(
+            Migration.name(),
+            "m20260116_000001_add_enabled_to_backfill_jobs"
+        );
     }
 }

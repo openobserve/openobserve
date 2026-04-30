@@ -74,6 +74,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260305_000001_create_trial_quota_usage_table");
+        assert_eq!(
+            Migration.name(),
+            "m20260305_000001_create_trial_quota_usage_table"
+        );
     }
 }

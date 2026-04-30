@@ -117,6 +117,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260415_000002_add_source_to_model_pricing");
+        assert_eq!(
+            Migration.name(),
+            "m20260415_000002_add_source_to_model_pricing"
+        );
     }
 }

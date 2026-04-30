@@ -71,6 +71,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20251226_000001_add_enrichment_table_urls_is_local_region");
+        assert_eq!(
+            Migration.name(),
+            "m20251226_000001_add_enrichment_table_urls_is_local_region"
+        );
     }
 }

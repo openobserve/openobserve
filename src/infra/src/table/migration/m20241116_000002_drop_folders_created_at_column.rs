@@ -63,6 +63,9 @@ mod tests {
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20241116_000002_drop_folders_created_at_column");
+        assert_eq!(
+            Migration.name(),
+            "m20241116_000002_drop_folders_created_at_column"
+        );
     }
 }
