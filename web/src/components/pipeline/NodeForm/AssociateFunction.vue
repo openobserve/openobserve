@@ -187,56 +187,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-card>
         </div>
 
-        <div
-          class="flex justify-start full-width"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        >
-          <q-btn
+        <div class="tw:flex tw:gap-2">
+          <OButton
             v-if="pipelineObj.isEditNode && !createNewFunction"
             data-test="associate-function-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
+            variant="outline-destructive"
+            size="sm-action"
             @click="openDeleteDialog"
-          >
-            <q-icon name="delete" class="q-mr-xs" />
-            {{ t("pipeline.deleteNode") }}
-          </q-btn>
-          <q-btn
+          >{{ t("pipeline.deleteNode") }}</OButton>
+          <OButton
             v-if="!createNewFunction"
             data-test="associate-function-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
+            variant="outline"
+            size="sm-action"
             @click="openCancelDialog"
-          />
-          <q-btn
+          >{{ t('alerts.cancel') }}</OButton>
+          <OButton
             v-if="!createNewFunction"
             data-test="associate-function-save-btn"
-            :label="
-              createNewFunction ? t('alerts.createFunction') : t('alerts.save')
-            "
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
+            variant="primary"
+            size="sm-action"
             type="submit"
-          />
+          >{{ createNewFunction ? t('alerts.createFunction') : t('alerts.save') }}</OButton>
         </div>
       </q-form>
     </div>

@@ -230,17 +230,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #separator>
-          <q-btn
+          <OButton
             data-test="logs-search-field-list-collapse-btn-management"
-            :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
+            variant="sidebar-button"
+            size="sidebar-button"
             :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
             :class="showManagementTabs ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
             @click="controlManagementTabs"
-          />
+          >
+            <template #icon-left>
+              <q-icon :name="showManagementTabs ? 'chevron_left' : 'chevron_right'" />
+            </template>
+          </OButton>
       </template>
 
       <template v-slot:after>
@@ -260,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OButton from '@/lib/core/Button/OButton.vue'
 // @ts-ignore
 import {
   defineComponent,
@@ -283,6 +285,7 @@ export default defineComponent({
   components: {
     OTabs,
     ORouteTab,
+    OButton,
   },
   setup() {
     const { t } = useI18n();
