@@ -244,7 +244,10 @@ export const useSearchResponseHandler = () => {
 
     if (appendResult) {
       searchObj.data.queryResults.total += response.content.results.total;
-      searchObj.data.queryResults.took += response.content.results.took;
+      searchObj.data.queryResults.took = Math.max(
+        searchObj.data.queryResults.took,
+        response.content.results.took,
+      );
       searchObj.data.queryResults.scan_size +=
         response.content.results.scan_size;
     } else {
@@ -256,9 +259,10 @@ export const useSearchResponseHandler = () => {
       } else if (response.content?.streaming_aggs) {
         searchObj.data.queryResults = {
           ...response.content.results,
-          took:
-            (searchObj.data?.queryResults?.took || 0) +
+          took: Math.max(
+            searchObj.data?.queryResults?.took || 0,
             response.content.results.took,
+          ),
           scan_size:
             (searchObj.data?.queryResults?.scan_size || 0) +
             response.content.results.scan_size,
@@ -275,6 +279,9 @@ export const useSearchResponseHandler = () => {
         searchObj.data.queryResults = response.content.results;
       }
     }
+
+    // Track search-only took so histogram can add on top without overwriting
+    searchObj.data.queryResults.searchTook = searchObj.data.queryResults.took;
 
     if (response.content.results.hasOwnProperty("is_histogram_eligible")) {
       searchObj.data.queryResults.is_histogram_eligible =
@@ -466,7 +473,13 @@ export const useSearchResponseHandler = () => {
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
-    searchObj.data.queryResults.took += response.content.results.took;
+    const histogramTook = Math.max(
+      searchObj.data.queryResults.histogramTook || 0,
+      response.content.results.took,
+    );
+    searchObj.data.queryResults.histogramTook = histogramTook;
+    searchObj.data.queryResults.took =
+      (searchObj.data.queryResults.searchTook || 0) + histogramTook;
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
     searchObj.data.queryResults.histogram_interval =
@@ -537,7 +550,11 @@ export const useSearchResponseHandler = () => {
       response?.content?.streaming_aggs;
 
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
-    searchObj.data.queryResults.took += response.content.results.took;
+    searchObj.data.queryResults.took = Math.max(
+      searchObj.data.queryResults.took,
+      response.content.results.took,
+    );
+    searchObj.data.queryResults.searchTook = searchObj.data.queryResults.took;
   };
 
   const handleFunctionError = (

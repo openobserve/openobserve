@@ -415,6 +415,7 @@ pub fn handle_partial_response(mut res: Response) -> Response {
 pub async fn process_delta(
     req: &mut config::meta::search::Request,
     req_no: usize,
+    start_timer: &Instant,
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -480,7 +481,6 @@ pub async fn process_delta(
         }
 
         // use cache for delta search
-        let start_timer = Instant::now();
         let trace_id = format!("{trace_id}-{}", req_no + idx);
         let mut search_res = do_search(
             &trace_id,
