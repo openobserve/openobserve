@@ -54,6 +54,28 @@ All O2 components automatically support dark mode via design tokens. No dark-mod
 
 ---
 
+## No Hardcoded Styling on O2 Components
+
+> **If the visual you need isn't produced by the component's default appearance, use the appropriate `variant` and `size` props — do NOT add inline `style="..."`, utility classes (`class="px-2 text-sm"`), or scoped CSS rules to an O2 component to patch its look.**
+
+Decision flow for every visual property that differs from the O2 default:
+
+1. **Can it be expressed via `variant` or `size`?** → use the prop.
+2. **No existing variant covers it?** → add a new named variant to the O2 component source first (via the `o2-component-create` skill), then use it via the prop.
+3. **Is it layout/positioning only** (`margin`, `flex-shrink`, `position`, `opacity: 0` for reveal)?  → wrap in a plain `<span>` and put the rule on the wrapper. Never on the O2 component itself.
+4. **Is it triggered by a parent state** (`.parent:hover .my-class`)? → wrapper rule, not a variant.
+
+**What is explicitly banned on an O2 component:**
+
+| Banned pattern | Why |
+|---|---|
+| `style="color: red"` | Bypasses design tokens |
+| `class="px-2 text-sm font-bold"` | Ad-hoc utility patching |
+| Scoped CSS targeting the component's class | Must become a variant instead |
+| `class="q-ml-sm"` / `class="q-mr-sm"` for spacing | Use `tw:gap-2` on the parent container |
+
+---
+
 ## Cancel / Save Button Standard (MANDATORY)
 
 > **All cancel/save button pairs in forms, dialogs, and config panels MUST follow this exact pattern — no exceptions.**
@@ -84,6 +106,7 @@ All O2 components automatically support dark mode via design tokens. No dark-mod
 | Spacing | remove `class="q-ml-*"` / `class="q-mr-*"` from button — use `tw:gap-2` on parent | same |
 
 - **`variant="secondary"` is NEVER correct for a cancel button** — always use `variant="outline"`.
+- **`variant="ghost-primary"` is NEVER correct for a cancel button** — always use `variant="outline"`.
 - **`size="sm"` is NEVER correct for cancel/save** — always use `size="sm-action"`.
 - **Never use `<q-space />`** between cancel and save buttons — use `tw:gap-2` on the parent container.
 - **Never use `class="q-ml-sm"` / `class="q-ml-md"` on an OButton** — move spacing to parent gap.
