@@ -871,6 +871,10 @@ pub async fn update_stream_settings(
         settings.enable_log_patterns_extraction = enable_log_patterns_extraction;
     }
 
+    if let Some(is_llm_stream) = new_settings.is_llm_stream {
+        settings.is_llm_stream = is_llm_stream;
+    }
+
     if let Some(storage_type) = new_settings.storage_type {
         if storage_type.is_compliance() {
             let effective_retention = new_settings

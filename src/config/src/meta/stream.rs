@@ -777,6 +777,8 @@ pub struct UpdateStreamSettings {
     #[serde(default)]
     pub enable_log_patterns_extraction: Option<bool>,
     #[serde(default)]
+    pub is_llm_stream: Option<bool>,
+    #[serde(default)]
     pub cross_links: UpdateSettingsWrapper<CrossLink>,
     #[serde(default)]
     pub storage_type: Option<StorageType>,
@@ -1367,6 +1369,18 @@ mod tests {
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
         let resp = FileMeta::from(&rpc_meta);
         assert_eq!(file_meta, resp);
+    }
+
+    #[test]
+    fn test_update_stream_settings_accepts_is_llm_stream() {
+        let settings: UpdateStreamSettings = json::from_str(r#"{"is_llm_stream":false}"#).unwrap();
+        assert_eq!(settings.is_llm_stream, Some(false));
+    }
+
+    #[test]
+    fn test_stream_settings_from_preserves_is_llm_stream() {
+        let settings = StreamSettings::from(r#"{"is_llm_stream":true}"#);
+        assert!(settings.is_llm_stream);
     }
 
     #[test]
