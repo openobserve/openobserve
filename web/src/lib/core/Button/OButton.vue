@@ -119,6 +119,14 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-muted-focus-ring",
     "tw:disabled:opacity-50",
   ].join(" "),
+  // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
+  "sidebar-button": [
+    "tw:bg-button-primary tw:text-button-primary-foreground",
+    "tw:enabled:hover:bg-button-primary-hover",
+    "tw:enabled:active:bg-button-primary-active",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-primary-hover",
+    "tw:disabled:bg-button-primary-disabled tw:disabled:text-button-primary-foreground",
+  ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
   "sidebar-toggle": [
     "tw:bg-[var(--q-color-btn-bg,var(--q-color-surface,#fff))] tw:text-button-ghost-text tw:border tw:border-button-border tw:shadow-sm",
@@ -156,6 +164,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-toolbar": "tw:size-[1.875rem] tw:p-0 tw:rounded-md tw:gap-x-0",
   // 26px rounded-lg — compact modern icon button for panel header collapse/expand
   "icon-panel": "tw:size-[1.625rem] tw:p-0 tw:rounded-lg tw:gap-x-0",
+  // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
+  "sidebar-button": "tw:h-8 tw:w-3 tw:p-0 tw:rounded-sm tw:overflow-hidden tw:gap-x-0",
 };
 
 const activeClasses = [

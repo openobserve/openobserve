@@ -21,6 +21,8 @@ export type ButtonVariant =
   | "sidebar-toggle"
   // Dedicated variant for sidebar panel collapse/expand icon button
   | "panel-collapse"
+  // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
+  | "sidebar-button"
   | "destructive";
 
 /** Size controls height, padding, font-size, and border-radius */
@@ -45,7 +47,9 @@ export type ButtonSize =
   // 30×30px square — matches toolbar icon button height (share/hamburger/auto-refresh)
   | "icon-toolbar"
   // 26px rounded-lg — compact modern icon button for panel header collapse/expand
-  | "icon-panel";
+  | "icon-panel"
+  // Tall narrow vertical rectangle — 32×20px for splitter collapse/expand buttons
+  | "sidebar-button";
 
 export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */
