@@ -72,18 +72,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
-            <div v-if="dialogConfig.isLicensed && chartData" class="usage-chart-section">
-              <div class="chart-wrapper">
-                <div class="usage-chart-container" style="height: 150px; width: 100%;">
-                  <ChartRenderer
-                    :key="dashboardRenderKey"
-                    :data="chartData"
-                  />
+            <div v-if="dialogConfig.isLicensed" class="usage-chart-section">
+              <!-- Loading skeleton -->
+              <template v-if="isLoadingLicense">
+                <q-skeleton
+                  type="rect"
+                  height="150px"
+                  class="chart-skeleton"
+                  animation="pulse"
+                  style="background: rgba(255, 255, 255, 0.1); border-radius: 8px;"
+                />
+              </template>
+              <!-- Loaded chart -->
+              <template v-else-if="chartData">
+                <div class="chart-wrapper">
+                  <div class="usage-chart-container" style="height: 150px; width: 100%;">
+                    <ChartRenderer
+                      :key="dashboardRenderKey"
+                      :data="chartData"
+                    />
+                  </div>
+                  <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
+                    {{ t('about.usage_shows_zero_unlimited') }}
+                  </div>
                 </div>
-                <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
-                  {{ t('about.usage_shows_zero_unlimited') }}
-                </div>
-              </div>
+              </template>
             </div>
 
             <!-- License Limit Note (only for Enterprise without license) -->
