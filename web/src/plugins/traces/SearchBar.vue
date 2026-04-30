@@ -163,36 +163,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="search-time tw:mr-[0.375rem] float-left tw:flex">
-          <q-btn
+          <OButton
             v-if="config.isEnterprise == 'true' && isLoading"
+            variant="outline"
+            size="sm-action"
             data-test="traces-search-bar-cancel-btn"
-            dense
             :title="t('search.cancel')"
-            class="q-pa-none o2-run-query-button o2-color-primary tw:bg-[var(--o2-cancel-query-bg)]! tw:h-[30px] element-box-shadow tw:leading-8!"
-            :class="
-              store.state.zoConfig.auto_query_enabled
-                ? 'search-button-enterprise-border-radius'
-                : ''
-            "
             @click="cancelQueryData"
-            >{{ t("search.cancel") }}</q-btn
-          >
-          <q-btn
+          >{{ t("search.cancel") }}</OButton>
+          <OButton
             v-else
+            variant="primary"
+            size="sm-action"
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
-            dense
-            flat
             :title="t('search.runQuery')"
-            class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow tw:leading-8!"
-            :class="
-              store.state.zoConfig.auto_query_enabled
-                ? 'search-button-enterprise-border-radius'
-                : ''
-            "
             @click="searchData"
             :loading="isLoading"
-            :disable="isLoading"
+            :disabled="isLoading"
           >
             <q-tooltip
               v-if="
@@ -201,17 +189,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               >{{ t("search.autoRunEnabled") }}</q-tooltip
             >
-            <q-icon
+            <template
               v-if="
                 searchObj.meta.liveMode &&
                 store.state.zoConfig.auto_query_enabled
               "
-              name="autorenew"
-              size="14px"
-              class="q-mr-xs"
-            />
+              #icon-left
+            >
+              <q-icon name="autorenew" size="14px" />
+            </template>
             {{ t("search.runQuery") }}
-          </q-btn>
+          </OButton>
           <!-- Dropdown: shown when live mode feature is enabled -->
           <q-separator
             v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
@@ -1123,15 +1111,7 @@ export default defineComponent({
   }
 }
 
-.search-button-enterprise-border-radius {
-  border-radius: 0.375rem 0px 0px 0.375rem !important;
-}
-
 .search-button-dropdown-enterprise-border-radius {
   border-radius: 0px 0.375rem 0.375rem 0px !important;
-}
-
-.o2-run-query-button {
-  width: 94px !important;
 }
 </style>

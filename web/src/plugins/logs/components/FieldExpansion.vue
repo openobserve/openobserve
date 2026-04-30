@@ -64,16 +64,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <div class="field_overlay tw:rounded-[0.25rem] tw:overflow-hidden">
-          <q-btn
-            v-if="field.isSchemaField"
-            :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
-            :icon="outlinedAdd"
-            style="margin-right: 0.375rem"
-            size="0.4rem"
-            class="q-mr-sm"
-            @click.stop="$emit('add-to-filter', `${field.name}=''`)"
-            round
-          />
+          <span v-if="field.isSchemaField" style="margin-right: 0.375rem">
+            <OButton
+              :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
+              variant="ghost"
+              size="icon-xs-circle"
+              @click.stop="$emit('add-to-filter', `${field.name}=''`)"
+            >
+              <q-icon :name="outlinedAdd" size="12px" />
+            </OButton>
+          </span>
           <q-icon
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
             v-if="!isFieldSelected"
@@ -142,6 +142,7 @@ import {
   outlinedVisibilityOff,
 } from "@quasar/extras/material-icons-outlined";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface Props {
   field: any;

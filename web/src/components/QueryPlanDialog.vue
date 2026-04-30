@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-sm q-pt-sm">
         <div class="text-h6">{{ t("search.queryPlan") }}</div>
         <q-space />
-        <q-btn icon="close" flat round dense @click="onClose">
+        <OButton variant="ghost" size="icon" @click="onClose">
+          <q-icon name="close" size="14px" />
           <q-tooltip>Close (ESC)</q-tooltip>
-        </q-btn>
+        </OButton>
       </q-card-section>
 
       <q-separator />
@@ -195,10 +196,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -220,9 +222,13 @@ import { searchState } from "@/composables/useLogs/searchState";
 export default defineComponent({
   name: "QueryPlanDialog",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
     MetricsSummaryCard,
     QueryPlanTree,
+    OButton,
   },
   props: {
     modelValue: {

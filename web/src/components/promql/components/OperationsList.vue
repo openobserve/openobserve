@@ -207,7 +207,9 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="outline" size="sm-action" v-close-popup>
+            Close
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -217,6 +219,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {
@@ -329,7 +332,7 @@ const filterOperationLabels = (val: string, update: any) => {
       // Filter labels based on input
       const needle = val.toLowerCase();
       filteredLabels.value = availableLabels.value.filter((label: string) =>
-        label.toLowerCase().includes(needle)
+        label.toLowerCase().includes(needle),
       );
     }
   });
@@ -341,7 +344,7 @@ watch(
   (newLabels) => {
     filteredLabels.value = newLabels;
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 defineExpose({

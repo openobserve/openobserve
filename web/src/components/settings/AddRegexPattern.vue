@@ -25,13 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="add-regex-pattern-header q-px-md tw:flex tw:items-center tw:justify-between">
         <div class="tw:flex tw:items-center tw:justify-between">
-                <q-btn
+        <OButton
                     data-test="add-regex-pattern-back-btn"
                     @click="closeAddRegexPatternDialog"
-                    round
-                    flat
-                    icon="arrow_back"
-                />
+                    variant="ghost"
+                    size="icon"
+                  >
+                    <q-icon name="arrow_back" size="14px" />
+                  </OButton>
           <div class="add-regex-pattern-title" data-test="add-regex-pattern-title">
             {{ isEdit ? t("regex_patterns.edit_regex_pattern") : t("regex_patterns.create_regex_pattern") }}
           </div>
@@ -56,23 +57,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
             </q-btn>
-            <q-btn 
-            data-test="add-regex-pattern-fullscreen-btn"
-            icon="fullscreen" 
-            size="14px" 
-            dense 
-            class="tw:cursor-pointer" 
-            :class="store.state.theme === 'dark' ? 'tw:text-white' : ''"
-            :color="isFullScreen ? 'primary' : undefined"
-            @click="toggleFullScreen"
-          />
-          <q-btn
+                      <OButton
+                        data-test="add-regex-pattern-fullscreen-btn"
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        @click="toggleFullScreen"
+                      >
+                        <q-icon name="fullscreen" size="14px" :color="isFullScreen ? 'primary' : undefined" />
+                      </OButton>
+            <OButton
+            variant="ghost"
+            size="icon"
             data-test="add-regex-pattern-close-btn"
             @click="closeAddRegexPatternDialog"
-            round
-            flat
-            icon="cancel"
-        />
+          >
+            <q-icon name="cancel" size="14px" />
+          </OButton>
         </div>
 
       </div>
@@ -117,16 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="regex-pattern-input-label">
                             Regex Pattern
                         </span>
-                        <q-btn v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                         class="tw:px-2 tw:py-1 tw:flex tw:items-center"
-                        style="border-radius: 4px;" dense no-caps flat  @click="toggleAIChat">
-                        <img :src="goToAILogo" class="tw:w-[20px] tw:h-[20px] tw:mr-1" />
-                        <span class="tw:text-[#5960B2] tw:text-sm tw:flex tw:items-center tw:gap-1">
-                            Try O2 Assistant to write expressions 
-                        </span>
-                        <q-icon size="sm" name="arrow_right_alt" class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1" />
-
-                            </q-btn>
+                        <OButton v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                          variant="ghost\"\n                          size=\"sm\"\n                          @click=\"toggleAIChat\">\n                          <img :src=\"goToAILogo\" class=\"tw:w-[20px] tw:h-[20px] tw:mr-1\" />\n                          <span class=\"tw:text-[#5960B2] tw:text-sm tw:flex tw:items-center tw:gap-1\">\n                              Try O2 Assistant to write expressions \n                          </span>\n                          <q-icon size=\"sm\" name=\"arrow_right_alt\" class=\"tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1\" />\n                        </OButton>"
                     </div>
                     <div class="regex-pattern-input">
                         <div
@@ -169,12 +161,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             Test Regex Pattern
                         </span>
                         <div class="tw:h-[19px] tw:flex tw:items-center tw:justify-center tw:font-[600]" style="border-radius: 3px;">
-                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw:px-2 tw:bg-[#5960B2] tw:text-[12px] tw:text-white tw:min-h-[19px] tw:h-[19px] tw:flex tw:items-center tw:justify-center"
-                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
-                        <span>
+                        <OButton
+                            variant="primary"
+                            size="xs"
+                            :disabled="regexPatternInputs.pattern.length === 0"
+                            @click="testStringOutput"
+                          >
                             Test Input
-                        </span>
-                    </q-btn>
+                          </OButton>
                         </div>
                     </div>
                 </div>
@@ -258,27 +252,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
             </q-form>
-            <div class="flex justify-end q-mt-sm" style="position: sticky; bottom: 0; right: 0;">
-                <q-btn
+            <div class="tw:flex tw:gap-2 tw:justify-end tw:mt-2" style="position: sticky; bottom: 0; right: 0;">
+                <OButton
                     v-close-popup
-                    class="q-mr-md o2-secondary-button tw:h-[36px]"
-                    :label="t('regex_patterns.cancel')"
-                    no-caps
-                    flat
-                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    variant="outline"
+                    size="sm-action"
                     data-test="add-regex-pattern-cancel-btn"
-                />
-                <q-btn
-                    class="o2-primary-button no-border tw:h-[36px]"
-                    :label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
+                  >
+                  {{ t('regex_patterns.cancel') }}
+                </OButton>
+                <OButton
+                    variant="primary"
+                    size="sm-action"
                     type="submit"
-                    no-caps
-                    flat
-                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                     @click="saveRegexPattern"
-                    :disable="isFormEmpty || isSaving"
+                    :disabled="isFormEmpty || isSaving"
                     data-test="add-regex-pattern-save-btn"
-                />
+                  >
+                  {{ isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close') }}
+                </OButton>
             </div>
             </div>
             <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width:35%; max-width: 100%; min-width: 75px; height: calc(100vh - 90px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
@@ -301,6 +293,7 @@ import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
@@ -321,7 +314,8 @@ export default defineComponent({
     emit: ["close", "update:list"],
     components: {
         FullViewContainer,
-        O2AIChat
+        O2AIChat,
+        OButton,
     },
 setup(props, {emit}) {
     const { t } = useI18n();

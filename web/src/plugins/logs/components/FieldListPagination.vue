@@ -43,7 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{ t("search.userDefinedSchemaLabel") }}</span>
+              <span class="text-bold" color="white">{{
+                t("search.userDefinedSchemaLabel")
+              }}</span>
             </q-tooltip>
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
@@ -55,12 +57,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{ t("search.allFieldsLabel") }}</span>
+              <span class="text-bold" color="white">{{
+                t("search.allFieldsLabel")
+              }}</span>
               <q-separator color="white" class="q-mt-xs q-mb-xs" />
               {{ t("search.allFieldsWarningMsg") }}
             </q-tooltip>
           </template>
-          <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
+          <template
+            v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
+          >
             <q-icon name="info" class="tw:text-[12px]!" />
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
@@ -69,7 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{ t("search.showOnlyInterestingFields") }}</span>
+              <span class="text-bold" color="white">{{
+                t("search.showOnlyInterestingFields")
+              }}</span>
             </q-tooltip>
           </template>
           <template v-else>{{ opt.label }}</template>
@@ -99,12 +107,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{ t("search.allFieldsLabel") }}</span>
+              <span class="text-bold" color="white">{{
+                t("search.allFieldsLabel")
+              }}</span>
               <q-separator color="white" class="q-mt-xs q-mb-xs" />
               {{ t("search.allFieldsWarningMsg") }}
             </q-tooltip>
           </template>
-          <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
+          <template
+            v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
+          >
             <q-icon name="info" class="tw:text-[12px]!" />
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
@@ -113,7 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{ t("search.showOnlyInterestingFields") }}</span>
+              <span class="text-bold" color="white">{{
+                t("search.showOnlyInterestingFields")
+              }}</span>
             </q-tooltip>
           </template>
           <template v-else>{{ opt.label }}</template>
@@ -136,42 +150,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tooltip>
 
         <!-- First page button -->
-        <q-btn
+        <OButton
           data-test="logs-page-fields-list-pagination-firstpage-button"
-          icon="fast_rewind"
-          color="primary"
-          flat
-          :disable="isFirstPage"
+          variant="ghost"
+          size="icon-xs-sq"
+          :disabled="isFirstPage"
           @click="$emit('first-page')"
-          class="pagination-nav-btn"
           aria-label="First page"
-        />
+        >
+          <q-icon name="fast_rewind" size="14px" />
+        </OButton>
 
         <!-- Page number buttons (3 at a time) -->
         <template v-for="page in visiblePages" :key="page">
-          <q-btn
-            flat
+          <OButton
+            :variant="currentPage === page ? 'primary' : 'ghost'"
+            size="sm"
             :data-test="`logs-page-fields-list-pagination-page-${page}-button`"
-            :class="[
-              'pagination-page-btn',
-              currentPage === page ? 'pagination-page-active' : '',
-            ]"
             @click="$emit('set-page', page)"
-            >{{ page }}</q-btn
+            >{{ page }}</OButton
           >
         </template>
 
         <!-- Last page button -->
-        <q-btn
+        <OButton
           data-test="logs-page-fields-list-pagination-lastpage-button"
-          icon="fast_forward"
-          color="primary"
-          flat
-          :disable="isLastPage"
+          variant="ghost"
+          size="icon-xs-sq"
+          :disabled="isLastPage"
           @click="$emit('last-page')"
-          class="pagination-nav-btn"
           aria-label="Last page"
-        />
+        >
+          <q-icon name="fast_forward" size="14px" />
+        </OButton>
       </div>
 
       <!-- Reset Fields Icon -->
@@ -203,6 +214,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const { t } = useI18n();
 
@@ -265,22 +277,6 @@ const visiblePages = computed(() => {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-}
-
-.pagination-nav-btn {
-  min-width: 2rem;
-  height: 2rem;
-}
-
-.pagination-page-btn {
-  min-width: 2rem;
-  height: 2rem;
-  font-size: 0.8125rem;
-}
-
-.pagination-page-active {
-  background-color: var(--q-primary);
-  color: white;
 }
 
 .field-list-reset {
