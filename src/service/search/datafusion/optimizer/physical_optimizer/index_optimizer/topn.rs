@@ -496,8 +496,7 @@ mod tests {
 
     #[test]
     fn test_simple_topn_visitor_multiple_index_fields() {
-        let fields =
-            HashSet::from(["service".to_string(), "host".to_string(), "pod".to_string()]);
+        let fields = HashSet::from(["service".to_string(), "host".to_string(), "pod".to_string()]);
         let visitor = SimpleTopnVisitor::new(fields.clone());
         assert_eq!(visitor.index_fields.len(), 3);
         assert!(visitor.index_fields.contains("service"));

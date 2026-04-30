@@ -108,6 +108,7 @@ pub fn spath_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarV
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::{Array, StringArray};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -117,8 +118,6 @@ mod tests {
         datasource::MemTable,
         prelude::SessionContext,
     };
-
-    use arrow::array::{Array, StringArray};
 
     use super::*;
 

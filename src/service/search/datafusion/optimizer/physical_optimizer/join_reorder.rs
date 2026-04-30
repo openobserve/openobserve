@@ -103,11 +103,10 @@ mod tests {
     use datafusion::{
         common::Result,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
+        physical_optimizer::PhysicalOptimizerRule,
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
-
-    use datafusion::physical_optimizer::PhysicalOptimizerRule;
 
     use super::*;
     use crate::service::search::datafusion::{

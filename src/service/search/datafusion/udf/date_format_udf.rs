@@ -95,7 +95,7 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::Int64Array;
+    use arrow::array::{Int64Array, StringArray};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -105,8 +105,6 @@ mod tests {
         datasource::MemTable,
         prelude::SessionContext,
     };
-
-    use arrow::array::StringArray;
 
     use super::*;
 

@@ -109,6 +109,7 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::{Array, StringArray};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -118,8 +119,6 @@ mod tests {
         datasource::MemTable,
         prelude::SessionContext,
     };
-
-    use arrow::array::{Array, StringArray};
 
     use super::*;
 

@@ -187,11 +187,10 @@ mod tests {
         common::Result,
         datasource::MemTable,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
+        optimizer::OptimizerRule,
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
-
-    use datafusion::optimizer::OptimizerRule;
 
     use super::LimitJoinRightSide;
     use crate::service::search::datafusion::planner::extension_planner::OpenobserveQueryPlanner;

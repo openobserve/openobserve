@@ -326,11 +326,10 @@ mod tests {
             PhysicalExpr,
             expressions::{BinaryExpr, Column, Literal},
         },
+        physical_optimizer::PhysicalOptimizerRule,
         prelude::SessionContext,
         scalar::ScalarValue,
     };
-
-    use datafusion::physical_optimizer::PhysicalOptimizerRule;
 
     use super::{is_expr_valid_for_index, *};
     use crate::service::search::{
@@ -539,28 +538,19 @@ mod tests {
 
     #[test]
     fn test_index_rule_name_returns_expected() {
-        let rule = IndexRule::new(
-            HashSet::new(),
-            Arc::new(parking_lot::Mutex::new(None)),
-        );
+        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
         assert_eq!(rule.name(), "IndexConditionRule");
     }
 
     #[test]
     fn test_index_rule_schema_check_returns_true() {
-        let rule = IndexRule::new(
-            HashSet::new(),
-            Arc::new(parking_lot::Mutex::new(None)),
-        );
+        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
         assert!(rule.schema_check());
     }
 
     #[test]
     fn test_index_rule_can_optimize_initial_false() {
-        let rule = IndexRule::new(
-            HashSet::new(),
-            Arc::new(parking_lot::Mutex::new(None)),
-        );
+        let rule = IndexRule::new(HashSet::new(), Arc::new(parking_lot::Mutex::new(None)));
         assert!(!rule.can_optimize());
     }
 

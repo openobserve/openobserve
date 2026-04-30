@@ -91,7 +91,7 @@ pub fn fuzzy_match_expr_impl() -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::StringArray;
+    use arrow::array::{BooleanArray, StringArray};
     use datafusion::{
         arrow::{
             array::Int64Array,
@@ -101,8 +101,6 @@ mod tests {
         datasource::MemTable,
         prelude::SessionContext,
     };
-
-    use arrow::array::BooleanArray;
 
     use super::*;
 

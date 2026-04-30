@@ -92,6 +92,7 @@ pub fn arr_join_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::Array;
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -101,8 +102,6 @@ mod tests {
         datasource::MemTable,
         prelude::SessionContext,
     };
-
-    use arrow::array::Array;
 
     use super::*;
 

@@ -127,6 +127,7 @@ pub fn arr_index_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::{Array, Int64Array};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -136,8 +137,6 @@ mod tests {
         datasource::MemTable,
         prelude::SessionContext,
     };
-
-    use arrow::array::{Array, Int64Array};
 
     use super::*;
 

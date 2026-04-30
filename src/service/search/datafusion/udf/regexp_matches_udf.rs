@@ -237,9 +237,10 @@ mod tests {
 
     use arrow::array::{RecordBatch, StringArray};
     use arrow_schema::Schema;
-    use datafusion::{assert_batches_eq, datasource::MemTable, prelude::SessionContext};
-
-    use datafusion::logical_expr::ScalarUDFImpl;
+    use datafusion::{
+        assert_batches_eq, datasource::MemTable, logical_expr::ScalarUDFImpl,
+        prelude::SessionContext,
+    };
 
     use super::*;
 

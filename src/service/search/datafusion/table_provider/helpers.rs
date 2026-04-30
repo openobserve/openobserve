@@ -245,8 +245,9 @@ mod tests {
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("col", DataType::Utf8, false),
         ]));
-        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema.clone()))
-            as Arc<dyn ExecutionPlan>;
+        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
+            schema.clone(),
+        )) as Arc<dyn ExecutionPlan>;
         let schema_ref: arrow_schema::Schema = schema.as_ref().clone();
         let result = apply_combined_filter(None, Some((1000, 2000)), &schema_ref, &[], exec, None);
         assert!(result.is_ok());
@@ -255,11 +256,12 @@ mod tests {
 
     #[test]
     fn test_apply_projection_with_diff_rules_produces_projection() {
-        use hashbrown::HashMap;
         use arrow_schema::{Field, Schema};
+        use hashbrown::HashMap;
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
-        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema.clone()))
-            as Arc<dyn ExecutionPlan>;
+        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
+            schema.clone(),
+        )) as Arc<dyn ExecutionPlan>;
         let mut diff_rules: HashMap<String, DataType> = HashMap::new();
         diff_rules.insert("col".to_string(), DataType::LargeUtf8);
         let result = apply_projection(&schema, &diff_rules, None, exec);

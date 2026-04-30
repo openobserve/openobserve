@@ -208,10 +208,9 @@ mod tests {
         },
         assert_batches_eq,
         datasource::MemTable,
+        optimizer::OptimizerRule,
         prelude::SessionContext,
     };
-
-    use datafusion::optimizer::OptimizerRule;
 
     use crate::service::search::datafusion::{
         optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram, udf::histogram_udf,

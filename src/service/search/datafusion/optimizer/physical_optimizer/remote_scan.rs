@@ -402,9 +402,9 @@ impl Default for NewEmptyExecCountVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use datafusion::physical_optimizer::PhysicalOptimizerRule;
+
+    use super::*;
 
     #[test]
     fn test_remote_scan_rule_name() {
