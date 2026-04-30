@@ -41,14 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </span>
           </div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
+          <OButton
+            variant="ghost"
+            size="icon"
             v-close-popup
             data-test="close-dialog-btn"
-          />
+          >
+            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
+          </OButton>
         </div>
       </q-card-section>
 
@@ -90,15 +90,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="settings" size="20px" />
                 <span class="tw:text-sm tw:font-semibold">Advanced Options</span>
               </div>
-              <q-btn
-                flat
-                dense
-                round
-                size="xs"
-                :icon="showAdvanced ? 'expand_less' : 'expand_more'"
+              <OButton
+                variant="ghost-muted"
+                size="icon-xs-sq"
+                :title="showAdvanced ? 'Collapse' : 'Expand'"
                 @click.stop
-                class="expand-toggle-btn"
-              />
+                class="expand-toggle-btn-wrapper"
+              >
+                <template #icon-left><ChevronsUpDown class="tw:size-3.5 tw:shrink-0" /></template>
+              </OButton>              />
             </div>
             <div v-show="showAdvanced" class="section-content">
               <div class="tw:space-y-4">
@@ -235,22 +235,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Form Actions -->
       <q-card-actions class="q-pa-md tw:flex-shrink-0">
         <q-form @submit="onSubmit" class="tw:w-full">
-          <div class="flex justify-end tw:gap-2">
-            <q-btn
-              flat
-              label="Cancel"
-              class="o2-secondary-button"
+          <div class="tw:flex tw:justify-end tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
               @click="onCancel"
               data-test="cancel-btn"
-            />
-            <q-btn
+            >Cancel</OButton>
+            <OButton
               type="submit"
-              label="Create Backfill Job"
-              class="o2-primary-button"
+              variant="primary"
+              size="sm-action"
               :loading="loading"
-              :disable="loading"
+              :disabled="loading"
               data-test="create-btn"
-            />
+            >Create Backfill Job</OButton>
           </div>
         </q-form>
       </q-card-actions>
@@ -274,23 +273,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="tw:mt-4">Are you sure you want to proceed?</p>
       </q-card-section>
 
-      <q-card-actions align="right" class="q-px-md q-pb-md">
-        <q-btn
-          flat
-          label="Cancel"
-          class="o2-secondary-button"
-          @click="showDeleteConfirmation = false"
-          data-test="delete-confirm-cancel-btn"
-          autofocus
-        />
-        <q-btn
-          unelevated
-          label="Yes, Delete and Backfill"
-          class="o2-primary-button"
-          @click="confirmDelete"
-          data-test="delete-confirm-yes-btn"
-        />
-      </q-card-actions>
+        <q-card-actions align="right" class="q-px-md q-pb-md">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="showDeleteConfirmation = false"
+            data-test="delete-confirm-cancel-btn"
+            autofocus
+          >Cancel</OButton>
+          <OButton
+            variant="destructive"
+            size="sm-action"
+            @click="confirmDelete"
+            data-test="delete-confirm-yes-btn"
+          >Yes, Delete and Backfill</OButton>
+        </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
@@ -299,6 +296,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { X, ChevronsUpDown } from "lucide-vue-next";
 import backfillService from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 
@@ -536,7 +535,7 @@ const createBackfillJobRequest = async () => {
     padding: 16px;
   }
 
-  .expand-toggle-btn {
+  .expand-toggle-btn-wrapper {
     opacity: 0.5;
     transition: all 0.2s ease;
 

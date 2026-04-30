@@ -22,14 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-between full-width tw:h-[68px] tw:px-2 tw:py-3"
         >
           <div class="flex items-center">
-            <q-btn
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              class="hideOnPrintMode el-border"
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              class="hideOnPrintMode"
               @click="goBack"
               data-test="alert-history-back-btn"
-            />
+            >
+              <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
+            </OButton>
             <div
               class="q-table__title tw:font-[600] q-ml-sm tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
@@ -100,28 +101,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item>
               </template>
             </q-select>
-            <q-btn
-              icon="search"
-              flat
-              dense
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              class="q-mr-sm"
               @click="manualSearch"
               data-test="pipeline-history-manual-search-btn"
-              :disable="loading"
-              class="q-mr-sm download-logs-btn q-px-sm q-py-sm element-box-shadow el-border"
+              :disabled="loading"
             >
+              <template #icon-left><Search class="tw:size-3.5 tw:shrink-0" /></template>
               <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              icon="refresh"
-              flat
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
               @click="refreshData"
-              class="download-logs-btn q-px-sm q-py-sm element-box-shadow el-border"
               data-test="pipeline-history-refresh-btn"
               :loading="loading"
             >
+              <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
               <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
         </div>
       </div>
@@ -576,14 +576,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </div>
           </div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
+          <OButton
+            variant="ghost"
+            size="icon"
             @click="closeErrorDialog"
             class="close-btn"
-          />
+          >
+            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
+          </OButton>
         </q-card-section>
 
         <q-separator />
@@ -597,12 +597,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
         <q-card-actions class="pipeline-error-actions">
-          <q-btn
-            flat
-            label="Close"
-            class="o2-secondary-button tw:h-[36px]"
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="closeErrorDialog"
-          />
+          >Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -618,6 +617,7 @@ import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { ChevronLeft, Search, RefreshCw, X } from "lucide-vue-next";
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";

@@ -106,55 +106,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-card>
         </div>
 
-        <div
-          class="flex justify-start full-width"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        >
-          <q-btn
+        <div class="tw:flex tw:gap-2">
+          <OButton
             v-if="pipelineObj.isEditNode"
             data-test="add-condition-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            color="negative"
-            flat
+            variant="outline-destructive"
+            size="sm-action"
             type="button"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
             @click="openDeleteDialog"
-          >
-            <q-icon name="delete" class="q-mr-xs" />
-            {{ t("pipeline.deleteNode") }}
-          </q-btn>
-          <q-btn
+          >{{ t("pipeline.deleteNode") }}</OButton>
+          <OButton
             data-test="add-condition-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            flat
+            variant="outline"
+            size="sm-action"
             type="button"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
             @click="openCancelDialog"
-          />
-          <q-btn
+          >{{ t('alerts.cancel') }}</OButton>
+          <OButton
             data-test="add-condition-save-btn"
-            :label="t('alerts.save')"
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
+            variant="primary"
+            size="sm-action"
             type="submit"
-          />
+          >{{ t('alerts.save') }}</OButton>
         </div>
       </q-form>
     </div>

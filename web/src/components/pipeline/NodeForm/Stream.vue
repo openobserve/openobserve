@@ -139,53 +139,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div
-            class="flex justify-start full-width q-mt-sm"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-          >
-            <q-btn
+          <div class="tw:flex tw:gap-2 q-mt-sm">
+            <OButton
               v-if="pipelineObj.isEditNode"
               data-test="input-node-stream-delete-btn"
-              class="o2-secondary-button tw:h-[36px] q-mr-md"
-              color="negative"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              no-caps
+              variant="outline-destructive"
+              size="sm-action"
               @click="openDeleteDialog"
-            >
-              <q-icon name="delete" class="q-mr-xs" />
-              {{ t("pipeline.deleteNode") }}
-            </q-btn>
-            <q-btn
+            >{{ t("pipeline.deleteNode") }}</OButton>
+            <OButton
               data-test="input-node-stream-cancel-btn"
-              class="o2-secondary-button tw:h-[36px]"
-              :label="t('alerts.cancel')"
-              no-caps
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
+              variant="outline"
+              size="sm-action"
               @click="openCancelDialog"
-            />
-            <q-btn
+            >{{ t('alerts.cancel') }}</OButton>
+            <OButton
               data-test="input-node-stream-save-btn"
-              :label="t('alerts.save')"
-              class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              flat
-              no-caps
+              variant="primary"
+              size="sm-action"
               type="submit"
-            />
+            >{{ t('alerts.save') }}</OButton>
           </div>
         </div>
         <div v-else class="pipeline-add-stream">
