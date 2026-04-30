@@ -71,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedDate"
             ref="dateTimePickerRef"
             :disable="disable"
-            class="tw:h-[36px]"
             @hide="setTimeForVariables"
             data-test="dashboard-global-date-time-picker"
           />
@@ -1779,6 +1778,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+:deep(.date-time-button) {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
 .dynamic-input {
   min-width: 200px;
   max-width: 500px;

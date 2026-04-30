@@ -1994,11 +1994,6 @@ export default defineComponent({
     background-color: var(--o2-hover-accent);
   }
 
-  :deep(.date-time-button) {
-    height: 30px;
-    min-height: 30px;
-  }
-
   :deep(.q-btn-dropdown) {
     height: 30px;
     min-height: 30px;

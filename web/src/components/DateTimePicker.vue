@@ -409,6 +409,8 @@ export default defineComponent({
 }
 
 .date-time-button {
+  height: 30px;
+  min-height: 30px;
   border-radius: 3px;
   padding: 0px 5px;
   min-width: auto;

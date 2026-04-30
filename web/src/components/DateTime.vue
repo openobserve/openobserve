@@ -1161,7 +1161,8 @@ export default defineComponent({
   border-radius: 0.375rem;
 }
 .date-time-button {
-  height: 100%;
+  height: 30px;
+  min-height: 30px;
   border-radius: 0.375rem;
   padding: 0px 5px;
   font-size: 12px;
