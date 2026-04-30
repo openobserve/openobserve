@@ -16,30 +16,23 @@
           <template v-for="(element, index) in props.operations">
             <div class="operation-item">
               <OButtonGroup>
-                <q-btn
-                  square
-                  icon="drag_indicator"
-                  no-caps
-                  dense
-                  flat
-                  size="sm"
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
                   class="drag-handle"
                   :data-test="`promql-operation-drag-${index}`"
                 >
+                  <GripVertical class="tw:size-3.5 tw:shrink-0" />
                   <q-tooltip>Drag to reorder</q-tooltip>
-                </q-btn>
-                <q-btn
-                  square
-                  icon-right="arrow_drop_down"
-                  no-caps
-                  dense
-                  :no-wrap="true"
-                  color="primary"
+                </OButton>
+                <OButton
+                  variant="primary"
                   size="sm"
-                  :label="computedLabel(element)"
-                  class="q-pl-sm"
+                  :no-wrap="true"
                   :data-test="`promql-operation-${index}`"
                 >
+                  {{ computedLabel(element) }}
+                  <template #icon-right><ChevronDown class="tw:size-3.5 tw:shrink-0" /></template>
                   <q-menu class="q-pa-md">
                     <div style="width: 350px">
                       <div class="text-weight-medium">
@@ -122,7 +115,7 @@
                       </template>
                     </div>
                   </q-menu>
-                </q-btn>
+                </OButton>
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
@@ -219,6 +212,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { ChevronDown, GripVertical } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {

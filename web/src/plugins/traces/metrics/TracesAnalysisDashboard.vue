@@ -108,28 +108,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="tw:flex tw:items-center tw:gap-3">
           <!-- Refresh button (shown when percentile changes on duration tab) -->
-          <q-btn
+          <OButton
             v-if="showRefreshButton"
-            dense
-            color="primary"
-            icon="refresh"
+            variant="primary"
+            size="icon-xs-sq"
             @click="refreshAfterPercentileChange"
             data-test="percentile-refresh-button"
-            class="tw:px-[0.5rem]!"
           >
+            <RefreshCw class="tw:size-3.5 tw:shrink-0" />
             <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
-          </q-btn>
+          </OButton>
 
-          <q-btn
-            flat
-            round
-            dense
-            size="sm"
-            :icon="outlinedClose"
+          <OButton
+            variant="ghost"
+            size="icon-xs-sq"
             @click="isOpen = false"
             data-test="analysis-dashboard-close"
-            class="traces-analysis-close-btn"
-          />
+          >
+            <X class="tw:size-3.5 tw:shrink-0" />
+          </OButton>
         </div>
       </q-card-section>
 
@@ -251,9 +248,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SEPARATOR: Collapse/Expand Button -->
           <template #separator>
-            <q-btn
+            <OButton
               data-test="dimension-selector-collapse-btn"
-              :icon="showDimensionSelector ? 'chevron_left' : 'chevron_right'"
               :title="
                 showDimensionSelector
                   ? 'Collapse Dimensions'
@@ -264,12 +260,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'splitter-icon-expand'
                   : 'splitter-icon-collapse'
               "
-              color="primary"
-              size="sm"
-              dense
-              round
+              variant="ghost"
+              size="icon-xs-sq"
               @click="toggleDimensionSelector"
-            />
+            >
+              <ChevronLeft v-if="showDimensionSelector" class="tw:size-3.5 tw:shrink-0" />
+              <ChevronRight v-else class="tw:size-3.5 tw:shrink-0" />
+            </OButton>
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -315,13 +312,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>
                   <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
-                  <q-btn
-                    outline
-                    color="primary"
-                    :label="t('latencyInsights.retryButton')"
+                  <OButton
+                    variant="outline"
+                    size="sm-action"
                     class="tw:mt-4"
                     @click="loadAnalysis"
-                  />
+                  >
+                    {{ t('latencyInsights.retryButton') }}
+                  </OButton>
                 </div>
 
                 <!-- Dashboard -->
@@ -351,6 +349,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OButton from "@/lib/core/Button/OButton.vue";
+import { RefreshCw, X, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -368,7 +368,6 @@ import {
   selectDimensionsFromData,
   selectTraceDimensions,
 } from "@/composables/useDimensionSelector";
-import { outlinedClose } from "@quasar/extras/material-icons-outlined";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1152,13 +1151,6 @@ watch(
     flex-shrink: 0;
     z-index: 1;
     margin: 8px 0px;
-  }
-
-  .traces-analysis-close-btn {
-    :deep(.q-icon) {
-      font-size: 1.2rem;
-      color: var(--o2-text-1);
-    }
   }
 
   .insights-dashboard-tabs {

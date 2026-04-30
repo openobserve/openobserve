@@ -24,16 +24,15 @@
                 class="q-mt-md text-body2"
                 v-html="DOMPurify.sanitize(t('about.contact_admin_license'))"
               ></div>
-              <q-btn
+              <OButton
                 data-test="no-license-get-license-btn"
-                color="primary"
-                no-caps
-                :label="t('about.get_license')"
-                @click="redirectToGetLicense"
+                variant="primary"
+                size="sm-action"
                 class="q-ml-sm q-mt-sm"
-                size="sm"
-                borderless
-              />
+                @click="redirectToGetLicense"
+              >
+                {{ t("about.get_license") }}
+              </OButton>
             </q-card-section>
           </q-card>
 
@@ -63,14 +62,16 @@
                   }}</span>
                 </div>
               </div>
-              <q-btn
+              <OButton
                 data-test="no-license-update-btn"
-                color="primary"
-                :label="t('about.update_license')"
-                @click="updateLicense"
+                variant="primary"
+                size="sm-action"
                 :loading="updating"
-                :disable="!licenseKey.trim()"
-              />
+                :disabled="!licenseKey.trim()"
+                @click="updateLicense"
+              >
+                {{ t("about.update_license") }}
+              </OButton>
             </q-card-section>
           </q-card>
         </div>
@@ -130,16 +131,15 @@
                     <td>
                       <div class="row items-center q-gutter-sm">
                         <span>{{ getMaskedLicenseKey() }}</span>
-                        <q-btn
-                          flat
-                          round
-                          dense
-                          icon="visibility"
-                          size="sm"
-                          @click="showLicenseKeyModal = true"
+                        <OButton
+                          variant="ghost"
+                          size="icon"
                           class="q-ml-sm"
                           data-test="show-license-key-btn"
-                        />
+                          @click="showLicenseKeyModal = true"
+                        >
+                          <q-icon name="visibility" size="14px" />
+                        </OButton>
                       </div>
                     </td>
                   </tr>
@@ -164,20 +164,22 @@
                 </tbody>
               </q-markup-table>
               <div class="tw:mt-3 tw:flex tw:gap-3">
-                <q-btn
-                  no-caps
-                  :label="t('about.request_new_license')"
-                  class="o2-primary-button"
+                <OButton
+                  variant="primary"
+                  size="sm-action"
                   @click="redirectToGetLicense"
                   data-test="request-new-license-btn"
-                />
-                <q-btn
+                >
+                  {{ t("about.request_new_license") }}
+                </OButton>
+                <OButton
                   data-test="add-license-key-btn"
-                  no-caps
-                  class="o2-primary-button"
-                  :label="t('about.add_new_license_key')"
+                  variant="primary"
+                  size="sm-action"
                   @click="showUpdateFormAndFocus"
-                />
+                >
+                  {{ t("about.add_new_license_key") }}
+                </OButton>
               </div>
             </q-card-section>
           </q-card>
@@ -209,25 +211,27 @@
                 </div>
               </div>
               <div class="row q-gutter-sm">
-                <q-btn
+                <OButton
                   data-test="cancel-update-license-btn"
-                  no-caps
-                  :label="t('common.cancel')"
-                  class="o2-secondary-button"
+                  variant="outline"
+                  size="sm-action"
                   @click="
                     showUpdateForm = false;
                     licenseKey = '';
                   "
-                />
-                <q-btn
+                >
+                  {{ t("common.cancel") }}
+                </OButton>
+                <OButton
                   data-test="confirm-update-license-btn"
-                  color="primary"
-                  no-caps
-                  :label="t('about.update_license')"
-                  @click="updateLicense"
+                  variant="primary"
+                  size="sm-action"
                   :loading="updating"
-                  :disable="!licenseKey.trim()"
-                />
+                  :disabled="!licenseKey.trim()"
+                  @click="updateLicense"
+                >
+                  {{ t("about.update_license") }}
+                </OButton>
               </div>
             </q-card-section>
           </q-card>
@@ -422,22 +426,24 @@
           />
         </q-card-section>
 
-        <q-card-actions align="right" class="q-pt-none">
-          <q-btn
+          <q-card-actions align="right" class="q-pt-none">
+          <OButton
             data-test="license-cancel-btn"
-            no-caps
-            :label="t('common.cancel')"
-            class="o2-secondary-button"
+            variant="outline"
+            size="sm-action"
             v-close-popup
-          />
-          <q-btn
+          >
+            {{ t("common.cancel") }}
+          </OButton>
+          <OButton
             data-test="license-copy-key-btn"
-            color="primary"
-            :label="t('about.copy_key')"
-            no-caps
+            variant="primary"
+            size="sm-action"
+            :disabled="!licenseData.key"
             @click="copyLicenseKey"
-            :disable="!licenseData.key"
-          />
+          >
+            {{ t("about.copy_key") }}
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>

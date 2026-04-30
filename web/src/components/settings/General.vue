@@ -172,15 +172,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>&nbsp;</span>
 
           <div class="flex justify-start">
-            <q-btn
+            <OButton
               data-test="dashboard-add-submit"
               :loading="onSubmit.isLoading.value"
-              :label="t('dashboard.save')"
-              class="q-mb-md o2-primary-button no-border tw:h-[36px]"
+              variant="primary"
+              size="sm-action"
               type="submit"
-              no-caps
-              size="md"
-            />
+            >
+              {{ t("dashboard.save") }}
+            </OButton>
           </div>
         </q-form>
       </div>
@@ -217,28 +217,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="customText"
             />
             <div class="btn-group tw:flex tw:h-[28px]">
-              <q-btn
+              <OButton
                 type="button"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
                 @click="editingText = !editingText"
-              ></q-btn>
-              <q-btn
+              >
+                <X class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
+              <OButton
                 data-test="settings_ent_logo_custom_text_save_btn"
                 :loading="onSubmit.isLoading.value"
-                icon="check"
+                variant="primary"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                dense
-                size="sm"
-                color="primary"
                 type="submit"
-                no-caps
                 @click="updateCustomText"
-              />
+              >
+                <Check class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
             </div>
           </div>
           <div v-else class="flex items-center">
@@ -254,15 +252,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ store.state.zoConfig.custom_logo_text }}
               </q-tooltip>
             </span>
-            <q-btn
+            <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
               :loading="onSubmit.isLoading.value"
-              icon="edit"
-              size="sm"
-              class="text-bold q-ml-sm"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="q-ml-sm"
               type="submit"
               @click="editingText = !editingText"
-            />
+            >
+              <Pencil class="tw:size-3.5 tw:shrink-0" />
+            </OButton>
           </div>
           <span class="individual-setting-description">
             {{ t("settings.customLogoTextDescription") }}
@@ -289,13 +289,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="max-width: 150px; max-height: 31px"
               class="q-mx-md"
             />
-            <q-btn
-              icon="delete"
+            <OButton
               data-test="setting_ent_custom_logo_img_delete_btn"
-              @click="confirmDeleteLogo('light')"
+              variant="ghost-destructive"
+              size="icon-xs-sq"
               class="q-mx-md"
-              size="sm"
-            ></q-btn>
+              @click="confirmDeleteLogo('light')"
+            >
+              <Trash2 class="tw:size-3.5 tw:shrink-0" />
+            </OButton>
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
@@ -315,28 +317,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-file>
             <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
-              <q-btn
+              <OButton
                 type="button"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
                 @click="filesLight = null"
-              ></q-btn>
-              <q-btn
+              >
+                <X class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
+              <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
-                icon="check"
+                variant="primary"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                dense
-                size="sm"
-                color="primary"
                 type="submit"
-                no-caps
                 @click="uploadImage(filesLight, 'light')"
-              />
+              >
+                <Check class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -368,13 +368,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="max-width: 150px; max-height: 31px"
               class="q-mx-md"
             />
-            <q-btn
-              icon="delete"
+            <OButton
               data-test="setting_ent_custom_logo_dark_img_delete_btn"
-              @click="confirmDeleteLogo('dark')"
+              variant="ghost-destructive"
+              size="icon-xs-sq"
               class="q-mx-md"
-              size="sm"
-            ></q-btn>
+              @click="confirmDeleteLogo('dark')"
+            >
+              <Trash2 class="tw:size-3.5 tw:shrink-0" />
+            </OButton>
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
@@ -394,28 +396,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-file>
             <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
-              <q-btn
+              <OButton
                 type="button"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
                 @click="filesDark = null"
-              ></q-btn>
-              <q-btn
+              >
+                <X class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
+              <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
                 :loading="onSubmit.isLoading.value"
-                icon="check"
+                variant="primary"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                dense
-                size="sm"
-                color="primary"
                 type="submit"
-                no-caps
                 @click="uploadImage(filesDark, 'dark')"
-              />
+              >
+                <Check class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -440,22 +440,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right" class="tw:flex tw:gap-1">
-        <q-btn
+        <OButton
           data-test="logs-search-bar-confirm-dialog-cancel-btn"
-          :label="t('confirmDialog.cancel')"
-          class="o2-secondary-button tw:h-[28px] no-border"
-          flat
-          no-caps
+          variant="outline"
+          size="sm-action"
           @click="cancelConfirmDialog"
-        />
-        <q-btn
+        >
+          {{ t("confirmDialog.cancel") }}
+        </OButton>
+        <OButton
           data-test="logs-search-bar-confirm-dialog-ok-btn"
-          :label="t('confirmDialog.ok')"
-          class="o2-primary-button tw:h-[28px] no-border"
-          no-caps
-          flat
+          variant="primary"
+          size="sm-action"
           @click="confirmDialogOK"
-        />
+        >
+          {{ t("confirmDialog.ok") }}
+        </OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -495,6 +495,7 @@ import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { X, Check, Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
   name: "PageGeneralSettings",
