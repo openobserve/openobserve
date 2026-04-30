@@ -192,7 +192,17 @@ pub fn get_peak_memory_from_ctx(ctx: &SessionContext) -> Arc<AtomicUsize> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::physical_plan::empty::EmptyExec;
+
     use super::*;
+
+    fn empty_plan() -> Arc<dyn datafusion::physical_plan::ExecutionPlan> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        Arc::new(EmptyExec::new(schema))
+    }
 
     #[test]
     fn test_remote_scan_visitor_new_has_no_stats() {
@@ -216,5 +226,29 @@ mod tests {
     fn test_peak_memory_visitor_new_has_none() {
         let v = PeakMemoryVisitor::new();
         assert!(v.peak_memory.is_none());
+    }
+
+    #[test]
+    fn test_get_scan_stats_no_remote_exec_returns_none() {
+        let plan = empty_plan();
+        assert!(get_scan_stats(&plan).is_none());
+    }
+
+    #[test]
+    fn test_get_cluster_metrics_no_remote_exec_returns_empty() {
+        let plan = empty_plan();
+        assert!(get_cluster_metrics(&plan).is_empty());
+    }
+
+    #[test]
+    fn test_get_partial_err_no_remote_exec_returns_none() {
+        let plan = empty_plan();
+        assert!(get_partial_err(&plan).is_none());
+    }
+
+    #[test]
+    fn test_get_peak_memory_no_remote_exec_returns_none() {
+        let plan = empty_plan();
+        assert!(get_peak_memory(&plan).is_none());
     }
 }
