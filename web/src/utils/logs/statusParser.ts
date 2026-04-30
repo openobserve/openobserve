@@ -44,18 +44,18 @@ export interface StatusInfo {
 
 /**
  * Color mapping for different log levels
- * Uses Tailwind CSS color palette for consistent theming
+ * Keys must stay aligned with SEMANTIC_COLORS_LIGHT / SEMANTIC_COLORS_DARK in convertLogData.ts.
  */
 export const STATUS_COLORS = {
-  emergency: '#E53935', // aligned with convertLogData fatal
-  alert: '#ea580c',    // no convertLogData equivalent — unchanged
-  critical: '#F4511E', // aligned with convertLogData critical
-  error: '#EF5350',    // aligned with convertLogData error
-  warning: '#FB8C00',  // aligned with convertLogData warn
-  notice: '#16a34a',   // no convertLogData equivalent — unchanged
-  info: '#1E88E5',     // aligned with convertLogData info
-  debug: '#00ACC1',    // aligned with convertLogData debug
-  ok: '#43A047',       // aligned with convertLogData success
+  emergency: '#E53935', // aligned with convertLogData fatal/emergency
+  alert:     '#ea580c',
+  critical:  '#F4511E', // aligned with convertLogData critical
+  error:     '#EF5350', // aligned with convertLogData error
+  warning:   '#FB8C00', // aligned with convertLogData warn/warning
+  notice:    '#16a34a',
+  info:      '#1E88E5', // aligned with convertLogData info
+  debug:     '#00ACC1', // aligned with convertLogData debug
+  ok:        '#43A047', // aligned with convertLogData success/ok
 } as const;
 
 /**

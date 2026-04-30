@@ -46,6 +46,7 @@ vi.mock("vuex", () => ({
         },
       },
     },
+    dispatch: vi.fn(),
   })),
 }));
 
@@ -486,9 +487,9 @@ describe("useTraces", () => {
   // navigateToLogs
   // -------------------------------------------------------------------------
   describe("navigateToLogs", () => {
-    it("calls router.push with /logs path", () => {
+    it("calls router.push with /logs path", async () => {
       const { navigateToLogs } = useTraces();
-      navigateToLogs({
+      await navigateToLogs({
         stream: "default",
         from: 1000,
         to: 2000,
@@ -502,9 +503,9 @@ describe("useTraces", () => {
       );
     });
 
-    it("passes all query parameters to router.push", () => {
+    it("passes all query parameters to router.push", async () => {
       const { navigateToLogs } = useTraces();
-      navigateToLogs({
+      await navigateToLogs({
         stream: "my-stream",
         from: 500,
         to: 1000,

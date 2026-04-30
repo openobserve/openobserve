@@ -2303,6 +2303,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       } else if (newType === "custom") {
         previewQuery.value = "";
         isUsingBackendSql.value = false;
+        // Restore aggregation enabled state from form data — switching from
+        // PromQL/SQL to custom loses it otherwise, and the generate_sql payload
+        // would skip the aggregation block even when it's configured.
+        isAggregationEnabled.value = !!formData.value.query_condition.aggregation;
         debouncedGenerateSql();
       }
     },

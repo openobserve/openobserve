@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed } from "vue";
+import { reactive, computed, nextTick } from "vue";
 import {
   b64EncodeStandard,
   b64EncodeUnicode,
@@ -343,8 +343,8 @@ const useTraces = () => {
 
     return {
       stream: searchObj.data.traceDetails.selectedLogStreams.join(","),
-      from: span.startTimeMs * 1000 - 60000000,
-      to: span.endTimeMs * 1000 + 60000000,
+      from: Math.floor(span.start_time / 1000) - 60000000,
+      to: Math.ceil(span.end_time / 1000) + 60000000,
       refresh: 0,
       query,
       orgIdentifier: store.state.selectedOrganization.identifier,
@@ -352,7 +352,9 @@ const useTraces = () => {
   };
 
   // Function to navigate to logs with the provided query details
-  const navigateToLogs = (queryDetails: any) => {
+  const navigateToLogs = async (queryDetails: any) => {
+    store.dispatch("logs/setIsInitialized", false);
+    await nextTick();
     router.push({
       path: "/logs",
       query: {
