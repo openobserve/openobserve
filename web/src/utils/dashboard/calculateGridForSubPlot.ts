@@ -67,6 +67,7 @@ export function getTrellisGrid(
   leftMargin: number,
   numOfColumns: number = -1,
   axisWidth: number | null = 10,
+  independentYAxisScale: boolean = false,
 ) {
   if (width <= 0) {
     throw new Error("Width and height must be positive numbers");
@@ -118,6 +119,16 @@ export function getTrellisGrid(
   const leftPaddingInPx =
     Math.max(leftMargin, axisWidth || 0) + SPACING_CONFIG.padding.extraLeft;
 
+  // When independent Y-axis scale is enabled, each non-first column needs
+  // space for tick value labels only (no axis name label).
+  // leftMargin is yAxisNameGap which already represents the tick label width.
+  // We only add a small margin (5px axisLabel.margin) instead of the full extraLeft padding.
+  const perCellLeftMarginInPx = independentYAxisScale
+    ? Math.max(leftMargin, axisWidth || 0) + 5
+    : 0;
+  const totalExtraLeftInPx = perCellLeftMarginInPx * (numCols - 1);
+  const perCellLeftMargin = (perCellLeftMarginInPx / width) * 100;
+
   const leftPadding = (leftPaddingInPx / width) * 100;
   const rightPadding = (SPACING_CONFIG.padding.right / width) * 100;
 
@@ -125,11 +136,12 @@ export function getTrellisGrid(
   const cellWidthInPx =
     (width -
       (SPACING_CONFIG.padding.right + leftPaddingInPx) -
-      xSpacingBetweenInPx) /
+      xSpacingBetweenInPx -
+      totalExtraLeftInPx) /
     numCols;
 
   const cellWidth =
-    (100 - (xSpacingBetween + rightPadding + leftPadding)) / numCols;
+    (100 - (xSpacingBetween + rightPadding + leftPadding) - perCellLeftMargin * (numCols - 1)) / numCols;
 
   // Calculate cell height based on cell width
   const cellHeightInPx = cellWidthInPx * 0.4;
@@ -153,7 +165,7 @@ export function getTrellisGrid(
         break;
       }
       const grid = {
-        left: `${col * cellWidth + col * ((SPACING_CONFIG.horizontal / width) * 100) + leftPadding}%`,
+        left: `${col * cellWidth + col * ((SPACING_CONFIG.horizontal / width) * 100) + leftPadding + col * perCellLeftMargin}%`,
         top: `${row * cellHeight + row * ((SPACING_CONFIG.vertical / totalChartHeight) * 100) + topPadding}%`,
         width: `${cellWidth}%`,
         height: `${cellHeight}%`,

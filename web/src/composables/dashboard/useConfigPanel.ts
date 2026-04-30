@@ -384,6 +384,12 @@ export function useConfigPanel(
           showTrellisConfig.value &&
           dashboardPanelData.data.config.trellis?.layout != null,
       },
+      "trellis-independent-y-axis": {
+        label: t("dashboard.trellisIndependentYAxis"),
+        visible:
+          showTrellisConfig.value &&
+          dashboardPanelData.data.config.trellis?.layout != null,
+      },
     },
     colors: {
       colors: {

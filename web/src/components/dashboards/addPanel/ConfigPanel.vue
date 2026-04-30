@@ -2242,6 +2242,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </div>
         </div>
+
+        <div
+          v-if="
+            dashboardPanelData.data.config.trellis?.layout &&
+            !(isBreakdownFieldEmpty || hasTimeShifts)
+          "
+          v-show="
+            isConfigOptionVisible('layout', 'trellis-independent-y-axis')
+          "
+          class="row items-center"
+        >
+          <q-toggle
+            v-model="
+              dashboardPanelData.data.config.trellis
+                .independent_y_axis_scale
+            "
+            :label="t('dashboard.trellisIndependentYAxis')"
+            data-test="dashboard-config-trellis-independent-y-axis"
+            class="tw:h-[36px] o2-toggle-button-lg"
+            size="lg"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-lg-dark'
+                : 'o2-toggle-button-lg-light'
+            "
+          />
+          <div>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-trellis-independent-y-axis-info"
+            />
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.trellisIndependentYAxisTooltip") }}
+            </q-tooltip>
+          </div>
+        </div>
       </div>
     </q-expansion-item>
 
@@ -2587,6 +2630,7 @@ export default defineComponent({
           layout: null,
           num_of_columns: 1,
           group_by_y_axis: false,
+          independent_y_axis_scale: false,
         };
       }
 

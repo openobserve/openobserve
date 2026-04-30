@@ -1667,6 +1667,8 @@
     "groupMultiYAxisTrellisTooltipEnabledResult": "• Enabled: 2 charts (Server A chart with CPU+Memory, Server B chart with CPU+Memory)",
     "groupMultiYAxisTrellisTooltipDisabledResult": "• Disabled: 4 charts (Server A CPU, Server A Memory, Server B CPU, Server B Memory)",
     "groupMultiYAxisTrellisTooltipDescription": "When you have multiple Y-axis fields and a breakdown field:",
+    "trellisIndependentYAxis": "Independent Y-axis scale",
+    "trellisIndependentYAxisTooltip": "When enabled, each trellis chart will have its own Y-axis scale based on its data range. When disabled, all charts share the same Y-axis scale.",
     "legendsType": "Legends Type",
     "legendHeight": "Legend Height",
     "chartAlign": "Chart Align",

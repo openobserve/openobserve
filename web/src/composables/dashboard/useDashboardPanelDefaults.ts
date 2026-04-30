@@ -25,6 +25,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
         layout: null,
         num_of_columns: 1,
         group_by_y_axis: false,
+        independent_y_axis_scale: false,
       },
       show_gridlines: true,
       show_legends: true,

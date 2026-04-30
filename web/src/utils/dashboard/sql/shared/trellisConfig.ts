@@ -110,8 +110,16 @@ export function createTrellisHelpers(deps: TrellisDeps) {
       maxYValue.value ===
       parseInt(num) + (decimals === undefined ? "" : `.${decimals}`);
 
+    const independentYAxisScale =
+      panelSchema.config.trellis?.independent_y_axis_scale;
+
     options.yAxis.forEach((it: any, index: number) => {
-      if (addMaxValue) {
+      if (independentYAxisScale) {
+        // When independent Y-axis scale is enabled, let ECharts auto-calculate
+        // min/max per sub-chart based on its own data range
+        delete it.min;
+        delete it.max;
+      } else if (addMaxValue) {
         const rounedMaxValue = Math.ceil(parseFloat(maxYValue.value));
         it.max = rounedMaxValue + rounedMaxValue * 0.1; // Add 10% to the max value, to ensure that the max value is not at the top of the chart
       }
@@ -129,21 +137,25 @@ export function createTrellisHelpers(deps: TrellisDeps) {
         },
       };
 
-      let showAxisLabel = true;
-
+      // Determine if this sub-chart is on the edge (leftmost col or bottom row)
+      let isEdgeChart = true;
       if (isHorizontalChart) {
-        showAxisLabel = options.yAxis.length - gridData.gridNoOfCol <= index;
+        isEdgeChart = options.yAxis.length - gridData.gridNoOfCol <= index;
       } else {
-        showAxisLabel = index % gridData.gridNoOfCol === 0;
+        isEdgeChart = index % gridData.gridNoOfCol === 0;
       }
 
-      // Here we are setting the axis label properties, if showAxisLabel is false then we are hiding the axis label
-      it.nameGap = showAxisLabel ? (isHorizontalChart ? 25 : yAxisNameGap) : 0;
-      it.axisLabel.margin = showAxisLabel ? 5 : 0;
-      it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
+      // Show tick values on all sub-charts when independent scale is enabled,
+      // otherwise only on edge charts
+      const showTickLabels = independentYAxisScale || isEdgeChart;
+
+      // Axis name (e.g. "Timestamp") always follows the edge-only rule
+      it.nameGap = isEdgeChart ? (isHorizontalChart ? 25 : yAxisNameGap) : 0;
+      it.axisLabel.margin = showTickLabels ? 5 : 0;
+      it.axisLabel.fontSize = showTickLabels ? 12 : 10;
       it.nameTextStyle.fontSize = 12;
-      it.axisLabel.show = showAxisLabel;
-      if (!showAxisLabel) it.name = "";
+      it.axisLabel.show = showTickLabels;
+      if (!isEdgeChart) it.name = "";
     });
   };
 
@@ -234,6 +246,9 @@ export function createTrellisHelpers(deps: TrellisDeps) {
       // with each chart containing multiple series (one per y-axis metric)
       const group_by_y_axis = panelSchema.config.trellis?.group_by_y_axis;
 
+      const independentYAxisScale =
+        !!panelSchema.config.trellis?.independent_y_axis_scale;
+
       // Calculate grid layout for trellis charts
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
@@ -244,6 +259,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
         yAxisNameGap,
         customCols,
         panelSchema.config?.axis_width,
+        independentYAxisScale,
       );
 
       options.grid = gridData.gridArray;
