@@ -40,20 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col col-12 q-pa-sm"
             style="text-align: center; width: 300px"
           >
-            <q-btn
+            <OButton
               data-test="logs-search-off-refresh-interval"
-              no-caps
-              :flat="modelValue.toString() !== '0'"
-              size="md"
-              :class="
-                'no-border full-width ' +
-                (modelValue.toString() === '0' ? 'selected' : '')
-              "
+              :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
+              size="sm"
+              :block="true"
               v-close-popup="true"
               @click="onItemClick({ label: t('common.off'), value: 0 })"
             >
               {{ t("common.off") }}
-            </q-btn>
+            </OButton>
           </div>
         </div>
         <q-separator />
@@ -64,18 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col col-4 q-pa-sm"
             style="text-align: center"
           >
-            <q-btn
+            <OButton
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
-              no-caps
-              :flat="Number(modelValue) !== item.value"
-              size="md"
-              :class="[
-                'no-border ' +
-                  (Number(modelValue) === item.value ? 'selected' : ''),
-              ]"
+              :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
+              size="sm"
               @click="onItemClick(item)"
               v-close-popup="true"
-              :disable="item.disabled"
+              :disabled="item.disabled"
             >
               <q-tooltip
                 v-if="item.disabled"
@@ -87,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ minRangeRestrictionMessageVal }}
               </q-tooltip>
               {{ item.label }}
-            </q-btn>
+            </OButton>
           </div>
         </div>
       </q-menu>
@@ -120,20 +111,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col col-12 q-pa-sm"
           style="text-align: center; width: 300px"
         >
-          <q-btn
+          <OButton
             data-test="logs-search-off-refresh-interval"
-            no-caps
-            :flat="modelValue.toString() !== '0'"
-            size="md"
-            :class="
-              'no-border full-width ' +
-              (modelValue.toString() === '0' ? 'selected' : '')
-            "
+            :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
+            size="sm"
+            :block="true"
             v-close-popup="true"
             @click="onItemClick({ label: t('common.off'), value: 0 })"
           >
             {{ t("common.off") }}
-          </q-btn>
+          </OButton>
         </div>
       </div>
       <q-separator />
@@ -144,18 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col col-4 q-pa-sm"
           style="text-align: center"
         >
-          <q-btn
+          <OButton
             :data-test="`logs-search-bar-refresh-time-${item.value}`"
-            no-caps
-            :flat="Number(modelValue) !== item.value"
-            size="md"
-            :class="[
-              'no-border ' +
-                (Number(modelValue) === item.value ? 'selected' : ''),
-            ]"
+            :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
+            size="sm"
             @click="onItemClick(item)"
             v-close-popup="true"
-            :disable="item.disabled"
+            :disabled="item.disabled"
           >
             <q-tooltip
               v-if="item.disabled"
@@ -167,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ minRangeRestrictionMessageVal }}
             </q-tooltip>
             {{ item.label }}
-          </q-btn>
+          </OButton>
         </div>
       </div>
     </q-btn-dropdown>

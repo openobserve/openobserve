@@ -11,26 +11,21 @@
       </div>
       <div class="tw:flex tw:items-center">
         <div>
-          <q-btn
+          <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          :ripple="false"
+          variant="ghost"
+          size="icon-toolbar"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
-          no-caps
-          :borderless="true"
-          flat
-          dense
-          class="o2-button ai-hover-btn q-py-sm"
+          class="ai-hover-btn"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 6px;"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
-
         >
-          <div class="row items-center no-wrap tw:gap-2  ">
+          <div class="row items-center no-wrap tw:gap-2">
             <img  :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
-        </q-btn>
+        </OButton>
         </div>
         <q-icon
           v-close-popup
