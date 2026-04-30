@@ -77,41 +77,35 @@
                 :allow-custom-columns="props.allowCustomColumns"
                 :module="props.module"
             />
-                <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
+                <OButton data-test="alert-conditions-delete-condition-btn" size="icon-xs-circle" variant="ghost" @click="removeCondition(item.id)">
+                  <q-icon name="close" />
+                </OButton>
                 </div>
         </div>
         <!-- Action buttons -->
 
         <div class="flex justify-start items-center tw:ml-4"
         >
-        <q-btn
+        <OButton
             data-test="alert-conditions-add-condition-btn"
-            class="q-ml-md flex justify-between items-center"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
+            class="q-ml-md"
             size="sm"
-            flat
+            variant="ghost-primary"
             @click="addCondition(props.group.groupId)"
-            color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="10px" style="border-radius: 50%;  border: 1px solid;" name="add" />
             <span class="tw:text-[12px]">Condition</span>
             <q-tooltip :delay="300">
               {{ t('alerts.conditions.addConditionTooltip') }}
             </q-tooltip>
-        </q-btn>
-        <q-btn
+        </OButton>
+        <OButton
             data-test="alert-conditions-add-condition-group-btn"
-            class="q-ml-xs flex justify-between items-center"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
+            class="q-ml-xs"
             size="sm"
-            flat
+            variant="ghost-primary"
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
-            color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
             <span class="text-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
@@ -121,23 +115,20 @@
             <q-tooltip v-else :delay="300">
               {{ t('alerts.conditions.maxDepthReachedTooltip') }}
             </q-tooltip>
-        </q-btn>
-        <q-btn
+        </OButton>
+        <OButton
             data-test="alert-conditions-reorder-btn"
-            class="q-ml-xs flex justify-between items-center"
-            padding="sm"
-            unelevated
+            class="q-ml-xs"
             size="sm"
-            flat
+            variant="ghost-primary"
             @click="reorderItems()"
-            color="primary"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="12px" name="swap_vert" />
             <span class="text-bold">Reorder</span>
             <q-tooltip :delay="300">
               Reorder items: Conditions first, then Groups
             </q-tooltip>
-        </q-btn>
+        </OButton>
      </div>
         </div>
     </div>
@@ -155,6 +146,7 @@
     import { computed, ref, watch } from 'vue';
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
+    import OButton from '@/lib/core/Button/OButton.vue';
     import { useI18n } from 'vue-i18n';
     import { getUUID } from '@/utils/zincutils';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';

@@ -34,20 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-          <q-btn
-            class="o2-secondary-button q-ml-sm tw:h-[36px]"
-            flat
-            :label="t(`dashboard.import`)"
+          <OButton
+            variant="outline"
+            size="sm"
             @click="importTemplate"
             data-test="template-import"
-          />
-          <q-btn
+          >{{ t(`dashboard.import`) }}</OButton>
+          <OButton
             data-test="template-list-add-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
-            flat
-            :label="t(`alert_templates.add`)"
+            variant="primary"
+            size="sm"
             @click="editTemplate(null)"
-          />
+          >{{ t(`alert_templates.add`) }}</OButton>
         </div>
       </div>
       <q-table
@@ -98,45 +96,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
+            <OButton
               title="Export Template"
               class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              icon="download"
+              variant="ghost"
+              size="icon-circle-sm"
               @click.stop="exportTemplate(props.row)"
               data-test="destination-export"
             >
-            </q-btn>
-            <q-btn
+              <q-icon name="download" />
+            </OButton>
+            <OButton
               :data-test="`alert-template-list-${props.row.name}-update-template`"
               class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              icon="edit"
+              variant="ghost"
+              size="icon-circle-sm"
               :title="t('alert_templates.edit')"
               @click="editTemplate(props.row)"
             >
-            </q-btn>
-            <q-btn
+              <q-icon name="edit" />
+            </OButton>
+            <OButton
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
               class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :icon="outlinedDelete"
+              variant="ghost"
+              size="icon-circle-sm"
               :title="t('alert_templates.delete')"
               @click="conformDeleteDestination(props.row)"
             >
-            </q-btn>
+              <q-icon :name="outlinedDelete" />
+            </OButton>
           </q-td>
         </template>
         <template #bottom="scope">
@@ -144,21 +133,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
               {{ resultTotal }} {{ t('alert_templates.header') }}
             </div>
-            <q-btn
+            <OButton
               v-if="selectedTemplates.length > 0"
               data-test="template-list-delete-templates-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              dense
+              variant="secondary"
+              size="sm"
+              class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
               <q-icon name="delete" size="16px" />
               <span class="tw:ml-2">Delete</span>
-            </q-btn>
+            </OButton>
             <QTablePagination
               :scope="scope"
               :position="'bottom'"
@@ -210,6 +195,7 @@ import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OButton from '@/lib/core/Button/OButton.vue';
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useReo } from "@/services/reodotdev_analytics";

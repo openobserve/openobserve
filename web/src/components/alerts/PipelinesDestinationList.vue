@@ -41,13 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
           </q-input>
-          <q-btn
+          <OButton
             data-test="pipeline-destination-list-add-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
-            flat
-            :label="t(`alert_destinations.add`)"
+            variant="primary"
+            size="sm"
             @click="editDestination(null)"
-          />
+          >{{ t(`alert_destinations.add`) }}</OButton>
         </div>
       </div>
       <q-table
@@ -74,30 +73,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div class="tw:flex tw:justify-center tw:items-center">
-              <q-btn
+              <OButton
                 :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="edit"
+                variant="ghost"
+                size="icon-circle-sm"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(props.row)"
               >
-              </q-btn>
-              <q-btn
+                <q-icon name="edit" />
+              </OButton>
+              <OButton
                 :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :icon="outlinedDelete"
+                variant="ghost"
+                size="icon-circle-sm"
                 :title="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(props.row)"
               >
-              </q-btn>
+                <q-icon :name="outlinedDelete" />
+              </OButton>
             </div>
           </q-td>
         </template>
@@ -111,21 +104,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
                   {{ resultTotal }} {{ t('pipeline_destinations.header') }}
                 </div>
-            <q-btn
+            <OButton
               v-if="selectedDestinations.length > 0"
               data-test="pipeline-destination-list-delete-destinations-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              dense
+              variant="secondary"
+              size="sm"
+              class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
               <q-icon name="delete" size="16px" />
               <span class="tw:ml-2">Delete</span>
-            </q-btn>
+            </OButton>
           <QTablePagination
             :scope="scope"
             :position="'bottom'"
@@ -215,6 +204,7 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useReo } from "@/services/reodotdev_analytics";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 interface ConformDelete {
   visible: boolean;
@@ -227,6 +217,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     QTablePagination,
+    OButton,
   },
   setup() {
     const qTable = ref();

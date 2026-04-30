@@ -131,13 +131,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-history-drawer-date-picker"
             @on:date-change="updateDateTime"
           />
-          <q-btn
+          <OButton
             v-close-popup="true"
-            round
-            flat
-            icon="cancel"
+            variant="ghost"
+            size="icon-circle-sm"
             data-test="alert-details-close-btn"
-          />
+          >
+            <q-icon name="cancel" />
+          </OButton>
         </div>
       </div>
     </q-card-section>
@@ -394,18 +395,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       SQL
                     </span>
                   </div>
-                  <q-btn
+                  <OButton
                     v-if="anomalySql"
                     @click="copyToClipboard(anomalySql, 'SQL')"
-                    flat
-                    dense
-                    size="xs"
-                    icon="content_copy"
-                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    variant="ghost-muted"
+                    size="icon-xs-sq"
                     data-test="anomaly-details-copy-sql-btn"
                   >
+                    <q-icon name="content_copy" />
                     <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
                 <pre
                   class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
@@ -451,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}
                     </span>
                   </div>
-                  <q-btn
+                  <OButton
                     v-if="
                       alertDetails.conditions &&
                       alertDetails.conditions !== '' &&
@@ -467,15 +466,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : t('alerts.alertDetails.conditions'),
                       )
                     "
-                    flat
-                    dense
-                    size="xs"
-                    icon="content_copy"
-                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    variant="ghost-muted"
+                    size="icon-xs-sq"
                     data-test="alert-details-copy-conditions-btn"
                   >
+                    <q-icon name="content_copy" />
                     <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
@@ -533,6 +530,7 @@ import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
+import OButton from '@/lib/core/Button/OButton.vue';
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";

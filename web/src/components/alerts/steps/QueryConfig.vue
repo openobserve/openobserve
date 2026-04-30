@@ -39,17 +39,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Open Full Editor (SQL/PromQL tabs) -->
-        <q-btn
+        <OButton
           v-if="localTab !== 'custom'"
           data-test="step2-view-editor-btn"
+          variant="outline"
           size="sm"
-          flat
-          no-caps
-          class="o2-secondary-button"
           @click="viewSqlEditor = true"
         >
         {{ t('alerts.queryConfig.openFullEditor') }}
-      </q-btn>
+      </OButton>
       </div>
 
       <!-- Custom Query Builder -->
@@ -203,28 +201,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="onLogGroupByChange"
                       />
-                      <q-btn
-                        icon="close"
-                        size="xs"
-                        flat
-                        round
-                        dense
+                      <OButton
+                        variant="ghost"
+                        size="icon-circle-sm"
                         class="tw:text-gray-400 hover:tw:text-red-500"
                         @click="deleteLogGroupByColumn(index)"
-                      />
+                      >
+                        <q-icon name="close" />
+                      </OButton>
                     </div>
                   </template>
-                  <q-btn
-                    icon="add"
-                    size="xs"
-                    flat
-                    round
-                    dense
-                    color="primary"
+                  <OButton
+                    variant="ghost-primary"
+                    size="icon-circle-sm"
                     @click="addLogGroupByColumn"
                   >
+                    <q-icon name="add" />
                     <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
 
@@ -409,28 +403,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="emitAggregationUpdate"
                       />
-                      <q-btn
-                        icon="close"
-                        size="xs"
-                        flat
-                        round
-                        dense
+                      <OButton
+                        variant="ghost"
+                        size="icon-circle-sm"
                         class="tw:text-gray-400 hover:tw:text-red-500"
                         @click="deleteGroupByColumn(index)"
-                      />
+                      >
+                        <q-icon name="close" />
+                      </OButton>
                     </div>
                   </template>
-                  <q-btn
-                    icon="add"
-                    size="xs"
-                    flat
-                    round
-                    dense
-                    color="primary"
+                  <OButton
+                    variant="ghost-primary"
+                    size="icon-circle-sm"
                     @click="addGroupByColumn"
                   >
+                    <q-icon name="add" />
                     <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
 
@@ -1045,6 +1035,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -1061,6 +1052,7 @@ export default defineComponent({
     QueryEditorDialog,
     CustomConfirmDialog,
     UnifiedQueryEditor,
+    OButton,
   },
   props: {
     tab: {
