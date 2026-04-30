@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @folder-selected="selectedFolder = $event"
         />
 
-        <div class="flex justify-start q-mt-sm tw:gap-2">
+        <div class="flex justify-start q-mt-md tw:gap-3">
           <OButton
             v-close-popup="true"
             variant="outline"
