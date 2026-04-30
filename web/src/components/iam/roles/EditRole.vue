@@ -326,6 +326,7 @@ import serviceAccountService from "@/services/service_accounts";
 import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Shield, Users, Bot, LayoutList, CheckSquare, Table2, Braces } from "lucide-vue-next";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
@@ -398,10 +399,12 @@ const tabs = [
   {
     value: "permissions",
     label: "Permissions",
+    icon: Shield,
   },
   {
     value: "users",
     label: "Users",
+    icon: Users,
   },
 ];
 
@@ -409,6 +412,7 @@ if (store.state.zoConfig.service_account_enabled) {
   tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",
+    icon: Bot,
   });
 }
 
@@ -416,10 +420,12 @@ const permissionDisplayOptions = [
   {
     label: "All",
     value: "all",
+    icon: LayoutList,
   },
   {
     label: "Selected",
     value: "selected",
+    icon: CheckSquare,
   },
 ];
 
@@ -427,10 +433,12 @@ const permissionUiOptions = [
   {
     label: "Table",
     value: "table",
+    icon: Table2,
   },
   {
     label: "JSON",
     value: "json",
+    icon: Braces,
   },
 ];
 

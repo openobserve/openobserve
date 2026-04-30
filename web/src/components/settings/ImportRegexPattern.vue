@@ -257,6 +257,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import AppTabs from "../common/AppTabs.vue";
+import { BookOpen, Upload, Link } from "lucide-vue-next";
 import BaseImport from "../common/BaseImport.vue";
 import axios from "axios";
 
@@ -318,14 +319,17 @@ export default defineComponent({
       {
         label: "Built-in Patterns",
         value: "import_built_in_patterns",
+        icon: BookOpen,
       },
       {
         label: "File Upload / JSON",
         value: "import_json_file",
+        icon: Upload,
       },
       {
         label: "URL Import",
         value: "import_json_url",
+        icon: Link,
       },
     ]);
 

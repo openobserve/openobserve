@@ -275,6 +275,7 @@ import { date, QTable, useQuasar } from "quasar";
 import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Code2, Info } from "lucide-vue-next";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 
@@ -336,10 +337,12 @@ export default defineComponent({
       {
         label: "Query / Function",
         value: "query",
+        icon: Code2,
       },
       {
         label: "More Details",
         value: "more_details",
+        icon: Info,
       },
     ]);
 

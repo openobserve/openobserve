@@ -589,6 +589,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { LayoutList, CalendarClock, Zap } from "lucide-vue-next";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";
@@ -669,14 +670,17 @@ const tabs = reactive([
   {
     label: t('pipeline_list.tab_all'),
     value: "all",
+    icon: LayoutList,
   },
   {
     label: t('pipeline_list.tab_scheduled'),
     value: "scheduled",
+    icon: CalendarClock,
   },
   {
     label: t('pipeline_list.tab_realtime'),
     value: "realtime",
+    icon: Zap,
   },
 ]);
 const perPageOptions: any = [

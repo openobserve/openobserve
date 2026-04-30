@@ -122,6 +122,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Database, CalendarClock } from "lucide-vue-next";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
@@ -176,10 +177,12 @@ const reportTypeTabs = reactive([
   {
     label: t("reports.cached"),
     value: "cached",
+    icon: Database,
   },
   {
     label: t("reports.scheduled"),
     value: "shared",
+    icon: CalendarClock,
   },
 ]);
 
