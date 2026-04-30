@@ -576,13 +576,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="search" class="o2-search-input-icon" />
               </template>
             </q-input>
-            <q-btn
-              :label="t('common.refresh')"
-              class="o2-secondary-button tw:h-[36px]"
-              flat
+            <OButton
+              variant="outline"
+              size="sm-action"
               @click="getData(true)"
             >
-            </q-btn>
+              {{ t("common.refresh") }}
+            </OButton>
           </div>
         </div>
         <q-table

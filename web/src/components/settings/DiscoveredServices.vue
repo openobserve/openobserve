@@ -33,14 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mb-4"
       />
       <div class="text-body1 text-negative">{{ error }}</div>
-      <q-btn
+      <OButton
         data-test="retry-discovered-services-btn"
-        flat
-        dense
-        icon="refresh"
+        variant="outline"
+        size="sm-action"
         @click="loadServices"
-        >{{ t("settings.correlation.retry") }}</q-btn
       >
+        <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
+        {{ t("settings.correlation.retry") }}
+      </OButton>
     </div>
 
     <!-- Empty State -->
@@ -52,16 +53,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-body2 text-grey-6 tw:mt-2">
         {{ t("settings.correlation.noServicesDescription") }}
       </div>
-      <q-btn
+      <OButton
         data-test="refresh-discovered-services-btn"
-        flat
-        dense
-        icon="refresh"
-        @click="loadServices(true)"
+        variant="outline"
+        size="sm-action"
         :loading="refreshing"
         class="tw:mt-3"
-        >{{ t("common.refresh") }}</q-btn
+        @click="loadServices(true)"
       >
+        <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
+        {{ t("common.refresh") }}
+      </OButton>
     </div>
 
     <!-- Services List -->
@@ -156,10 +158,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-            <q-btn
+            <OButton
               data-test="reset-discovered-services-btn"
-              round
-              class="o2-secondary-button"
+              variant="outline"
+              size="sm-action"
               :loading="resetting"
               @click="confirmResetServices"
             >
@@ -167,16 +169,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tooltip>{{
                 t("settings.correlation.resetServicesTooltip")
               }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              flat
-              round
+            </OButton>
+            <OButton
+              variant="outline"
+              size="sm-action"
               :loading="refreshing"
               @click="loadServices(true)"
               data-test="refresh-discovered-services-btn"
-              class="o2-secondary-button refresh-btn"
-              >{{ t("common.refresh") }}</q-btn
             >
+              {{ t("common.refresh") }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -610,6 +612,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { RefreshCw } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
@@ -1669,8 +1672,5 @@ onMounted(() => {
   padding-right: 1.5rem !important;
 }
 
-.refresh-btn {
-  min-height: 2.25rem;
-  height: 2.25rem;
-}
+
 </style>

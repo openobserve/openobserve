@@ -142,17 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="model-pricing-pattern-input"
                 />
               </div>
-              <q-btn
-                icon="lightbulb_outline"
-                padding="xs"
-                flat
-                unelevated
-                round
-                dense
-                size="sm"
+              <OButton
+                variant="ghost"
+                size="icon-xs-sq"
                 class="pattern-examples-btn tw:mt-7"
                 @click="showExamples = true"
               >
+                <q-icon name="lightbulb_outline" size="14px" />
                 <q-tooltip
                   anchor="top right"
                   self="bottom right"
@@ -160,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ t("modelPricing.patternExamplesBtn") }}
                 </q-tooltip>
-              </q-btn>
+              </OButton>
 
               <!-- Pattern Examples Dialog -->
               <q-dialog v-model="showExamples">
@@ -199,30 +195,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <code class="examples-pattern">{{
                           ex.match_pattern
                         }}</code>
-                        <q-btn
-                          :icon="
-                            copiedPattern === ex.match_pattern
-                              ? 'check'
-                              : 'content_copy'
-                          "
-                          flat
-                          round
-                          dense
-                          size="xs"
-                          :color="
-                            copiedPattern === ex.match_pattern
-                              ? 'positive'
-                              : undefined
-                          "
+                        <OButton
+                          variant="ghost"
+                          size="icon-xs-sq"
                           class="examples-copy-btn"
                           @click="copyPattern(ex.match_pattern)"
                         >
+                          <q-icon
+                            :name="copiedPattern === ex.match_pattern ? 'check' : 'content_copy'"
+                            size="12px"
+                            :class="copiedPattern === ex.match_pattern ? 'text-positive' : ''"
+                          />
                           <q-tooltip :offset="[0, 4]">{{
                             copiedPattern === ex.match_pattern
                               ? t("modelPricing.copied")
                               : t("modelPricing.copyPattern")
                           }}</q-tooltip>
-                        </q-btn>
+                        </OButton>
                       </div>
                     </div>
                   </q-card-section>
@@ -265,20 +254,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-shrink-0">
-                  <q-btn
+                  <OButton
                     v-if="model.tiers.length > 1"
-                    :icon="outlinedDelete"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    flat
-                    style="
-                      min-width: auto;
-                      border: 1px solid #f2452f;
-                      color: #f2452f;
-                    "
+                    variant="outline-destructive"
+                    size="icon"
                     @click="removeTier(idx as number)"
-                  />
+                  >
+                    <q-icon :name="outlinedDelete" size="14px" />
+                  </OButton>
                 </div>
               </div>
 
@@ -409,19 +392,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ><span class="price-dollar">$</span></template
                         >
                       </q-input>
-                      <q-btn
-                        :icon="outlinedDelete"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        flat
-                        style="
-                          min-width: auto;
-                          border: 1px solid #f2452f;
-                          color: #f2452f;
-                        "
+                      <OButton
+                        variant="outline-destructive"
+                        size="icon"
                         @click="deletePrice(tier, entry.key)"
-                      />
+                      >
+                        <q-icon :name="outlinedDelete" size="14px" />
+                      </OButton>
                     </div>
 
                     <!-- Empty state -->
@@ -464,20 +441,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ><span class="price-dollar">$</span></template
                         >
                       </q-input>
-                      <q-btn
-                        icon="add"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        flat
-                        style="
-                          min-width: auto;
-                          border: 1px solid #5960b2;
-                          color: #5960b2;
-                        "
-                        :disable="!addState[idx as number].key.trim()"
+                      <OButton
+                        variant="outline"
+                        size="icon"
+                        :disabled="!addState[idx as number].key.trim()"
                         @click="addPrice(tier, idx)"
-                      />
+                      >
+                        <q-icon name="add" size="14px" />
+                      </OButton>
                     </div>
                   </div>
 
@@ -544,14 +515,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <q-btn
-              class="o2-secondary-button tw:h-[28px] tw:self-start"
-              no-caps
-              flat
-              size="sm"
-              :label="t('modelPricing.addTier')"
+            <OButton
+              variant="outline"
+              size="sm-action"
+              class="tw:self-start"
               @click="addTier"
-            />
+            >
+              {{ t("modelPricing.addTier") }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -559,24 +530,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Footer -->
     <div class="page-footer">
-      <q-btn
-        class="o2-secondary-button tw:h-[36px]"
-        :label="t('modelPricing.cancel')"
-        no-caps
-        flat
+      <OButton
+        variant="outline"
+        size="sm-action"
         @click="goBack"
         data-test="model-pricing-editor-cancel-btn"
-      />
-      <q-btn
-        class="o2-primary-button no-border tw:h-[36px]"
-        no-caps
-        flat
-        :label="t('modelPricing.save')"
+      >
+        {{ t("modelPricing.cancel") }}
+      </OButton>
+      <OButton
+        variant="primary"
+        size="sm-action"
         :loading="saving"
-        :disable="!!nameError || !!regexError"
+        :disabled="!!nameError || !!regexError"
         @click="save"
         data-test="model-pricing-editor-save-btn"
-      />
+      >
+        {{ t("modelPricing.save") }}
+      </OButton>
     </div>
   </q-page>
 </template>
