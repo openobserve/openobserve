@@ -428,7 +428,7 @@ test.describe("Scheduled Alert Features", () => {
         await page.waitForTimeout(1000);
 
         // Open editor and write SQL query
-        const viewEditorBtn = page.locator(pm.alertsPage.locators.viewEditorButton);
+        const viewEditorBtn = page.locator(pm.alertsPage.locators.step2ViewEditorButton).first();
         await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
         await viewEditorBtn.click();
         await page.waitForTimeout(1000);

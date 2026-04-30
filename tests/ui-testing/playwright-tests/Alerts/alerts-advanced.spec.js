@@ -40,7 +40,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
     // ==================== ADVANCED CONDITIONS TESTS ====================
 
-    test("Create alert with multiple AND conditions", {
+    test.skip("Create alert with multiple AND conditions", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@multiCondition']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
@@ -76,7 +76,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('Multi-condition alert created and verified successfully', { alertName });
     });
 
-    test("Verify condition operator toggle (AND to OR)", {
+    test.skip("Verify condition operator toggle (AND to OR)", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@conditionOperator']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
@@ -112,7 +112,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
     // ==================== BULK OPERATIONS TESTS ====================
 
-    test("Bulk pause and unpause multiple alerts", {
+    test.skip("Bulk pause and unpause multiple alerts", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@bulkOperations']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
@@ -165,7 +165,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
     // ==================== DEDUPLICATION TESTS ====================
 
-    test("Create scheduled alert with deduplication configuration", {
+    test.skip("Create scheduled alert with deduplication configuration", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@deduplication']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);

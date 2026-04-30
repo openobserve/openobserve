@@ -20,8 +20,8 @@ export class AlertManagement {
     }
 
     /**
-     * Update an existing alert using Alerts 2.0 wizard UI
-     * Opens the alert edit wizard and modifies the operator condition
+     * Update an existing alert using V3 tab-based UI
+     * Opens the alert edit view, modifies the operator condition, and saves
      * @param {string} alertName - Name of the alert to update
      */
     async updateAlert(alertName) {
@@ -29,14 +29,11 @@ export class AlertManagement {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Opened alert for editing', { alertName });
 
-        await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
+        // Wait for the alert edit view to load (name input visible)
+        await expect(this.page.locator(this.locators.alertNameInput)).toBeVisible({ timeout: 10000 });
         await this.page.waitForTimeout(1000);
 
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Navigated to Step 2: Conditions');
-
+        // In V3 UI, conditions are on the "Alert Rules" tab (default)
         // Change operator from Contains to = to verify update functionality
         const operatorDropdown = this.page.locator(this.locators.operatorSelect).first();
         await expect(operatorDropdown).toBeVisible({ timeout: 5000 });
@@ -46,17 +43,7 @@ export class AlertManagement {
         await this.page.waitForTimeout(1000);
         testLogger.info('Changed operator from Contains to =');
 
-        // Real-time alerts wizard: Step 2 -> Step 4 -> Step 6 (last)
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-        testLogger.info('Navigated to Step 4: Alert Settings');
-
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-        testLogger.info('Navigated to Step 6: Advanced (last step)');
-
+        // Save directly (V3 UI: no multi-step wizard, just Save button)
         await this.page.locator(this.locators.alertSubmitButton).click();
         await expect(this.page.getByText(this.locators.alertUpdatedMessage)).toBeVisible({ timeout: 30000 });
         testLogger.info('Successfully updated alert', { alertName });
@@ -461,25 +448,44 @@ export class AlertManagement {
     /**
      * Open alert details dialog by clicking alert name in the list (PR #10470)
      * The new AlertHistoryDrawer is rendered inside a q-dialog
+     * Includes retry with page reload for API-created alerts that may not be immediately visible.
      * @param {string} alertName - Name of the alert
      */
     async openAlertDetailsDialog(alertName) {
         testLogger.info('Opening alert details dialog', { alertName });
 
-        await this.searchAlert(alertName);
-        await this.page.waitForTimeout(1000);
+        // Try up to 2 times — reload if first attempt fails to find the row
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await this.searchAlert(alertName);
+            await this.page.waitForTimeout(1000);
 
-        const alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
-        await alertRow.waitFor({ state: 'visible', timeout: 10000 });
+            // Scope search to the alert list table for more reliable matching
+            const alertTable = this.page.locator(this.locators.alertListTable);
+            const alertRow = alertTable.locator(`tr:has-text("${alertName}")`).first();
+            const rowVisible = await alertRow.isVisible({ timeout: 10000 }).catch(() => false);
 
-        // Click the alert name cell (2nd column) to open details dialog
-        const alertNameCell = alertRow.locator('td').nth(1);
-        await alertNameCell.click();
-        await this.page.waitForTimeout(1500);
+            if (rowVisible) {
+                // Click the alert name cell (2nd column) to open details dialog
+                const alertNameCell = alertRow.locator('td').nth(1);
+                await alertNameCell.click();
+                await this.page.waitForTimeout(1500);
 
-        // Wait for the new dialog to appear
-        await expect(this.page.locator('[data-test="alert-details-dialog"]')).toBeVisible({ timeout: 10000 });
-        testLogger.info('Alert details dialog opened', { alertName });
+                // Wait for the new dialog to appear
+                await expect(this.page.locator('[data-test="alert-details-dialog"]')).toBeVisible({ timeout: 10000 });
+                testLogger.info('Alert details dialog opened', { alertName });
+                return;
+            }
+
+            // Row not found — reload page and retry (API-created alerts may need refresh)
+            testLogger.warn('Alert row not visible on attempt', { alertName, attempt });
+            if (attempt < 2) {
+                await this.page.reload();
+                await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+                await this.page.waitForTimeout(2000);
+            }
+        }
+
+        throw new Error(`Alert "${alertName}" not found in table after retry`);
     }
 
     /**
