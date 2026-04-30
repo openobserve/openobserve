@@ -1,21 +1,24 @@
 <template>
   <div class="tw:flex tw:items-center tw:w-full">
-    <q-btn-dropdown
+    <ODropdown
       v-if="hasDropdownSlot"
-      data-test="attribute-value-cell-dropdown-btn"
-      size="0.5rem"
-      flat
-      outlined
-      filled
-      dense
-      class="pointer"
-      :name="'img:' + getImageURL('images/common/add_icon.svg')"
-      aria-label="Add icon"
+      side="bottom"
+      align="start"
     >
-      <q-list class="logs-table-list">
+      <template #trigger>
+        <OButton
+          data-test="attribute-value-cell-dropdown-btn"
+          size="icon-xs"
+          variant="ghost"
+          aria-label="Add icon"
+        >
+          <img :src="getImageURL('images/common/add_icon.svg')" class="tw:size-3" alt="" />
+        </OButton>
+      </template>
+      <div class="logs-table-list tw:min-w-[180px]">
         <slot name="dropdown" :field="field" :value="value" />
-      </q-list>
-    </q-btn-dropdown>
+      </div>
+    </ODropdown>
     <span class="q-pl-xs tw:truncate">{{ value }}</span>
   </div>
 </template>
@@ -23,9 +26,15 @@
 <script lang="ts">
 import { computed, useSlots } from "vue";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default {
   name: "AttributeValueCell",
+  components: {
+    OButton,
+    ODropdown,
+  },
   props: {
     field: {
       type: String,

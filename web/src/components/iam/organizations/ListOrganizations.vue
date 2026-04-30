@@ -69,17 +69,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn
+          <OButton
             v-if="props.row.role == 'Admin'"
-            icon="group"
             :title="t('organization.invite')"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
+            variant="ghost"
+            size="icon-sm"
             @click="redirectToInviteMember(props)"
-          ></q-btn>
+          >
+            <q-icon name="group" />
+          </OButton>
         </q-td>
       </template> -->
 
