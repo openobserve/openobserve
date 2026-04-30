@@ -191,8 +191,29 @@ mod tests {
         prelude::{SessionConfig, SessionContext},
     };
 
+    use datafusion::optimizer::OptimizerRule;
+
     use super::LimitJoinRightSide;
     use crate::service::search::datafusion::planner::extension_planner::OpenobserveQueryPlanner;
+
+    #[test]
+    fn test_limit_join_right_side_name() {
+        let rule = LimitJoinRightSide::new(10);
+        assert_eq!(rule.name(), "limit_join_right_side");
+    }
+
+    #[test]
+    fn test_limit_join_right_side_supports_rewrite() {
+        let rule = LimitJoinRightSide::new(10);
+        assert!(rule.supports_rewrite());
+    }
+
+    #[test]
+    fn test_limit_join_right_side_apply_order() {
+        use datafusion::optimizer::optimizer::ApplyOrder;
+        let rule = LimitJoinRightSide::new(10);
+        assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
+    }
 
     #[tokio::test]
     async fn test_subquery() -> Result<()> {

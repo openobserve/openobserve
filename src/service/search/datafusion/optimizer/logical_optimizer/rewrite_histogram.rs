@@ -211,9 +211,23 @@ mod tests {
         prelude::SessionContext,
     };
 
+    use datafusion::optimizer::OptimizerRule;
+
     use crate::service::search::datafusion::{
         optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram, udf::histogram_udf,
     };
+
+    #[test]
+    fn test_rewrite_histogram_rule_name() {
+        let rule = RewriteHistogram::new(0, 1000, 60);
+        assert_eq!(rule.name(), "rewrite_histogram");
+    }
+
+    #[test]
+    fn test_rewrite_histogram_rule_supports_rewrite() {
+        let rule = RewriteHistogram::new(0, 1000, 60);
+        assert!(rule.supports_rewrite());
+    }
 
     #[tokio::test]
     async fn test_rewrite_histogram_interval() {
