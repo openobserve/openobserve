@@ -94,6 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'logs-splitter-icon-expand'
                       : 'logs-splitter-icon-collapse'
                   "
+                  variant="primary"
+                  size="icon-sm"
                   @click="collapseFieldList"
                   ><template #icon-left>
                     <q-icon
