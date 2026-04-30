@@ -25,8 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("pipeline.llmEvaluation") }}
       <div>
-        <q-btn v-close-popup="true" round
-flat icon="cancel"></q-btn>
+        <OButton variant="ghost" size="icon" v-close-popup>
+          <q-icon name="cancel" size="14px" />
+        </OButton>
       </div>
     </div>
     <q-separator />
@@ -222,10 +223,11 @@ import { useQuasar } from "quasar";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "LlmEvaluation",
-  components: { ConfirmDialog },
+  components: { ConfirmDialog, OButton },
   emits: ["cancel:hideform"],
   setup(props, { emit }) {
     const store = useStore();
@@ -371,9 +373,14 @@ export default defineComponent({
 
       if (savedTemplate) {
         // Editing: restore saved template by ID to get full object (needed to display name)
-        const match = availableTemplates.value.find((t: any) => t.id === savedTemplate);
+        const match = availableTemplates.value.find(
+          (t: any) => t.id === savedTemplate,
+        );
         selectedTemplate.value = match || null;
-      } else if (!pipelineObj.isEditNode && availableTemplates.value.length > 0) {
+      } else if (
+        !pipelineObj.isEditNode &&
+        availableTemplates.value.length > 0
+      ) {
         // New node: default to first template
         selectedTemplate.value = availableTemplates.value[0];
       }

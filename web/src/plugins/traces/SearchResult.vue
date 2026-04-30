@@ -48,19 +48,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
         />
         <!-- Insights Button -->
-        <q-btn
-          outline
-          dense
-          no-caps
-          color="primary"
-          icon="timeline"
-          :label="t('volumeInsights.insightsButtonLabel')"
-          class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
+          <OButton
+          variant="outline"
+          size="sm"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
+          <template #icon-left>
+            <q-icon name="timeline" size="14px" />
+          </template>
+          {{ t('volumeInsights.insightsButtonLabel') }}
           <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
-        </q-btn>
+        </OButton>
         <ORefreshButton
           :last-run-at="searchObj.meta.lastRunAt"
           :loading="searchObj.loading"
@@ -176,11 +175,13 @@ import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import { formatLargeNumber } from "../../utils/zincutils";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     ORefreshButton,
+    OButton,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),

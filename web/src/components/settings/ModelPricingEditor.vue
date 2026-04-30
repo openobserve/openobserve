@@ -15,10 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none tw:flex tw:flex-col" style="min-height: 0; height: 100%; overflow: hidden;">
-
+  <q-page
+    class="q-pa-none tw:flex tw:flex-col"
+    style="min-height: 0; height: 100%; overflow: hidden"
+  >
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:px-3 tw:h-[68px] tw:border-b-[1px] tw:gap-3 tw:flex-shrink-0">
+    <div
+      class="tw:flex tw:items-center tw:px-3 tw:h-[68px] tw:border-b-[1px] tw:gap-3 tw:flex-shrink-0"
+    >
       <div
         data-test="model-pricing-editor-back-btn"
         class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius"
@@ -28,36 +32,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon name="arrow_back_ios_new" size="14px" />
       </div>
       <div class="tw:flex tw:flex-col tw:justify-center">
-        <div class="q-table__title tw:font-[600] tw:leading-tight" data-test="model-pricing-editor-title">
-          {{ isEdit ? t('modelPricing.editTitle') : t('modelPricing.newTitle') }}
+        <div
+          class="q-table__title tw:font-[600] tw:leading-tight"
+          data-test="model-pricing-editor-title"
+        >
+          {{
+            isEdit ? t("modelPricing.editTitle") : t("modelPricing.newTitle")
+          }}
         </div>
       </div>
     </div>
 
     <!-- Form Body -->
-    <div class="tw:px-3 tw:py-3" style="flex: 1; min-height: 0; height: calc(100vh - 170px);  overflow-y: auto;">
-      <div style="max-width: 760px;" class="tw:flex tw:flex-col tw:gap-6">
-
+    <div
+      class="tw:px-3 tw:py-3"
+      style="
+        flex: 1;
+        min-height: 0;
+        height: calc(100vh - 170px);
+        overflow-y: auto;
+      "
+    >
+      <div style="max-width: 760px" class="tw:flex tw:flex-col tw:gap-6">
         <!-- ── Model Details Card ── -->
         <div class="form-card">
           <div class="form-card-header">
             <div>
-              <div class="form-card-title">{{ t('modelPricing.modelDetails') }}</div>
-              <div class="form-card-subtitle">{{ t('modelPricing.modelDetailsDesc') }}</div>
+              <div class="form-card-title">
+                {{ t("modelPricing.modelDetails") }}
+              </div>
+              <div class="form-card-subtitle">
+                {{ t("modelPricing.modelDetailsDesc") }}
+              </div>
             </div>
           </div>
           <div class="form-card-body tw:flex tw:flex-row tw:gap-4">
             <div class="tw:flex-1">
               <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
-                {{ t('modelPricing.modelNameField') }}
+                {{ t("modelPricing.modelNameField") }}
                 <q-icon
                   name="info"
                   size="14px"
                   class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                  :class="
+                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  "
                 >
-                  <q-tooltip anchor="center right" self="center left" max-width="300px">
-                    <span style="font-size: 13px">{{ t('modelPricing.modelNameTooltip') }}</span>
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                  >
+                    <span style="font-size: 13px">{{
+                      t("modelPricing.modelNameTooltip")
+                    }}</span>
                   </q-tooltip>
                 </q-icon>
               </div>
@@ -76,16 +104,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:flex-1 tw:flex tw:items-start tw:gap-1">
               <div class="tw:flex-1">
-                <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
-                  {{ t('modelPricing.matchPatternField') }}
+                <div
+                  class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label"
+                >
+                  {{ t("modelPricing.matchPatternField") }}
                   <q-icon
                     name="info"
                     size="14px"
                     class="q-ml-xs cursor-pointer"
-                    :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'text-grey-5'
+                        : 'text-grey-7'
+                    "
                   >
-                    <q-tooltip anchor="center right" self="center left" max-width="300px">
-                      <span style="font-size: 13px">{{ t('modelPricing.matchPatternTooltip') }}</span>
+                    <q-tooltip
+                      anchor="center right"
+                      self="center left"
+                      max-width="300px"
+                    >
+                      <span style="font-size: 13px">{{
+                        t("modelPricing.matchPatternTooltip")
+                      }}</span>
                     </q-tooltip>
                   </q-icon>
                 </div>
@@ -105,42 +145,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 icon="lightbulb_outline"
                 padding="xs"
-                flat unelevated round dense size="sm"
+                flat
+                unelevated
+                round
+                dense
+                size="sm"
                 class="pattern-examples-btn tw:mt-7"
                 @click="showExamples = true"
               >
-                <q-tooltip anchor="top right" self="bottom right" :offset="[0, 4]">
-                  {{ t('modelPricing.patternExamplesBtn') }}
+                <q-tooltip
+                  anchor="top right"
+                  self="bottom right"
+                  :offset="[0, 4]"
+                >
+                  {{ t("modelPricing.patternExamplesBtn") }}
                 </q-tooltip>
               </q-btn>
 
               <!-- Pattern Examples Dialog -->
               <q-dialog v-model="showExamples">
                 <q-card class="pattern-examples-card">
-                  <q-card-section class="tw:flex tw:items-center tw:justify-between tw:pb-0">
+                  <q-card-section
+                    class="tw:flex tw:items-center tw:justify-between tw:pb-0"
+                  >
                     <div>
-                      <div class="tw:font-semibold tw:text-sm">{{ t('modelPricing.patternExamplesTitle') }}</div>
-                      <div class="tw:text-xs tw:opacity-50 tw:mt-0.5">{{ t('modelPricing.patternExamplesDesc') }}</div>
+                      <div class="tw:font-semibold tw:text-sm">
+                        {{ t("modelPricing.patternExamplesTitle") }}
+                      </div>
+                      <div class="tw:text-xs tw:opacity-50 tw:mt-0.5">
+                        {{ t("modelPricing.patternExamplesDesc") }}
+                      </div>
                     </div>
-                    <q-btn icon="cancel" flat round dense size="sm" v-close-popup />
+                    <OButton variant="ghost" size="icon" v-close-popup>
+                      <q-icon name="cancel" size="14px" />
+                    </OButton>
                   </q-card-section>
                   <q-card-section class="tw:pt-3">
                     <div class="examples-table">
                       <div class="examples-table-head">
-                        <span>{{ t('modelPricing.patternExamplesModelCol') }}</span>
-                        <span>{{ t('modelPricing.patternExamplesPatternCol') }}</span>
+                        <span>{{
+                          t("modelPricing.patternExamplesModelCol")
+                        }}</span>
+                        <span>{{
+                          t("modelPricing.patternExamplesPatternCol")
+                        }}</span>
                       </div>
-                      <div v-for="ex in patternExamples" :key="ex.name" class="examples-table-row">
+                      <div
+                        v-for="ex in patternExamples"
+                        :key="ex.name"
+                        class="examples-table-row"
+                      >
                         <span class="examples-model-name">{{ ex.name }}</span>
-                        <code class="examples-pattern">{{ ex.match_pattern }}</code>
+                        <code class="examples-pattern">{{
+                          ex.match_pattern
+                        }}</code>
                         <q-btn
-                          :icon="copiedPattern === ex.match_pattern ? 'check' : 'content_copy'"
-                          flat round dense size="xs"
-                          :color="copiedPattern === ex.match_pattern ? 'positive' : undefined"
+                          :icon="
+                            copiedPattern === ex.match_pattern
+                              ? 'check'
+                              : 'content_copy'
+                          "
+                          flat
+                          round
+                          dense
+                          size="xs"
+                          :color="
+                            copiedPattern === ex.match_pattern
+                              ? 'positive'
+                              : undefined
+                          "
                           class="examples-copy-btn"
                           @click="copyPattern(ex.match_pattern)"
                         >
-                          <q-tooltip :offset="[0, 4]">{{ copiedPattern === ex.match_pattern ? t('modelPricing.copied') : t('modelPricing.copyPattern') }}</q-tooltip>
+                          <q-tooltip :offset="[0, 4]">{{
+                            copiedPattern === ex.match_pattern
+                              ? t("modelPricing.copied")
+                              : t("modelPricing.copyPattern")
+                          }}</q-tooltip>
                         </q-btn>
                       </div>
                     </div>
@@ -155,25 +236,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="form-card">
           <div class="form-card-header">
             <div>
-              <div class="form-card-title">{{ t('modelPricing.pricingTiers') }}</div>
-              <div class="form-card-subtitle">{{ t('modelPricing.pricingTiersDesc') }}</div>
+              <div class="form-card-title">
+                {{ t("modelPricing.pricingTiers") }}
+              </div>
+              <div class="form-card-subtitle">
+                {{ t("modelPricing.pricingTiersDesc") }}
+              </div>
             </div>
           </div>
 
           <div class="form-card-body tw:flex tw:flex-col tw:gap-3">
             <div
               v-for="(tier, idx) in model.tiers"
-              :key="(idx as number)"
+              :key="idx as number"
               class="tier-card"
             >
               <!-- Tier Header -->
               <div class="tier-header">
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="tier-name-label">{{ t('modelPricing.tierName') }}</span>
+                  <span class="tier-name-label">{{
+                    t("modelPricing.tierName")
+                  }}</span>
                   <q-input
                     v-model="tier.name"
                     :placeholder="t('modelPricing.tierNamePlaceholder')"
-                    dense borderless
+                    dense
+                    borderless
                   />
                 </div>
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-shrink-0">
@@ -181,8 +269,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="model.tiers.length > 1"
                     :icon="outlinedDelete"
                     padding="sm"
-                    unelevated size="sm" flat
-                    style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
+                    unelevated
+                    size="sm"
+                    flat
+                    style="
+                      min-width: auto;
+                      border: 1px solid #f2452f;
+                      color: #f2452f;
+                    "
                     @click="removeTier(idx as number)"
                   />
                 </div>
@@ -190,31 +284,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Tier Body -->
               <div class="tier-body">
-
                 <!-- Condition row (non-default tiers only) -->
-                <div v-if="(idx as number) > 0 && tier.condition" class="condition-block">
-                  <div class="sub-label tw:mb-2">{{ t('modelPricing.applyTierWhen') }}</div>
+                <div
+                  v-if="(idx as number) > 0 && tier.condition"
+                  class="condition-block"
+                >
+                  <div class="sub-label tw:mb-2">
+                    {{ t("modelPricing.applyTierWhen") }}
+                  </div>
                   <div class="tw:flex tw:gap-2 tw:items-start tw:flex-wrap">
                     <q-input
                       v-model="tier.condition.usage_key"
                       :label="t('modelPricing.usageKeyCol')"
-                      dense borderless
+                      dense
+                      borderless
                       class="tw:flex-1 tw:min-w-[130px]"
                       :placeholder="t('modelPricing.usageKeyPlaceholder')"
                     />
                     <q-select
                       v-model="tier.condition.operator"
                       :options="operators"
-                      dense borderless options-dense
-                      emit-value map-options
+                      dense
+                      borderless
+                      options-dense
+                      emit-value
+                      map-options
                       class="tw:w-[90px] tw:flex-shrink-0"
-                      :display-value="operators.find((o: any) => o.value === tier.condition.operator)?.label || ''"
+                      :display-value="
+                        operators.find(
+                          (o: any) => o.value === tier.condition.operator,
+                        )?.label || ''
+                      "
                     />
                     <q-input
                       v-model.number="tier.condition.value"
                       :label="t('modelPricing.threshold')"
                       type="number"
-                      dense borderless
+                      dense
+                      borderless
                       class="tw:w-[140px] tw:flex-shrink-0"
                     />
                   </div>
@@ -222,12 +329,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Quick Setup -->
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-                  <span class="sub-label">{{ t('modelPricing.quickSetup') }}</span>
+                  <span class="sub-label">{{
+                    t("modelPricing.quickSetup")
+                  }}</span>
                   <button
                     v-for="tpl in usageTemplates"
                     :key="tpl.name"
                     class="template-chip"
-                    :class="{ 'template-chip--active': isTemplateActive(tier, tpl.keys) }"
+                    :class="{
+                      'template-chip--active': isTemplateActive(tier, tpl.keys),
+                    }"
                     :style="{ '--chip-dot-color': tpl.color }"
                     @click="applyTemplate(tier, tpl.keys)"
                   >
@@ -236,22 +347,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="isTemplateActive(tier, tpl.keys)"
                       class="template-chip-close"
                       @click.stop="clearTemplate(tier, tpl.keys)"
-                    >×</span>
+                      >×</span
+                    >
                   </button>
                 </div>
 
                 <!-- Price Table -->
                 <div>
                   <div class="price-table-label tw:mb-2">
-                    {{ t('modelPricing.tokenPrices') }}
-                    <span class="price-table-label-sub"> {{ t('modelPricing.tokenPricesUnit') }}</span>
+                    {{ t("modelPricing.tokenPrices") }}
+                    <span class="price-table-label-sub">
+                      {{ t("modelPricing.tokenPricesUnit") }}</span
+                    >
                   </div>
 
                   <div class="price-table">
                     <!-- Column headers (only when rows exist) -->
-                    <div v-if="Object.keys(tier.prices).length" class="price-table-head">
-                      <span>{{ t('modelPricing.usageKeyCol') }}</span>
-                      <span>{{ t('modelPricing.pricePerMillionHeader') }}</span>
+                    <div
+                      v-if="Object.keys(tier.prices).length"
+                      class="price-table-head"
+                    >
+                      <span>{{ t("modelPricing.usageKeyCol") }}</span>
+                      <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
                       <span></span>
                     </div>
 
@@ -265,107 +382,195 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         :model-value="entry.key"
                         :placeholder="t('modelPricing.usageKeyPlaceholder')"
-                        dense borderless
-                        @update:model-value="(val: any) => renamePriceByIndex(tier, entryIdx, val)"
+                        dense
+                        borderless
+                        @update:model-value="
+                          (val: any) => renamePriceByIndex(tier, entryIdx, val)
+                        "
                       />
                       <q-input
                         :model-value="toPerMillion(entry.value)"
-                        type="number" :min="0" step="0.01"
+                        type="number"
+                        :min="0"
+                        step="0.01"
                         :placeholder="t('modelPricing.pricePlaceholder')"
-                        dense borderless
-                        @update:model-value="(val: any) => updatePrice(tier, entry.key, fromPerMillion(Number(val)))"
+                        dense
+                        borderless
+                        @update:model-value="
+                          (val: any) =>
+                            updatePrice(
+                              tier,
+                              entry.key,
+                              fromPerMillion(Number(val)),
+                            )
+                        "
                       >
-                        <template #prepend><span class="price-dollar">$</span></template>
+                        <template #prepend
+                          ><span class="price-dollar">$</span></template
+                        >
                       </q-input>
                       <q-btn
                         :icon="outlinedDelete"
                         padding="sm"
-                        unelevated size="sm" flat
-                        style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
+                        unelevated
+                        size="sm"
+                        flat
+                        style="
+                          min-width: auto;
+                          border: 1px solid #f2452f;
+                          color: #f2452f;
+                        "
                         @click="deletePrice(tier, entry.key)"
                       />
                     </div>
 
                     <!-- Empty state -->
-                    <div v-if="!Object.keys(tier.prices).length" class="price-empty">
-                      <div class="price-empty-title">{{ t('modelPricing.noPricesDefined') }}</div>
-                      <div class="price-empty-sub">{{ t('modelPricing.noPricesDesc') }}</div>
+                    <div
+                      v-if="!Object.keys(tier.prices).length"
+                      class="price-empty"
+                    >
+                      <div class="price-empty-title">
+                        {{ t("modelPricing.noPricesDefined") }}
+                      </div>
+                      <div class="price-empty-sub">
+                        {{ t("modelPricing.noPricesDesc") }}
+                      </div>
                     </div>
 
                     <!-- Add row -->
-                    <div class="price-add-row" :class="{ 'price-add-row--no-top': !Object.keys(tier.prices).length }">
+                    <div
+                      class="price-add-row"
+                      :class="{
+                        'price-add-row--no-top': !Object.keys(tier.prices)
+                          .length,
+                      }"
+                    >
                       <q-input
-                        v-model="addState[(idx as number)].key"
-                        dense borderless
+                        v-model="addState[idx as number].key"
+                        dense
+                        borderless
                         :placeholder="t('modelPricing.addUsageKeyPlaceholder')"
                       />
                       <q-input
-                        v-model.number="addState[(idx as number)].value"
-                        type="number" :min="0" step="0.01"
-                        dense borderless
+                        v-model.number="addState[idx as number].value"
+                        type="number"
+                        :min="0"
+                        step="0.01"
+                        dense
+                        borderless
                         :placeholder="t('modelPricing.pricePlaceholder')"
                       >
-                        <template #prepend><span class="price-dollar">$</span></template>
+                        <template #prepend
+                          ><span class="price-dollar">$</span></template
+                        >
                       </q-input>
                       <q-btn
                         icon="add"
                         padding="sm"
-                        unelevated size="sm" flat
-                        style="min-width: auto; border: 1px solid #5960B2; color: #5960B2;"
-                        :disable="!addState[(idx as number)].key.trim()"
+                        unelevated
+                        size="sm"
+                        flat
+                        style="
+                          min-width: auto;
+                          border: 1px solid #5960b2;
+                          color: #5960b2;
+                        "
+                        :disable="!addState[idx as number].key.trim()"
                         @click="addPrice(tier, idx)"
                       />
                     </div>
                   </div>
 
                   <!-- Price Preview Table -->
-                  <div v-if="previewEntries(tier, idx as number).length" class="tw:mt-5 tw:border tw:rounded" style="background: rgba(0,0,0,0.015); border-color: var(--o2-border-color);">
-                     <div class="tw:px-4 tw:py-2 tw:text-xs text-grey-8 tw:font-semibold tw:border-b" style="border-color: var(--o2-border-color);">{{ t('modelPricing.pricePreview') }}</div>
-                     <table class="tw:w-full tw:text-xs" style="border-collapse: collapse;">
-                        <thead>
-                           <tr class="tw:text-left text-grey-7 tw:border-b" style="border-color: var(--o2-border-color);">
-                             <th class="tw:px-4 tw:py-2 tw:font-medium">{{ t('modelPricing.usageType') }}</th>
-                             <th class="tw:px-4 tw:py-2 tw:font-medium">{{ t('modelPricing.perThousand') }}</th>
-                             <th class="tw:px-4 tw:py-2 tw:font-medium">{{ t('modelPricing.perMillion') }}</th>
-                           </tr>
-                        </thead>
-                        <tbody>
-                           <tr v-for="entry in previewEntries(tier, idx as number)" :key="entry.stableId" class="tw:border-b last:tw:border-none" :class="{ 'preview-row-pending': entry.stableId === -1 }" style="border-color: var(--o2-border-color);">
-                              <td class="tw:px-4 tw:py-2 text-grey-9 tw:font-medium">{{ entry.key }}</td>
-                              <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1000) }}</td>
-                              <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1000000) }}</td>
-                           </tr>
-                        </tbody>
-                     </table>
+                  <div
+                    v-if="previewEntries(tier, idx as number).length"
+                    class="tw:mt-5 tw:border tw:rounded"
+                    style="
+                      background: rgba(0, 0, 0, 0.015);
+                      border-color: var(--o2-border-color);
+                    "
+                  >
+                    <div
+                      class="tw:px-4 tw:py-2 tw:text-xs text-grey-8 tw:font-semibold tw:border-b"
+                      style="border-color: var(--o2-border-color)"
+                    >
+                      {{ t("modelPricing.pricePreview") }}
+                    </div>
+                    <table
+                      class="tw:w-full tw:text-xs"
+                      style="border-collapse: collapse"
+                    >
+                      <thead>
+                        <tr
+                          class="tw:text-left text-grey-7 tw:border-b"
+                          style="border-color: var(--o2-border-color)"
+                        >
+                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                            {{ t("modelPricing.usageType") }}
+                          </th>
+                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                            {{ t("modelPricing.perThousand") }}
+                          </th>
+                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                            {{ t("modelPricing.perMillion") }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr
+                          v-for="entry in previewEntries(tier, idx as number)"
+                          :key="entry.stableId"
+                          class="tw:border-b last:tw:border-none"
+                          :class="{
+                            'preview-row-pending': entry.stableId === -1,
+                          }"
+                          style="border-color: var(--o2-border-color)"
+                        >
+                          <td
+                            class="tw:px-4 tw:py-2 text-grey-9 tw:font-medium"
+                          >
+                            {{ entry.key }}
+                          </td>
+                          <td class="tw:px-4 tw:py-2 text-grey-9">
+                            ${{ formatPreviewCost(entry.value, 1000) }}
+                          </td>
+                          <td class="tw:px-4 tw:py-2 text-grey-9">
+                            ${{ formatPreviewCost(entry.value, 1000000) }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-
               </div>
             </div>
             <q-btn
               class="o2-secondary-button tw:h-[28px] tw:self-start"
-              no-caps flat size="sm"
+              no-caps
+              flat
+              size="sm"
               :label="t('modelPricing.addTier')"
               @click="addTier"
             />
           </div>
         </div>
-
       </div>
     </div>
-
 
     <!-- Footer -->
     <div class="page-footer">
       <q-btn
         class="o2-secondary-button tw:h-[36px]"
-        :label="t('modelPricing.cancel')" no-caps flat
+        :label="t('modelPricing.cancel')"
+        no-caps
+        flat
         @click="goBack"
         data-test="model-pricing-editor-cancel-btn"
       />
       <q-btn
         class="o2-primary-button no-border tw:h-[36px]"
-        no-caps flat
+        no-caps
+        flat
         :label="t('modelPricing.save')"
         :loading="saving"
         :disable="!!nameError || !!regexError"
@@ -373,7 +578,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="model-pricing-editor-save-btn"
       />
     </div>
-
   </q-page>
 </template>
 
@@ -383,6 +587,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
 import modelPricingService from "@/services/model_pricing";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
@@ -396,26 +601,30 @@ const saving = ref(false);
 const existingModels = ref<any[]>([]);
 const nameTouched = ref(false);
 const patternTouched = ref(false);
-const addState = ref<Array<{ key: string; value: number }>>([{ key: "", value: 0 }]);
+const addState = ref<Array<{ key: string; value: number }>>([
+  { key: "", value: 0 },
+]);
 const showExamples = ref(false);
 const copiedPattern = ref<string | null>(null);
 
 function copyPattern(pattern: string) {
   navigator.clipboard.writeText(pattern);
   copiedPattern.value = pattern;
-  setTimeout(() => { copiedPattern.value = null; }, 1500);
+  setTimeout(() => {
+    copiedPattern.value = null;
+  }, 1500);
 }
 
 const patternExamples = [
-  { name: "GPT-4o",           match_pattern: "gpt-4o" },
-  { name: "o3",               match_pattern: "o3" },
-  { name: "Claude Sonnet 4.6",match_pattern: "claude-sonnet-4-6" },
-  { name: "Gemini 2.5 Pro",   match_pattern: "gemini-2.5-pro" },
-  { name: "GPT-4o Mini",      match_pattern: "gpt-4o-mini" },
+  { name: "GPT-4o", match_pattern: "gpt-4o" },
+  { name: "o3", match_pattern: "o3" },
+  { name: "Claude Sonnet 4.6", match_pattern: "claude-sonnet-4-6" },
+  { name: "Gemini 2.5 Pro", match_pattern: "gemini-2.5-pro" },
+  { name: "GPT-4o Mini", match_pattern: "gpt-4o-mini" },
 ];
 
 const orgIdentifier = computed(
-  () => store.state.selectedOrganization?.identifier || ""
+  () => store.state.selectedOrganization?.identifier || "",
 );
 
 /** Real-time name validation. */
@@ -451,7 +660,9 @@ const regexError = computed(() => {
   }
 });
 
-const isEdit = computed(() => !!route.query.id && route.query.duplicate !== "true");
+const isEdit = computed(
+  () => !!route.query.id && route.query.duplicate !== "true",
+);
 
 const model = ref<any>(createEmptyModel());
 
@@ -470,19 +681,32 @@ function newTier(name: string, condition: any = null) {
 }
 
 function resetAddState(tierCount: number) {
-  addState.value = Array.from({ length: tierCount }, () => ({ key: "", value: 0 }));
+  addState.value = Array.from({ length: tierCount }, () => ({
+    key: "",
+    value: 0,
+  }));
 }
 
 const usageTemplates = [
   {
     name: "OpenAI",
     color: "#10a37f",
-    keys: ["input", "output", "cache_read_input_tokens", "output_reasoning_tokens"],
+    keys: [
+      "input",
+      "output",
+      "cache_read_input_tokens",
+      "output_reasoning_tokens",
+    ],
   },
   {
     name: "Anthropic",
     color: "#d97706",
-    keys: ["input", "output", "cache_read_input_tokens", "cache_creation_input_tokens"],
+    keys: [
+      "input",
+      "output",
+      "cache_read_input_tokens",
+      "cache_creation_input_tokens",
+    ],
   },
 ];
 
@@ -497,7 +721,11 @@ const operators = [
 
 function addTier() {
   model.value.tiers.push(
-    newTier(t("modelPricing.tierConditionalName"), { usage_key: "input", operator: "gt", value: 200000 })
+    newTier(t("modelPricing.tierConditionalName"), {
+      usage_key: "input",
+      operator: "gt",
+      value: 200000,
+    }),
   );
   addState.value.push({ key: "", value: 0 });
 }
@@ -522,7 +750,9 @@ const stableIdMap = new WeakMap<any, Map<number, number>>();
 
 /** Convert tier.prices object to an array with stable IDs for v-for :key.
  *  Each entry gets a numeric stableId that persists across key renames. */
-function priceEntries(tier: any): Array<{ key: string; value: number; stableId: number }> {
+function priceEntries(
+  tier: any,
+): Array<{ key: string; value: number; stableId: number }> {
   if (!stableIdMap.has(tier)) stableIdMap.set(tier, new Map());
   const idMap = stableIdMap.get(tier)!;
   return Object.entries(tier.prices || {}).map(([k, v], idx) => {
@@ -599,8 +829,12 @@ function previewEntries(tier: any, idx: number) {
   if (pending?.key.trim()) {
     const pendingValue = fromPerMillion(pending.value || 0);
     // Don't duplicate if the key already exists
-    if (!committed.find(e => e.key === pending.key.trim())) {
-      committed.push({ key: pending.key.trim(), value: pendingValue, stableId: -1 });
+    if (!committed.find((e) => e.key === pending.key.trim())) {
+      committed.push({
+        key: pending.key.trim(),
+        value: pendingValue,
+        stableId: -1,
+      });
     }
   }
   return committed;
@@ -612,7 +846,7 @@ function formatPreviewCost(costPerUnit: number, multiplier: number) {
   if (c === 0) return "0";
   if (c < 0.00001) return c.toExponential(2);
   let str = c.toFixed(8);
-  str = str.replace(/0+$/, '').replace(/\.$/, '');
+  str = str.replace(/0+$/, "").replace(/\.$/, "");
   return str;
 }
 
@@ -631,7 +865,10 @@ function addPrice(tier: any, idx: number | string): boolean {
     notifyWarn(keyError);
     return false;
   }
-  tier.prices = { ...tier.prices, [key]: fromPerMillion(addState.value[i].value || 0) };
+  tier.prices = {
+    ...tier.prices,
+    [key]: fromPerMillion(addState.value[i].value || 0),
+  };
   addState.value[i] = { key: "", value: 0 };
   return true;
 }
@@ -651,8 +888,14 @@ function notifyWarn(message: string) {
  *  403 errors are already handled by the global HTTP interceptor (persistent top banner). */
 function notifyError(prefix: string, e: any) {
   if (e?.response?.status === 403) return;
-  const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
-  q.notify({ type: "negative", message: `${prefix}: ${msg}`, position: "bottom", timeout: 5000 });
+  const msg =
+    e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
+  q.notify({
+    type: "negative",
+    message: `${prefix}: ${msg}`,
+    position: "bottom",
+    timeout: 5000,
+  });
 }
 
 async function save() {
@@ -663,7 +906,9 @@ async function save() {
   for (let i = 0; i < m.tiers.length; i++) {
     const pending = addState.value[i];
     if (pending && pending.value > 0 && !pending.key.trim()) {
-      notifyWarn(t("modelPricing.tierPriceMissingKey", { name: m.tiers[i].name }));
+      notifyWarn(
+        t("modelPricing.tierPriceMissingKey", { name: m.tiers[i].name }),
+      );
       return;
     }
     if (pending && pending.key.trim()) {
@@ -677,7 +922,11 @@ async function save() {
     if (!c) continue;
     const key = (c.usage_key || "").trim();
     if (key && /^\d+$/.test(key)) {
-      notifyWarn(t("modelPricing.tierUsageKeyPlainNumber", { name: m.tiers[i].name || `#${i + 1}` }));
+      notifyWarn(
+        t("modelPricing.tierUsageKeyPlainNumber", {
+          name: m.tiers[i].name || `#${i + 1}`,
+        }),
+      );
       return;
     }
   }
@@ -734,7 +983,12 @@ async function save() {
         timeout: 8000,
       });
     } else {
-      q.notify({ type: "positive", message: t("modelPricing.modelPricingSaved"), position: "bottom", timeout: 3000 });
+      q.notify({
+        type: "positive",
+        message: t("modelPricing.modelPricingSaved"),
+        position: "bottom",
+        timeout: 3000,
+      });
     }
     goBack();
   } catch (e: any) {
@@ -752,9 +1006,14 @@ onBeforeMount(async () => {
   try {
     const listRes = await modelPricingService.list(orgIdentifier.value);
     existingModels.value = (listRes.data || []).filter(
-      (m: any) => (m.source === 'org' || !m.source) && m.org_id === orgIdentifier.value && m.enabled !== false
+      (m: any) =>
+        (m.source === "org" || !m.source) &&
+        m.org_id === orgIdentifier.value &&
+        m.enabled !== false,
     );
-  } catch { /* non-critical */ }
+  } catch {
+    /* non-critical */
+  }
   if (id) {
     try {
       const res = await modelPricingService.get(orgIdentifier.value, id);
@@ -772,7 +1031,11 @@ onBeforeMount(async () => {
         }
         for (let i = 1; i < model.value.tiers.length; i++) {
           if (!model.value.tiers[i].condition) {
-            model.value.tiers[i].condition = { usage_key: "input", operator: "gt", value: 0 };
+            model.value.tiers[i].condition = {
+              usage_key: "input",
+              operator: "gt",
+              value: 0,
+            };
           }
         }
       }
@@ -785,7 +1048,6 @@ onBeforeMount(async () => {
 </script>
 
 <style lang="scss" scoped>
-
 /* ── Sticky footer ─────────────────────────────────── */
 .page-footer {
   display: flex;
@@ -849,7 +1111,6 @@ onBeforeMount(async () => {
   }
 }
 
-
 /* ── Tier card ──────────────────────────────────────── */
 .tier-card {
   border: 1px solid var(--o2-border-color);
@@ -895,7 +1156,9 @@ onBeforeMount(async () => {
     height: 30px;
     align-items: center;
   }
-  :deep(.q-field__label) { display: none; }
+  :deep(.q-field__label) {
+    display: none;
+  }
   :deep(.q-field__native) {
     padding-top: 0;
     padding-bottom: 0;
@@ -935,7 +1198,6 @@ onBeforeMount(async () => {
   }
 }
 
-
 .tier-status-badge {
   font-size: 10px;
   font-weight: 600;
@@ -955,7 +1217,7 @@ onBeforeMount(async () => {
   padding: 5px 14px;
 
   &::before {
-    content: '';
+    content: "";
     display: inline-block;
     width: 7px;
     height: 7px;
@@ -967,7 +1229,10 @@ onBeforeMount(async () => {
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
   border: 1px solid var(--o2-border-color);
   background: transparent;
   color: inherit;
@@ -1068,14 +1333,15 @@ onBeforeMount(async () => {
   gap: 8px;
   align-items: center;
   padding: 4px 12px;
-
 }
 
 /* ── Pattern examples button & dialog ─────────────── */
 .pattern-examples-btn {
   opacity: 0.5;
   color: var(--q-primary);
-  &:hover { opacity: 1; }
+  &:hover {
+    opacity: 1;
+  }
 }
 
 .pattern-examples-card {
@@ -1116,7 +1382,9 @@ onBeforeMount(async () => {
   border-bottom: 1px solid var(--o2-border-color);
   font-size: 12px;
 
-  &:last-child { border-bottom: none; }
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .examples-model-name {
@@ -1125,7 +1393,9 @@ onBeforeMount(async () => {
 
 .examples-copy-btn {
   opacity: 0.4;
-  &:hover { opacity: 1; }
+  &:hover {
+    opacity: 1;
+  }
 }
 
 .examples-pattern {
