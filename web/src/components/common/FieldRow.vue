@@ -51,16 +51,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem] tw:overflow-hidden"
       v-if="field.name !== timestampColumn"
     >
-      <q-btn
-        v-if="field.isSchemaField && field.name != timestampColumn"
-        :icon="outlinedAdd"
-        :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
-        style="margin-right: 0.375rem"
-        size="0.4rem"
-        class="q-mr-sm tw:cursor-pointer"
-        @click.stop="$emit('add-to-filter', `${field.name}=''`)"
-        round
-      />
+      <span style="margin-right: 0.375rem">
+        <OButton
+          v-if="field.isSchemaField && field.name != timestampColumn"
+          variant="ghost-primary"
+          size="icon-xs-circle"
+          :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
+          @click.stop="$emit('add-to-filter', `${field.name}=''`)"
+        >
+          <q-icon :name="outlinedAdd" size="0.8rem" />
+        </OButton>
+      </span>
       <q-icon
         :data-test="`log-search-index-list-add-${field.name}-field-btn`"
         v-if="
@@ -113,6 +114,7 @@ import {
   outlinedVisibility,
   outlinedVisibilityOff,
 } from "@quasar/extras/material-icons-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface Props {
   field: any;

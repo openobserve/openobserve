@@ -79,16 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </div>
                 <q-space />
-                <q-btn
+                <OButton
                   v-if="!isAnalyzing && !showAnalyzeResults"
-                  color="primary"
-                  :label="t('search.analyze')"
+                  variant="primary"
                   size="sm"
-                  @click="runAnalyze"
                   :loading="loading"
+                  @click="runAnalyze"
                 >
+                  {{ t('search.analyze') }}
                   <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
-                </q-btn>
+                </OButton>
               </div>
               <q-separator />
 
