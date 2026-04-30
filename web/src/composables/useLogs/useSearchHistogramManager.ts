@@ -223,12 +223,7 @@ export const useSearchHistogramManager = () => {
 
     searchObj.data.queryResults.aggs.push(...response.content.results.hits);
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
-    const histogramTook =
-      (searchObj.data.queryResults.histogramTook || 0) +
-      response.content.results.took;
-    searchObj.data.queryResults.histogramTook = histogramTook;
-    searchObj.data.queryResults.took =
-      (searchObj.data.queryResults.searchTook || 0) + histogramTook;
+    searchObj.data.queryResults.took += response.content.results.took;
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
 
