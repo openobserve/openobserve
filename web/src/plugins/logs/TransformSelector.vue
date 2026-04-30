@@ -19,39 +19,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="q-pa-none float-left q-mr-xs transform-selector element-box-shadow el-border"
   >
+    <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
     <div class="tw:flex tw:items-center">
-      <q-toggle
-        data-test="logs-search-bar-show-query-toggle-btn"
-        v-model="searchObj.meta.showTransformEditor"
-        class="o2-toggle-button-xs"
-        size="xs"
-        flat
-        :disable="!searchObj.data.transformType"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-xs-dark'
-            : 'o2-toggle-button-xs-light'
-        "
-      >
-        <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-          {{ getTransformLabelTooltip }}
-        </q-tooltip>
-      </q-toggle>
-    </div>
-    <ODropdown v-model:open="functionModel" side="bottom" align="start">
-      <template #trigger>
-        <OButton
-          data-test="logs-search-bar-function-dropdown"
-          variant="ghost"
-          size="icon-toolbar"
+      <div class="tw:flex tw:items-center">
+        <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="searchObj.meta.showTransformEditor"
+          class="o2-toggle-button-xs"
+          size="xs"
+          flat
+          :disable="!searchObj.data.transformType"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-xs-dark'
+              : 'o2-toggle-button-xs-light'
+          "
         >
-          <img v-if="transformIcon?.startsWith('img:')" :src="transformIcon.slice(4)" alt="Transform" class="tw:size-4" />
-          <q-icon v-else :name="transformIcon" size="16px" />
-          <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
-          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{ transformsLabel }}</q-tooltip>
-        </OButton>
-      </template>
-      <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
+          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+            {{ getTransformLabelTooltip }}
+          </q-tooltip>
+        </q-toggle>
+      </div>
+      <ODropdown v-model:open="functionModel" side="bottom" align="start">
+        <template #trigger>
+          <OButton
+            data-test="logs-search-bar-function-dropdown"
+            variant="ghost"
+            size="icon-toolbar"
+          >
+            <img v-if="transformIcon?.startsWith('img:')" :src="transformIcon.slice(4)" alt="Transform" class="tw:size-4" />
+            <q-icon v-else :name="transformIcon" size="16px" />
+            <q-icon name="arrow_drop_down" size="18px" class="tw:ms-0.5" />
+            <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{ transformsLabel }}</q-tooltip>
+          </OButton>
+        </template>
+        <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
         <!-- Search Input -->
         <div
           data-test="logs-search-bar-transform-type-select"
@@ -123,7 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item>
         </div>
       </q-list>
-    </ODropdown>
+      </ODropdown>
+    </div>
     <OButton
       data-test="logs-search-bar-save-transform-btn"
       variant="ghost"

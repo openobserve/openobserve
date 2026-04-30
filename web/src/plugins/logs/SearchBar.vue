@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton variant="ghost" size="icon-toolbar">
                 <q-icon name="saved_search" size="16px" />
-                <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
+                <q-icon name="arrow_drop_down" size="18px" class="tw:-ms-1" />
                 <q-tooltip>{{ t("search.listSavedViews") }}</q-tooltip>
               </OButton>
             </template>
