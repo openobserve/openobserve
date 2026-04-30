@@ -244,4 +244,48 @@ mod tests {
         let expr = utf8_literal("val");
         assert_eq!(get_column_name(&expr), UNKNOWN_NAME);
     }
+
+    #[test]
+    fn test_is_aggregate_exec_false_for_empty_exec() {
+        use arrow::datatypes::{DataType, Field, Schema};
+        use datafusion::physical_plan::empty::EmptyExec;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
+        assert!(!is_aggregate_exec(&exec));
+    }
+
+    #[test]
+    fn test_extract_column_ok() {
+        let expr = col_expr("mycol");
+        let col = extract_column(&expr).unwrap();
+        assert_eq!(col.name(), "mycol");
+    }
+
+    #[test]
+    fn test_extract_column_err_for_literal() {
+        let expr = utf8_literal("val");
+        assert!(extract_column(&expr).is_err());
+    }
+
+    #[test]
+    fn test_disjunction_empty_returns_true_literal() {
+        let result = disjunction(vec![]);
+        // empty → lit(true)
+        let lit = result.as_any().downcast_ref::<datafusion::physical_plan::expressions::Literal>();
+        assert!(lit.is_some());
+    }
+
+    #[test]
+    fn test_disjunction_single_returns_same() {
+        let expr = utf8_literal("x");
+        let result = disjunction(vec![expr.clone()]);
+        assert!(is_value(&result));
+    }
+
+    #[test]
+    fn test_is_only_timestamp_filter_empty_slice() {
+        // all() on empty = true
+        assert!(is_only_timestamp_filter(&[]));
+    }
 }

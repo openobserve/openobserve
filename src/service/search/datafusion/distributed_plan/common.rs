@@ -274,4 +274,38 @@ mod tests {
         let err_stream = stream.with_error(tonic::Status::internal("test"));
         assert!(err_stream.e.is_some());
     }
+
+    #[test]
+    fn test_query_context_with_scan_stats() {
+        let node: Arc<dyn config::meta::cluster::NodeInfo> = Arc::new(TestNode);
+        let stats = Arc::new(Mutex::new(config::meta::search::ScanStats::new()));
+        let ctx = QueryContext::new(node).with_scan_stats(stats.clone());
+        assert!(Arc::ptr_eq(&ctx.scan_stats, &stats));
+    }
+
+    #[test]
+    fn test_query_context_with_partial_err() {
+        let node: Arc<dyn config::meta::cluster::NodeInfo> = Arc::new(TestNode);
+        let err = Arc::new(Mutex::new("pre-err".to_string()));
+        let ctx = QueryContext::new(node).with_partial_err(err.clone());
+        assert_eq!(*ctx.partial_err.lock(), "pre-err");
+    }
+
+    #[test]
+    fn test_query_context_with_peak_memory() {
+        use std::sync::atomic::Ordering;
+
+        let node: Arc<dyn config::meta::cluster::NodeInfo> = Arc::new(TestNode);
+        let mem = Arc::new(std::sync::atomic::AtomicUsize::new(42));
+        let ctx = QueryContext::new(node).with_peak_memory(mem.clone());
+        assert_eq!(ctx.peak_memory.load(Ordering::Relaxed), 42);
+    }
+
+    #[test]
+    fn test_query_context_with_start_time() {
+        let node: Arc<dyn config::meta::cluster::NodeInfo> = Arc::new(TestNode);
+        let t = std::time::Instant::now();
+        let ctx = QueryContext::new(node).with_start_time(t);
+        assert!(ctx.start.elapsed().as_secs() < 10);
+    }
 }

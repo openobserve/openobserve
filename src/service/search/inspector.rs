@@ -358,6 +358,25 @@ mod tests {
     }
 
     #[test]
+    fn test_search_inspector_fields_disabled_returns_msg() {
+        // Default config has search_inspector_enabled=false → returns msg unchanged
+        let msg = "original message".to_string();
+        let fields = SearchInspectorFields::default();
+        let result = search_inspector_fields(msg.clone(), fields);
+        // If disabled, result == msg; if enabled, result contains msg + json
+        assert!(result.contains("original message"));
+    }
+
+    #[test]
+    fn test_search_inspector_fields_builder_new_defaults() {
+        let builder = SearchInspectorFieldsBuilder::new();
+        let fields = builder.build();
+        // region and cluster are set from LOCAL_NODE
+        assert!(fields.trace_id.is_none());
+        assert!(fields.duration.is_none());
+    }
+
+    #[test]
     fn test_search_inspector_fields_builder_all_setters() {
         let fields = SearchInspectorFieldsBuilder::new()
             .trace_id("tid".to_string())

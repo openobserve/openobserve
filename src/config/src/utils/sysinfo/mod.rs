@@ -131,4 +131,11 @@ mod tests {
         assert_eq!(m.memory_total, 0);
         assert_eq!(m.tcp_conns, 0);
     }
+
+    #[test]
+    fn test_get_cpu_usage_finite() {
+        let usage = get_cpu_usage();
+        assert!(usage.is_finite());
+        assert!(usage >= 0.0);
+    }
 }
