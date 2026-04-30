@@ -1039,7 +1039,6 @@ export default defineComponent({
 
 .dialog-split-layout {
   display: flex;
-  height: 780px;
   max-height: 92vh;
 
   &.cloud-layout {
