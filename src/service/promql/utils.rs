@@ -25,6 +25,54 @@ use datafusion::{
 use hashbrown::HashSet;
 use promql_parser::label::{MatchOp, Matchers};
 
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use datafusion::{
+        arrow::{
+            array::Int32Array,
+            datatypes::{DataType, Field, Schema as ArrowSchema},
+            record_batch::RecordBatch,
+        },
+        prelude::SessionContext,
+    };
+    use hashbrown::HashSet;
+    use promql_parser::label::Matchers;
+
+    use super::*;
+
+    fn make_df() -> (DataFrame, ArrowSchema) {
+        let schema = Arc::new(ArrowSchema::new(vec![
+            Field::new("a", DataType::Int32, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let df = ctx.read_batch(batch).unwrap();
+        (df, ArrowSchema::new(vec![Field::new("a", DataType::Int32, false)]))
+    }
+
+    #[test]
+    fn test_apply_matchers_empty_matchers_returns_ok() {
+        let (df, schema) = make_df();
+        let matchers = Matchers::new(vec![]);
+        let result = apply_matchers(df, &schema, &matchers);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_apply_label_selector_empty_set_returns_some() {
+        let (df, schema) = make_df();
+        let label_selector = HashSet::new();
+        let result = apply_label_selector(df, &schema, &label_selector);
+        assert!(result.is_some());
+    }
+}
+
 use crate::service::search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
 
 pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
