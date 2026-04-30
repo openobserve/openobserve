@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroup
               class="tw:shrink-0 tw:ml-4"
               :model-value="activeTab"
-              @update:model-value="activeTab = ($event as string)"
+              @update:model-value="activeTab = $event as string"
             >
               <OToggleGroupItem
                 value="history"
@@ -521,16 +521,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
-import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import { History, Code2 } from 'lucide-vue-next';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { History, Code2 } from "lucide-vue-next";
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
