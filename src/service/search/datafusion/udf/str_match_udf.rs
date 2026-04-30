@@ -306,4 +306,47 @@ mod tests {
             assert!(count > 0);
         }
     }
+
+    #[test]
+    fn test_str_match_impl_wrong_arg_count_errors() {
+        let result = str_match_impl(&[], false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_str_match_impl_direct_match() {
+        use datafusion::common::ScalarValue;
+        let haystack = Arc::new(StringArray::from(vec!["hello world", "foo bar"]));
+        let args = [
+            ColumnarValue::Array(haystack),
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some("world".to_string()))),
+        ];
+        let result = str_match_impl(&args, false).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            use arrow::array::{Array, BooleanArray};
+            let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
+            assert!(out.value(0));
+            assert!(!out.value(1));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_str_match_impl_case_insensitive() {
+        use datafusion::common::ScalarValue;
+        let haystack = Arc::new(StringArray::from(vec!["Hello World"]));
+        let args = [
+            ColumnarValue::Array(haystack),
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some("world".to_string()))),
+        ];
+        let result = str_match_impl(&args, true).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            use arrow::array::{Array, BooleanArray};
+            let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
+            assert!(out.value(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
 }

@@ -530,4 +530,26 @@ mod tests {
         let test2 = ctx.sql(sqls[1].0).await;
         assert!(test2.is_err());
     }
+
+    #[test]
+    fn test_regex_pattern_to_fields_with_named_groups() {
+        let result =
+            regex_pattern_to_fields(r"(?P<host>[^\s]+) (?P<method>[^\s]+)", &DataType::Utf8)
+                .unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].name(), "host");
+        assert_eq!(result[1].name(), "method");
+    }
+
+    #[test]
+    fn test_regex_pattern_to_fields_no_named_groups_errors() {
+        let result = regex_pattern_to_fields(r"([^\s]+) ([^\s]+)", &DataType::Utf8);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_regex_pattern_to_fields_empty_pattern_errors() {
+        let result = regex_pattern_to_fields("", &DataType::Utf8);
+        assert!(result.is_err());
+    }
 }
