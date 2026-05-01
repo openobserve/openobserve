@@ -24,7 +24,7 @@
           class="q-pa-md"
           @show="(e: any) => loadFilterItem(condition.column)"
         >
-          <div style="display: flex">
+          <div style="display: flex; align-items: center; gap: 4px;">
             <StreamFieldSelect
               class="tw:w-full"
               :streams="getAllSelectedStreams()"
@@ -33,11 +33,11 @@
             />
             <OButton
               variant="ghost"
-              size="icon-chip"
+              size="icon"
               @click="removeColumnName"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
             >
-              <template #icon-left><q-icon name="close" /></template>
+              <template #icon-left><q-icon name="close" size="18px" /></template>
             </OButton>
           </div>
           <div style="height: 100%">

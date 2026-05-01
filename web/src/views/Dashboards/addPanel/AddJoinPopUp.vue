@@ -194,7 +194,7 @@
               class="bg-grey-8"
               anchor="top middle"
               self="bottom middle"
-            ></q-tooltip>
+            >Remove clause</q-tooltip>
           </OButton>
         </div>
       </div>
