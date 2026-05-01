@@ -17,12 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="search-bar-component tw:h-full" id="searchBarComponent">
     <div class="row tw:m-0! tw:p-[0.375rem]">
-      <div class="float-right col flex items-center">
+      <div class="float-right col flex items-center tw:gap-[0.375rem]">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
           @update:model-value="$emit('update:searchMode', $event)"
-          class="tw:mr-[0.375rem]"
         >
           <OToggleGroupItem data-test="traces-search-mode-spans-btn" value="spans" size="sm">
             <template #icon-left><Layers class="tw:size-3.5 tw:shrink-0" /></template>
@@ -63,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
+            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
           >
             <q-toggle
               data-test="traces-search-bar-show-metrics-toggle-btn"
@@ -91,7 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-search-bar-reset-filters-btn"
             variant="outline"
             size="icon-toolbar"
-            class="tw:mr-[0.375rem]"
             @click="resetFilters"
           >
             <q-icon name="restart_alt" size="16px" />
@@ -101,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <!-- Error Only Toggle -->
           <div
-            class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
+            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
           >
             <q-toggle
               data-test="traces-search-bar-error-only-toggle-btn"
@@ -138,10 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.meta.searchMode !== 'service-graph' &&
           searchObj.meta.searchMode !== 'services-catalog'
         "
-        class="float-right col-auto"
+        class="float-right col-auto tw:flex tw:items-center tw:gap-[0.375rem]"
       >
-        <div class="float-left tw:mr-[0.375rem]">
-          <date-time
+        <date-time
             ref="dateTimeRef"
             auto-apply
             :default-type="searchObj.data.datetime.type"
@@ -161,83 +158,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
-        </div>
-        <div class="search-time tw:mr-[0.375rem] float-left tw:flex">
-          <OButton
-            v-if="config.isEnterprise == 'true' && isLoading"
-            variant="outline"
-            size="sm-action"
-            data-test="traces-search-bar-cancel-btn"
-            :title="t('search.cancel')"
-            @click="cancelQueryData"
-          >{{ t("search.cancel") }}</OButton>
-          <OButton
-            v-else
-            variant="primary"
-            size="sm-action"
-            data-test="logs-search-bar-refresh-btn"
-            data-cy="search-bar-refresh-button"
-            :title="t('search.runQuery')"
-            @click="searchData"
-            :loading="isLoading"
-            :disabled="isLoading"
-          >
-            <q-tooltip
-              v-if="
-                searchObj.meta.liveMode &&
+        <div class="search-time">
+          <div class="tw:flex tw:items-center">
+            <OButton
+              v-if="config.isEnterprise == 'true' && isLoading"
+              variant="ghost"
+              data-test="traces-search-bar-cancel-btn"
+              :title="t('search.cancel')"
+              class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+              @click="cancelQueryData"
+            >{{ t("search.cancel") }}</OButton>
+            <OButton
+              v-else
+              variant="ghost"
+              data-test="logs-search-bar-refresh-btn"
+              data-cy="search-bar-refresh-button"
+              :title="t('search.runQuery')"
+              class="q-pa-none tw:h-[1.875rem]! element-box-shadow o2-run-query-button o2-color-primary"
+              :class="
                 store.state.zoConfig.auto_query_enabled
+                  ? 'search-button-enterprise-border-radius'
+                  : 'search-button-normal-border-radius'
               "
-              >{{ t("search.autoRunEnabled") }}</q-tooltip
+              @click="searchData"
+              :loading="isLoading"
+              :disabled="isLoading"
             >
-            <template
-              v-if="
-                searchObj.meta.liveMode &&
-                store.state.zoConfig.auto_query_enabled
-              "
-              #icon-left
+              <q-tooltip
+                v-if="
+                  searchObj.meta.liveMode &&
+                  store.state.zoConfig.auto_query_enabled
+                "
+              >{{ t("search.autoRunEnabled") }}</q-tooltip>
+              <q-icon
+                v-if="
+                  searchObj.meta.liveMode &&
+                  store.state.zoConfig.auto_query_enabled
+                "
+                name="autorenew"
+                size="14px"
+                class="q-mr-xs"
+              />
+              {{ t("search.runQuery") }}
+            </OButton>
+            <!-- Dropdown: shown when live mode feature is enabled -->
+            <q-separator
+              v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
+              class="tw:h-[1.875rem]! tw:w-[1px]"
+            />
+            <ODropdown
+              v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
+              side="bottom"
+              align="end"
             >
-              <q-icon name="autorenew" size="14px" />
-            </template>
-            {{ t("search.runQuery") }}
-          </OButton>
-          <!-- Dropdown: shown when live mode feature is enabled -->
-          <q-separator
-            v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
-            class="tw:h-[29px] tw:w-[1px]"
-          />
-          <ODropdown
-            v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
-            side="bottom"
-            align="end"
-          >
-            <template #trigger>
-              <OButton
-                variant="ghost"
-                size="icon-xs"
-                class="tw:h-[29px] search-button-dropdown o2-color-primary search-button-dropdown-enterprise-border-radius"
-              >
-                <q-icon name="arrow_drop_down" size="18px" />
-              </OButton>
-            </template>
-            <ODropdownItem
-              data-test="traces-search-bar-live-mode-toggle-btn"
-              @select="toggleLiveMode"
-            >
-              <template #icon-left>
-                <q-icon
-                  :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
-                  size="16px"
-                  :color="searchObj.meta.liveMode ? 'primary' : ''"
-                />
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  :class="[
+                    'o2-color-primary',
+                    'search-button-dropdown-enterprise-border-radius',
+                  ]"
+                >
+                  <q-icon name="arrow_drop_down" size="18px" />
+                </OButton>
               </template>
-              <span class="tw:font-medium">
-                {{ searchObj.meta.liveMode ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
-              </span>
-            </ODropdownItem>
-          </ODropdown>
+              <ODropdownItem
+                data-test="traces-search-bar-live-mode-toggle-btn"
+                @select="toggleLiveMode"
+              >
+                <template #icon-left>
+                  <q-icon
+                    :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
+                    size="16px"
+                    :color="searchObj.meta.liveMode ? 'primary' : ''"
+                  />
+                </template>
+                <span>
+                  <div class="tw:font-medium tw:text-[12px]">
+                    {{ searchObj.meta.liveMode ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                  </div>
+                  <div class="tw:text-[11px] tw:text-muted-foreground">
+                    {{ t("search.liveModeTooltip") }}
+                  </div>
+                </span>
+              </ODropdownItem>
+            </ODropdown>
+          </div>
         </div>
         <OButton
-          class="tw:mr-[0.375rem] tw:float-left"
           variant="outline"
           size="icon-toolbar"
           :disabled="!searchObj.data.queryResults?.hits?.length"
@@ -1106,7 +1115,41 @@ export default defineComponent({
   }
 }
 
+.o2-run-query-button {
+  font-size: 11px;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 0px !important;
+  width: 94px !important;
+  transition:
+    box-shadow 0.3s ease,
+    opacity 0.2s ease;
+}
+
+.o2-color-primary {
+  background-color: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
+
+  &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
+}
+
+.search-button-enterprise-border-radius {
+  border-radius: 0.375rem 0px 0px 0.375rem !important;
+}
+
+.search-button-normal-border-radius {
+  border-radius: 0.375rem;
+}
+
 .search-button-dropdown-enterprise-border-radius {
   border-radius: 0px 0.375rem 0.375rem 0px !important;
+}
+
+.o2-color-cancel {
+  background-color: #f67a7a;
+  color: var(--o2-primary-btn-text);
 }
 </style>
