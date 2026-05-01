@@ -33,13 +33,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Header -->
           <div class="retry-dialog-header">
             <h3 class="retry-dialog-title">Retry Enrichment Table Job</h3>
-            <button
-              class="retry-dialog-close"
+            <OButton
+              variant="ghost"
+              size="icon"
               @click="handleCancel"
               aria-label="Close"
             >
               <q-icon name="close" size="20px" />
-            </button>
+            </OButton>
           </div>
 
           <!-- Content -->
@@ -353,35 +354,6 @@ export default defineComponent({
   color: #e0e0e0;
 }
 
-.retry-dialog-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-  padding: 0;
-}
-
-.retry-dialog-close:hover {
-  background-color: #f5f5f5;
-  color: #333;
-}
-
-.dark-theme .retry-dialog-close {
-  color: #999;
-}
-
-.dark-theme .retry-dialog-close:hover {
-  background-color: #2a2a2a;
-  color: #e0e0e0;
-}
 
 .retry-dialog-content {
   padding: 24px;
