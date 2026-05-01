@@ -250,12 +250,26 @@ pub struct PanelFields {
     pub promql_operations: Vec<PromQLOperation>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AxisType {
     Build,
     Raw,
     Custom,
+}
+
+impl<'de> Deserialize<'de> for AxisType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "build" => Self::Build,
+            "raw" => Self::Raw,
+            _ => Self::Custom,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -359,12 +373,26 @@ pub enum LogicalOperator {
     Or,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum FilterType {
     #[default]
     Condition,
     Group,
+}
+
+impl<'de> Deserialize<'de> for FilterType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "condition" => Self::Condition,
+            "group" => Self::Group,
+            _ => Self::default(),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -473,42 +501,80 @@ pub enum PromqlTableMode {
     All,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
 pub enum Unit {
-    #[serde(rename = "numbers")]
     Numbers,
-    #[serde(rename = "bytes")]
     Bytes,
-    #[serde(rename = "kilobytes")]
     Kilobytes,
-    #[serde(rename = "megabytes")]
     Megabytes,
-    #[serde(rename = "bps")]
     Bps,
-    #[serde(rename = "seconds")]
     Seconds,
-    #[serde(rename = "milliseconds")]
     Milliseconds,
-    #[serde(rename = "microseconds")]
     Microseconds,
-    #[serde(rename = "nanoseconds")]
     Nanoseconds,
-    #[serde(rename = "percent-1")]
     PercentNormalized,
-    #[serde(rename = "percent")]
     Percent,
-    #[serde(rename = "currency-dollar")]
     CurrencyDollar,
-    #[serde(rename = "currency-euro")]
     CurrencyEuro,
-    #[serde(rename = "currency-pound")]
     CurrencyPound,
-    #[serde(rename = "currency-yen")]
     CurrencyYen,
-    #[serde(rename = "currency-rupee")]
     CurrencyRupee,
-    #[serde(rename = "custom")]
-    Custom,
+    Custom(String),
+}
+
+impl Default for Unit {
+    fn default() -> Self {
+        Self::Custom(String::new())
+    }
+}
+
+impl From<String> for Unit {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "numbers" => Self::Numbers,
+            "bytes" => Self::Bytes,
+            "kilobytes" => Self::Kilobytes,
+            "megabytes" => Self::Megabytes,
+            "bps" => Self::Bps,
+            "seconds" => Self::Seconds,
+            "milliseconds" => Self::Milliseconds,
+            "microseconds" => Self::Microseconds,
+            "nanoseconds" => Self::Nanoseconds,
+            "percent-1" => Self::PercentNormalized,
+            "percent" => Self::Percent,
+            "currency-dollar" => Self::CurrencyDollar,
+            "currency-euro" => Self::CurrencyEuro,
+            "currency-pound" => Self::CurrencyPound,
+            "currency-yen" => Self::CurrencyYen,
+            "currency-rupee" => Self::CurrencyRupee,
+            _ => Self::Custom(s),
+        }
+    }
+}
+
+impl From<Unit> for String {
+    fn from(value: Unit) -> Self {
+        match value {
+            Unit::Numbers => "numbers".to_string(),
+            Unit::Bytes => "bytes".to_string(),
+            Unit::Kilobytes => "kilobytes".to_string(),
+            Unit::Megabytes => "megabytes".to_string(),
+            Unit::Bps => "bps".to_string(),
+            Unit::Seconds => "seconds".to_string(),
+            Unit::Milliseconds => "milliseconds".to_string(),
+            Unit::Microseconds => "microseconds".to_string(),
+            Unit::Nanoseconds => "nanoseconds".to_string(),
+            Unit::PercentNormalized => "percent-1".to_string(),
+            Unit::Percent => "percent".to_string(),
+            Unit::CurrencyDollar => "currency-dollar".to_string(),
+            Unit::CurrencyEuro => "currency-euro".to_string(),
+            Unit::CurrencyPound => "currency-pound".to_string(),
+            Unit::CurrencyYen => "currency-yen".to_string(),
+            Unit::CurrencyRupee => "currency-rupee".to_string(),
+            Unit::Custom(s) => s,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -535,6 +601,7 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     chart_align: Option<ChartAlign>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
     unit: Option<Unit>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit_custom: Option<String>,
@@ -656,28 +723,56 @@ fn default_show_legends() -> bool {
     true
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
 pub enum ColorMode {
-    #[serde(rename = "palette-classic-by-series")]
     PaletteClassicBySeries,
-    #[serde(rename = "palette-classic")]
     PaletteClassic,
-    #[serde(rename = "fixed")]
     Fixed,
-    #[serde(rename = "shades")]
     Shades,
-    #[serde(rename = "continuous-green-yellow-red")]
     ContinuousGreenYellowRed,
-    #[serde(rename = "continuous-red-yellow-green")]
     ContinuousRedYellowGreen,
-    #[serde(rename = "continuous-temperature")]
     ContinuousTemperature,
-    #[serde(rename = "continuous-positive")]
     ContinuousPositive,
-    #[serde(rename = "continuous-negative")]
     ContinuousNegative,
-    #[serde(rename = "continuous-light-to-dark-blue")]
     ContinuousLightToDarkBlue,
+    Custom(String),
+}
+
+impl From<String> for ColorMode {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "palette-classic-by-series" => Self::PaletteClassicBySeries,
+            "palette-classic" => Self::PaletteClassic,
+            "fixed" => Self::Fixed,
+            "shades" => Self::Shades,
+            "continuous-green-yellow-red" => Self::ContinuousGreenYellowRed,
+            "continuous-red-yellow-green" => Self::ContinuousRedYellowGreen,
+            "continuous-temperature" => Self::ContinuousTemperature,
+            "continuous-positive" => Self::ContinuousPositive,
+            "continuous-negative" => Self::ContinuousNegative,
+            "continuous-light-to-dark-blue" => Self::ContinuousLightToDarkBlue,
+            _ => Self::Custom(s),
+        }
+    }
+}
+
+impl From<ColorMode> for String {
+    fn from(value: ColorMode) -> Self {
+        match value {
+            ColorMode::PaletteClassicBySeries => "palette-classic-by-series".to_string(),
+            ColorMode::PaletteClassic => "palette-classic".to_string(),
+            ColorMode::Fixed => "fixed".to_string(),
+            ColorMode::Shades => "shades".to_string(),
+            ColorMode::ContinuousGreenYellowRed => "continuous-green-yellow-red".to_string(),
+            ColorMode::ContinuousRedYellowGreen => "continuous-red-yellow-green".to_string(),
+            ColorMode::ContinuousTemperature => "continuous-temperature".to_string(),
+            ColorMode::ContinuousPositive => "continuous-positive".to_string(),
+            ColorMode::ContinuousNegative => "continuous-negative".to_string(),
+            ColorMode::ContinuousLightToDarkBlue => "continuous-light-to-dark-blue".to_string(),
+            ColorMode::Custom(s) => s,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -685,6 +780,7 @@ pub enum ColorMode {
 #[serde(rename_all = "camelCase")]
 pub struct ColorCfg {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
     mode: Option<ColorMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     fixed_color: Option<Vec<String>>,
@@ -809,7 +905,7 @@ pub struct Field {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", from = "ConfigRaw")]
 pub enum Config {
     #[serde(rename = "unit")]
     Unit {
@@ -824,11 +920,40 @@ pub enum Config {
     },
 }
 
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum ConfigRaw {
+    #[serde(rename = "unit")]
+    Unit {
+        #[serde(default)]
+        value: Option<Value>,
+    },
+    #[serde(rename = "unique_value_color")]
+    #[serde(rename_all = "camelCase")]
+    UniqueValueColor {
+        #[serde(default)]
+        auto_color: bool,
+    },
+    #[serde(other)]
+    Unknown,
+}
+
+impl From<ConfigRaw> for Config {
+    fn from(raw: ConfigRaw) -> Self {
+        match raw {
+            ConfigRaw::Unit { value } => Self::Unit { value },
+            ConfigRaw::UniqueValueColor { auto_color } => Self::UniqueValueColor { auto_color },
+            ConfigRaw::Unknown => Self::UniqueValueColor { auto_color: false },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Value {
-    unit: String,
+    #[schema(value_type = String)]
+    unit: Unit,
     custom_unit: String,
 }
 
@@ -868,11 +993,32 @@ pub struct DrillDownVariables {
     value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
 pub enum LayerType {
     Scatter,
     Heatmap,
+    Custom(String),
+}
+
+impl From<String> for LayerType {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "scatter" => Self::Scatter,
+            "heatmap" => Self::Heatmap,
+            _ => Self::Custom(s),
+        }
+    }
+}
+
+impl From<LayerType> for String {
+    fn from(value: LayerType) -> Self {
+        match value {
+            LayerType::Scatter => "scatter".to_string(),
+            LayerType::Heatmap => "heatmap".to_string(),
+            LayerType::Custom(s) => s,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -882,6 +1028,7 @@ pub struct QueryConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     step_value: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
     layer_type: Option<LayerType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<f64>)]
@@ -1145,7 +1292,7 @@ pub struct LabelOption {
     pub rotate: Option<OrdF64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, ToSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum LineInterpolation {
     #[default]
@@ -1156,7 +1303,24 @@ pub enum LineInterpolation {
     StepMiddle,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+impl<'de> Deserialize<'de> for LineInterpolation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "smooth" => Self::Smooth,
+            "linear" => Self::Linear,
+            "step-start" => Self::StepStart,
+            "step-end" => Self::StepEnd,
+            "step-middle" => Self::StepMiddle,
+            _ => Self::default(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum LabelPosition {
     #[default]
@@ -1174,6 +1338,32 @@ pub enum LabelPosition {
     InsideTopRight,
     InsideBottomRight,
     Outside,
+}
+
+impl<'de> Deserialize<'de> for LabelPosition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "top" => Self::Top,
+            "left" => Self::Left,
+            "right" => Self::Right,
+            "bottom" => Self::Bottom,
+            "inside" => Self::Inside,
+            "insideLeft" => Self::InsideLeft,
+            "insideRight" => Self::InsideRight,
+            "insideTop" => Self::InsideTop,
+            "insideBottom" => Self::InsideBottom,
+            "insideTopLeft" => Self::InsideTopLeft,
+            "insideBottomLeft" => Self::InsideBottomLeft,
+            "insideTopRight" => Self::InsideTopRight,
+            "insideBottomRight" => Self::InsideBottomRight,
+            "outside" => Self::Outside,
+            _ => Self::default(),
+        })
+    }
 }
 
 #[cfg(test)]
