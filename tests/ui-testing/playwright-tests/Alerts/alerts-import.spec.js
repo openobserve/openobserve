@@ -47,6 +47,8 @@ test.describe("Alerts Import/Export", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   });
 
+  // Re-enabled from test.skip — API-first fixes (alertTemplatesPage/alertDestinationsPage) resolved
+  // the cascading "page context closed" errors that caused this test to fail previously
   test('Import/Export Alert Functionality', {
     tag: ['@all', '@alerts', '@alertsImportExport'],
     timeout: FIVE_MINUTES_MS

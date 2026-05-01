@@ -51,7 +51,7 @@ export class AlertTemplatesPage {
 
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(() => {});
 
         try {
@@ -146,7 +146,7 @@ export class AlertTemplatesPage {
 
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(() => {});
 
         // Try multiple fallback selectors for add button
@@ -422,7 +422,7 @@ export class AlertTemplatesPage {
                 const data = await checkResponse.json().catch(() => null);
                 if (data) {
                     const list = Array.isArray(data) ? data : (data.list || []);
-                    const found = list.some(item => item.name === templateName || item.name === templateName.toLowerCase());
+                    const found = list.some(item => item.name.toLowerCase() === templateName.toLowerCase());
                     if (found) {
                         testLogger.info('Template exists (API check — verified name)', { templateName });
                         return templateName;
@@ -487,7 +487,7 @@ export class AlertTemplatesPage {
 
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(() => {});
 
         await this.page.locator(this.addTemplateButton).click({ force: true });
@@ -665,7 +665,7 @@ export class AlertTemplatesPage {
                     return;
                 }
                 // Try next page
-                const nextBtn = this.page.locator('button:has(mat-icon:text("chevron_right"))');
+                const nextBtn = this.page.locator('button:has-text("chevron_right")').first();
                 if (await nextBtn.isVisible().catch(() => false) && await nextBtn.isEnabled().catch(() => false)) {
                     await nextBtn.click();
                     await this.page.waitForTimeout(2000);
@@ -700,7 +700,7 @@ export class AlertTemplatesPage {
                 const data = await response.json().catch(() => null);
                 if (data) {
                     const list = Array.isArray(data) ? data : (data.list || []);
-                    const found = list.some(item => item.name === templateName || item.name === templateName.toLowerCase());
+                    const found = list.some(item => item.name.toLowerCase() === templateName.toLowerCase());
                     if (found) {
                         testLogger.info('Found template via API', { templateName });
                         return true;

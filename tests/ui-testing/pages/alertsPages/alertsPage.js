@@ -647,7 +647,7 @@ export class AlertsPage {
 
         // Clean up any q-portal overlays that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(() => {});
         await this.page.waitForTimeout(500);
 
@@ -2498,7 +2498,7 @@ export class AlertsPage {
     async clickAlertUpdateButton(alertName) {
         // Clean up any q-portal overlays that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(() => {});
 
         // Search for the alert first
@@ -2525,7 +2525,7 @@ export class AlertsPage {
         await alertRow.waitFor({ state: 'visible', timeout: 20000 });
 
         // The edit button uses data-test="alert-list-{name}-update-alert" in v3 AlertList.vue
-        const editBtn = alertRow.locator('[data-test*="update-alert"], button[q-icon="edit"], .q-btn');
+        const editBtn = alertRow.locator('[data-test*="update-alert"], [aria-label*="edit"]');
         await editBtn.first().click({ force: true });
 
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});

@@ -38,7 +38,7 @@ export class AlertDestinationsPage {
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
-        this.nextPageButton = 'button:has(mat-icon:text("chevron_right")), button:has-text("chevron_right")';
+        this.nextPageButton = 'button:has-text("chevron_right")';
 
         // Prebuilt destination locators
         this.prebuiltDestinationSelector = '[data-test="prebuilt-destination-selector"]';
@@ -67,7 +67,7 @@ export class AlertDestinationsPage {
 
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(() => {});
 
         try {
@@ -186,8 +186,7 @@ export class AlertDestinationsPage {
                 if (data) {
                     const list = Array.isArray(data) ? data : (data.list || []);
                     const found = list.some(item =>
-                        item.name === destinationName ||
-                        item.name === destinationName.toLowerCase()
+                        item.name.toLowerCase() === destinationName.toLowerCase()
                     );
                     if (found) {
                         testLogger.info('Found destination via API', { destinationName });
@@ -685,7 +684,7 @@ export class AlertDestinationsPage {
     async selectDestinationType(type) {
         // Clean up any q-portal overlays that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(() => {});
         await this.page.waitForTimeout(300);
 
