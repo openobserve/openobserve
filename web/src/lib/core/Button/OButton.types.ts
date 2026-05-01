@@ -55,7 +55,9 @@ export type ButtonSize =
   // 26px rounded-lg — compact modern icon button for panel header collapse/expand
   | "icon-panel"
   // Tall narrow vertical rectangle — 32×20px for splitter collapse/expand buttons
-  | "sidebar-button";
+  | "sidebar-button"
+  // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
+  | "sm-toolbar";
 
 export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */
