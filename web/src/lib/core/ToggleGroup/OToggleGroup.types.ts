@@ -13,6 +13,12 @@ export type {
 
 export type ToggleGroupType = "single" | "multiple";
 export type ToggleGroupOrientation = "horizontal" | "vertical";
+/**
+ * default — standard toggle on neutral/white backgrounds (logs page, dialogs)
+ * primary — toggle placed on a primary-100 colored bar (dashboard query bar);
+ *           uses a white active pill on a primary-200 track so it reads clearly
+ */
+export type ToggleGroupVariant = "default" | "primary";
 
 export interface ToggleGroupProps {
   /** Whether one or multiple items can be active at a time */
@@ -23,6 +29,8 @@ export interface ToggleGroupProps {
   disabled?: boolean;
   /** Layout axis for keyboard navigation */
   orientation?: ToggleGroupOrientation;
+  /** Visual variant — use 'primary' when the toggle sits on a primary-colored bar */
+  variant?: ToggleGroupVariant;
 }
 
 export interface ToggleGroupEmits {
