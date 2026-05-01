@@ -856,6 +856,10 @@ pub async fn update_stream_settings(
         settings.storage_type = storage_type;
     }
 
+    if let Some(is_llm_stream) = new_settings.is_llm_stream {
+        settings.is_llm_stream = is_llm_stream;
+    }
+
     if !new_settings.full_text_search_keys.add.is_empty() {
         settings
             .full_text_search_keys
