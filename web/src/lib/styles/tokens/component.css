@@ -86,9 +86,9 @@
   --color-toggle-track-bg: var(--color-surface-subtle);
   --color-toggle-item-bg: transparent;
   --color-toggle-item-text: var(--color-text-primary);
-  --color-toggle-item-hover-bg: var(--color-surface-subtle-hover);
-  --color-toggle-item-active-bg: var(--color-white);
-  --color-toggle-item-active-text: var(--color-text-primary);
+  --color-toggle-item-hover-bg: var(--color-primary-50);
+  --color-toggle-item-active-bg: var(--color-primary-100);
+  --color-toggle-item-active-text: var(--color-primary-700);
   --color-toggle-item-disabled: var(--color-text-disabled);
   --color-toggle-border: var(--color-border-default);
   --color-toggle-focus-ring: var(--color-primary-400);
