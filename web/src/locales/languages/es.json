@@ -1125,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "apache",
     "iis": "IIS",
-    "pubsub": "Registros de Pub/Sub"
+    "pubsub": "Registros de Pub/Sub",
+    "aiLabel": "Integraciones de IA"
   },
   "dashboard": {
     "selectField": "Campo",
