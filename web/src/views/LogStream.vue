@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   @click="listSchema(props)"
                 >
-                  <FileList2 class="tw:size-4" />
+                  <FileText class="tw:size-4" />
                 </OButton>
                 <OButton
                   :title="t('logStream.delete')"
@@ -403,7 +403,7 @@ import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import {
   Search,
-  FileList2,
+  FileText,
   Trash2,
   ChevronLeft,
   ChevronRight,
@@ -427,7 +427,7 @@ export default defineComponent({
     GitFork,
     Info,
     Search,
-    FileList2,
+    FileText,
     Trash2,
     ChevronLeft,
     ChevronRight,
