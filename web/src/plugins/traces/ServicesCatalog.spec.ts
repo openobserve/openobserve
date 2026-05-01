@@ -1573,7 +1573,12 @@ describe("ServicesCatalog", () => {
         // Verify the query uses production-stream, not different-stream
         expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
         const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
-        const decodedSql = atob(callArgs.queryReq.query.sql);
+        // b64EncodeUnicode uses URL-safe base64 (-, _, .), so reverse those
+        // before calling atob.
+        const urlSafeSql = callArgs.queryReq.query.sql;
+        const decodedSql = atob(
+          urlSafeSql.replace(/\-/g, "+").replace(/\_/g, "/").replace(/\./g, "="),
+        );
         expect(decodedSql).toContain('FROM "production-stream"');
       });
     });
