@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="alert-variables-add-btn"
           size="sm"
-          variant="secondary"
+          variant="outline"
           @click="addVariable"
         >
         <q-icon name="add" />

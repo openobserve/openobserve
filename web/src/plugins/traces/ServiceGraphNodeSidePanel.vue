@@ -119,13 +119,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 >{{ chip.label }}</span
               >
-              <button
-                class="tw:ml-0.5 tw:flex tw:items-center tw:justify-center tw:rounded-full tw:text-[var(--o2-text-secondary)] tw:hover:text-[var(--o2-text-primary)] tw:cursor-pointer tw:border-none tw:bg-transparent tw:p-0"
+              <OButton
+                variant="ghost"
+                size="icon-chip"
+                class="tw:ml-0.5"
                 :data-test="`service-graph-filter-chip-remove-${chip.key}`"
                 @click="removeLocalRangeFilter(chip.key)"
               >
                 <q-icon name="close" size="0.65rem" />
-              </button>
+              </OButton>
             </div>
 
             <!-- Spacer -->

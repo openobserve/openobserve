@@ -377,16 +377,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="unit-container"
               v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
             >
-              <button
+              <OButton
                 @click="setUnit('px')"
-                :class="{
-                  active:
-                    dashboardPanelData?.data?.config.legend_width?.unit ===
-                      null ||
-                    dashboardPanelData?.data?.config?.legend_width?.unit ===
-                      'px',
-                }"
-                style="height: 100%; width: 100%; font-size: 14px"
+                variant="outline"
+                :active="
+                  dashboardPanelData?.data?.config.legend_width?.unit === null ||
+                  dashboardPanelData?.data?.config?.legend_width?.unit === 'px'
+                "
+                size="sm"
                 :data-test="`dashboard-config-legend-width-unit-${
                   dashboardPanelData?.data?.config?.legend_width?.unit === 'px'
                     ? 'active'
@@ -394,15 +392,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }`"
               >
                 px
-              </button>
-              <button
+              </OButton>
+              <OButton
                 @click="setUnit('%')"
-                :class="{
-                  active:
-                    dashboardPanelData?.data?.config?.legend_width?.unit ===
-                    '%',
-                }"
-                style="height: 100%; width: 100%; font-size: 14px"
+                variant="outline"
+                :active="
+                  dashboardPanelData?.data?.config?.legend_width?.unit === '%'
+                "
+                size="sm"
                 :data-test="`dashboard-config-legend-width-unit-${
                   dashboardPanelData?.data?.config?.legend_width?.unit === '%'
                     ? 'active'
@@ -410,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }`"
               >
                 %
-              </button>
+              </OButton>
             </div>
           </div>
 
@@ -438,16 +435,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="unit-container"
               v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
             >
-              <button
+              <OButton
                 @click="setHeightUnit('px')"
-                :class="{
-                  active:
-                    dashboardPanelData?.data?.config.legend_height?.unit ===
-                      null ||
-                    dashboardPanelData?.data?.config?.legend_height?.unit ===
-                      'px',
-                }"
-                style="height: 100%; width: 100%; font-size: 14px"
+                variant="outline"
+                :active="
+                  dashboardPanelData?.data?.config.legend_height?.unit === null ||
+                  dashboardPanelData?.data?.config?.legend_height?.unit === 'px'
+                "
+                size="sm"
                 :data-test="`dashboard-config-legend-height-unit-${
                   dashboardPanelData?.data?.config?.legend_height?.unit === 'px'
                     ? 'active'
@@ -455,15 +450,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }`"
               >
                 px
-              </button>
-              <button
+              </OButton>
+              <OButton
                 @click="setHeightUnit('%')"
-                :class="{
-                  active:
-                    dashboardPanelData?.data?.config?.legend_height?.unit ===
-                    '%',
-                }"
-                style="height: 100%; width: 100%; font-size: 14px"
+                variant="outline"
+                :active="
+                  dashboardPanelData?.data?.config?.legend_height?.unit === '%'
+                "
+                size="sm"
                 :data-test="`dashboard-config-legend-height-unit-${
                   dashboardPanelData?.data?.config?.legend_height?.unit === '%'
                     ? 'active'
@@ -471,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }`"
               >
                 %
-              </button>
+              </OButton>
             </div>
           </div>
         </div>
@@ -3400,42 +3394,12 @@ export default defineComponent({
   gap: 6px;
 }
 
-.input-container button-group {
-  border: 1px solid gray !important;
-  border-radius: 9px;
-}
-
-.input-container button {
-  display: block;
-  cursor: pointer;
-  background-color: #f0eaea;
-  border: none;
-  font-size: 13px;
-  padding: 2px 8px;
-}
-
-.input-container button-left {
-  border-top-left-radius: 8px;
-  border-bottom-left-radius: 8px;
-}
-
-.input-container button-right {
-  border-top-right-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-
-.input-container button.active {
-  background-color: var(--q-primary) !important;
-  font-weight: bold;
-  color: white;
-}
 
 .unit-container {
-  width: auto;
   display: flex;
-  height: 36px;
+  align-items: center;
+  gap: 4px;
   margin-top: 9px;
-  width: 100px;
 }
 
 .config-legend-input {

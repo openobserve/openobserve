@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="row items-center" style="width: 100%">
                   <div
-                    class="row no-wrap items-start q-mb-xs"
+                    class="row no-wrap items-center q-mb-xs"
                     style="width: 100%"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon"
-                      style="margin-bottom: 20px; flex-shrink: 0"
+                      style="flex-shrink: 0"
                       @click="removeFilter(index)"
                       :data-test="`dashboard-variable-adhoc-close-${index}`"
                     >

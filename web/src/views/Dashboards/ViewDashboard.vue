@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
               v-show="store.state.printMode !== true"
-              variant="ghost-destructive"
+              variant="outline-destructive"
               size="icon-xs"
               @click="cancelQuery"
               data-test="dashboard-cancel-btn"

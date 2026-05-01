@@ -23,19 +23,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-form ref="formRef" @submit.prevent>
         <!-- Query Mode Tabs -->
         <div class="tw:mb-4">
-          <div class="query-mode-tabs" data-test="anomaly-query-tabs">
-            <button
+          <OToggleGroup
+            :model-value="config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters'"
+            @update:model-value="config.query_mode = ($event as string)"
+            data-test="anomaly-query-tabs"
+          >
+            <OToggleGroupItem
               v-for="tab in queryTabOptions"
               :key="tab.value"
-              type="button"
-              class="query-mode-tab"
-              :class="{ active: (config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters') === tab.value }"
-              @click="config.query_mode = tab.value"
+              :value="tab.value"
+              size="sm"
             >
               {{ tab.label }}
-            </button>
-          </div>
-        </div>
+            </OToggleGroupItem>
+          </OToggleGroup>
 
         <!-- Filters mode -->
         <div
@@ -693,12 +694,14 @@ import {
 import QueryEditor from "@/components/QueryEditor.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import { X } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { QueryEditor, PanelSchemaRenderer, OButton, X },
+  components: { QueryEditor, PanelSchemaRenderer, OButton, OToggleGroup, OToggleGroupItem, X },
 
   props: {
     config: {
