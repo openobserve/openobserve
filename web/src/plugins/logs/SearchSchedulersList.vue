@@ -113,7 +113,7 @@
                       "
                       @click="confirmCancelJob(props.row)"
                     >
-                      <q-icon name="cancel" />
+                      <q-icon name="cancel" size="14px" />
                     </OButton>
 
                     <OButton
@@ -123,7 +123,7 @@
                       :title="t('search_scheduler_job.delete')"
                       @click="confirmDeleteJob(props.row)"
                     >
-                      <q-icon name="delete" />
+                      <q-icon name="delete" size="14px" />
                     </OButton>
                     <OButton
                       data-test="search-scheduler-restart-btn"
@@ -136,7 +136,7 @@
                       "
                       @click="retrySearchJob(props.row)"
                     >
-                      <q-icon name="refresh" />
+                      <q-icon name="refresh" size="14px" />
                     </OButton>
                     <OButton
                       data-test="search-scheduler-explore-btn"
@@ -148,7 +148,7 @@
                       "
                       @click="fetchSearchResults(props.row)"
                     >
-                      <q-icon name="search" />
+                      <q-icon name="search" size="14px" />
                     </OButton>
                   </template>
                 </q-td>
