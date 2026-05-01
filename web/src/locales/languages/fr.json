@@ -1125,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Journaux Pub/Sub"
+    "pubsub": "Journaux Pub/Sub",
+    "aiLabel": "Intégrations d'IA"
   },
   "dashboard": {
     "selectField": "Champ",

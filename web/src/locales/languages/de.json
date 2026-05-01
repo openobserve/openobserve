@@ -1125,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub-Protokolle"
+    "pubsub": "Pub/Sub-Protokolle",
+    "aiLabel": "KI-Integrationen"
   },
   "dashboard": {
     "selectField": "Feld",
