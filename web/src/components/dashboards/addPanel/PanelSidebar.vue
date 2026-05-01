@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="sidebar-header-expanded">
       <div class="expanded-title">{{ title }}</div>
       <OButton
-        variant="sidebar-toggle"
+        variant="outline"
         size="icon-xs-sq"
         class="tw:rotate-90"
         @click="toggleSidebar"

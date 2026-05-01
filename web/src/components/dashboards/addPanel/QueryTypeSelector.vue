@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row tw:gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
+        variant="primary"
         :model-value="selectedButtonQueryType"
         @update:model-value="onUpdateQueryMode($event as string)"
       >
@@ -43,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Builder Mode: Builder / Custom -->
       <OToggleGroup
+        variant="primary"
         :model-value="selectedButtonType"
         @update:model-value="onUpdateBuilderMode($event as string)"
       >

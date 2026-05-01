@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="flex justify-center items-start">
+    <div class="flex justify-center items-end">
       <!-- select new folder -->
       <q-select
         v-model="selectedFolder"
@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-select>
 
-      <div style="width: 40px; position: relative; top: 32px;" :style="computedStyle">
+      <div style="width: 40px; margin-bottom: -4px;" :style="computedStyle">
         <OButton
-          variant="ghost"
+          variant="outline"
           size="icon"
           :data-test="`${type}-folder-move-new-add`"
           title="Add Folder"
