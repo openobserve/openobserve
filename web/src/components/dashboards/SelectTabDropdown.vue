@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-center items-start">
+  <div class="flex items-end tw:gap-2">
     <!-- select new tab -->
     <q-select
       v-model="selectedTab"
@@ -26,8 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       behavior="menu"
       borderless
       dense
-      class="q-mb-xs showLabelOnTop o2-custom-select-dashboard"
-      style="width: calc(100% - 44px)"
+      class="q-mb-xs showLabelOnTop o2-custom-select-dashboard tw:flex-1"
       :loading="getTabList.isLoading.value"
       hide-bottom-space
     >
@@ -40,9 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       data-test="dashboard-tab-new-add"
-      variant="ghost"
-      size="icon"
-      :style="computedStyle"
+      variant="outline"
+      size="icon-sm"
+      class="q-mb-xs"
       @click="
         () => {
           showAddTabDialog = true;
@@ -70,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch, computed } from "vue";
+import { defineComponent, onActivated, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
@@ -103,10 +102,6 @@ export default defineComponent({
     const route = useRoute();
     const showAddTabDialog: any = ref(false);
     const tabList: any = ref([]);
-
-    const computedStyle = computed(() => {
-      return "height: 35px; margin-top: 13px";
-    });
 
     //dropdown selected folder index
     const selectedTab: any = ref(null);
@@ -181,7 +176,6 @@ export default defineComponent({
       showAddTabDialog,
       tabList,
       getTabList,
-      computedStyle,
     };
   },
 });

@@ -31,7 +31,6 @@
             v-if="activeFolderId"
             :folder-id="activeFolderId"
             @dashboard-selected="updateSelectedDashboard"
-            class="showLabelOnTop"
           />
 
           <!-- select tab or create new tab and select -->
@@ -40,7 +39,6 @@
             :folder-id="activeFolderId"
             :dashboard-id="selectedDashboard"
             @tab-selected="updateActiveTabId"
-            class="showLabelOnTop"
           />
           <span>&nbsp;</span>
           <q-input
@@ -105,6 +103,8 @@ export default defineComponent({
     SelectFolderDropdown,
     SelectDashboardDropdown,
     SelectTabDropdown,
+    OButton,
+    X,
   },
   props: {
     dashboardPanelData: {
