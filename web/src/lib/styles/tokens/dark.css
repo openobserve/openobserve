@@ -75,7 +75,8 @@
     --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
     /* ToggleGroup */
-    --color-toggle-item-active-bg: var(--color-surface-subtle-hover);
+    --color-toggle-item-hover-bg: var(--color-primary-950);
+    --color-toggle-item-active-bg: var(--color-primary-900);
 
     /* Tabs */
     --color-tabs-active-bg: var(--color-primary-800);
