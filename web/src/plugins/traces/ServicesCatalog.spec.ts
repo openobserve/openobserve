@@ -781,9 +781,9 @@ describe("ServicesCatalog", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Status chips
+  // Status bar
   // -----------------------------------------------------------------------
-  describe("status chips", () => {
+  describe("status bar", () => {
     beforeEach(() => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_req: any, callbacks: any) => {
@@ -836,37 +836,63 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.statusCounts.degraded).toBe(1);
     });
 
-    it("should render critical chip when count > 0", async () => {
+    it("should render the pill with only total when all services are healthy", async () => {
+      mockFetchQueryDataWithHttpStream.mockReset();
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_req: any, callbacks: any) => {
+          const hits = [
+            {
+              service_name: "svc-a",
+              total_requests: 100,
+              error_count: 0,
+              error_rate: 0,
+              avg_duration_ns: 1000,
+              max_duration_ns: 2000,
+              p50_latency_ns: 800,
+              p95_latency_ns: 1500,
+              p99_latency_ns: 1800,
+            },
+          ];
+
+          if (callbacks?.data) {
+            callbacks.data(null, {
+              type: "search_response_hits",
+              content: { results: { hits } },
+            });
+          }
+          if (callbacks?.complete) {
+            callbacks.complete(null, {});
+          }
+        },
+      );
+
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const criticalChip = wrapper.find(
-        '[data-test="services-catalog-chip-critical"]',
-      );
-      expect(criticalChip.exists()).toBe(true);
+      const pill = wrapper.find('[data-test="services-catalog-status-pill"]');
+      expect(pill.exists()).toBe(true);
+      // Just the total — no colored status dots
+      expect(pill.text()).toContain("(1)");
+      expect(wrapper.vm.statusCounts.critical).toBe(0);
     });
 
-    it("should render warning chip when count > 0", async () => {
+    it("should show colored dot counts for non-healthy statuses", async () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const warningChip = wrapper.find(
-        '[data-test="services-catalog-chip-warning"]',
-      );
-      expect(warningChip.exists()).toBe(true);
+      const pill = wrapper.find('[data-test="services-catalog-status-pill"]');
+      expect(pill.exists()).toBe(true);
+
+      // With mockServices: 1 critical, 1 warning, 1 degraded, 2 healthy
+      const text = pill.text();
+      expect(text).toContain("(5)");
+      // The pill shows the count next to each colored dot
+      expect(wrapper.vm.statusCounts.critical).toBe(1);
+      expect(wrapper.vm.statusCounts.warning).toBe(1);
+      expect(wrapper.vm.statusCounts.degraded).toBe(1);
     });
 
-    it("should render degraded chip when count > 0", async () => {
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      const degradedChip = wrapper.find(
-        '[data-test="services-catalog-chip-degraded"]',
-      );
-      expect(degradedChip.exists()).toBe(true);
-    });
-
-    it("should not render critical chip when count is zero", async () => {
+    it("should only show relevant status counts", async () => {
       // Override: only healthy services (no critical)
       mockFetchQueryDataWithHttpStream.mockReset();
       mockFetchQueryDataWithHttpStream.mockImplementation(
@@ -900,10 +926,10 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const criticalChip = wrapper.find(
-        '[data-test="services-catalog-chip-critical"]',
-      );
-      expect(criticalChip.exists()).toBe(false);
+      const pill = wrapper.find('[data-test="services-catalog-status-pill"]');
+      expect(pill.exists()).toBe(true);
+      // No non-healthy statuses, so pill only shows total
+      expect(wrapper.vm.statusCounts.critical).toBe(0);
     });
   });
 
@@ -1008,7 +1034,7 @@ describe("ServicesCatalog", () => {
       await flushPromises();
 
       const badge = wrapper.find(
-        '[data-test="services-catalog-service-count"]',
+        '[data-test="services-catalog-status-pill"]',
       );
       expect(badge.exists()).toBe(true);
       // Without filter, shows just the total
@@ -1049,7 +1075,7 @@ describe("ServicesCatalog", () => {
       await flushPromises();
 
       const badge = wrapper.find(
-        '[data-test="services-catalog-service-count"]',
+        '[data-test="services-catalog-status-pill"]',
       );
       expect(badge.exists()).toBe(true);
       // With filter, shows "filtered / total"
@@ -1067,7 +1093,7 @@ describe("ServicesCatalog", () => {
       await flushPromises();
 
       const badge = wrapper.find(
-        '[data-test="services-catalog-service-count"]',
+        '[data-test="services-catalog-status-pill"]',
       );
       // The badge is inside v-if="!isLoading && services.length > 0"
       expect(badge.exists()).toBe(false);
@@ -1577,7 +1603,10 @@ describe("ServicesCatalog", () => {
         // before calling atob.
         const urlSafeSql = callArgs.queryReq.query.sql;
         const decodedSql = atob(
-          urlSafeSql.replace(/\-/g, "+").replace(/\_/g, "/").replace(/\./g, "="),
+          urlSafeSql
+            .replace(/\-/g, "+")
+            .replace(/\_/g, "/")
+            .replace(/\./g, "="),
         );
         expect(decodedSql).toContain('FROM "production-stream"');
       });

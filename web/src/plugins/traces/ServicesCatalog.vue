@@ -58,73 +58,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="no-border tw:w-[14rem]! tw:h-[36px] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
         >
           <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem"
-name="search" />
+            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
           </template>
         </q-input>
       </div>
 
       <template v-if="!isLoading && services.length > 0">
-        <!-- Neutral total / filtered count -->
+        <!-- Combined pill: total count + colored status dots with counts -->
         <div
-          class="tw:flex tw:items-center tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
-          data-test="services-catalog-service-count"
+          class="tw:flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
+          data-test="services-catalog-status-pill"
         >
           <template v-if="filterText">
-            {{ filteredServices.length }} / {{ services.length }}
+            {{ filteredServices.length }}/{{ services.length }}
           </template>
-          <template v-else>
-            {{ services.length }}
-          </template>
+          <template v-else> {{ services.length }} </template>
           {{
             services.length === 1
               ? t("traces.servicesCatalog.serviceLabel")
               : t("traces.servicesCatalog.servicesLabel")
           }}
-          <q-tooltip v-if="filterText">
-            {{ filteredServices.length }} of {{ services.length }} services
-            shown
-          </q-tooltip>
         </div>
 
-        <!-- Critical chip -->
-        <div
-          v-if="statusCounts.critical > 0"
-          class="sc-chip sc-chip--critical"
-          data-test="services-catalog-chip-critical"
-        >
-          {{ statusCounts.critical }}
-          {{ t("traces.servicesCatalog.status.critical") }}
-        </div>
-
-        <!-- Warning chip -->
-        <div
-          v-if="statusCounts.warning > 0"
-          class="sc-chip sc-chip--warning"
-          data-test="services-catalog-chip-warning"
-        >
-          {{ statusCounts.warning }}
-          {{ t("traces.servicesCatalog.status.warning") }}
-        </div>
-
-        <!-- Degraded chip -->
-        <div
-          v-if="statusCounts.degraded > 0"
-          class="sc-chip sc-chip--degraded"
-          data-test="services-catalog-chip-degraded"
-        >
-          {{ statusCounts.degraded }}
-          {{ t("traces.servicesCatalog.status.degraded") }}
-        </div>
+        <template v-if="statusCounts.critical > 0">
+          <span class="sc-pill-dot sc-pill-dot--critical" />
+          <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-2)]!">{{
+            statusCounts.critical
+          }}</span>
+        </template>
+        <template v-if="statusCounts.warning > 0">
+          <span class="sc-pill-dot sc-pill-dot--warning tw:ml-[0.325rem]" />
+          <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-2)]!">{{
+            statusCounts.warning
+          }}</span>
+        </template>
+        <template v-if="statusCounts.degraded > 0">
+          <span class="sc-pill-dot sc-pill-dot--degraded tw:ml-[0.325rem]" />
+          <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-2)]!">{{
+            statusCounts.degraded
+          }}</span>
+        </template>
       </template>
 
       <!-- Status legend -->
       <div
-        class="tw:ml-auto tw:flex tw:items-center tw:gap-3 tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]"
+        class="tw:ml-auto tw:flex tw:items-center tw:gap-3 tw:px-[0.625rem] tw:py-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]"
         data-test="services-catalog-status-legend"
       >
         <span
-          class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-4)] tw:whitespace-nowrap"
+          class="tw:text-[0.7rem] tw:font-bold tw:text-[var(--o2-text-4)] tw:whitespace-nowrap"
         >
           {{ t("traces.servicesCatalog.legend.title") }}
         </span>
@@ -195,8 +177,7 @@ name="search" />
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)]"
       data-test="services-catalog-empty"
     >
-      <q-icon name="layers" size="3rem"
-class="tw:mb-3 tw:opacity-40" />
+      <q-icon name="layers" size="3rem" class="tw:mb-3 tw:opacity-40" />
       <p class="tw:text-[0.9rem]">
         {{ t("traces.servicesCatalog.noServicesFound") }}
       </p>
@@ -808,38 +789,22 @@ onUnmounted(() => {
   color: var(--o2-service-health-critical);
 }
 
-// Count chips in toolbar
-.sc-chip {
-  display: flex;
-  align-items: center;
-  padding: 0.25rem 0.625rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  gap: 0.25rem;
+// Inline pill status dots
+.sc-pill-dot {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
-.sc-chip--degraded {
-  color: var(--o2-service-health-degraded);
-  background: color-mix(
-    in srgb,
-    var(--o2-service-health-degraded) 12%,
-    transparent
-  );
+.sc-pill-dot--degraded {
+  background: var(--o2-service-health-degraded);
 }
-.sc-chip--warning {
-  color: var(--o2-service-health-warning);
-  background: color-mix(
-    in srgb,
-    var(--o2-service-health-warning) 12%,
-    transparent
-  );
+.sc-pill-dot--warning {
+  background: var(--o2-service-health-warning);
 }
-.sc-chip--critical {
-  color: var(--o2-service-health-critical);
-  background: color-mix(
-    in srgb,
-    var(--o2-service-health-critical) 12%,
-    transparent
-  );
+.sc-pill-dot--critical {
+  background: var(--o2-service-health-critical);
 }
 
 // Legend dots
