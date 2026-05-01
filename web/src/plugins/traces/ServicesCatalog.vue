@@ -18,8 +18,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="services-catalog tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
   >
-    <!-- Toolbar: filter + chips + legend -->
+    <!-- Toolbar: stream selector + filter + chips + legend -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
+      <!-- Stream selector -->
+      <div
+        data-test="services-catalog-stream-selector"
+        class="tw:w-[11rem] tw:flex-shrink-0"
+      >
+        <q-select
+          v-model="streamFilter"
+          :options="
+            availableStreams.length > 0
+              ? availableStreams.map((s) => ({ label: s, value: s }))
+              : []
+          "
+          dense
+          borderless
+          emit-value
+          map-options
+          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          @update:model-value="onStreamFilterChange"
+          :disable="availableStreams.length === 0"
+        >
+          <q-tooltip v-if="availableStreams.length === 0">
+            {{ t("traces.servicesCatalog.noStreamsDetected") }}
+          </q-tooltip>
+        </q-select>
+      </div>
+
       <!-- Search input -->
       <div data-test="services-catalog-filter-input">
         <q-input
@@ -32,7 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="no-border tw:w-[14rem]! tw:h-[36px] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
         >
           <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+            <q-icon class="o2-search-input-icon" size="1rem"
+name="search" />
           </template>
         </q-input>
       </div>
@@ -168,7 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)]"
       data-test="services-catalog-empty"
     >
-      <q-icon name="layers" size="3rem" class="tw:mb-3 tw:opacity-40" />
+      <q-icon name="layers" size="3rem"
+class="tw:mb-3 tw:opacity-40" />
       <p class="tw:text-[0.9rem]">
         {{ t("traces.servicesCatalog.noServicesFound") }}
       </p>
@@ -345,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :graph-data="emptyGraphData"
       :time-range="timeRange"
       :visible="showSidePanel"
-      :stream-filter="searchObj.data.stream.selectedStream.value"
+      :stream-filter="streamFilter"
       data-test="services-catalog-node-side-panel"
       @close="handleCloseSidePanel"
       @view-traces="viewTraces"
@@ -363,6 +391,7 @@ import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import useTraces from "@/composables/useTraces";
+import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { formatLatency } from "@/utils/traces/treeTooltipHelpers";
 import {
@@ -377,6 +406,7 @@ import { cloneDeep } from "lodash-es";
 const { t } = useI18n();
 const store = useStore();
 const { searchObj } = useTraces();
+const { getStreams } = useStreams();
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 
@@ -386,6 +416,12 @@ const emit = defineEmits<{
 
 // p99 > 1 second triggers the orange highlight
 const P99_WARN_NS = 1_000_000_000;
+
+// Stream filter — synced from traces page selected stream
+const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
+const storedStreamFilter = localStorage.getItem("servicesCatalog_streamFilter");
+const streamFilter = ref(tracesStream || storedStreamFilter || "default");
+const availableStreams = ref<string[]>([]);
 
 interface ServiceRow {
   service_name: string;
@@ -609,8 +645,26 @@ function getTimeRange(): { start_time: number; end_time: number } {
   };
 }
 
+// Load trace streams using the same method as the Traces search page
+const loadAvailableStreams = async () => {
+  try {
+    const res = await getStreams("traces", false, false);
+    if (res?.list?.length > 0) {
+      availableStreams.value = res.list.map((stream: any) => stream.name);
+    }
+  } catch (e) {
+    console.error("Error loading trace streams:", e);
+  }
+};
+
+const onStreamFilterChange = (stream: string) => {
+  streamFilter.value = stream;
+  localStorage.setItem("servicesCatalog_streamFilter", stream);
+  loadServicesCatalog();
+};
+
 async function loadServicesCatalog() {
-  const streamName = searchObj.data.stream.selectedStream.value;
+  const streamName = streamFilter.value;
   if (!streamName) return;
 
   if (currentTraceId) {
@@ -702,11 +756,11 @@ ORDER BY total_requests DESC`;
 }
 
 // Expose for parent ref access
-defineExpose({ loadServicesCatalog });
+defineExpose({ loadServicesCatalog, streamFilter });
 
 watch(
   () => [
-    searchObj.data.stream.selectedStream.value,
+    streamFilter.value,
     searchObj.data.datetime.startTime,
     searchObj.data.datetime.endTime,
     searchObj.data.datetime.relativeTimePeriod,
@@ -718,7 +772,8 @@ watch(
   },
 );
 
-onMounted(() => {
+onMounted(async () => {
+  await loadAvailableStreams();
   loadServicesCatalog();
 });
 

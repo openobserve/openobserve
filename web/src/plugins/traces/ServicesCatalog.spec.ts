@@ -162,6 +162,16 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock useStreams composable
+// ---------------------------------------------------------------------------
+const mockGetStreams = vi.fn().mockResolvedValue({ list: [] });
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStreams: mockGetStreams,
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock vue-router
 // ---------------------------------------------------------------------------
 const mockRouterPush = vi.fn();
@@ -399,6 +409,7 @@ describe("ServicesCatalog", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.removeItem("servicesCatalog_streamFilter");
 
     // Reset searchObj to baseline before each test
     mockSearchObj.data.datetime.startTime = now - 3600000;
@@ -1352,8 +1363,9 @@ describe("ServicesCatalog", () => {
   // loadServicesCatalog
   // -----------------------------------------------------------------------
   describe("loadServicesCatalog", () => {
-    it("should not call fetch when stream name is empty", async () => {
-      // Set stream value to empty
+    it("should call fetch with default stream when both selectedStream and localStorage are empty", async () => {
+      // Set both sources to empty so streamFilter cascades to "default"
+      localStorage.removeItem("servicesCatalog_streamFilter");
       mockSearchObj.data.stream.selectedStream = {
         label: "",
         value: "",
@@ -1362,9 +1374,9 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      // fetchQueryDataWithHttpStream should not have been called because
-      // loadServicesCatalog guards on !streamName
-      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      // With the cascade "tracesStream || storedStreamFilter || 'default'",
+      // streamFilter becomes "default" when both sources are empty.
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
     });
 
     it("should call fetchQueryDataWithHttpStream when stream is provided", async () => {
@@ -1416,6 +1428,154 @@ describe("ServicesCatalog", () => {
       await flushPromises();
 
       expect(typeof wrapper.vm.loadServicesCatalog).toBe("function");
+    });
+
+    it("should expose streamFilter", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.vm.streamFilter).toBeDefined();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Stream selection
+  // -----------------------------------------------------------------------
+  describe("stream selection", () => {
+    describe("stream selector renders", () => {
+      it("should render stream selector and populate availableStreams when streams are returned", async () => {
+        mockGetStreams.mockResolvedValueOnce({
+          list: [
+            { name: "default" },
+            { name: "production" },
+            { name: "staging" },
+          ],
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        const selector = wrapper.find(
+          '[data-test="services-catalog-stream-selector"]',
+        );
+        expect(selector.exists()).toBe(true);
+        expect(wrapper.vm.availableStreams).toEqual([
+          "default",
+          "production",
+          "staging",
+        ]);
+      });
+
+      it("should render stream selector when no streams are available", async () => {
+        mockGetStreams.mockResolvedValueOnce({ list: [] });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        const selector = wrapper.find(
+          '[data-test="services-catalog-stream-selector"]',
+        );
+        expect(selector.exists()).toBe(true);
+        expect(wrapper.vm.availableStreams).toEqual([]);
+      });
+    });
+
+    describe("changing stream triggers data reload", () => {
+      it("should update streamFilter, persist to localStorage, and trigger reload", async () => {
+        mockGetStreams.mockResolvedValueOnce({
+          list: [{ name: "default" }, { name: "production" }],
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        // Clear the call from onMounted so we can assert the reload call
+        mockFetchQueryDataWithHttpStream.mockClear();
+
+        wrapper.vm.streamFilter = "production";
+        wrapper.vm.onStreamFilterChange("production");
+        await flushPromises();
+
+        expect(localStorage.getItem("servicesCatalog_streamFilter")).toBe(
+          "production",
+        );
+        expect(wrapper.vm.streamFilter).toBe("production");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+    });
+
+    describe("stream selection persists from localStorage on init", () => {
+      it("should use localStorage value when selectedStream is empty", async () => {
+        localStorage.setItem("servicesCatalog_streamFilter", "staging");
+
+        // Set selectedStream value to empty so it falls through to localStorage
+        mockSearchObj.data.stream.selectedStream = {
+          label: "",
+          value: "",
+        };
+
+        mockGetStreams.mockResolvedValueOnce({
+          list: [{ name: "staging" }],
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        expect(wrapper.vm.streamFilter).toBe("staging");
+      });
+
+      it("should prefer selectedStream value over localStorage when both are set", async () => {
+        localStorage.setItem("servicesCatalog_streamFilter", "staging");
+
+        // selectedStream takes precedence
+        mockSearchObj.data.stream.selectedStream = {
+          label: "selected-stream",
+          value: "selected-stream",
+        };
+
+        mockGetStreams.mockResolvedValueOnce({
+          list: [{ name: "selected-stream" }, { name: "staging" }],
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        expect(wrapper.vm.streamFilter).toBe("selected-stream");
+      });
+    });
+
+    describe("loadServicesCatalog uses local streamFilter", () => {
+      it("should construct SQL with streamFilter value instead of selectedStream", async () => {
+        // Set selectedStream different from what we will use via streamFilter
+        mockSearchObj.data.stream.selectedStream = {
+          label: "different-stream",
+          value: "different-stream",
+        };
+
+        mockGetStreams.mockResolvedValueOnce({
+          list: [{ name: "production-stream" }],
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        // streamFilter is initialized from selectedStream, so it starts as
+        // "different-stream". Change it — the watcher fires and calls
+        // loadServicesCatalog.  Flush, then clear so we only measure the
+        // explicit call below.
+        wrapper.vm.streamFilter = "production-stream";
+        await flushPromises();
+
+        mockFetchQueryDataWithHttpStream.mockClear();
+
+        await wrapper.vm.loadServicesCatalog();
+
+        // Verify the query uses production-stream, not different-stream
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+        const callArgs = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+        const decodedSql = atob(callArgs.queryReq.query.sql);
+        expect(decodedSql).toContain('FROM "production-stream"');
+      });
     });
   });
 });
