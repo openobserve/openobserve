@@ -1385,8 +1385,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="searchObj.meta.buildModeQueryEditorDisabled ? 'builder' : 'custom'"
                   @update:model-value="onBuildModeToggle(($event as string) === 'builder')"
                 >
-                  <OToggleGroupItem value="builder" size="sm">Builder</OToggleGroupItem>
-                  <OToggleGroupItem value="custom" size="sm">Custom</OToggleGroupItem>
+                  <OToggleGroupItem value="builder" size="xs">Builder</OToggleGroupItem>
+                  <OToggleGroupItem value="custom" size="xs">Custom</OToggleGroupItem>
                 </OToggleGroup>
               </div>
             </div>
@@ -5794,9 +5794,9 @@ export default defineComponent({
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   background: var(--o2-muted-background);
-  padding: 3px 8px;
+  padding: 2px 4px;
   border-radius: 0.375rem;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   border: 0.0625rem solid var(--o2-border-color);
