@@ -2024,6 +2024,7 @@ button:focus-visible {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
+  border-radius: 0;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
