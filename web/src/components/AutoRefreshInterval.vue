@@ -95,8 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
           variant="outline"
-          size="sm"
-          class="q-pa-xs element-box-shadow el-border"
+          size="sm-toolbar"
         >
           <div class="row items-center no-wrap">
             <q-icon
@@ -108,6 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
             />
             <div class="text-center">{{ selectedLabel }}</div>
+            <q-icon
+              name="arrow_drop_down"
+              size="16px"
+              class="tw:ml-0.5"
+            />
           </div>
         </OButton>
       </template>
