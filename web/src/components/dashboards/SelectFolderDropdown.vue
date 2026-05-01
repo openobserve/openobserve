@@ -15,46 +15,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:w-full">
-    <span class="tw:text-xs tw:text-gray-500 tw:mb-1">{{
-      t("dashboard.selectFolderLabel")
-    }}</span>
-    <div class="flex items-center tw:gap-2">
-      <!-- select new folder -->
-      <q-select
-        v-model="selectedFolder"
-        :options="
-          store.state.organizationData.folders.map((item: any) => {
-            return { label: item.name, value: item.folderId };
-          })
-        "
-        data-test="index-dropdown-stream_type"
-        input-debounce="0"
-        behavior="menu"
-        borderless
-        dense
-        class="no-case o2-custom-select-dashboard tw:flex-1"
-      >
-        <template #no-option>
-          <q-item>
-            <q-item-section> {{ t("search.noResult") }}</q-item-section>
-          </q-item>
-        </template>
-      </q-select>
+  <div class="flex items-end tw:gap-2">
+    <!-- select new folder -->
+    <q-select
+      v-model="selectedFolder"
+      :label="t('dashboard.selectFolderLabel')"
+      :options="
+        store.state.organizationData.folders.map((item: any) => {
+          return { label: item.name, value: item.folderId };
+        })
+      "
+      data-test="index-dropdown-stream_type"
+      input-debounce="0"
+      behavior="menu"
+      borderless
+      dense
+      class="q-mb-xs showLabelOnTop no-case o2-custom-select-dashboard tw:flex-1"
+    >
+      <template #no-option>
+        <q-item>
+          <q-item-section> {{ t("search.noResult") }}</q-item-section>
+        </q-item>
+      </template>
+    </q-select>
 
-      <OButton
-        data-test="dashboard-folder-move-new-add"
-        variant="outline"
-        size="icon-sm"
-        @click="
-          () => {
-            showAddFolderDialog = true;
-          }
-        "
-      >
-        <template #icon-left><q-icon name="add" /></template>
-      </OButton>
-    </div>
+    <OButton
+      data-test="dashboard-folder-move-new-add"
+      variant="outline"
+      size="icon-sm"
+      class="q-mb-xs"
+      @click="
+        () => {
+          showAddFolderDialog = true;
+        }
+      "
+    >
+      <template #icon-left><q-icon name="add" /></template>
+    </OButton>
   </div>
   <!-- add folder -->
   <q-dialog
