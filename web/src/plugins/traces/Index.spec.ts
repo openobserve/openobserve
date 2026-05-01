@@ -2169,7 +2169,7 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
-  describe("Services Catalog — activeTab computed & URL restore", () => {
+  describe("Services Catalog — activeTab computed & URL restore", async () => {
     function mountWithServicesCatalogStub() {
       return mount(Index, {
         attachTo: node,

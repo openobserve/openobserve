@@ -872,7 +872,7 @@ describe("ServicesCatalog", () => {
       const pill = wrapper.find('[data-test="services-catalog-status-pill"]');
       expect(pill.exists()).toBe(true);
       // Just the total — no colored status dots
-      expect(pill.text()).toContain("(1)");
+      expect(pill.text()).toContain("1 service");
       expect(wrapper.vm.statusCounts.critical).toBe(0);
     });
 
@@ -885,7 +885,7 @@ describe("ServicesCatalog", () => {
 
       // With mockServices: 1 critical, 1 warning, 1 degraded, 2 healthy
       const text = pill.text();
-      expect(text).toContain("(5)");
+      expect(text).toContain("5 services");
       // The pill shows the count next to each colored dot
       expect(wrapper.vm.statusCounts.critical).toBe(1);
       expect(wrapper.vm.statusCounts.warning).toBe(1);
@@ -1033,9 +1033,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const badge = wrapper.find(
-        '[data-test="services-catalog-status-pill"]',
-      );
+      const badge = wrapper.find('[data-test="services-catalog-status-pill"]');
       expect(badge.exists()).toBe(true);
       // Without filter, shows just the total
       expect(badge.text()).toContain("5");
@@ -1074,9 +1072,7 @@ describe("ServicesCatalog", () => {
       wrapper.vm.filterText = "gateway";
       await flushPromises();
 
-      const badge = wrapper.find(
-        '[data-test="services-catalog-status-pill"]',
-      );
+      const badge = wrapper.find('[data-test="services-catalog-status-pill"]');
       expect(badge.exists()).toBe(true);
       // With filter, shows "filtered / total"
       expect(badge.text()).toContain("1");
@@ -1092,9 +1088,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const badge = wrapper.find(
-        '[data-test="services-catalog-status-pill"]',
-      );
+      const badge = wrapper.find('[data-test="services-catalog-status-pill"]');
       // The badge is inside v-if="!isLoading && services.length > 0"
       expect(badge.exists()).toBe(false);
     });
