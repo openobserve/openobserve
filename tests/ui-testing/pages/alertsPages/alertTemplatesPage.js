@@ -446,7 +446,7 @@ export class AlertTemplatesPage {
                     const data = await verifyResponse.json().catch(() => null);
                     if (data) {
                         const list = Array.isArray(data) ? data : (data.list || []);
-                        const found = list.some(item => item.name === templateName || item.name === templateName.toLowerCase());
+                        const found = list.some(item => item.name.toLowerCase() === templateName.toLowerCase());
                         if (found) {
                             testLogger.info('Verified template created via API', { templateName });
                             return templateName;
@@ -568,7 +568,7 @@ export class AlertTemplatesPage {
                 const data = await checkResponse.json().catch(() => null);
                 if (data) {
                     const list = Array.isArray(data) ? data : (data.list || []);
-                    const found = list.some(item => item.name === templateName || item.name === templateName.toLowerCase());
+                    const found = list.some(item => item.name.toLowerCase() === templateName.toLowerCase());
                     if (found) {
                         testLogger.info('Validation template exists (API check — verified name)', { templateName });
                         return templateName;
@@ -592,7 +592,7 @@ export class AlertTemplatesPage {
                     const data = await verifyResponse.json().catch(() => null);
                     if (data) {
                         const list = Array.isArray(data) ? data : (data.list || []);
-                        const found = list.some(item => item.name === templateName || item.name === templateName.toLowerCase());
+                        const found = list.some(item => item.name.toLowerCase() === templateName.toLowerCase());
                         if (found) {
                             testLogger.info('Verified validation template created via API', { templateName });
                             return templateName;
