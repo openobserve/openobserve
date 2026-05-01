@@ -762,6 +762,24 @@ const useIngestionRoutes = () => {
           ],
         },
         {
+          path: "ai-integrations",
+          name: "ai-integrations",
+          component: AIIntegrations,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "",
+              redirect: () => {
+                const first = aiCategories[0].integrations[0];
+                return { name: first.routeName };
+              },
+            },
+            ...aiIntegrationRoutes,
+          ],
+        },
+        {
           path: "others",
           name: "others",
           component: Others,
@@ -809,24 +827,6 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
-          ],
-        },
-        {
-          path: "ai-integrations",
-          name: "ai-integrations",
-          component: AIIntegrations,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-          children: [
-            {
-              path: "",
-              redirect: () => {
-                const first = aiCategories[0].integrations[0];
-                return { name: first.routeName };
-              },
-            },
-            ...aiIntegrationRoutes,
           ],
         },
       ],

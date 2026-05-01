@@ -214,17 +214,6 @@ align="left" class="q-ml-md">
             content-class="tab_content"
           />
           <q-route-tab
-            name="others"
-            :to="{
-              name: 'others',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.otherLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
             name="ai-integrations"
             :to="{
               name: 'ai-integrations',
@@ -233,6 +222,17 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.aiLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="others"
+            :to="{
+              name: 'others',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            :label="t('ingestion.otherLabel')"
             content-class="tab_content"
           />
         </q-tabs>
@@ -532,8 +532,8 @@ export default defineComponent({
       { name: "networking", label: t("ingestion.networkingLabel") },
       { name: "message-queues", label: t("ingestion.messageQueuesLabel") },
       { name: "languages", label: t("ingestion.languagesLabel") },
-      { name: "others", label: t("ingestion.otherLabel") },
       { name: "ai-integrations", label: t("ingestion.aiLabel") },
+      { name: "others", label: t("ingestion.otherLabel") },
     ];
 
     // Recommended sub-tabs
