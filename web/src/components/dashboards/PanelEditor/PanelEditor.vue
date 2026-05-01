@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Warning icons and last refreshed time -->
-                  <div class="tw:flex tw:justify-end tw:mr-2 tw:items-center">
+                  <div class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center">
                     <!-- Common error/warning buttons component -->
                     <PanelErrorButtons
                       :error="errorMessage"
@@ -222,8 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="resolvedConfig.showAddToDashboardButton"
                       variant="primary"
-                      size="sm"
-                      class="q-ml-sm"
+                      size="xs"
                       @click="emit('addToDashboard')"
                       :title="t('search.addToDashboard')"
                     >
