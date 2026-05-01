@@ -780,6 +780,8 @@ pub struct UpdateStreamSettings {
     pub cross_links: UpdateSettingsWrapper<CrossLink>,
     #[serde(default)]
     pub storage_type: Option<StorageType>,
+    #[serde(default)]
+    pub is_llm_stream: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
