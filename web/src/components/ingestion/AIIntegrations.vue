@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" class="cursor-pointer" />
             </template>
           </q-input>
-          <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-100px)]">
+          <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-150px)]">
             <q-tabs
               v-model="selectedIntegration"
               vertical
