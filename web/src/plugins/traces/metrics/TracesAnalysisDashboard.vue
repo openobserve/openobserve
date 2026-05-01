@@ -260,8 +260,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'splitter-icon-expand'
                   : 'splitter-icon-collapse'
               "
-              variant="ghost"
-              size="icon-xs-sq"
+              variant="sidebar-button"
+              size="sidebar-button"
               @click="toggleDimensionSelector"
             >
               <ChevronLeft v-if="showDimensionSelector" class="tw:size-3.5 tw:shrink-0" />
