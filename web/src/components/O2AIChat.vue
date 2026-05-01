@@ -2876,12 +2876,18 @@ export default defineComponent({
       window.dispatchEvent(new Event('resize'));
     };
 
+    const toggleAiChat = () => {
+      store.dispatch('setIsAiChatEnabled', !store.state.isAiChatEnabled);
+      window.dispatchEvent(new Event('resize'));
+    };
+
     useShortcuts([
       {
         key: 'escape',
         description: 'Close AI chat',
         handler: () => {
-          if (store.state.isAiChatExpanded) {
+          if (store.state.isAiChatEnabled) {
+            store.dispatch('setIsAiChatEnabled', false);
             store.dispatch('setIsAiChatExpanded', false);
             window.dispatchEvent(new Event('resize'));
           }
@@ -2890,12 +2896,12 @@ export default defineComponent({
       {
         key: 'ctrl+b',
         description: 'Toggle AI chat',
-        handler: () => toggleExpand(),
+        handler: toggleAiChat,
       },
       {
         key: 'meta+b',
         description: 'Toggle AI chat',
-        handler: () => toggleExpand(),
+        handler: toggleAiChat,
       },
     ]);
 

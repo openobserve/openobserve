@@ -9,23 +9,46 @@ import type {
 // Manager is created on the first composable call and lives for the app lifetime.
 // ---------------------------------------------------------------------------
 
-let _instance: ShortcutManager | null = null;
+// Store state on window so it survives Vite HMR module replacement.
+// Module-level variables reset on every hot-reload, but window persists.
+const _KEY = "__vue_shortcut_manager__";
+
+interface ManagerState {
+  instance: ShortcutManager | null;
+  handler: ((e: KeyboardEvent) => void) | null;
+}
+
+function _state(): ManagerState {
+  if (typeof window === "undefined") return { instance: null, handler: null };
+  if (!(window as any)[_KEY]) {
+    (window as any)[_KEY] = { instance: null, handler: null } as ManagerState;
+  }
+  return (window as any)[_KEY];
+}
 
 export function getManager(
   options?: ShortcutManagerOptions,
 ): ShortcutManager | null {
-  // SSR guard — window does not exist on the server
   if (typeof window === "undefined") return null;
-  if (!_instance) {
-    _instance = new ShortcutManager(options);
-    window.addEventListener("keydown", (e) => _instance!.handleKeyDown(e));
+  const s = _state();
+  if (!s.instance) {
+    s.instance = new ShortcutManager(options);
+    s.handler = (e) => _state().instance!.handleKeyDown(e);
+    window.addEventListener("keydown", s.handler);
+    console.log("[shortcut-manager] created + listener added");
   }
-  return _instance;
+  return s.instance;
 }
 
-/** Reset singleton — useful in tests or SSR */
+/** Reset singleton — removes the global keydown listener */
 export function resetManager(): void {
-  _instance = null;
+  if (typeof window === "undefined") return;
+  const s = _state();
+  if (s.handler) {
+    window.removeEventListener("keydown", s.handler);
+    s.handler = null;
+  }
+  s.instance = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +116,7 @@ export class ShortcutManager {
       { ...shortcut, key, id },
     ]);
 
+    console.log(`[shortcut-manager] registered "${key}"`);
     this.notify();
     return id;
   }
@@ -173,6 +197,10 @@ export class ShortcutManager {
 
     if (!key || key === "") return;
 
+    if (!["ctrl", "shift", "alt", "meta"].includes(key)) {
+      console.log(`[shortcut-manager] keydown="${key}" registered=[${Array.from(this.shortcuts.keys())}]`);
+    }
+
     this.sequenceBuffer.push(key);
     if (this.sequenceTimeout) clearTimeout(this.sequenceTimeout);
 
@@ -235,6 +263,7 @@ export class ShortcutManager {
       if (!el || document.activeElement !== el) return;
     }
 
+    console.log(`[shortcut-manager] FIRING "${shortcut.key}" → ${shortcut.description}`);
     if (this.options.preventDefault) e.preventDefault();
     if (this.options.stopPropagation) e.stopPropagation();
     shortcut.handler();
