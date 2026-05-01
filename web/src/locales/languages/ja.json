@@ -1142,7 +1142,8 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Subログ",
-    "oracle": "オラクル"
+    "oracle": "オラクル",
+    "aiLabel": "AI インテグレーション"
   },
   "dashboard": {
     "selectField": "フィールド",
