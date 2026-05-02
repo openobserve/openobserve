@@ -188,9 +188,9 @@
 
   /* Spacing */
   --spacing-dialog-header-px: var(--spacing-5);
-  --spacing-dialog-header-py: var(--spacing-4);
+  --spacing-dialog-header-py: var(--spacing-3);
   --spacing-dialog-content-px: var(--spacing-5);
-  --spacing-dialog-content-py: var(--spacing-4);
+  --spacing-dialog-content-py: var(--spacing-3);
   --spacing-dialog-footer-px: var(--spacing-5);
   --spacing-dialog-footer-py: var(--spacing-3);
 }
