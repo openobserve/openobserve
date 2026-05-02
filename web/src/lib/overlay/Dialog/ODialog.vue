@@ -73,19 +73,19 @@ const sizeClasses = computed(() => {
   }
   switch (props.size) {
     case "xs":
-      return "tw:max-w-[320px] tw:w-full";
+      return "tw:max-w-[min(320px,calc(100vw-2rem))] tw:w-full";
     case "sm":
-      return "tw:max-w-[480px] tw:w-full";
+      return "tw:max-w-[min(480px,calc(100vw-2rem))] tw:w-full";
     case "md":
-      return "tw:max-w-[640px] tw:w-full";
+      return "tw:max-w-[min(640px,calc(100vw-2rem))] tw:w-full";
     case "lg":
-      return "tw:max-w-[800px] tw:w-full";
+      return "tw:max-w-[min(800px,calc(100vw-2rem))] tw:w-full";
     case "xl":
-      return "tw:max-w-[1024px] tw:w-full";
+      return "tw:max-w-[min(1024px,calc(100vw-2rem))] tw:w-full";
     case "full":
       return "tw:w-screen tw:h-screen tw:max-w-none tw:rounded-none";
     default:
-      return "tw:max-w-[640px] tw:w-full";
+      return "tw:max-w-[min(640px,calc(100vw-2rem))] tw:w-full";
   }
 });
 
@@ -131,8 +131,6 @@ const contentStyle = computed(() =>
           sizeClasses,
           // Non-full: cap height so the flex structure actually clips
           !isFullSize && 'tw:max-h-[90vh]',
-          // Clamp width to viewport on narrow screens (prevents horizontal page scroll)
-          !isFullSize && 'tw:max-w-[calc(100vw-2rem)]',
           // Surface
           'tw:bg-dialog-bg tw:border tw:border-dialog-border',
           !isFullSize && 'tw:rounded-xl',
@@ -185,7 +183,7 @@ const contentStyle = computed(() =>
             <!-- Plain title prop — use span to avoid browser h2/heading default styles -->
             <span
               v-else-if="title"
-              class="tw:text-base tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+              class="tw:text-sm tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
             >
               {{ title }}
             </span>
