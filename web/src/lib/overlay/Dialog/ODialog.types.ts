@@ -34,6 +34,13 @@ export interface DialogProps {
    * @default true
    */
   showClose?: boolean;
+
+  /**
+   * Dialog panel width as a percentage of the viewport width (1–100).
+   * Translates directly to a `vw` unit, e.g. `width={60}` → `60vw`.
+   * When provided, overrides the `size` preset width entirely.
+   */
+  width?: number;
 }
 
 export interface DialogEmits {
