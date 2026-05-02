@@ -281,7 +281,7 @@ export class AlertCreationWizard {
 
         // Forcefully remove any remaining q-portal elements that intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
@@ -365,7 +365,7 @@ export class AlertCreationWizard {
         // Forcefully remove any remaining q-portal elements that intercept clicks
         // (q-dialog uses q-portal which can leave aria-hidden overlays in the DOM)
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
@@ -709,7 +709,7 @@ export class AlertCreationWizard {
 
         // Forcefully remove any remaining q-portal elements that intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
@@ -931,7 +931,7 @@ export class AlertCreationWizard {
         // Attempt 3: Try clicking on the operator area and selecting from dropdown
         if (!toggleSuccessful) {
             try {
-                const operatorSelect = this.page.locator('.alert-conditions-operator, .condition-operator-toggle, button:has-text("AND"):not([role="tab"]), [class*="operator-toggle"]').first();
+                const operatorSelect = this.page.locator('.step-conditions .alert-conditions-operator, .step-conditions .condition-operator-toggle, .step-conditions button:has-text("AND"):not([role="tab"]), .step-conditions [class*="operator-toggle"]').first();
                 if (await operatorSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
                     await operatorSelect.click();
                     await this.page.waitForTimeout(500);
@@ -1595,7 +1595,7 @@ export class AlertCreationWizard {
         // Forcefully remove any remaining q-portal elements that intercept clicks
         // (q-dialog uses q-portal which can leave aria-hidden overlays in the DOM)
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
         testLogger.info('Closed PromQL Editor dialog — portal cleaned up');

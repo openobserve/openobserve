@@ -91,17 +91,18 @@ async function fetchRumToken(page, baseUrl, orgId, email, password) {
   }
 
   const data = await fetchResponse.json().catch(() => null);
-  const response = {
-    success: true,
-    token: data?.data?.rum_token || data?.rum_token
-  };
-
-  if (!response.success) {
-    testLogger.warn('Failed to fetch RUM token', { status: response.status });
+  if (!data) {
+    testLogger.warn('Failed to fetch RUM token - could not parse response body');
     return null;
   }
 
-  return response.token;
+  const token = data?.data?.rum_token || data?.rum_token;
+  if (!token) {
+    testLogger.warn('Failed to fetch RUM token - no token in response');
+    return null;
+  }
+
+  return token;
 }
 
 /**

@@ -224,7 +224,7 @@ export class AlertTemplatesPage {
             // Strategy 2: data-test selector for template search
             () => this.page.locator('[data-test="alert-template-search-input"]'),
             // Strategy 3: input inside the templates section (look for search/filter input)
-            () => this.page.locator('.q-table__control input[type="text"], input.q-field__input[placeholder*="Search"], input[placeholder*="search"]').first()
+            () => this.page.locator('.q-page-container .q-table__control input[type="text"], .q-page-container input.q-field__input[placeholder*="Search"], .q-page-container input[placeholder*="search"]').first()
         ];
 
         for (const strategy of strategies) {
@@ -283,7 +283,11 @@ export class AlertTemplatesPage {
                 testLogger.info('Template deleted and verified via API', { templateName });
                 return;
             }
-            testLogger.warn('Template API deletion reported success but template still found', { templateName });
+            if (stillExists === null) {
+                testLogger.warn('API unavailable for verification, falling back to UI cleanup', { templateName });
+            } else {
+                testLogger.warn('Template API deletion reported success but template still found', { templateName });
+            }
             // Fall through to UI-based cleanup as fallback
         }
 
