@@ -1,0 +1,236 @@
+<script setup lang="ts">
+import type { DrawerProps, DrawerEmits, DrawerSlots } from "./ODrawer.types";
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+  DialogTrigger,
+} from "reka-ui";
+import { ref, watch, useSlots, computed } from "vue";
+
+const props = withDefaults(defineProps<DrawerProps>(), {
+  persistent: false,
+  side: "right",
+  size: "md",
+  showClose: true,
+  width: undefined,
+});
+
+const emit = defineEmits<DrawerEmits>();
+
+defineSlots<DrawerSlots>();
+
+const slots = useSlots();
+
+// Mirrors the same controlled/uncontrolled pattern as ODialog — Vue
+// boolean-casts an absent `open` prop to `false`, locking reka-ui into
+// controlled-closed mode, so we manage state internally.
+const internalOpen = ref(props.open ?? false);
+
+watch(
+  () => props.open,
+  (v) => {
+    if (v !== undefined) internalOpen.value = v;
+  },
+);
+
+function handleOpenChange(v: boolean) {
+  internalOpen.value = v;
+  emit("update:open", v);
+}
+
+function handleEscapeKeyDown(e: KeyboardEvent) {
+  if (props.persistent) {
+    e.preventDefault();
+  }
+}
+
+function handleInteractOutside(e: Event) {
+  if (props.persistent) {
+    e.preventDefault();
+  }
+}
+
+// Header renders when there is a header slot, a title, OR a visible close button.
+const hasHeader = computed(
+  () =>
+    !!slots.header || !!props.title || (!props.persistent && props.showClose),
+);
+const hasFooter = computed(() => !!slots.footer);
+const hasTrigger = computed(() => !!slots.trigger);
+const isRight = computed(() => props.side !== "left");
+
+// Width preset → CSS class
+const sizeClasses = computed(() => {
+  if (props.width) return "tw:max-w-none";
+  switch (props.size) {
+    case "sm":
+      return "tw:w-[min(360px,100vw)]";
+    case "md":
+      return "tw:w-[min(480px,100vw)]";
+    case "lg":
+      return "tw:w-[min(640px,100vw)]";
+    case "xl":
+      return "tw:w-[min(800px,100vw)]";
+    case "full":
+      return "tw:w-screen";
+    default:
+      return "tw:w-[min(480px,100vw)]";
+  }
+});
+
+// Explicit vw width override
+const contentStyle = computed(() =>
+  props.width != null ? { width: `${props.width}vw` } : undefined,
+);
+</script>
+
+<template>
+  <DialogRoot :open="internalOpen" @update:open="handleOpenChange">
+    <!-- Trigger slot — omit when controlling via v-model:open -->
+    <DialogTrigger v-if="hasTrigger" as-child>
+      <slot name="trigger" />
+    </DialogTrigger>
+
+    <DialogPortal>
+      <!-- Overlay / scrim — same z-index as ODialog -->
+      <DialogOverlay
+        :class="[
+          'tw:fixed tw:inset-0 tw:z-5999',
+          'tw:bg-dialog-overlay',
+          'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
+          'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
+          'tw:duration-200',
+        ]"
+      />
+
+      <!-- Drawer panel -->
+      <DialogContent
+        data-o2-drawer
+        :style="contentStyle"
+        :class="[
+          // Full-height, anchored to chosen edge
+          'tw:fixed tw:inset-y-0 tw:z-6000',
+          isRight ? 'tw:right-0' : 'tw:left-0',
+          // Flex column so header/footer are shrink-0 and body scrolls
+          'tw:flex tw:flex-col tw:overflow-hidden tw:h-screen',
+          sizeClasses,
+          // Surface — reuse dialog tokens (same visual language)
+          'tw:bg-dialog-bg tw:text-dialog-content-text',
+          isRight
+            ? 'tw:border-s tw:border-dialog-border'
+            : 'tw:border-e tw:border-dialog-border',
+          'tw:shadow-xl',
+          // Focus ring
+          'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',
+          // Slide-in animation — direction matches side
+          isRight
+            ? [
+                'tw:data-[state=open]:animate-in tw:data-[state=open]:slide-in-from-right',
+                'tw:data-[state=closed]:animate-out tw:data-[state=closed]:slide-out-to-right',
+              ]
+            : [
+                'tw:data-[state=open]:animate-in tw:data-[state=open]:slide-in-from-left',
+                'tw:data-[state=closed]:animate-out tw:data-[state=closed]:slide-out-to-left',
+              ],
+          'tw:duration-300',
+        ]"
+        @escape-key-down="handleEscapeKeyDown"
+        @interact-outside="handleInteractOutside"
+      >
+        <!-- Accessibility: hidden title required by Reka UI -->
+        <DialogTitle class="tw:sr-only tw:absolute">
+          {{ title ?? "Drawer" }}
+        </DialogTitle>
+        <DialogDescription class="tw:sr-only tw:absolute">
+          {{ title ?? "Drawer" }}
+        </DialogDescription>
+
+        <!-- ── Header ───────────────────────────────────────── -->
+        <div
+          v-if="hasHeader"
+          :class="[
+            'tw:flex tw:items-center tw:gap-2 tw:shrink-0',
+            'tw:px-(--spacing-dialog-header-px) tw:py-(--spacing-dialog-header-py)',
+            'tw:bg-dialog-header-bg tw:text-dialog-header-text',
+            'tw:border-b tw:border-dialog-header-border',
+          ]"
+        >
+          <!-- Title area: flex-1 + min-w-0 lets long titles truncate gracefully -->
+          <div class="tw:flex-1 tw:min-w-0">
+            <slot v-if="slots.header" name="header" />
+            <span
+              v-else-if="title"
+              class="tw:text-sm tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+            >
+              {{ title }}
+            </span>
+          </div>
+
+          <!-- Close button — always shrink-0 so it is never squeezed out -->
+          <DialogClose v-if="!persistent && showClose" as-child>
+            <button
+              type="button"
+              aria-label="Close drawer"
+              :class="[
+                'tw:shrink-0 tw:flex tw:items-center tw:justify-center',
+                'tw:h-7 tw:w-7 tw:rounded-md',
+                'tw:text-dialog-close-text',
+                'tw:hover:bg-dialog-close-hover-bg',
+                'tw:active:bg-dialog-close-active-bg',
+                'tw:transition-colors tw:duration-150',
+                'tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',
+                'tw:cursor-pointer',
+              ]"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </DialogClose>
+        </div>
+
+        <!-- ── Content (scrollable body) ───────────────────── -->
+        <!-- min-h-0 is required for flex children to overflow correctly -->
+        <div
+          :class="[
+            'tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
+            'tw:px-(--spacing-dialog-content-px) tw:py-(--spacing-dialog-content-py)',
+            'tw:text-dialog-content-text',
+          ]"
+        >
+          <slot />
+        </div>
+
+        <!-- ── Footer ───────────────────────────────────────── -->
+        <div
+          v-if="hasFooter"
+          :class="[
+            'tw:shrink-0',
+            'tw:px-(--spacing-dialog-footer-px) tw:py-(--spacing-dialog-footer-py)',
+            'tw:bg-dialog-footer-bg',
+            'tw:border-t tw:border-dialog-footer-border',
+          ]"
+        >
+          <slot name="footer" />
+        </div>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
+</template>
