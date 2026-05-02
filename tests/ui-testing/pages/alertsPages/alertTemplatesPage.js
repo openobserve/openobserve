@@ -51,7 +51,7 @@ export class AlertTemplatesPage {
 
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(() => {});
 
         try {
@@ -146,7 +146,7 @@ export class AlertTemplatesPage {
 
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(() => {});
 
         // Try multiple fallback selectors for add button
@@ -491,7 +491,7 @@ export class AlertTemplatesPage {
 
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(() => {});
 
         await this.page.locator(this.addTemplateButton).click({ force: true });
@@ -749,7 +749,7 @@ export class AlertTemplatesPage {
 
             // Clean up any q-portal elements that may intercept clicks
             await this.page.evaluate(() => {
-                document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+                document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
             }).catch(() => {});
 
             // Try import button selectors (avoiding overly broad selectors that click wrong elements)

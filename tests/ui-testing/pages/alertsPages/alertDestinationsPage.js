@@ -67,7 +67,7 @@ export class AlertDestinationsPage {
 
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(() => {});
 
         try {
@@ -651,7 +651,7 @@ export class AlertDestinationsPage {
     async importDestinationFromFile(filePath, templateName, destinationName) {
         // Clean up any q-portal elements that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(() => {});
 
         // Try multiple fallback selectors for the import button
@@ -735,7 +735,7 @@ export class AlertDestinationsPage {
     async selectDestinationType(type) {
         // Clean up any q-portal overlays that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(() => {});
         await this.page.waitForTimeout(300);
 

@@ -432,7 +432,7 @@ export class AlertCreationWizard {
         // Destination selection with fallback
         // Forcefully remove q-portal elements that may intercept clicks (e.g. leftover Monaco editor overlays)
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
@@ -1056,7 +1056,7 @@ export class AlertCreationWizard {
 
     async _switchToTab(tabName) {
         // The "Alert Rules" tab has required:true so text is "Alert Rules *"
-        const tab = this.page.locator('div.alert-v3-tabs div[class*="tw:cursor-pointer"]').filter({ hasText: tabName }).first();
+        const tab = this.page.locator('div.alert-v3-tabs > div').filter({ hasText: tabName }).first();
         await tab.waitFor({ state: 'visible', timeout: 5000 });
         // Use force:true to bypass any residual q-portal overlays from closed dialogs
         await tab.click({ force: true });
@@ -1411,7 +1411,7 @@ export class AlertCreationWizard {
         const groupBySection = this.page.locator('.alert-condition-row').filter({ hasText: 'Group by' }).first();
         await groupBySection.waitFor({ state: 'visible', timeout: 5000 });
         // Click the "+" add button to create a group-by field entry
-        const addGroupByBtn = groupBySection.locator('button').last();
+        const addGroupByBtn = groupBySection.locator('button:has(.q-icon:not(.q-icon--delete)), button[icon="add"], [data-test="group-by-add-btn"], button:has-text("add")').first();
         await addGroupByBtn.waitFor({ state: 'visible', timeout: 5000 });
         await addGroupByBtn.click();
         await this.page.waitForTimeout(800);

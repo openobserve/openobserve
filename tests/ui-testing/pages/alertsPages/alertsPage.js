@@ -647,7 +647,7 @@ export class AlertsPage {
 
         // Clean up any q-portal overlays that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(() => {});
         await this.page.waitForTimeout(500);
 
@@ -815,6 +815,9 @@ export class AlertsPage {
         }
         await scheduledTab.click();
         await this.page.waitForTimeout(1000);
+        // Note: This counts only rows visible on the current page (first page).
+        // For paginated results this undercounts total alerts. A total-count
+        // badge/element should be read instead for full accuracy.
         const scheduledRows = this.page.locator('tbody tr[data-index]');
         const scheduledAlertsCount = String(await scheduledRows.count());
 
@@ -2498,7 +2501,7 @@ export class AlertsPage {
     async clickAlertUpdateButton(alertName) {
         // Clean up any q-portal overlays that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
         }).catch(() => {});
 
         // Search for the alert first
