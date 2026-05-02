@@ -631,7 +631,40 @@ export class AlertDestinationsPage {
      * @param {string} destinationName - Name for the destination
      */
     async importDestinationFromFile(filePath, templateName, destinationName) {
-        await this.page.locator(this.destinationImportButton).click();
+        // Clean up any q-portal elements that may intercept clicks
+        await this.page.evaluate(() => {
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+        }).catch(() => {});
+
+        // Try multiple fallback selectors for the import button
+        const importBtnFallbackLocators = [
+            this.destinationImportButton,
+            'button:has-text("Import Destination")',
+            '[data-test*="destination-import"]',
+            'button:has-text("Import")',
+            '.q-table__control button:has-text("Import")',
+            'button.q-btn:not(.q-btn--flat)'
+        ];
+
+        let importBtnClicked = false;
+        for (const selector of importBtnFallbackLocators) {
+            try {
+                const btn = this.page.locator(selector).first();
+                if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await btn.click({ force: true, timeout: 5000 });
+                    importBtnClicked = true;
+                    testLogger.info('Clicked Import Destination button via fallback selector', { selector });
+                    break;
+                }
+            } catch (e) {
+                // Try next selector
+            }
+        }
+
+        if (!importBtnClicked) {
+            throw new Error('Could not find Import Destination button in the UI');
+        }
+
         await this.page.locator(this.importJsonFileTab).click();
 
         // Try original locator first, fallback to new locator if it fails

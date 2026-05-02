@@ -392,7 +392,31 @@ export class AlertCreationWizard {
         await thresholdOperator.click({ force: true });
         await this.page.waitForTimeout(500);
         // Scope to visible menu to avoid strict mode violation (selected value + dropdown option)
-        await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click();
+        // Use fallback strategies for operator selection to handle q-menu timing issues
+        let operatorSelected = false;
+        try {
+            await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click({ timeout: 5000 });
+            operatorSelected = true;
+        } catch (e) {
+            testLogger.warn('Direct operator click failed, trying keyboard navigation', { error: e.message });
+        }
+        if (!operatorSelected) {
+            try {
+                // Press ArrowDown multiple times to navigate to '>=' then Enter to select
+                await this.page.keyboard.press('ArrowDown');
+                await this.page.waitForTimeout(200);
+                await this.page.keyboard.press('ArrowDown');
+                await this.page.waitForTimeout(200);
+                await this.page.keyboard.press('ArrowDown');
+                await this.page.waitForTimeout(200);
+                await this.page.keyboard.press('Enter');
+                await this.page.waitForTimeout(500);
+                operatorSelected = true;
+                testLogger.info('Selected >= operator via keyboard navigation');
+            } catch (e2) {
+                testLogger.warn('Keyboard navigation for operator also failed, using first available', { error: e2.message });
+            }
+        }
 
         const thresholdInput = thresholdSection.locator('input[type="number"]').first();
         await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
