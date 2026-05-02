@@ -461,15 +461,20 @@ bordered class="my-card q-py-md">
 
 <script lang="ts">
 import { useQuasar } from "quasar";
-import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
+import { computed, defineComponent, defineAsyncComponent, ref, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
 import config from "../aws-exports";
 import { formatSizeFromMB, addCommasToNumber, getImageURL } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
+import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import pipelines from "@/services/pipelines";
-import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
+// Lazy-load the chart renderer so echarts (~1 MB) doesn't block Home's initial paint.
+// Charts fade in shortly after the page is interactive.
+const CustomChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/CustomChartRenderer.vue"),
+);
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanner.vue";
@@ -477,8 +482,13 @@ import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vu
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import { useRouter } from "vue-router";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
-import OverviewTab from "@/views/OverviewTab.vue";
-import O2AIChat from "@/components/O2AIChat.vue";
+// OverviewTab statically imports plugins/traces/ServiceGraphNodeSidePanel,
+// which transitively pulls echarts (~1 MB) into the main bundle. Lazy-load it
+// so echarts only ships when the user actually selects the Overview tab.
+const OverviewTab = defineAsyncComponent(() => import("@/views/OverviewTab.vue"));
+// O2AIChat pulls highlight.js + marked. Lazy-load so they don't ship until
+// the user opens the AI panel.
+const O2AIChat = defineAsyncComponent(() => import("@/components/O2AIChat.vue"));
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
 
@@ -494,6 +504,7 @@ export default defineComponent({
     const no_data_ingest = ref(false);
     const isCloud = config.isCloud;
     const { setStreams } = useStreams();
+    const { prefetchRoute } = useRoutePrefetch();
     const alertsPanelDataKey = ref(0);
     const pipelinesPanelDataKey = ref(0);
     const isLoadingSummary = ref(false);
@@ -987,8 +998,31 @@ export default defineComponent({
       : summary.value.index_size;
   });
 
-
-
+    // Speculatively prefetch the Logs route during Home idle time so the
+    // Home → Logs navigation is instant. Logs is statistically the most-clicked
+    // route and pulls ~1.5 MB of chunks (including Monaco) on first visit.
+    let prefetchHandle: number | null = null;
+    onMounted(() => {
+      const ric = (window as any).requestIdleCallback;
+      if (ric) {
+        prefetchHandle = ric(() => {
+          prefetchHandle = null;
+          prefetchRoute("/logs");
+        });
+      } else {
+        prefetchHandle = window.setTimeout(() => {
+          prefetchHandle = null;
+          prefetchRoute("/logs");
+        }, 200);
+      }
+    });
+    onUnmounted(() => {
+      if (prefetchHandle == null) return;
+      const cic = (window as any).cancelIdleCallback;
+      if (cic) cic(prefetchHandle);
+      else clearTimeout(prefetchHandle);
+      prefetchHandle = null;
+    });
 
     const homeChat = ref<any>(null);
     function onLoadChat(id: number) {

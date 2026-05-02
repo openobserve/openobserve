@@ -155,6 +155,7 @@ import {
 import {
   ref,
   defineComponent,
+  defineAsyncComponent,
   KeepAlive,
   computed,
   onMounted,
@@ -204,7 +205,10 @@ import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
-import O2AIChat from "@/components/O2AIChat.vue";
+// Lazy-load O2AIChat — it pulls highlight.js (~970 KB) and marked, neither
+// needed until the user opens the AI chat panel. Keeping it static dragged
+// both libs into the main bundle for every cold visit.
+const O2AIChat = defineAsyncComponent(() => import("@/components/O2AIChat.vue"));
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 

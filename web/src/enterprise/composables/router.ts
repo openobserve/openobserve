@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import Billing from "@/enterprise/components/billings/Billing.vue";
-import Plans from "@/enterprise/components/billings/plans.vue";
-import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
-import Usage from "@/enterprise/components/billings/usage.vue";
-import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
-import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
-import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
-import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
+// Lazy-import all enterprise routes so their transitive deps (echarts via
+// CustomChartRenderer in usage.vue, among others) don't end up in the main
+// entry's static graph, which adds modulepreload tags for ~1 MB of chunks
+// every cold visit regardless of whether these pages are ever opened.
+const Billing = () => import("@/enterprise/components/billings/Billing.vue");
+const Plans = () => import("@/enterprise/components/billings/plans.vue");
+const InvoiceHistory = () => import("@/enterprise/components/billings/invoiceHistory.vue");
+const Usage = () => import("@/enterprise/components/billings/usage.vue");
+const AzureMarketplaceSetup = () => import("@/views/AzureMarketplaceSetup.vue");
+const AwsMarketplaceSetup = () => import("@/views/AwsMarketplaceSetup.vue");
+const EvalTemplateList = () => import("@/enterprise/components/EvalTemplateList.vue");
+const EvalTemplateEditor = () => import("@/enterprise/components/EvalTemplateEditor.vue");
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
