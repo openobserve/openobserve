@@ -63,10 +63,3 @@ tests/ui-testing/docs/test_generator/audit-reports/cloud-compatibility-audit-202
 tests/ui-testing/scripts/check-topology.js
 v0.70.0_release_gap_report.pdf
 tests/ui-testing/.env.old
-/uncommitted_backup/
-/test-assist-results/
-tests/ui-testing/batch*-retest.js
-tests/ui-testing/bug*-retest.js
-tests/ui-testing/check-enrichment-url.js
-tests/ui-testing/bug*-test.js
-tests/ui-testing/test-output/
