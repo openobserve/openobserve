@@ -645,8 +645,12 @@ const onStreamFilterChange = (stream: string) => {
 };
 
 async function loadServicesCatalog() {
-  const streamName = streamFilter.value;
+  const streamName = streamFilter.value?.replaceAll('"', '');
   if (!streamName) return;
+
+  if (availableStreams.value.length && !availableStreams.value.includes(streamName)) {
+    return;
+  }
 
   if (currentTraceId) {
     cancelStreamQueryBasedOnRequestId({
