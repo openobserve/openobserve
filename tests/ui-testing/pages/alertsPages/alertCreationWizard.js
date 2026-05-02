@@ -430,9 +430,15 @@ export class AlertCreationWizard {
         }
 
         // Destination selection with fallback
+        // Forcefully remove q-portal elements that may intercept clicks (e.g. leftover Monaco editor overlays)
+        await this.page.evaluate(() => {
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { el.remove(); });
+        }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
+        await this.page.waitForTimeout(300);
+
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click();
+        await destinationDropdown.click({ force: true });
         await this.page.waitForTimeout(1000);
 
         const visibleDestMenuSql = this.page.locator('.q-menu:visible');

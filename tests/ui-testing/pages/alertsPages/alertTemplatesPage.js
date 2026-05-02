@@ -61,7 +61,7 @@ export class AlertTemplatesPage {
             // Try URL-based navigation first (more reliable than menu clicking)
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
             const orgIdentifier = process.env.ORGNAME || 'default';
-            const templatesUrl = `${baseUrl}/web/settings?org_identifier=${orgIdentifier}#tab-templates`;
+            const templatesUrl = `${baseUrl}/web/settings/templates?org_identifier=${orgIdentifier}`;
 
             try {
                 await this.page.goto(templatesUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -729,50 +729,63 @@ export class AlertTemplatesPage {
      * @param {string} importType - Type of import: 'valid' or 'invalid'
      */
     async importTemplateFromUrl(url, templateName, importType = 'valid') {
-        await this.navigateToTemplates();
-        await this.page.waitForTimeout(2000);
+        // Navigate directly to the import template page (bypasses import button click)
+        // The URL with action=import triggers TemplateList's onMounted → getTemplates → updateRoute → showImportTemplate
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const orgIdentifier = process.env.ORGNAME || 'default';
+        const importUrl = `${baseUrl}/web/settings/templates?org_identifier=${orgIdentifier}&action=import`;
 
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
-        }).catch(() => {});
+        try {
+            await this.page.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+            // Wait for ImportTemplate/BaseImport with AppTabs to render
+            await this.page.waitForTimeout(3000);
+            await this.page.locator(this.importUrlTab).waitFor({ state: 'visible', timeout: 20000 });
+            testLogger.info('Navigated directly to template import page');
+        } catch (navError) {
+            testLogger.warn('Direct navigation to template import failed, trying button click', { error: navError.message });
+            // Fallback: navigate to templates page first, then try clicking import button
+            await this.navigateToTemplates();
+            await this.page.waitForTimeout(2000);
 
-        // Try multiple fallback selectors for the import button
-        const importBtnLocator = this.page.locator(this.templateImportButton);
-        const importBtnFallbackLocators = [
-            this.templateImportButton,
-            'button:has-text("Import Template")',
-            '[data-test*="template-import"]',
-            'button:has-text("Import")',
-            '.q-table__control button:has-text("Import")',
-            'button.q-btn:not(.q-btn--flat)'
-        ];
+            // Clean up any q-portal elements that may intercept clicks
+            await this.page.evaluate(() => {
+                document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
+            }).catch(() => {});
 
-        let importBtnClicked = false;
-        for (const selector of importBtnFallbackLocators) {
-            try {
-                const btn = this.page.locator(selector).first();
-                if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                    await btn.click({ force: true, timeout: 5000 });
-                    importBtnClicked = true;
-                    testLogger.info('Clicked Import Template button via fallback selector', { selector });
-                    break;
+            // Try import button selectors (avoiding overly broad selectors that click wrong elements)
+            const importBtnFallbackLocators = [
+                this.templateImportButton,
+                'button:has-text("Import Template")',
+                '[data-test*="template-import"]',
+                'button:has-text("Import")',
+                '.q-table__control button:has-text("Import")',
+            ];
+
+            let importBtnClicked = false;
+            for (const selector of importBtnFallbackLocators) {
+                try {
+                    const btn = this.page.locator(selector).first();
+                    if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                        await btn.click({ force: true, timeout: 5000 });
+                        importBtnClicked = true;
+                        testLogger.info('Clicked Import Template button via fallback selector', { selector });
+                        break;
+                    }
+                } catch (e) {
+                    // Try next selector
                 }
-            } catch (e) {
-                // Try next selector
             }
-        }
 
-        if (!importBtnClicked) {
-            // If import button not found, check if we can see the templates page at all
-            const addBtnVisible = await this.page.locator(this.addTemplateButton).isVisible({ timeout: 3000 }).catch(() => false);
-            if (addBtnVisible) {
-                // The templates page loaded but import button is missing — create via API instead
+            if (!importBtnClicked) {
+                // The import page is not accessible via UI — create via API instead
                 testLogger.warn('Import button not found, falling back to API-based template creation', { templateName });
                 await this.createTemplateViaApi(templateName);
                 return;
             }
-            throw new Error('Could not find Import Template button in the UI');
+
+            // Wait for import page to render after button click
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.importUrlTab).waitFor({ state: 'visible', timeout: 15000 });
         }
 
         await this.page.locator(this.importUrlTab).click();

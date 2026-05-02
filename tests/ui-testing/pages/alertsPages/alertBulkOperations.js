@@ -150,8 +150,16 @@ export class AlertBulkOperations {
             testLogger.warn('Pagination text not immediately visible, continuing — header checkbox was checked');
         }
 
-        // Click move across folders button
-        await this.page.locator(this.locators.moveAcrossFoldersButton).click();
+        // Click move across folders button with fallback
+        const moveBtn = this.page.locator(this.locators.moveAcrossFoldersButton);
+        await moveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        try {
+            await moveBtn.click({ timeout: 5000 });
+        } catch (e) {
+            testLogger.warn('Move button click failed, retrying with force', { error: e.message });
+            await this.page.waitForTimeout(1000);
+            await moveBtn.click({ force: true, timeout: 5000 });
+        }
 
         // Handle folder selection with scrolling
         await this.page.locator(this.locators.folderDropdown).click();

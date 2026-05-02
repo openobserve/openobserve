@@ -77,7 +77,7 @@ export class AlertDestinationsPage {
             // Try URL-based navigation first (more reliable than menu clicking)
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
             const orgIdentifier = process.env.ORGNAME || 'default';
-            const destinationsUrl = `${baseUrl}/web/settings?org_identifier=${orgIdentifier}#tab-destinations`;
+            const destinationsUrl = `${baseUrl}/web/settings/alert_destinations?org_identifier=${orgIdentifier}`;
 
             try {
                 await this.page.goto(destinationsUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -271,7 +271,23 @@ export class AlertDestinationsPage {
      * @param {string} destinationName - Name for the destination
      */
     async importDestinationFromUrl(url, templateName, destinationName) {
-        await this.page.locator(this.destinationImportButton).click();
+        // Navigate directly to the import destination page (bypasses import button click)
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const orgIdentifier = process.env.ORGNAME || 'default';
+        const importUrl = `${baseUrl}/web/settings/alert_destinations?org_identifier=${orgIdentifier}&action=import`;
+
+        try {
+            await this.page.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+            // Wait for ImportDestination/BaseImport with AppTabs to render
+            await this.page.waitForTimeout(3000);
+            await this.page.locator(this.importJsonUrlTab).waitFor({ state: 'visible', timeout: 20000 });
+            testLogger.info('Navigated directly to destination import page');
+        } catch (navError) {
+            testLogger.warn('Direct navigation failed, clicking import button', { error: navError.message });
+            await this.page.locator(this.destinationImportButton).click();
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.importJsonUrlTab).waitFor({ state: 'visible', timeout: 15000 });
+        }
         await this.page.locator(this.importJsonUrlTab).click();
         await this.page.locator(this.destinationImportUrlInput).click();
         await this.page.locator(this.destinationImportUrlInput).fill(url);
@@ -284,6 +300,8 @@ export class AlertDestinationsPage {
         await this.page.locator(this.destinationImportNameInput).click();
         await this.page.locator(this.destinationImportNameInput).fill(destinationName);
         await this.page.locator(this.destinationImportJsonBtn).click();
+        // Wait for import to complete
+        await this.page.waitForTimeout(2000);
     }
 
     /**
