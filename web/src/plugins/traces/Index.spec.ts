@@ -2186,27 +2186,15 @@ describe("Index.vue (Main Traces Page)", () => {
           },
         },
       });
-    }
+    };
+
+    it("should restore tab=services-catalog from URL params", async () => {
       mockSearchObj.meta.searchMode = "services-catalog";
       wrapper = mountWithServicesCatalogStub();
       await flushPromises();
 
       expect(wrapper.vm.activeTab).toBe("services-catalog");
-    });
-
-    it("should restore tab=services-catalog from URL params", async () => {
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-    }
+    })
 
     it("should set searchMode and early-return without resetting sortBy when switching to services-catalog", async () => {
       // Set a non-default sortBy to prove it was not reset
