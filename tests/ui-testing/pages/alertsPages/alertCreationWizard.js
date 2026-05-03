@@ -362,10 +362,13 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // Forcefully remove any remaining q-portal elements that intercept clicks
-        // (q-dialog uses q-portal which can leave aria-hidden overlays in the DOM)
+        // Fully remove stale q-portal containers (Monaco editor's dialog portal).
+        // q-portal containers must be removed entirely rather than hidden with
+        // display:none, because Quasar recycles portal DOM nodes for new menus;
+        // hiding them would cause newly-opened menus (destination dropdown, etc.)
+        // to attach into hidden containers and never become visible.
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
@@ -430,9 +433,11 @@ export class AlertCreationWizard {
         }
 
         // Destination selection with fallback
-        // Forcefully remove q-portal elements that may intercept clicks (e.g. leftover Monaco editor overlays)
+        // Fully remove stale q-portal containers — same reason as above:
+        // hiding with display:none lets Quasar recycle the hidden nodes for
+        // new menus, making them invisible.
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
@@ -441,17 +446,31 @@ export class AlertCreationWizard {
         await destinationDropdown.click({ force: true });
         await this.page.waitForTimeout(1000);
 
-        const visibleDestMenuSql = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenuSql.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-
+        // Locate the destination option by data-test attribute first (more reliable
+        // than .q-menu:visible which can miss recycled q-portal menus)
         let destFoundSql = false;
-        const destOptionSql = visibleDestMenuSql.locator('.q-item').filter({ hasText: destinationName }).first();
-        if (await destOptionSql.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await destOptionSql.click();
+        try {
+            const destOption = this.page.locator(`[data-test="alert-destination-option-${destinationName}"]`);
+            await destOption.waitFor({ state: 'visible', timeout: 5000 });
+            await destOption.click();
             destFoundSql = true;
+            testLogger.info('Selected destination by data-test', { destinationName });
+        } catch (e) {
+            testLogger.warn('Failed to select destination by data-test, trying .q-menu', { error: e.message, destinationName });
         }
 
         if (!destFoundSql) {
+            const visibleDestMenuSql = this.page.locator('.q-menu:visible');
+            await expect(visibleDestMenuSql.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+            const destOptionSql = visibleDestMenuSql.locator('.q-item').filter({ hasText: destinationName }).first();
+            if (await destOptionSql.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await destOptionSql.click();
+                destFoundSql = true;
+            }
+        }
+
+        if (!destFoundSql) {
+            const visibleDestMenuSql = this.page.locator('.q-menu:visible');
             await visibleDestMenuSql.locator('.q-item').first().click();
             testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
         }
