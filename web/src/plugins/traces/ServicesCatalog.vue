@@ -81,22 +81,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <template v-if="statusCounts.critical > 0">
-          <span class="sc-pill-dot sc-pill-dot--critical" />
-          <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-2)]!">{{
-            statusCounts.critical
-          }}</span>
+          <div
+            class="tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] tw:text-[var(--o2-service-health-critical)]"
+            data-test="services-catalog-pill-critical"
+          >
+            <span>{{ statusCounts.critical }}</span>
+            <span>{{ t("traces.servicesCatalog.status.critical") }}</span>
+            <q-tooltip>
+              {{ t("traces.servicesCatalog.status.critical") }}: &gt; 10%
+              {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+            </q-tooltip>
+          </div>
         </template>
         <template v-if="statusCounts.warning > 0">
-          <span class="sc-pill-dot sc-pill-dot--warning tw:ml-[0.325rem]" />
-          <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-2)]!">{{
-            statusCounts.warning
-          }}</span>
+          <div
+            class="tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-service-health-warning)_12%,transparent)] tw:text-[var(--o2-service-health-warning)]"
+            data-test="services-catalog-pill-warning"
+          >
+            <span>{{ statusCounts.warning }}</span>
+            <span>{{ t("traces.servicesCatalog.status.warning") }}</span>
+            <q-tooltip>
+              {{ t("traces.servicesCatalog.status.warning") }}: 5 – 10%
+              {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+            </q-tooltip>
+          </div>
         </template>
         <template v-if="statusCounts.degraded > 0">
-          <span class="sc-pill-dot sc-pill-dot--degraded tw:ml-[0.325rem]" />
-          <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-2)]!">{{
-            statusCounts.degraded
-          }}</span>
+          <div
+            class="tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:font-medium tw:bg-[color-mix(in_srgb,var(--o2-service-health-degraded)_12%,transparent)] tw:text-[var(--o2-service-health-degraded)]"
+            data-test="services-catalog-pill-degraded"
+          >
+            <span>{{ statusCounts.degraded }}</span>
+            <span>{{ t("traces.servicesCatalog.status.degraded") }}</span>
+            <q-tooltip>
+              {{ t("traces.servicesCatalog.status.degraded") }}: 1 – 5%
+              {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+            </q-tooltip>
+          </div>
         </template>
       </template>
 
@@ -901,43 +922,5 @@ onUnmounted(() => {
 }
 .o2-status-badge--error {
   color: var(--o2-service-health-critical);
-}
-
-// Inline pill status dots
-.sc-pill-dot {
-  display: inline-block;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.sc-pill-dot--degraded {
-  background: var(--o2-service-health-degraded);
-}
-.sc-pill-dot--warning {
-  background: var(--o2-service-health-warning);
-}
-.sc-pill-dot--critical {
-  background: var(--o2-service-health-critical);
-}
-
-// Legend dots
-.sc-legend-dot {
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.sc-legend-dot--healthy {
-  background: var(--o2-service-health-healthy);
-}
-.sc-legend-dot--degraded {
-  background: var(--o2-service-health-degraded);
-}
-.sc-legend-dot--warning {
-  background: var(--o2-service-health-warning);
-}
-.sc-legend-dot--critical {
-  background: var(--o2-service-health-critical);
 }
 </style>

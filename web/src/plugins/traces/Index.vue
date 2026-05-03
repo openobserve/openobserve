@@ -1545,9 +1545,7 @@ function restoreUrlQueryParams() {
     tab !== undefined &&
     (
       ["service-graph", "traces", "spans", "services-catalog"] as const
-    ).includes(
-      tab as "service-graph" | "traces" | "spans" | "services-catalog",
-    )
+    ).includes(tab as "service-graph" | "traces" | "spans" | "services-catalog")
   ) {
     if (tab === "service-graph" && config.isEnterprise !== "true") return;
     searchObj.meta.searchMode = tab as TraceSearchMode;
@@ -1818,6 +1816,12 @@ const searchData = () => {
   ) {
     return;
   }
+
+  if (
+    activeTab.value === "service-graph" ||
+    activeTab.value === "services-catalog"
+  )
+    return;
 
   // Clear brush selections when running query
   // The filters are now part of the query, so brush selections should be cleared
