@@ -100,8 +100,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
-      <!-- Status legend -->
+      <!-- pagination controls -->
       <div
+        v-if="services.length > 0"
+        class="row items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
+        data-test="services-catalog-pagination-bar"
+      >
+        <q-select
+          v-model="rowsPerPage"
+          :options="rowsPerPageOptions"
+          class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
+          size="sm"
+          dense
+          borderless
+          data-test="services-catalog-records-per-page"
+          @update:model-value="changeRowsPerPage"
+        />
+        <q-pagination
+          v-model="currentPage"
+          :max="totalPages"
+          :input="false"
+          direction-links
+          :boundary-numbers="false"
+          :max-pages="5"
+          :ellipses="false"
+          icon-first="skip_previous"
+          icon-last="skip_next"
+          icon-prev="fast_rewind"
+          icon-next="fast_forward"
+          class="float-right paginator-section tw:mt-0!"
+          data-test="services-catalog-pagination"
+          @update:model-value="changePage"
+        />
+      </div>
+      <!-- Status legend -->
+      <!-- <div
         class="tw:ml-auto tw:flex tw:items-center tw:gap-3 tw:px-[0.625rem] tw:py-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]"
         data-test="services-catalog-status-legend"
       >
@@ -168,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </div>
         </div>
-      </div>
+      </div> -->
     </div>
 
     <!-- Empty state (shown when not loading and no data) -->
@@ -190,9 +223,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <TenstackTable
         class="tw:h-auto!"
-        :rows="filteredServices"
+        :rows="paginatedServices"
         :columns="tableColumns"
         :loading="isLoading"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
         :row-height="28"
         :enable-column-reorder="true"
         :enable-row-expand="false"
@@ -201,6 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-columns="false"
         data-test="services-catalog-table"
         @click:dataRow="handleRowClick"
+        @sort-change="handleSortChange"
       >
         <!-- Status badge -->
         <template #cell-status="{ item }">
@@ -420,6 +456,40 @@ interface ServiceRow {
 const isLoading = ref(false);
 const services = ref<ServiceRow[]>([]);
 const filterText = ref("");
+const currentPage = ref(1);
+const rowsPerPage = ref(25);
+const rowsPerPageOptions = [10, 25, 50, 100];
+const sortBy = ref<string>("status");
+const sortOrder = ref<"asc" | "desc">("desc");
+
+const totalPages = computed(() =>
+  filteredServices.value.length && rowsPerPage.value
+    ? Math.max(1, Math.ceil(filteredServices.value.length / rowsPerPage.value))
+    : 1,
+);
+
+const paginatedServices = computed(() => {
+  const all = sortedServices.value;
+  if (!all.length) return [];
+  const start = (currentPage.value - 1) * rowsPerPage.value;
+  return all.slice(start, start + rowsPerPage.value);
+});
+
+function changePage(page: number) {
+  currentPage.value = page;
+}
+
+function changeRowsPerPage(val: number) {
+  rowsPerPage.value = val;
+  currentPage.value = 1;
+}
+
+function handleSortChange(field: string, order: "asc" | "desc") {
+  sortBy.value = field;
+  sortOrder.value = order;
+  currentPage.value = 1;
+}
+
 const selectedServiceRow = ref<ServiceRow | null>(null);
 const showSidePanel = ref(false);
 
@@ -448,7 +518,7 @@ const tableColumns = computed(() => [
     accessorKey: "service_name",
     enableSorting: true,
     size: 200,
-    meta: { slot: true, align: "left" },
+    meta: { slot: true, align: "left", sortable: true },
   },
   {
     id: "status",
@@ -463,7 +533,12 @@ const tableColumns = computed(() => [
         (order[rowB.original.status as keyof typeof order] ?? 0)
       );
     },
-    meta: { slot: true, align: "left", disableCellAction: true },
+    meta: {
+      slot: true,
+      align: "left",
+      disableCellAction: true,
+      sortable: true,
+    },
   },
   {
     id: "total_requests",
@@ -471,7 +546,7 @@ const tableColumns = computed(() => [
     accessorKey: "total_requests",
     size: 110,
     enableSorting: true,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "right", sortable: true },
   },
   {
     id: "error_rate",
@@ -479,7 +554,7 @@ const tableColumns = computed(() => [
     accessorKey: "error_rate",
     size: 110,
     enableSorting: true,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "right", sortable: true },
   },
   {
     id: "error_count",
@@ -487,7 +562,7 @@ const tableColumns = computed(() => [
     accessorKey: "error_count",
     size: 90,
     enableSorting: true,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "right", sortable: true },
   },
   {
     id: "p50_latency_ns",
@@ -495,7 +570,7 @@ const tableColumns = computed(() => [
     accessorKey: "p50_latency_ns",
     size: 100,
     enableSorting: true,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "right", sortable: true },
   },
   {
     id: "p95_latency_ns",
@@ -503,7 +578,7 @@ const tableColumns = computed(() => [
     accessorKey: "p95_latency_ns",
     size: 100,
     enableSorting: true,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "right", sortable: true },
   },
   {
     id: "p99_latency_ns",
@@ -511,7 +586,7 @@ const tableColumns = computed(() => [
     accessorKey: "p99_latency_ns",
     size: 100,
     enableSorting: true,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "right", sortable: true },
   },
   {
     id: "avg_duration_ns",
@@ -519,7 +594,7 @@ const tableColumns = computed(() => [
     accessorKey: "avg_duration_ns",
     size: 120,
     enableSorting: true,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "right", sortable: true },
   },
   {
     id: "max_duration_ns",
@@ -527,7 +602,7 @@ const tableColumns = computed(() => [
     accessorKey: "max_duration_ns",
     size: 120,
     enableSorting: true,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "right", sortable: true },
   },
 ]);
 
@@ -541,6 +616,36 @@ const filteredServices = computed(() => {
   if (!filterText.value.trim()) return services.value;
   const q = filterText.value.trim().toLowerCase();
   return services.value.filter((s) => s.service_name.toLowerCase().includes(q));
+});
+
+const statusOrder: Record<string, number> = {
+  healthy: 0,
+  degraded: 1,
+  warning: 2,
+  critical: 3,
+};
+
+const sortedServices = computed(() => {
+  const arr = [...filteredServices.value];
+  if (!sortBy.value) return arr;
+
+  return arr.sort((a, b) => {
+    let result: number;
+
+    if (sortBy.value === "status") {
+      result = (statusOrder[a.status] ?? 0) - (statusOrder[b.status] ?? 0);
+    } else {
+      const va = a[sortBy.value as keyof ServiceRow];
+      const vb = b[sortBy.value as keyof ServiceRow];
+      if (typeof va === "number" && typeof vb === "number") {
+        result = va - vb;
+      } else {
+        result = String(va ?? "").localeCompare(String(vb ?? ""));
+      }
+    }
+
+    return sortOrder.value === "desc" ? -result : result;
+  });
 });
 
 function deriveStatus(
@@ -645,10 +750,13 @@ const onStreamFilterChange = (stream: string) => {
 };
 
 async function loadServicesCatalog() {
-  const streamName = streamFilter.value?.replaceAll('"', '');
+  const streamName = streamFilter.value?.replaceAll('"', "");
   if (!streamName) return;
 
-  if (availableStreams.value.length && !availableStreams.value.includes(streamName)) {
+  if (
+    availableStreams.value.length &&
+    !availableStreams.value.includes(streamName)
+  ) {
     return;
   }
 
@@ -688,7 +796,7 @@ ORDER BY total_requests DESC`;
           start_time,
           end_time,
           from: 0,
-          size: 1000,
+          size: -1,
         },
         encoding: "base64",
       },
@@ -773,6 +881,8 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
+@import "@/styles/pagination.scss";
+
 :deep(.services-catalog-table-container) {
   .container {
     border-radius: 0 !important;
