@@ -368,9 +368,11 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // Clean up any residual q-portal overlays (only aria-hidden ones from closed dialogs)
+        // Clean up any residual q-portal dialog overlays from the closed SQL Editor.
+        // The VRL Editor dialog portal often remains without aria-hidden and intercepts
+        // pointer events. Target only dialog portals (not menus/tooltips) and remove all.
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
+            document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => { el.style.display = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove dialog portals', { error: e.message }));
         await this.page.waitForTimeout(300);
         testLogger.info('Closed SQL Editor dialog — portal cleaned up');
@@ -385,8 +387,8 @@ export class AlertCreationWizard {
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
         // Click the q-field__control area to open the dropdown (more reliable than clicking the whole component)
         await thresholdOperator.locator('.q-field__control, .q-field').first().click({ timeout: 5000 }).catch(async () => {
-            testLogger.info('q-field click failed, clicking main element instead');
-            await thresholdOperator.click();
+            testLogger.info('q-field click failed, clicking main element with force');
+            await thresholdOperator.click({ force: true });
         });
         await this.page.waitForTimeout(1000);
         // Use role-based option selection (bypasses q-portal visibility issues)
