@@ -647,7 +647,7 @@ export class AlertsPage {
 
         // Clean up any q-portal overlays that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
         }).catch(() => {});
         await this.page.waitForTimeout(500);
 
@@ -2501,7 +2501,7 @@ export class AlertsPage {
     async clickAlertUpdateButton(alertName) {
         // Clean up any q-portal overlays that may intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.pointerEvents = 'none'; });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
         }).catch(() => {});
 
         // Search for the alert first
