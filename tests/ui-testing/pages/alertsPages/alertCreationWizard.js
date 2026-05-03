@@ -324,11 +324,15 @@ export class AlertCreationWizard {
 
         await this.selectStreamByName(streamName);
 
-        // Select Scheduled alert type via dropdown (v3 UI)
-        await this._selectAlertType('Scheduled');
+        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
+        await this.page.locator(this.locators.scheduledAlertRadio).click();
 
         // ==================== STEP 2: CONDITIONS (SQL) ====================
-        const sqlTab = this.page.locator('[data-test="step2-query-tabs"] button:has-text("SQL")');
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
+
+        const sqlTab = this.page.locator('[data-test="tab-sql"]');
         await sqlTab.waitFor({ state: 'visible', timeout: 10000 });
         await sqlTab.click();
         await this.page.waitForTimeout(1000);
@@ -362,18 +366,10 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // Fully remove stale q-portal containers (Monaco editor's dialog portal).
-        // q-portal containers must be removed entirely rather than hidden with
-        // display:none, because Quasar recycles portal DOM nodes for new menus;
-        // hiding them would cause newly-opened menus (destination dropdown, etc.)
-        // to attach into hidden containers and never become visible.
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
-        }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
-        await this.page.waitForTimeout(300);
-
-        // ==================== COMPARE WITH PAST (Advanced tab) ====================
-        await this._switchToAdvancedTab();
+        // ==================== STEP 3: COMPARE WITH PAST ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
 
         // Add 30-minute time range comparison
         const addTimeRangeBtn = this.page.locator(this.locators.multiTimeRangeAddButton);
@@ -384,112 +380,60 @@ export class AlertCreationWizard {
             await this.page.locator('[data-test="date-time-relative-30-m-btn"]').click();
         }
 
-        // ==================== ALERT SETTINGS (back in Alert Rules tab) ====================
-        await this._switchToAlertRulesTab();
+        // ==================== STEP 4: ALERT SETTINGS ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(1000);
 
-        // In v3 UI, threshold operator + input are in QueryConfig as part of the "Alert if *" section
-        // For SQL mode, the condition row shows "Alert if No. of events *" (not "matching logs")
-        const thresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'No. of events' }).first();
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
+        const thresholdOperator = this.page.locator(this.locators.stepAlertConditionsQSelect).first();
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        await thresholdOperator.click({ force: true });
+        await thresholdOperator.click();
         await this.page.waitForTimeout(500);
-        // Scope to visible menu to avoid strict mode violation (selected value + dropdown option)
-        // Use fallback strategies for operator selection to handle q-menu timing issues
-        let operatorSelected = false;
-        try {
-            await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click({ timeout: 5000 });
-            operatorSelected = true;
-        } catch (e) {
-            testLogger.warn('Direct operator click failed, trying keyboard navigation', { error: e.message });
-        }
-        if (!operatorSelected) {
-            try {
-                // Press ArrowDown multiple times to navigate to '>=' then Enter to select
-                await this.page.keyboard.press('ArrowDown');
-                await this.page.waitForTimeout(200);
-                await this.page.keyboard.press('ArrowDown');
-                await this.page.waitForTimeout(200);
-                await this.page.keyboard.press('ArrowDown');
-                await this.page.waitForTimeout(200);
-                await this.page.keyboard.press('Enter');
-                await this.page.waitForTimeout(500);
-                operatorSelected = true;
-                testLogger.info('Selected >= operator via keyboard navigation');
-            } catch (e2) {
-                testLogger.warn('Keyboard navigation for operator also failed, using first available', { error: e2.message });
-            }
-        }
+        await this.page.getByText('>=', { exact: true }).click();
 
-        const thresholdInput = thresholdSection.locator('input[type="number"]').first();
+        const thresholdInput = this.page.locator(this.locators.stepAlertConditionsNumberInput).first();
         await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
         await thresholdInput.fill('1');
 
-        // Fill period (still in AlertSettings.vue)
-        const periodInput = this.page.locator('.period-input-container input[type="number"]');
+        const periodInput = this.page.locator('input[type="number"]').nth(1);
         await this.page.waitForTimeout(500);
         if (await periodInput.isVisible({ timeout: 3000 })) {
             await periodInput.fill('15');
         }
 
         // Destination selection with fallback
-        // Fully remove stale q-portal containers — same reason as above:
-        // hiding with display:none lets Quasar recycle the hidden nodes for
-        // new menus, making them invisible.
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.remove(); });
-        }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
-        await this.page.waitForTimeout(300);
-
-        const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
+        const destinationRow = this.page.locator(this.locators.alertSettingsRow).filter({ hasText: /Destination/ });
+        const destinationDropdown = destinationRow.locator('.q-select').first();
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-
-        // Open q-select menu via keyboard (ArrowDown) rather than click.
-        // force:true click on q-select does not reliably trigger Quasar's
-        // menu-opening handler. ArrowDown is the native Quasar key binding
-        // to open the options popup and bypasses overlay/portal issues.
-        await destinationDropdown.focus();
-        await this.page.waitForTimeout(200);
-        await this.page.keyboard.press('ArrowDown');
+        await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        // Select destination by data-test attribute — menu should now be open
+        const visibleDestMenuSql = this.page.locator('.q-menu:visible');
+        await expect(visibleDestMenuSql.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+
         let destFoundSql = false;
-        try {
-            const destOption = this.page.locator(`[data-test="alert-destination-option-${destinationName}"]`);
-            await destOption.waitFor({ state: 'visible', timeout: 5000 });
-            await destOption.click();
+        const destOptionSql = visibleDestMenuSql.locator('.q-item').filter({ hasText: destinationName }).first();
+        if (await destOptionSql.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await destOptionSql.click();
             destFoundSql = true;
-            testLogger.info('Selected destination by data-test', { destinationName });
-        } catch (e) {
-            testLogger.warn('Failed data-test select, keyboard-navigating menu', { error: e.message, destinationName });
         }
 
-        // Fallback: keyboard-navigate the menu to find the destination
         if (!destFoundSql) {
-            for (let i = 0; i < 20; i++) {
-                await this.page.keyboard.press('ArrowDown');
-                await this.page.waitForTimeout(100);
-                const focused = await this.page.evaluate(() => {
-                    const active = document.activeElement;
-                    return active ? active.textContent || '' : '';
-                });
-                if (focused.includes(destinationName)) {
-                    await this.page.keyboard.press('Enter');
-                    destFoundSql = true;
-                    testLogger.info('Selected destination via keyboard navigation', { destinationName });
-                    break;
-                }
-            }
-        }
-
-        // Final fallback: press Enter on whatever is highlighted
-        if (!destFoundSql) {
-            await this.page.keyboard.press('Enter');
-            testLogger.warn('Selected destination via default Enter (fallback)', { requestedDestination: destinationName });
+            await visibleDestMenuSql.locator('.q-item').first().click();
+            testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
         }
         await this.page.waitForTimeout(500);
         await this.page.keyboard.press('Escape');
+
+        // ==================== STEP 5: DEDUPLICATION (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(500);
+
+        // ==================== STEP 6: ADVANCED (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(500);
 
         // ==================== SUBMIT ====================
         await this.page.locator(this.locators.alertSubmitButton).click();
