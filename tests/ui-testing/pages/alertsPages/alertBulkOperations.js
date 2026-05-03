@@ -150,8 +150,23 @@ export class AlertBulkOperations {
             testLogger.warn('Pagination text not immediately visible, continuing — header checkbox was checked');
         }
 
-        // Click move across folders button with fallback
+        // Wait for Vue reactivity to propagate the selection
+        await this.page.waitForTimeout(500);
+
+        // Click move across folders button with retry — header checkbox may not
+        // always propagate `selectedAlerts` on first attempt due to Vue reactivity timing.
         const moveBtn = this.page.locator(this.locators.moveAcrossFoldersButton);
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await moveBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+                break;
+            }
+            testLogger.warn('Move button not visible after header checkbox, re-clicking select-all', { attempt });
+            const headerCheckbox = this.page.locator(this.locators.headerCheckbox).first();
+            if (!(await headerCheckbox.isChecked())) {
+                await headerCheckbox.click({ force: true });
+            }
+            await this.page.waitForTimeout(1000);
+        }
         await moveBtn.waitFor({ state: 'visible', timeout: 10000 });
         try {
             await moveBtn.click({ timeout: 5000 });
