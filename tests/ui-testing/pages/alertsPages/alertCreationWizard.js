@@ -443,11 +443,17 @@ export class AlertCreationWizard {
 
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
         await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await destinationDropdown.click({ force: true });
+
+        // Open q-select menu via keyboard (ArrowDown) rather than click.
+        // force:true click on q-select does not reliably trigger Quasar's
+        // menu-opening handler. ArrowDown is the native Quasar key binding
+        // to open the options popup and bypasses overlay/portal issues.
+        await destinationDropdown.focus();
+        await this.page.waitForTimeout(200);
+        await this.page.keyboard.press('ArrowDown');
         await this.page.waitForTimeout(1000);
 
-        // Locate the destination option by data-test attribute first (more reliable
-        // than .q-menu:visible which can miss recycled q-portal menus)
+        // Select destination by data-test attribute — menu should now be open
         let destFoundSql = false;
         try {
             const destOption = this.page.locator(`[data-test="alert-destination-option-${destinationName}"]`);
@@ -456,23 +462,31 @@ export class AlertCreationWizard {
             destFoundSql = true;
             testLogger.info('Selected destination by data-test', { destinationName });
         } catch (e) {
-            testLogger.warn('Failed to select destination by data-test, trying .q-menu', { error: e.message, destinationName });
+            testLogger.warn('Failed data-test select, keyboard-navigating menu', { error: e.message, destinationName });
         }
 
+        // Fallback: keyboard-navigate the menu to find the destination
         if (!destFoundSql) {
-            const visibleDestMenuSql = this.page.locator('.q-menu:visible');
-            await expect(visibleDestMenuSql.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-            const destOptionSql = visibleDestMenuSql.locator('.q-item').filter({ hasText: destinationName }).first();
-            if (await destOptionSql.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await destOptionSql.click();
-                destFoundSql = true;
+            for (let i = 0; i < 20; i++) {
+                await this.page.keyboard.press('ArrowDown');
+                await this.page.waitForTimeout(100);
+                const focused = await this.page.evaluate(() => {
+                    const active = document.activeElement;
+                    return active ? active.textContent || '' : '';
+                });
+                if (focused.includes(destinationName)) {
+                    await this.page.keyboard.press('Enter');
+                    destFoundSql = true;
+                    testLogger.info('Selected destination via keyboard navigation', { destinationName });
+                    break;
+                }
             }
         }
 
+        // Final fallback: press Enter on whatever is highlighted
         if (!destFoundSql) {
-            const visibleDestMenuSql = this.page.locator('.q-menu:visible');
-            await visibleDestMenuSql.locator('.q-item').first().click();
-            testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+            await this.page.keyboard.press('Enter');
+            testLogger.warn('Selected destination via default Enter (fallback)', { requestedDestination: destinationName });
         }
         await this.page.waitForTimeout(500);
         await this.page.keyboard.press('Escape');
