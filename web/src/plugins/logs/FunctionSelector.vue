@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs function-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs function-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
     <div class="tw:flex tw:items-center">
       <q-toggle
@@ -45,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
           <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
-          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{ selectedFunctionTooltip }}</q-tooltip>
+          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
+            selectedFunctionTooltip
+          }}</q-tooltip>
         </OButton>
       </template>
       <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
@@ -150,7 +152,7 @@ const functionModel = ref(false);
 
 const searchTerm = ref("");
 
-const functionIconUrl = computed(() => iconRight.value.replace('img:', ''));
+const functionIconUrl = computed(() => iconRight.value.replace("img:", ""));
 
 const fnSavedFunctionDialog = () => {
   emit("save:function");

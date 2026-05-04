@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButtonGroup
           v-if="!shouldMoveSavedViewToMenu"
-          class="q-ml-xs q-pa-none element-box-shadow el-border"
+          class="q-ml-xs q-pa-none element-box-shadow tw:border tw:border-button-outline-border"
         >
           <!-- Save current view -->
           <OButton
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-utilities-menu-btn"
           class="group-menu-btn element-box-shadow"
-          variant="ghost"
+          variant="outline"
           size="xs"
         >
           <Ellipsis class="tw:size-3.5 tw:shrink-0" />
@@ -5628,7 +5628,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 0.0625rem solid var(--o2-border-color); // 1px
+  border: 0.0625rem solid var(--color-button-outline-border); // 1px
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
   cursor: pointer;
@@ -5639,7 +5639,7 @@ export default defineComponent({
 }
 
 .dark-theme .toolbar-toggle-container {
-  border: 0.0625rem solid var(--o2-border-color);
+  border: 0.0625rem solid var(--color-button-outline-border);
 }
 
 .toolbar-icon {
@@ -5727,7 +5727,7 @@ export default defineComponent({
 .group-menu-btn {
   padding: 0.25rem 0.25rem !important; // 4px 8px
   margin-left: 0.25rem; // 8px
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12) !important; // 1px
+  border: 0.0625rem solid var(--color-button-outline-border) !important; // 1px
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
   min-height: 1.875rem !important; // 30px
@@ -5745,7 +5745,7 @@ export default defineComponent({
 
 .dark-theme .group-menu-btn,
 .q-dark .group-menu-btn {
-  border: 0.0625rem solid var(--o2-border-color) !important;
+  border: 0.0625rem solid var(--color-button-outline-border) !important;
 }
 .o2-run-query-button {
   font-size: 11px;
