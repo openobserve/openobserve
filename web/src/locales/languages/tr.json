@@ -1125,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apaçi",
     "iis": "IIS",
-    "pubsub": "Pub/Alt Günlükleri"
+    "pubsub": "Pub/Alt Günlükleri",
+    "aiLabel": "Yapay Zeka Entegrasyonları"
   },
   "dashboard": {
     "selectField": "Tarla",

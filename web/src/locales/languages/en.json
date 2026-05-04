@@ -1403,7 +1403,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub Logs"
+    "pubsub": "Pub/Sub Logs",
+    "aiLabel": "AI Integrations"
   },
   "dashboard": {
     "selectField": "Field",
