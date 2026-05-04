@@ -151,64 +151,55 @@ async function performGlobalIngestion(page) {
     "Content-Type": "application/json",
   };
 
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    // Remove trailing slash from URL if present
-    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-    const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
+  const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
+  let response;
+  try {
+    response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
-      body: JSON.stringify(logsdata)
+      data: logsdata
     });
+  } catch (requestError) {
+    testLogger.error('Data ingestion request failed', { error: requestError.message });
+    throw new Error(`Data ingestion request failed: ${requestError.message}`);
+  }
 
-    // Try to parse JSON, but handle cases where response is empty or not JSON
-    let data = null;
-    const contentType = fetchResponse.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      try {
-        const text = await fetchResponse.text();
-        data = text ? JSON.parse(text) : null;
-      } catch (e) {
-        data = { error: 'Failed to parse JSON response', text: await fetchResponse.text() };
-      }
-    } else {
-      data = { text: await fetchResponse.text() };
+  const responseStatus = response.status();
+  let responseData = null;
+  const contentType = response.headers()['content-type'] || '';
+  if (contentType.includes('application/json')) {
+    try {
+      const text = await response.text();
+      responseData = text ? JSON.parse(text) : null;
+    } catch (e) {
+      responseData = { error: 'Failed to parse JSON response', text: await response.text().catch(() => '') };
     }
-
-    return {
-      status: fetchResponse.status,
-      data: data
-    };
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
+  } else {
+    responseData = { text: await response.text().catch(() => '') };
+  }
   
   testLogger.debug('Data ingestion API response received', {
-    status: response.status,
+    status: responseStatus,
     orgId,
     streamName,
-    data: response.data
+    data: responseData
   });
 
-  if (response.status !== 200) {
+  if (responseStatus !== 200) {
     testLogger.error('Data ingestion failed', {
-      status: response.status,
-      response: response.data,
-      url: `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      status: responseStatus,
+      response: responseData,
+      url: `${baseUrl}/api/${orgId}/${streamName}/_json`,
       orgId,
       streamName
     });
-    throw new Error(`Data ingestion failed with status: ${response.status}. Response: ${JSON.stringify(response.data)}`);
+    throw new Error(`Data ingestion failed with status: ${responseStatus}. Response: ${JSON.stringify(responseData)}`);
   }
 
   testLogger.info('Global data ingestion successful', {
-    status: response.status,
+    status: responseStatus,
     orgId,
     streamName,
-    responseData: response.data
+    responseData: responseData
   });
 }
 
