@@ -23,15 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("pipeline.header") }}
               </div>
               <div class="tw:flex tw:items-center q-ml-auto">
-                <div class="app-tabs-container tw:h-[36px] q-mr-sm">
-                  <app-tabs
+                <app-tabs
                   data-test="pipeline-list-tabs"
-                  class="tabs-selection-container"
+                  class="q-mr-sm"
                   :tabs="tabs"
                   v-model:active-tab="activeTab"
                   @update:active-tab="updateActiveTab"
                 />
-                </div>
 
                 <q-input
                   data-test="pipeline-list-search-input"
@@ -1622,13 +1620,5 @@ const onBackfillSuccess = (jobId: string) => {
   }
 }
 
-// Compact tabs: reduce padding so tabs are auto-width and
-// accommodate additional tabs (e.g. Anomalies) at narrow widths
-.app-tabs-container {
-  :deep(.o2-tab) {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    min-width: auto;
-  }
-}
+
 </style>

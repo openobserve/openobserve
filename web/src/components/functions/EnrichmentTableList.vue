@@ -26,15 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("function.enrichmentTables") }}
             </div>
             <div class="tw:flex tw:items-center q-ml-auto">
-              <div class="app-tabs-container tw:h-[36px] q-mr-sm">
-                <app-tabs
-                  data-test="enrichment-tables-list-tabs"
-                  class="tabs-selection-container"
-                  :tabs="filterTabs"
-                  v-model:active-tab="selectedFilter"
-                  @update:active-tab="updateActiveTab"
-                />
-              </div>
+              <app-tabs
+                data-test="enrichment-tables-list-tabs"
+                class="q-mr-sm"
+                :tabs="filterTabs"
+                v-model:active-tab="selectedFilter"
+                @update:active-tab="updateActiveTab"
+              />
 
               <q-input
                 data-test="enrichment-tables-search-input"
@@ -1063,10 +1061,4 @@ export default defineComponent({
 }
 
 /* No custom styles needed - using Quasar components */
-
-.app-tabs-container .o2-tab {
-  padding-left: 1rem !important;
-  padding-right: 1rem !important;
-  min-width: auto !important;
-}
 </style>
