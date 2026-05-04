@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}
           </div>
-          <div class="tw:flex tw:justify-end">
+          <div class="tw:flex tw:justify-end tw:gap-2">
             <q-input
               v-model="filterQuery"
               borderless
