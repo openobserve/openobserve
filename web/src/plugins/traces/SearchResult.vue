@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Insights Button -->
           <OButton
           variant="outline"
-          size="sm"
+          size="xs"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
