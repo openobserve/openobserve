@@ -24,9 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="performance_title">
             {{ t("rum.performanceSummaryLabel") }}
           </div>
-          <div class="flex items-center">
+          <div class="flex items-center tw:gap-[0.5rem]">
             <DateTimePickerDashboard
-              class="q-ml-sm rum-date-time-picker"
+              class="rum-date-time-picker"
               ref="dateTimePicker"
               v-model="selectedDate"
             />
@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               trigger
-              class="app-performance-auto-refresh-interval tw:ml-[0.5rem]! tw:pl-0! tw:overflow-hidden!"
+              class="app-performance-auto-refresh-interval tw:pl-0! tw:overflow-hidden!"
               @trigger="refreshData"
             />
             <OButton
-              :variant="isVariablesChanged ? 'ghost-warning' : 'ghost'"
-              size="icon"
+              :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
+              size="icon-toolbar"
               data-test="rum-performance-refresh"
               @click="refreshData"
             >
