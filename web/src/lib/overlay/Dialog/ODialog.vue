@@ -248,7 +248,6 @@ const contentStyle = computed(() =>
         <div
           :class="[
             'tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
-            'tw:px-(--spacing-dialog-content-px) tw:py-(--spacing-dialog-content-py)',
             'tw:text-dialog-content-text',
           ]"
         >

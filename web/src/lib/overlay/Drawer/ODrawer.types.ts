@@ -57,6 +57,13 @@ export interface DrawerProps {
    * @default true
    */
   showClose?: boolean;
+
+  /**
+   * When true, the backdrop overlay is hidden so the rest of the page remains
+   * interactive and visually unobscured (mirrors Quasar q-dialog `seamless`).
+   * @default false
+   */
+  seamless?: boolean;
 }
 
 export interface DrawerEmits {
