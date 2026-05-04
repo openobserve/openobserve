@@ -62,7 +62,7 @@
             searchRequestTraceIds.length &&
             disable
           "
-          variant="ghost-destructive"
+          variant="outline-destructive"
           size="icon-xs"
           @click="cancelViewPanelQuery"
           data-test="dashboard-viewpanel-cancel-btn"

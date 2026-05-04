@@ -185,18 +185,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :label="t('ingestion.languagesLabel')"
             />
-            <q-route-tab
-            name="ai-integrations"
-            :to="{
-              name: 'ai-integrations',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.aiLabel')"
-            content-class="tab_content"
-          />
-          <ORouteTab
+            <ORouteTab
+              name="ai-integrations"
+              :to="{
+                name: 'ai-integrations',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.aiLabel')"
+            />
+            <ORouteTab
               name="others"
               :to="{
                 name: 'others',
@@ -210,11 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div
-     
-      class="tw:max-h-[calc(100vh - var(--navbar-height) - 100px)]"
-    
-    >
+    <div class="tw:max-h-[calc(100vh - var(--navbar-height) - 100px)]">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"
