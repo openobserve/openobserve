@@ -201,4 +201,52 @@ mod tests {
         assert_eq!(exec.org_id, "default");
         assert_eq!(exec.name, "test");
     }
+
+    #[test]
+    fn test_execution_plan_name() {
+        use datafusion::physical_plan::ExecutionPlan;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = EnrichExec::new("org", "stream", schema);
+        assert_eq!(ExecutionPlan::name(&exec), "EnrichExec");
+    }
+
+    #[test]
+    fn test_children_is_empty() {
+        use datafusion::physical_plan::ExecutionPlan;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = EnrichExec::new("org", "stream", schema);
+        assert!(exec.children().is_empty());
+    }
+
+    #[test]
+    fn test_as_any_downcasts() {
+        use datafusion::physical_plan::ExecutionPlan;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = EnrichExec::new("org", "stream", schema);
+        let any = exec.as_any();
+        assert!(any.downcast_ref::<EnrichExec>().is_some());
+    }
+
+    #[test]
+    fn test_properties_not_null() {
+        use datafusion::physical_plan::ExecutionPlan;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = EnrichExec::new("org", "stream", schema);
+        let props = exec.properties();
+        // verify partitioning is set (UnknownPartitioning(1))
+        assert_eq!(props.output_partitioning().partition_count(), 1);
+    }
+
+    #[test]
+    fn test_metrics_returns_some() {
+        use datafusion::physical_plan::ExecutionPlan;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = EnrichExec::new("org", "stream", schema);
+        assert!(exec.metrics().is_some());
+    }
 }

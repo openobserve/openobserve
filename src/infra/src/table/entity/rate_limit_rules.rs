@@ -22,3 +22,28 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            rule_id: "rule-1".to_string(),
+            org: "myorg".to_string(),
+            rule_type: "user".to_string(),
+            user_role: "admin".to_string(),
+            user_id: "user@example.com".to_string(),
+            api_group_name: "search".to_string(),
+            api_group_operation: "read".to_string(),
+            threshold: 100,
+            stat_interval_ms: 60000,
+            created_at: 1000,
+        };
+        assert_eq!(m.rule_id, "rule-1");
+        assert_eq!(m.org, "myorg");
+        assert_eq!(m.threshold, 100);
+        assert_eq!(m.stat_interval_ms, 60000);
+    }
+}

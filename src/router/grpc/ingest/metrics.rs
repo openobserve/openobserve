@@ -86,3 +86,13 @@ impl MetricsService for MetricsServer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metrics_server_default() {
+        let _server = MetricsServer::default();
+    }
+}

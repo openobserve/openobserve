@@ -243,3 +243,44 @@ fn init_client(root_dir: &str) -> Box<dyn object_store::ObjectStore> {
             .expect("Error creating local file system"),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_local(root: &str, with_prefix: bool) -> Local {
+        Local::new(root, with_prefix)
+    }
+
+    #[test]
+    fn test_name_returns_local() {
+        assert_eq!(Local::name(), "local");
+    }
+
+    #[test]
+    fn test_display_format() {
+        let l = make_local("/tmp", false);
+        assert_eq!(format!("{l}"), "storage for local disk");
+    }
+
+    #[test]
+    fn test_debug_format() {
+        let l = make_local("/tmp", false);
+        let s = format!("{l:?}");
+        assert!(s.contains("storage for local disk"));
+    }
+
+    #[test]
+    fn test_new_stores_root_dir() {
+        let l = make_local("/tmp", false);
+        assert_eq!(l.root_dir, std::path::PathBuf::from("/tmp"));
+    }
+
+    #[test]
+    fn test_new_stores_with_prefix_flag() {
+        let l_true = make_local("/tmp", true);
+        assert!(l_true.with_prefix);
+        let l_false = make_local("/tmp", false);
+        assert!(!l_false.with_prefix);
+    }
+}

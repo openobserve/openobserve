@@ -66,3 +66,15 @@ mod meta {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(Migration.name(), "m20250125_172300_delete_metas_templates");
+    }
+}

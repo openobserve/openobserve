@@ -219,4 +219,17 @@ mod tests {
         let result = get_server_url_from_cert(cert.der().iter().as_slice());
         assert_eq!(result.unwrap(), "2001:db8:85a3::8a2e:370:7334");
     }
+
+    #[test]
+    fn test_get_server_url_from_cert_invalid_bytes_returns_error() {
+        let garbage = b"not a valid certificate";
+        let result = get_server_url_from_cert(garbage);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_server_url_from_cert_empty_bytes_returns_error() {
+        let result = get_server_url_from_cert(&[]);
+        assert!(result.is_err());
+    }
 }

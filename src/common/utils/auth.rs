@@ -1882,4 +1882,34 @@ mod tests {
         let path: Vec<&str> = "v2/default/trigger".split('/').collect();
         assert_eq!(resolve_write_method("PATCH", &path), "PUT");
     }
+
+    #[test]
+    fn test_build_basic_auth_header_format() {
+        use base64::Engine as _;
+        let header = build_basic_auth_header("user@example.com", "mytoken");
+        assert!(header.starts_with("Basic "));
+        let encoded = header.strip_prefix("Basic ").unwrap();
+        let decoded = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, "user@example.com:mytoken");
+    }
+
+    #[test]
+    fn test_build_basic_auth_header_empty_fields() {
+        use base64::Engine as _;
+        let header = build_basic_auth_header("", "");
+        assert!(header.starts_with("Basic "));
+        let encoded = header.strip_prefix("Basic ").unwrap();
+        let decoded = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, ":");
+    }
 }

@@ -61,3 +61,15 @@ pub(super) enum Organizations {
     Table,
     TrialEndsAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(Migration.name(), "m20250520_000001_add_trial_end_col");
+    }
+}

@@ -115,6 +115,66 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_quantile_value_none_input() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = quantile(0.5, Value::None, &eval_ctx).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_quantile_invalid_input_returns_err() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = quantile(0.5, Value::Float(1.0), &eval_ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_quantile_out_of_range_positive_returns_infinity() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = quantile(1.5, Value::None, &eval_ctx).unwrap();
+        match result {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert!(m[0].samples[0].value.is_infinite());
+                assert!(m[0].samples[0].value > 0.0);
+            }
+            _ => panic!("Expected Matrix"),
+        }
+    }
+
+    #[test]
+    fn test_quantile_out_of_range_negative_returns_neg_infinity() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = quantile(-0.1, Value::None, &eval_ctx).unwrap();
+        match result {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert!(m[0].samples[0].value.is_infinite());
+                assert!(m[0].samples[0].value < 0.0);
+            }
+            _ => panic!("Expected Matrix"),
+        }
+    }
+
+    #[test]
+    fn test_quantile_nan_returns_nan_samples() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = quantile(f64::NAN, Value::None, &eval_ctx).unwrap();
+        match result {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert!(m[0].samples[0].value.is_nan());
+            }
+            _ => panic!("Expected Matrix"),
+        }
+    }
+
+    #[test]
     fn test_quantile_calculation() {
         // Test the core quantile calculation logic
         let values = vec![10.0, 20.0, 30.0];

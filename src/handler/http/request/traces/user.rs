@@ -277,26 +277,7 @@ pub async fn get_latest_users(
     }
 
     // Parse user_id -> trace_ids from Phase 1 results
-    let mut user_trace_ids: HashMap<String, Vec<String>> =
-        HashMap::with_capacity(resp_search.hits.len());
-    let mut llm_user_ids: Vec<String> = Vec::with_capacity(resp_search.hits.len());
-    for item in resp_search.hits {
-        let llm_user_id = match item.get(user_id_col).and_then(|v| v.as_str()) {
-            Some(s) => s.to_string(),
-            None => continue,
-        };
-        let trace_ids: Vec<String> = item
-            .get("trace_ids")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        llm_user_ids.push(llm_user_id.clone());
-        user_trace_ids.insert(llm_user_id, trace_ids);
-    }
+    let (llm_user_ids, user_trace_ids) = parse_user_trace_ids(&resp_search.hits, user_id_col);
 
     // Collect all unique trace_ids across users
     let all_trace_ids: Vec<String> = user_trace_ids
@@ -385,38 +366,7 @@ pub async fn get_latest_users(
     }
 
     // Aggregate per user from trace details
-    let mut users_data: Vec<UserResponseItem> = Vec::with_capacity(llm_user_ids.len());
-    for llm_user_id in &llm_user_ids {
-        let trace_ids = match user_trace_ids.get(llm_user_id) {
-            Some(ids) => ids,
-            None => continue,
-        };
-        let mut first_event: i64 = 0;
-        let mut last_event: i64 = 0;
-        let mut usage_total: i64 = 0;
-        let mut cost_total: f64 = 0.0;
-        for tid in trace_ids {
-            if let Some(detail) = trace_details.get(tid) {
-                if first_event == 0 || detail.start_time < first_event {
-                    first_event = detail.start_time;
-                }
-                if detail.end_time > last_event {
-                    last_event = detail.end_time;
-                }
-                usage_total += detail.llm_usage_total;
-                cost_total += detail.llm_cost_total;
-            }
-        }
-        users_data.push(UserResponseItem {
-            user_id: llm_user_id.clone(),
-            first_event,
-            last_event,
-            total_events: trace_ids.len() as u32,
-            llm_usage_tokens_total: usage_total,
-            llm_usage_cost_total: cost_total,
-        });
-    }
-    users_data.sort_by(|a, b| b.last_event.cmp(&a.last_event));
+    let users_data = aggregate_users(&llm_user_ids, &user_trace_ids, &trace_details);
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -468,4 +418,232 @@ struct UserResponseItem {
     total_events: u32,
     llm_usage_tokens_total: i64,
     llm_usage_cost_total: f64,
+}
+
+fn parse_user_trace_ids(
+    hits: &[json::Value],
+    user_id_col: &str,
+) -> (Vec<String>, HashMap<String, Vec<String>>) {
+    let mut user_trace_ids: HashMap<String, Vec<String>> = HashMap::with_capacity(hits.len());
+    let mut llm_user_ids: Vec<String> = Vec::with_capacity(hits.len());
+    for item in hits {
+        let llm_user_id = match item.get(user_id_col).and_then(|v| v.as_str()) {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+        let trace_ids: Vec<String> = item
+            .get("trace_ids")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        llm_user_ids.push(llm_user_id.clone());
+        user_trace_ids.insert(llm_user_id, trace_ids);
+    }
+    (llm_user_ids, user_trace_ids)
+}
+
+fn aggregate_users(
+    llm_user_ids: &[String],
+    user_trace_ids: &HashMap<String, Vec<String>>,
+    trace_details: &HashMap<String, TraceDetail>,
+) -> Vec<UserResponseItem> {
+    let mut users_data: Vec<UserResponseItem> = Vec::with_capacity(llm_user_ids.len());
+    for llm_user_id in llm_user_ids {
+        let trace_ids = match user_trace_ids.get(llm_user_id) {
+            Some(ids) => ids,
+            None => continue,
+        };
+        let mut first_event: i64 = 0;
+        let mut last_event: i64 = 0;
+        let mut usage_total: i64 = 0;
+        let mut cost_total: f64 = 0.0;
+        for tid in trace_ids {
+            if let Some(detail) = trace_details.get(tid) {
+                if first_event == 0 || detail.start_time < first_event {
+                    first_event = detail.start_time;
+                }
+                if detail.end_time > last_event {
+                    last_event = detail.end_time;
+                }
+                usage_total += detail.llm_usage_total;
+                cost_total += detail.llm_cost_total;
+            }
+        }
+        users_data.push(UserResponseItem {
+            user_id: llm_user_id.clone(),
+            first_event,
+            last_event,
+            total_events: trace_ids.len() as u32,
+            llm_usage_tokens_total: usage_total,
+            llm_usage_cost_total: cost_total,
+        });
+    }
+    users_data.sort_by(|a, b| b.last_event.cmp(&a.last_event));
+    users_data
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_user_trace_ids_empty() {
+        let (ids, map) = parse_user_trace_ids(&[], "user_id");
+        assert!(ids.is_empty());
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn test_parse_user_trace_ids_basic() {
+        let hits = vec![
+            json!({"user_id": "user-1", "trace_ids": ["t1", "t2"]}),
+            json!({"user_id": "user-2", "trace_ids": ["t3"]}),
+        ];
+        let (ids, map) = parse_user_trace_ids(&hits, "user_id");
+        assert_eq!(ids, vec!["user-1", "user-2"]);
+        assert_eq!(
+            map.get("user-1").unwrap(),
+            &vec!["t1".to_string(), "t2".to_string()]
+        );
+        assert_eq!(map.get("user-2").unwrap(), &vec!["t3".to_string()]);
+    }
+
+    #[test]
+    fn test_parse_user_trace_ids_skips_missing_col() {
+        let hits = vec![
+            json!({"other": "value"}),
+            json!({"user_id": "user-1", "trace_ids": ["t1"]}),
+        ];
+        let (ids, map) = parse_user_trace_ids(&hits, "user_id");
+        assert_eq!(ids.len(), 1);
+        assert!(map.contains_key("user-1"));
+    }
+
+    #[test]
+    fn test_parse_user_trace_ids_no_trace_ids_array() {
+        let hits = vec![json!({"user_id": "user-1"})];
+        let (ids, map) = parse_user_trace_ids(&hits, "user_id");
+        assert_eq!(ids, vec!["user-1"]);
+        assert!(map.get("user-1").unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_users_empty() {
+        let result = aggregate_users(&[], &HashMap::new(), &HashMap::new());
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_users_single_user_two_traces() {
+        let user_ids = vec!["user-1".to_string()];
+        let mut user_trace_ids = HashMap::new();
+        user_trace_ids.insert(
+            "user-1".to_string(),
+            vec!["t1".to_string(), "t2".to_string()],
+        );
+        let mut trace_details = HashMap::new();
+        trace_details.insert(
+            "t1".to_string(),
+            TraceDetail {
+                start_time: 1000,
+                end_time: 2000,
+                llm_usage_total: 150,
+                llm_cost_total: 0.01,
+            },
+        );
+        trace_details.insert(
+            "t2".to_string(),
+            TraceDetail {
+                start_time: 500,
+                end_time: 3000,
+                llm_usage_total: 300,
+                llm_cost_total: 0.02,
+            },
+        );
+
+        let result = aggregate_users(&user_ids, &user_trace_ids, &trace_details);
+        assert_eq!(result.len(), 1);
+        let u = &result[0];
+        assert_eq!(u.user_id, "user-1");
+        assert_eq!(u.first_event, 500);
+        assert_eq!(u.last_event, 3000);
+        assert_eq!(u.total_events, 2);
+        assert_eq!(u.llm_usage_tokens_total, 450);
+        assert!((u.llm_usage_cost_total - 0.03).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_aggregate_users_sorted_descending_by_last_event() {
+        let user_ids = vec!["user-1".to_string(), "user-2".to_string()];
+        let mut user_trace_ids = HashMap::new();
+        user_trace_ids.insert("user-1".to_string(), vec!["t1".to_string()]);
+        user_trace_ids.insert("user-2".to_string(), vec!["t2".to_string()]);
+        let mut trace_details = HashMap::new();
+        trace_details.insert(
+            "t1".to_string(),
+            TraceDetail {
+                start_time: 100,
+                end_time: 200,
+                llm_usage_total: 0,
+                llm_cost_total: 0.0,
+            },
+        );
+        trace_details.insert(
+            "t2".to_string(),
+            TraceDetail {
+                start_time: 500,
+                end_time: 9000,
+                llm_usage_total: 0,
+                llm_cost_total: 0.0,
+            },
+        );
+
+        let result = aggregate_users(&user_ids, &user_trace_ids, &trace_details);
+        assert_eq!(result.len(), 2);
+        assert!(result[0].last_event >= result[1].last_event);
+    }
+
+    #[test]
+    fn test_aggregate_users_missing_trace_detail() {
+        let user_ids = vec!["user-1".to_string()];
+        let mut user_trace_ids = HashMap::new();
+        user_trace_ids.insert("user-1".to_string(), vec!["missing".to_string()]);
+
+        let result = aggregate_users(&user_ids, &user_trace_ids, &HashMap::new());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].first_event, 0);
+        assert_eq!(result[0].total_events, 1);
+    }
+
+    #[test]
+    fn test_aggregate_users_first_event_is_earliest_start() {
+        let user_ids = vec!["user-1".to_string()];
+        let mut user_trace_ids = HashMap::new();
+        user_trace_ids.insert(
+            "user-1".to_string(),
+            vec!["t1".to_string(), "t2".to_string(), "t3".to_string()],
+        );
+        let mut trace_details = HashMap::new();
+        for (id, start) in [("t1", 300i64), ("t2", 100i64), ("t3", 200i64)] {
+            trace_details.insert(
+                id.to_string(),
+                TraceDetail {
+                    start_time: start,
+                    end_time: start + 50,
+                    llm_usage_total: 0,
+                    llm_cost_total: 0.0,
+                },
+            );
+        }
+
+        let result = aggregate_users(&user_ids, &user_trace_ids, &trace_details);
+        assert_eq!(result[0].first_event, 100);
+        assert_eq!(result[0].last_event, 350);
+    }
 }

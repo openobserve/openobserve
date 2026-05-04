@@ -465,3 +465,55 @@ impl Scheduler {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_config() -> SchedulerConfig {
+        SchedulerConfig {
+            alert_schedule_concurrency: 3,
+            alert_schedule_timeout: 60,
+            report_schedule_timeout: 120,
+            poll_interval_secs: 10,
+            keep_alive_interval_secs: 30,
+        }
+    }
+
+    #[test]
+    fn test_scheduler_new_creates_correct_worker_count() {
+        let cfg = make_config();
+        let scheduler = Scheduler::new(cfg.clone());
+        assert_eq!(
+            scheduler.workers.len(),
+            cfg.alert_schedule_concurrency as usize
+        );
+    }
+
+    #[test]
+    fn test_scheduler_new_single_worker() {
+        let cfg = SchedulerConfig {
+            alert_schedule_concurrency: 1,
+            ..make_config()
+        };
+        let scheduler = Scheduler::new(cfg);
+        assert_eq!(scheduler.workers.len(), 1);
+    }
+
+    #[test]
+    fn test_scheduler_worker_new_stores_id() {
+        let (tx, rx) = mpsc::channel(1);
+        let rx = Arc::new(Mutex::new(rx));
+        drop(tx);
+        let worker = SchedulerWorker::new(7, make_config(), rx);
+        assert_eq!(worker.id, 7);
+    }
+
+    #[test]
+    fn test_scheduler_job_puller_new() {
+        let (tx, _rx) = mpsc::channel(1);
+        let puller = SchedulerJobPuller::new(tx, make_config());
+        assert_eq!(puller.config.poll_interval_secs, 10);
+        assert_eq!(puller.config.alert_schedule_concurrency, 3);
+    }
+}

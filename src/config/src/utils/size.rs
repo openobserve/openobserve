@@ -85,4 +85,15 @@ mod tests {
         assert_eq!(bytes_to_human_readable(1024.0 * 1.234), "1.23 KB");
         assert_eq!(bytes_to_human_readable(1024.0 * 1024.0 * 1.234), "1.23 MB");
     }
+
+    #[test]
+    fn test_bytes_to_human_readable_exabytes() {
+        let eb = 1024.0f64.powi(6);
+        assert_eq!(bytes_to_human_readable(eb), "1.00 EB");
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_sub_byte() {
+        assert_eq!(bytes_to_human_readable(0.5), "0.50 B");
+    }
 }

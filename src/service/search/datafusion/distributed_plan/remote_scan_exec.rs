@@ -435,3 +435,118 @@ pub fn is_parquet_file_not_found(e: &tonic::Status) -> bool {
             .unwrap_or(false)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::physical_plan::empty::EmptyExec;
+
+    use super::*;
+    use crate::service::search::datafusion::distributed_plan::node::RemoteScanNode;
+
+    #[derive(Debug)]
+    struct TestNode;
+
+    impl config::meta::cluster::NodeInfo for TestNode {
+        fn get_grpc_addr(&self) -> String {
+            "localhost:9090".to_string()
+        }
+        fn get_auth_token(&self) -> String {
+            "token".to_string()
+        }
+        fn get_name(&self) -> String {
+            "test-node".to_string()
+        }
+        fn is_local(&self) -> bool {
+            true
+        }
+    }
+
+    fn make_remote_exec() -> RemoteScanExec {
+        let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
+        let node = RemoteScanNode {
+            nodes: vec![Arc::new(TestNode)],
+            opentelemetry_context: opentelemetry::Context::current(),
+            query_identifier: Default::default(),
+            search_infos: Default::default(),
+            index_info: Default::default(),
+            super_cluster_info: Default::default(),
+        };
+        RemoteScanExec::new(input, node).unwrap()
+    }
+
+    #[test]
+    fn test_remote_scan_exec_name() {
+        let exec = make_remote_exec();
+        assert_eq!(ExecutionPlan::name(&exec), "RemoteScanExec");
+    }
+
+    #[test]
+    fn test_remote_scan_exec_children_len() {
+        let exec = make_remote_exec();
+        assert_eq!(exec.children().len(), 1);
+    }
+
+    #[test]
+    fn test_remote_scan_exec_as_any() {
+        let exec = make_remote_exec();
+        assert!(exec.as_any().downcast_ref::<RemoteScanExec>().is_some());
+    }
+
+    #[test]
+    fn test_remote_scan_exec_metrics_some() {
+        let exec = make_remote_exec();
+        assert!(exec.metrics().is_some());
+    }
+
+    #[test]
+    fn test_remote_scan_exec_partial_err_empty() {
+        let exec = make_remote_exec();
+        assert!(exec.partial_err().lock().is_empty());
+    }
+
+    #[test]
+    fn test_remote_scan_exec_set_analyze() {
+        let exec = make_remote_exec();
+        assert!(!exec.analyze());
+        let exec = exec.set_analyze();
+        assert!(exec.analyze());
+    }
+
+    #[test]
+    fn test_remote_scan_exec_with_partial_err() {
+        let exec = make_remote_exec();
+        let new_err = Arc::new(parking_lot::Mutex::new("pre-set".to_string()));
+        let exec = exec.with_partial_err(new_err.clone());
+        assert_eq!(*exec.partial_err().lock(), "pre-set");
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_true() {
+        let msg = r#"prefix text {"code":20006,"inner":""}"#;
+        let status = tonic::Status::new(tonic::Code::Internal, msg);
+        assert!(is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_wrong_code() {
+        let msg = r#"{"code":20001,"inner":"bad sql"}"#;
+        let status = tonic::Status::new(tonic::Code::Internal, msg);
+        assert!(!is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_non_internal_status() {
+        let status = tonic::Status::new(tonic::Code::NotFound, "not found");
+        assert!(!is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_no_json() {
+        let status = tonic::Status::new(tonic::Code::Internal, "no json here");
+        assert!(!is_parquet_file_not_found(&status));
+    }
+}

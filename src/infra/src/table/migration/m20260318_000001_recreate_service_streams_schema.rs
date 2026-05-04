@@ -249,3 +249,26 @@ enum ServiceStreams {
     LastSeen,
     Metadata,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_streams_name_idx_constant() {
+        assert_eq!(SERVICE_STREAMS_NAME_IDX, "service_streams_name_idx");
+    }
+
+    #[test]
+    fn test_service_streams_unique_idx_constant() {
+        assert_eq!(SERVICE_STREAMS_UNIQUE_IDX, "service_streams_unique_idx");
+    }
+
+    #[test]
+    fn test_service_streams_disambig_gin_idx_constant() {
+        assert_eq!(
+            SERVICE_STREAMS_DISAMBIG_GIN_IDX,
+            "service_streams_disambig_idx"
+        );
+    }
+}

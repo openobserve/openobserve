@@ -408,4 +408,266 @@ mod tests {
             Some(false)
         );
     }
+
+    #[test]
+    fn test_send_strategy_from_str() {
+        use std::str::FromStr;
+        assert_eq!(
+            SendStrategy::from_str("first_with_count").unwrap(),
+            SendStrategy::FirstWithCount
+        );
+        assert_eq!(
+            SendStrategy::from_str("summary").unwrap(),
+            SendStrategy::Summary
+        );
+        assert_eq!(SendStrategy::from_str("all").unwrap(), SendStrategy::All);
+        // unknown → default (FirstWithCount)
+        assert_eq!(
+            SendStrategy::from_str("UNKNOWN").unwrap(),
+            SendStrategy::default()
+        );
+        assert_eq!(SendStrategy::from_str("").unwrap(), SendStrategy::default());
+    }
+
+    #[test]
+    fn test_global_dedup_config_validate_disabled_ok() {
+        let config = GlobalDeduplicationConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_global_dedup_config_validate_cross_alert_no_groups_err() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: true,
+            alert_fingerprint_groups: vec![],
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .contains("cross_alert_fingerprint_groups")
+        );
+    }
+
+    #[test]
+    fn test_global_dedup_config_validate_cross_alert_with_groups_ok() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: true,
+            alert_fingerprint_groups: vec!["field1".to_string()],
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_global_dedup_config_default_with_presets() {
+        let config = GlobalDeduplicationConfig::default_with_presets();
+        assert!(!config.enabled);
+        assert!(!config.alert_dedup_enabled);
+        assert!(config.alert_fingerprint_groups.is_empty());
+        assert!(config.time_window_minutes.is_none());
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_disabled_ok() {
+        let config = DeduplicationConfig {
+            enabled: false,
+            fingerprint_fields: vec!["field1".to_string(); 15], // > 10 but disabled
+            ..Default::default()
+        };
+        // disabled → skip all validation
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_zero_size_err() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 0,
+                send_strategy: SendStrategy::All,
+                group_wait_seconds: 10,
+            }),
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Max group size"));
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_negative_wait_err() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 5,
+                send_strategy: SendStrategy::Summary,
+                group_wait_seconds: -1,
+            }),
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Group wait seconds"));
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_disabled_skip() {
+        // grouping present but enabled=false → skip grouping validation
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: false,
+                max_group_size: 0, // would fail if checked
+                send_strategy: SendStrategy::All,
+                group_wait_seconds: -1, // would fail if checked
+            }),
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_deduplication_config_mem_size() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec!["host".to_string(), "service".to_string()],
+            time_window_minutes: Some(5),
+            grouping: None,
+        };
+        let size = config.mem_size();
+        assert!(size >= std::mem::size_of::<DeduplicationConfig>());
+    }
+
+    #[test]
+    fn test_grouping_config_mem_size() {
+        let config = GroupingConfig::default();
+        let size = config.mem_size();
+        assert_eq!(size, std::mem::size_of::<GroupingConfig>());
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_string_number() {
+        // time_window_minutes as a JSON string containing a number
+        let json = r#"{"enabled":false,"time_window_minutes":"15"}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, Some(15));
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_empty_string_returns_none() {
+        // Empty string → None
+        let json = r#"{"enabled":false,"time_window_minutes":""}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, None);
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_null_returns_none() {
+        // null → None
+        let json = r#"{"enabled":false,"time_window_minutes":null}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, None);
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_invalid_string_returns_error() {
+        // Invalid string → error
+        let json = r#"{"enabled":false,"time_window_minutes":"not_a_number"}"#;
+        let result: Result<GlobalDeduplicationConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_boolean_returns_error() {
+        // Boolean type → error (hits the `_ => Err` branch)
+        let json = r#"{"enabled":false,"time_window_minutes":true}"#;
+        let result: Result<GlobalDeduplicationConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deduplication_config_empty_fields_absent_from_json() {
+        let config = DeduplicationConfig::default();
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        // Vec::is_empty → absent
+        assert!(!obj.contains_key("fingerprint_fields"));
+        // Option::is_none → absent
+        assert!(!obj.contains_key("time_window_minutes"));
+        assert!(!obj.contains_key("grouping"));
+    }
+
+    #[test]
+    fn test_deduplication_config_set_fields_present_in_json() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec!["host".to_string()],
+            time_window_minutes: Some(30),
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 10,
+                send_strategy: SendStrategy::Summary,
+                group_wait_seconds: 30,
+            }),
+        };
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("fingerprint_fields"));
+        assert!(obj.contains_key("time_window_minutes"));
+        assert!(obj.contains_key("grouping"));
+    }
+
+    #[test]
+    fn test_global_dedup_config_empty_fields_absent_from_json() {
+        let config = GlobalDeduplicationConfig::default();
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        // Vec::is_empty → absent
+        assert!(!obj.contains_key("alert_fingerprint_groups"));
+        // Option::is_none → absent
+        assert!(!obj.contains_key("time_window_minutes"));
+    }
+
+    #[test]
+    fn test_global_dedup_config_set_fields_present_in_json() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: false,
+            alert_fingerprint_groups: vec!["host".to_string()],
+            time_window_minutes: Some(60),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("alert_fingerprint_groups"));
+        assert!(obj.contains_key("time_window_minutes"));
+    }
+
+    #[test]
+    fn test_default_upgrade_window() {
+        assert_eq!(default_upgrade_window(), 30);
+    }
+
+    #[test]
+    fn test_default_max_group_size() {
+        assert_eq!(default_max_group_size(), 100);
+    }
+
+    #[test]
+    fn test_default_group_wait() {
+        assert_eq!(default_group_wait(), 30);
+    }
 }

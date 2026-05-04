@@ -116,3 +116,39 @@ pub fn parse_alert_key(key: &str) -> Option<(String, String)> {
     let alert_id = parts[2].to_owned();
     Some((org, alert_id))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_alert_key_format() {
+        let key = alert_key("myorg", "alert-id-123");
+        assert_eq!(key, "/alerts/myorg/alert-id-123");
+    }
+
+    #[test]
+    fn test_parse_alert_key_valid() {
+        let (org, id) = parse_alert_key("/alerts/myorg/alert-id-123").unwrap();
+        assert_eq!(org, "myorg");
+        assert_eq!(id, "alert-id-123");
+    }
+
+    #[test]
+    fn test_parse_alert_key_roundtrip() {
+        let key = alert_key("testorg", "abc-789");
+        let (org, id) = parse_alert_key(&key).unwrap();
+        assert_eq!(org, "testorg");
+        assert_eq!(id, "abc-789");
+    }
+
+    #[test]
+    fn test_parse_alert_key_too_short_returns_none() {
+        assert!(parse_alert_key("/alerts/onlyorg").is_none());
+    }
+
+    #[test]
+    fn test_parse_alert_key_wrong_prefix_returns_none() {
+        assert!(parse_alert_key("/notAlerts/org/id").is_none());
+    }
+}

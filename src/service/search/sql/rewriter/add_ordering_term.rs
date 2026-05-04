@@ -92,4 +92,70 @@ mod tests {
         let expected = "SELECT * FROM users ORDER BY name ASC";
         assert_eq!(statement.to_string(), expected);
     }
+
+    #[test]
+    fn test_add_ordering_term_visitor_desc() {
+        let sql = "SELECT * FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut ordering_visitor = AddOrderingTermVisitor::new("_timestamp".to_string(), false);
+        let _ = statement.visit(&mut ordering_visitor);
+
+        assert_eq!(
+            statement.to_string(),
+            "SELECT * FROM users ORDER BY _timestamp DESC"
+        );
+    }
+
+    #[test]
+    fn test_add_ordering_term_visitor_order_by_already_present() {
+        let sql = "SELECT * FROM users ORDER BY age ASC";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut ordering_visitor = AddOrderingTermVisitor::new("_timestamp".to_string(), false);
+        let _ = statement.visit(&mut ordering_visitor);
+
+        // ORDER BY already present → visitor does not add another one
+        assert_eq!(
+            statement.to_string(),
+            "SELECT * FROM users ORDER BY age ASC"
+        );
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_simple_asc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert!(result.contains("_timestamp"));
+        assert!(result.to_uppercase().contains("ASC"));
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_simple_desc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, false).unwrap();
+        assert!(result.contains("_timestamp"));
+        assert!(result.to_uppercase().contains("DESC"));
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_complex_query_unchanged() {
+        // GROUP BY makes it complex — should return unchanged
+        let sql = "SELECT status, COUNT(*) FROM logs GROUP BY status";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        // Complex query → returned unchanged
+        assert_eq!(result, sql);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_invalid_sql() {
+        let result = check_or_add_order_by_timestamp("NOT VALID SQL !!!", true);
+        assert!(result.is_err());
+    }
 }

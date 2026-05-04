@@ -27,3 +27,32 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "ksuid-001".to_string(),
+            org: "myorg".to_string(),
+            name: "enrichment1".to_string(),
+            url: "https://example.com/data.csv".to_string(),
+            status: 1,
+            error_message: None,
+            created_at: 1000,
+            updated_at: 2000,
+            total_bytes_fetched: 512,
+            total_records_processed: 10,
+            retry_count: 0,
+            append_data: false,
+            last_byte_position: 512,
+            supports_range: true,
+            is_local_region: false,
+        };
+        assert_eq!(m.id, "ksuid-001");
+        assert_eq!(m.total_records_processed, 10);
+        assert!(m.error_message.is_none());
+    }
+}

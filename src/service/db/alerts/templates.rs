@@ -222,3 +222,44 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("{} Templates Cached", ALERTS_TEMPLATES.len());
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_template_error_display_empty_name() {
+        let e = TemplateError::EmptyName;
+        assert_eq!(e.to_string(), "Template name cannot be empty");
+    }
+
+    #[test]
+    fn test_template_error_display_empty_body() {
+        let e = TemplateError::EmptyBody;
+        assert_eq!(e.to_string(), "Template body cannot be empty");
+    }
+
+    #[test]
+    fn test_template_error_display_not_found() {
+        let e = TemplateError::NotFound;
+        assert_eq!(e.to_string(), "Template not found");
+    }
+
+    #[test]
+    fn test_template_error_display_already_exists() {
+        let e = TemplateError::AlreadyExists;
+        assert_eq!(e.to_string(), "Template with the same name already exists");
+    }
+
+    #[test]
+    fn test_template_error_display_delete_with_destination() {
+        let e = TemplateError::DeleteWithDestination("my-dest".to_string());
+        assert!(e.to_string().contains("my-dest"));
+    }
+
+    #[test]
+    fn test_template_error_display_delete_with_alert() {
+        let e = TemplateError::DeleteWithAlert("my-alert".to_string());
+        assert!(e.to_string().contains("my-alert"));
+    }
+}

@@ -1128,3 +1128,40 @@ async fn queue_services_from_parquet(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+
+    use super::*;
+
+    #[test]
+    fn test_split_perfix_logs() {
+        let prefix = "files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/";
+        let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
+        assert_eq!(org_id, "default");
+        assert_eq!(stream_type, StreamType::Logs);
+        assert_eq!(stream_name, "olympics");
+        assert_eq!(prefix_date, "2023-08-21");
+    }
+
+    #[test]
+    fn test_split_perfix_traces() {
+        let prefix = "files/myorg/traces/default/2023/09/04/05/default/";
+        let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
+        assert_eq!(org_id, "myorg");
+        assert_eq!(stream_type, StreamType::Traces);
+        assert_eq!(stream_name, "default");
+        assert_eq!(prefix_date, "2023-09-04");
+    }
+
+    #[test]
+    fn test_split_perfix_metrics() {
+        let prefix = "files/acme/metrics/cpu_usage/2024/01/15/12/some-id/";
+        let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
+        assert_eq!(org_id, "acme");
+        assert_eq!(stream_type, StreamType::Metrics);
+        assert_eq!(stream_name, "cpu_usage");
+        assert_eq!(prefix_date, "2024-01-15");
+    }
+}

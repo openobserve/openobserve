@@ -23,3 +23,24 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            origin: "alert".to_string(),
+            origin_id: "alert-1".to_string(),
+            org_name: "myorg".to_string(),
+            stream_name: "default".to_string(),
+            stream_type: "logs".to_string(),
+            field_name: "status".to_string(),
+        };
+        assert_eq!(m.origin, "alert");
+        assert_eq!(m.origin_id, "alert-1");
+        assert_eq!(m.stream_type, "logs");
+        assert_eq!(m.field_name, "status");
+    }
+}

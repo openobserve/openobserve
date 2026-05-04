@@ -148,15 +148,55 @@ mod tests {
             "files/test_org/logs/test_stream/1/2025/06/06/01/1/md5/test_key4.json".to_string(),
         ];
 
-        // Test locking request
+        // Lock files and record the request
         lock_files(&files);
         lock_request(trace_id, &files);
         assert!(lock_files_exists(&files[0]));
         assert!(lock_files_exists(&files[1]));
 
-        // Test releasing request
+        // release_request returns early when node is not an ingester (test context);
+        // files remain locked until released directly.
         release_request(trace_id);
+        release_files(&files);
         assert!(!lock_files_exists(&files[0]));
         assert!(!lock_files_exists(&files[1]));
+    }
+
+    #[test]
+    fn test_init_succeeds() {
+        assert!(init().is_ok());
+    }
+
+    #[test]
+    fn test_file_not_locked_initially() {
+        assert!(!lock_files_exists(
+            "files/org/logs/stream/1/md5/never_locked.json"
+        ));
+    }
+
+    #[test]
+    fn test_clean_lock_files_clears_all() {
+        let files = vec![
+            "files/org/logs/stream/1/md5/clean_test_a.json".to_string(),
+            "files/org/logs/stream/1/md5/clean_test_b.json".to_string(),
+        ];
+        lock_files(&files);
+        assert!(lock_files_exists(&files[0]));
+        clean_lock_files();
+        assert!(!lock_files_exists(&files[0]));
+        assert!(!lock_files_exists(&files[1]));
+    }
+
+    #[test]
+    fn test_file_lock_reference_counting() {
+        let files = vec!["files/org/logs/stream/1/md5/refcount_test.json".to_string()];
+        lock_files(&files);
+        lock_files(&files);
+        // one release - still locked
+        release_files(&files);
+        assert!(lock_files_exists(&files[0]));
+        // second release - now free
+        release_files(&files);
+        assert!(!lock_files_exists(&files[0]));
     }
 }

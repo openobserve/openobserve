@@ -16,3 +16,22 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            org_id: "org".to_string(),
+            feature: "ingest".to_string(),
+            usage_count: 100,
+            updated_at: 1000,
+            notified_checkpoint: 0,
+        };
+        assert_eq!(m.org_id, "org");
+        assert_eq!(m.usage_count, 100);
+        assert_eq!(m.notified_checkpoint, 0);
+    }
+}

@@ -327,6 +327,66 @@ impl<'a> IndexStatement<'a> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_parse_key_three_parts() {
+        let (module, k1, k2) = parse_key("/alerts/myorg/alert-id");
+        assert_eq!(module, "alerts");
+        assert_eq!(k1, "myorg");
+        assert_eq!(k2, "alert-id");
+    }
+
+    #[test]
+    fn test_parse_key_two_parts() {
+        let (module, k1, k2) = parse_key("/alerts/myorg");
+        assert_eq!(module, "alerts");
+        assert_eq!(k1, "myorg");
+        assert!(k2.is_empty());
+    }
+
+    #[test]
+    fn test_parse_key_one_part() {
+        let (module, k1, k2) = parse_key("/alerts");
+        assert_eq!(module, "alerts");
+        assert!(k1.is_empty());
+        assert!(k2.is_empty());
+    }
+
+    #[test]
+    fn test_parse_key_empty() {
+        let (module, k1, k2) = parse_key("");
+        assert!(module.is_empty());
+        assert!(k1.is_empty());
+        assert!(k2.is_empty());
+    }
+
+    #[test]
+    fn test_parse_key_deep_path_joins_remainder() {
+        let (module, k1, k2) = parse_key("/mod/org/type/name");
+        assert_eq!(module, "mod");
+        assert_eq!(k1, "org");
+        assert_eq!(k2, "type/name");
+    }
+
+    #[test]
+    fn test_build_key_all_parts() {
+        assert_eq!(build_key("mod", "k1", "k2", 0), "/mod/k1/k2");
+    }
+
+    #[test]
+    fn test_build_key_with_start_dt() {
+        assert_eq!(build_key("mod", "k1", "k2", 1000), "/mod/k1/k2/1000");
+    }
+
+    #[test]
+    fn test_build_key_no_key1() {
+        assert_eq!(build_key("mod", "", "k2", 0), "/mod/");
+    }
+
+    #[test]
+    fn test_build_key_no_key2() {
+        assert_eq!(build_key("mod", "k1", "", 0), "/mod/k1");
+    }
+
     #[tokio::test]
     async fn test_put() {
         create_table().await.unwrap();

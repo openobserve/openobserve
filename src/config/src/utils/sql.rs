@@ -1153,4 +1153,174 @@ mod tests {
         // Test invalid SQL
         assert!(!is_explain_query("INVALID SQL"));
     }
+
+    #[test]
+    fn test_is_aggregate_query() {
+        assert!(is_aggregate_query("SELECT count(*) FROM t").unwrap());
+        assert!(is_aggregate_query("SELECT max(val), min(val) FROM t").unwrap());
+        assert!(is_aggregate_query("SELECT x FROM t GROUP BY x").unwrap());
+        assert!(is_aggregate_query("SELECT DISTINCT x FROM t").unwrap());
+        assert!(!is_aggregate_query("SELECT x FROM t").unwrap());
+        assert!(!is_aggregate_query("SELECT x, y FROM t WHERE x > 1").unwrap());
+    }
+
+    #[test]
+    fn test_is_simple_aggregate_query() {
+        assert!(is_simple_aggregate_query("SELECT count(*) FROM t").unwrap());
+        assert!(is_simple_aggregate_query("SELECT sum(val) FROM t GROUP BY x").unwrap());
+        // subquery makes it not simple
+        assert!(!is_simple_aggregate_query("SELECT x FROM (SELECT x FROM t)").unwrap());
+        // no aggregation — still returns true per logic (no false condition hit)
+        // JOIN makes it not simple
+        assert!(
+            !is_simple_aggregate_query("SELECT count(*) FROM t JOIN t2 ON t.id = t2.id").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_is_simple_distinct_query() {
+        assert!(is_simple_distinct_query("SELECT DISTINCT x FROM t").unwrap());
+        assert!(!is_simple_distinct_query("SELECT x FROM t").unwrap());
+        assert!(!is_simple_distinct_query("SELECT DISTINCT x FROM t GROUP BY x").unwrap());
+    }
+
+    #[test]
+    fn test_is_eligible_for_histogram_basic() {
+        // Simple query — eligible
+        let (eligible, is_sub) = is_eligible_for_histogram("SELECT x FROM t", false).unwrap();
+        assert!(eligible);
+        assert!(!is_sub);
+
+        // DISTINCT — not eligible
+        let (eligible, _) = is_eligible_for_histogram("SELECT DISTINCT x FROM t", false).unwrap();
+        assert!(!eligible);
+
+        // LIMIT — not eligible
+        let (eligible, _) = is_eligible_for_histogram("SELECT x FROM t LIMIT 10", false).unwrap();
+        assert!(!eligible);
+
+        // Subquery — eligible as sub
+        let (eligible, is_sub) =
+            is_eligible_for_histogram("SELECT x FROM (SELECT x FROM t)", false).unwrap();
+        assert!(eligible);
+        assert!(is_sub);
+    }
+
+    #[test]
+    fn test_is_eligible_for_histogram_join_and_union_not_eligible() {
+        // JOIN — not eligible
+        let (eligible, _) =
+            is_eligible_for_histogram("SELECT x FROM t1 JOIN t2 ON t1.id = t2.id", false).unwrap();
+        assert!(!eligible);
+
+        // UNION — not eligible
+        let (eligible, _) =
+            is_eligible_for_histogram("SELECT x FROM t1 UNION SELECT x FROM t2", false).unwrap();
+        assert!(!eligible);
+    }
+
+    #[test]
+    fn test_is_eligible_for_histogram_multi_stream_union_all() {
+        // is_multi_stream_search = true → delegates to is_multi_search_eligible_for_histogram
+        // UNION ALL → eligible
+        let (eligible, is_sub) =
+            is_eligible_for_histogram("SELECT x FROM t1 UNION ALL SELECT x FROM t2", true).unwrap();
+        assert!(eligible);
+        assert!(!is_sub);
+
+        // UNION (not ALL) with multi-stream → not eligible
+        let (eligible, _) =
+            is_eligible_for_histogram("SELECT x FROM t1 UNION SELECT x FROM t2", true).unwrap();
+        assert!(!eligible);
+    }
+
+    #[test]
+    fn test_is_aggregate_query_having_join_union_subquery() {
+        // HAVING → aggregate
+        assert!(
+            is_aggregate_query("SELECT x, count(*) FROM t GROUP BY x HAVING count(*) > 1").unwrap()
+        );
+
+        // JOIN → aggregate
+        assert!(is_aggregate_query("SELECT a.x FROM a JOIN b ON a.id = b.id").unwrap());
+
+        // UNION → aggregate
+        assert!(is_aggregate_query("SELECT x FROM t1 UNION SELECT x FROM t2").unwrap());
+
+        // Subquery → aggregate
+        assert!(is_aggregate_query("SELECT x FROM t WHERE x IN (SELECT x FROM t2)").unwrap());
+    }
+
+    #[test]
+    fn test_is_simple_aggregate_query_window_and_cte_and_union_not_simple() {
+        // Window function → not simple
+        assert!(
+            !is_simple_aggregate_query("SELECT x, ROW_NUMBER() OVER (ORDER BY x) as rn FROM t")
+                .unwrap()
+        );
+
+        // CTE → not simple
+        assert!(
+            !is_simple_aggregate_query("WITH cte AS (SELECT x FROM t) SELECT count(*) FROM cte")
+                .unwrap()
+        );
+
+        // UNION → not simple
+        assert!(
+            !is_simple_aggregate_query("SELECT count(*) FROM t1 UNION SELECT count(*) FROM t2")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_is_aggregate_expression_via_binary_op_and_nested() {
+        // BinaryOp with aggregate on left side → is aggregate
+        assert!(is_aggregate_query("SELECT count(*) + 1 FROM t").unwrap());
+
+        // Nested aggregate: (count(*))
+        assert!(is_aggregate_query("SELECT (count(*)) FROM t").unwrap());
+    }
+
+    #[test]
+    fn test_is_aggregate_expression_via_cast_and_unary() {
+        // Cast of aggregate → is aggregate
+        assert!(is_aggregate_query("SELECT CAST(count(*) AS TEXT) FROM t").unwrap());
+    }
+
+    #[test]
+    fn test_is_aggregate_expression_case_with_aggregate() {
+        // CASE WHEN ... with aggregate in THEN clause → is aggregate
+        assert!(
+            is_aggregate_query("SELECT CASE WHEN 1=1 THEN count(*) ELSE 0 END FROM t").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_is_eligible_for_histogram_cte_not_eligible() {
+        // CTE → has_cte = true → returns (false, false)
+        let (eligible, _) =
+            is_eligible_for_histogram("WITH cte AS (SELECT x FROM t) SELECT x FROM cte", false)
+                .unwrap();
+        assert!(!eligible);
+    }
+
+    #[test]
+    fn test_is_aggregate_query_count_distinct_function() {
+        // COUNT(DISTINCT x) → DistinctVisitor::pre_visit_expr branch
+        assert!(is_aggregate_query("SELECT count(DISTINCT x) FROM t").unwrap());
+    }
+
+    #[test]
+    fn test_is_aggregate_expression_unary_op_with_aggregate() {
+        // Unary negation of aggregate → UnaryOp branch in is_aggregate_expression
+        assert!(is_aggregate_query("SELECT -count(*) FROM t").unwrap());
+    }
+
+    #[test]
+    fn test_is_aggregate_expression_case_else_result_aggregate() {
+        // Aggregate in ELSE clause → else_result branch in Case matching
+        assert!(
+            is_aggregate_query("SELECT CASE WHEN 1=0 THEN 0 ELSE count(*) END FROM t").unwrap()
+        );
+    }
 }

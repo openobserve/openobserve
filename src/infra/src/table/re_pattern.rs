@@ -66,6 +66,52 @@ impl PatternEntry {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pattern_entry_new_sets_all_fields() {
+        let entry = PatternEntry::new("myorg", "pat1", "a description", r"\d+", "alice");
+        assert_eq!(entry.org, "myorg");
+        assert_eq!(entry.name, "pat1");
+        assert_eq!(entry.description, "a description");
+        assert_eq!(entry.pattern, r"\d+");
+        assert_eq!(entry.created_by, "alice");
+        assert!(!entry.id.is_empty());
+    }
+
+    #[test]
+    fn test_pattern_entry_new_timestamps_equal_at_creation() {
+        let entry = PatternEntry::new("org", "name", "desc", "pat", "user");
+        assert_eq!(entry.created_at, entry.updated_at);
+        assert!(entry.created_at > 0);
+    }
+
+    #[test]
+    fn test_pattern_entry_from_model_maps_all_fields() {
+        let model = Model {
+            id: "id-1".to_string(),
+            org: "myorg".to_string(),
+            name: "email".to_string(),
+            description: "match emails".to_string(),
+            created_by: "admin".to_string(),
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+            pattern: r"\S+@\S+\.\S+".to_string(),
+        };
+        let entry = PatternEntry::from(model);
+        assert_eq!(entry.id, "id-1");
+        assert_eq!(entry.org, "myorg");
+        assert_eq!(entry.name, "email");
+        assert_eq!(entry.description, "match emails");
+        assert_eq!(entry.created_by, "admin");
+        assert_eq!(entry.created_at, 1_000_000);
+        assert_eq!(entry.updated_at, 2_000_000);
+        assert_eq!(entry.pattern, r"\S+@\S+\.\S+");
+    }
+}
+
 pub async fn add(entry: PatternEntry) -> Result<(), errors::Error> {
     let record = ActiveModel {
         id: Set(entry.id),

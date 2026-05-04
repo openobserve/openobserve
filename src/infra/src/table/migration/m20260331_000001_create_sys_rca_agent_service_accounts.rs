@@ -201,6 +201,41 @@ mod users {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_users_ksuid_from_hash_is_deterministic() {
+        let email = "test@example.com".to_string();
+        let k1 = super::users::ksuid_from_hash(email.clone());
+        let k2 = super::users::ksuid_from_hash(email);
+        assert_eq!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_users_ksuid_from_hash_different_inputs_produce_different_ksuids() {
+        let k1 = super::users::ksuid_from_hash("alice@example.com".to_string());
+        let k2 = super::users::ksuid_from_hash("bob@example.com".to_string());
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_org_users_ksuid_from_hash_is_deterministic() {
+        let org = "org-1".to_string();
+        let email = "admin@example.com".to_string();
+        let k1 = super::org_users::ksuid_from_hash(org.clone(), email.clone());
+        let k2 = super::org_users::ksuid_from_hash(org, email);
+        assert_eq!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_org_users_ksuid_same_email_different_org_yields_different_ksuid() {
+        let email = "shared@example.com".to_string();
+        let k1 = super::org_users::ksuid_from_hash("org-a".to_string(), email.clone());
+        let k2 = super::org_users::ksuid_from_hash("org-b".to_string(), email);
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
+}
+
 /// Representation of the org_users table at the time this migration executes.
 mod org_users {
     use sea_orm::entity::prelude::*;
