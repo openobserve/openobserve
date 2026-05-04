@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div
-                      style="width: calc(30%); position: relative"
+                      style="width: calc(30%); position: relative; bottom: 21px"
                       data-test="dashboard-folder-dropdown"
                       class="import-folder-dropdown-container"
                     >
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-file>
                     </div>
                     <div
-                      style="width: calc(30%); position: relative"
+                      style="width: calc(30%); position: relative; bottom: 21px"
                       class="import-folder-dropdown-container"
                     >
                       <select-folder-dropdown
@@ -1000,10 +1000,7 @@ export default defineComponent({
 }
 .import-folder-dropdown-container {
   :deep(.q-field) {
-    padding-top: 10px;
-  }
-  :deep(.flex) {
-    align-items: center !important;
+    padding-top: 32px;
   }
   :deep(.add-folder-btn) {
     margin-bottom: 0 !important;
