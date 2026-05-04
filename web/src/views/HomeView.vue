@@ -2015,7 +2015,7 @@ button:focus-visible {
 .home-tab-bar {
   display: flex;
   gap: 0;
-  border-bottom: 1px solid var(--o2-border-color);
+  border-bottom: 1px solid var(--color-tabs-bar-border);
   margin: 0 0.625rem 0 0.625rem;
   padding-top: 0.25rem;
 }
@@ -2023,16 +2023,21 @@ button:focus-visible {
 .home-tab-btn {
   background: none;
   border: none;
+  border-top-left-radius: 0.375rem;
+  border-top-right-radius: 0.375rem;
   border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 0.5rem 1rem;
+  border-radius: 0.375rem 0.375rem 0 0 !important;
+  padding: 0 0.75rem;
+  height: 40px;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--o2-text-muted);
+  color: var(--color-tabs-inactive-text);
   cursor: pointer;
+  white-space: nowrap;
   transition:
     color 0.15s,
     border-color 0.15s,
+    background-color 0.15s,
     opacity 0.15s;
   margin-bottom: -1px;
   display: inline-flex;
@@ -2041,7 +2046,8 @@ button:focus-visible {
   user-select: none;
 
   &:hover {
-    color: var(--o2-text-primary);
+    color: var(--color-tabs-hover-text);
+    background: var(--color-tabs-hover-bg);
 
     .home-tab-drag-handle {
       opacity: 0.6;
@@ -2065,8 +2071,9 @@ button:focus-visible {
 }
 
 .home-tab-active {
-  color: var(--o2-text-primary) !important;
-  border-bottom-color: var(--o2-primary-color) !important;
+  color: var(--color-tabs-active-text) !important;
+  border-bottom-color: var(--color-tabs-indicator) !important;
+  background: var(--color-tabs-active-bg) !important;
 }
 
 .home-tab-panel {
