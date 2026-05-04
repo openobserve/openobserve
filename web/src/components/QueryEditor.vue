@@ -625,16 +625,7 @@ defineExpose({
 
 /* AI Close Button */
 .ai-close-button {
-  color: #999 !important;
   transition: color 0.2s ease !important;
-}
-
-.ai-close-button:hover {
-  color: #333 !important;
-}
-
-.q-dark .ai-close-button:hover {
-  color: #fff !important;
 }
 
 /* AI Input Bar Styling */
