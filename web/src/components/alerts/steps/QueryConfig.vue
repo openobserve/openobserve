@@ -1328,6 +1328,12 @@ export default defineComponent({
     // Fires when stream type prop changes (e.g. async load on edit, or user switching stream type).
     watch(isEventBased, (eventBased, oldEventBased) => {
       if (eventBased) {
+        // PromQL is only available for metrics — switch to builder when
+        // moving to logs/traces so the user isn't stuck on an invalid tab.
+        if (localTab.value === "promql") {
+          updateTab("custom");
+        }
+
         // Switched to logs/traces — restore saved function or default to total_events.
         // When coming from metrics the aggregation defaults don't apply to log fields.
         if (props.isAggregationEnabled && props.inputData.aggregation?.function && oldEventBased !== false) {
