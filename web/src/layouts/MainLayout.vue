@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col-auto"
         :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
         :style="store.state.isAiChatExpanded
-          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: 44px;'
-          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;'"
+          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: calc(var(--navbar-height) + 8px);'
+          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: calc(var(--navbar-height) + 8px); padding-right: 0.625rem;'"
       >
         <O2AIChat
           :header-height="42.5"
