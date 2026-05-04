@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!viewOnly && !simplifiedPanelView"
         >
           <template #trigger>
-            <OButton variant="ghost" size="icon-xs">
+            <OButton variant="ghost" size="icon">
               <q-icon name="more_vert" size="16px" />
             </OButton>
           </template>
@@ -140,7 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-edit-panel"
             @select="onPanelModifyClick('EditPanel')"
           >
-            <template #icon-left><q-icon :name="outlinedEdit" size="16px" /></template>
+            <template #icon-left
+              ><q-icon :name="outlinedEdit" size="16px"
+            /></template>
             {{ t("panel.editPanel") }}
           </ODropdownItem>
           <ODropdownItem
@@ -148,7 +150,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
           >
-            <template #icon-left><q-icon :name="outlinedDashboardCustomize" size="16px" /></template>
+            <template #icon-left
+              ><q-icon :name="outlinedDashboardCustomize" size="16px"
+            /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
           <ODropdownItem
@@ -156,42 +160,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-duplicate-panel"
             @select="onPanelModifyClick('DuplicatePanel')"
           >
-            <template #icon-left><q-icon name="content_copy" size="16px" /></template>
+            <template #icon-left
+              ><q-icon name="content_copy" size="16px"
+            /></template>
             {{ t("panel.duplicate") }}
           </ODropdownItem>
           <ODropdownItem
             data-test="dashboard-delete-panel"
             @select="onPanelModifyClick('DeletePanel')"
           >
-            <template #icon-left><q-icon name="delete_outline" size="16px" /></template>
+            <template #icon-left
+              ><q-icon name="delete_outline" size="16px"
+            /></template>
             {{ t("panel.deletePanel") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            v-if="
+              !simplifiedPanelView && metaData && metaData.queries?.length > 0
+            "
             data-test="dashboard-query-inspector-panel"
             @select="showViewPanel = true"
           >
-            <template #icon-left><q-icon name="manage_search" size="16px" /></template>
+            <template #icon-left
+              ><q-icon name="manage_search" size="16px"
+            /></template>
             {{ t("panel.queryInspector") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            v-if="
+              !simplifiedPanelView && metaData && metaData.queries?.length > 0
+            "
             data-test="dashboard-panel-download-as-csv-btn"
-            @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+            @select="
+              PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)
+            "
           >
-            <template #icon-left><q-icon :name="outlinedFileDownload" size="16px" /></template>
+            <template #icon-left
+              ><q-icon :name="outlinedFileDownload" size="16px"
+            /></template>
             {{ t("panel.downloadAsCSV") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            v-if="
+              !simplifiedPanelView && metaData && metaData.queries?.length > 0
+            "
             data-test="dashboard-panel-download-as-json-btn"
-            @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+            @select="
+              PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)
+            "
           >
-            <template #icon-left><q-icon name="data_object" size="16px" /></template>
+            <template #icon-left
+              ><q-icon name="data_object" size="16px"
+            /></template>
             {{ t("panel.downloadAsJSON") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            v-if="
+              !simplifiedPanelView && metaData && metaData.queries?.length > 0
+            "
             :disabled="props.data.queryType != 'sql'"
             data-test="dashboard-move-to-logs-module"
             @select="onLogPanel"
@@ -212,15 +238,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-move-to-another-panel"
             @select="onPanelModifyClick('MovePanel')"
           >
-            <template #icon-left><q-icon :name="outlinedDriveFileMove" size="16px" /></template>
+            <template #icon-left
+              ><q-icon :name="outlinedDriveFileMove" size="16px"
+            /></template>
             {{ t("panel.moveToAnotherTab") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            v-if="
+              !simplifiedPanelView && metaData && metaData.queries?.length > 0
+            "
             data-test="dashboard-create-alert-from-panel"
             @select="onPanelModifyClick('CreateAlert')"
           >
-            <template #icon-left><q-icon :name="outlinedReportProblem" size="16px" /></template>
+            <template #icon-left
+              ><q-icon :name="outlinedReportProblem" size="16px"
+            /></template>
             {{ t("panel.createAlert") }}
           </ODropdownItem>
         </ODropdown>
