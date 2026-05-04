@@ -34,6 +34,15 @@ vi.mock("marked", () => ({
   },
 }));
 
+// Mock CodeQueryEditor (Monaco wrapper, not needed in unit tests)
+vi.mock("@/components/CodeQueryEditor.vue", () => ({
+  default: {
+    name: "CodeQueryEditor",
+    template:
+      '<div class="code-query-editor-mock" data-test="code-query-editor">CodeQueryEditor</div>',
+  },
+}));
+
 describe("LLMContentRenderer", () => {
   let wrapper: any;
 
