@@ -322,6 +322,17 @@ import { cloneDeep, debounce } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import {
+  applyFieldGrouping,
+  buildSemanticIndex,
+  CATEGORY,
+  type FieldObj,
+} from "@/utils/fieldCategories";
+import {
+  useServiceCorrelation,
+  type KeyFieldsConfig,
+  type FieldGroupingConfig,
+} from "@/composables/useServiceCorrelation";
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
@@ -391,6 +402,7 @@ const toggleErrorDetails = () => {
 };
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams();
+const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
@@ -1286,7 +1298,6 @@ async function extractFields() {
             name: rowName,
             ftsKey: ftsKeys.has(rowName),
             showValues: !idFields[rowName],
-            label: rowName,
             dataType: schemaTypeMap.get(rowName),
             isSchemaField: true,
           });
@@ -1294,8 +1305,6 @@ async function extractFields() {
       });
 
       schema.forEach((row: any) => {
-        // let keys = deepKeys(row);
-        // for (let i in row) {
         if (!importantFields[row.name] && !ignoreFields.includes(row.name)) {
           if (fields[row.name] == undefined) {
             fields[row.name] = {};
@@ -1309,6 +1318,35 @@ async function extractFields() {
           }
         }
       });
+
+      // Apply field grouping
+      try {
+        const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
+          loadSemanticGroups(),
+          loadKeyFields(),
+          loadFieldGrouping(),
+        ]);
+        const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
+          ? (fieldGrouping as FieldGroupingConfig)
+          : null;
+        const semanticIndex =
+          semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
+        const keySpec = (keyFieldsConfig as KeyFieldsConfig)["traces"] ?? {
+          fields: [],
+          groups: [],
+        };
+        const keyFieldSet = new Set(keySpec.fields.map((f: string) => f.toLowerCase()));
+        const keyGroupSet = new Set(keySpec.groups.map((g: string) => g.toLowerCase()));
+
+        searchObj.data.stream.selectedStreamFields = applyFieldGrouping(
+          searchObj.data.stream.selectedStreamFields as FieldObj[],
+          semanticIndex,
+          keyFieldSet,
+          keyGroupSet,
+        );
+      } catch (groupErr) {
+        console.warn("Field grouping failed for traces, using flat list", groupErr);
+      }
     }
   } catch (e) {
     searchObj.loading = false;
