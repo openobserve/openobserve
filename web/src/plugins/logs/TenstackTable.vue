@@ -193,7 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-xs"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
-              ><component :is="isFunctionErrorOpen ? ChevronDown : ChevronRight" :size="14" /></OButton
+                ><component
+                  :is="isFunctionErrorOpen ? ChevronDown : ChevronRight"
+                  :size="14" /></OButton
               ><b>
                 <q-icon name="warning" size="15px"></q-icon>
                 {{ t("search.functionErrorLabel") }}</b
@@ -336,7 +338,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
-                ><component :is="expandedRowIndices.has(virtualRow.index) ? ChevronDown : ChevronRight" :size="14" /></OButton>
+                  ><component
+                    :is="
+                      expandedRowIndices.has(virtualRow.index)
+                        ? ChevronDown
+                        : ChevronRight
+                    "
+                    :size="14"
+                /></OButton>
 
                 <template
                   v-if="activeCellActionId === `${cell.id}_${cell.column.id}`"
@@ -378,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     cell.column.columnDef.id ===
                     store.state.zoConfig.timestamp_column
                   "
-                  class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                  class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
                   @send-to-ai-chat="
                     sendToAiChat(JSON.stringify(cell.row.original), true)
                   "

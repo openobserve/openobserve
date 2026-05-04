@@ -15,37 +15,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit">
-    <div v-if="!showImportTemplate && !showTemplateEditor" >
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+  <q-page
+    class="q-pa-none"
+    style="height: calc(100vh - 88px); min-height: inherit"
+  >
+    <div v-if="!showImportTemplate && !showTemplateEditor">
+      <div
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
-        <div class="q-table__title tw:font-[600]" data-test="alert-templates-list-title">
-            {{ t("alert_templates.header") }}
-          </div>
-          <div class="tw:flex tw:justify-end">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input"
-              :placeholder="t('template.search')"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
+        <div
+          class="q-table__title tw:font-[600]"
+          data-test="alert-templates-list-title"
+        >
+          {{ t("alert_templates.header") }}
+        </div>
+        <div class="col-auto flex">
+          <q-input
+            v-model="filterQuery"
+            borderless
+            dense
+            class="q-ml-auto no-border o2-search-input"
+            :placeholder="t('template.search')"
+          >
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" name="search" />
+            </template>
+          </q-input>
           <OButton
             variant="outline"
-            size="sm"
+            size="sm-action"
+            class="q-ml-sm"
             @click="importTemplate"
             data-test="template-import"
-          >{{ t(`dashboard.import`) }}</OButton>
+            >{{ t(`dashboard.import`) }}</OButton
+          >
           <OButton
             data-test="template-list-add-btn"
             variant="primary"
-            size="sm"
+            size="sm-action"
+            class="q-ml-sm"
             @click="editTemplate(null)"
-          >{{ t(`alert_templates.add`) }}</OButton>
+            >{{ t(`alert_templates.add`) }}</OButton
+          >
         </div>
       </div>
       <q-table
@@ -60,15 +71,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows-per-page-options="[0]"
         :pagination="pagination"
         class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="hasVisibleRows
+        :style="
+          hasVisibleRows
             ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;'
-            : 'width: 100%'"
+            : 'width: 100%'
+        "
       >
         <template #no-data>
           <NoData />
         </template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <q-checkbox
+            v-model="scope.selected"
+            size="sm"
+            class="o2-table-checkbox"
+          />
         </template>
         <template v-slot:header="props">
           <q-tr :props="props">
@@ -77,7 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-checkbox
                 v-model="props.selected"
                 size="sm"
-                :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
                 class="o2-table-checkbox"
               />
             </q-th>
@@ -129,9 +150,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
-              {{ resultTotal }} {{ t('alert_templates.header') }}
+          <div
+            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+          >
+            <div
+              class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md"
+            >
+              {{ resultTotal }} {{ t("alert_templates.header") }}
             </div>
             <OButton
               v-if="selectedTemplates.length > 0"
@@ -184,7 +209,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts" setup>
-import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
+import {
+  ref,
+  onActivated,
+  onMounted,
+  watch,
+  defineAsyncComponent,
+  computed,
+} from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableProps } from "quasar";
@@ -195,7 +227,7 @@ import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -231,18 +263,18 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alert_templates.actions"),
     align: "center",
     sortable: false,
-    classes:'actions-column'
+    classes: "actions-column",
   },
 ]);
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
-  const perPageOptions: any = [
+const perPageOptions: any = [
   { label: "5", value: 5 },
   { label: "10", value: 10 },
   { label: "20", value: 20 },
   { label: "50", value: 50 },
-  { label: "100", value: 100 }
+  { label: "100", value: 100 },
 ];
 const resultTotal = ref<number>(0);
 const selectedPerPage = ref<number>(20);
@@ -330,7 +362,7 @@ const editTemplate = (template: any = null) => {
   if (!template) {
     track("Button Click", {
       button: "Add Template",
-      page: "Alert Templates"
+      page: "Alert Templates",
     });
   }
   resetEditingTemplate();
@@ -458,21 +490,28 @@ const visibleRows = computed(() => {
 });
 const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
-
 // Watch visibleRows to sync resultTotal with search filter
-watch(visibleRows, (newVisibleRows) => {
-  resultTotal.value = newVisibleRows.length;
-}, { immediate: true });
+watch(
+  visibleRows,
+  (newVisibleRows) => {
+    resultTotal.value = newVisibleRows.length;
+  },
+  { immediate: true },
+);
 
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;
 };
 
 const bulkDeleteTemplates = () => {
-  const templateNames = selectedTemplates.value.map((template: any) => template.name);
+  const templateNames = selectedTemplates.value.map(
+    (template: any) => template.name,
+  );
 
   templateService
-    .bulkDelete(store.state.selectedOrganization.identifier, { ids: templateNames })
+    .bulkDelete(store.state.selectedOrganization.identifier, {
+      ids: templateNames,
+    })
     .then((res) => {
       const { successful, unsuccessful } = res.data;
 
@@ -501,7 +540,10 @@ const bulkDeleteTemplates = () => {
       getTemplates();
     })
     .catch((err: any) => {
-      const errorMessage = err.response?.data?.message || err?.message || "Error while deleting templates. Please try again.";
+      const errorMessage =
+        err.response?.data?.message ||
+        err?.message ||
+        "Error while deleting templates. Please try again.";
       if (err.response?.status != 403 || err?.status != 403) {
         q.notify({
           type: "negative",
@@ -510,5 +552,6 @@ const bulkDeleteTemplates = () => {
         });
       }
     });
-};</script>
+};
+</script>
 <style lang=""></style>
