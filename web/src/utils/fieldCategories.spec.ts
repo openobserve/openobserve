@@ -20,6 +20,7 @@ import {
   discoverPrefixes,
   resolveFieldGroup,
   applyFieldGrouping,
+  applyCollapseFilter,
   CATEGORY,
 } from "@/utils/fieldCategories";
 
@@ -155,5 +156,63 @@ describe("applyFieldGrouping", () => {
 
   it("empty input returns empty array", () => {
     expect(applyFieldGrouping([], semanticIndex, keyFieldSet, keyGroupSet)).toEqual([]);
+  });
+});
+
+// ---- applyCollapseFilter tests ----------------------------------------------
+
+describe("applyCollapseFilter", () => {
+  function field(name: string, group: string): any {
+    return { name, group, label: false, dataType: "Utf8", ftsKey: false, isSchemaField: true, showValues: true, isInterestingField: false, streams: [] };
+  }
+  function labelRow(group: string): any {
+    return { name: group, group, label: true, dataType: "", ftsKey: false, isSchemaField: false, showValues: false, isInterestingField: false, streams: [] };
+  }
+
+  const rows = [
+    labelRow("http"),
+    field("http_method", "http"),
+    field("http_status", "http"),
+    labelRow("k8s"),
+    field("k8s_pod", "k8s"),
+  ];
+
+  it("returns all rows when filterTerm is non-empty (bypass collapse)", () => {
+    const expanded = { http: true, k8s: false };
+    const result = applyCollapseFilter(rows, expanded, "pod");
+    expect(result).toHaveLength(rows.length);
+  });
+
+  it("hides fields in collapsed groups when filterTerm is empty", () => {
+    const expanded = { http: true, k8s: false };
+    const result = applyCollapseFilter(rows, expanded, "");
+    const names = result.map((r: any) => r.name);
+    expect(names).toContain("http_method");
+    expect(names).toContain("http_status");
+    expect(names).not.toContain("k8s_pod");
+  });
+
+  it("always keeps label rows regardless of collapse state", () => {
+    const expanded = { http: false, k8s: false };
+    const result = applyCollapseFilter(rows, expanded, "");
+    const labels = result.filter((r: any) => r.label);
+    expect(labels).toHaveLength(2);
+  });
+
+  it("shows all fields when expandGroupRows is empty (flat list, no groups)", () => {
+    const result = applyCollapseFilter(rows, {}, "");
+    expect(result).toHaveLength(rows.length);
+  });
+
+  it("returns all rows unchanged when all groups are expanded and no filter", () => {
+    const expanded = { http: true, k8s: true };
+    const result = applyCollapseFilter(rows, expanded, "");
+    expect(result).toHaveLength(rows.length);
+  });
+
+  it("treats whitespace-only filterTerm as active (bypasses collapse)", () => {
+    const expanded = { http: true, k8s: false };
+    const result = applyCollapseFilter(rows, expanded, "  ");
+    expect(result).toHaveLength(rows.length);
   });
 });

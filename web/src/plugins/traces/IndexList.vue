@@ -160,6 +160,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
+import { applyCollapseFilter } from "@/utils/fieldCategories";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
 
@@ -314,15 +315,13 @@ export default defineComponent({
       return counts;
     });
 
-    // Respect group collapse state; always show label rows
-    const visibleFieldRows = computed(() => {
-      return normalizedFieldList.value.filter((row: any) => {
-        if (row.label) return true;
-        const group = row.group;
-        if (group === undefined || !(group in expandGroupRows.value)) return true;
-        return expandGroupRows.value[group] !== false;
-      });
-    });
+    const visibleFieldRows = computed(() =>
+      applyCollapseFilter(
+        normalizedFieldList.value,
+        expandGroupRows.value,
+        searchObj.data.stream.filterField ?? "",
+      ),
+    );
 
     // Column ID "status" maps to stream field "span_status" — the only mismatch.
     const TRACES_LOCKED_FIELD_NAMES = new Set(

@@ -221,6 +221,7 @@ import {
   removeFieldFromWhereAST,
 } from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
+import { applyCollapseFilter } from "@/utils/fieldCategories";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
@@ -1935,15 +1936,7 @@ export default defineComponent({
 
         const expandGroupRows = searchObj.data.stream.expandGroupRows;
 
-        // Keep label rows always; keep field rows only when their group is expanded.
-        // When no groups are defined (flat list), expandGroupRows is empty and every
-        // row passes through unchanged.
-        return source.filter((row: any) => {
-          if (row.label) return true;
-          const group = row.group;
-          if (group === undefined || !(group in expandGroupRows)) return true;
-          return expandGroupRows[group] !== false;
-        });
+        return applyCollapseFilter(source, expandGroupRows, searchObj.data.stream.filterField ?? "");
       }),
       formatLargeNumber,
       sortedStreamFields,

@@ -329,3 +329,28 @@ export function applyFieldGrouping(
   }
   return result;
 }
+
+/**
+ * Filter `fields` according to group-collapse state.
+ *
+ * Rules:
+ * - Label (header) rows are always kept.
+ * - When `filterTerm` is non-empty, bypass collapse entirely so the q-table
+ *   filter-method can match fields inside collapsed groups.
+ * - When a field's group is not tracked in `expandGroupRows`, it is visible
+ *   (flat / ungrouped list behaviour).
+ * - Otherwise the field is visible only when its group is expanded.
+ */
+export function applyCollapseFilter(
+  fields: FieldObj[],
+  expandGroupRows: Record<string, boolean>,
+  filterTerm: string,
+): FieldObj[] {
+  if (filterTerm) return fields;
+  return fields.filter((row) => {
+    if (row.label) return true;
+    const group = row.group;
+    if (group === undefined || !(group in expandGroupRows)) return true;
+    return expandGroupRows[group] !== false;
+  });
+}
