@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm-action"
+        style="font-size: 1rem"
         @click="$emit('update:Panel')"
         data-test="dashboard-if-no-panel-add-panel-btn"
       >
