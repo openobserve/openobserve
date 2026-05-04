@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 config.isEnterprise == 'true' && searchRequestTraceIds.length
               "
-              variant="ghost-destructive"
+              variant="outline-destructive"
               size="sm-toolbar"
               data-test="metrics-cancel"
               @click="cancelAddPanelQuery"
