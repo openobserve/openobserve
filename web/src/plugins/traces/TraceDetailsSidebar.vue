@@ -349,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-type="input"
                   :span="span"
                   view-mode="formatted"
+                  :instance-id="`${span.span_id}-input`"
                 />
               </div>
             </div>
@@ -396,6 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-type="output"
                   :span="span"
                   view-mode="formatted"
+                  :instance-id="`${span.span_id}-output`"
                 />
               </div>
             </div>

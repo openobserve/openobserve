@@ -33,12 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="tool-data">
         <CodeQueryEditor
-          :editor-id="`tool-json-viewer-${span?.llm_tool_call_id || 'unknown'}`"
+          :editor-id="`${editorIdPrefix}tool-json-viewer-${span?.llm_tool_call_id || 'unknown'}`"
           :query="toolContentJson"
           language="json"
           :read-only="true"
           :show-auto-complete="false"
           :show-line-numbers="false"
+          :stick-scroll="false"
           class="json-viewer-editor tw:max-h-full! tw:h-full!"
         />
       </div>
@@ -75,12 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="background-color: var(--o2-code-bg)"
               >
                 <CodeQueryEditor
-                  :editor-id="`msg-json-editor-${idx}`"
+                  :editor-id="`${editorIdPrefix}msg-json-editor-${idx}`"
                   :query="stringifyMessageContent(msg.content)"
                   language="json"
                   :read-only="true"
                   :show-auto-complete="false"
                   :show-line-numbers="false"
+                  :stick-scroll="false"
                   class="json-viewer-editor tw:max-h-full! tw:h-full!"
                 />
               </div>
@@ -97,12 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
-              editor-id="truncated-formatted-json-viewer"
+              :editor-id="`truncated-formatted-json-viewer-${editorIdPrefix}`"
               :query="parsedContentJson"
               language="json"
               :read-only="true"
               :show-auto-complete="false"
               :show-line-numbers="false"
+              :stick-scroll="false"
               class="json-viewer-editor tw:max-h-full! tw:h-full!"
             />
           </div>
@@ -111,12 +114,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- JSON mode -->
         <div v-else class="json-content">
           <CodeQueryEditor
-            editor-id="truncated-json-mode-viewer"
+            :editor-id="`truncated-json-mode-viewer-${editorIdPrefix}`"
             :query="parsedContentJson"
             language="json"
             :read-only="true"
             :show-auto-complete="false"
             :show-line-numbers="false"
+            :stick-scroll="false"
             class="json-viewer-editor tw:max-h-full! tw:h-full!"
           />
         </div>
@@ -163,12 +167,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="background-color: var(--o2-code-bg)"
               >
                 <CodeQueryEditor
-                  :editor-id="`msg-json-editor-full-${idx}`"
+                  :editor-id="`${editorIdPrefix}msg-json-editor-full-${idx}`"
                   :query="stringifyMessageContent(msg.content)"
                   language="json"
                   :read-only="true"
                   :show-auto-complete="false"
                   :show-line-numbers="false"
+                  :stick-scroll="false"
                   class="json-viewer-editor tw:max-h-full! tw:h-full!"
                 />
               </div>
@@ -185,12 +190,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-else class="json-content tw:h-full">
             <CodeQueryEditor
-              editor-id="full-formatted-json-viewer"
+              :editor-id="`full-formatted-json-viewer-${editorIdPrefix}`"
               :query="parsedContentJson"
               language="json"
               :read-only="true"
               :show-auto-complete="false"
               :show-line-numbers="false"
+              :stick-scroll="false"
               class="json-viewer-editor tw:max-h-full! tw:h-full"
             />
           </div>
@@ -199,12 +205,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- JSON mode -->
         <div v-else class="json-content">
           <CodeQueryEditor
-            editor-id="full-json-mode-viewer"
+            :editor-id="`full-json-mode-viewer-${editorIdPrefix}`"
             :query="parsedContentJson"
             language="json"
             :read-only="true"
             :show-auto-complete="false"
             :show-line-numbers="false"
+            :stick-scroll="false"
             class="json-viewer-editor"
           />
         </div>
@@ -257,7 +264,15 @@ const props = defineProps({
     type: String as () => "formatted" | "json",
     default: "formatted",
   },
+  instanceId: {
+    type: String,
+    default: "",
+  },
 });
+
+const editorIdPrefix = computed(() =>
+  props.instanceId ? `${props.instanceId}-` : "",
+);
 
 const isExpanded = ref(false);
 

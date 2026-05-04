@@ -116,6 +116,10 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    stickScroll: {
+      type: Boolean,
+      default: true,
+    },
     language: {
       type: String,
       default: "sql",
@@ -686,6 +690,9 @@ export default defineComponent({
         minimap: { enabled: false },
         readOnly: props.readOnly,
         renderValidationDecorations: "on",
+        stickyScroll: {
+          enabled: props.stickScroll,
+        },
       });
 
       editorObj.onDidChangeModelContent(
@@ -851,7 +858,9 @@ export default defineComponent({
     watch(
       () => props.showLineNumbers,
       () => {
-        editorObj?.updateOptions({ lineNumbers: props.showLineNumbers ? "on" : "off" });
+        editorObj?.updateOptions({
+          lineNumbers: props.showLineNumbers ? "on" : "off",
+        });
       },
     );
 
