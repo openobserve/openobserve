@@ -53,15 +53,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add folder -->
-  <q-dialog
-    v-model="showAddFolderDialog"
-    position="right"
-    full-height
-    maximized
+  <ODrawer
+    v-model:open="showAddFolderDialog"
+    :width="30"
+    :show-close="false"
+    @close="showAddFolderDialog = false"
     data-test="dashboard-folder-move-dialog"
   >
-    <AddFolder @update:modelValue="updateFolderList" :edit-mode="false" />
-  </q-dialog>
+    <AddFolder @update:modelValue="updateFolderList" @close="showAddFolderDialog = false" :edit-mode="false" />
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -70,11 +70,12 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton },
+  components: { AddFolder, OButton, ODrawer },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {

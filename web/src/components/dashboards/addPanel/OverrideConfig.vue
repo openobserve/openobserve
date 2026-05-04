@@ -9,7 +9,7 @@
       {{ t("dashboard.addFieldOverride") }}
     </OButton>
 
-    <q-dialog v-model="showOverrideConfigPopup">
+    <ODialog v-model:open="showOverrideConfigPopup" :show-close="false" :width="85">
       <OverrideConfigPopup
         :columns="columns"
         :override-config="{
@@ -19,7 +19,7 @@
         @save="saveOverrideConfigConfig"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
-    </q-dialog>
+    </ODialog>
   </div>
 </template>
 
@@ -29,6 +29,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 
 interface Column {
@@ -43,7 +44,7 @@ export interface OverrideConfig {
 
 export default defineComponent({
   name: "OverrideConfig",
-  components: { OverrideConfigPopup, OButton },
+  components: { OverrideConfigPopup, OButton, ODialog },
   props: {
     panelData: {
       type: Object,

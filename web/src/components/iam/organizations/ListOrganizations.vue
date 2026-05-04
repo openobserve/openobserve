@@ -115,15 +115,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
       </div>
-    <q-dialog
-      v-model="showAddOrganizationDialog"
-      position="right"
-      full-height
-      maximized
-      @before-hide="hideAddOrgDialog"
+    <ODrawer
+      v-model:open="showAddOrganizationDialog"
+      size="lg"
+      :show-close="false"
+      @close="hideAddOrgDialog"
+      @update:open="(v) => !v && hideAddOrgDialog()"
     >
       <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" @cancel:hideform="hideAddOrgDialog" />
-    </q-dialog>
+    </ODrawer>
   </q-page>
 </template>
 
@@ -142,6 +142,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -153,6 +154,7 @@ export default defineComponent({
     QTablePagination,
     NoData,
     OButton,
+    ODrawer,
   },
   setup() {
     const store = useStore();

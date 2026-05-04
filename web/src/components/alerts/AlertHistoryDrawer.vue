@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="ghost"
             size="icon-circle-sm"
             data-test="alert-details-close-btn"

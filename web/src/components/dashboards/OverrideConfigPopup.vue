@@ -1,7 +1,7 @@
 <template>
   <div style="padding: 0px 10px; min-width: min(1000px, 90vw)">
     <div
-      class="flex justify-between items-center q-py-md header"
+      class="flex justify-between items-center q-py-md header tw:sticky tw:top-0 tw:bg-dialog-bg tw:z-[1]"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
@@ -123,11 +123,11 @@
       >{{ t("dashboard.overrideConfigAddNew") }}</OButton
     >
 
-    <q-card-actions align="right">
+    <div class="tw:flex tw:justify-end tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:pt-2 tw:z-[1]">
       <OButton variant="primary" size="sm-action" @click="saveOverrides">{{
         t("dashboard.overrideConfigSave")
       }}</OButton>
-    </q-card-actions>
+    </div>
   </div>
 </template>
 

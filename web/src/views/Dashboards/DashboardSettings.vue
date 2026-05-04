@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="cancel"
           class="cursor-pointer tw:mr-5"
           size="20px"
-          v-close-popup="true"
+          @click="$emit('close')"
         />
       </div>
     </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             animated
           >
             <OTabPanel name="generalSettings" data-test="general-tab-panels-default">
-              <GeneralSettings @save="refreshRequired" />
+              <GeneralSettings @save="refreshRequired" @close="$emit('close')" />
             </OTabPanel>
 
             <OTabPanel name="variableSettings" data-test="variable-tab-panels-default">
@@ -116,7 +116,7 @@ export default defineComponent({
     GeneralSettings,
     TabsSettings,
   },
-  emits: ["refresh"],
+  emits: ["refresh", "close"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();

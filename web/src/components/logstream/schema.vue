@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+          <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
             <X :size="14" />
           </OButton>
         </div>
@@ -1173,11 +1173,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center justify-end tw:gap-2"
                 >
                   <OButton
-                    v-close-popup="true"
-                    data-test="schema-cancel-button"
+                      data-test="schema-cancel-button"
                     variant="outline"
                     size="sm-action"
-                    @click="llmEvalFormDirty = false"
+                    @click="llmEvalFormDirty = false; $emit('close')"
                   >
                     {{ t("logStream.cancel") }}
                   </OButton>
@@ -1253,10 +1252,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex justify-end tw:gap-2">
                     <OButton
-                      v-close-popup="true"
-                      data-test="schema-cancel-button"
+                        data-test="schema-cancel-button"
                       variant="outline"
                       size="sm-action"
+                    @click="$emit('close')"
                     >
                       {{ t("logStream.cancel") }}
                     </OButton>
@@ -1281,22 +1280,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
   </q-card>
-  <q-dialog
-    v-model="patternAssociationDialog.show"
-    position="right"
-    full-height
-    maximized
-  >
-    <AssociatedRegexPatterns
-      :data="patternAssociationDialog.data"
-      :fieldName="patternAssociationDialog.fieldName"
-      @closeDialog="patternAssociationDialog.show = false"
-      @addPattern="handleAddPattern"
-      @removePattern="handleRemovePattern"
-      @updateSettings="onSubmit"
-      @updateAppliedPattern="handleUpdateAppliedPattern"
-    />
-  </q-dialog>
+  <ODrawer v-model:open="patternAssociationDialog.show" size="lg" :show-close="false">
+    <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
+  </ODrawer>
 
   <ConfirmDialog
     title="Delete Action"
@@ -1367,6 +1353,7 @@ import {
 import DateTime from "@/components/DateTime.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 
@@ -1382,6 +1369,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SchemaIndex",
+  emits: ["close"],
   props: {
     // eslint-disable-next-line vue/require-default-prop
     modelValue: {
@@ -1401,6 +1389,7 @@ export default defineComponent({
     QTablePagination,
     DateTime,
     AssociatedRegexPatterns,
+    ODrawer,
     PerformanceFieldsDialog,
     LlmEvaluationSettings,
     CrossLinkManager,

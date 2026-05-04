@@ -159,64 +159,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
 
               <!-- Pattern Examples Dialog -->
-              <q-dialog v-model="showExamples">
-                <q-card class="pattern-examples-card">
-                  <q-card-section
-                    class="tw:flex tw:items-center tw:justify-between tw:pb-0"
+              <ODialog v-model:open="showExamples" size="sm">
+                <template #header>
+                  <div>
+                    <div class="tw:font-semibold tw:text-sm">
+                      {{ t("modelPricing.patternExamplesTitle") }}
+                    </div>
+                    <div class="tw:text-xs tw:opacity-50 tw:mt-0.5">
+                      {{ t("modelPricing.patternExamplesDesc") }}
+                    </div>
+                  </div>
+                </template>
+                <div class="examples-table">
+                  <div class="examples-table-head">
+                    <span>{{
+                      t("modelPricing.patternExamplesModelCol")
+                    }}</span>
+                    <span>{{
+                      t("modelPricing.patternExamplesPatternCol")
+                    }}</span>
+                  </div>
+                  <div
+                    v-for="ex in patternExamples"
+                    :key="ex.name"
+                    class="examples-table-row"
                   >
-                    <div>
-                      <div class="tw:font-semibold tw:text-sm">
-                        {{ t("modelPricing.patternExamplesTitle") }}
-                      </div>
-                      <div class="tw:text-xs tw:opacity-50 tw:mt-0.5">
-                        {{ t("modelPricing.patternExamplesDesc") }}
-                      </div>
-                    </div>
-                    <OButton variant="ghost" size="icon" v-close-popup>
-                      <q-icon name="cancel" size="14px" />
+                    <span class="examples-model-name">{{ ex.name }}</span>
+                    <code class="examples-pattern">{{
+                      ex.match_pattern
+                    }}</code>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="examples-copy-btn"
+                      @click="copyPattern(ex.match_pattern)"
+                    >
+                      <q-icon
+                        :name="copiedPattern === ex.match_pattern ? 'check' : 'content_copy'"
+                        size="12px"
+                        :class="copiedPattern === ex.match_pattern ? 'text-positive' : ''"
+                      />
+                      <q-tooltip :offset="[0, 4]">{{
+                        copiedPattern === ex.match_pattern
+                          ? t("modelPricing.copied")
+                          : t("modelPricing.copyPattern")
+                      }}</q-tooltip>
                     </OButton>
-                  </q-card-section>
-                  <q-card-section class="tw:pt-3">
-                    <div class="examples-table">
-                      <div class="examples-table-head">
-                        <span>{{
-                          t("modelPricing.patternExamplesModelCol")
-                        }}</span>
-                        <span>{{
-                          t("modelPricing.patternExamplesPatternCol")
-                        }}</span>
-                      </div>
-                      <div
-                        v-for="ex in patternExamples"
-                        :key="ex.name"
-                        class="examples-table-row"
-                      >
-                        <span class="examples-model-name">{{ ex.name }}</span>
-                        <code class="examples-pattern">{{
-                          ex.match_pattern
-                        }}</code>
-                        <OButton
-                          variant="ghost"
-                          size="icon-xs-sq"
-                          class="examples-copy-btn"
-                          @click="copyPattern(ex.match_pattern)"
-                        >
-                          <q-icon
-                            :name="copiedPattern === ex.match_pattern ? 'check' : 'content_copy'"
-                            size="12px"
-                            :class="copiedPattern === ex.match_pattern ? 'text-positive' : ''"
-                          />
-                          <q-tooltip :offset="[0, 4]">{{
-                            copiedPattern === ex.match_pattern
-                              ? t("modelPricing.copied")
-                              : t("modelPricing.copyPattern")
-                          }}</q-tooltip>
-                        </OButton>
-                      </div>
-                    </div>
-                  </q-card-section>
-                </q-card>
-              </q-dialog>
+                  </div>
+                </div>
+              </ODialog>
             </div>
           </div>
         </div>
@@ -559,6 +550,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
@@ -1274,11 +1266,6 @@ onBeforeMount(async () => {
   &:hover {
     opacity: 1;
   }
-}
-
-.pattern-examples-card {
-  min-width: 480px;
-  max-width: 560px;
 }
 
 .examples-table {
