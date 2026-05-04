@@ -95,7 +95,7 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::Int64Array;
+    use arrow::array::{Int64Array, StringArray};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -107,6 +107,35 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_date_format_impl_wrong_arg_count_errors() {
+        assert!(date_format_expr_impl(&[]).is_err());
+        let arr = Int64Array::from(vec![0i64]);
+        let args = [ColumnarValue::Array(Arc::new(arr))];
+        assert!(date_format_expr_impl(&args).is_err());
+    }
+
+    #[test]
+    fn test_date_format_impl_direct_utc() {
+        use config::utils::time;
+        let ts = time::parse_str_to_timestamp_micros("2021-06-15T12:00:00.000Z").unwrap();
+        let timestamp = Int64Array::from(vec![ts]);
+        let format = StringArray::from(vec!["%Y-%m-%d"]);
+        let timezone = StringArray::from(vec![""]);
+        let args = [
+            ColumnarValue::Array(Arc::new(timestamp)),
+            ColumnarValue::Array(Arc::new(format)),
+            ColumnarValue::Array(Arc::new(timezone)),
+        ];
+        let result = date_format_expr_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert_eq!(out.value(0), "2021-06-15");
+        } else {
+            panic!("expected array result");
+        }
+    }
 
     #[tokio::test]
     async fn test_date_format_udf() {

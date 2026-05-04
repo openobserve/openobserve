@@ -111,3 +111,18 @@ enum FileList {
     UpdatedAt,
     MinTs,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20250822_093713_add_updated_at_for_file_list_table"
+        );
+    }
+}

@@ -55,4 +55,21 @@ mod tests {
         assert_eq!(h.sum64("test2"), 13211586869705959535);
         assert_eq!(h.sum64("test3"), 3708989183841402594);
     }
+
+    #[test]
+    fn test_cityhash_new_hasher_produces_nonzero_hash() {
+        use std::hash::Hasher;
+        let mut hasher = new_hasher();
+        hasher.write(b"hello world");
+        let hash = hasher.finish();
+        assert_ne!(hash, 0);
+    }
+
+    #[test]
+    fn test_cityhash_empty_string() {
+        let mut h = new();
+        let sum = h.sum64("");
+        // Should be deterministic, not panic
+        assert_eq!(sum, h.sum64(""));
+    }
 }

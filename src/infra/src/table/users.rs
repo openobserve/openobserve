@@ -285,3 +285,86 @@ pub async fn batch_remove(emails: Vec<String>) -> Result<(), errors::Error> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::user::{DBUser, UserOrg, UserRole, UserType};
+
+    use super::*;
+
+    fn make_db_user(is_external: bool, role: UserRole) -> DBUser {
+        DBUser {
+            email: "test@example.com".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            password: "hash123".to_string(),
+            salt: "salt".to_string(),
+            organizations: vec![UserOrg {
+                name: "default".to_string(),
+                org_name: "Default".to_string(),
+                token: "tok".to_string(),
+                rum_token: None,
+                role,
+            }],
+            is_external,
+            password_ext: None,
+        }
+    }
+
+    #[test]
+    fn test_from_db_user_internal() {
+        let db_user = make_db_user(false, UserRole::Admin);
+        let rec = UserRecord::from(&db_user);
+        assert_eq!(rec.email, "test@example.com");
+        assert_eq!(rec.user_type, UserType::Internal);
+        assert!(!rec.is_root);
+    }
+
+    #[test]
+    fn test_from_db_user_external() {
+        let db_user = make_db_user(true, UserRole::Viewer);
+        let rec = UserRecord::from(&db_user);
+        assert_eq!(rec.user_type, UserType::External);
+    }
+
+    #[test]
+    fn test_from_db_user_root_role_sets_is_root() {
+        let db_user = make_db_user(false, UserRole::Root);
+        let rec = UserRecord::from(&db_user);
+        assert!(rec.is_root);
+    }
+
+    #[test]
+    fn test_from_user_record_to_db_user() {
+        let db_user = make_db_user(false, UserRole::Admin);
+        let rec = UserRecord::from(&db_user);
+        let back = DBUser::from(&rec);
+        assert_eq!(back.email, "test@example.com");
+        assert!(!back.is_external);
+        assert!(back.organizations.is_empty());
+    }
+
+    #[test]
+    fn test_from_model_to_user_record() {
+        use super::super::entity::users::Model;
+        let model = Model {
+            id: "uid-1".to_string(),
+            email: "model@example.com".to_string(),
+            first_name: "Model".to_string(),
+            last_name: "User".to_string(),
+            password: "pw".to_string(),
+            salt: "salt".to_string(),
+            is_root: true,
+            password_ext: Some("ext".to_string()),
+            user_type: 0, // 0 = Internal
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+        };
+        let rec = UserRecord::from(model);
+        assert_eq!(rec.email, "model@example.com");
+        assert!(rec.is_root);
+        assert_eq!(rec.password_ext, Some("ext".to_string()));
+        assert_eq!(rec.created_at, 1_000_000);
+        assert_eq!(rec.updated_at, 2_000_000);
+    }
+}

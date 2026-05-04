@@ -249,4 +249,34 @@ mod tests {
             assert_eq!(expected, is_simple_distinct(physical_plan, index_fields));
         }
     }
+
+    #[test]
+    fn test_simple_distinct_visitor_initial_state() {
+        let fields = HashSet::from(["col".to_string()]);
+        let visitor = SimpleDistinctVisitor::new(fields.clone());
+        assert!(visitor.simple_distinct.is_none());
+        assert_eq!(visitor.index_fields, fields);
+    }
+
+    #[test]
+    fn test_simple_distinct_visitor_empty_fields() {
+        let fields: HashSet<String> = HashSet::new();
+        let visitor = SimpleDistinctVisitor::new(fields);
+        assert!(visitor.simple_distinct.is_none());
+        assert!(visitor.index_fields.is_empty());
+    }
+
+    #[test]
+    fn test_is_simple_distinct_returns_none_for_empty_exec() {
+        use datafusion::physical_plan::empty::EmptyExec;
+        let schema = Arc::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+            "a",
+            arrow_schema::DataType::Int32,
+            false,
+        )]));
+        let plan: Arc<dyn datafusion::physical_plan::ExecutionPlan> =
+            Arc::new(EmptyExec::new(schema));
+        let index_fields = HashSet::from(["a".to_string()]);
+        assert!(is_simple_distinct(plan, index_fields).is_none());
+    }
 }

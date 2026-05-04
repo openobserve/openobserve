@@ -66,3 +66,49 @@ fn set_val_if_not_zero<T: PartialOrd + Clone + Default>(
         data.insert(key, value);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_json_value_from_string() {
+        let s = json::Value::String(r#"{"key":"val"}"#.to_string());
+        let result = parse_json_value(&s).unwrap();
+        assert_eq!(result.get("key").unwrap().as_str().unwrap(), "val");
+    }
+
+    #[test]
+    fn test_parse_json_value_from_object() {
+        let obj = json::json!({"x": 1});
+        let result = parse_json_value(&obj).unwrap();
+        assert!(result.contains_key("x"));
+    }
+
+    #[test]
+    fn test_parse_json_value_invalid_string_returns_none() {
+        let s = json::Value::String("not valid json".to_string());
+        assert!(parse_json_value(&s).is_none());
+    }
+
+    #[test]
+    fn test_set_val_if_not_zero_positive_inserts() {
+        let mut map: HashMap<String, i64> = HashMap::new();
+        set_val_if_not_zero(&mut map, "k".to_string(), 5i64);
+        assert_eq!(map["k"], 5);
+    }
+
+    #[test]
+    fn test_set_val_if_not_zero_does_not_insert_zero() {
+        let mut map: HashMap<String, i64> = HashMap::new();
+        set_val_if_not_zero(&mut map, "k".to_string(), 0i64);
+        assert!(!map.contains_key("k"));
+    }
+
+    #[test]
+    fn test_set_val_if_not_zero_negative_does_not_insert() {
+        let mut map: HashMap<String, i64> = HashMap::new();
+        set_val_if_not_zero(&mut map, "k".to_string(), -1i64);
+        assert!(!map.contains_key("k"));
+    }
+}

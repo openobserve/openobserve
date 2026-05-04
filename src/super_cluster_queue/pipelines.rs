@@ -113,3 +113,26 @@ fn parse_key(key: &str) -> Result<String> {
     }
     Ok(key_columns[2].into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_key_valid() {
+        let id = parse_key("/pipelines/pipe_abc").unwrap();
+        assert_eq!(id, "pipe_abc");
+    }
+
+    #[test]
+    fn test_parse_key_wrong_segment_count_returns_err() {
+        // needs exactly 3 segments when split by '/'
+        assert!(parse_key("/pipelines/abc/extra").is_err());
+        assert!(parse_key("/pipelines").is_err());
+    }
+
+    #[test]
+    fn test_parse_key_empty_id_returns_err() {
+        assert!(parse_key("/pipelines/").is_err());
+    }
+}

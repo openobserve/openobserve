@@ -748,4 +748,161 @@ mod tests {
             + "value".to_string().mem_size();
         assert_eq!(mem_size, expected);
     }
+
+    // ============================================================================
+    // MemorySize primitive tests
+    // ============================================================================
+
+    #[test]
+    fn test_memory_size_primitives() {
+        assert_eq!(42usize.mem_size(), std::mem::size_of::<usize>());
+        assert_eq!(42u64.mem_size(), std::mem::size_of::<u64>());
+        assert_eq!(42i64.mem_size(), std::mem::size_of::<i64>());
+        assert_eq!(42i32.mem_size(), std::mem::size_of::<i32>());
+        assert_eq!(42u8.mem_size(), std::mem::size_of::<u8>());
+        assert_eq!(true.mem_size(), std::mem::size_of::<bool>());
+        assert_eq!(3.14f64.mem_size(), std::mem::size_of::<f64>());
+    }
+
+    #[test]
+    fn test_memory_size_string() {
+        let s = "hello".to_string();
+        assert_eq!(s.mem_size(), std::mem::size_of::<String>() + s.len());
+    }
+
+    #[test]
+    fn test_memory_size_str_ref() {
+        let s: &str = "world";
+        // &str auto-derefs to str impl: len + size_of::<usize>
+        assert_eq!(s.mem_size(), s.len() + std::mem::size_of::<usize>());
+    }
+
+    #[test]
+    fn test_memory_size_str_slice() {
+        let s: &str = "hello world";
+        // str (unsized) impl: len + size_of::<usize>
+        assert_eq!((*s).mem_size(), s.len() + std::mem::size_of::<usize>());
+    }
+
+    #[test]
+    fn test_memory_size_bytes() {
+        let b = bytes::Bytes::from("hello");
+        assert_eq!(b.mem_size(), std::mem::size_of::<bytes::Bytes>() + b.len());
+    }
+
+    #[test]
+    fn test_memory_size_option_none() {
+        let opt: Option<u64> = None;
+        assert_eq!(opt.mem_size(), 0);
+    }
+
+    #[test]
+    fn test_memory_size_option_some() {
+        let opt: Option<u64> = Some(42u64);
+        assert_eq!(opt.mem_size(), 42u64.mem_size());
+    }
+
+    #[test]
+    fn test_memory_size_vec_empty() {
+        let v: Vec<u64> = Vec::new();
+        assert_eq!(v.mem_size(), std::mem::size_of::<Vec<u64>>());
+    }
+
+    #[test]
+    fn test_memory_size_vec_with_data() {
+        let v: Vec<u64> = vec![1u64, 2u64, 3u64];
+        assert_eq!(
+            v.mem_size(),
+            std::mem::size_of::<Vec<u64>>() + 3 * std::mem::size_of::<u64>()
+        );
+    }
+
+    #[test]
+    fn test_memory_size_tuple() {
+        let t = (42u64, "hello".to_string());
+        assert_eq!(
+            t.mem_size(),
+            std::mem::size_of::<(u64, String)>()
+                + 42u64.mem_size()
+                + "hello".to_string().mem_size()
+        );
+    }
+
+    #[test]
+    fn test_memory_size_arc() {
+        let s = Arc::new("hello".to_string());
+        let expected = ARC_SIZE + "hello".to_string().mem_size();
+        assert_eq!(s.mem_size(), expected);
+    }
+
+    #[test]
+    fn test_memory_size_hashbrown_hashmap() {
+        let mut m: HashMap<String, u64> = HashMap::new();
+        m.insert("key".to_string(), 99u64);
+        let expected = std::mem::size_of::<HashMap<String, u64>>()
+            + "key".to_string().mem_size()
+            + 99u64.mem_size();
+        assert_eq!(m.mem_size(), expected);
+    }
+
+    #[test]
+    fn test_memory_size_hashbrown_hashset() {
+        let mut s: HashSet<String> = HashSet::new();
+        s.insert("abc".to_string());
+        let expected = std::mem::size_of::<HashSet<String>>() + "abc".to_string().mem_size();
+        assert_eq!(s.mem_size(), expected);
+    }
+
+    #[test]
+    fn test_memory_size_std_hashmap() {
+        let mut m: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+        m.insert("key".to_string(), 7u64);
+        let expected = std::mem::size_of::<std::collections::HashMap<String, u64>>()
+            + "key".to_string().mem_size()
+            + 7u64.mem_size();
+        assert_eq!(m.mem_size(), expected);
+    }
+
+    #[test]
+    fn test_memory_size_std_hashset() {
+        let mut s: std::collections::HashSet<String> = std::collections::HashSet::new();
+        s.insert("xyz".to_string());
+        let expected =
+            std::mem::size_of::<std::collections::HashSet<String>>() + "xyz".to_string().mem_size();
+        assert_eq!(s.mem_size(), expected);
+    }
+
+    #[test]
+    fn test_memory_size_std_btreemap() {
+        let mut m: std::collections::BTreeMap<String, u64> = std::collections::BTreeMap::new();
+        m.insert("k".to_string(), 1u64);
+        let expected = std::mem::size_of::<std::collections::BTreeMap<String, u64>>()
+            + "k".to_string().mem_size()
+            + 1u64.mem_size();
+        assert_eq!(m.mem_size(), expected);
+    }
+
+    #[test]
+    fn test_cache_stats_sync_hashset() {
+        let mut s: HashSet<String> = HashSet::new();
+        s.insert("a".to_string());
+        s.insert("bb".to_string());
+        let (len, cap, mem_size) = s.stats();
+        assert_eq!(len, 2);
+        assert!(cap >= 2);
+        let expected = std::mem::size_of::<HashSet<String>>()
+            + "a".to_string().mem_size()
+            + "bb".to_string().mem_size();
+        assert_eq!(mem_size, expected);
+    }
+
+    #[test]
+    fn test_memory_size_pathbuf() {
+        let p = PathBuf::from("/some/path/to/file.txt");
+        // PathBuf impl calls to_str().mem_size() which is Option<&str>::mem_size().
+        // Inside Option, as_ref() yields &&str, so the &str impl fires:
+        // size_of::<&str>() + len
+        let path_str = "/some/path/to/file.txt";
+        assert_eq!(p.mem_size(), std::mem::size_of::<&str>() + path_str.len());
+    }
 }

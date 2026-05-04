@@ -381,3 +381,20 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         Ok(pipeline)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sqlite_pipeline_table_new() {
+        let t = SqlitePipelineTable::new();
+        drop(t);
+    }
+
+    #[test]
+    fn test_sqlite_pipeline_table_default() {
+        let t = SqlitePipelineTable::default();
+        drop(t);
+    }
+}

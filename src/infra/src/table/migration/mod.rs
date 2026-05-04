@@ -232,3 +232,13 @@ pub fn get_binary_type() -> &'static str {
         _ => "bytea",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_text_type_returns_text() {
+        assert_eq!(get_text_type(), "text");
+    }
+}

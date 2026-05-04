@@ -115,6 +115,61 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_to_rule_string_all_variants() {
+        assert_eq!(
+            IndexOptimizeMode::SimpleSelect(100, true).to_rule_string(),
+            "s(l:100,a:true)"
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleSelect(50, false).to_rule_string(),
+            "s(l:50,a:false)"
+        );
+        assert_eq!(IndexOptimizeMode::SimpleCount.to_rule_string(), "c");
+        assert_eq!(
+            IndexOptimizeMode::SimpleHistogram(0, 10, 5).to_rule_string(),
+            "h(m:0,b:10,n:5)"
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleHistogram(-100, 25, 20).to_rule_string(),
+            "h(m:-100,b:25,n:20)"
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleTopN("cpu".to_string(), 10, true).to_rule_string(),
+            "t(fcpu,l:10,a:true)"
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleTopN("mem".to_string(), 5, false).to_rule_string(),
+            "t(fmem,l:5,a:false)"
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleDistinct("uid".to_string(), 100, true).to_rule_string(),
+            "d(f:uid,l:100,a:true)"
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleDistinct("sid".to_string(), 25, false).to_rule_string(),
+            "d(f:sid,l:25,a:false)"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid IndexOptimizeMode")]
+    fn test_to_rpc_simple_select_panics() {
+        let _: cluster_rpc::IdxOptimizeMode = IndexOptimizeMode::SimpleSelect(10, true).into();
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid IndexOptimizeMode")]
+    fn test_to_rpc_simple_count_panics() {
+        let _: cluster_rpc::IdxOptimizeMode = IndexOptimizeMode::SimpleCount.into();
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid IndexOptimizeMode")]
+    fn test_to_rpc_simple_histogram_panics() {
+        let _: cluster_rpc::IdxOptimizeMode = IndexOptimizeMode::SimpleHistogram(0, 10, 5).into();
+    }
+
+    #[test]
     fn test_index_optimize_mode_display_formatting() {
         // Test all Display implementations for each variant
         let test_cases = [

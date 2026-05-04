@@ -98,6 +98,24 @@ pub fn aggregate_edges(_edges: Vec<()>) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    #[cfg(not(feature = "enterprise"))]
+    use super::*;
+
+    #[test]
+    #[cfg(not(feature = "enterprise"))]
+    fn test_aggregate_edges_empty_returns_ok() {
+        assert!(aggregate_edges(vec![]).is_ok());
+    }
+
+    #[test]
+    #[cfg(not(feature = "enterprise"))]
+    fn test_aggregate_edges_nonempty_returns_ok() {
+        assert!(aggregate_edges(vec![(), ()]).is_ok());
+    }
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub async fn write_aggregated_edges(_org_id: &str, _aggregated: ()) -> Result<(), anyhow::Error> {
     Ok(())

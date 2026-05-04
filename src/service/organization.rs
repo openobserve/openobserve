@@ -1186,4 +1186,42 @@ mod tests {
         let resp = update_passcode(Some(org_id), user_id).await.unwrap();
         assert_ne!(resp.passcode, passcode);
     }
+
+    #[test]
+    fn test_is_system_service_account_valid() {
+        // Constructed the same way as ensure_sys_rca_agent does it
+        let email = format!("{O2_SRE_AGENT_EMAIL_PREFIX}myorg{O2_SRE_AGENT_EMAIL_SUFFIX}");
+        assert!(is_system_service_account(&email));
+    }
+
+    #[test]
+    fn test_is_system_service_account_regular_user() {
+        assert!(!is_system_service_account("user@example.com"));
+        assert!(!is_system_service_account("admin@openobserve.ai"));
+    }
+
+    #[test]
+    fn test_is_system_service_account_prefix_only() {
+        // Has prefix but not suffix
+        let email = format!("{O2_SRE_AGENT_EMAIL_PREFIX}someorg@notinternal.com");
+        assert!(!is_system_service_account(&email));
+    }
+
+    #[test]
+    fn test_is_system_service_account_suffix_only() {
+        // Has suffix but not prefix
+        let email = format!("regularuser{O2_SRE_AGENT_EMAIL_SUFFIX}");
+        assert!(!is_system_service_account(&email));
+    }
+
+    #[test]
+    fn test_is_system_service_account_empty() {
+        assert!(!is_system_service_account(""));
+    }
+
+    #[test]
+    fn test_should_mask_token_no_org() {
+        // Without an org context, masking is never applied
+        assert!(!should_mask_token(None, "user@example.com"));
+    }
 }

@@ -1251,4 +1251,509 @@ mod tests {
         let rel = DimensionRelationship::check(&existing, &new);
         assert_eq!(rel, DimensionRelationship::Equal);
     }
+
+    #[test]
+    fn test_incident_event_is_alert() {
+        let alert_event = IncidentEvent::alert("alert-1", "High CPU", 1000);
+        assert!(alert_event.is_alert());
+
+        let created_event = IncidentEvent::created();
+        assert!(!created_event.is_alert());
+
+        let resolved_event = IncidentEvent::resolved(None);
+        assert!(!resolved_event.is_alert());
+    }
+
+    #[test]
+    fn test_incident_event_is_alert_for() {
+        let event = IncidentEvent::alert("alert-abc", "High CPU", 1000);
+        assert!(event.is_alert_for("alert-abc"));
+        assert!(!event.is_alert_for("alert-xyz"));
+        assert!(!event.is_alert_for(""));
+
+        // Non-alert event is never alert_for any id
+        let created = IncidentEvent::created();
+        assert!(!created.is_alert_for("alert-abc"));
+    }
+
+    #[test]
+    fn test_incident_event_increment_alert_matching() {
+        let mut event = IncidentEvent::alert("alert-1", "CPU spike", 1000);
+
+        // First increment: count goes 1→2, last_at updated
+        let result = event.increment_alert("alert-1", 2000);
+        assert!(result);
+
+        if let IncidentEventType::Alert {
+            count,
+            last_at,
+            first_at,
+            ..
+        } = &event.event_type
+        {
+            assert_eq!(*count, 2);
+            assert_eq!(*last_at, 2000);
+            assert_eq!(*first_at, 1000); // first_at unchanged
+        } else {
+            panic!("expected Alert variant");
+        }
+
+        // Second increment
+        let result2 = event.increment_alert("alert-1", 3000);
+        assert!(result2);
+        if let IncidentEventType::Alert { count, last_at, .. } = &event.event_type {
+            assert_eq!(*count, 3);
+            assert_eq!(*last_at, 3000);
+        }
+    }
+
+    #[test]
+    fn test_incident_event_increment_alert_wrong_id() {
+        let mut event = IncidentEvent::alert("alert-1", "CPU spike", 1000);
+        let result = event.increment_alert("alert-2", 2000);
+        assert!(!result);
+
+        // count unchanged
+        if let IncidentEventType::Alert { count, last_at, .. } = &event.event_type {
+            assert_eq!(*count, 1);
+            assert_eq!(*last_at, 1000);
+        }
+    }
+
+    #[test]
+    fn test_incident_event_increment_alert_non_alert_event() {
+        let mut event = IncidentEvent::created();
+        let result = event.increment_alert("alert-1", 2000);
+        assert!(!result);
+    }
+
+    // ── IncidentStatus Display + FromStr ─────────────────────────────────────
+
+    #[test]
+    fn test_incident_status_display() {
+        assert_eq!(IncidentStatus::Open.to_string(), "open");
+        assert_eq!(IncidentStatus::Acknowledged.to_string(), "acknowledged");
+        assert_eq!(IncidentStatus::Resolved.to_string(), "resolved");
+    }
+
+    #[test]
+    fn test_incident_status_from_str() {
+        use std::str::FromStr;
+        assert_eq!(
+            IncidentStatus::from_str("open").unwrap(),
+            IncidentStatus::Open
+        );
+        assert_eq!(
+            IncidentStatus::from_str("ACKNOWLEDGED").unwrap(),
+            IncidentStatus::Acknowledged
+        );
+        assert_eq!(
+            IncidentStatus::from_str("resolved").unwrap(),
+            IncidentStatus::Resolved
+        );
+        assert!(IncidentStatus::from_str("unknown").is_err());
+    }
+
+    // ── IncidentSeverity Display + FromStr ────────────────────────────────────
+
+    #[test]
+    fn test_incident_severity_display() {
+        assert_eq!(IncidentSeverity::P1.to_string(), "P1");
+        assert_eq!(IncidentSeverity::P2.to_string(), "P2");
+        assert_eq!(IncidentSeverity::P3.to_string(), "P3");
+        assert_eq!(IncidentSeverity::P4.to_string(), "P4");
+    }
+
+    #[test]
+    fn test_incident_severity_from_str() {
+        use std::str::FromStr;
+        assert_eq!(
+            IncidentSeverity::from_str("p1").unwrap(),
+            IncidentSeverity::P1
+        );
+        assert_eq!(
+            IncidentSeverity::from_str("P2").unwrap(),
+            IncidentSeverity::P2
+        );
+        assert_eq!(
+            IncidentSeverity::from_str("P3").unwrap(),
+            IncidentSeverity::P3
+        );
+        assert_eq!(
+            IncidentSeverity::from_str("P4").unwrap(),
+            IncidentSeverity::P4
+        );
+        assert!(IncidentSeverity::from_str("P5").is_err());
+    }
+
+    // ── CorrelationReason TryFrom ─────────────────────────────────────────────
+
+    #[test]
+    fn test_correlation_reason_try_from() {
+        assert_eq!(
+            CorrelationReason::try_from("service_discovery").unwrap(),
+            CorrelationReason::ServiceDiscovery
+        );
+        assert_eq!(
+            CorrelationReason::try_from("PRIMARY_MATCH").unwrap(),
+            CorrelationReason::PrimaryMatch
+        );
+        assert!(CorrelationReason::try_from("bad_value").is_err());
+    }
+
+    // ── KeyType ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_key_type_display() {
+        assert_eq!(KeyType::AlertId.to_string(), "AlertId");
+        assert_eq!(KeyType::Secondary.to_string(), "Secondary");
+        assert_eq!(KeyType::Primary.to_string(), "Primary");
+    }
+
+    #[test]
+    fn test_key_type_can_upgrade_to() {
+        // AlertId can upgrade to Secondary or Primary
+        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Secondary));
+        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Primary));
+        // Secondary can upgrade to Primary or stay Secondary
+        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Primary));
+        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Secondary));
+        // Secondary cannot downgrade to AlertId
+        assert!(!KeyType::Secondary.can_upgrade_to(KeyType::AlertId));
+        // Primary can only upgrade to itself
+        assert!(KeyType::Primary.can_upgrade_to(KeyType::Primary));
+        assert!(!KeyType::Primary.can_upgrade_to(KeyType::Secondary));
+        assert!(!KeyType::Primary.can_upgrade_to(KeyType::AlertId));
+    }
+
+    // ── DimensionRelationship::check ──────────────────────────────────────────
+
+    #[test]
+    fn test_dimension_relationship_new_empty_existing_not() {
+        let existing: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
+        let result = DimensionRelationship::check(&existing, &HashMap::new());
+        assert_eq!(result, DimensionRelationship::PartialOverlap);
+    }
+
+    #[test]
+    fn test_dimension_relationship_new_is_superset() {
+        let existing: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
+        let new: HashMap<String, String> = [
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]
+        .into();
+        let result = DimensionRelationship::check(&existing, &new);
+        assert_eq!(result, DimensionRelationship::NewIsSuperset);
+    }
+
+    #[test]
+    fn test_dimension_relationship_new_is_subset() {
+        let existing: HashMap<String, String> = [
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]
+        .into();
+        let new: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
+        let result = DimensionRelationship::check(&existing, &new);
+        assert_eq!(result, DimensionRelationship::NewIsSubset);
+    }
+
+    fn make_incident(
+        resolved_at: Option<i64>,
+        title: Option<String>,
+        assigned_to: Option<String>,
+        topology_context: Option<IncidentTopology>,
+    ) -> Incident {
+        Incident {
+            id: "abc123".to_string(),
+            org_id: "org1".to_string(),
+            status: IncidentStatus::default(),
+            severity: IncidentSeverity::default(),
+            first_alert_at: 1000,
+            last_alert_at: 2000,
+            resolved_at,
+            alert_count: 1,
+            title,
+            assigned_to,
+            created_at: 1000,
+            updated_at: 2000,
+            group_values: serde_json::Value::Null,
+            key_type: KeyType::default(),
+            topology_context,
+        }
+    }
+
+    #[test]
+    fn test_incident_optional_fields_none_absent_from_json() {
+        let incident = make_incident(None, None, None, None);
+        let json = serde_json::to_value(&incident).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("resolved_at"));
+        assert!(!obj.contains_key("title"));
+        assert!(!obj.contains_key("assigned_to"));
+        assert!(!obj.contains_key("topology_context"));
+    }
+
+    #[test]
+    fn test_incident_optional_fields_some_present_in_json() {
+        let incident = make_incident(
+            Some(3000),
+            Some("High CPU".to_string()),
+            Some("oncall@example.com".to_string()),
+            None,
+        );
+        let json = serde_json::to_value(&incident).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("resolved_at"));
+        assert_eq!(obj["resolved_at"], serde_json::json!(3000_i64));
+        assert!(obj.contains_key("title"));
+        assert_eq!(obj["title"], serde_json::json!("High CPU"));
+        assert!(obj.contains_key("assigned_to"));
+    }
+
+    #[test]
+    fn test_incident_stats_mttr_none_absent_from_json() {
+        let stats = IncidentStats {
+            total_incidents: 10,
+            open_incidents: 5,
+            acknowledged_incidents: 2,
+            resolved_incidents: 3,
+            by_severity: Default::default(),
+            by_service: Default::default(),
+            mttr_minutes: None,
+            alerts_per_incident_avg: 2.5,
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("mttr_minutes"));
+    }
+
+    #[test]
+    fn test_incident_stats_mttr_some_present_in_json() {
+        let stats = IncidentStats {
+            total_incidents: 5,
+            open_incidents: 1,
+            acknowledged_incidents: 0,
+            resolved_incidents: 4,
+            by_severity: Default::default(),
+            by_service: Default::default(),
+            mttr_minutes: Some(15.5),
+            alerts_per_incident_avg: 3.0,
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("mttr_minutes"));
+        assert_eq!(obj["mttr_minutes"], serde_json::json!(15.5_f64));
+    }
+
+    #[test]
+    fn test_incident_event_factory_severity_upgrade() {
+        let event = IncidentEvent::severity_upgrade(
+            IncidentSeverity::P3,
+            IncidentSeverity::P1,
+            "latency spike",
+        );
+        assert!(event.timestamp > 0);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::SeverityUpgrade {
+                from: IncidentSeverity::P3,
+                to: IncidentSeverity::P1,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_incident_event_factory_severity_override() {
+        let event = IncidentEvent::severity_override(
+            IncidentSeverity::P1,
+            IncidentSeverity::P4,
+            "user@example.com",
+        );
+        assert!(event.timestamp > 0);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::SeverityOverride {
+                from: IncidentSeverity::P1,
+                to: IncidentSeverity::P4,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_incident_event_factory_acknowledged() {
+        let event = IncidentEvent::acknowledged("user@example.com");
+        assert!(event.timestamp > 0);
+        if let IncidentEventType::Acknowledged { user_id } = &event.event_type {
+            assert_eq!(user_id, "user@example.com");
+        } else {
+            panic!("Expected Acknowledged event");
+        }
+    }
+
+    #[test]
+    fn test_incident_event_factory_reopened() {
+        let event = IncidentEvent::reopened("user@example.com", "false positive");
+        assert!(event.timestamp > 0);
+        if let IncidentEventType::Reopened { user_id, reason } = &event.event_type {
+            assert_eq!(user_id, "user@example.com");
+            assert_eq!(reason, "false positive");
+        } else {
+            panic!("Expected Reopened event");
+        }
+    }
+
+    #[test]
+    fn test_incident_event_factory_dimensions_upgraded() {
+        let event = IncidentEvent::dimensions_upgraded("alert-id-key", "secondary-key");
+        assert!(event.timestamp > 0);
+        if let IncidentEventType::DimensionsUpgraded { from_key, to_key } = &event.event_type {
+            assert_eq!(from_key, "alert-id-key");
+            assert_eq!(to_key, "secondary-key");
+        } else {
+            panic!("Expected DimensionsUpgraded event");
+        }
+    }
+
+    #[test]
+    fn test_incident_event_factory_title_changed() {
+        let event = IncidentEvent::title_changed("Old Title", "New Title", "user@example.com");
+        assert!(event.timestamp > 0);
+        if let IncidentEventType::TitleChanged { from, to, user_id } = &event.event_type {
+            assert_eq!(from, "Old Title");
+            assert_eq!(to, "New Title");
+            assert_eq!(user_id, "user@example.com");
+        } else {
+            panic!("Expected TitleChanged event");
+        }
+    }
+
+    #[test]
+    fn test_incident_event_factory_comment() {
+        let event = IncidentEvent::comment("user@example.com", "investigating now");
+        assert!(event.timestamp > 0);
+        if let IncidentEventType::Comment { user_id, comment } = &event.event_type {
+            assert_eq!(user_id, "user@example.com");
+            assert_eq!(comment, "investigating now");
+        } else {
+            panic!("Expected Comment event");
+        }
+    }
+
+    #[test]
+    fn test_incident_event_factory_ai_analysis_failed() {
+        let event = IncidentEvent::ai_analysis_failed(
+            "timeout",
+            AnalysisTriggerType::AutomaticNewIncident,
+            Some("request timed out".to_string()),
+        );
+        assert!(event.timestamp > 0);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::AIAnalysisFailed { .. }
+        ));
+    }
+
+    #[test]
+    fn test_incident_correlation_outcome_incident_id_all_variants() {
+        let created = IncidentCorrelationOutcome::NewIncidentCreated {
+            incident_id: "inc-001".to_string(),
+            service_name: "svc-a".to_string(),
+        };
+        assert_eq!(created.incident_id(), "inc-001");
+
+        let joined = IncidentCorrelationOutcome::NewAlertTypeJoined {
+            incident_id: "inc-002".to_string(),
+            service_name: "svc-b".to_string(),
+        };
+        assert_eq!(joined.incident_id(), "inc-002");
+
+        let repeated = IncidentCorrelationOutcome::ExistingAlertRepeated {
+            incident_id: "inc-003".to_string(),
+            service_name: "svc-c".to_string(),
+        };
+        assert_eq!(repeated.incident_id(), "inc-003");
+    }
+
+    #[test]
+    fn test_incident_correlation_outcome_service_name_all_variants() {
+        let created = IncidentCorrelationOutcome::NewIncidentCreated {
+            incident_id: "inc-001".to_string(),
+            service_name: "service-x".to_string(),
+        };
+        assert_eq!(created.service_name(), "service-x");
+
+        let joined = IncidentCorrelationOutcome::NewAlertTypeJoined {
+            incident_id: "inc-001".to_string(),
+            service_name: "service-y".to_string(),
+        };
+        assert_eq!(joined.service_name(), "service-y");
+
+        let repeated = IncidentCorrelationOutcome::ExistingAlertRepeated {
+            incident_id: "inc-001".to_string(),
+            service_name: "service-z".to_string(),
+        };
+        assert_eq!(repeated.service_name(), "service-z");
+    }
+
+    #[test]
+    fn test_default_time_window() {
+        assert_eq!(default_time_window(), 60);
+    }
+
+    #[test]
+    fn test_default_min_alerts() {
+        assert_eq!(default_min_alerts(), 1);
+    }
+
+    #[test]
+    fn test_default_upgrade_window() {
+        assert_eq!(default_upgrade_window(), 30);
+    }
+
+    #[test]
+    fn test_default_true() {
+        assert!(default_true());
+    }
+
+    #[test]
+    fn test_incident_event_factory_resolved_with_user() {
+        let event = IncidentEvent::resolved(Some("user@test.com".to_string()));
+        assert!(event.timestamp > 0);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::Resolved { user_id: Some(ref u) } if u == "user@test.com"
+        ));
+    }
+
+    #[test]
+    fn test_incident_event_factory_resolved_without_user() {
+        let event = IncidentEvent::resolved(None);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::Resolved { user_id: None }
+        ));
+    }
+
+    #[test]
+    fn test_incident_event_factory_ai_analysis_begin() {
+        let event = IncidentEvent::ai_analysis_begin();
+        assert!(event.timestamp > 0);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::AIAnalysisBegin
+        ));
+    }
+
+    #[test]
+    fn test_incident_event_factory_ai_analysis_complete() {
+        let event = IncidentEvent::ai_analysis_complete();
+        assert!(event.timestamp > 0);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::AIAnalysisComplete
+        ));
+    }
 }

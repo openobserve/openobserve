@@ -63,3 +63,29 @@ impl Related<super::reports::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "d-1".to_string(),
+            dashboard_id: "dash-001".to_string(),
+            folder_id: "folder-1".to_string(),
+            owner: "admin@example.com".to_string(),
+            role: None,
+            title: "My Dashboard".to_string(),
+            description: Some("A test dashboard".to_string()),
+            data: serde_json::json!({"panels": []}),
+            version: 1,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        assert_eq!(m.id, "d-1");
+        assert_eq!(m.title, "My Dashboard");
+        assert_eq!(m.version, 1);
+        assert!(m.role.is_none());
+    }
+}

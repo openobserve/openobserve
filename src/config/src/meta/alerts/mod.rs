@@ -2141,4 +2141,445 @@ mod test {
             result.err()
         );
     }
+
+    #[test]
+    fn test_default_align_time() {
+        assert!(default_align_time());
+    }
+
+    #[test]
+    fn test_agg_function_display() {
+        assert_eq!(AggFunction::Avg.to_string(), "avg");
+        assert_eq!(AggFunction::Min.to_string(), "min");
+        assert_eq!(AggFunction::Max.to_string(), "max");
+        assert_eq!(AggFunction::Sum.to_string(), "sum");
+        assert_eq!(AggFunction::Count.to_string(), "count");
+        assert_eq!(AggFunction::Median.to_string(), "median");
+        assert_eq!(AggFunction::P50.to_string(), "p50");
+        assert_eq!(AggFunction::P75.to_string(), "p75");
+        assert_eq!(AggFunction::P90.to_string(), "p90");
+        assert_eq!(AggFunction::P95.to_string(), "p95");
+        assert_eq!(AggFunction::P99.to_string(), "p99");
+    }
+
+    #[test]
+    fn test_agg_function_try_from_str() {
+        assert_eq!(AggFunction::try_from("avg").unwrap(), AggFunction::Avg);
+        assert_eq!(AggFunction::try_from("AVG").unwrap(), AggFunction::Avg);
+        assert_eq!(AggFunction::try_from("min").unwrap(), AggFunction::Min);
+        assert_eq!(AggFunction::try_from("max").unwrap(), AggFunction::Max);
+        assert_eq!(AggFunction::try_from("sum").unwrap(), AggFunction::Sum);
+        assert_eq!(AggFunction::try_from("count").unwrap(), AggFunction::Count);
+        assert_eq!(
+            AggFunction::try_from("median").unwrap(),
+            AggFunction::Median
+        );
+        assert_eq!(AggFunction::try_from("p50").unwrap(), AggFunction::P50);
+        assert_eq!(AggFunction::try_from("p75").unwrap(), AggFunction::P75);
+        assert_eq!(AggFunction::try_from("p90").unwrap(), AggFunction::P90);
+        assert_eq!(AggFunction::try_from("p95").unwrap(), AggFunction::P95);
+        assert_eq!(AggFunction::try_from("p99").unwrap(), AggFunction::P99);
+        assert!(AggFunction::try_from("unknown").is_err());
+    }
+
+    #[test]
+    fn test_query_type_display() {
+        assert_eq!(QueryType::Custom.to_string(), "custom");
+        assert_eq!(QueryType::SQL.to_string(), "sql");
+        assert_eq!(QueryType::PromQL.to_string(), "promql");
+    }
+
+    #[test]
+    fn test_query_type_from_str() {
+        assert_eq!(QueryType::from("custom"), QueryType::Custom);
+        assert_eq!(QueryType::from("sql"), QueryType::SQL);
+        assert_eq!(QueryType::from("SQL"), QueryType::SQL);
+        assert_eq!(QueryType::from("promql"), QueryType::PromQL);
+        assert_eq!(QueryType::from("unknown"), QueryType::Custom);
+    }
+
+    #[test]
+    fn test_operator_display() {
+        assert_eq!(Operator::EqualTo.to_string(), "=");
+        assert_eq!(Operator::NotEqualTo.to_string(), "!=");
+        assert_eq!(Operator::GreaterThan.to_string(), ">");
+        assert_eq!(Operator::GreaterThanEquals.to_string(), ">=");
+        assert_eq!(Operator::LessThan.to_string(), "<");
+        assert_eq!(Operator::LessThanEquals.to_string(), "<=");
+        assert_eq!(Operator::Contains.to_string(), "contains");
+        assert_eq!(Operator::NotContains.to_string(), "not contains");
+    }
+
+    #[test]
+    fn test_condition_group_has_conditions_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        assert!(!group.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_group_has_conditions_non_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: Some(false),
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_group_validate_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        // Empty group is invalid
+        assert!(group.validate().is_err());
+    }
+
+    #[test]
+    fn test_condition_group_validate_wrong_filter_type() {
+        let group = ConditionGroup {
+            filter_type: "condition".to_string(), // wrong — must be "group"
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.validate().is_err());
+    }
+
+    #[test]
+    fn test_condition_group_validate_non_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "status".to_string(),
+                operator: Operator::GreaterThan,
+                value: serde_json::Value::Number(serde_json::Number::from(400)),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.validate().is_ok());
+    }
+
+    #[test]
+    fn test_alert_condition_params_unsupported_version_returns_error() {
+        // version 3 → _ => Err branch in Deserialize
+        let json = r#"{"version": 3, "conditions": {}}"#;
+        let result: Result<AlertConditionParams, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Unsupported version"), "unexpected: {msg}");
+    }
+
+    #[test]
+    fn test_alert_condition_params_v2_missing_conditions_returns_error() {
+        // version 2 without "conditions" field → error
+        let json = r#"{"version": 2}"#;
+        let result: Result<AlertConditionParams, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("conditions field missing"),
+            "unexpected: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_alert_condition_params_v1_serialize_roundtrip() {
+        // V1 serialize → delegates to ConditionList::serialize
+        let conditions = ConditionList::AndNode {
+            and: vec![ConditionList::EndCondition(Condition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: false,
+            })],
+        };
+        let params = AlertConditionParams::V1(conditions);
+        let serialized = serde_json::to_string(&params).unwrap();
+        assert!(
+            serialized.contains("\"and\""),
+            "V1 should serialize as ConditionList"
+        );
+        assert!(
+            !serialized.contains("\"version\""),
+            "V1 should have no version field"
+        );
+    }
+
+    #[test]
+    fn test_alert_condition_params_v2_serialize_includes_version() {
+        // V2 serialize → includes version:2 field
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        let params = AlertConditionParams::V2(group);
+        let serialized = serde_json::to_string(&params).unwrap();
+        assert!(
+            serialized.contains("\"version\":2"),
+            "V2 should include version:2"
+        );
+        assert!(
+            serialized.contains("\"conditions\""),
+            "V2 should include conditions field"
+        );
+    }
+
+    #[test]
+    fn test_frequency_type_serde() {
+        let cron = serde_json::to_string(&FrequencyType::Cron).unwrap();
+        assert_eq!(cron, "\"cron\"");
+        let minutes = serde_json::to_string(&FrequencyType::Minutes).unwrap();
+        assert_eq!(minutes, "\"minutes\"");
+        let back: FrequencyType = serde_json::from_str(&cron).unwrap();
+        assert_eq!(back, FrequencyType::Cron);
+        let back2: FrequencyType = serde_json::from_str(&minutes).unwrap();
+        assert_eq!(back2, FrequencyType::Minutes);
+        // default = Minutes
+        let d: FrequencyType = Default::default();
+        assert_eq!(d, FrequencyType::Minutes);
+    }
+
+    #[test]
+    fn test_logical_operator_serde_uppercase() {
+        let and = serde_json::to_string(&LogicalOperator::And).unwrap();
+        assert_eq!(and, "\"AND\"");
+        let or = serde_json::to_string(&LogicalOperator::Or).unwrap();
+        assert_eq!(or, "\"OR\"");
+        let back_and: LogicalOperator = serde_json::from_str(&and).unwrap();
+        assert_eq!(back_and, LogicalOperator::And);
+        let back_or: LogicalOperator = serde_json::from_str(&or).unwrap();
+        assert_eq!(back_or, LogicalOperator::Or);
+    }
+
+    #[test]
+    fn test_operator_serde_roundtrip() {
+        let cases = [
+            (Operator::EqualTo, "\"=\""),
+            (Operator::NotEqualTo, "\"!=\""),
+            (Operator::GreaterThan, "\">\""),
+            (Operator::GreaterThanEquals, "\">=\""),
+            (Operator::LessThan, "\"<\""),
+            (Operator::LessThanEquals, "\"<=\""),
+            (Operator::Contains, "\"contains\""),
+            (Operator::NotContains, "\"not_contains\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: Operator = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_trigger_condition_timezone_none_absent_from_json() {
+        let tc = TriggerCondition {
+            timezone: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("timezone"));
+    }
+
+    #[test]
+    fn test_trigger_condition_timezone_some_present_in_json() {
+        let tc = TriggerCondition {
+            timezone: Some("America/New_York".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("timezone"));
+        assert_eq!(obj["timezone"], serde_json::json!("America/New_York"));
+    }
+
+    #[test]
+    fn test_condition_item_condition_ignore_case_none_absent_from_json() {
+        let cic = ConditionItemCondition {
+            column: "level".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("error"),
+            ignore_case: None,
+            logical_operator: LogicalOperator::And,
+        };
+        let json = serde_json::to_value(&cic).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("ignore_case"));
+    }
+
+    #[test]
+    fn test_condition_item_condition_ignore_case_some_present_in_json() {
+        let cic = ConditionItemCondition {
+            column: "level".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("error"),
+            ignore_case: Some(true),
+            logical_operator: LogicalOperator::Or,
+        };
+        let json = serde_json::to_value(&cic).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("ignore_case"));
+        assert_eq!(obj["ignore_case"], serde_json::json!(true));
+    }
+
+    fn make_end_condition() -> ConditionList {
+        ConditionList::EndCondition(Condition {
+            column: "field".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("value"),
+            ignore_case: false,
+        })
+    }
+
+    #[test]
+    fn test_condition_list_depth_end_condition() {
+        assert_eq!(make_end_condition().depth(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_depth_legacy_conditions() {
+        let cond = ConditionList::LegacyConditions(vec![Condition {
+            column: "c".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!(1),
+            ignore_case: false,
+        }]);
+        assert_eq!(cond.depth(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_depth_and_node() {
+        let node = ConditionList::AndNode {
+            and: vec![make_end_condition(), make_end_condition()],
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_or_node() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_nested() {
+        let inner = ConditionList::AndNode {
+            and: vec![make_end_condition()],
+        };
+        let outer = ConditionList::OrNode { or: vec![inner] };
+        // outer (depth 1) → inner AndNode (depth 2) → EndCondition (depth 1): total 3
+        assert_eq!(outer.depth(), 3);
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_end_condition() {
+        assert!(make_end_condition().has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        assert!(node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_and_node_empty() {
+        let node = ConditionList::AndNode { and: vec![] };
+        assert!(!node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_or_node_non_empty() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        assert!(node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_legacy_empty() {
+        let node = ConditionList::LegacyConditions(vec![]);
+        assert!(!node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_and_node() {
+        let node = ConditionList::AndNode {
+            and: vec![make_end_condition(), make_end_condition()],
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_or_node() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_end_condition() {
+        let node = make_end_condition();
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+        assert!(matches!(items[0], ConditionList::EndCondition(_)));
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_legacy_conditions() {
+        let cond = Condition {
+            column: "x".to_string(),
+            operator: Operator::GreaterThan,
+            value: serde_json::json!(5),
+            ignore_case: false,
+        };
+        let node = ConditionList::LegacyConditions(vec![cond]);
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+        assert!(matches!(items[0], ConditionList::EndCondition(_)));
+    }
 }

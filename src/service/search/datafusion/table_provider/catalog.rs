@@ -73,3 +73,91 @@ impl SchemaProvider for StreamTypeProvider {
         unreachable!("deregister_table is not implemented")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema, SchemaRef};
+    use async_trait::async_trait;
+    use datafusion::{
+        catalog::SchemaProvider,
+        datasource::{TableProvider, TableType},
+        logical_expr::TableProviderFilterPushDown,
+        prelude::Expr,
+    };
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct DummyTable(SchemaRef);
+
+    impl DummyTable {
+        fn new() -> Arc<Self> {
+            Arc::new(Self(Arc::new(Schema::new(vec![Field::new(
+                "id",
+                DataType::Int64,
+                false,
+            )]))))
+        }
+    }
+
+    #[async_trait]
+    impl TableProvider for DummyTable {
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn schema(&self) -> SchemaRef {
+            self.0.clone()
+        }
+        fn table_type(&self) -> TableType {
+            TableType::Base
+        }
+        async fn scan(
+            &self,
+            _: &dyn datafusion::catalog::Session,
+            _: Option<&Vec<usize>>,
+            _: &[Expr],
+            _: Option<usize>,
+        ) -> datafusion::common::Result<Arc<dyn datafusion::physical_plan::ExecutionPlan>> {
+            unimplemented!()
+        }
+        fn supports_filters_pushdown(
+            &self,
+            filters: &[&Expr],
+        ) -> datafusion::common::Result<Vec<TableProviderFilterPushDown>> {
+            Ok(vec![TableProviderFilterPushDown::Inexact; filters.len()])
+        }
+    }
+
+    #[tokio::test]
+    async fn test_table_names_empty() {
+        let provider = StreamTypeProvider::create("logs").await.unwrap();
+        assert!(provider.table_names().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_table_exist_false_when_not_registered() {
+        let provider = StreamTypeProvider::create("logs").await.unwrap();
+        assert!(!provider.table_exist("default"));
+    }
+
+    #[tokio::test]
+    async fn test_register_then_exist() {
+        let provider = StreamTypeProvider::create("logs").await.unwrap();
+        provider
+            .register_table("default".to_string(), DummyTable::new())
+            .unwrap();
+        assert!(provider.table_exist("default"));
+    }
+
+    #[tokio::test]
+    async fn test_table_names_after_register() {
+        let provider = StreamTypeProvider::create("logs").await.unwrap();
+        provider
+            .register_table("stream_a".to_string(), DummyTable::new())
+            .unwrap();
+        let names = provider.table_names();
+        assert_eq!(names, vec!["stream_a"]);
+    }
+}

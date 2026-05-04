@@ -35,3 +35,19 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            r#type: "default".to_string(),
+            content: "You are a helpful assistant.".to_string(),
+            updated_at: 1000,
+        };
+        assert_eq!(m.r#type, "default");
+        assert!(!m.content.is_empty());
+    }
+}

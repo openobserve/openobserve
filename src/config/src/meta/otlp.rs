@@ -19,3 +19,33 @@ pub enum OtlpRequestType {
     HttpJson,
     HttpProtobuf,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_otlp_request_type_equality() {
+        assert_eq!(OtlpRequestType::Grpc, OtlpRequestType::Grpc);
+        assert_eq!(OtlpRequestType::HttpJson, OtlpRequestType::HttpJson);
+        assert_eq!(OtlpRequestType::HttpProtobuf, OtlpRequestType::HttpProtobuf);
+        assert_ne!(OtlpRequestType::Grpc, OtlpRequestType::HttpJson);
+        assert_ne!(OtlpRequestType::HttpJson, OtlpRequestType::HttpProtobuf);
+    }
+
+    #[test]
+    fn test_otlp_request_type_debug() {
+        assert!(format!("{:?}", OtlpRequestType::Grpc).contains("Grpc"));
+        assert!(format!("{:?}", OtlpRequestType::HttpJson).contains("HttpJson"));
+        assert!(format!("{:?}", OtlpRequestType::HttpProtobuf).contains("HttpProtobuf"));
+    }
+
+    #[test]
+    fn test_otlp_request_type_copy_clone() {
+        let a = OtlpRequestType::HttpJson;
+        let b = a;
+        let c = a.clone();
+        assert_eq!(a, b);
+        assert_eq!(a, c);
+    }
+}

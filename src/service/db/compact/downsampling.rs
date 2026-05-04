@@ -148,6 +148,18 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_mk_key_format() {
+        let key = mk_key("myorg", StreamType::Metrics, "cpu_usage", (0, 100));
+        assert_eq!(key, "/compact/downsampling/myorg/metrics/cpu_usage/0/100");
+    }
+
+    #[test]
+    fn test_mk_key_different_stream_types() {
+        let key = mk_key("org1", StreamType::Logs, "app_logs", (50, 200));
+        assert_eq!(key, "/compact/downsampling/org1/logs/app_logs/50/200");
+    }
+
     #[tokio::test]
     async fn test_downsampling() {
         const OFFSET: i64 = 100;

@@ -35,3 +35,18 @@ pub async fn emit_rollback_event() -> Result<(), Error> {
         .delete(AI_PROMPTS_WATCH_PREFIX, false, true, None)
         .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ai_prompts_watch_prefix_value() {
+        assert_eq!(AI_PROMPTS_WATCH_PREFIX, "/ai_prompts/");
+    }
+
+    #[test]
+    fn test_ai_prompts_watch_prefix_starts_with_slash() {
+        assert!(AI_PROMPTS_WATCH_PREFIX.starts_with('/'));
+    }
+}

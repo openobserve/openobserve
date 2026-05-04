@@ -1634,3 +1634,107 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
     #[cfg(not(feature = "enterprise"))]
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use hashbrown::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_generate_filter_from_equal_items_empty() {
+        let result = generate_filter_from_equal_items(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_generate_filter_from_equal_items_single_pair() {
+        let items = vec![("field1".to_string(), "val1".to_string())];
+        let result = generate_filter_from_equal_items(&items);
+        assert_eq!(result.len(), 1);
+        let (field, values) = &result[0];
+        assert_eq!(field, "field1");
+        assert_eq!(values, &["val1"]);
+    }
+
+    #[test]
+    fn test_generate_filter_from_equal_items_groups_by_field() {
+        let items = vec![
+            ("a".to_string(), "3".to_string()),
+            ("b".to_string(), "5".to_string()),
+            ("a".to_string(), "4".to_string()),
+            ("b".to_string(), "6".to_string()),
+        ];
+        let mut result = generate_filter_from_equal_items(&items);
+        result.sort_by(|x, y| x.0.cmp(&y.0));
+        assert_eq!(result.len(), 2);
+        let (_, a_vals) = result.iter().find(|(f, _)| f == "a").unwrap();
+        let mut a_vals = a_vals.clone();
+        a_vals.sort();
+        assert_eq!(a_vals, vec!["3", "4"]);
+        let (_, b_vals) = result.iter().find(|(f, _)| f == "b").unwrap();
+        let mut b_vals = b_vals.clone();
+        b_vals.sort();
+        assert_eq!(b_vals, vec!["5", "6"]);
+    }
+
+    #[test]
+    fn test_generate_filter_from_equal_items_single_field_multiple_values() {
+        let items = vec![
+            ("status".to_string(), "200".to_string()),
+            ("status".to_string(), "404".to_string()),
+            ("status".to_string(), "500".to_string()),
+        ];
+        let result = generate_filter_from_equal_items(&items);
+        assert_eq!(result.len(), 1);
+        let (_, values) = &result[0];
+        let mut v = values.clone();
+        v.sort();
+        assert_eq!(v, vec!["200", "404", "500"]);
+    }
+
+    #[test]
+    fn test_generate_search_schema_diff_no_diff() {
+        let field = Arc::new(Field::new("col1", DataType::Utf8, false));
+        let schema = Schema::new(vec![field.clone()]);
+        let map: HashMap<&String, &Arc<Field>> = [(field.name(), &field)].into_iter().collect();
+        let diff = generate_search_schema_diff(&schema, &map);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_generate_search_schema_diff_detects_type_change() {
+        let old_field = Arc::new(Field::new("col1", DataType::Utf8, false));
+        let new_field = Arc::new(Field::new("col1", DataType::Int64, false));
+        let schema = Schema::new(vec![old_field.clone()]);
+        let map: HashMap<&String, &Arc<Field>> =
+            [(new_field.name(), &new_field)].into_iter().collect();
+        let diff = generate_search_schema_diff(&schema, &map);
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff.get("col1").unwrap(), &DataType::Int64);
+    }
+
+    #[test]
+    fn test_generate_search_schema_diff_missing_in_latest() {
+        let field = Arc::new(Field::new("col1", DataType::Utf8, false));
+        let schema = Schema::new(vec![field]);
+        let map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        let diff = generate_search_schema_diff(&schema, &map);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_server_internal_error_contains_message() {
+        let err = server_internal_error("disk full");
+        assert!(err.to_string().contains("disk full"));
+    }
+
+    #[test]
+    fn test_check_search_allowed_non_enterprise_always_ok() {
+        assert!(check_search_allowed("myorg", None).is_ok());
+        assert!(check_search_allowed("myorg", Some("logs")).is_ok());
+    }
+}

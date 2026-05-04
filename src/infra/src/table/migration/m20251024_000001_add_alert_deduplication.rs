@@ -260,3 +260,15 @@ enum AlertDedupState {
     NotificationSent,
     CreatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(Migration.name(), "m20251024_000001_add_alert_deduplication");
+    }
+}
