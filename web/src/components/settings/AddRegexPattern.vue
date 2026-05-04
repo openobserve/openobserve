@@ -164,8 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     name="arrow_right_alt"
                     class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1"
-                  /> </OButton
-                >"
+                  />
+                </OButton>
               </div>
               <div class="regex-pattern-input">
                 <div
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OButton
                     variant="primary"
-                    size="xs"
+                    size="chip"
                     :disabled="regexPatternInputs.pattern.length === 0"
                     @click="testStringOutput"
                   >
