@@ -331,6 +331,27 @@ export function applyFieldGrouping(
 }
 
 /**
+ * Decide whether semantic field grouping should be applied.
+ *
+ * Grouping is suppressed when multiple streams are selected because the
+ * multi-stream layout uses per-stream label rows (group: streamName) and
+ * semantic re-grouping would discard those headers.
+ */
+export function shouldApplyFieldGrouping(opts: {
+  semanticIndex: SemanticIndex | null;
+  streamCount: number;
+  udsActive: boolean;
+  udsFieldLimit: number;
+  totalSchemaFieldCount: number;
+}): boolean {
+  if (!opts.semanticIndex) return false;
+  if (opts.streamCount !== 1) return false;
+  if (opts.udsActive) return true;
+  if (opts.udsFieldLimit > 0) return opts.totalSchemaFieldCount <= opts.udsFieldLimit;
+  return true;
+}
+
+/**
  * Filter `fields` according to group-collapse state.
  *
  * Rules:

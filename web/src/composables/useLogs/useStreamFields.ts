@@ -41,6 +41,7 @@ import {
   buildSemanticIndex,
   discoverPrefixes,
   applyFieldGrouping,
+  shouldApplyFieldGrouping,
   CATEGORY,
   type SemanticIndex,
   type FieldObj,
@@ -799,6 +800,7 @@ export const useStreamFields = () => {
 
                   if (fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
+                    if (!interestingFieldsMapping[stream.name]) interestingFieldsMapping[stream.name] = [];
                     interestingFieldsMapping[stream.name].push(fieldObj);
                     interestingFieldsMap[fieldObj.name] = true;
                   }
@@ -827,12 +829,13 @@ export const useStreamFields = () => {
         //     if no UDS is defined at all (udsFieldLimit=0), fall back to a reasonable
         //     default threshold so grouping still works for normal streams.
         const udsFieldLimit = userDefineSchemaSettings.length;
-        const shouldGroup =
-          semanticIndex !== null &&
-          (udsActive ||
-            (udsFieldLimit > 0
-              ? totalSchemaFieldCount <= udsFieldLimit
-              : true));
+        const shouldGroup = shouldApplyFieldGrouping({
+          semanticIndex,
+          streamCount: searchObj.data.stream.selectedStream.length,
+          udsActive,
+          udsFieldLimit,
+          totalSchemaFieldCount,
+        });
 
         if (!shouldGroup) {
           searchObj.data.stream.selectedStreamFields = [
