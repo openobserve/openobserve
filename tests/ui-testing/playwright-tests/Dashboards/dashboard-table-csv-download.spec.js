@@ -9,7 +9,9 @@ import { cleanupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
   setupTablePanel,
+  buildPromQLPanel,
 } from "./utils/configPanelHelpers.js";
+import { ensureMetricsIngested } from "../utils/shared-metrics-setup.js";
 import testLogger from "../utils/test-logger.js";
 import {
   TABLE_SELECTOR,
@@ -308,6 +310,247 @@ test.describe("Dashboard Table Chart — CSV Download", () => {
       expect(hasNonEmptyValue).toBe(true);
 
       testLogger.info("JSON download verification passed", {
+        columnCount: parsed.columns.length,
+        rowCount: parsed.rows.length,
+      });
+    }
+  );
+});
+
+/**
+ * Dashboard PromQL Table Chart — CSV/JSON Download Tests
+ *
+ * Covers the fix where PromQL table panels could not download CSV/JSON at all
+ * because PromQLTableChart rendered instead of TableRenderer, leaving the
+ * tableRendererRef null. The fix wires PromQLTableChart.downloadTableAsCSV/JSON
+ * to delegate to its inner TableRenderer.
+ */
+test.describe("Dashboard PromQL Table Chart — CSV Download", () => {
+  test.describe.configure({ mode: "serial", retries: 1 });
+
+  let pm;
+  let dashboardName;
+
+  test.beforeAll(async () => {
+    await ensureMetricsIngested();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await navigateToBase(page);
+    pm = new PageManager(page);
+    dashboardName = generateDashboardName();
+  });
+
+  test.afterEach(async ({ page }) => {
+    try {
+      await cleanupTestDashboard(page, pm, dashboardName);
+    } catch (e) {
+      testLogger.warn("Dashboard cleanup failed", { error: e.message });
+    }
+  });
+
+  /** Installs a Blob interceptor to capture CSV/JSON content from blob: URLs. */
+  async function installBlobInterceptor(page) {
+    await page.evaluate(() => {
+      window.__capturedBlobs = [];
+      const OrigBlob = window.Blob;
+      window.Blob = class InterceptedBlob extends OrigBlob {
+        constructor(parts, options) {
+          super(parts, options);
+          try {
+            const content = typeof parts[0] === "string" ? parts[0] : "";
+            window.__capturedBlobs.push({
+              content,
+              type: options?.type || "",
+            });
+          } catch (_) {
+            // Ignore errors from non-string blobs
+          }
+        }
+      };
+    });
+  }
+
+  /** Retrieves the last captured blob content for a given MIME type. */
+  async function getCapturedBlob(page, mimeType) {
+    return page.evaluate((type) => {
+      const blobs = window.__capturedBlobs || [];
+      for (let i = blobs.length - 1; i >= 0; i--) {
+        if (blobs[i].type === type) return blobs[i].content;
+      }
+      return null;
+    }, mimeType);
+  }
+
+  /**
+   * Saves the panel and waits for the PromQL table to render with data.
+   * Handles two flaky scenarios:
+   * 1. Save button click not registering → retry click with force
+   * 2. Dashboard shows "No Data" initially → reload page to force fresh query
+   */
+  async function savePanelAndWaitForTable(page, pm) {
+    // Ensure any overlays are dismissed before saving
+    await page.waitForTimeout(500);
+
+    // Click save button — use force in case an overlay partially covers it
+    const saveBtn = page.locator('[data-test="dashboard-panel-save"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click({ force: true });
+
+    // Wait for navigation away from panel editor
+    await page.waitForURL((url) => !url.toString().includes("add_panel"), {
+      timeout: 20000,
+    });
+    testLogger.info("Navigated to dashboard view");
+
+    // Wait for network to settle after dashboard loads
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    // Check if table has data; if "No Data" is shown, reload to force fresh query
+    const hasData = await page.evaluate((selector) => {
+      const table = document.querySelector(selector);
+      if (!table) return false;
+      const rows = table.querySelectorAll("tbody tr");
+      return rows && rows.length > 0 &&
+        Array.from(rows).some((row) =>
+          Array.from(row.querySelectorAll("td")).some(
+            (cell) => cell.textContent.trim() !== ""
+          )
+        );
+    }, TABLE_SELECTOR).catch(() => false);
+
+    if (!hasData) {
+      testLogger.info("Table has no data after initial load, reloading page");
+      await page.reload({ waitUntil: "networkidle" });
+    }
+
+    // Wait for table with non-empty data rows
+    await page.waitForFunction(
+      (selector) => {
+        const table = document.querySelector(selector);
+        if (!table) return false;
+        const rows = table.querySelectorAll("tbody tr");
+        return (
+          rows &&
+          rows.length > 0 &&
+          Array.from(rows).some((row) =>
+            Array.from(row.querySelectorAll("td")).some(
+              (cell) => cell.textContent.trim() !== ""
+            )
+          )
+        );
+      },
+      TABLE_SELECTOR,
+      { timeout: 30000 }
+    );
+
+    // Allow TanStack row model to stabilise
+    await page.waitForTimeout(1500);
+    testLogger.info("PromQL dashboard table is ready with data");
+  }
+
+  test(
+    "should download CSV with populated data from a PromQL table panel",
+    { tag: ["@tableChart", "@promql", "@csvDownload", "@smoke", "@P0"] },
+    async ({ page }) => {
+      const panelName = "PromQL CSV Panel";
+
+      // 1. Create PromQL table panel (opens config sidebar)
+      testLogger.info("Setting up PromQL table panel", {
+        dashboardName,
+        panelName,
+      });
+      await buildPromQLPanel(page, pm, dashboardName, { chartType: "table", panelName, query: "memory_usage" });
+
+      // 2. Save (with pre-registered response listener) and wait for table data
+      await savePanelAndWaitForTable(page, pm);
+
+      // 3. Verify table data is visible
+      const rowCount = await page.$$eval(
+        `${TABLE_SELECTOR} tbody tr`,
+        (rows) =>
+          rows.filter((r) =>
+            Array.from(r.querySelectorAll("td")).some(
+              (td) => td.textContent.trim() !== ""
+            )
+          ).length
+      );
+      testLogger.info("PromQL table row count", { rowCount });
+      expect(rowCount).toBeGreaterThan(0);
+
+      // 4. Install blob interceptor, trigger CSV download
+      await installBlobInterceptor(page);
+      await pm.dashboardPanelEdit.downloadCsvPanel(panelName);
+      await page.waitForTimeout(500);
+
+      // 5. Retrieve and validate CSV content
+      const csvContent = await getCapturedBlob(page, "text/csv");
+      testLogger.info("PromQL CSV captured", {
+        length: csvContent?.length ?? 0,
+        preview: csvContent?.substring(0, 300),
+      });
+
+      expect(csvContent).not.toBeNull();
+      expect(csvContent.length).toBeGreaterThan(0);
+
+      const csvLines = csvContent
+        .split("\n")
+        .filter((line) => line.trim() !== "");
+      expect(csvLines.length).toBeGreaterThanOrEqual(2);
+
+      // 6. Verify data rows have actual values (the bug fix validation)
+      const dataLines = csvLines.slice(1);
+      const hasNonEmptyData = dataLines.some((line) => {
+        const cells = line.split(",").map((c) => c.replace(/^"|"$/g, ""));
+        return cells.some((cell) => cell.trim() !== "");
+      });
+      expect(hasNonEmptyData).toBe(true);
+
+      testLogger.info("PromQL CSV download verification passed", {
+        headerCount: csvLines[0].split(",").length,
+        dataRowCount: dataLines.length,
+      });
+    }
+  );
+
+  test(
+    "should download JSON with populated data from a PromQL table panel",
+    { tag: ["@tableChart", "@promql", "@jsonDownload", "@functional", "@P1"] },
+    async ({ page }) => {
+      const panelName = "PromQL JSON Panel";
+
+      await buildPromQLPanel(page, pm, dashboardName, { chartType: "table", panelName, query: "memory_usage" });
+      await savePanelAndWaitForTable(page, pm);
+
+      // Install interceptor, download JSON
+      await installBlobInterceptor(page);
+      await pm.dashboardPanelEdit.downloadJsonPanel(panelName);
+      await page.waitForTimeout(500);
+
+      const jsonContent = await getCapturedBlob(page, "application/json");
+      testLogger.info("PromQL JSON captured", {
+        length: jsonContent?.length ?? 0,
+      });
+
+      expect(jsonContent).not.toBeNull();
+      expect(jsonContent.length).toBeGreaterThan(0);
+
+      const parsed = JSON.parse(jsonContent);
+      expect(parsed.columns).toBeDefined();
+      expect(Array.isArray(parsed.columns)).toBe(true);
+      expect(parsed.columns.length).toBeGreaterThan(0);
+
+      expect(parsed.rows).toBeDefined();
+      expect(Array.isArray(parsed.rows)).toBe(true);
+      expect(parsed.rows.length).toBeGreaterThan(0);
+
+      const firstRow = parsed.rows[0];
+      const hasNonEmptyValue = Object.values(firstRow).some(
+        (v) => v !== null && v !== undefined && v !== ""
+      );
+      expect(hasNonEmptyValue).toBe(true);
+
+      testLogger.info("PromQL JSON download verification passed", {
         columnCount: parsed.columns.length,
         rowCount: parsed.rows.length,
       });
