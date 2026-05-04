@@ -24,6 +24,7 @@
       <!-- Field dropdown slot: render the button only when the slot is provided -->
       <ODropdown
         v-if="hasFieldDropdownSlot"
+        v-model:open="dropdownOpenMap[key]"
         side="bottom"
         align="start"
       >
@@ -35,7 +36,7 @@
             class="q-ml-sm"
             aria-label="Add icon"
           >
-            <img :src="getImageURL('images/common/add_icon.svg')" class="tw:size-3" alt="" />
+            <q-icon :name="dropdownOpenMap[key] ? 'expand_less' : 'expand_more'" size="14px" />
           </OButton>
         </template>
         <div class="logs-table-list tw:min-w-[180px]">
@@ -69,7 +70,7 @@
 </template>
 
 <script lang="ts">
-import { computed, useSlots } from "vue";
+import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard as quasarCopyToClipboard, useQuasar } from "quasar";
@@ -114,6 +115,7 @@ export default {
     const slots = useSlots();
 
     const hasFieldDropdownSlot = computed(() => !!slots["field-dropdown"]);
+    const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
     const copyToClipboard = () => {
       quasarCopyToClipboard(JSON.stringify(props.value, null, 2));
@@ -145,6 +147,7 @@ export default {
       copyToClipboard,
       getContentSize,
       getImageURL,
+      dropdownOpenMap,
     };
   },
 };

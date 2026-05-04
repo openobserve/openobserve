@@ -2,6 +2,7 @@
   <div class="tw:flex tw:items-center tw:w-full">
     <ODropdown
       v-if="hasDropdownSlot"
+      v-model:open="isDropdownOpen"
       side="bottom"
       align="start"
     >
@@ -12,7 +13,7 @@
           variant="ghost"
           aria-label="Add icon"
         >
-          <img :src="getImageURL('images/common/add_icon.svg')" class="tw:size-3" alt="" />
+          <q-icon :name="isDropdownOpen ? 'expand_less' : 'expand_more'" size="14px" />
         </OButton>
       </template>
       <div class="logs-table-list tw:min-w-[180px]">
@@ -24,7 +25,7 @@
 </template>
 
 <script lang="ts">
-import { computed, useSlots } from "vue";
+import { computed, ref, useSlots } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -48,10 +49,12 @@ export default {
   setup() {
     const slots = useSlots();
     const hasDropdownSlot = computed(() => !!slots["dropdown"]);
+    const isDropdownOpen = ref(false);
 
     return {
       hasDropdownSlot,
       getImageURL,
+      isDropdownOpen,
     };
   },
 };

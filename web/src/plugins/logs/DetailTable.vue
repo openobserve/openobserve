@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="!shouldWrapValues ? 'ellipsis' : ''"
               >
                 <div class="tw:flex tw:items-start tw:gap-2">
-                  <ODropdown side="bottom" align="start">
+                  <ODropdown v-model:open="tableDropdownOpenMap[props.row.field]" side="bottom" align="start">
                     <template #trigger>
                       <OButton
                         :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="ghost"
                         aria-label="Add icon"
                       >
-                        <img :src="getImageURL('images/common/add_icon.svg')" class="tw:size-3" alt="" />
+                        <q-icon :name="tableDropdownOpenMap[props.row.field] ? 'expand_less' : 'expand_more'" size="14px" />
                       </OButton>
                     </template>
                     <ODropdownItem
@@ -428,7 +428,7 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
-import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
+import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -541,6 +541,7 @@ export default defineComponent({
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
+    const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
@@ -820,6 +821,7 @@ export default defineComponent({
       selectedRelativeValue,
       recordSizeOptions,
       getImageURL,
+      tableDropdownOpenMap,
       shouldWrapValues,
       toggleWrapLogDetails,
       copyContentToClipboard,
