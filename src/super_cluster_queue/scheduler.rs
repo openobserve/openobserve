@@ -210,13 +210,14 @@ async fn update(msg: Message) -> Result<()> {
         }
         TriggerModule::AnomalyDetection => {
             // Only sync if the anomaly detection config still exists in this region.
-            use infra::table::entity::anomaly_detection_config;
-            use sea_orm::EntityTrait;
-            if anomaly_detection_config::Entity::find_by_id(&trigger.module_key)
-                .one(conn)
-                .await
-                .unwrap_or(None)
-                .is_some()
+            if infra::table::anomaly_detection::config::get_by_id(
+                conn,
+                &trigger.org,
+                &trigger.module_key,
+            )
+            .await
+            .unwrap_or(None)
+            .is_some()
             {
                 scheduler::push(trigger.clone()).await.map_err(|e| {
                     let error_msg = format!(
