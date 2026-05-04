@@ -1326,10 +1326,11 @@ export default defineComponent({
 
     // Watch stream type changes to restore saved state or set new-alert defaults.
     // Fires when stream type prop changes (e.g. async load on edit, or user switching stream type).
-    watch(isEventBased, (eventBased) => {
+    watch(isEventBased, (eventBased, oldEventBased) => {
       if (eventBased) {
-        // Switched to logs/traces — restore saved function or default to total_events
-        if (props.isAggregationEnabled && props.inputData.aggregation?.function) {
+        // Switched to logs/traces — restore saved function or default to total_events.
+        // When coming from metrics the aggregation defaults don't apply to log fields.
+        if (props.isAggregationEnabled && props.inputData.aggregation?.function && oldEventBased !== false) {
           selectedFunction.value = props.inputData.aggregation.function;
           localIsAggregationEnabled.value = true;
         } else {
