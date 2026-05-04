@@ -1178,6 +1178,7 @@ export default defineComponent({
   .date-time-arrow {
     transition: transform 0.25s ease;
     margin-left: auto;
+    font-size: 18px !important;
   }
   &.isOpen .date-time-arrow {
     transform: rotate(180deg);
