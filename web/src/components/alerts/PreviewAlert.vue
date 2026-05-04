@@ -229,6 +229,8 @@ onBeforeMount(() => {
     props.selectedTab === "sql" && props.formData.query_condition?.vrl_function
       ? true
       : false;
+  // Give y-axis labels enough room so they don't collide with the chart
+  dashboardPanelData.data.config.unit = "numbers"
   dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
   dashboardPanelData.data.queries[0].fields.stream_type =
     props.formData.stream_type;
