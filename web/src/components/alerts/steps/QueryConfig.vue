@@ -1649,15 +1649,28 @@ export default defineComponent({
       });
     };
 
+    // Helper to get numeric columns based on selected function
+    const getNumericColumns = (cols: any[]) => {
+      if (selectedFunction.value === 'count' || selectedFunction.value === 'total_events') {
+        return [...cols];
+      }
+      return cols.filter((column: any) => {
+        if (typeof column === "string") return false;
+        if (!column.type) return false;
+        return !/(?:utf8|string)/i.test(column.type);
+      });
+    };
+
     // Filtered columns for log measure column (unique count uses all fields, measure uses numeric)
-    const filteredLogMeasureColumns = ref([...props.columns]);
+    const filteredLogMeasureColumns = ref(getNumericColumns(props.columns));
     const filterLogMeasureColumns = (val: string, update: any) => {
       update(() => {
+        const numericCols = getNumericColumns(props.columns);
         if (val === "") {
-          filteredLogMeasureColumns.value = [...props.columns];
+          filteredLogMeasureColumns.value = numericCols;
         } else {
           const needle = val.toLowerCase();
-          filteredLogMeasureColumns.value = props.columns.filter((v: any) => {
+          filteredLogMeasureColumns.value = numericCols.filter((v: any) => {
             const label = typeof v === "string" ? v : v.label || v.value || "";
             return label.toLowerCase().indexOf(needle) > -1;
           });
@@ -2087,6 +2100,7 @@ export default defineComponent({
       (newCols) => {
         filteredFields.value = [...newCols];
         filteredNumericColumns.value = [...newCols];
+        filteredLogMeasureColumns.value = getNumericColumns(newCols);
 
         if (!isEventBased.value && props.inputData.aggregation?.having) {
           const currentCol = props.inputData.aggregation.having.column;
@@ -2202,6 +2216,7 @@ export default defineComponent({
 
     // When function switches to measure mode, reset threshold to >= 1 if group-by is empty
     watch(selectedFunction, (value) => {
+      filteredLogMeasureColumns.value = getNumericColumns(props.columns);
       if (value === 'total_events') return;
       const groupByEmpty = isEventBased.value
         ? !hasLogGroupByFields.value
