@@ -69,22 +69,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 config.isEnterprise == 'true' && searchRequestTraceIds.length
               "
               variant="ghost-destructive"
-              size="sm-action"
+              size="sm-toolbar"
               data-test="metrics-cancel"
               @click="cancelAddPanelQuery"
             >
-              {{ t('panel.cancel') }}
+              {{ t("panel.cancel") }}
             </OButton>
             <OButton
               v-else
               variant="primary"
-              size="sm-action"
+              size="sm-toolbar"
               data-test="metrics-apply"
               :loading="disable"
               :disabled="disable"
               @click="runQuery"
             >
-              {{ t('metrics.runQuery') }}
+              {{ t("metrics.runQuery") }}
             </OButton>
           </div>
         </div>
@@ -152,7 +152,7 @@ import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "Metrics",

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="metrics-explorer-run-query-button"
               data-cy="metrics-explorer-run-query-button"
               variant="primary"
-              size="sm-action"
+              size="sm-toolbar"
               :title="t('metrics.runQuery')"
               @click="runQuery"
             >
