@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="col-auto">
-        <OButton variant="ghost" size="icon-circle" v-close-popup="true">
+        <OButton variant="ghost" size="icon-circle" @click="$emit('close')">
           <template #icon-left
             ><img
               :src="getImageURL('images/common/close_icon.svg')"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm-action"
-          v-close-popup="true"
+          @click="$emit('close')"
           data-test="panel-layout-settings-cancel"
           >{{ t("dashboard.cancel") }}</OButton
         >
@@ -125,7 +125,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ["save:layout"],
+  emits: ["save:layout", "close"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();

@@ -1,21 +1,21 @@
 <template>
-  <q-dialog v-model="internalValue" persistent>
-    <q-card class="test-match-card" data-test="test-model-match-dialog">
-      <!-- Header -->
-      <div class="tmm-header">
+  <ODialog v-model:open="internalValue" persistent size="xl" :show-close="false" data-test="test-model-match-dialog">
+    <template #header>
+      <div class="tw:flex tw:items-start tw:justify-between tw:w-full tw:gap-2">
         <div>
           <div class="tmm-title">{{ t("modelPricing.testMatchTitle") }}</div>
           <div class="tmm-subtitle">
             {{ t("modelPricing.testMatchSubtitle") }}
           </div>
         </div>
-        <OButton variant="ghost" size="icon" v-close-popup>
+        <OButton variant="ghost" size="icon" @click="internalValue = false">
           <q-icon name="cancel" size="14px" />
         </OButton>
       </div>
+    </template>
 
-      <!-- Two-column body -->
-      <div class="tmm-body">
+    <!-- Two-column body -->
+    <div class="tmm-body" style="height: 100%">
         <!-- ── Left: Inputs ── -->
         <div class="tmm-inputs-panel">
           <!-- Model Name -->
@@ -244,12 +244,12 @@
         </div>
       </div>
 
-      <!-- Footer -->
-      <div class="tmm-footer">
+    <template #footer>
+      <div class="tw:flex tw:justify-end tw:items-center tw:gap-2">
         <OButton
           variant="outline"
           size="sm-action"
-          v-close-popup
+          @click="internalValue = false"
           data-test="test-match-close-btn"
         >
           {{ t("modelPricing.close") }}
@@ -264,10 +264,9 @@
         >
           {{ t("modelPricing.testMatch") }}
         </OButton>
-        <div class="tw:flex-1"></div>
       </div>
-    </q-card>
-  </q-dialog>
+    </template>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
@@ -276,6 +275,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -421,24 +421,11 @@ function formatRate(rate: number) {
 </script>
 
 <style lang="scss" scoped>
-/* ── Card Shell ─────────────────────────────────────── */
-.test-match-card {
-  width: 860px;
-  max-width: 95vw;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
 /* ── Header ─────────────────────────────────────────── */
 .tmm-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 20px 24px 16px;
-  border-bottom: 1px solid var(--o2-border-color);
 }
 
 .tmm-title {
@@ -1036,8 +1023,6 @@ function formatRate(rate: number) {
 .tmm-footer {
   display: flex;
   align-items: center;
-  padding: 10px 20px;
-  border-top: 1px solid var(--o2-border-color);
   gap: 8px;
 }
 

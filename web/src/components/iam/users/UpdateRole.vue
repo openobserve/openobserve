@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
         </div>
         <div class="col-auto">
-          <OButton v-close-popup="true" variant="ghost" size="icon-circle-sm">
+          <OButton @click="$emit('close')" variant="ghost" size="icon-circle-sm">
             <q-icon name="cancel" />
           </OButton>
         </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex justify-center q-mt-lg tw:gap-2">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="outline"
             size="sm-action"
           >
@@ -125,7 +125,7 @@ export default defineComponent({
       default: () => defaultValue(),
     },
   },
-  emits: ["update:modelValue", "updated", "finish"],
+  emits: ["update:modelValue", "updated", "finish", "close"],
   setup() {
     const store: any = useStore();
     const { t } = useI18n();

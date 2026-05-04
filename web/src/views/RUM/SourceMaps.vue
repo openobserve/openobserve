@@ -228,35 +228,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Delete Confirmation Dialog -->
-    <q-dialog v-model="deleteDialog.show">
-      <q-card data-test="delete-source-maps-dialog" style="min-width: 300px; width: 370px;">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ deleteDialog.title }}</div>
-          <div class="para">{{ deleteDialog.message }}</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <div class="tw:flex tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="cancel-button"
-              @click="deleteDialog.show = false"
-            >
-              Cancel
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="deleteSourceMap(); deleteDialog.show = false"
-              data-test="confirm-button"
-            >
-              OK
-            </OButton>
-          </div>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog
+      v-model:open="deleteDialog.show"
+      size="xs"
+      :title="deleteDialog.title"
+      data-test="delete-source-maps-dialog"
+    >
+      <p class="para">{{ deleteDialog.message }}</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="cancel-button"
+            @click="deleteDialog.show = false"
+          >
+            Cancel
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            @click="deleteSourceMap(); deleteDialog.show = false"
+            data-test="confirm-button"
+          >
+            OK
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
   </div>
 </template>
 
@@ -270,6 +269,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import sourcemapsService from "@/services/sourcemaps";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const store = useStore();
 const router = useRouter();

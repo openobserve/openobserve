@@ -11,11 +11,11 @@
       </div>
       <div class="col-auto">
         <q-icon
-          v-close-popup
           name="cancel"
           class="cursor-pointer tw:mr-3"
           size="20px"
           data-test="json-editor-close"
+          @click="$emit('close')"
         />
       </div>
     </div>
@@ -53,7 +53,7 @@
       <OButton
         variant="outline"
         size="sm-action"
-        v-close-popup
+        @click="$emit('close')"
         data-test="json-editor-cancel"
         >{{ t("common.cancel") }}</OButton
       >

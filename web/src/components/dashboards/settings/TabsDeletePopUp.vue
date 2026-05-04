@@ -17,24 +17,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-dialog>
-    <q-card style="width: 600px" data-test="dialog-box">
-      <q-card-section class="confirmBody">
-        <div class="head" data-test="dashboard-tab-delete-tab-head">
-          Delete
-          <span
-            style="text-decoration: underline"
-            data-test="dashboard-tab-delete-tab-name"
-            >{{
-              dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.name
-            }}</span
-          >
-        </div>
-        <div class="para" data-test="dashboard-tab-delete-tab-para">
-          This action cannot be undone. Are you sure you want to delete this
-          tab?
-        </div>
-      </q-card-section>
+  <ODialog
+    v-model:open="open"
+    size="md"
+  >
+    <template #header>
+      <span
+        data-test="dashboard-tab-delete-tab-head"
+        class="tw:text-base tw:font-semibold"
+      >
+        Delete
+        <span
+          style="text-decoration: underline"
+          data-test="dashboard-tab-delete-tab-name"
+          >{{
+            dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.name
+          }}</span
+        >
+      </span>
+    </template>
+
+    <div data-test="dialog-box">
+      <p class="para" data-test="dashboard-tab-delete-tab-para">
+        This action cannot be undone. Are you sure you want to delete this
+        tab?
+      </p>
 
       <!-- only show if there are panels in the tab -->
       <div
@@ -42,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.panels
             ?.length
         "
-        style="padding: 10px"
+        class="tw:mt-4"
         data-test="dashboard-tab-delete-tab-panels-container"
       >
         <div class="radio-group">
@@ -74,49 +81,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-radio>
         </div>
       </div>
+    </div>
 
-      <q-card-actions class="confirmActions">
-        <div class="button-container tw:gap-2">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            @click="onCancel"
-            data-test="cancel-button"
-          >
-            {{ t("confirmDialog.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="onConfirm"
-            data-test="confirm-button"
-          >
-            {{ t("confirmDialog.ok") }}
-          </OButton>
-        </div>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+    <template #footer>
+      <div class="tw:flex tw:justify-end tw:gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="onCancel"
+          data-test="cancel-button"
+        >
+          {{ t("confirmDialog.cancel") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          @click="onConfirm"
+          data-test="confirm-button"
+        >
+          {{ t("confirmDialog.ok") }}
+        </OButton>
+      </div>
+    </template>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { onMounted } from "vue";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "TabsDeletePopUp",
-  components: { OButton },
-  emits: ["update:ok", "update:cancel"],
-  props: ["tabId", "dashboardData"],
+  components: { OButton, ODialog },
+  emits: ["update:ok", "update:cancel", "update:modelValue"],
+  props: {
+    tabId: { type: String },
+    dashboardData: { type: Object },
+    modelValue: { type: Boolean, default: false },
+  },
   setup(props, { emit }) {
     const { t } = useI18n();
     const action = ref("move");
     const selectedTabToMovePanels = ref({ label: "Default", value: "default" });
     const moveTabOptions = ref([]);
+
+    const open = computed({
+      get: () => props.modelValue ?? false,
+      set: (v: boolean) => emit("update:modelValue", v),
+    });
 
     onMounted(() => {
       // update move tab options
@@ -136,28 +151,30 @@ export default defineComponent({
       // set selectedTabToMovePanels to [0]th value
       selectedTabToMovePanels.value = newMoveTabOptions[0];
 
-      // selectedTabToMovePanels.value = {
-      //   label: "Default",
-      //   value: "default",
-      // };
       moveTabOptions.value = newMoveTabOptions;
     });
 
     const onCancel = () => {
+      open.value = false;
       emit("update:cancel");
     };
 
     const onConfirm = () => {
       // if action is delete, then emit without passing the selectedTabToMovePanels as args
       // else pass the selectedTabToMovePanels
+      // if action is delete, then emit without passing the selectedTabToMovePanels as args
+      // else pass the selectedTabToMovePanels
       if (action.value === "delete") {
+        open.value = false;
         emit("update:ok");
         return;
       }
+      open.value = false;
       emit("update:ok", selectedTabToMovePanels.value.value);
     };
     return {
       t,
+      open,
       onCancel,
       onConfirm,
       action,

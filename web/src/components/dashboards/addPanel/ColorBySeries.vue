@@ -49,7 +49,7 @@
           : t("dashboard.applyColorBySeries")
       }}
     </OButton>
-    <q-dialog v-model="showColorBySeriesPopUp">
+    <ODialog v-model:open="showColorBySeriesPopUp" :show-close="false" :width="90">
       <ColorBySeriesPopUp
         :seriesOptions="seriesOptions?.series"
         :colorBySeries="
@@ -59,7 +59,7 @@
         @save="saveColorBySeriesconfig"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
-    </q-dialog>
+    </ODialog>
   </div>
 </template>
 
@@ -70,9 +70,10 @@ import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 export default defineComponent({
   name: "ColorBySeries",
-  components: { ColorBySeriesPopUp, OButton },
+  components: { ColorBySeriesPopUp, OButton, ODialog },
   props: {
     colorBySeriesData: {
       type: Object,

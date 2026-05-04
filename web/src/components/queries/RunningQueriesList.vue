@@ -97,15 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </q-table>
-    <q-dialog
-      v-model="showListSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="showListSchemaDialog"
+      size="lg"
       data-test="list-schema-dialog"
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
-    </q-dialog>
+    </ODrawer>
   </div>
 </template>
 
@@ -121,6 +119,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { List, X } from 'lucide-vue-next';
 import { getDuration, durationFormatter } from "@/utils/zincutils";
 
@@ -128,7 +127,7 @@ import { getDuration, durationFormatter } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData, OButton, List, X },
+  components: { QueryList, QTablePagination, NoData, OButton, List, X, ODrawer },
   props: {
     rows: {
       type: Array,

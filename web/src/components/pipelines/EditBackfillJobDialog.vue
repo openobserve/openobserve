@@ -15,34 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="show"
-    position="right"
-    full-height
-    maximized
+  <ODrawer
+    v-model:open="show"
+    :width="47"
     data-test="edit-backfill-job-dialog"
   >
-    <q-card class="tw-w-full" style="width: 600px">
-      <q-card-section class="q-pa-md">
-        <div class="flex items-center justify-between">
-          <div class="text-h6" data-test="dialog-title">
-            Edit Backfill Job
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon"
-            v-close-popup
-            data-test="close-dialog-btn"
-          >
-            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-          </OButton>
-        </div>
-      </q-card-section>
+    <template #header>
+      <div class="text-h6" data-test="dialog-title">Edit Backfill Job</div>
+    </template>
 
-      <q-separator />
-
-      <q-card-section class="q-pa-md">
-        <q-form @submit="onSubmit" class="tw-space-y-4">
+    <q-form @submit="onSubmit" id="edit-backfill-form" class="tw-space-y-4">
           <!-- Time Range Section -->
           <div>
             <div class="text-subtitle2 q-mb-sm">
@@ -146,33 +128,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-card>
           </q-expansion-item>
 
-          <!-- Error Message -->
-          <div v-if="errorMessage" class="text-negative">
-            <q-icon name="error" class="q-mr-sm" />
-            {{ errorMessage }}
-          </div>
+      <!-- Error Message -->
+      <div v-if="errorMessage" class="text-negative">
+        <q-icon name="error" class="q-mr-sm" />
+        {{ errorMessage }}
+      </div>
+    </q-form>
 
-          <!-- Form Actions -->
-          <div class="tw:flex tw:justify-end tw:gap-2 q-mt-md">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="onCancel"
-              data-test="cancel-btn"
-            >Cancel</OButton>
-            <OButton
-              type="submit"
-              variant="primary"
-              size="sm-action"
-              :loading="loading"
-              :disabled="loading"
-              data-test="update-btn"
-            >Update Job</OButton>
-          </div>
-        </q-form>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+    <template #footer>
+      <div class="tw:flex tw:justify-end tw:gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="onCancel"
+          data-test="cancel-btn"
+        >Cancel</OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :loading="loading"
+          :disabled="loading"
+          @click="onSubmit"
+          data-test="update-btn"
+        >Update Job</OButton>
+      </div>
+    </template>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -180,6 +161,7 @@ import { ref, computed, watch, nextTick } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { X } from "lucide-vue-next";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";

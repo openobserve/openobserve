@@ -117,21 +117,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
       </div>
     </div>
-      <q-dialog
-          v-model="showAddFolderDialog"
-          position="right"
-          full-height
-          maximized
+      <ODrawer
+          v-model:open="showAddFolderDialog"
+          :width="30"
+          :show-close="false"
+          @close="showAddFolderDialog = false"
           data-test="dashboard-folder-dialog"
         >
         <AddFolder  
-        style="width: 30vw;"
         @update:modelValue="updateFolderList"
+        @close="showAddFolderDialog = false"
         :edit-mode="isFolderEditMode"
         :folder-id="selectedFolderToEdit ?? 'default'"
         :type="type"
         />
-      </q-dialog>
+      </ODrawer>
     <ConfirmDialog
     :title="t('dashboard.deleteFolder')"
     data-test="dashboard-confirm-delete-folder-dialog"
@@ -186,6 +186,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
     outlinedEdit,
   } from "@quasar/extras/material-icons-outlined";
   import AddFolder from "./AddFolder.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
   import useNotifications from "@/composables/useNotifications";
   import { filter, forIn } from "lodash-es";
   import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
@@ -212,6 +213,7 @@ export default defineComponent({
       OTabs,
       OTab,
       OButton,
+      ODrawer,
     },
     props: {
       type: {
