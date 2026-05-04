@@ -15,12 +15,12 @@ export interface SummarySegment {
  * @param formData - The alert form data
  * @param destinations - Array of destination objects
  * @param t - Translation function (optional, for i18n support)
- * @param wizardStep - Current wizard step (1-6), used to show progressive summary
+ * @param wizardStep - Deprecated: no longer gates content; kept for backward compatibility
  * @param previewQuery - The formatted preview query string
  * @param generatedSqlQuery - The generated SQL query for custom conditions (computed property)
  */
 export function generateAlertSummary(formData: any, destinations: any[], t?: (key: string) => string, wizardStep: number = 6, previewQuery: string = '', generatedSqlQuery: string = ''): string {
-  // Generate summary based on available data (progressive disclosure)
+  // Generate summary based on available data
   if (!formData) {
     return '';
   }
@@ -70,58 +70,52 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     return `<span class="summary-clickable" data-focus-target="${fieldId}">${esc(text)}</span>`;
   };
 
-  // Build the bullet-point summary based on wizard step
+  // Build the bullet-point summary
   const streamType = formData.stream_type || 'logs';
   const streamName = formData.stream_name || 'the selected stream';
 
-  // Step 1: Show basic alert info (stream type, stream name, alert type)
-  if (wizardStep >= 1) {
-    // Capitalize stream type for better display
-    const displayStreamType = streamType.charAt(0).toUpperCase() + streamType.slice(1);
-    parts.push(`✓ ${translate('alerts.summary.streamInfo')}: ${clickable(displayStreamType, 'streamType')} - ${clickable(streamName, 'stream')}`);
-    if (isRealTime) {
-      parts.push(`✓ ${translate('alerts.summary.alertType')}: ${clickable('Real-Time', 'alertType')}`);
-    } else {
-      parts.push(`✓ ${translate('alerts.summary.alertType')}: ${clickable('Scheduled', 'alertType')}`);
+  // Basic alert info (stream type, stream name, alert type)
+  const displayStreamType = streamType.charAt(0).toUpperCase() + streamType.slice(1);
+  parts.push(`✓ ${translate('alerts.summary.streamInfo')}: ${clickable(displayStreamType, 'streamType')} - ${clickable(streamName, 'stream')}`);
+  if (isRealTime) {
+    parts.push(`✓ ${translate('alerts.summary.alertType')}: ${clickable('Real-Time', 'alertType')}`);
+  } else {
+    parts.push(`✓ ${translate('alerts.summary.alertType')}: ${clickable('Scheduled', 'alertType')}`);
+  }
+
+  // Show query condition
+  let queryText = '';
+
+  // Get query from different sources
+  if (previewQuery && previewQuery.trim()) {
+    // Use previewQuery if available (already formatted by previewAlert)
+    queryText = previewQuery;
+  } else if (generatedSqlQuery && generatedSqlQuery.trim()) {
+    // For custom mode, use the generated SQL query from computed property
+    queryText = generatedSqlQuery;
+  } else if (formData.query_condition) {
+    // Fall back to extracting from formData
+    if (formData.query_condition.sql) {
+      queryText = formData.query_condition.sql.trim();
+    } else if (formData.query_condition.promql) {
+      queryText = formData.query_condition.promql.trim();
     }
   }
 
-  // Step 2+: Show query condition (from step 2 onwards)
-  if (wizardStep >= 2) {
-    let queryText = '';
+  if (queryText) {
+    // Truncate if longer than 50 characters
+    const maxLength = 48;
+    const truncatedQuery = queryText.length > maxLength
+      ? queryText.substring(0, maxLength) + '...'
+      : queryText;
 
-    // Get query from different sources
-    if (previewQuery && previewQuery.trim()) {
-      // Use previewQuery if available (already formatted by previewAlert)
-      queryText = previewQuery;
-    } else if (generatedSqlQuery && generatedSqlQuery.trim()) {
-      // For custom mode, use the generated SQL query from computed property
-      queryText = generatedSqlQuery;
-    } else if (formData.query_condition) {
-      // Fall back to extracting from formData
-      if (formData.query_condition.sql) {
-        queryText = formData.query_condition.sql.trim();
-      } else if (formData.query_condition.promql) {
-        queryText = formData.query_condition.promql.trim();
-      }
-    }
-
-    if (queryText) {
-      // Truncate if longer than 50 characters
-      const maxLength = 48;
-      const truncatedQuery = queryText.length > maxLength
-        ? queryText.substring(0, maxLength) + '...'
-        : queryText;
-
-      // Create clickable span with query
-      const queryLabel = translate('alerts.summary.queryCondition');
-      parts.push(`✓ ${queryLabel}: <span class="summary-clickable" data-focus-target="query">${esc(truncatedQuery)}</span>`);
-    }
+    // Create clickable span with query
+    const queryLabel = translate('alerts.summary.queryCondition');
+    parts.push(`✓ ${queryLabel}: <span class="summary-clickable" data-focus-target="query">${esc(truncatedQuery)}</span>`);
   }
 
-  // Step 4+: Show alert settings (threshold, period, frequency, cooldown, destinations)
-  if (wizardStep >= 4) {
-    if (isRealTime) {
+  // Show alert settings (threshold, period, frequency, cooldown, destinations)
+  if (isRealTime) {
       // Real-time alert summary - triggers immediately when query conditions match
       parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${translate('alerts.summary.eventsDetected')} ${translate('alerts.summary.inRealTime')}`);
     } else {
@@ -150,15 +144,12 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
       }
     }
 
-    // Notification section
-    if (!destinations || destinations.length === 0) {
+    // Notification section — use formData.destinations (selected), not destinations param (all available)
+    const selectedDestinations: string[] = formData.destinations || [];
+    if (selectedDestinations.length === 0) {
       parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(translate('alerts.summary.noDestination'), 'destinations')} ${translate('alerts.summary.notSetupYet')} ⚠️`);
     } else {
-      const destNames = destinations.map(dest => {
-        if (typeof dest === 'string') return dest;
-        return dest.name || 'Unknown';
-      });
-      const uniqueNames = Array.from(new Set(destNames));
+      const uniqueNames = Array.from(new Set(selectedDestinations));
       const destText = uniqueNames.join(', ');
       parts.push(`✓ ${translate('alerts.summary.sendsTo')}: ${clickable(destText, 'destinations')}`);
     }
@@ -168,7 +159,6 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
       const timeText = getSilenceText(formData.trigger_condition.silence, translate);
       parts.push(`✓ ${translate('alerts.summary.cooldown')}: ${clickable(timeText, 'silence')} ${translate('alerts.summary.betweenAlerts')}`);
     }
-  }
 
   // Build the final summary with plain English first, then bullet points
   const bulletPoints = parts.join('\n');
@@ -302,7 +292,6 @@ function getSilenceText(silence: number, t: (key: string) => string): string {
 
 /**
  * Generate a plain English summary of the alert
- * Shows progressive summary based on wizard step
  */
 function generatePlainEnglishSummary(formData: any, destinations: any[], isRealTime: boolean, t: (key: string) => string, wizardStep: number = 6): string {
   if (!formData || !formData.stream_name) return '';
@@ -315,20 +304,7 @@ function generatePlainEnglishSummary(formData: any, destinations: any[], isRealT
   const hourText = t('alerts.summary.hour') || 'hour';
   const hoursText = t('alerts.summary.hours') || 'hours';
 
-  // Step 1-3: Show basic information about configuring the alert
-  if (wizardStep < 4) {
-    const streamType = formData.stream_type || 'logs';
-    const streamName = formData.stream_name;
-    if (isRealTime) {
-      const configuringText = t('alerts.summary.configuringRealTime') || 'Configuring a real-time alert for';
-      return `${configuringText} ${streamType} stream "${streamName}"`;
-    } else {
-      const configuringText = t('alerts.summary.configuringScheduled') || 'Configuring a scheduled alert for';
-      return `${configuringText} ${streamType} stream "${streamName}"`;
-    }
-  }
-
-  // Step 4+: Show full alert logic
+  // Show full alert logic
   if (isRealTime) {
     parts.push(t('alerts.summary.plainEnglish.realTime') || 'Alert me immediately when matching events occur in real-time');
   } else {
