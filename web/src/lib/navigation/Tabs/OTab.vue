@@ -30,7 +30,7 @@ const baseClasses = computed<string>(() => [
     ? 'tw:flex tw:justify-start'
     : 'tw:inline-flex tw:justify-center',
   'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap',
-  isVertical.value ? '' : 'tw:rounded-t-md',
+  isVertical.value ? 'tw:rounded-md' : 'tw:rounded-t-md',
   'tw:outline-none tw:transition-colors tw:duration-150',
   'tw:select-none',
   'tw:focus-visible:outline-none',
