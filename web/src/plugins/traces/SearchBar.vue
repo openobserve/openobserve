@@ -23,16 +23,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="searchObj.meta.searchMode"
           @update:model-value="$emit('update:searchMode', $event)"
         >
-          <OToggleGroupItem data-test="traces-search-mode-spans-btn" value="spans" size="sm">
-            <template #icon-left><Layers class="tw:size-3.5 tw:shrink-0" /></template>
+          <OToggleGroupItem
+            data-test="traces-search-mode-spans-btn"
+            value="spans"
+            size="sm"
+          >
+            <template #icon-left
+              ><Layers class="tw:size-3.5 tw:shrink-0"
+            /></template>
             Spans
           </OToggleGroupItem>
-          <OToggleGroupItem data-test="traces-search-mode-traces-btn" value="traces" size="sm">
-            <template #icon-left><GitFork class="tw:size-3.5 tw:shrink-0" /></template>
+          <OToggleGroupItem
+            data-test="traces-search-mode-traces-btn"
+            value="traces"
+            size="sm"
+          >
+            <template #icon-left
+              ><GitFork class="tw:size-3.5 tw:shrink-0"
+            /></template>
             Traces
           </OToggleGroupItem>
-          <OToggleGroupItem v-if="config.isEnterprise == 'true'" data-test="traces-service-graph-toggle" value="service-graph" size="sm">
-            <template #icon-left><Network class="tw:size-3.5 tw:shrink-0" /></template>
+          <OToggleGroupItem
+            v-if="config.isEnterprise == 'true'"
+            data-test="traces-service-graph-toggle"
+            value="service-graph"
+            size="sm"
+          >
+            <template #icon-left
+              ><Network class="tw:size-3.5 tw:shrink-0"
+            /></template>
             Service Graph
           </OToggleGroupItem>
           <div>
@@ -139,25 +158,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="float-right col-auto tw:flex tw:items-center tw:gap-[0.375rem]"
       >
         <date-time
-            ref="dateTimeRef"
-            auto-apply
-            :default-type="searchObj.data.datetime.type"
-            :default-absolute-time="{
-              startTime: searchObj.data.datetime.startTime,
-              endTime: searchObj.data.datetime.endTime,
-            }"
-            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
-            data-test="logs-search-bar-date-time-dropdown"
-            :queryRangeRestrictionInHour="
-              searchObj.data.datetime.queryRangeRestrictionInHour
-            "
-            :queryRangeRestrictionMsg="
-              searchObj.data.datetime.queryRangeRestrictionMsg
-            "
-            class="tw:h-[2rem]"
-            @on:date-change="updateDateTime"
-            @on:timezone-change="updateTimezone"
-          />
+          ref="dateTimeRef"
+          auto-apply
+          :default-type="searchObj.data.datetime.type"
+          :default-absolute-time="{
+            startTime: searchObj.data.datetime.startTime,
+            endTime: searchObj.data.datetime.endTime,
+          }"
+          :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+          data-test="logs-search-bar-date-time-dropdown"
+          :queryRangeRestrictionInHour="
+            searchObj.data.datetime.queryRangeRestrictionInHour
+          "
+          :queryRangeRestrictionMsg="
+            searchObj.data.datetime.queryRangeRestrictionMsg
+          "
+          class="tw:h-[2rem]"
+          @on:date-change="updateDateTime"
+          @on:timezone-change="updateTimezone"
+        />
         <div class="search-time">
           <div class="tw:flex tw:items-center">
             <OButton
@@ -167,7 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('search.cancel')"
               class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
               @click="cancelQueryData"
-            >{{ t("search.cancel") }}</OButton>
+              >{{ t("search.cancel") }}</OButton
+            >
             <OButton
               v-else
               variant="ghost"
@@ -189,7 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.liveMode &&
                   store.state.zoConfig.auto_query_enabled
                 "
-              >{{ t("search.autoRunEnabled") }}</q-tooltip>
+                >{{ t("search.autoRunEnabled") }}</q-tooltip
+              >
               <q-icon
                 v-if="
                   searchObj.meta.liveMode &&
@@ -229,14 +250,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #icon-left>
                   <q-icon
-                    :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
+                    :name="
+                      searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
+                    "
                     size="16px"
                     :color="searchObj.meta.liveMode ? 'primary' : ''"
                   />
                 </template>
                 <span>
                   <div class="tw:font-medium tw:text-[12px]">
-                    {{ searchObj.meta.liveMode ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                    {{
+                      searchObj.meta.liveMode
+                        ? t("search.turnOffLiveMode")
+                        : t("search.turnOnLiveMode")
+                    }}
                   </div>
                   <div class="tw:text-[11px] tw:text-muted-foreground">
                     {{ t("search.liveModeTooltip") }}
@@ -258,8 +285,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <share-button
           data-test="logs-search-bar-share-link-btn"
           :url="tracesShareURL"
-          button-class="tw:mr-0 download-logs-btn q-px-sm tw:min-h-[2rem] el-border"
-          button-size="sm"
+          variant="outline"
+          size="icon-toolbar"
         />
       </div>
 
@@ -296,12 +323,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="searchObj.meta.serviceGraphVisualizationType"
             @update:model-value="onServiceGraphVisualizationChange($event)"
           >
-            <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree" size="sm">
-              <template #icon-left><GitBranch class="tw:size-3.5 tw:shrink-0" /></template>
+            <OToggleGroupItem
+              data-test="service-graph-tree-view-btn"
+              value="tree"
+              size="sm"
+            >
+              <template #icon-left
+                ><GitBranch class="tw:size-3.5 tw:shrink-0"
+              /></template>
               Tree View
             </OToggleGroupItem>
-            <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
-              <template #icon-left><Share2 class="tw:size-3.5 tw:shrink-0" /></template>
+            <OToggleGroupItem
+              data-test="service-graph-graph-view-btn"
+              value="graph"
+              size="sm"
+            >
+              <template #icon-left
+                ><Share2 class="tw:size-3.5 tw:shrink-0"
+              /></template>
               Graph View
             </OToggleGroupItem>
           </OToggleGroup>
@@ -1132,7 +1171,8 @@ export default defineComponent({
 
   &:hover {
     opacity: 0.9;
-    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+    box-shadow: 0 0 8px
+      color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
 

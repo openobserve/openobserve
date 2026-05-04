@@ -44,7 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handleBackOrClose"
             >
               <q-icon name="arrow_back" size="16px" />
-              <q-tooltip>{{ areFiltersAdded ? t("traces.applyPendingFilters") : t("traces.backToTraces") }}</q-tooltip>
+              <q-tooltip>{{
+                areFiltersAdded
+                  ? t("traces.applyPendingFilters")
+                  : t("traces.backToTraces")
+              }}</q-tooltip>
             </OButton>
 
             <div
@@ -162,8 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:mr-2.5"
               @click="openFilterPopover"
             >
-              <template #icon-left><q-icon name="filter_alt" size="14px" /></template>
-              <span class="tw:text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
+              <template #icon-left
+                ><q-icon name="filter_alt" size="14px"
+              /></template>
+              <span class="tw:text-[0.75rem]">{{
+                t("traces.viewFilters")
+              }}</span>
               <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
             </OButton>
 
@@ -185,7 +193,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="mode === 'standalone' && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
-              button-class="tw:px-1! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              variant="outline"
+              size="icon-xs"
             />
 
             <!-- Close button -->
@@ -216,22 +225,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OToggleGroup
               :model-value="activeTab"
-              @update:model-value="activeTab = ($event as string)"
+              @update:model-value="activeTab = $event as string"
             >
               <OToggleGroupItem value="waterfall" size="sm">
-                <template #icon-left><AlignLeft class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left
+                  ><AlignLeft class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 Waterfall
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
-                <template #icon-left><Flame class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left
+                  ><Flame class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 Flame Graph
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
-                <template #icon-left><Network class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left
+                  ><Network class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 Trace Graph
               </OToggleGroupItem>
               <OToggleGroupItem v-if="hasLLMSpans" value="dag" size="sm">
-                <template #icon-left><GitBranch class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left
+                  ><GitBranch class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 DAG
               </OToggleGroupItem>
               <OToggleGroupItem
@@ -239,7 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 value="evaluations"
                 size="sm"
               >
-                <template #icon-left><ClipboardCheck class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left
+                  ><ClipboardCheck class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 Evaluations
               </OToggleGroupItem>
             </OToggleGroup>
@@ -293,7 +312,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="button-separator"></div>
                   <OButton
                     data-test="trace-details-search-next-btn"
-                    :disabled="!searchResults || currentIndex + 1 === searchResults"
+                    :disabled="
+                      !searchResults || currentIndex + 1 === searchResults
+                    "
                     variant="ghost-muted"
                     size="icon"
                     @click="nextMatch"
@@ -381,8 +402,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('traces.viewLogs')"
                   @click="redirectToLogs"
                 >
-                  <template #icon-left><q-icon name="search" size="14px" /></template>
-                  {{ searchObj.meta.redirectedFromLogs ? t('traces.backToLogs') : t('traces.viewLogs') }}
+                  <template #icon-left
+                    ><q-icon name="search" size="14px"
+                  /></template>
+                  {{
+                    searchObj.meta.redirectedFromLogs
+                      ? t("traces.backToLogs")
+                      : t("traces.viewLogs")
+                  }}
                 </OButton>
               </span>
               <OButton
@@ -393,8 +420,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:ml-2"
                 @click="redirectToSessionReplay"
               >
-                <template #icon-left><q-icon :name="outlinedPlayCircle" size="14px" /></template>
-                {{ t('rum.playSessionReplay') }}
+                <template #icon-left
+                  ><q-icon :name="outlinedPlayCircle" size="14px"
+                /></template>
+                {{ t("rum.playSessionReplay") }}
               </OButton>
             </div>
           </div>
@@ -723,19 +752,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
         >
           <div class="tw:flex tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              v-close-popup
-            >
-              {{ t('common.cancel') }}
+            <OButton variant="outline" size="sm-action" v-close-popup>
+              {{ t("common.cancel") }}
             </OButton>
             <OButton
               variant="primary"
               size="sm-action"
               @click="applyAndViewTraces"
             >
-              {{ t('traces.showTraces') }}
+              {{ t("traces.showTraces") }}
             </OButton>
           </div>
         </q-card-actions>
@@ -805,10 +830,16 @@ import {
   formatTimestamp,
   useTraceProcessing,
 } from "@/composables/traces/useTraceProcessing";
-import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
-import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import OButton from '@/lib/core/Button/OButton.vue';
-import { AlignLeft, Flame, Network, GitBranch, ClipboardCheck } from 'lucide-vue-next';
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import {
+  AlignLeft,
+  Flame,
+  Network,
+  GitBranch,
+  ClipboardCheck,
+} from "lucide-vue-next";
 import pipelineService from "@/services/pipelines";
 
 // Import FlameGraphView

@@ -611,7 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <div class="float-right col-auto">
+      <div class="float-right col-auto tw:flex tw:items-center tw:gap-1">
         <transform-selector
           v-if="isActionsEnabled && !shouldMoveShareToMenu"
           :function-options="functionOptions"
@@ -624,19 +624,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
         />
-        <share-button
-          v-if="!shouldMoveShareToMenu"
-          data-test="logs-search-bar-share-link-btn"
-          :url="shareURL"
-          button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
-          button-size="xs"
-        />
-
         <OButton
           data-test="logs-search-bar-more-options-btn"
           class="download-logs-btn"
           variant="outline"
           size="icon-toolbar"
+          style="order: 4"
         >
           <q-icon name="menu" size="16px" />
           <q-menu>
@@ -652,9 +645,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-section>
                   <share-button
                     :url="shareURL"
-                    button-class="tw:w-full"
-                    button-size="xs"
-                    :flat="true"
+                    variant="outline"
+                    size="sm-action"
+                    :show-label="true"
+                    class="tw:w-full"
                   />
                 </q-item-section>
               </q-item>
@@ -865,7 +859,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.moreActions") }}
           </q-tooltip>
         </OButton>
-        <div class="float-left tw:mr-[4px]">
+        <share-button
+          v-if="!shouldMoveShareToMenu"
+          data-test="logs-search-bar-share-link-btn"
+          :url="shareURL"
+          variant="outline"
+          size="icon-toolbar"
+          style="order: 3"
+        />
+        <div class="float-left tw:mr-[4px]" style="order: 1">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -888,7 +890,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="element-box-shadow"
           />
         </div>
-        <div class="search-time float-left q-mr-xs">
+        <div class="search-time float-left" style="order: 2">
           <div class="flex">
             <OButtonGroup
               class="q-pa-none q-mr-xs element-box-shadow el-border"

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       behavior="menu"
       borderless
       dense
-      class="q-mb-xs showLabelOnTop no-case o2-custom-select-dashboard tw:flex-1"
+      class="showLabelOnTop no-case o2-custom-select-dashboard tw:flex-1"
     >
       <template #no-option>
         <q-item>
@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-folder-move-new-add"
       variant="outline"
       size="icon-sm"
-      class="q-mb-xs"
       @click="
         () => {
           showAddFolderDialog = true;

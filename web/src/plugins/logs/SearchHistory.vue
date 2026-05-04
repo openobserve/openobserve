@@ -1,259 +1,283 @@
 ﻿<template>
-  <div
-  class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
-  >
-   <div class="">
-    <div class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
-      <div class="flex items-center q-py-sm q-pl-md">
-        <div
-          data-test="search-history-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer tw:font-[600]"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
-          title="Go Back"
-          @click="closeSearchHistory"
-        >
-          <q-icon name="arrow_back_ios_new" size="14px" />
-        </div>
-        <div class="text-h6 tw:font-[600]" data-test="add-alert-title">{{ t('search_history.title') }}</div>
-      </div>
-      <div class="tw:flex tw:items-center q-pr-md">
-        <div>
-          <q-toggle
-            v-model="wrapText"
-            :label="t('search_history.wrapText')"
-            class="o2-toggle-button-xs q-mr-md"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            " />
-        </div>
-        <div class="warning-text flex items-center q-px-sm q-mr-md tw:h-[36px] tw:rounded-md">
-          <q-icon name="info" class="q-mr-xs" size="16px" />
-          <div>
-            {{ t('search_history.delayMessage') }} <b>{{ delayMessage }}</b>
-          </div>
-        </div>
-        <div style="height: 36px;"
-        >
-          <date-time
-            data-test-name="search-history-date-time"
-            ref="searchDateTimeRef"
-            auto-apply
-            style="height: 36px"
-            :default-type="searchObj.data.datetime.type"
-            @on:date-change="updateDateTime"
-          />
-        </div>
-
-        <div>
-          <OButton
-            variant="primary"
-            size="sm"
-            class="q-ml-md"
-            @click="fetchSearchHistory"
-            :disabled="isLoading"
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+    <div class="">
+      <div
+        class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]"
+      >
+        <div class="flex items-center q-py-sm q-pl-md">
+          <div
+            data-test="search-history-alert-back-btn"
+            class="flex justify-center items-center q-mr-md cursor-pointer tw:font-[600]"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="closeSearchHistory"
           >
-            {{ t('search_history.get_history') }}
-          </OButton>
+            <q-icon name="arrow_back_ios_new" size="14px" />
+          </div>
+          <div class="text-h6 tw:font-[600]" data-test="add-alert-title">
+            {{ t("search_history.title") }}
+          </div>
         </div>
-      </div>
-    </div>
-   <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class=" tw:h-[calc(100vh - var(--navbar-height) - 95px)] card-container">
-        <q-table
-          ref="qTable"
-          dense
-          :rows="dataToBeLoaded"
-          :columns="columnsToBeRendered"
-          :pagination.sync="pagination"
-          row-key="trace_id"
-          :rows-per-page-options="[]"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :sort-method="sortMethod"
-          :wrap-cells="wrapText"
-          :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;' : 'height: 0px'"
-        >
-          <template v-slot:body="props">
-            <q-tr
-              :data-test="`stream-association-table-${props.row.trace_id}-row`"
-              :props="props"
-              style="cursor: pointer"
-              @click="triggerExpand(props)"
-            >
-              <q-td>
-                <OButton
-                  variant="ghost"
-                  size="icon"
-                >
-                  <q-icon
-                    :name="
-                      expandedRow != props.row.uuid
-                        ? 'expand_more'
-                        : 'expand_less'
-                    "
-                  />
-                </OButton>
-              </q-td>
-
-              <q-td
-                :style="{
-                  whiteSpace:
-                    wrapText && col.name === 'sql' ? 'wrap' : 'nowrap',
-                }"
-                v-for="col in columnsToBeRendered.slice(1)"
-                :key="col.name"
-                :props="props"
-              >
-                {{ props.row[col.field] }}
-              </q-td>
-            </q-tr>
-            <q-tr v-show="expandedRow === props.row.uuid" :props="props">
-              <q-td colspan="100%">
-                <div class="app-tabs-container tw:w-fit tw:my-1">
-                  <app-tabs
-                    data-test="expanded-list-tabs"
-                    class="tabs-selection-container"
-                    :tabs="tabs"
-                    v-model:active-tab="activeTab"
-                  />
-                </div>
-                <div v-show="activeTab === 'query'">
-                  <div class="text-left tw:px-2 q-mb-sm expanded-content">
-                    <div class="tw:flex tw:items-center q-py-sm tw:gap-2">
-                      <strong
-                        >SQL Query :
-                        <span>
-                          <OButton
-                            variant="ghost"
-                            size="icon"
-                            class="copy-btn-sql tw:ml-2"
-                            @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
-                          >
-                            <q-icon name="content_copy" />
-                          </OButton></span
-                      ></strong>
-                      <OButton
-                        variant="ghost-destructive"
-                        size="sm"
-                        class="copy-btn tw:mx-2"
-                        @click.stop="goToLogs(props.row)"
-                      >
-                        <template #icon-left><q-icon name="search" /></template>
-                        Logs
-                      </OButton>
-                      <OButton
-                        v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
-                        variant="ghost"
-                        size="sm"
-                        class="copy-btn"
-                        @click.stop="goToInspector(props.row)"
-                      >
-                        <template #icon-left><q-icon name="analytics" /></template>
-                        Inspect
-                      </OButton>
-                    </div>
-                    <div class="tw:flex tw:items-start tw:justify-center">
-                      <div class="scrollable-content expanded-sql">
-                        <pre style="text-wrap: wrap">{{ props.row?.sql }}</pre>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    v-if="props.row?.function"
-                    class="text-left q-mb-sm tw:px-2 expanded-content"
-                  >
-                    <div class="tw:flex tw:items-center q-py-sm">
-                      <strong
-                        >Function Definition :
-                        <span>
-                          <OButton
-                            variant="ghost"
-                            size="icon"
-                            class="copy-btn-function tw:ml-2"
-                            @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
-                          >
-                            <q-icon name="content_copy" />
-                          </OButton></span
-                      ></strong>
-                    </div>
-
-                    <div class="tw:flex tw:items-start tw:justify-center">
-                      <div class="scrollable-content expanded-function">
-                        <pre style="text-wrap: wrap">{{
-                          props.row?.function
-                        }}</pre>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <query-editor
-                  v-show="activeTab === 'more_details'"
-                  style="height: 200px"
-                  :ref="`QueryEditorRef${props.row.trace_id + props.row.sql}`"
-                  :editor-id="`search-query-editor${props.row.trace_id + props.row.sql}`"
-                  class="monaco-editor"
-                  :debounceTime="600"
-                  v-model:query="moreDetailsToDisplay"
-                  language="json"
-                  read-only
-                />
-              </q-td>
-            </q-tr>
-          </template>
-          <template #bottom="scope">
-            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
-              {{ resultTotal }} {{ t('search_history.results') }}
-            </div>
-            <div class="tw:ml-auto tw:mr-2">Max Limit : <b>1000</b></div>
-            <q-separator
-              style="height: 1.5rem; margin: auto 0"
-              vertical
-              inset
-              class="q-mr-md"
+        <div class="tw:flex tw:items-center q-pr-md">
+          <div>
+            <q-toggle
+              v-model="wrapText"
+              :label="t('search_history.wrapText')"
+              class="o2-toggle-button-xs q-mr-md"
+              size="xs"
+              flat
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-toggle-button-xs-dark'
+                  : 'o2-toggle-button-xs-light'
+              "
             />
-
-            <div class="q-pl-md">
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
+          </div>
+          <div
+            class="warning-text flex items-center q-px-sm q-mr-md tw:h-[36px] tw:rounded-md"
+          >
+            <q-icon name="info" class="q-mr-xs" size="16px" />
+            <div>
+              {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
             </div>
           </div>
-          </template>
-          <template #no-data>
-            <div v-if="!isLoading" class="tw:flex tw:mx-auto">
-              <NoData />
-            </div>
-          </template>
-        </q-table>
+          <div>
+            <date-time
+              data-test-name="search-history-date-time"
+              ref="searchDateTimeRef"
+              auto-apply
+              :default-type="searchObj.data.datetime.type"
+              @on:date-change="updateDateTime"
+            />
+          </div>
 
-        <div
-          v-if="isLoading"
-          class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
-        >
-          <q-spinner-hourglass color="primary" size="lg" />
+          <div>
+            <OButton
+              variant="primary"
+              size="sm"
+              class="q-ml-md"
+              @click="fetchSearchHistory"
+              :disabled="isLoading"
+            >
+              {{ t("search_history.get_history") }}
+            </OButton>
+          </div>
         </div>
-    </div>
-    </div>
+      </div>
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+        <div
+          class="tw:h-[calc(100vh - var(--navbar-height) - 95px)] card-container"
+        >
+          <q-table
+            ref="qTable"
+            dense
+            :rows="dataToBeLoaded"
+            :columns="columnsToBeRendered"
+            :pagination.sync="pagination"
+            row-key="trace_id"
+            :rows-per-page-options="[]"
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            :sort-method="sortMethod"
+            :wrap-cells="wrapText"
+            :style="
+              dataToBeLoaded.length > 0
+                ? 'height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;'
+                : 'height: 0px'
+            "
+          >
+            <template v-slot:body="props">
+              <q-tr
+                :data-test="`stream-association-table-${props.row.trace_id}-row`"
+                :props="props"
+                style="cursor: pointer"
+                @click="triggerExpand(props)"
+              >
+                <q-td>
+                  <OButton variant="ghost" size="icon">
+                    <q-icon
+                      :name="
+                        expandedRow != props.row.uuid
+                          ? 'expand_more'
+                          : 'expand_less'
+                      "
+                    />
+                  </OButton>
+                </q-td>
+
+                <q-td
+                  :style="{
+                    whiteSpace:
+                      wrapText && col.name === 'sql' ? 'wrap' : 'nowrap',
+                  }"
+                  v-for="col in columnsToBeRendered.slice(1)"
+                  :key="col.name"
+                  :props="props"
+                >
+                  {{ props.row[col.field] }}
+                </q-td>
+              </q-tr>
+              <q-tr v-show="expandedRow === props.row.uuid" :props="props">
+                <q-td colspan="100%">
+                  <div class="app-tabs-container tw:w-fit tw:my-1">
+                    <app-tabs
+                      data-test="expanded-list-tabs"
+                      class="tabs-selection-container"
+                      :tabs="tabs"
+                      v-model:active-tab="activeTab"
+                    />
+                  </div>
+                  <div v-show="activeTab === 'query'">
+                    <div class="text-left tw:px-2 q-mb-sm expanded-content">
+                      <div class="tw:flex tw:items-center q-py-sm tw:gap-2">
+                        <strong
+                          >SQL Query :
+                          <span>
+                            <OButton
+                              variant="ghost"
+                              size="icon"
+                              class="copy-btn-sql tw:ml-2"
+                              @click.stop="
+                                copyToClipboard(props.row.sql, 'SQL Query')
+                              "
+                            >
+                              <q-icon name="content_copy" /> </OButton></span
+                        ></strong>
+                        <OButton
+                          variant="ghost-destructive"
+                          size="sm"
+                          class="copy-btn tw:mx-2"
+                          @click.stop="goToLogs(props.row)"
+                        >
+                          <template #icon-left
+                            ><q-icon name="search"
+                          /></template>
+                          Logs
+                        </OButton>
+                        <OButton
+                          v-if="
+                            config.isEnterprise == 'true' &&
+                            config.isCloud == 'false' &&
+                            store.state.zoConfig.search_inspector_enabled
+                          "
+                          variant="ghost"
+                          size="sm"
+                          class="copy-btn"
+                          @click.stop="goToInspector(props.row)"
+                        >
+                          <template #icon-left
+                            ><q-icon name="analytics"
+                          /></template>
+                          Inspect
+                        </OButton>
+                      </div>
+                      <div class="tw:flex tw:items-start tw:justify-center">
+                        <div class="scrollable-content expanded-sql">
+                          <pre style="text-wrap: wrap">{{
+                            props.row?.sql
+                          }}</pre>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      v-if="props.row?.function"
+                      class="text-left q-mb-sm tw:px-2 expanded-content"
+                    >
+                      <div class="tw:flex tw:items-center q-py-sm">
+                        <strong
+                          >Function Definition :
+                          <span>
+                            <OButton
+                              variant="ghost"
+                              size="icon"
+                              class="copy-btn-function tw:ml-2"
+                              @click.stop="
+                                copyToClipboard(
+                                  props.row.function,
+                                  'Function Defination',
+                                )
+                              "
+                            >
+                              <q-icon name="content_copy" /> </OButton></span
+                        ></strong>
+                      </div>
+
+                      <div class="tw:flex tw:items-start tw:justify-center">
+                        <div class="scrollable-content expanded-function">
+                          <pre style="text-wrap: wrap">{{
+                            props.row?.function
+                          }}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <query-editor
+                    v-show="activeTab === 'more_details'"
+                    style="height: 200px"
+                    :ref="`QueryEditorRef${props.row.trace_id + props.row.sql}`"
+                    :editor-id="`search-query-editor${props.row.trace_id + props.row.sql}`"
+                    class="monaco-editor"
+                    :debounceTime="600"
+                    v-model:query="moreDetailsToDisplay"
+                    language="json"
+                    read-only
+                  />
+                </q-td>
+              </q-tr>
+            </template>
+            <template #bottom="scope">
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
+                <div
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md"
+                >
+                  {{ resultTotal }} {{ t("search_history.results") }}
+                </div>
+                <div class="tw:ml-auto tw:mr-2">Max Limit : <b>1000</b></div>
+                <q-separator
+                  style="height: 1.5rem; margin: auto 0"
+                  vertical
+                  inset
+                  class="q-mr-md"
+                />
+
+                <div class="q-pl-md">
+                  <QTablePagination
+                    :scope="scope"
+                    :position="'bottom'"
+                    :resultTotal="resultTotal"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                  />
+                </div>
+              </div>
+            </template>
+            <template #no-data>
+              <div v-if="!isLoading" class="tw:flex tw:mx-auto">
+                <NoData />
+              </div>
+            </template>
+          </q-table>
+
+          <div
+            v-if="isLoading"
+            class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
+          >
+            <q-spinner-hourglass color="primary" size="lg" />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Show NoData component if there's no data to display -->
 </template>
 <script lang="ts">
-
 //@ts-nocheck
 import { ref, watch, onMounted, nextTick, computed, onUnmounted } from "vue";
 import {
@@ -330,7 +354,7 @@ export default defineComponent({
     const isDateTimeChanged = ref(false);
     const moreDetailsToDisplay = ref("");
 
-    const {extractTimestamps} = logsUtils();
+    const { extractTimestamps } = logsUtils();
 
     const activeTab = ref("query");
     const tabs = ref([
@@ -371,8 +395,8 @@ export default defineComponent({
       // Define the desired column order and names
       const desiredColumns = [
         { key: "#", label: "#" },
-        { key: "executed_time", label: t('search_history.executed_at') },
-        { key: "sql", label: t('search_history.sql_query') },
+        { key: "executed_time", label: t("search_history.executed_at") },
+        { key: "sql", label: t("search_history.sql_query") },
       ];
       let aligin = "left";
 
@@ -409,19 +433,21 @@ export default defineComponent({
 
         //check if datetime is present or not
         //else show the error message
-        if(!startTime) {
+        if (!startTime) {
           $q.notify({
             type: "negative",
-            message: "The selected start time is  invalid. Please choose a valid time",
+            message:
+              "The selected start time is  invalid. Please choose a valid time",
             timeout: 5000,
           });
           isLoading.value = false;
           return;
         }
-        if(!endTime){
+        if (!endTime) {
           $q.notify({
             type: "negative",
-            message: "The selected end time is  invalid. Please choose a valid time",
+            message:
+              "The selected end time is  invalid. Please choose a valid time",
             timeout: 5000,
           });
           isLoading.value = false;
@@ -685,8 +711,7 @@ export default defineComponent({
         const functionContent = b64EncodeUnicode(row.function);
         queryObject["functionContent"] = functionContent;
         queryObject["fn_editor"] = "true";
-      }
-      else{
+      } else {
         queryObject["fn_editor"] = "false";
       }
 
@@ -787,5 +812,5 @@ export default defineComponent({
 });
 </script>
 <style lang="scss" scoped>
-@import '@/styles/logs/search-history.scss';
+@import "@/styles/logs/search-history.scss";
 </style>
