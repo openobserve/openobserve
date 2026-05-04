@@ -160,7 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.duplicate") }}
           </ODropdownItem>
           <ODropdownItem
-            variant="destructive"
             data-test="dashboard-delete-panel"
             @select="onPanelModifyClick('DeletePanel')"
           >
