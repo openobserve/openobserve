@@ -813,10 +813,10 @@ describe("IndexList Component", () => {
   // ─── filterFieldFn — edge cases ───────────────────────────────────────────
 
   describe("filterFieldFn — edge cases", () => {
-    it("should return empty array when terms is empty string", () => {
+    it("should return all rows when terms is empty string", () => {
       const rows = [{ name: "field_a" }, { name: "field_b" }];
       const result = wrapper.vm.filterFieldFn(rows, "");
-      expect(result).toEqual([]);
+      expect(result).toEqual(rows);
     });
 
     it("should perform case-insensitive match", () => {
@@ -836,10 +836,12 @@ describe("IndexList Component", () => {
       expect(result).toHaveLength(2);
     });
 
-    it("should return empty array when no rows match", () => {
+    it("should return sentinel row when no rows match", () => {
       const rows = [{ name: "field_a" }, { name: "field_b" }];
       const result = wrapper.vm.filterFieldFn(rows, "xyz_no_match");
-      expect(result).toHaveLength(0);
+      expect(result).toHaveLength(1);
+      expect(result[0].label).toBe(true);
+      expect(result[0].name).toBe("No matching fields found");
     });
   });
 

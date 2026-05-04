@@ -277,11 +277,18 @@ export default defineComponent({
       emit("update:changeStream");
     };
 
+    // Column ID "status" maps to stream field "span_status" — the only mismatch.
+    const TRACES_LOCKED_FIELD_NAMES = new Set(
+      [...DEFAULT_TRACE_COLUMNS.traces].map((id) =>
+        id === "status" ? "span_status" : id,
+      ),
+    );
+
     const normalizedFieldList = computed(() =>
       (props.fieldList as any[]).map((f: any) => ({
         ...f,
-        isSchemaField: f.label ? false : true,
-        enableVisibility: f.label ? false : !TRACES_LOCKED_FIELD_NAMES.has(f.name),
+        isSchemaField: f.label === true ? false : true,
+        enableVisibility: f.label === true ? false : !TRACES_LOCKED_FIELD_NAMES.has(f.name),
       })),
     );
 
@@ -320,13 +327,6 @@ export default defineComponent({
         normalizedFieldList.value,
         expandGroupRows.value,
         searchObj.data.stream.filterField ?? "",
-      ),
-    );
-
-    // Column ID "status" maps to stream field "span_status" — the only mismatch.
-    const TRACES_LOCKED_FIELD_NAMES = new Set(
-      [...DEFAULT_TRACE_COLUMNS.traces].map((id) =>
-        id === "status" ? "span_status" : id,
       ),
     );
 
