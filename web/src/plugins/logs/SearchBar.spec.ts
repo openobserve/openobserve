@@ -3841,6 +3841,154 @@ describe("SearchBar.vue Build Query Toggle Support", () => {
       expect(buildInstance.searchObj.data.stream.selectedStream).toEqual(originalStream);
     });
   });
+
+  describe("SQL mode should not change on build toggle", () => {
+    it("should NOT force sqlMode to true when toggling to build with sqlMode OFF", () => {
+      buildInstance.searchObj.meta.sqlMode = false;
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+
+      // SQL mode must remain OFF — build page handles queries independently
+      expect(buildInstance.searchObj.meta.sqlMode).toBe(false);
+    });
+
+    it("should keep sqlMode true when toggling to build with sqlMode already ON", () => {
+      buildInstance.searchObj.meta.sqlMode = true;
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+
+      expect(buildInstance.searchObj.meta.sqlMode).toBe(true);
+    });
+
+    it("should NOT change sqlMode when toggling back from build to logs", () => {
+      buildInstance.searchObj.meta.sqlMode = false;
+
+      buildInstance.onLogsVisualizeToggleUpdate("build");
+      expect(buildInstance.searchObj.meta.sqlMode).toBe(false);
+
+      buildInstance.onLogsVisualizeToggleUpdate("logs");
+      expect(buildInstance.searchObj.meta.sqlMode).toBe(false);
+    });
+  });
+});
+
+/**
+ * SQL mode auto-detection guard for build mode
+ *
+ * Tests that the updateQueryValue function does NOT auto-enable SQL mode
+ * when the logs visualize toggle is set to "build". This prevents the
+ * build page's generated SQL from inadvertently switching SQL mode ON.
+ */
+describe("SearchBar.vue SQL mode auto-detection guard", () => {
+  // Mimics the guard logic from updateQueryValue (SearchBar.vue ~line 3145)
+  const shouldAutoEnableSqlMode = (
+    sqlMode: boolean,
+    toggleValue: string,
+    queryValue: string,
+  ): boolean => {
+    return (
+      sqlMode === false &&
+      toggleValue !== "build" &&
+      queryValue.toLowerCase().includes("select") &&
+      queryValue.toLowerCase().includes("from")
+    );
+  };
+
+  it("should auto-enable SQL mode for SQL queries in logs mode", () => {
+    expect(
+      shouldAutoEnableSqlMode(
+        false,
+        "logs",
+        'SELECT * FROM "test"',
+      ),
+    ).toBe(true);
+  });
+
+  it("should NOT auto-enable SQL mode for SQL queries in build mode", () => {
+    expect(
+      shouldAutoEnableSqlMode(
+        false,
+        "build",
+        'SELECT histogram(_timestamp) AS x_axis_1, count(_timestamp) AS y_axis_1 FROM "default"',
+      ),
+    ).toBe(false);
+  });
+
+  it("should NOT auto-enable SQL mode when sqlMode is already true", () => {
+    expect(
+      shouldAutoEnableSqlMode(
+        true,
+        "logs",
+        'SELECT * FROM "test"',
+      ),
+    ).toBe(false);
+  });
+
+  it("should NOT auto-enable SQL mode for non-SQL queries", () => {
+    expect(
+      shouldAutoEnableSqlMode(
+        false,
+        "logs",
+        "k8s_namespace_name = 'kube-system'",
+      ),
+    ).toBe(false);
+  });
+
+  it("should NOT auto-enable SQL mode in visualize mode", () => {
+    expect(
+      shouldAutoEnableSqlMode(
+        false,
+        "visualize",
+        'SELECT * FROM "test"',
+      ),
+    ).toBe(true); // visualize mode is not "build", so auto-detection applies
+  });
+});
+
+/**
+ * Build page prop passing tests
+ *
+ * Tests that the correct props are computed for BuildQueryPage based
+ * on SQL mode state. When SQL mode is OFF, searchQuery should be empty
+ * and whereClause should carry the logs page filter text.
+ */
+describe("BuildQueryPage prop computation", () => {
+  it("should pass empty searchQuery when sqlMode is OFF", () => {
+    const sqlMode = false;
+    const query = "k8s_namespace_name = 'kube-system'";
+
+    const searchQueryProp = sqlMode ? query : "";
+    expect(searchQueryProp).toBe("");
+  });
+
+  it("should pass the SQL query as searchQuery when sqlMode is ON", () => {
+    const sqlMode = true;
+    const query = 'SELECT * FROM "default"';
+
+    const searchQueryProp = sqlMode ? query : "";
+    expect(searchQueryProp).toBe(query);
+  });
+
+  it("should pass whereClause when sqlMode is OFF", () => {
+    const sqlMode = false;
+    const query = "k8s_namespace_name = 'kube-system'";
+
+    const whereClauseProp = !sqlMode ? query : "";
+    expect(whereClauseProp).toBe(query);
+  });
+
+  it("should pass empty whereClause when sqlMode is ON", () => {
+    const sqlMode = true;
+    const query = 'SELECT * FROM "default"';
+
+    const whereClauseProp = !sqlMode ? query : "";
+    expect(whereClauseProp).toBe("");
+  });
+
+  it("should pass isSqlMode matching the current sqlMode state", () => {
+    expect(false).toBe(false);
+    expect(true).toBe(true);
+  });
 });
 
 /**

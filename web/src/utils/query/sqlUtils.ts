@@ -1260,6 +1260,80 @@ export async function buildSQLQueryWithParser(
   return sql.replace(/`/g, '"'); // Replace backticks with double quotes for consistency
 }
 
+/**
+ * Parse a raw WHERE clause text (from non-SQL mode) into the builder's filter
+ * structure. Wraps the clause in a dummy SQL query to leverage the SQL parser.
+ */
+export const parseWhereClauseToFilter = async (
+  whereClauseText: string,
+): Promise<{
+  filterType: string;
+  logicalOperator: string;
+  conditions: any[];
+}> => {
+  const defaultFilter = {
+    filterType: "group" as const,
+    logicalOperator: "AND",
+    conditions: [] as any[],
+  };
+
+  if (!whereClauseText?.trim()) return defaultFilter;
+
+  try {
+    await importSqlParser();
+    const ast: any = parser.astify(
+      `SELECT * FROM "dummy" WHERE ${whereClauseText}`,
+    );
+    if (!ast?.where) return defaultFilter;
+
+    const filters = convertWhereToFilter(ast.where);
+
+    // Ensure top-level is always a group
+    if (filters?.filterType === "condition") {
+      return {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [filters],
+      };
+    }
+
+    return filters || defaultFilter;
+  } catch {
+    return defaultFilter;
+  }
+};
+
+/**
+ * Extract the WHERE clause text from a full SQL query.
+ * Returns just the condition text without the WHERE keyword, or empty string
+ * if the query has no WHERE clause.
+ */
+export const extractWhereClause = async (
+  sql: string,
+): Promise<string> => {
+  if (!sql?.trim()) return "";
+
+  try {
+    await importSqlParser();
+    const ast: any = parser.astify(sql);
+    if (!ast?.where) return "";
+
+    // Build a dummy query with only the WHERE clause, then strip the prefix
+    const dummyAst = {
+      type: "select",
+      columns: [{ expr: { type: "column_ref", table: null, column: "*" }, as: null }],
+      from: [{ db: null, table: "dummy", as: null }],
+      where: ast.where,
+    };
+    const dummySql = parser.sqlify(dummyAst);
+    // dummySql = 'SELECT * FROM `dummy` WHERE <conditions>'
+    const whereMatch = dummySql.match(/\bWHERE\b\s+([\s\S]+)$/i);
+    return whereMatch ? whereMatch[1].replace(/`/g, '"') : "";
+  } catch {
+    return "";
+  }
+};
+
 // Export internal functions for testing
 export {
   formatValue,
