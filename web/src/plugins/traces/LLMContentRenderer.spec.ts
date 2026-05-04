@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 
@@ -195,7 +197,7 @@ describe("LLMContentRenderer", () => {
       const toolContent = wrapper.vm.toolContent;
       expect(toolContent).toBeTruthy();
       // Check that it either unwrapped to the text or kept the structure
-      if (typeof toolContent === 'string') {
+      if (typeof toolContent === "string") {
         expect(toolContent).toBe("Nested text content");
       } else {
         expect(toolContent.content).toBeDefined();
@@ -278,7 +280,10 @@ describe("LLMContentRenderer", () => {
         props: {
           content: JSON.stringify([
             { type: "text", text: "Hello world" },
-            { type: "image_url", image_url: { url: "https://example.com/img.png" } },
+            {
+              type: "image_url",
+              image_url: { url: "https://example.com/img.png" },
+            },
           ]),
           viewMode: "formatted",
         },
@@ -384,7 +389,10 @@ describe("LLMContentRenderer", () => {
             role: "user",
             content: [
               { type: "text", text: "What is this?" },
-              { type: "image_url", image_url: { url: "https://example.com/img.png" } },
+              {
+                type: "image_url",
+                image_url: { url: "https://example.com/img.png" },
+              },
             ],
           }),
           viewMode: "formatted",
@@ -393,7 +401,9 @@ describe("LLMContentRenderer", () => {
 
       const messages = wrapper.vm.parsedMessages;
       expect(messages[0].content).toContain("What is this?");
-      expect(messages[0].content).toContain("[Image: https://example.com/img.png]");
+      expect(messages[0].content).toContain(
+        "[Image: https://example.com/img.png]",
+      );
     });
 
     it("should handle Anthropic image format", () => {
@@ -417,7 +427,10 @@ describe("LLMContentRenderer", () => {
 
   describe("Content Truncation", () => {
     it("should truncate long content", () => {
-      const longContent = Array.from({ length: 20 }, (_, i) => `Line ${i}`).join("\n");
+      const longContent = Array.from(
+        { length: 20 },
+        (_, i) => `Line ${i}`,
+      ).join("\n");
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -446,7 +459,10 @@ describe("LLMContentRenderer", () => {
     });
 
     it("should expand content when expand button is clicked", async () => {
-      const longContent = Array.from({ length: 20 }, (_, i) => `Line ${i}`).join("\n");
+      const longContent = Array.from(
+        { length: 20 },
+        (_, i) => `Line ${i}`,
+      ).join("\n");
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -466,7 +482,10 @@ describe("LLMContentRenderer", () => {
     });
 
     it("should collapse content when collapse button is clicked", async () => {
-      const longContent = Array.from({ length: 20 }, (_, i) => `Line ${i}`).join("\n");
+      const longContent = Array.from(
+        { length: 20 },
+        (_, i) => `Line ${i}`,
+      ).join("\n");
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -660,7 +679,8 @@ describe("LLMContentRenderer", () => {
     });
 
     it("should handle content with special characters", () => {
-      const specialContent = "Content with\ttabs\nand\rnewlines\r\nand unicode: 🎉";
+      const specialContent =
+        "Content with\ttabs\nand\rnewlines\r\nand unicode: 🎉";
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -696,7 +716,9 @@ describe("LLMContentRenderer", () => {
     it("should handle messages with missing role", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
-          content: JSON.stringify([{ role: undefined, content: "No role specified" }]),
+          content: JSON.stringify([
+            { role: undefined, content: "No role specified" },
+          ]),
           viewMode: "formatted",
         },
       });
@@ -746,7 +768,10 @@ describe("LLMContentRenderer", () => {
 
     it("should format image URLs in content", () => {
       const content = [
-        { type: "image_url", image_url: { url: "https://example.com/image.png" } },
+        {
+          type: "image_url",
+          image_url: { url: "https://example.com/image.png" },
+        },
       ];
 
       wrapper = mount(LLMContentRenderer, {
@@ -777,7 +802,7 @@ describe("LLMContentRenderer", () => {
 
   describe("XSS Prevention", () => {
     it("should sanitize HTML content through DOMPurify", () => {
-      const maliciousContent = '<img src=x onerror="alert(\'xss\')">';
+      const maliciousContent = "<img src=x onerror=\"alert('xss')\">";
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -887,6 +912,378 @@ describe("LLMContentRenderer", () => {
       });
 
       expect(wrapper.vm.parsedContent).toEqual({ key: "value" });
+    });
+  });
+
+  describe("instanceId & editorIdPrefix", () => {
+    it("should default instanceId to empty string", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "test" },
+      });
+
+      expect(wrapper.props("instanceId")).toBe("");
+    });
+
+    it("should accept custom instanceId", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "test", instanceId: "abc" },
+      });
+
+      expect(wrapper.props("instanceId")).toBe("abc");
+    });
+
+    it("should return 'abc-' when instanceId is 'abc'", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "test", instanceId: "abc" },
+      });
+
+      expect(wrapper.vm.editorIdPrefix).toBe("abc-");
+    });
+
+    it("should return empty string when instanceId is empty string", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "test", instanceId: "" },
+      });
+
+      expect(wrapper.vm.editorIdPrefix).toBe("");
+    });
+
+    it("should return empty string when instanceId is not provided", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "test" },
+      });
+
+      expect(wrapper.vm.editorIdPrefix).toBe("");
+    });
+  });
+
+  describe("toolContentJson & parsedContentJson", () => {
+    it("should stringify toolContentJson for object content", () => {
+      const mockSpan = {
+        llm_tool_call_arguments: '{"key": "value"}',
+      };
+
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: null,
+          observationType: "TOOL",
+          contentType: "input",
+          span: mockSpan,
+        },
+      });
+
+      expect(wrapper.vm.toolContentJson).toBe('{\n  "key": "value"\n}');
+    });
+
+    it("should return empty string for toolContentJson when null", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: null,
+          observationType: "TOOL",
+          contentType: "input",
+          span: { llm_tool_call_arguments: "null" },
+        },
+      });
+
+      expect(wrapper.vm.toolContentJson).toBe("");
+    });
+
+    it("should stringify parsedContentJson for JSON object", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: '{"a": 1}', viewMode: "formatted" },
+      });
+
+      expect(wrapper.vm.parsedContentJson).toBe('{\n  "a": 1\n}');
+    });
+
+    it("should return empty string for parsedContentJson when null", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: null, viewMode: "formatted" },
+      });
+
+      expect(wrapper.vm.parsedContentJson).toBe("");
+    });
+  });
+
+  describe("Helper Functions", () => {
+    describe("isMessageJson", () => {
+      it("should return true for valid JSON", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.isMessageJson('{"key": "val"}')).toBe(true);
+      });
+
+      it("should return false for invalid JSON", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.isMessageJson("not json")).toBe(false);
+      });
+    });
+
+    describe("stringifyMessageContent", () => {
+      it("should return pretty-printed JSON", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        const result = wrapper.vm.stringifyMessageContent('{"b":2,"a":1}');
+        expect(result).toBe('{\n  "b": 2,\n  "a": 1\n}');
+      });
+    });
+
+    describe("roleColor", () => {
+      it("should return correct color for user role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleColor("user")).toBe("rgba(25, 118, 210, 0.1)");
+      });
+
+      it("should return correct color for assistant role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleColor("assistant")).toBe(
+          "rgba(76, 175, 80, 0.1)",
+        );
+      });
+
+      it("should return correct color for system role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleColor("system")).toBe("rgba(255, 152, 0, 0.1)");
+      });
+
+      it("should return correct color for tool role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleColor("tool")).toBe("rgba(156, 39, 176, 0.1)");
+      });
+
+      it("should return fallback color for unknown role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleColor("unknown")).toBe(
+          "rgba(158, 158, 158, 0.1)",
+        );
+      });
+    });
+
+    describe("roleLabel", () => {
+      it("should return correct label for user role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleLabel("user")).toBe("User");
+      });
+
+      it("should return correct label for assistant role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleLabel("assistant")).toBe("Assistant");
+      });
+
+      it("should return correct label for system role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleLabel("system")).toBe("System");
+      });
+
+      it("should return correct label for tool role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleLabel("tool")).toBe("Tool");
+      });
+
+      it("should return role name as-is for unknown role", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        expect(wrapper.vm.roleLabel("custom-agent")).toBe("custom-agent");
+      });
+    });
+
+    describe("renderMarkdown", () => {
+      it("should replace [Image: URL] with markdown image syntax", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        const result = wrapper.vm.renderMarkdown(
+          "Check: [Image: https://example.com/img.png]",
+        );
+        expect(result).toContain("![Image](https://example.com/img.png)");
+      });
+
+      it("should call DOMPurify.sanitize with marked output", () => {
+        wrapper = mount(LLMContentRenderer, {
+          props: { content: "test" },
+        });
+
+        wrapper.vm.renderMarkdown("Hello world");
+        expect(DOMPurify.sanitize).toHaveBeenCalled();
+        expect(marked.parse).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("CodeQueryEditor Rendering", () => {
+    it("should render CodeQueryEditor stub for JSON content in formatted mode", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: '{"key": "value"}', viewMode: "formatted" },
+        global: {
+          stubs: {
+            CodeQueryEditor: {
+              template:
+                '<div data-test="code-query-editor">CodeQueryEditorStub</div>',
+            },
+          },
+        },
+      });
+
+      expect(wrapper.find('[data-test="code-query-editor"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should render CodeQueryEditor stub in JSON view mode", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: '{"key": "value"}', viewMode: "json" },
+        global: {
+          stubs: {
+            CodeQueryEditor: {
+              template:
+                '<div data-test="code-query-editor">CodeQueryEditorStub</div>',
+            },
+          },
+        },
+      });
+
+      expect(wrapper.find('[data-test="code-query-editor"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should render CodeQueryEditor stub for tool content", () => {
+      const mockSpan = {
+        llm_tool_name: "test-tool",
+        llm_tool_call_id: "call-1",
+        llm_tool_call_arguments: '{"op": "add"}',
+      };
+
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: null,
+          observationType: "TOOL",
+          contentType: "input",
+          span: mockSpan,
+        },
+        global: {
+          stubs: {
+            CodeQueryEditor: {
+              template:
+                '<div data-test="code-query-editor">CodeQueryEditorStub</div>',
+            },
+          },
+        },
+      });
+
+      expect(wrapper.find('[data-test="code-query-editor"]').exists()).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("Inline Message Rendering", () => {
+    it("should render message items with role labels via v-for", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "user", content: "Hello" },
+            { role: "assistant", content: "Hi there" },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const messageItems = wrapper.findAll(".message-item");
+      expect(messageItems.length).toBe(2);
+
+      const roles = wrapper.findAll(".message-role");
+      expect(roles.length).toBe(2);
+      expect(roles[0].text()).toBe("User");
+      expect(roles[1].text()).toBe("Assistant");
+    });
+
+    it("should render markdown content when message content is not JSON", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "assistant", content: "I am an assistant" },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const markdownBody = wrapper.find(".markdown-body");
+      expect(markdownBody.exists()).toBe(true);
+    });
+
+    it("should render CodeQueryEditor stub when message content is JSON", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "assistant", content: '{"inner": "json"}' },
+          ]),
+          viewMode: "formatted",
+        },
+        global: {
+          stubs: {
+            CodeQueryEditor: {
+              template:
+                '<div data-test="code-query-editor">CodeQueryEditorStub</div>',
+            },
+          },
+        },
+      });
+
+      const messageJson = wrapper.find(".message-content-json");
+      expect(messageJson.exists()).toBe(true);
+      expect(messageJson.find('[data-test="code-query-editor"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should apply role-based background color to message items", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([{ role: "user", content: "Hello" }]),
+          viewMode: "formatted",
+        },
+      });
+
+      const roleDiv = wrapper.find(".message-role");
+      expect(roleDiv.attributes("style")).toContain("rgba(25, 118, 210, 0.1)");
     });
   });
 });
