@@ -221,6 +221,7 @@ jobs:
                 "dashboard-pie-donut.spec.js",
                 "dashboard-table-chart.spec.js",
                 "dashboard-table-copy-cell.spec.js",
+                "dashboard-table-csv-download.spec.js",
                 "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
