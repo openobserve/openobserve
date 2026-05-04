@@ -368,7 +368,7 @@ export function applyCollapseFilter(
 ): FieldObj[] {
   if (filterTerm) return fields;
   return fields.filter((row) => {
-    if (row.label) return true;
+    if (row.label === true) return true;
     const group = row.group;
     if (group === undefined || !(group in expandGroupRows)) return true;
     return expandGroupRows[group] !== false;

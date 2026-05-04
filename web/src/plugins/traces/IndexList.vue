@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #body-cell-name="props">
           <!-- Group header row -->
           <q-tr
-            v-if="props.row.label"
+            v-if="props.row.label === true"
             :props="props"
             class="cursor-pointer text-bold"
             @click="toggleGroup(props.row.group)"
@@ -299,7 +299,7 @@ export default defineComponent({
       normalizedFieldList,
       (list) => {
         for (const row of list) {
-          if (row.label && row.group && !(row.group in expandGroupRows.value)) {
+          if (row.label === true && row.group && !(row.group in expandGroupRows.value)) {
             expandGroupRows.value[row.group] = true;
           }
         }
@@ -315,7 +315,7 @@ export default defineComponent({
     const groupFieldCount = computed(() => {
       const counts: Record<string, number> = {};
       for (const row of normalizedFieldList.value) {
-        if (!row.label && row.group) {
+        if (row.label !== true && row.group) {
           counts[row.group] = (counts[row.group] ?? 0) + 1;
         }
       }
