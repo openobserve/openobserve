@@ -80,6 +80,7 @@
 
     /* Tabs */
     --color-tabs-active-bg: var(--color-primary-800);
+    --color-tabs-active-text: var(--color-white);
     --color-tabs-hover-bg: var(--color-primary-900);
     --color-tabs-bar-border: var(--color-grey-700);
 
