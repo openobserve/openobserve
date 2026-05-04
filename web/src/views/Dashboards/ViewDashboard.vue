@@ -290,33 +290,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:runId="updateRunId"
       />
 
-      <q-dialog
-        v-model="showDashboardSettingsDialog"
-        position="right"
-        full-height
-        maximized
-        data-test="dashboard-settings-dialog"
+      <ODrawer
+        v-model:open="showDashboardSettingsDialog"
+        :width="73"
+        :show-close="false"
+        @close="showDashboardSettingsDialog = false"
       >
-        <DashboardSettings @refresh="loadDashboard" />
-      </q-dialog>
+        <DashboardSettings @refresh="loadDashboard" @close="showDashboardSettingsDialog = false" />
+      </ODrawer>
 
-      <q-dialog
-        v-model="selectedPanelConfig.show"
-        position="right"
-        full-height
-        maximized
+      <ODrawer
+        v-model:open="selectedPanelConfig.show"
+        size="sm"
+        :show-close="false"
+        @close="selectedPanelConfig.show = false"
       >
         <PanelLayoutSettings
           :layout="selectedPanelConfig.data.layout"
           @save:layout="savePanelLayout"
+          @close="selectedPanelConfig.show = false"
         />
-      </q-dialog>
+      </ODrawer>
 
-      <q-dialog
-        v-model="showScheduledReportsDialog"
-        position="right"
-        full-height
-        maximized
+      <ODrawer
+        v-model:open="showScheduledReportsDialog"
+        :width="60"
+        :show-close="false"
+        @close="showScheduledReportsDialog = false"
       >
         <ScheduledDashboards
           :reports="scheduledReports"
@@ -325,22 +325,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dashboardId="dashboardId"
           :tabId="tabId"
           :tabs="currentDashboardData?.data?.tabs || []"
+          @close="showScheduledReportsDialog = false"
         />
-      </q-dialog>
+      </ODrawer>
 
-      <q-dialog
-        v-model="showJsonEditorDialog"
-        position="right"
-        full-height
-        maximized
-        :persistent="true"
+      <ODrawer
+        v-model:open="showJsonEditorDialog"
+        :width="72"
+        persistent
       >
         <DashboardJsonEditor
           :dashboard-data="currentDashboardData.data"
           :save-json-dashboard="saveJsonDashboard"
           @close="showJsonEditorDialog = false"
         />
-      </q-dialog>
+      </ODrawer>
     </div>
   </q-page>
 </template>
@@ -395,6 +394,7 @@ import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -434,6 +434,7 @@ export default defineComponent({
     PanelLayoutSettings,
     DashboardJsonEditor,
     OButton,
+    ODrawer,
   },
   setup() {
     const { t } = useI18n();

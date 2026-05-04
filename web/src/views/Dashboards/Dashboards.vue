@@ -497,19 +497,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-table>
 
               <!-- add dashboard -->
-              <q-dialog
-                v-model="showAddDashboardDialog"
-                position="right"
-                full-height
-                maximized
+              <ODrawer
+                v-model:open="showAddDashboardDialog"
+                :width="30"
+                :show-close="false"
                 data-test="dashboard-add-dialog"
               >
                 <AddDashboard
-                  style="width: 30vw"
+                  @close="showAddDashboardDialog = false"
                   @updated="updateDashboardList"
                   :activeFolderId="activeFolderId"
                 />
-              </q-dialog>
+              </ODrawer>
 
               <!-- add dashboard from GitHub gallery -->
               <AddDashboardFromGitHub
@@ -518,35 +517,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- add/edit folder -->
-              <q-dialog
-                v-model="showAddFolderDialog"
-                position="right"
-                full-height
-                maximized
+              <ODrawer
+                v-model:open="showAddFolderDialog"
+                :width="30"
+                :show-close="false"
+                @close="showAddFolderDialog = false"
                 data-test="dashboard-folder-dialog"
               >
                 <AddFolder
-                  style="width: 30vw"
                   @update:modelValue="updateFolderList"
+                  @close="showAddFolderDialog = false"
                   :edit-mode="isFolderEditMode"
                   :folder-id="selectedFolderToEdit ?? 'default'"
                 />
-              </q-dialog>
+              </ODrawer>
 
               <!-- move dashboard to another folder -->
-              <q-dialog
-                v-model="showMoveDashboardDialog"
-                position="right"
-                full-height
-                maximized
+              <ODrawer
+                v-model:open="showMoveDashboardDialog"
+                size="lg"
+                :show-close="false"
+                @close="showMoveDashboardDialog = false"
                 data-test="dashboard-move-to-another-folder-dialog"
               >
                 <MoveDashboardToAnotherFolder
                   @updated="handleDashboardMoved"
+                  @close="showMoveDashboardDialog = false"
                   :dashboard-ids="selectedDashboardIdToMove"
                   :activeFolderId="activeFolderToMove"
                 />
-              </q-dialog>
+              </ODrawer>
 
               <!-- delete dashboard dialog -->
               <ConfirmDialog
@@ -589,6 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 // @ts-nocheck
@@ -656,6 +657,7 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    ODrawer,
     AddDashboard,
     AddDashboardFromGitHub,
     QTablePagination,

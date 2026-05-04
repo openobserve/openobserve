@@ -510,9 +510,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <router-view v-else />
 
-  <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
+  <ODrawer v-model:open="showCreatePipeline" size="lg">
     <stream-selection @save="savePipeline" />
-  </q-dialog>
+  </ODrawer>
 
   <confirm-dialog
     :title="confirmDialogMeta.title"
@@ -540,110 +540,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 
   <!-- Pipeline Error Dialog -->
-  <q-dialog v-model="errorDialog.show" @hide="closeErrorDialog">
-    <q-card
-      class="pipeline-error-dialog"
-      :class="
-        store.state.theme === 'dark'
-          ? 'pipeline-error-dialog-dark'
-          : 'pipeline-error-dialog-light'
-      "
-    >
-      <!-- Header with Pipeline Name and Timestamp -->
-      <q-card-section
-        class="pipeline-error-header tw:flex tw:items-center tw:justify-between"
-      >
-        <div class="tw:flex-1">
-          <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-            <q-icon name="error" size="24px" class="error-icon" />
-            <span class="pipeline-name">{{ errorDialog.data?.name }}</span>
-          </div>
-          <div class="error-timestamp">
-            <span class="tw:mr-2">{{ t("pipeline_list.last_error") }}:</span>
-            <q-icon name="schedule" size="14px" class="tw:mr-1" />
-            {{
-              errorDialog.data &&
-              new Date(
-                errorDialog.data.last_error.last_error_timestamp / 1000,
-              ).toLocaleString()
-            }}
-          </div>
+  <ODialog v-model:open="errorDialog.show" @update:open="(v) => !v && closeErrorDialog()" size="md">
+    <template #header>
+      <div class="tw:flex-1">
+        <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
+          <q-icon name="error" size="24px" class="error-icon" />
+          <span class="pipeline-name">{{ errorDialog.data?.name }}</span>
         </div>
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click="closeErrorDialog"
-          class="close-btn"
-        >
-          <template #icon-left>
-            <X class="tw:size-4 tw:shrink-0" />
-          </template>
-        </OButton>
-      </q-card-section>
+        <div class="error-timestamp">
+          <span class="tw:mr-2">{{ t('pipeline_list.last_error') }}:</span>
+          <q-icon name="schedule" size="14px" class="tw:mr-1" />
+          {{ errorDialog.data && new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString() }}
+        </div>
+      </div>
+    </template>
 
-      <q-separator />
-
-      <q-card-section v-if="errorDialog.data" class="pipeline-error-content">
-        <!-- Error Summary -->
-        <div v-if="errorDialog.data.last_error.error_summary" class="tw:mb-4">
-          <div class="section-label tw:mb-2">
+    <div v-if="errorDialog.data" class="pipeline-error-content">
+      <!-- Error Summary -->
+      <div v-if="errorDialog.data.last_error.error_summary" class="tw:mb-4">
+        <div class="section-label tw:mb-2">
             {{ t("pipeline_list.error_summary") }}
           </div>
-          <div class="error-summary-box">
-            {{ errorDialog.data.last_error.error_summary }}
-          </div>
+        <div class="error-summary-box">
+          {{ errorDialog.data.last_error.error_summary }}
         </div>
+      </div>
 
-        <!-- Node Errors -->
-        <div
+      <!-- Node Errors -->
+      <div
           v-if="
             errorDialog.data.last_error.node_errors &&
             Object.keys(errorDialog.data.last_error.node_errors).length > 0
           "
         >
-          <div class="section-label tw:mb-3">
+        <div class="section-label tw:mb-3">
             {{ t("pipeline_list.node_errors") }}
           </div>
-          <div class="node-errors-container">
-            <div
-              v-for="(nodeError, nodeId) in errorDialog.data.last_error
+        <div class="node-errors-container">
+          <div
+            v-for="(nodeError, nodeId) in errorDialog.data.last_error
                 .node_errors"
-              :key="nodeId"
-              class="node-error-item"
-            >
-              <div class="node-error-header">
-                <span class="node-name">{{
+            :key="nodeId"
+            class="node-error-item"
+          >
+            <div class="node-error-header">
+              <span class="node-name">{{
                   nodeError.node_name || nodeId
                 }}</span>
-                <span class="node-type">{{ nodeError.node_type }}</span>
-              </div>
-              <div
+              <span class="node-type">{{ nodeError.node_type }}</span>
+            </div>
+            <div
                 v-if="
                   nodeError.error_messages &&
                   nodeError.error_messages.length > 0
                 "
                 class="node-error-messages"
               >
-                <div
+              <div
                   v-for="(msg, idx) in nodeError.error_messages"
                   :key="idx"
                   class="error-message"
                 >
-                  {{ msg }}
-                </div>
+                {{ msg }}
               </div>
             </div>
           </div>
         </div>
-      </q-card-section>
+      </div>
+    </div>
 
-      <q-card-actions class="pipeline-error-actions">
+    <template #footer>
+      <div class="flex justify-end">
         <OButton variant="outline" size="sm-action" @click="closeErrorDialog">
           {{ t("pipeline_list.close") }}
         </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      </div>
+    </template>
+  </ODialog>
 </template>
 <script setup lang="ts">
 import {
@@ -699,6 +672,8 @@ import {
   ChevronUp,
 } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";

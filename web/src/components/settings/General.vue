@@ -433,20 +433,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="lg"
     color="primary"
   ></q-spinner-hourglass>
-  <q-dialog v-model="confirmDeleteImage">
-    <q-card>
-      <q-card-section>
-        {{ t("settings.deleteLogoMessage") }}
-      </q-card-section>
-
-      <q-card-actions align="right" class="tw:flex tw:gap-1">
+  <ODialog v-model:open="confirmDeleteImage" size="xs">
+    <p>{{ t('settings.deleteLogoMessage') }}</p>
+    <template #footer>
+      <div class="tw:flex tw:justify-end tw:gap-2">
         <OButton
           data-test="logs-search-bar-confirm-dialog-cancel-btn"
           variant="outline"
           size="sm-action"
           @click="cancelConfirmDialog"
         >
-          {{ t("confirmDialog.cancel") }}
+          {{ t('confirmDialog.cancel') }}
         </OButton>
         <OButton
           data-test="logs-search-bar-confirm-dialog-ok-btn"
@@ -454,28 +451,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           @click="confirmDialogOK"
         >
-          {{ t("confirmDialog.ok") }}
+          {{ t('confirmDialog.ok') }}
         </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      </div>
+    </template>
+  </ODialog>
 
   <!-- Color Picker Dialog -->
-  <q-dialog v-model="showColorPicker" @hide="onColorPickerClose">
-    <q-card style="min-width: 300px">
-      <q-card-section>
-        <div class="text-h6">{{ t("settings.pickCustomColor") }}</div>
-      </q-card-section>
-      <q-card-section>
-        <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
-      </q-card-section>
-      <q-card-actions align="right">
-        <OButton variant="outline" size="sm-action" v-close-popup>
-          {{ t("settings.close") }}
+  <ODialog v-model:open="showColorPicker" @update:open="(v) => !v && onColorPickerClose()" size="xs" :title="t('settings.pickCustomColor')">
+    <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
+    <template #footer>
+      <div class="tw:flex tw:justify-end">
+        <OButton variant="outline" size="sm-action" @click="showColorPicker = false">
+          {{ t('settings.close') }}
         </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      </div>
+    </template>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -495,6 +487,7 @@ import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { X, Check, Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
@@ -515,6 +508,7 @@ export default defineComponent({
   components: {
     GroupHeader,
     OButton,
+    ODialog,
   },
   setup() {
     const { t } = useI18n();

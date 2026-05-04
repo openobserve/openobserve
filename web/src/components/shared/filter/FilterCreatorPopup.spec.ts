@@ -32,7 +32,12 @@ const mockI18n = createI18n({
 });
 
 const globalStubs = {
-  "q-dialog": { template: '<div class="q-dialog"><slot /></div>' },
+  ODialog: { template: '<div class="o-dialog"><slot name="header" /><slot /><slot name="footer" /></div>', props: ["open", "size"] },
+  OButton: {
+    template: '<button class="o-btn" @click="$emit(\'click\')"><slot /></button>',
+    props: ["variant", "size"],
+    emits: ["click"],
+  },
   "q-card": { template: '<div class="q-card"><slot /></div>' },
   "q-card-section": { template: '<div class="q-card-section"><slot /></div>' },
   "q-card-actions": {
@@ -136,7 +141,7 @@ describe("FilterCreatorPopup", () => {
 
     it("should render cancel and apply buttons", () => {
       wrapper = mountComponent();
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll(".o-btn");
       expect(buttons.length).toBe(2);
       expect(buttons[0].text()).toBe("Cancel");
       expect(buttons[1].text()).toBe("Apply");
@@ -249,7 +254,7 @@ describe("FilterCreatorPopup", () => {
 
     it("should emit apply when Apply button is clicked", async () => {
       wrapper = mountComponent();
-      const applyBtn = wrapper.findAll(".q-btn")[1];
+      const applyBtn = wrapper.findAll(".o-btn")[1];
       await applyBtn.trigger("click");
       expect(wrapper.emitted("apply")).toBeTruthy();
     });
@@ -292,15 +297,15 @@ describe("FilterCreatorPopup", () => {
   });
 
   describe("component structure", () => {
-    it("should have a q-dialog as root", () => {
+    it("should have an ODialog as root", () => {
       wrapper = mountComponent();
-      expect(wrapper.find(".q-dialog").exists()).toBe(true);
+      expect(wrapper.find(".o-dialog").exists()).toBe(true);
     });
 
-    it("should have at least 3 q-card-section elements", () => {
+    it("should have at least 2 q-card-section elements", () => {
       wrapper = mountComponent();
       expect(wrapper.findAll(".q-card-section").length).toBeGreaterThanOrEqual(
-        3,
+        2,
       );
     });
 

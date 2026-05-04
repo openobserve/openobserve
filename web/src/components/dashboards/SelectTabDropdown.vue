@@ -52,11 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add/edit tab -->
-  <q-dialog
-    v-model="showAddTabDialog"
-    position="right"
-    full-height
-    maximized
+  <ODrawer
+    v-model:open="showAddTabDialog"
+    size="md"
+    :show-close="false"
+    @close="showAddTabDialog = false"
     data-test="dashboard-tab-add-dialog"
   >
     <AddTab
@@ -64,8 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="dashboardId"
       :folder-id="folderId"
       @refresh="updateTabList"
+      @close="showAddTabDialog = false"
     />
-  </q-dialog>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -74,6 +75,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
@@ -81,7 +83,7 @@ import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectTabDropdown",
-  components: { AddTab, OButton },
+  components: { AddTab, OButton, ODrawer },
   emits: ["tab-selected", "tab-list-updated"],
   props: {
     folderId: {

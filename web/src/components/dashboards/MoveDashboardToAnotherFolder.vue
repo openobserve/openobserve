@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-auto">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="ghost"
             size="icon-circle"
             data-test="dashboard-folder-move-cancel"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex justify-start q-mt-sm tw:gap-2">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="outline"
             size="sm-action"
             data-test="dashboard-folder-move-cancel"
@@ -118,7 +118,7 @@ export default defineComponent({
       default: [],
     },
   },
-  emits: ["updated"],
+  emits: ["updated", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const moveFolderForm: any = ref(null);

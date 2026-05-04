@@ -40,7 +40,7 @@
         <OButton
           variant="ghost"
           size="icon"
-          v-close-popup="true"
+          @click="$emit('close')"
           data-test="query-inspector-close-btn"
         >
           <template #icon-left><q-icon name="close" /></template>
@@ -284,6 +284,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "QueryInspector",
+  emits: ["close"],
   components: { OButton },
   props: {
     metaData: {

@@ -312,16 +312,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ></PanelSchemaRenderer>
     </div>
 
-    <q-dialog v-model="showViewPanel" data-test="query-inspector-dialog">
-      <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
-    </q-dialog>
+    <ODialog v-model:open="showViewPanel" :show-close="false" :width="80" @close="showViewPanel = false" data-test="query-inspector-dialog">
+      <QueryInspector :metaData="metaData" :data="props.data" @close="showViewPanel = false"></QueryInspector>
+    </ODialog>
 
-    <q-dialog v-model="showLegendsDialog">
+    <ODialog v-model:open="showLegendsDialog" :show-close="false" size="lg">
       <ShowLegendsPopup
         :panelData="currentPanelData"
         @close="showLegendsDialog = false"
       />
-    </q-dialog>
+    </ODialog>
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
@@ -382,6 +382,7 @@ import {
 } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { isEqual } from "lodash-es";
@@ -444,6 +445,7 @@ export default defineComponent({
     RelativeTime,
     PanelErrorButtons,
     OButton,
+    ODialog,
     ODropdown,
     ODropdownItem,
     ShowLegendsPopup: defineAsyncComponent(() => {

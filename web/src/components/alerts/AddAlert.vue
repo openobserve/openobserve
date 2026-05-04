@@ -487,6 +487,7 @@ import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlertin
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -531,6 +532,7 @@ export default defineComponent({
     OButton,
     OToggleGroup,
     OToggleGroupItem,
+    ODrawer,
     Shield,
     SlidersHorizontal,
     TrendingUp,

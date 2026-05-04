@@ -51,17 +51,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- add folder -->
-    <q-dialog
+    <ODrawer
       v-if="!disableDropdown"
-      v-model="showAddFolderDialog"
-      position="right"
-      full-height
-      maximized
-      
+      v-model:open="showAddFolderDialog"
+      :width="30"
+      :show-close="false"
+      @close="showAddFolderDialog = false"
       :data-test="`${type}-folder-move-dialog`"
     >
-      <AddFolder style="width: 30vw;" :type="type" @update:modelValue="updateFolderList" :edit-mode="false" />
-    </q-dialog>
+      <AddFolder :type="type" @update:modelValue="updateFolderList" @close="showAddFolderDialog = false" :edit-mode="false" />
+    </ODrawer>
   </template>
 
   <script lang="ts">
@@ -73,10 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
-    components: { AddFolder, OButton },
+    components: { AddFolder, OButton, ODrawer },
     emits: ["folder-selected"],
     props: {
       activeFolderId: {

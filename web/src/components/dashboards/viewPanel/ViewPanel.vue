@@ -179,12 +179,12 @@
         </div>
       </div>
     </div>
-    <q-dialog v-model="showLegendsDialog">
+    <ODialog v-model:open="showLegendsDialog" :show-close="false" size="lg">
       <ShowLegendsPopup
         :panelData="currentPanelData"
         @close="showLegendsDialog = false"
       />
-    </q-dialog>
+    </ODialog>
   </div>
 </template>
 
@@ -232,6 +232,7 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -253,6 +254,7 @@ export default defineComponent({
     ShowLegendsPopup,
     PanelErrorButtons,
     OButton,
+    ODialog,
   },
   props: {
     panelId: {

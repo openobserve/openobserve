@@ -176,72 +176,55 @@
       <q-separator class="tw:bg-[#DBDBDB]" />
 
       <!-- History Panel -->
-      <q-dialog v-model="showHistory" position="right">
-        <q-card style="width: 350px; max-width: 100vw; height: 100vh;">
-          <q-card-section class="row items-center q-pb-none">
-            <div class="text-h6">Chat History</div>
-            <q-space />
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              @click="showHistory = false"
-            >
-              <q-icon name="close" size="1rem" />
-            </OButton>
-          </q-card-section>
-
-          <q-card-section class="q-pa-md" style="max-height: calc(100vh - 70px); overflow: auto;">
-            <q-list separator>
-              <q-item
-                v-for="chat in chatHistory"
-                :key="chat.id"
-                clickable
-                v-ripple
-                @click="loadChat(chat.id)"
-              >
-                <q-item-section>
-                  <q-item-label>{{ chat.title }}</q-item-label>
-                  <q-item-label caption>
-                    {{ new Date(chat.timestamp).toLocaleString() }}
-                  </q-item-label>
-                  <q-item-label caption>
-                    Model: {{ chat.model }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
+      <ODrawer v-model:open="showHistory" size="sm">
+        <template #header>
+          <div class="text-h6">Chat History</div>
+        </template>
+        <q-list separator>
+          <q-item
+            v-for="chat in chatHistory"
+            :key="chat.id"
+            clickable
+            v-ripple
+            @click="loadChat(chat.id)"
+          >
+            <q-item-section>
+              <q-item-label>{{ chat.title }}</q-item-label>
+              <q-item-label caption>
+                {{ new Date(chat.timestamp).toLocaleString() }}
+              </q-item-label>
+              <q-item-label caption>
+                Model: {{ chat.model }}
+              </q-item-label>
+            </q-item-section>
+          </q-item>
+        </q-list>
+      </ODrawer>
 
       <!-- Edit Title Dialog -->
-      <q-dialog v-model="showEditTitleDialog">
-        <q-card style="min-width: 350px">
-          <q-card-section>
-            <div class="text-h6">Edit Chat Title</div>
-          </q-card-section>
-
-          <q-card-section class="q-pt-none">
-            <q-input
-              v-model="editingTitle"
-              dense
-              borderless
-              autofocus
-              @keyup.enter="saveEditedTitle"
-              placeholder="Enter chat title"
-            />
-          </q-card-section>
-
-          <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
+      <ODialog v-model:open="showEditTitleDialog" size="sm">
+        <template #header>
+          <div class="text-h6">Edit Chat Title</div>
+        </template>
+        <q-input
+          v-model="editingTitle"
+          dense
+          borderless
+          autofocus
+          @keyup.enter="saveEditedTitle"
+          placeholder="Enter chat title"
+        />
+        <template #footer>
+          <div class="flex justify-end tw:gap-2">
             <OButton variant="outline" size="sm-action" @click="showEditTitleDialog = false"
               >Cancel</OButton
             >
             <OButton variant="primary" size="sm-action" @click="saveEditedTitle"
               >Save</OButton
             >
-          </q-card-actions>
-        </q-card>
-      </q-dialog>
+          </div>
+        </template>
+      </ODialog>
 
       <!-- Delete Chat Confirmation Dialog -->
       <ConfirmDialog
@@ -263,99 +246,19 @@
 
 
       <!-- Image Preview Dialog -->
-      <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
-        <q-card class="image-preview-dialog" style="max-width: 90vw; max-height: 90vh;">
-          <q-card-section class="row items-center q-pb-none">
-            <div class="text-subtitle1">{{ previewImage?.filename }}</div>
-            <q-space />
-            <OButton variant="ghost" size="icon-sm" @click="closeImagePreview">
-              <q-icon name="close" size="1rem" />
-            </OButton>
-          </q-card-section>
-          <q-card-section class="q-pa-md tw:flex tw:justify-center">
-            <img
-              v-if="previewImage"
-              :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
-              :alt="previewImage.filename"
-              style="max-width: 100%; max-height: 80vh; object-fit: contain;"
-            />
-          </q-card-section>
-        </q-card>
-      </q-dialog>
-
-      <!-- Edit Title Dialog -->
-      <q-dialog v-model="showEditTitleDialog">
-        <q-card style="min-width: 350px">
-          <q-card-section>
-            <div class="text-h6">Edit Chat Title</div>
-          </q-card-section>
-
-          <q-card-section class="q-pt-none">
-            <q-input
-              v-model="editingTitle"
-              dense
-              borderless
-              autofocus
-              @keyup.enter="saveEditedTitle"
-              placeholder="Enter chat title"
-            />
-          </q-card-section>
-
-          <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
-            <OButton variant="outline" size="sm-action" @click="showEditTitleDialog = false"
-              >Cancel</OButton
-            >
-            <OButton variant="primary" size="sm-action" @click="saveEditedTitle"
-              >Save</OButton
-            >
-          </q-card-actions>
-        </q-card>
-      </q-dialog>
-
-      <!-- Delete Chat Confirmation Dialog -->
-      <ConfirmDialog
-        v-model="showDeleteChatConfirmDialog"
-        title="Delete Chat"
-        message="Are you sure you want to delete this chat? This action cannot be undone."
-        @update:ok="confirmDeleteChat"
-        @update:cancel="showDeleteChatConfirmDialog = false"
-      />
-
-      <!-- Clear All Conversations Confirmation Dialog -->
-      <ConfirmDialog
-        v-model="showClearAllConfirmDialog"
-        title="Clear All Conversations"
-        message="Are you sure you want to clear all conversations? This action cannot be undone."
-        @update:ok="confirmClearAllConversations"
-        @update:cancel="showClearAllConfirmDialog = false"
-      />
-
-
-      <!-- Image Preview Dialog -->
-      <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
-        <q-card
-          class="image-preview-dialog"
-          style="max-width: 90vw; max-height: 90vh"
-        >
-          <q-card-section class="row items-center q-pb-none">
-            <div class="text-subtitle1">{{ previewImage?.filename }}</div>
-            <q-space />
-            <OButton variant="ghost" size="icon-sm" @click="closeImagePreview">
-              <q-icon name="close" size="1rem" />
-            </OButton>
-          </q-card-section>
-          <q-card-section class="q-pa-md tw:flex tw:justify-center">
-            <img
-              v-if="previewImage"
-              :src="
-                'data:' + previewImage.mimeType + ';base64,' + previewImage.data
-              "
-              :alt="previewImage.filename"
-              style="max-width: 100%; max-height: 80vh; object-fit: contain"
-            />
-          </q-card-section>
-        </q-card>
-      </q-dialog>
+      <ODialog v-model:open="showImagePreview" @update:open="(v) => !v && closeImagePreview()" size="lg">
+        <template #header>
+          <div class="text-subtitle1">{{ previewImage?.filename }}</div>
+        </template>
+        <div class="tw:flex tw:justify-center">
+          <img
+            v-if="previewImage"
+            :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
+            :alt="previewImage.filename"
+            style="max-width: 100%; max-height: 80vh; object-fit: contain;"
+          />
+        </div>
+      </ODialog>
 
 
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
@@ -1504,6 +1407,8 @@ import {
   getDashboardEventType,
 } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 const { fetchAiChat, submitFeedback } = useAiChat();

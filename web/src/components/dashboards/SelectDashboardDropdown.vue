@@ -52,19 +52,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add dashboard -->
-  <q-dialog
-    v-model="showAddDashboardDialog"
-    position="right"
-    full-height
-    maximized
+  <ODrawer
+    v-model:open="showAddDashboardDialog"
+    size="lg"
+    :show-close="false"
+    @close="showAddDashboardDialog = false"
     data-test="dashboard-dashboard-add-dialog"
   >
     <AddDashboard
       :active-folder-id="folderId as any"
       @updated="updateDashboardList"
+      @close="showAddDashboardDialog = false"
       :show-folder-selection="false"
     />
-  </q-dialog>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -73,13 +74,14 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getAllDashboardsByFolderId, getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",
-  components: { AddDashboard, OButton },
+  components: { AddDashboard, OButton, ODrawer },
   emits: ["dashboard-selected", "dashboard-list-updated"],
   props: {
     folderId: {

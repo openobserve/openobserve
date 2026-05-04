@@ -267,46 +267,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-dialog
-      v-model="showIndexSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="showIndexSchemaDialog"
+      size="lg"
+      :show-close="false"
+      @close="showIndexSchemaDialog = false"
     >
-      <SchemaIndex v-model="schemaData" />
-    </q-dialog>
+      <SchemaIndex v-model="schemaData" @close="showIndexSchemaDialog = false" />
+    </ODrawer>
 
-    <q-dialog
-      v-model="addStreamDialog.show"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="addStreamDialog.show"
+      size="md"
+      :show-close="false"
     >
       <AddStream
         :is-in-pipeline="false"
         @close="addStreamDialog.show = false"
         @streamAdded="getLogStream"
       />
-    </q-dialog>
+    </ODrawer>
 
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 420px">
-        <q-card-section class="confirmBodyLogStream">
-          <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
-        </q-card-section>
-        <div
-          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
-        >
-          <q-checkbox
-            class="checkbox-delete-associated-alerts-pipelines"
-            v-model="deleteAssociatedAlertsPipelines"
-          />
-          <span class="delete-associated-alerts-pipelines-text">
-            Delete all pipelines and alerts associated with the stream
-          </span>
-        </div>
-        <q-card-actions class="confirmActionsLogStream tw:gap-2">
+    <ODialog v-model:open="confirmDelete" size="sm">
+      <template #header>{{ t("logStream.confirmDeleteHead") }}</template>
+      <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
+      <div
+        class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
+      >
+        <q-checkbox
+          class="checkbox-delete-associated-alerts-pipelines"
+          v-model="deleteAssociatedAlertsPipelines"
+        />
+        <span class="delete-associated-alerts-pipelines-text">
+          Delete all pipelines and alerts associated with the stream
+        </span>
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             variant="outline"
             size="sm-action"
@@ -326,28 +323,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("logStream.ok") }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmBatchDelete">
-      <q-card style="width: 420px">
-        <q-card-section class="confirmBodyLogStream">
-          <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
-          <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
-        </q-card-section>
-        <div
-          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
-        >
-          <q-checkbox
-            class="checkbox-delete-associated-alerts-pipelines"
-            v-model="deleteAssociatedAlertsPipelines"
-          />
-          <span class="delete-associated-alerts-pipelines-text">
-            Delete all pipelines and alerts associated with the selected streams
-          </span>
         </div>
-        <q-card-actions class="confirmActionsLogStream tw:gap-2">
+      </template>
+    </ODialog>
+
+    <ODialog v-model:open="confirmBatchDelete" size="sm">
+      <template #header>{{ t("logStream.confirmBatchDeleteHead") }}</template>
+      <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+      <div
+        class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
+      >
+        <q-checkbox
+          class="checkbox-delete-associated-alerts-pipelines"
+          v-model="deleteAssociatedAlertsPipelines"
+        />
+        <span class="delete-associated-alerts-pipelines-text">
+          Delete all pipelines and alerts associated with the selected streams
+        </span>
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             variant="outline"
             size="sm-action"
@@ -367,9 +362,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("logStream.ok") }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
   </div>
 </template>
 
@@ -403,6 +398,8 @@ import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import {
   Search,
   FileText,
@@ -422,6 +419,8 @@ export default defineComponent({
     NoData,
     AddStream,
     OButton,
+    ODrawer,
+    ODialog,
     OToggleGroup,
     OToggleGroupItem,
     ScrollText,

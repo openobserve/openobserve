@@ -96,63 +96,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-dialog v-model="confirmAccept">
-      <q-card style="width: 300px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("invitation.confirmAcceptHead") }}</div>
-          <div class="para">
-            {{
-              t("invitation.confirmAcceptMsg", {
-                org: selectedInvitation?.org_name,
-              })
-            }}
-          </div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("invitation.cancel") }}
+    <ODialog v-model:open="confirmAccept" size="xs" :title="t('invitation.confirmAcceptHead')">
+      <p>{{ t('invitation.confirmAcceptMsg', { org: selectedInvitation?.org_name }) }}</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmAccept = false">
+            {{ t('invitation.cancel') }}
           </OButton>
           <OButton
-            v-close-popup="true"
             variant="primary"
             size="sm-action"
             @click="confirmAcceptInvitation"
           >
-            {{ t("invitation.accept") }}
+            {{ t('invitation.accept') }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
 
-    <q-dialog v-model="confirmReject">
-      <q-card style="width: 300px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("invitation.confirmRejectHead") }}</div>
-          <div class="para">
-            {{
-              t("invitation.confirmRejectMsg", {
-                org: selectedInvitation?.org_name,
-              })
-            }}
-          </div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("invitation.cancel") }}
+    <ODialog v-model:open="confirmReject" size="xs" :title="t('invitation.confirmRejectHead')">
+      <p>{{ t('invitation.confirmRejectMsg', { org: selectedInvitation?.org_name }) }}</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmReject = false">
+            {{ t('invitation.cancel') }}
           </OButton>
           <OButton
-            v-close-popup="true"
             variant="primary"
-            size="sm"
+            size="sm-action"
             @click="confirmRejectInvitation"
           >
-            {{ t("invitation.reject") }}
+            {{ t('invitation.reject') }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
   </div>
 </template>
 
@@ -160,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useStore } from "vuex";
 import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -174,6 +153,7 @@ export default defineComponent({
     NoData,
     QTablePagination,
     OButton,
+    ODialog,
   },
   props: {
     userEmail: {
@@ -323,6 +303,7 @@ export default defineComponent({
 
     const confirmAcceptInvitation = async () => {
       if (!selectedInvitation.value) return;
+      confirmAccept.value = false;
 
       const dismiss = $q.notify({
         spinner: true,
@@ -370,6 +351,7 @@ export default defineComponent({
 
     const confirmRejectInvitation = async () => {
       if (!selectedInvitation.value) return;
+      confirmReject.value = false;
 
       const dismiss = $q.notify({
         spinner: true,

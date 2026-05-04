@@ -113,14 +113,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
     </div>
-    <q-dialog v-model="showAddGroup" position="right" full-height maximized>
+    <ODrawer v-model:open="showAddGroup" :width="30" :show-close="false" @close="hideAddGroup">
       <AddGroup
-        style="width: 30vw"
         :org_identifier="store.state.selectedOrganization.identifier"
         @cancel:hideform="hideAddGroup"
         @added:group="setupGroups"
       />
-    </q-dialog>
+    </ODrawer>
     <ConfirmDialog
       title="Delete Group"
       :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
@@ -142,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";

@@ -16,50 +16,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <q-dialog
-    :model-value="modelValue"
-    @update:model-value="$emit('update:modelValue', $event)"
-    position="right"
-    full-height
-    maximized
+    <ODrawer
+    :open="modelValue"
+    @update:open="$emit('update:modelValue', $event)"
+    :width="90"
+    :show-close="false"
   >
-    <q-card
-      v-if="selectedPattern"
-      class="column full-height no-wrap detail-table-dialog tw:w-[90vw]! tw:max-w-[90vw]! tw:border-t-4 tw:border-t-[var(--q-primary)] tw:border-solid"
-    >
-      <!-- Header -->
-      <q-card-section class="q-px-md q-pb-sm">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <div class="text-body1 text-bold">{{ t("search.patternDetailsTitle") }}</div>
-            <div
-              class="text-caption"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-            >
-              {{ t("search.patternXofY", { index: selectedPattern.index + 1, total: totalPatterns }) }}
-            </div>
-          </div>
-          <div class="col-auto">
-            <OButton
-              variant="ghost"
-              size="icon-circle"
-              data-test="close-pattern-dialog"
-              @click="$emit('update:modelValue', false)"
-            >
-              <q-icon name="cancel" />
-            </OButton>
+    <template v-if="selectedPattern" #header>
+      <div class="row items-center no-wrap tw:w-full">
+        <div class="col">
+          <div class="text-body1 text-bold">{{ t("search.patternDetailsTitle") }}</div>
+          <div
+            class="text-caption"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
+          >
+            {{ t("search.patternXofY", { index: selectedPattern.index + 1, total: totalPatterns }) }}
           </div>
         </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <!-- Content - Single Scrollable View -->
-      <q-card-section
-        class="tw:py-[0.375rem] tw:px-[0.625rem] tw:flex-1 tw:overflow-y-auto"
-      >
+        <div class="col-auto">
+          <OButton
+            variant="ghost"
+            size="icon-circle"
+            data-test="close-pattern-dialog"
+            @click="$emit('update:modelValue', false)"
+          >
+            <q-icon name="cancel" />
+          </OButton>
+        </div>
+      </div>
+    </template>
+    <template v-if="selectedPattern">
         <!-- Statistics -->
         <div class="tw-mb-[1rem]">
           <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
@@ -262,12 +250,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-      </q-card-section>
+      </template>
 
       <!-- Footer Navigation -->
-      <q-separator />
-      <q-card-section class="tw:px-[0.625rem] tw:py-[0.375rem]">
-        <div class="row items-center no-wrap justify-between">
+    <template #footer>
+      <div class="row items-center no-wrap justify-between">
           <div class="col-auto">
             <OButton
               variant="secondary"
@@ -298,9 +285,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+    </template>
+  </ODrawer>
 
     <WildcardValuePopover
       :visible="!!hoveredToken"
@@ -321,6 +307,7 @@ import { useStore } from "vuex";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,
