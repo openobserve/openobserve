@@ -23,24 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
-        <div
-          class="q-table__title tw:font-[600]"
-          data-test="alert-templates-list-title"
-        >
-          {{ t("alert_templates.header") }}
-        </div>
-        <div class="col-auto flex">
-          <q-input
-            v-model="filterQuery"
-            borderless
-            dense
-            class="q-ml-auto no-border o2-search-input"
-            :placeholder="t('template.search')"
-          >
-            <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
-            </template>
-          </q-input>
+        <div class="q-table__title tw:font-[600]" data-test="alert-templates-list-title">
+            {{ t("alert_templates.header") }}
+          </div>
+          <div class="tw:flex tw:justify-end tw:gap-2">
+            <q-input
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input"
+              :placeholder="t('template.search')"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
           <OButton
             variant="outline"
             size="sm-action"

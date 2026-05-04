@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("pipeline_destinations.header") }}
         </div>
-        <div class="col-auto flex">
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <q-input
             v-model="filterQuery"
             borderless
