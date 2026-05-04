@@ -1571,13 +1571,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
-      <q-card>
-        <q-card-section>
-          {{ confirmMessage }}
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
+    <ODialog ref="confirmDialog" v-model:open="confirmDialogVisible" size="xs">
+      <p>{{ confirmMessage }}</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
             variant="outline"
@@ -1592,19 +1589,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="confirmDialogOK"
             >{{ t("confirmDialog.ok") }}</OButton
           >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog
-      ref="confirmSavedViewDialog"
-      v-model="confirmSavedViewDialogVisible"
-    >
-      <q-card>
-        <q-card-section>
-          {{ confirmMessageSavedView }}
-        </q-card-section>
+        </div>
+      </template>
+    </ODialog>
 
-        <q-card-actions align="right" class="tw:gap-2">
+    <ODialog ref="confirmSavedViewDialog" v-model:open="confirmSavedViewDialogVisible" size="xs">
+      <p>{{ confirmMessageSavedView }}</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
             variant="outline"
@@ -1617,74 +1609,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm-action"
             @click="confirmDialogOK"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="customDownloadDialog">
-      <q-card>
-        <q-card-section>
-          {{ t("search.customDownloadMessage") }}
-        </q-card-section>
-
-        <q-card-section>
-          <q-input
-            type="number"
-            data-test="custom-download-initial-number-input"
-            v-model="downloadCustomInitialNumber"
-            :label="t('search.initialNumber')"
-            default-value="1"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            tabindex="0"
-            min="1"
-          />
-          <q-select
-            data-test="custom-download-range-select"
-            v-model="downloadCustomRange"
-            :options="downloadCustomRangeOptions"
-            :label="t('search.range')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-          />
-          <div class="q-py-sm file-type">
-            <label class="q-pr-sm">{{ t("search.fileType") }}</label
-            ><br />
-            <OButtonGroup
-              data-test="custom-download-file-type-button-group"
-              class="file-type-button-group q-mt-xs"
-            >
-              <OButton
-                v-for="option in downloadCustomFileTypeOptions"
-                :key="option.value"
-                :data-test="`custom-download-file-type-${option.value}-btn`"
-                :active="downloadCustomFileType === option.value"
-                variant="outline"
-                size="sm"
-                @click="downloadCustomFileType = option.value"
-                >{{ option.label }}</OButton
-              >
-            </OButtonGroup>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
+          >{{ t('confirmDialog.ok') }}</OButton>
+        </div>
+      </template>
+    </ODialog>
+    <ODialog v-model:open="customDownloadDialog" size="md" title="Custom Download">
+      <p>{{ t('search.customDownloadMessage') }}</p>
+      <q-input
+        type="number"
+        data-test="custom-download-initial-number-input"
+        v-model="downloadCustomInitialNumber"
+        :label="t('search.initialNumber')"
+        default-value="1"
+        color="input-border"
+        bg-color="input-bg"
+        class="showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        tabindex="0"
+        min="1"
+      />
+      <q-select
+        data-test="custom-download-range-select"
+        v-model="downloadCustomRange"
+        :options="downloadCustomRangeOptions"
+        :label="t('search.range')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+      />
+      <div class="q-py-sm file-type">
+        <label class="q-pr-sm">{{ t('search.fileType') }}</label><br />
+        <OButtonGroup
+          data-test="custom-download-file-type-button-group"
+          class="file-type-button-group q-mt-xs"
+        >
+          <OButton
+            v-for="option in downloadCustomFileTypeOptions"
+            :key="option.value"
+            :data-test="`custom-download-file-type-${option.value}-btn`"
+            :active="downloadCustomFileType === option.value"
+            variant="outline"
+            size="sm"
+            @click="downloadCustomFileType = option.value"
+          >{{ option.label }}</OButton>
+        </OButtonGroup>
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             variant="outline"
             size="sm-action"
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            v-close-popup
+            @click="customDownloadDialog = false"
             >{{ t("confirmDialog.cancel") }}</OButton
           >
           <OButton
@@ -1694,62 +1677,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="downloadRangeData"
             >{{ t("search.btnDownload") }}</OButton
           >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="store.state.savedViewDialog">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div v-if="isSavedViewAction == 'create'">
-            <q-input
-              data-test="add-alert-name-input"
-              v-model="savedViewName"
-              :label="t('search.savedViewName')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[
-                (val) => !!val.trim() || 'This field is required',
-                (val) =>
-                  /^[-A-Za-z0-9 /@/_]+$/.test(val) ||
-                  'Input must be alphanumeric',
-              ]"
-              tabindex="0"
-            />
-          </div>
-          <div v-else>
-            <q-select
-              data-test="saved-view-name-select"
-              v-model="savedViewSelectedName"
-              :options="searchObj.data.savedViews"
-              option-label="view_name"
-              option-value="view_id"
-              :label="t('search.savedViewName')"
-              :popup-content-style="{ textTransform: 'capitalize' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
+        </div>
+      </template>
+    </ODialog>
+    <ODialog v-model:open="store.state.savedViewDialog" size="md" :title="t('search.savedViewsLabel')">
+      <div v-if="isSavedViewAction == 'create'">
+        <q-input
+          data-test="add-alert-name-input"
+          v-model="savedViewName"
+          :label="t('search.savedViewName')"
+          color="input-border"
+          bg-color="input-bg"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          :rules="[
+            (val) => !!val.trim() || 'This field is required',
+            (val) =>
+              /^[-A-Za-z0-9 /@/_]+$/.test(val) ||
+              'Input must be alphanumeric',
+          ]"
+          tabindex="0"
+        />
+      </div>
+      <div v-else>
+        <q-select
+          data-test="saved-view-name-select"
+          v-model="savedViewSelectedName"
+          :options="searchObj.data.savedViews"
+          option-label="view_name"
+          option-value="view_id"
+          :label="t('search.savedViewName')"
+          :popup-content-style="{ textTransform: 'capitalize' }"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-sm showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          :rules="[(val: any) => !!val || 'Field is required!']"
+        />
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             data-test="saved-view-dialog-cancel-btn"
             variant="outline"
             size="sm-action"
-            v-close-popup
+            @click="store.state.savedViewDialog = false"
             >{{ t("confirmDialog.cancel") }}</OButton
           >
           <OButton
@@ -1768,74 +1744,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="true"
             >{{ t("confirmDialog.loading") }}</OButton
           >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="store.state.savedFunctionDialog">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">{{ t("search.functionPlaceholder") }}</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div class="tw:flex tw:items-center">
-            <span class="tw:mt-2">Update</span>
-            <q-toggle
-              data-test="saved-function-action-toggle"
-              v-bind:disable="functionOptions.length == 0"
-              name="saved_function_action"
-              v-model="isSavedFunctionAction"
-              true-value="create"
-              false-value="update"
-              label=""
-              size="lg"
-              class="o2-toggle-button-lg"
-              @change="savedFunctionName = ''"
-            />
-            <span class="tw:mt-2">Create</span>
-          </div>
-          <div v-if="isSavedFunctionAction == 'create'">
-            <q-input
-              data-test="saved-function-name-input"
-              v-model="savedFunctionName"
-              :label="t('search.saveFunctionName')"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[
-                (val) => !!val.trim() || 'This field is required',
-                (val) =>
-                  /^[-A-Za-z0-9/_]+$/.test(val) || 'Input must be alphanumeric',
-              ]"
-              tabindex="0"
-            />
-          </div>
-          <div v-else>
-            <q-select
-              data-test="saved-function-name-select"
-              v-model="savedFunctionSelectedName"
-              :options="functionOptions"
-              option-label="name"
-              option-value="name"
-              :label="t('search.saveFunctionName')"
-              placeholder="Select Function Name"
-              :popup-content-style="{ textTransform: 'capitalize' }"
-              class="q-py-sm showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
+        </div>
+      </template>
+    </ODialog>
+    <ODialog v-model:open="store.state.savedFunctionDialog" size="md" :title="t('search.functionPlaceholder')">
+      <div class="tw:flex tw:items-center">
+        <span class="tw:mt-2">Update</span>
+        <q-toggle
+          data-test="saved-function-action-toggle"
+          v-bind:disable="functionOptions.length == 0"
+          name="saved_function_action"
+          v-model="isSavedFunctionAction"
+          true-value="create"
+          false-value="update"
+          label=""
+          size="lg"
+          class="o2-toggle-button-lg"
+          @change="savedFunctionName = ''"
+        />
+        <span class="tw:mt-2">Create</span>
+      </div>
+      <div v-if="isSavedFunctionAction == 'create'">
+        <q-input
+          data-test="saved-function-name-input"
+          v-model="savedFunctionName"
+          :label="t('search.saveFunctionName')"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          :rules="[
+            (val) => !!val.trim() || 'This field is required',
+            (val) =>
+              /^[-A-Za-z0-9/_]+$/.test(val) || 'Input must be alphanumeric',
+          ]"
+          tabindex="0"
+        />
+      </div>
+      <div v-else>
+        <q-select
+          data-test="saved-function-name-select"
+          v-model="savedFunctionSelectedName"
+          :options="functionOptions"
+          option-label="name"
+          option-value="name"
+          :label="t('search.saveFunctionName')"
+          placeholder="Select Function Name"
+          :popup-content-style="{ textTransform: 'capitalize' }"
+          class="q-py-sm showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          :rules="[(val: any) => !!val || 'Field is required!']"
+        />
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             data-test="saved-function-dialog-cancel-btn"
             variant="outline"
             size="sm-action"
-            v-close-popup
+            @click="store.state.savedFunctionDialog = false"
             >{{ t("confirmDialog.cancel") }}</OButton
           >
           <OButton
@@ -1854,70 +1823,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="true"
             >{{ t("confirmDialog.loading") }}</OButton
           >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="searchSchedulerJob">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">{{ t("search.scheduleSearchJob") }}</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div>
-            <div class="text-left q-mb-xs">
-              {{ t("search.noOfRecords") }}:
-              <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("search.noOfRecordsTooltip")
-                  }}</span>
-                </q-tooltip>
-              </q-icon>
-            </div>
-            <q-input
-              type="number"
-              data-test="search-scheuduler-max-number-of-records-input"
-              v-model="searchObj.meta.jobRecords"
-              default-value="100"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              tabindex="0"
-              min="100"
-            />
-          </div>
-          <div class="text-left">
-            {{ t("search.maxEventsScheduleJob") }}
-          </div>
-          <div
-            style="opacity: 0.8"
-            class="text-left mapping-warning-msg q-mt-md"
-          >
-            <q-icon name="warning" color="red" class="q-mr-sm" />
-            <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
+        </div>
+      </template>
+    </ODialog>
+    <ODialog v-model:open="searchSchedulerJob" size="md" :title="t('search.scheduleSearchJob')">
+      <div>
+        <div class="text-left q-mb-xs">
+          {{ t("search.noOfRecords") }}:
+          <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              <span style="font-size: 14px">{{
+                t("search.noOfRecordsTooltip")
+              }}</span>
+            </q-tooltip>
+          </q-icon>
+        </div>
+        <q-input
+          type="number"
+          data-test="search-scheuduler-max-number-of-records-input"
+          v-model="searchObj.meta.jobRecords"
+          default-value="100"
+          color="input-border"
+          bg-color="input-bg"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          tabindex="0"
+          min="100"
+        />
+      </div>
+      <div class="text-left">
+        {{ t("search.maxEventsScheduleJob") }}
+      </div>
+      <div
+        style="opacity: 0.8"
+        class="text-left mapping-warning-msg q-mt-md"
+      >
+        <q-icon name="warning" color="red" class="q-mr-sm" />
+        <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             data-test="search-scheduler-max-records-cancel-btn"
             variant="outline"
             size="sm-action"
-            v-close-popup
-            @click="
-              {
-                searchSchedulerJob = false;
-                searchObj.meta.showSearchScheduler = false;
-              }
-            "
+            @click="searchSchedulerJob = false; searchObj.meta.showSearchScheduler = false;"
             >{{ t("confirmDialog.cancel") }}</OButton
           >
           <OButton
@@ -1925,39 +1881,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm-action"
             @click="addJobScheduler"
-            v-close-popup
             >{{ t("confirmDialog.ok") }}</OButton
           >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
 
     <!-- Search Inspect Dialog -->
-    <q-dialog v-model="searchInspectDialog">
-      <q-card style="width: 500px; max-width: 90vw">
-        <q-card-section>
-          <div class="text-h6">Search Inspect</div>
-        </q-card-section>
-        <q-card-section class="q-pt-none">
-          <div class="text-left q-mb-xs">Trace ID:</div>
-          <q-input
-            v-model="searchInspectTraceId"
-            placeholder="Enter trace ID"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            autofocus
-            data-test="search-inspect-trace-id-input"
-          />
-        </q-card-section>
-        <q-card-actions align="right" class="tw:gap-2">
+    <ODialog v-model:open="searchInspectDialog" size="sm" title="Search Inspect">
+      <div class="text-left q-mb-xs">Trace ID:</div>
+      <q-input
+        v-model="searchInspectTraceId"
+        placeholder="Enter trace ID"
+        color="input-border"
+        bg-color="input-bg"
+        class="showLabelOnTop"
+        stack-label
+        borderless
+        dense
+        autofocus
+        data-test="search-inspect-trace-id-input"
+      />
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             variant="outline"
             size="sm-action"
-            v-close-popup
             @click="searchInspectDialog = false"
             >{{ t("confirmDialog.cancel") }}</OButton
           >
@@ -1966,13 +1915,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="!searchInspectTraceId.trim()"
             @click="navigateToSearchInspect"
-            v-close-popup
             data-test="search-inspect-submit-btn"
             >{{ t("confirmDialog.ok") }}</OButton
           >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
 
     <ConfirmDialog
       title="Change Query Mode"
@@ -1999,28 +1947,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <QueryPlanDialog v-model="showExplainDialog" :searchObj="searchObj" />
 
     <!-- Saved Views List Dialog -->
-    <q-dialog
-      v-model="savedViewsListDialog"
+    <ODialog
+      v-model:open="savedViewsListDialog"
+      size="lg"
+      :title="t('search.savedViewsLabel')"
       data-test="saved-views-list-dialog"
     >
-      <q-card
-        :style="
-          localSavedViews.length > 0
-            ? 'width: 600px; max-width: 80vw'
-            : 'width: 350px; max-width: 80vw'
-        "
-      >
-        <q-card-section class="row items-center q-pb-none q-pa-md">
-          <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-circle" v-close-popup>
-            <q-icon name="cancel" />
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section class="q-pt-md">
+      <div>
           <q-list data-test="logs-search-saved-view-list">
             <q-item style="padding: 0px 0px 0px 0px">
               <q-item-section
@@ -2257,9 +2190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </q-list>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -2287,6 +2219,7 @@ import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import useLogs from "@/composables/useLogs";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -2438,6 +2371,7 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     OButtonGroup,
+    ODialog,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,

@@ -28,7 +28,7 @@
           : t("dashboard.addValueMapping")
       }}
     </OButton>
-    <q-dialog v-model="showValueMappingPopUp">
+    <ODialog v-model:open="showValueMappingPopUp" :show-close="false" :width="90">
       <ValueMappingPopUp
         :value-mapping="
           JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))
@@ -37,7 +37,7 @@
         @save="saveValueMappingConfig"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
-    </q-dialog>
+    </ODialog>
   </div>
 </template>
 
@@ -49,10 +49,11 @@ import useDashboardPanelData from "../../../composables/dashboard/useDashboardPa
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
 import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ValueMapping",
-  components: { ValueMappingPopUp, OButton },
+  components: { ValueMappingPopUp, OButton, ODialog },
   props: [],
   setup() {
     const { t } = useI18n();

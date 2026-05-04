@@ -110,18 +110,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <q-dialog
-      v-model="showAddToDashboardDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="showAddToDashboardDialog"
+      :width="40"
     >
       <add-to-dashboard
         @save="addPanelToDashboard"
         @cancel="showAddToDashboardDialog = false"
         :dashboardPanelData="dashboardPanelData"
       />
-    </q-dialog>
+    </ODrawer>
   </div>
 </template>
 
@@ -163,6 +161,7 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 
 export default defineComponent({
   name: "Metrics",
@@ -176,6 +175,7 @@ export default defineComponent({
     AutoRefreshInterval,
     PanelEditor,
     OButton,
+    ODrawer,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");

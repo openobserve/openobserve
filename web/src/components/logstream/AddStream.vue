@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="col-auto">
         <OButton
           data-test="add-stream-close-btn"
-          v-close-popup="true"
+          @click="$emit('close')"
           variant="ghost"
           size="icon-sm"
         >
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex justify-start q-mt-md tw:gap-2">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             data-test="add-stream-cancel-btn"
             variant="outline"
             size="sm-action"

@@ -144,50 +144,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Extend Trial Dialog -->
-    <q-dialog v-model="extendTrialPrompt">
-      <q-card class="q-pa-sm" style="min-width: 450px">
-        <q-toolbar>
-          <q-toolbar-title>
-            <span class="text-weight-bold" :title="extendTrialDataRow.name"
-              >Extend Trial for {{ extendTrialDataRow.name }}</span
-            >
-            <span class="text-subtitle2 flex"
-              >Set the new trial extension period.</span
-            >
-          </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-toolbar>
-
-        <q-card-section>
-          <div>
-            <div class="float-left text-bold">Week(s)</div>
-            <div class="float-right q-gutter-xs">
-              <span
-                v-for="page in 4"
-                :key="page"
-                @click="extendedTrial = page"
-                :class="[
-                  'cursor-pointer q-px-sm q-py-xs page-border',
-                  extendedTrial === page
-                    ? 'bg-primary text-white'
-                    : 'bg-white text-gray-700 border-gray-3',
-                ]"
-              >
-                {{ page }}
-              </span>
-            </div>
+    <ODialog v-model:open="extendTrialPrompt" size="sm">
+      <template #header>
+        <div>
+          <div class="tw:font-semibold tw:text-sm tw:truncate" :title="extendTrialDataRow?.name">
+            Extend Trial for {{ extendTrialDataRow?.name }}
           </div>
-        </q-card-section>
-        <q-card-actions align="right" class="text-primary q-mt-md">
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            class="q-mr-md"
+          <div class="tw:text-xs tw:text-gray-500">Set the new trial extension period.</div>
+        </div>
+      </template>
+      <div>
+        <div class="float-left text-bold">Week(s)</div>
+        <div class="float-right q-gutter-xs">
+          <span
+            v-for="page in 4"
+            :key="page"
+            @click="extendedTrial = page"
+            :class="[
+              'cursor-pointer q-px-sm q-py-xs page-border',
+              extendedTrial === page
+                ? 'bg-primary text-white'
+                : 'bg-white text-gray-700 border-gray-3',
+            ]"
           >
-            {{ t("common.cancel") }}
+            {{ page }}
+          </span>
+        </div>
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2 q-mt-md">
+          <OButton variant="outline" size="sm-action" @click="extendTrialPrompt = false" class="q-mr-md">
+            {{ t('common.cancel') }}
           </OButton>
           <OButton
             variant="primary"
@@ -196,68 +183,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             Extend trial by {{ extendedTrial }} week(s)
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
 
     <!-- External Contract Dialog -->
-    <q-dialog v-model="contractPrompt">
-      <q-card class="q-pa-sm" style="min-width: 500px">
-        <q-toolbar>
-          <q-toolbar-title>
-            <span class="text-weight-bold" :title="contractDataRow.name">
-              {{ contractMode === "create" ? "Create" : "Extend" }} External
-              Contract for {{ contractDataRow.name }}
-            </span>
-          </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
+    <ODialog v-model:open="contractPrompt" size="sm">
+      <template #header>
+        <div class="tw:font-semibold tw:text-sm tw:truncate" :title="contractDataRow?.name">
+          {{ contractMode === 'create' ? 'Create' : 'Extend' }} External
+          Contract for {{ contractDataRow?.name }}
+        </div>
+      </template>
+      <div class="q-mb-md">
+        <div class="text-bold q-mb-xs">
+          {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
+        </div>
+        <q-input
+          v-model="contractEndDate"
+          dense
+          outlined
+          type="date"
+          data-test="contract-end-date-input"
+        />
+      </div>
+      <div
+        v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
+        class="text-caption text-grey"
+      >
+        Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="contractPrompt = false" class="q-mr-md">
+            {{ t('common.cancel') }}
           </OButton>
-        </q-toolbar>
-
-        <q-card-section>
-          <div class="q-mb-md">
-            <div class="text-bold q-mb-xs">
-              {{ contractMode === "create" ? "End Date" : "New End Date" }}
-            </div>
-            <q-input
-              v-model="contractEndDate"
-              dense
-              outlined
-              type="date"
-              data-test="contract-end-date-input"
-            />
-          </div>
-          <div
-            v-if="
-              contractMode === 'extend' && contractDataRow.contract_end_date
-            "
-            class="text-caption text-grey"
-          >
-            Current end date:
-            {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="text-primary">
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            class="q-mr-md"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click.stop="submitContract"
-          >
+          <OButton variant="primary" size="sm-action" @click.stop="submitContract">
             {{ contractMode === 'create' ? 'Create Contract' : 'Extend Contract' }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
   </q-page>
 </template>
 <script lang="ts">
@@ -279,6 +245,7 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import orgStorageService from "@/services/org_storage";
 export default defineComponent({
   name: "PageAlerts",
@@ -286,6 +253,7 @@ export default defineComponent({
     NoData,
     QTablePagination,
     OButton,
+    ODialog,
   },
   setup() {
     const qTable = ref();

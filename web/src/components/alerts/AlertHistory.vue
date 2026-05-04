@@ -311,27 +311,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <q-dialog v-model="detailsDialog" position="standard">
-      <q-card
-        style="width: 700px; max-width: 80vw; max-height: 90vh"
-        class="alert-details-dialog"
-      >
-        <q-card-section class="row items-center q-pb-xs bg-primary text-white">
-          <div class="text-h6">Alert Execution Details</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-circle-sm" v-close-popup>
-            <q-icon name="close" />
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section
-          class="scroll"
-          style="max-height: 70vh"
-          v-if="selectedRow"
-        >
-          <div class="q-gutter-sm">
+    <ODialog v-model:open="detailsDialog" :width="55" title="Alert Execution Details">
+      <div v-if="selectedRow" class="q-gutter-sm">
             <!-- Basic Information -->
             <div class="detail-section">
               <div class="row q-col-gutter-md">
@@ -478,19 +459,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Error Details
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-negative-1 q-mt-xs">
+                <div class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-negative/5">
                   <pre
                     class="text-body2"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: &quot;Courier New&quot;, monospace;
+                      font-family: 'Courier New', monospace;
                       font-size: 12px;
                     "
                     >{{ selectedRow.error }}</pre
                   >
-                </q-card>
+                </div>
               </div>
             </template>
 
@@ -507,76 +488,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Response
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-positive-1 q-mt-xs">
+                <div class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-positive/5">
                   <pre
                     class="text-body2"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: &quot;Courier New&quot;, monospace;
+                      font-family: 'Courier New', monospace;
                       font-size: 12px;
                     "
                     >{{ selectedRow.success_response }}</pre
                   >
-                </q-card>
+                </div>
               </div>
             </template>
-          </div>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-actions align="right" class="q-pa-md">
-          <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end">
+          <OButton variant="outline" size="sm-action" @click="detailsDialog = false">Close</OButton>
+        </div>
+      </template>
+    </ODialog>
 
     <!-- Error Dialog -->
-    <q-dialog v-model="errorDialog">
-      <q-card style="min-width: 500px">
-        <q-card-section class="pipeline-error-header row items-center q-pb-none">
-          <div class="tw:flex-1">
-            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-              <q-icon name="error" size="24px" class="error-icon" />
-              <span class="pipeline-name">{{ errorMessage.alert_name }}</span>
-            </div>
-            <div class="error-timestamp">
-              <span class="tw:ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw:mr-1" />
-              {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
-            </div>
+    <ODialog v-model:open="errorDialog" size="md">
+      <template #header>
+        <div class="tw:flex tw:flex-col tw:gap-1">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <q-icon name="error" size="18px" class="error-icon" />
+            <span class="pipeline-name tw:font-semibold tw:text-sm">{{ errorMessage.alert_name }}</span>
           </div>
-          <OButton
-            variant="ghost"
-            size="icon-circle-sm"
-            @click="closeErrorDialog"
-            class="close-btn"
-          >
-            <q-icon name="close" />
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section>
-          <div class="tw:mb-4">
-            <div class="section-label tw:mb-2">Error Summary</div>
-              <div class="error-summary-box">
-                {{ errorMessage.error }}
-              </div>
+          <div class="error-timestamp tw:text-xs">
+            <span class="tw:mr-1">Last error:</span>
+            <q-icon name="schedule" size="14px" class="tw:mr-1" />
+            {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
           </div>
-        </q-card-section>
-        <q-card-actions class="pipeline-error-actions">
-          <OButton
-            variant="ghost"
-            size="sm-action"
-            @click="closeErrorDialog"
-          >Close</OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+
+      <div class="tw:mb-4">
+        <div class="section-label tw:mb-2">Error Summary</div>
+        <div class="error-summary-box">
+          {{ errorMessage.error }}
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="tw:flex tw:justify-end">
+          <OButton variant="outline" size="sm-action" @click="closeErrorDialog">Close</OButton>
+        </div>
+      </template>
+    </ODialog>
   </div>
 </template>
 
@@ -592,6 +555,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 
 const { t } = useI18n();
 const store = useStore();

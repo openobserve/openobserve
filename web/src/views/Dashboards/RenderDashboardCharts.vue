@@ -255,25 +255,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- view panel dialog -->
-      <q-dialog
-        v-model="showViewPanel"
-        :no-route-dismiss="true"
-        full-height
-        full-width
+      <ODialog
+        v-model:open="showViewPanel"
+        size="full"
+        :show-close="false"
       >
-        <q-card style="overflow: hidden">
-          <ViewPanel
-            :folderId="folderId"
-            :dashboardId="dashboardData.dashboardId"
-            :panelId="viewPanelId"
-            :selectedDateForViewPanel="viewPanelSelectedDate"
-            :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
-            :searchType="searchType"
-            @close-panel="() => (showViewPanel = false)"
-            @update:initial-variable-values="updateInitialVariableValues"
-          />
-        </q-card>
-      </q-dialog>
+        <ViewPanel
+          :folderId="folderId"
+          :dashboardId="dashboardData.dashboardId"
+          :panelId="viewPanelId"
+          :selectedDateForViewPanel="viewPanelSelectedDate"
+          :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
+          :searchType="searchType"
+          @close-panel="() => (showViewPanel = false)"
+          @update:initial-variable-values="updateInitialVariableValues"
+        />
+      </ODialog>
       <div v-if="!panels.length">
         <!-- if data not available show nodata component -->
         <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
@@ -402,6 +399,9 @@ export default defineComponent({
     VariablesValueSelector,
     ViewPanel,
     TabList,
+    ODialog: defineAsyncComponent(() =>
+      import("@/lib/overlay/Dialog/ODialog.vue")
+    ),
   },
   setup(props: any, { emit }) {
     const { t } = useI18n();

@@ -40,7 +40,7 @@
         <OButton
           variant="ghost"
           size="icon"
-          v-close-popup="true"
+          @click="$emit('close')"
           data-test="query-inspector-close-btn"
         >
           <template #icon-left><q-icon name="close" /></template>
@@ -287,6 +287,7 @@ import DOMPurify from "dompurify";
 
 export default defineComponent({
   name: "QueryInspector",
+  emits: ["close"],
   components: { OButton },
   props: {
     metaData: {

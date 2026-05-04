@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              @click="router.replace({ name: 'organizations' })"
+              @click="$emit('cancel:hideform')"
               data-test="cancel-organizations-modal"
             >
               {{ t('organization.cancel') }}

@@ -184,21 +184,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
 
-    <q-dialog
+    <ODrawer
       v-if="config.isCloud == 'false'"
-      v-model="showUpdateUserDialog"
-      position="right"
-      full-height
-      maximized
+      v-model:open="showUpdateUserDialog"
+      side="right"
+      size="lg"
+      persistent
+      :show-close="false"
     >
-      <update-user-role v-model="selectedUser" @updated="updateMember" />
-    </q-dialog>
+      <update-user-role v-model="selectedUser" @updated="updateMember" @close="showUpdateUserDialog = false" />
+    </ODrawer>
 
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="showAddUserDialog"
+      side="right"
+      size="lg"
+      persistent
+      :show-close="false"
     >
       <add-user
         v-if="config.isCloud == 'false'"
@@ -210,76 +212,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated="addMember"
         @cancel:hideform="hideForm"
       />
-    </q-dialog>
+    </ODrawer>
 
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("user.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("user.confirmDeleteMsg") }}</div>
-        </q-card-section>
+    <ODialog v-model:open="confirmDelete" size="xs" :title="t('user.confirmDeleteHead')">
+      <p>{{ t('user.confirmDeleteMsg') }}</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmDelete = false">
+            {{ t('user.cancel') }}
+          </OButton>
+          <OButton variant="primary" size="sm-action" @click="deleteUser">
+            {{ t('user.ok') }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
 
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("user.cancel") }}
+    <ODialog v-model:open="confirmRevoke" size="xs" title="Revoke Invitation">
+      <p>Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmRevoke = false">
+            {{ t('user.cancel') }}
           </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="deleteUser"
-          >
-            {{ t("user.ok") }}
+          <OButton variant="primary" size="sm-action" @click="revokeInvite">
+            {{ t('user.ok') }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
 
-    <q-dialog v-model="confirmRevoke">
-      <q-card style="width: 400px">
-        <q-card-section class="confirmBody">
-          <div class="head">Revoke Invitation</div>
-          <div class="para">Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="revokeInvite"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmBulkDelete">
-      <q-card style="width: 280px">
-        <q-card-section class="confirmBody">
-          <div class="head">Delete Users</div>
-          <div class="para">Are you sure you want to delete {{ selectedUsers.length }} user(s)?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            Cancel
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="bulkDeleteUsers"
-          >
-            OK
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog v-model:open="confirmBulkDelete" size="xs" title="Delete Users">
+      <p>Are you sure you want to delete {{ selectedUsers.length }} user(s)?</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmBulkDelete = false">Cancel</OButton>
+          <OButton variant="primary" size="sm-action" @click="bulkDeleteUsers">OK</OButton>
+        </div>
+      </template>
+    </ODialog>
   </q-page>
 </template>
 
@@ -287,6 +258,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -321,6 +294,8 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    ODialog,
+    ODrawer,
   },
   emits: [
     "updated:fields",
@@ -876,6 +851,7 @@ export default defineComponent({
     };
 
     const deleteUser = async () => {
+      confirmDelete.value = false;
       usersService
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
@@ -905,6 +881,7 @@ export default defineComponent({
     };
 
     const revokeInvite = async () => {
+      confirmRevoke.value = false;
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait...",

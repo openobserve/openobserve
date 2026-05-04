@@ -167,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Query Inspector Dialog -->
-    <q-dialog v-model="showViewPanel" data-test="query-inspector-dialog">
-      <QueryInspector :metaData="metaData" :data="panelTitle"></QueryInspector>
-    </q-dialog>
+    <ODialog v-model:open="showViewPanel" :show-close="false" :width="80" @close="showViewPanel = false" data-test="query-inspector-dialog">
+      <QueryInspector :metaData="metaData" :data="panelTitle" @close="showViewPanel = false"></QueryInspector>
+    </ODialog>
 
     <!-- Add Variable Drawer -->
     <div
@@ -240,6 +240,7 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
@@ -254,6 +255,7 @@ export default defineComponent({
   components: {
     OButtonGroup,
     OButton,
+    ODialog,
     ODropdown,
     ODropdownItem,
     DateTimePickerDashboard,

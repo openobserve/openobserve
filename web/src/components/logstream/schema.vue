@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+          <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
             <X :size="14" />
           </OButton>
         </div>
@@ -999,10 +999,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex justify-end tw:gap-2">
                   <OButton
-                    v-close-popup="true"
-                    data-test="schema-cancel-button"
+                      data-test="schema-cancel-button"
                     variant="outline"
                     size="sm-action"
+                    @click="llmEvalFormDirty = false; $emit('close')"
                   >
                     {{ t('logStream.cancel') }}
                   </OButton>
@@ -1016,6 +1016,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t('logStream.updateSettings') }}
                   </OButton>
                 </div>
+
+                <div
+                  v-else-if="indexData.schema.length > 0"
+                  class="flex items-center justify-between"
+                >
+                  <div class="flex items-center tw:gap-2">
+                    <span
+                      v-if="activeMainTab == 'schemaSettings'"
+                      class="q-px-sm q-py-sm"
+                      ><strong> {{ selectedFields.length }}</strong> fields
+                      selected</span
+                    >
+                    <OButton
+                      v-if="
+                        isSchemaUDSEnabled && activeMainTab == 'schemaSettings'
+                      "
+                      data-test="schema-add-field-button"
+                      variant="outline"
+                      size="sm-action"
+                      :disabled="
+                        !selectedFields.length || hasUDSFieldInSelection
+                      "
+                      @click="updateDefinedSchemaFields"
+                    >
+                      <span
+                        class="flex items-center justify-start tw:gap-1 tw:mr-1"
+                      >
+                        <UserCheck :size="13" />
+                        <LayoutList :size="13" />
+                      </span>
+                      {{
+                        activeTab === "schemaFields"
+                          ? t("logStream.removeSchemaField")
+                          : t("logStream.addSchemaField")
+                      }}
+                      <q-tooltip v-if="hasUDSFieldInSelection">
+                        {{ t("logStream.udsFieldAlreadyInSchema") }}
+                      </q-tooltip>
+                    </OButton>
+                    <OButton
+                      v-if="
+                        activeMainTab != 'configuration' &&
+                        activeMainTab != 'crossLinking'
+                      "
+                      :disabled="
+                        !selectedFields.length && !selectedDateFields.length
+                      "
+                      data-test="schema-delete-button"
+                      variant="outline"
+                      size="sm-action"
+                      @click="
+                        activeMainTab == 'schemaSettings'
+                          ? (confirmQueryModeChangeDialog = true)
+                          : (confirmDeleteDatesDialog = true)
+                      "
+                    >
+                      <Trash2 :size="14" class="tw:mr-1" />
+                      {{ t("logStream.delete") }}
+                    </OButton>
+                  </div>
+                  <div class="flex justify-end tw:gap-2">
+                    <OButton
+                        data-test="schema-cancel-button"
+                      variant="outline"
+                      size="sm-action"
+                    @click="$emit('close')"
+                    >
+                      {{ t("logStream.cancel") }}
+                    </OButton>
+                    <OButton
+                      :disabled="!formDirtyFlag"
+                      data-test="schema-update-settings-button"
+                      variant="primary"
+                      size="sm-action"
+                      type="submit"
+                    >
+                      {{ t("logStream.updateSettings") }}
+                    </OButton>
+                  </div>
+                </div>
               </div>
             </div>
             </div>
@@ -1027,9 +1107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
   </q-card>
-  <q-dialog v-model="patternAssociationDialog.show" position="right" full-height maximized>
+  <ODrawer v-model:open="patternAssociationDialog.show" size="lg" :show-close="false">
     <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
-  </q-dialog>
+  </ODrawer>
 
   <ConfirmDialog
     title="Delete Action"
@@ -1100,6 +1180,7 @@ import {
 import DateTime from "@/components/DateTime.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 
@@ -1115,6 +1196,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SchemaIndex",
+  emits: ["close"],
   props: {
      
     modelValue: {
@@ -1133,6 +1215,7 @@ export default defineComponent({
     QTablePagination,
     DateTime,
     AssociatedRegexPatterns,
+    ODrawer,
     PerformanceFieldsDialog,
     LlmEvaluationSettings,
     CrossLinkManager,

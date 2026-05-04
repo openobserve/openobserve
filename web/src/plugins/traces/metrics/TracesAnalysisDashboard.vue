@@ -15,21 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="isOpen"
-    position="right"
-    full-height
-    :maximized="true"
-    allow-focus-outside
-    transition-show="slide-left"
-    transition-hide="slide-right"
-    @hide="onClose"
+  <ODrawer
+    v-model:open="isOpen"
+    :width="90"
+    :show-close="false"
+    @update:open="(v) => !v && onClose()"
   >
-    <q-card class="analysis-dashboard-card">
-      <!-- Header -->
-      <q-card-section
-        class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-[0.675rem]"
-      >
+    <!-- Header -->
+    <template #header>
+      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
         <div class="tw:flex tw:items-center tw:gap-1 tw:flex-wrap">
           <q-icon name="timeline" size="1.5rem" color="primary" />
           <span
@@ -129,7 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <X class="tw:size-3.5 tw:shrink-0" />
           </OButton>
         </div>
-      </q-card-section>
+      </div>
+    </template>
 
       <!-- Tabs (only shown if multiple analysis types available) -->
       <OTabs
@@ -150,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <q-card-section class="analysis-content tw:flex-1 tw:p-0">
+      <div class="tw:flex-1 tw:p-0 tw:overflow-hidden">
         <q-splitter
           v-model="splitterModel"
           :limits="splitterLimits"
@@ -342,15 +337,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-splitter>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+      </div>
+  </ODrawer>
 </template>
 
 <script lang="ts" setup>
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { RefreshCw, X, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";

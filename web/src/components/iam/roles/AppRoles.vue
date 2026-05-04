@@ -114,13 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   </div>
   </div>
-  <q-dialog v-model="showAddGroup" position="right" full-height maximized>
+  <ODrawer v-model:open="showAddGroup" :width="30" :show-close="false" @close="hideForm">
     <AddRole
-      style="width: 30vw"
       @cancel:hideform="hideForm"
       @added:role="setupRoles"
     />
-  </q-dialog>
+  </ODrawer>
   <ConfirmDialog
     title="Delete Role"
     :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
@@ -142,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";

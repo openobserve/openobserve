@@ -15,12 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="isOpen"
-    position="right"
-    full-height
-    maximized
-    @hide="closeDrawer"
+  <ODrawer
+    v-model:open="isOpen"
+    size="lg"
+    @update:open="(v) => !v && closeDrawer()"
   >
     <EventDetailDrawerContent
       :event="event"
@@ -30,12 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @close="closeDrawer"
       @resource-selected="$emit('resource-selected', $event)"
     />
-  </q-dialog>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import EventDetailDrawerContent from "./EventDetailDrawerContent.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 const props = defineProps({
   modelValue: {

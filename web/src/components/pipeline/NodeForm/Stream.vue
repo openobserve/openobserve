@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("pipeline.streamTitle") }}
       <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
+        <OButton variant="ghost" size="icon" @click="$emit('cancel:hideform')">
           <q-icon name="cancel" size="14px" />
         </OButton>
       </div>

@@ -34,7 +34,7 @@
             </div>
             </div>
             <div class="col-auto">
-            <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+            <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
               <X :size="14" />
             </OButton>
             </div>

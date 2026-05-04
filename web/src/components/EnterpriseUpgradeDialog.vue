@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onDialogHide">
-    <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
+  <ODialog v-model:open="showDialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
+    <div class="enterprise-dialog-v3">
       <!-- Close Button -->
       <div class="close-btn-top-right">
         <OButton
           variant="ghost"
           size="icon"
-          v-close-popup
+          @click="showDialog = false"
         >
           <q-icon name="cancel" size="16px" />
         </OButton>
@@ -223,8 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -236,6 +236,7 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -286,6 +287,7 @@ export default defineComponent({
   components: {
     ChartRenderer,
     OButton,
+    ODialog,
   },
   props: {
     modelValue: {

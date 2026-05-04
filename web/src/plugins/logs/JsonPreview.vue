@@ -98,7 +98,6 @@
         </q-select>
         <OButton
           data-test="trace-view-logs-btn"
-          v-close-popup="true"
           class="traces-view-logs-btn"
           size="sm-action"
           variant="outline"
@@ -264,49 +263,37 @@
         </div>
       </div>
     </div>
-    <q-dialog v-if="config.isEnterprise == 'true'" v-model="typeOfRegexPattern">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">
-            What is the type of regex pattern you want to create?
-          </div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div>
-            <q-input
-              type="text"
-              data-test="regex-pattern-type-input"
-              v-model="regexPatternType"
-              color="input-border"
-              label="Type of regex pattern (e.g. email, phone number, etc.)"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
+    <ODialog v-if="config.isEnterprise == 'true'" v-model:open="typeOfRegexPattern" size="lg" title="What is the type of regex pattern you want to create?">
+      <q-input
+        type="text"
+        data-test="regex-pattern-type-input"
+        v-model="regexPatternType"
+        color="input-border"
+        label="Type of regex pattern (e.g. email, phone number, etc.)"
+        bg-color="input-bg"
+        class="showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+      />
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             data-test="search-scheduler-max-records-cancel-btn"
             variant="outline"
             size="sm-action"
-            v-close-popup
+            @click="typeOfRegexPattern = false"
           >{{ t('confirmDialog.cancel') }}</OButton>
           <OButton
             data-test="search-scheduler-max-records-submit-btn"
             variant="primary"
             size="sm-action"
             @click="confirmRegexPatternType"
-            v-close-popup
           >{{ t('confirmDialog.ok') }}</OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
   </div>
 </template>
 
@@ -340,6 +327,7 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -391,6 +379,7 @@ export default {
     LogsHighLighting,
     ChunkedContent,
     OButton,
+    ODialog,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,

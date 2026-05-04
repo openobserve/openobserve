@@ -126,11 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </draggable>
     </div>
 
-    <q-dialog
-      v-model="showAddTabDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="showAddTabDialog"
+      size="md"
+      :show-close="false"
+      @close="showAddTabDialog = false"
       data-test="dashboard-tab-settings-add-tab-dialog"
     >
       <AddTab
@@ -138,8 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :tabId="selectedTabIdToEdit"
         :dashboard-id="currentDashboardData.data.dashboardId"
         @refresh="refreshRequired"
+        @close="showAddTabDialog = false"
       />
-    </q-dialog>
+    </ODrawer>
     <!-- delete tab dialog -->
     <TabsDeletePopUp
       v-model="deletePopupVisible"
@@ -168,6 +169,7 @@ import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import { updateDashboard } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -177,6 +179,7 @@ export default defineComponent({
     AddTab,
     TabsDeletePopUp,
     OButton,
+    ODrawer,
   },
   emits: ["refresh"],
   setup(props, { emit }) {

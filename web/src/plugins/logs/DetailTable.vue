@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-auto">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="ghost"
             size="icon-sm"
             data-test="close-dialog"
