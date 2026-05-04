@@ -255,7 +255,7 @@ describe("shouldApplyFieldGrouping", () => {
     expect(shouldApplyFieldGrouping({ ...base, udsFieldLimit: 20, totalSchemaFieldCount: 15 })).toBe(true);
   });
 
-  it("returns false when UDS limit set and field count exceeds limit", () => {
-    expect(shouldApplyFieldGrouping({ ...base, udsFieldLimit: 10, totalSchemaFieldCount: 50 })).toBe(false);
+  it("returns true when UDS limit set and field count exceeds limit (grouping no longer suppressed)", () => {
+    expect(shouldApplyFieldGrouping({ ...base, udsFieldLimit: 10, totalSchemaFieldCount: 50 })).toBe(true);
   });
 });

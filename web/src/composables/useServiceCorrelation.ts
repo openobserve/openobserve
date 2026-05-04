@@ -294,6 +294,10 @@ export function useServiceCorrelation() {
     const org = orgIdentifier.value;
     semanticGroupsGlobalCache.delete(org);
     pendingSemanticGroupsRequests.delete(org);
+    keyFieldsGlobalCache.delete(org);
+    pendingKeyFieldsRequests.delete(org);
+    fieldGroupingGlobalCache.delete(org);
+    pendingFieldGroupingRequests.delete(org);
     clearIdentityConfigCache(org);
     console.log(`[useServiceCorrelation] Cleared caches for org '${org}'`);
   }
@@ -305,6 +309,10 @@ export function useServiceCorrelation() {
   function clearAllCaches() {
     semanticGroupsGlobalCache.clear();
     pendingSemanticGroupsRequests.clear();
+    keyFieldsGlobalCache.clear();
+    pendingKeyFieldsRequests.clear();
+    fieldGroupingGlobalCache.clear();
+    pendingFieldGroupingRequests.clear();
     clearAllIdentityConfigCache();
     console.log(`[useServiceCorrelation] Cleared all caches`);
   }

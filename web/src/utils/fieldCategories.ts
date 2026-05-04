@@ -347,7 +347,6 @@ export function shouldApplyFieldGrouping(opts: {
   if (!opts.semanticIndex) return false;
   if (opts.streamCount !== 1) return false;
   if (opts.udsActive) return true;
-  if (opts.udsFieldLimit > 0) return opts.totalSchemaFieldCount <= opts.udsFieldLimit;
   return true;
 }
 

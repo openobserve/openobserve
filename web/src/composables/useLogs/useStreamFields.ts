@@ -857,24 +857,32 @@ export const useStreamFields = () => {
             keyGroupSet,
           );
 
+          // Precompute per-group field counts in a single pass
+          const groupFieldCountMap = new Map<string, number>();
+          for (const r of orderedFields) {
+            if (!r.label && r.group) {
+              groupFieldCountMap.set(r.group, (groupFieldCountMap.get(r.group) ?? 0) + 1);
+            }
+          }
+          const interestingGroupFieldCountMap = new Map<string, number>();
+          for (const r of orderedInterestingFields) {
+            if (!r.label && r.group) {
+              interestingGroupFieldCountMap.set(r.group, (interestingGroupFieldCountMap.get(r.group) ?? 0) + 1);
+            }
+          }
+
           // Sync expand-state counts from final buckets
           for (const row of orderedFields) {
             if (!row.label) continue;
             const groupKey = row.group;
-            const groupFieldsCount = orderedFields.filter(
-              (r) => !r.label && r.group === groupKey,
-            ).length;
             streamState.expandGroupRows[groupKey] = streamState.expandGroupRows[groupKey] ?? true;
-            streamState.expandGroupRowsFieldCount[groupKey] = groupFieldsCount;
+            streamState.expandGroupRowsFieldCount[groupKey] = groupFieldCountMap.get(groupKey) ?? 0;
           }
           for (const row of orderedInterestingFields) {
             if (!row.label) continue;
             const groupKey = row.group;
-            const interestingCount = orderedInterestingFields.filter(
-              (r) => !r.label && r.group === groupKey,
-            ).length;
             streamState.interestingExpandedGroupRows[groupKey] = streamState.interestingExpandedGroupRows[groupKey] ?? true;
-            streamState.interestingExpandedGroupRowsFieldCount[groupKey] = interestingCount;
+            streamState.interestingExpandedGroupRowsFieldCount[groupKey] = interestingGroupFieldCountMap.get(groupKey) ?? 0;
           }
 
           searchObj.data.stream.selectedStreamFields = orderedFields;
