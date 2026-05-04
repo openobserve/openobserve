@@ -2879,7 +2879,38 @@
       "multiStepAgent": "Agente de varios pasos"
     },
     "noLogsAvailableForService": "No hay registros disponibles para este servicio",
-    "spansTruncatedWarning": "Se muestran {count} de intervalos de {total}; es posible que el rastreo esté incompleto. Reduzca el intervalo de tiempo o póngase en contacto con su administrador para aumentar el límite de intervalo."
+    "spansTruncatedWarning": "Se muestran {count} de intervalos de {total}; es posible que el rastreo esté incompleto. Reduzca el intervalo de tiempo o póngase en contacto con su administrador para aumentar el límite de intervalo.",
+    "servicesCatalog": {
+      "tabLabel": "Catálogo de servicios",
+      "title": "Catálogo de servicios",
+      "filterPlaceholder": "Filtrar por nombre de servicio...",
+      "noServicesFound": "No se ha encontrado ningún servicio en el intervalo de tiempo seleccionado.",
+      "loading": "Cargando servicios...",
+      "columns": {
+        "serviceName": "Servicio",
+        "status": "Estado",
+        "requests": "Solicitudes",
+        "errorRate": "Tasa de error",
+        "errors": "Errores",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Latencia promedio",
+        "lastSeen": "Visto por última vez",
+        "operations": "Operaciones"
+      },
+      "status": {
+        "healthy": "Saludable",
+        "warning": "Advertencia",
+        "degraded": "Degradado"
+      },
+      "viewTraces": "Ver trazas",
+      "exportCsv": "Exportar CSV",
+      "justNow": "Justo ahora",
+      "minutesAgo": "Hace {n} m",
+      "hoursAgo": "Hace {n} h",
+      "daysAgo": "Hace {n} d"
+    }
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
