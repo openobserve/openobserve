@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, useSlots, computed } from "vue";
+import { ref, watch, useSlots, computed, inject, provide } from "vue";
 
 const props = withDefaults(defineProps<DrawerProps>(), {
   persistent: false,
@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   size: "md",
   showClose: true,
   width: undefined,
+  seamless: false,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -73,6 +74,13 @@ function handleInteractOutside(e: Event) {
   }
 }
 
+// Stacking support: each nested ODrawer gets a higher z-index layer
+const drawerDepth = inject<number>("o2DrawerDepth", 0);
+provide("o2DrawerDepth", drawerDepth + 1);
+
+const overlayZIndex = computed(() => 5999 + drawerDepth * 1000);
+const contentZIndex = computed(() => 6000 + drawerDepth * 1000);
+
 // Header renders when there is a header slot, a title, OR a visible close button.
 const hasHeader = computed(
   () =>
@@ -102,9 +110,13 @@ const sizeClasses = computed(() => {
 });
 
 // Explicit vw width override
-const contentStyle = computed(() =>
-  props.width != null ? { width: `${props.width}vw` } : undefined,
-);
+const contentStyle = computed(() => {
+  const style: Record<string, string | number> = {
+    zIndex: contentZIndex.value,
+  };
+  if (props.width != null) style.width = `${props.width}vw`;
+  return style;
+});
 </script>
 
 <template>
@@ -118,12 +130,15 @@ const contentStyle = computed(() =>
       <!-- Overlay / scrim — same z-index as ODialog -->
       <DialogOverlay
         :class="[
-          'tw:fixed tw:inset-0 tw:z-5999',
-          'tw:bg-dialog-overlay',
+          'tw:fixed tw:inset-0',
+          seamless
+            ? 'tw:bg-transparent tw:pointer-events-none'
+            : 'tw:bg-dialog-overlay',
           'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
           'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
           'tw:duration-200',
         ]"
+        :style="{ zIndex: overlayZIndex }"
       />
 
       <!-- Drawer panel -->
@@ -132,7 +147,7 @@ const contentStyle = computed(() =>
         :style="contentStyle"
         :class="[
           // Full-height, anchored to chosen edge
-          'tw:fixed tw:inset-y-0 tw:z-6000',
+          'tw:fixed tw:inset-y-0',
           isRight ? 'tw:right-0' : 'tw:left-0',
           // Flex column so header/footer are shrink-0 and body scrolls
           'tw:flex tw:flex-col tw:overflow-hidden tw:h-screen',
@@ -229,7 +244,6 @@ const contentStyle = computed(() =>
         <div
           :class="[
             'tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
-            'tw:px-(--spacing-dialog-content-px) tw:py-(--spacing-dialog-content-py)',
             'tw:text-dialog-content-text',
           ]"
         >
