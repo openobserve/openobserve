@@ -215,19 +215,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="regex-pattern-test-string-label">
                   Test Regex Pattern
                 </span>
-                <div
-                  class="tw:h-[19px] tw:flex tw:items-center tw:justify-center tw:font-[600]"
-                  style="border-radius: 3px"
+                <OButton
+                  variant="primary"
+                  size="chip"
+                  :disabled="regexPatternInputs.pattern.length === 0"
+                  @click="testStringOutput"
                 >
-                  <OButton
-                    variant="primary"
-                    size="chip"
-                    :disabled="regexPatternInputs.pattern.length === 0"
-                    @click="testStringOutput"
-                  >
-                    Test Input
-                  </OButton>
-                </div>
+                  Test Input
+                </OButton>
               </div>
             </div>
             <div class="regex-pattern-test-string-container q-mb-sm">
