@@ -1396,8 +1396,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="searchObj.meta.buildModeQueryEditorDisabled ? 'builder' : 'custom'"
                   @update:model-value="onBuildModeToggle(($event as string) === 'builder')"
                 >
-                  <OToggleGroupItem value="builder" size="xs">Builder</OToggleGroupItem>
-                  <OToggleGroupItem value="custom" size="xs">Custom</OToggleGroupItem>
+                  <OToggleGroupItem value="builder" size="xs">
+                    <template #icon-left><Wrench class="tw:size-3 tw:shrink-0" /></template>
+                    Builder
+                  </OToggleGroupItem>
+                  <OToggleGroupItem value="custom" size="xs">
+                    <template #icon-left><Code2 class="tw:size-3 tw:shrink-0" /></template>
+                    Custom
+                  </OToggleGroupItem>
                 </OToggleGroup>
               </div>
             </div>
@@ -2302,6 +2308,7 @@ import {
   Maximize,
   Minimize,
   Wrench,
+  Code2,
   Layers,
 } from "lucide-vue-next";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -2401,6 +2408,7 @@ export default defineComponent({
     Maximize,
     Minimize,
     Wrench,
+    Code2,
     Layers,
     OToggleGroup,
     OToggleGroupItem,

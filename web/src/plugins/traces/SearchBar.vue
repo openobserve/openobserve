@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><GitFork class="tw:size-3.5 tw:shrink-0"
+              ><q-icon :name="outlinedAccountTree" class="tw:text-[14px] tw:shrink-0"
             /></template>
             Traces
           </OToggleGroupItem>
@@ -446,7 +446,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { Layers, GitFork, Network, GitBranch, Share2 } from "lucide-vue-next";
+import { Layers, Network, GitBranch, Share2 } from "lucide-vue-next";
+import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -473,7 +474,6 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     Layers,
-    GitFork,
     Network,
     GitBranch,
     Share2,
@@ -954,6 +954,7 @@ export default defineComponent({
       onServiceGraphVisualizationChange,
       onServiceGraphLayoutChange,
       toggleLiveMode,
+      outlinedAccountTree,
     };
   },
   computed: {

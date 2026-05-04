@@ -69,7 +69,7 @@
 
     <q-space></q-space>
 
-    <q-card-actions align="right" class="q-pa-md">
+    <q-card-actions align="right" class="q-pa-md tw:gap-2">
       <OButton
         variant="outline"
         size="sm-action"

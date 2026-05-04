@@ -502,6 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     @click="addingToEnv = envKey"
                   >
+                    <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                     {{ t("settings.correlation.addField") }}
                     <q-tooltip
                       anchor="top middle"
@@ -600,6 +601,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   @click="addingToEnv = generateGroupId()"
                 >
+                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                   {{ t("settings.correlation.addGroup") }}
                   <q-tooltip
                     anchor="top middle"
@@ -770,6 +772,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   @click="addingTrackedAlias = true"
                 >
+                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                   Add field
                 </OButton>
               </div>
@@ -1641,6 +1644,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
 import TagInput from "@/components/alerts/TagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { Plus } from "lucide-vue-next";
 import type {
   ServiceIdentityConfig,
   IdentitySet,
