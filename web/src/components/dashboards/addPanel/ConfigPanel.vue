@@ -381,7 +381,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="setUnit('px')"
                 variant="outline"
                 :active="
-                  dashboardPanelData?.data?.config.legend_width?.unit === null ||
+                  dashboardPanelData?.data?.config.legend_width?.unit ===
+                    null ||
                   dashboardPanelData?.data?.config?.legend_width?.unit === 'px'
                 "
                 size="sm"
@@ -439,7 +440,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="setHeightUnit('px')"
                 variant="outline"
                 :active="
-                  dashboardPanelData?.data?.config.legend_height?.unit === null ||
+                  dashboardPanelData?.data?.config.legend_height?.unit ===
+                    null ||
                   dashboardPanelData?.data?.config?.legend_height?.unit === 'px'
                 "
                 size="sm"
@@ -2342,13 +2344,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <OButton
-          variant="outline"
-          size="sm"
-          @click="addTimeShift"
-          data-test="dashboard-addpanel-config-time-shift-add-btn"
-          >{{ t("dashboard.addButton") }}</OButton
-        >
+        <div style="align-self: flex-start">
+          <OButton
+            variant="outline"
+            size="sm"
+            @click="addTimeShift"
+            data-test="dashboard-addpanel-config-time-shift-add-btn"
+            >{{ t("dashboard.addButton") }}</OButton
+          >
+        </div>
       </div>
     </q-expansion-item>
 
@@ -3393,7 +3397,6 @@ export default defineComponent({
   justify-content: space-between;
   gap: 6px;
 }
-
 
 .unit-container {
   display: flex;

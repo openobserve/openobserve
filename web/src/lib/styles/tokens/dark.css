@@ -16,7 +16,7 @@
     --color-surface-base: var(--color-grey-950);
     --color-surface-panel: var(--color-grey-900);
     --color-surface-overlay: var(--color-grey-800);
-    --color-surface-subtle:       var(--color-grey-800);
+    --color-surface-subtle: var(--color-grey-800);
     --color-surface-subtle-hover: var(--color-grey-700);
 
     /* --- Borders --- */
@@ -86,4 +86,13 @@
     /* RefreshButton — staleness dot (slightly muted in dark mode) */
     --color-refresh-dot-stale: var(--color-warning-700);
     --color-refresh-dot-critical: var(--color-error-400);
+}
+
+/* ToggleGroup — primary variant dark overrides */
+.dark [data-variant="primary"] {
+    --color-toggle-track-bg: var(--color-primary-900);
+    --color-toggle-border: var(--color-primary-700);
+    --color-toggle-item-hover-bg: var(--color-primary-950);
+    --color-toggle-item-active-bg: var(--color-primary-800);
+    --color-toggle-item-active-text: var(--color-primary-200);
 }

@@ -107,11 +107,16 @@
   --color-dropdown-item-destructive-hover-bg: var(--color-error-50);
 
   /* Icon sizes */
-  --text-icon-xs: var(--spacing-3);   /* 12px */
-  --text-icon-sm: var(--spacing-4);   /* 16px */
-  --text-icon-md: var(--spacing-5);   /* 20px */
-  --text-icon-lg: var(--spacing-6);   /* 24px */
-  --text-icon-xl: var(--spacing-8);   /* 32px */
+  --text-icon-xs: var(--spacing-3);
+  /* 12px */
+  --text-icon-sm: var(--spacing-4);
+  /* 16px */
+  --text-icon-md: var(--spacing-5);
+  /* 20px */
+  --text-icon-lg: var(--spacing-6);
+  /* 24px */
+  --text-icon-xl: var(--spacing-8);
+  /* 32px */
 
   /* RefreshButton — staleness dot */
   --color-refresh-dot-idle: var(--color-text-disabled);
@@ -131,6 +136,15 @@
   --color-tabs-focus-ring: var(--color-primary-400);
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
+}
+
+/* ToggleGroup — primary variant (colored tray) */
+[data-variant="primary"] {
+  --color-toggle-track-bg: var(--color-primary-200);
+  --color-toggle-border: var(--color-primary-300);
+  --color-toggle-item-hover-bg: var(--color-primary-100);
+  --color-toggle-item-active-bg: var(--color-surface-base);
+  --color-toggle-item-active-text: var(--color-primary-700);
 }
 
 /* ── Register ALL tokens for Tailwind utility generation ── */
