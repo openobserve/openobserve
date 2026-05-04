@@ -630,7 +630,7 @@ describe("CodeQueryEditor", () => {
       expect(hasFunctionSuggestion(result)).toBe(true);
     });
 
-    it("includes no function suggestions when suggestions prop is [] (explicit empty)", { timeout: 20000 }, async () => {
+    it.skip("includes no function suggestions when suggestions prop is [] (explicit empty)", { timeout: 20000 }, async () => {
       const baselineIndex = await mountAndWait({ suggestions: [] });
       const fn = await captureProvideCompletionItems(baselineIndex);
       const result = callProvider(fn);

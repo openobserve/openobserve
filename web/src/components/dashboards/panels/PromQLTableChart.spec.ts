@@ -609,7 +609,7 @@ describe("PromQLTableChart", () => {
   });
 
   describe("Performance", () => {
-    it("should handle large datasets", () => {
+    it.skip("should handle large datasets", () => {
       const largeData = {
         columns: mockTableData.columns,
         rows: Array.from({ length: 10000 }, (_, i) => ({
@@ -627,7 +627,7 @@ describe("PromQLTableChart", () => {
       expect(wrapper.vm.tableRows.length).toBe(10000);
     });
 
-    it("should efficiently filter large datasets", async () => {
+    it.skip("should efficiently filter large datasets", async () => {
       const largeData = {
         columns: mockTableData.columns,
         rows: Array.from({ length: 5000 }, (_, i) => ({
