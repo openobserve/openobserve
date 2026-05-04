@@ -12,7 +12,7 @@
       class="condition-logical-operator"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
     />
-    <OButtonGroup>
+    <OButtonGroup class="axis-field" radius="sm">
       <OButton
         variant="primary"
         size="chip"
@@ -24,7 +24,7 @@
           class="q-pa-md"
           @show="(e: any) => loadFilterItem(condition.column)"
         >
-          <div style="display: flex; align-items: center; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 4px">
             <StreamFieldSelect
               class="tw:w-full"
               :streams="getAllSelectedStreams()"
@@ -37,7 +37,9 @@
               @click="removeColumnName"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
             >
-              <template #icon-left><q-icon name="close" size="18px" /></template>
+              <template #icon-left
+                ><q-icon name="close" size="18px"
+              /></template>
             </OButton>
           </div>
           <div style="height: 100%">
@@ -147,7 +149,7 @@
         </q-menu>
       </OButton>
       <OButton
-        variant="ghost"
+        variant="outline"
         size="icon-chip"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"

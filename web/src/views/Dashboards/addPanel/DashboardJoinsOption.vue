@@ -9,7 +9,7 @@
           :key="index"
           class="join-item"
         >
-          <OButtonGroup align="center">
+          <OButtonGroup class="axis-field" radius="sm">
             <OButton
               variant="primary"
               size="chip"
@@ -47,7 +47,7 @@
               <template #icon-right><q-icon name="arrow_drop_down" /></template>
             </OButton>
             <OButton
-              variant="ghost"
+              variant="outline"
               size="icon-chip"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
