@@ -157,6 +157,7 @@ export default defineComponent({
     const lastSplitterPosition = ref(200);
     const splitterModel = ref(220);
     const billingProvider = ref(""); // empty until loaded
+    const isPaidUser = ref(false);
     const billingInfoLoaded = ref(false);
 
     // Fetch billing info to determine provider
@@ -166,6 +167,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier
         );
         billingProvider.value = res.data?.provider || "";
+        isPaidUser.value = res.data?.customer_id.length > 0;
       } catch (e) {
         console.error("Failed to fetch billing info:", e);
         billingProvider.value = "";
@@ -179,7 +181,7 @@ export default defineComponent({
       return billingInfoLoaded.value && billingProvider.value === "stripe";
     });
     const options = computed(()=>{
-      return billingInfoLoaded.value && billingProvider.value === "stripe" ?
+      return billingInfoLoaded.value && billingProvider.value === "stripe" && isPaidUser.value ?
         [
           {label: "Current Cycle", value: "1cycle"},
           {label: "30 Days", value: "30days"},
@@ -280,6 +282,7 @@ export default defineComponent({
       lastSplitterPosition,
       showInvoiceTab,
       billingProvider,
+      isPaidUser,
     };
   },
 });
