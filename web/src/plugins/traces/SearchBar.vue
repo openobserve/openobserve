@@ -54,23 +54,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></template>
             Service Graph
           </OToggleGroupItem>
-          <div>
-              <q-btn
-                data-test="traces-search-mode-services-catalog-btn"
-                :class="[
-                  'button button-right tw:w-[7.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                  searchObj.meta.searchMode === 'services-catalog'
-                    ? 'selected'
-                    : '',
-                ]"
-                @click="$emit('update:searchMode', 'services-catalog')"
-                no-caps
-                size="sm"
-              >
-                {{ t("traces.servicesCatalog.tabLabel") }}
-                <q-tooltip>{{ t("traces.servicesCatalog.tabLabel") }}</q-tooltip>
-              </q-btn>
-            </div>
+          <OToggleGroupItem
+            data-test="traces-search-mode-services-catalog-btn"
+            value="services-catalog"
+            size="sm"
+          >
+            <template #icon-left
+              ><BookOpen class="tw:size-3.5 tw:shrink-0"
+            /></template>
+            {{ t("traces.servicesCatalog.tabLabel") }}
+          </OToggleGroupItem>
         </OToggleGroup>
 
         <!-- Show search controls only when not on Service Graph or Services Catalog -->
@@ -377,14 +370,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:h-[2rem]!"
             @on:date-change="updateDateTime"
           />
-          <q-btn
+          <OButton
             data-test="services-catalog-refresh-btn"
-            class="tw:mr-[0.375rem] tw:w-[1rem]! tw:min-h-[1.9rem]! tw:h-[1.9rem]! el-border"
-            icon="refresh"
+            variant="outline"
+            size="icon-toolbar"
+            class="tw:mr-[0.375rem]"
             @click="$emit('services-catalog-refresh')"
           >
+            <q-icon name="refresh" size="16px" />
             <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </div>
     </div>
@@ -446,7 +441,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { Layers, Network, GitBranch, Share2 } from "lucide-vue-next";
+import { Layers, Network, GitBranch, Share2, BookOpen } from "lucide-vue-next";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -477,6 +472,7 @@ export default defineComponent({
     Network,
     GitBranch,
     Share2,
+    BookOpen,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
