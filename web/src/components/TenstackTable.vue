@@ -25,7 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scroll container: grows to fill available height -->
     <div
       ref="parentRef"
-      :class="['container', 'table-container', 'tw:flex-1', 'tw:min-h-0', 'tw:overflow-auto', 'tw:relative', { 'virtual-scroll-active': useVirtualScroll }]"
+      :class="[
+        'container',
+        'table-container',
+        'tw:flex-1',
+        'tw:min-h-0',
+        'tw:overflow-auto',
+        'tw:relative',
+        { 'virtual-scroll-active': useVirtualScroll },
+      ]"
     >
       <table
         v-if="table"
@@ -94,7 +102,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 level.isLeaf
                   ? 'pivot-value-header'
                   : 'pivot-group-header tw:text-center',
-                { 'pivot-section-border': cell.hasBorder && !(stickyColTotals && cell._isTotalHeader) },
+                {
+                  'pivot-section-border':
+                    cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
+                },
                 { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
                 { 'tw:cursor-pointer': cell._sortColumn },
               ]"
@@ -348,8 +359,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="table-row-expand-menu"
                   @click.capture.stop="expandFunctionError"
                 >
-                  <q-icon :name="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'" size="14px" />
-                </OButton
+                  <q-icon
+                    :name="
+                      isFunctionErrorOpen ? 'expand_more' : 'chevron_right'
+                    "
+                    size="14px"
+                  /> </OButton
                 ><b>
                   <q-icon name="warning" size="15px"></q-icon>
                   {{ t("search.functionErrorLabel") }}</b
@@ -405,9 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :ref="(node: any) => measureDashboardRow(node)"
               class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
-              @click="
-                handleDataRowClick(row.original, idx as number, $event)
-              "
+              @click="handleDataRowClick(row.original, idx as number, $event)"
             >
               <td
                 v-for="(cell, cellIndex) in row.getVisibleCells()"
@@ -494,7 +507,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                       >
-                        <q-icon :name="isCellCopied(idx as number, cell.column.id) ? 'check' : 'content_copy'" size="14px" />
+                        <q-icon
+                          :name="
+                            isCellCopied(idx as number, cell.column.id)
+                              ? 'check'
+                              : 'content_copy'
+                          "
+                          size="14px"
+                        />
                       </OButton>
                     </span>
                     <!-- JSON field inline renderer -->
@@ -537,7 +557,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                       >
-                        <q-icon :name="isCellCopied(idx as number, cell.column.id) ? 'check' : 'content_copy'" size="14px" />
+                        <q-icon
+                          :name="
+                            isCellCopied(idx as number, cell.column.id)
+                              ? 'check'
+                              : 'content_copy'
+                          "
+                          size="14px"
+                        />
                       </OButton>
                     </span>
                   </div>
@@ -729,7 +756,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="table-row-expand-menu"
                       @click.capture.stop="handleExpandRow(virtualRow.index)"
                     >
-                      <q-icon :name="expandedRowIndices.has(virtualRow.index) ? 'expand_more' : 'chevron_right'" size="14px" />
+                      <q-icon
+                        :name="
+                          expandedRowIndices.has(virtualRow.index)
+                            ? 'expand_more'
+                            : 'chevron_right'
+                        "
+                        size="14px"
+                      />
                     </OButton>
                     <slot
                       name="cell-actions"
@@ -778,7 +812,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                           >
-                            <q-icon :name="isCellCopied(virtualRow.index, cell.column.id) ? 'check' : 'content_copy'" size="14px" />
+                            <q-icon
+                              :name="
+                                isCellCopied(virtualRow.index, cell.column.id)
+                                  ? 'check'
+                                  : 'content_copy'
+                              "
+                              size="14px"
+                            />
                           </OButton>
                         </span>
                         <!-- Dashboard: JSON field inline renderer -->
@@ -831,7 +872,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             cell.column.columnDef.id ===
                               store.state.zoConfig.timestamp_column
                           "
-                          class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                          class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
                           @send-to-ai-chat="
                             sendToAiChat(
                               JSON.stringify(cell.row.original),
@@ -860,7 +901,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                           >
-                            <q-icon :name="isCellCopied(virtualRow.index, cell.column.id) ? 'check' : 'content_copy'" size="14px" />
+                            <q-icon
+                              :name="
+                                isCellCopied(virtualRow.index, cell.column.id)
+                                  ? 'check'
+                                  : 'content_copy'
+                              "
+                              size="14px"
+                            />
                           </OButton>
                         </span>
                       </template>
@@ -1439,7 +1487,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     "white-space": "normal",
     "word-break": "break-word",
     // Remove border so shadow aligns with body total column
-    "border": "none",
+    border: "none",
   };
   return style;
 };
@@ -1855,9 +1903,7 @@ const rowVirtualizerOptions = computed(() => {
       if (props.rowHeight) return props.rowHeight;
       // Logs/traces: check for expanded rows
       const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
-      return isExpandedRow
-        ? expandedRowHeights.value[index] || 300
-        : 28;
+      return isExpandedRow ? expandedRowHeights.value[index] || 300 : 28;
     },
     // Dashboard: moderate overscan keeps rows buffered above/below viewport.
     // Logs/traces: high overscan for smooth fast-scroll.
