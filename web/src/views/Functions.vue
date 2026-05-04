@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
             variant="sidebar-button"
             size="sidebar-button"
+            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
             @click="collapseSidebar"
           >
             <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" size="12px" />
