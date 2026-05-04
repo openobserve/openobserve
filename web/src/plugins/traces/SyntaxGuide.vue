@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton
     data-cy="syntax-guide-button"
-    variant="ghost"
+    variant="outline"
     size="icon-sm"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
   >

@@ -394,8 +394,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <!-- add delete icon in actions column -->
                 <template #body-cell-actions="props">
-                  <q-td :props="props" class="tw:overflow-visible">
-                    <div class="tw:flex tw:items-center tw:gap-1">
+                  <q-td
+                    :props="props"
+                    class="tw:overflow-visible tw:text-center"
+                  >
+                    <div
+                      class="tw:flex tw:items-center tw:justify-center tw:gap-1"
+                    >
                       <OButton
                         v-if="props.row.actions == 'true'"
                         :title="t('dashboard.move_to_another_folder')"

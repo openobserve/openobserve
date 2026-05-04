@@ -3414,24 +3414,27 @@ export default defineComponent({
 }
 
 .panel-time-picker-btn {
-  overflow: hidden;
+  flex: 1 1 0;
   min-width: 0;
+  overflow: hidden;
 
   :deep(.date-time-button) {
+    width: fit-content;
     min-width: 0 !important;
     max-width: 100%;
+    overflow: hidden;
 
-    .q-btn__content {
-      flex-wrap: nowrap;
+    .date-time-label {
+      flex: 1 1 0;
+      min-width: 0;
       overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
-      .block {
-        flex: 1 1 0;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
+    .date-time-arrow {
+      flex-shrink: 0;
+      font-size: 18px !important;
     }
   }
 }
