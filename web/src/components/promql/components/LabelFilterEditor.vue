@@ -10,14 +10,15 @@
           :key="index"
           class="label-filter-item"
         >
-          <OButtonGroup>
+          <OButtonGroup class="axis-field" radius="sm">
             <OButton
               variant="primary"
-              size="sm"
+              size="chip"
+              class="tw:!text-[12px]"
               :data-test="`promql-label-filter-${index}`"
             >
               {{ computedLabel(label) }}
-              <template #icon-right><ChevronDown class="tw:size-3.5 tw:shrink-0" /></template>
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu class="q-pa-md">
                 <div style="width: 350px">
                   <!-- Label Selection -->
@@ -127,12 +128,12 @@
               </q-menu>
             </OButton>
             <OButton
-              variant="ghost"
-              size="icon-xs-sq"
+              variant="outline"
+              size="icon-chip"
               @click="removeLabel(index)"
               :data-test="`promql-label-filter-remove-${index}`"
             >
-              <q-icon name="close" size="14px" />
+              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </OButtonGroup>
         </div>
@@ -157,7 +158,6 @@
 import { ref, watch, computed, inject } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronDown } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
