@@ -128,6 +128,7 @@
       >
         <ODropdown
           v-if="!hideFieldOptions"
+          v-model:open="dropdownOpenMap[key]"
           side="bottom"
           align="start"
         >
@@ -139,7 +140,7 @@
               class="q-ml-sm"
               aria-label="Add icon"
             >
-              <img :src="getImageURL('images/common/add_icon.svg')" class="tw:size-3" alt="" />
+              <q-icon :name="dropdownOpenMap[key] ? 'expand_less' : 'expand_more'" size="14px" />
             </OButton>
           </template>
           <ODropdownItem
@@ -311,6 +312,7 @@
 <script lang="ts">
 import {
   ref,
+  reactive,
   onBeforeMount,
   computed,
   nextTick,
@@ -433,6 +435,7 @@ export default {
 
     const previewId = ref("");
     const schemaToBeSearch = ref({});
+    const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
     const $q = useQuasar();
     const unflattendData: any = ref("");
@@ -974,6 +977,7 @@ export default {
       addSearchTerm,
       addFieldToTable,
       outlinedAccountTree,
+      dropdownOpenMap,
       store,
       searchObj,
       multiStreamFields,
