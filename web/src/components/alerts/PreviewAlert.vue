@@ -32,9 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="preview-alert-chart"
       style="flex: 1; min-height: 0; padding: 1rem"
     >
+      <!-- Empty query placeholder -->
+      <div
+        v-if="!query && (selectedTab === 'sql' || selectedTab === 'promql')"
+        class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2"
+      >
+        <q-icon name="edit" size="40px" class="tw:opacity-20" />
+        <span class="tw:text-sm tw:opacity-40">Write a query to see preview</span>
+      </div>
       <PanelSchemaRenderer
         ref="panelRendererRef"
-        v-if="chartData"
+        v-else-if="chartData"
         :height="5"
         :width="5"
         :panelSchema="chartData"
@@ -968,6 +976,12 @@ const evaluateAndSetStatus = (resultCount: number) => {
 };
 
 const refreshData = () => {
+  // Skip if there is no query to run (e.g. user switched to SQL/PromQL
+  // without writing a query yet, or closed the editor with an empty query).
+  if (!props.query) {
+    return;
+  }
+
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
     console.warn(
