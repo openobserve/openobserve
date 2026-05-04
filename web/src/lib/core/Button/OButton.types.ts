@@ -29,7 +29,9 @@ export type ButtonVariant =
   // Use on dark gradient backgrounds — white background with primary text
   | "on-dark-primary"
   // Use on dark gradient backgrounds — transparent with white border/text
-  | "on-dark-ghost";
+  | "on-dark-ghost"
+  // Solid warning (yellow) background — use to draw attention to a required action
+  | "warning";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =

@@ -92,6 +92,14 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-[color:var(--q-warning)]/50",
     "tw:disabled:opacity-60",
   ].join(" "),
+  // Solid warning: filled yellow background + dark text — for buttons requiring user attention
+  warning: [
+    "tw:bg-[var(--q-warning)] tw:text-gray-900 tw:border tw:border-[color:var(--q-warning)]",
+    "tw:enabled:hover:bg-[color:var(--q-warning)]/90",
+    "tw:enabled:active:bg-[color:var(--q-warning)]/80",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-[color:var(--q-warning)]/50",
+    "tw:disabled:opacity-60",
+  ].join(" "),
   // Neutral ghost: inherits parent text color — used for compact inline action buttons
   // where no color accent is desired (e.g. field adder buttons +X +Y +B +F)
   "ghost-neutral": [

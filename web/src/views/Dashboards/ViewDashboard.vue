@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-else
               v-show="store.state.printMode !== true"
-              :variant="isVariablesChanged ? 'primary' : 'outline'"
+              :variant="isVariablesChanged ? 'warning' : 'outline'"
               size="icon-xs"
               @click="refreshData"
               :disabled="arePanelsLoading"
