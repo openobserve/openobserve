@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
-        minHeight: totalSize + 'px',
+        minHeight: (totalSize + 44) + 'px',
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
