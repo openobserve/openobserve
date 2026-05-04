@@ -18,6 +18,7 @@ import { byString } from "@/utils/json";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import config from "@/aws-exports";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
@@ -218,8 +219,9 @@ export const useStreamFields = () => {
         const streamType = searchObj.data.stream.streamType || "logs";
 
         // Load org semantic groups + key fields config + field grouping in parallel (all cached after first call)
+        const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
         const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
-          loadSemanticGroups(),
+          isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
           loadKeyFields(),
           loadFieldGrouping(),
         ]);

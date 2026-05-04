@@ -1322,8 +1322,9 @@ async function extractFields() {
 
       // Apply field grouping
       try {
+        const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
         const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
-          loadSemanticGroups(),
+          isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
           loadKeyFields(),
           loadFieldGrouping(),
         ]);
