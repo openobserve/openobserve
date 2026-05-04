@@ -1298,6 +1298,7 @@ async function extractFields() {
             name: rowName,
             ftsKey: ftsKeys.has(rowName),
             showValues: !idFields[rowName],
+            label: rowName,
             dataType: schemaTypeMap.get(rowName),
             isSchemaField: true,
           });
