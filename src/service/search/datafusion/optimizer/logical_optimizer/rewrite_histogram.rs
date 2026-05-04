@@ -222,12 +222,6 @@ mod tests {
         assert_eq!(rule.name(), "rewrite_histogram");
     }
 
-    #[test]
-    fn test_rewrite_histogram_rule_supports_rewrite() {
-        let rule = RewriteHistogram::new(0, 1000, 60);
-        assert!(rule.supports_rewrite());
-    }
-
     #[tokio::test]
     async fn test_rewrite_histogram_interval() {
         let sqls = [
@@ -301,7 +295,6 @@ mod tests {
         use datafusion::optimizer::OptimizerRule;
         let rule = RewriteHistogram::new(100, 200, 50);
         assert_eq!(rule.name(), "rewrite_histogram");
-        assert!(rule.supports_rewrite());
         assert_eq!(
             rule.apply_order(),
             Some(datafusion::optimizer::optimizer::ApplyOrder::BottomUp)

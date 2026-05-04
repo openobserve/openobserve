@@ -209,7 +209,6 @@ mod tests {
         use datafusion::optimizer::OptimizerRule;
         let rule = AddSortAndLimitRule::new(10, 5);
         assert_eq!(rule.name(), "add_sort_and_limit");
-        assert!(rule.supports_rewrite());
         assert_eq!(
             rule.apply_order(),
             Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)

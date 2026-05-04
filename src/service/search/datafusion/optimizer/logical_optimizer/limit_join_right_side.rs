@@ -202,12 +202,6 @@ mod tests {
     }
 
     #[test]
-    fn test_limit_join_right_side_supports_rewrite() {
-        let rule = LimitJoinRightSide::new(10);
-        assert!(rule.supports_rewrite());
-    }
-
-    #[test]
     fn test_limit_join_right_side_apply_order() {
         use datafusion::optimizer::optimizer::ApplyOrder;
         let rule = LimitJoinRightSide::new(10);
@@ -408,7 +402,6 @@ mod tests {
         use datafusion::optimizer::OptimizerRule;
         let rule = LimitJoinRightSide::new(100);
         assert_eq!(rule.name(), "limit_join_right_side");
-        assert!(rule.supports_rewrite());
         assert_eq!(
             rule.apply_order(),
             Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
