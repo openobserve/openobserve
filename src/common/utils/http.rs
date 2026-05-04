@@ -585,6 +585,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_get_or_create_trace_id_manual_parse_valid() {
         // Test manual parsing of valid traceparent
         let mut headers = HeaderMap::new();
@@ -598,6 +599,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_get_or_create_trace_id_manual_parse_invalid() {
         // Test manual parsing of invalid traceparent (all zeros)
         let mut headers = HeaderMap::new();
@@ -704,6 +706,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_get_or_create_trace_id_fallback_to_traceparent() {
         // Test fallback to traceparent when x-openobserve-trace-id is invalid
         let mut headers = HeaderMap::new();

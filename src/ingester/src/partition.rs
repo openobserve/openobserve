@@ -332,3 +332,21 @@ impl MemorySize for PartitionFile {
         std::mem::size_of::<PartitionFile>() + self.data.mem_size()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_partition_new_has_empty_schema_and_files() {
+        let p = Partition::new();
+        assert!(p.schema_fields.is_empty());
+        assert!(p.files.is_empty());
+    }
+
+    #[test]
+    fn test_partition_mem_size_at_least_struct_size() {
+        let p = Partition::new();
+        assert!(p.mem_size() >= std::mem::size_of::<Partition>());
+    }
+}

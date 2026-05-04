@@ -404,4 +404,114 @@ mod tests {
         assert_eq!(O2Attributes::EVALUATOR_VERSION, "llm.evaluator.version");
         assert_eq!(O2Attributes::EVALUATOR_TYPE, "llm.evaluator.type");
     }
+
+    #[test]
+    fn test_gen_ai_attributes_constants() {
+        assert_eq!(GenAiAttributes::OPERATION_NAME, "gen_ai.operation.name");
+        assert_eq!(GenAiAttributes::REQUEST_MODEL, "gen_ai.request.model");
+        assert_eq!(GenAiAttributes::RESPONSE_MODEL, "gen_ai.response.model");
+        assert_eq!(
+            GenAiAttributes::USAGE_INPUT_TOKENS,
+            "gen_ai.usage.input_tokens"
+        );
+        assert_eq!(
+            GenAiAttributes::USAGE_OUTPUT_TOKENS,
+            "gen_ai.usage.output_tokens"
+        );
+        assert_eq!(
+            GenAiAttributes::USAGE_TOTAL_TOKENS,
+            "gen_ai.usage.total_tokens"
+        );
+        assert_eq!(GenAiAttributes::SYSTEM, "gen_ai.system");
+        assert_eq!(GenAiAttributes::CONVERSATION_ID, "gen_ai.conversation.id");
+    }
+
+    #[test]
+    fn test_langfuse_attributes_constants() {
+        assert_eq!(LangfuseAttributes::TYPE, "langfuse.observation.type");
+        assert_eq!(LangfuseAttributes::INPUT, "langfuse.observation.input");
+        assert_eq!(LangfuseAttributes::OUTPUT, "langfuse.observation.output");
+        assert_eq!(LangfuseAttributes::MODEL, "langfuse.observation.model.name");
+        assert_eq!(
+            LangfuseAttributes::USAGE_DETAILS,
+            "langfuse.observation.usage_details"
+        );
+        assert_eq!(
+            LangfuseAttributes::COST_DETAILS,
+            "langfuse.observation.cost_details"
+        );
+        assert_eq!(
+            LangfuseAttributes::PROMPT_NAME,
+            "langfuse.observation.prompt.name"
+        );
+    }
+
+    #[test]
+    fn test_vercel_ai_sdk_attributes_constants() {
+        assert_eq!(VercelAiSdkAttributes::MODEL_ID, "ai.model.id");
+        assert_eq!(VercelAiSdkAttributes::MODEL_PROVIDER, "ai.model.provider");
+        assert_eq!(VercelAiSdkAttributes::RESPONSE_TEXT, "ai.response.text");
+        assert_eq!(VercelAiSdkAttributes::USAGE_TOKENS, "ai.usage.tokens");
+        assert_eq!(
+            VercelAiSdkAttributes::TELEMETRY_METADATA_USER_ID,
+            "ai.telemetry.metadata.userId"
+        );
+    }
+
+    #[test]
+    fn test_open_inference_attributes_constants() {
+        assert_eq!(
+            OpenInferenceAttributes::SPAN_KIND,
+            "openinference.span.kind"
+        );
+        assert_eq!(OpenInferenceAttributes::LLM_MODEL_NAME, "llm.model_name");
+        assert_eq!(
+            OpenInferenceAttributes::LLM_TOKEN_COUNT_PROMPT,
+            "llm.token_count.prompt"
+        );
+        assert_eq!(
+            OpenInferenceAttributes::LLM_TOKEN_COUNT_COMPLETION,
+            "llm.token_count.completion"
+        );
+    }
+
+    #[test]
+    fn test_framework_attributes_constants() {
+        assert_eq!(FrameworkAttributes::LOGFIRE_PROMPT, "prompt");
+        assert_eq!(FrameworkAttributes::INPUT_VALUE, "input.value");
+        assert_eq!(FrameworkAttributes::OUTPUT_VALUE, "output.value");
+        assert_eq!(FrameworkAttributes::INPUT, "input");
+        assert_eq!(FrameworkAttributes::OUTPUT, "output");
+        assert_eq!(FrameworkAttributes::TOOL_ARGUMENTS, "tool_arguments");
+        assert_eq!(FrameworkAttributes::TOOL_RESPONSE, "tool_response");
+    }
+
+    #[test]
+    fn test_gen_ai_event_names_constants() {
+        assert_eq!(GenAiEventNames::SYSTEM_MESSAGE, "gen_ai.system.message");
+        assert_eq!(GenAiEventNames::USER_MESSAGE, "gen_ai.user.message");
+        assert_eq!(
+            GenAiEventNames::ASSISTANT_MESSAGE,
+            "gen_ai.assistant.message"
+        );
+        assert_eq!(GenAiEventNames::TOOL_MESSAGE, "gen_ai.tool.message");
+        assert_eq!(GenAiEventNames::CHOICE, "gen_ai.choice");
+        assert_eq!(GenAiEventNames::CONTENT_PROMPT, "gen_ai.content.prompt");
+        assert_eq!(
+            GenAiEventNames::CONTENT_COMPLETION,
+            "gen_ai.content.completion"
+        );
+    }
+
+    #[test]
+    fn test_llm_attributes_constants() {
+        assert_eq!(LLMAttributes::REQUEST_TYPE, "llm.request.type");
+        assert_eq!(LLMAttributes::USAGE_TOTAL_TOKENS, "llm.usage.total_tokens");
+    }
+
+    #[test]
+    fn test_otel_attributes_constants() {
+        assert_eq!(OtelAttributes::USER_ID, "user.id");
+        assert_eq!(OtelAttributes::SESSION_ID, "session.id");
+    }
 }

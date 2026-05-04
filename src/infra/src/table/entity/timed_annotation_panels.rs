@@ -30,3 +30,19 @@ impl Related<super::timed_annotations::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "panel-1".to_string(),
+            timed_annotation_id: "annot-1".to_string(),
+            panel_id: "p-1".to_string(),
+        };
+        assert_eq!(m.id, "panel-1");
+        assert_eq!(m.panel_id, "p-1");
+    }
+}

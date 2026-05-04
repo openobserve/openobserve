@@ -66,3 +66,18 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_license_key_prefix_value() {
+        assert_eq!(LICENSE_KEY_PREFIX, "/license/");
+    }
+
+    #[test]
+    fn test_license_key_prefix_starts_with_slash() {
+        assert!(LICENSE_KEY_PREFIX.starts_with('/'));
+    }
+}

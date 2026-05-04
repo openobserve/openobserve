@@ -3378,4 +3378,428 @@ mod tests {
         assert_eq!(arr[0]["user"], "Alice");
         assert_eq!(arr[1]["user"], "Bob");
     }
+
+    // ── update_cron_expression ──────────────────────────────────────────────
+
+    #[test]
+    fn test_update_cron_expression_no_star_prefix() {
+        // Does not start with '*' → unchanged
+        let cron_exp = "30 * * * * *";
+        let result = update_cron_expression(cron_exp, 15);
+        assert_eq!(result, "30 * * * * *");
+    }
+
+    #[test]
+    fn test_update_cron_expression_empty_string() {
+        // Empty string starts with '*'? No, it is empty → unchanged
+        let result = update_cron_expression("", 10);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_update_cron_expression_star_only() {
+        // "*" alone — after split on '*' rest is "" which trims to ""
+        let result = update_cron_expression("*", 7);
+        assert_eq!(result, "7 ");
+    }
+
+    #[test]
+    fn test_update_cron_expression_leading_whitespace_not_star() {
+        // Leading space means it does NOT start with '*'
+        let cron_exp = " * * * * *";
+        let result = update_cron_expression(cron_exp, 5);
+        // trim() removes leading space, but the trimmed string starts with '*'
+        assert_eq!(result, "5 * * * *");
+    }
+
+    #[test]
+    fn test_update_cron_expression_zero_seconds() {
+        let result = update_cron_expression("* */5 * * * *", 0);
+        assert_eq!(result, "0 */5 * * * *");
+    }
+
+    // ── format_variable_value ──────────────────────────────────────────────
+
+    #[test]
+    fn test_format_variable_value_single_quote() {
+        assert_eq!(format_variable_value("'".to_string()), "\\\\'");
+    }
+
+    #[test]
+    fn test_format_variable_value_soh_stx_us() {
+        // \x01 SOH, \x02 STX, \x1f US — each has a dedicated arm
+        assert_eq!(format_variable_value("\x01".to_string()), "\\u{1}");
+        assert_eq!(format_variable_value("\x02".to_string()), "\\u{2}");
+        assert_eq!(format_variable_value("\x1f".to_string()), "\\u{1f}");
+    }
+
+    #[test]
+    fn test_format_variable_value_mixed_unicode_and_control() {
+        let input = "hi\x01\x02\x1fthere";
+        let result = format_variable_value(input.to_string());
+        assert_eq!(result, "hi\\u{1}\\u{2}\\u{1f}there");
+    }
+
+    #[test]
+    fn test_format_variable_value_all_printable_ascii() {
+        let input = "Hello, World! 123";
+        assert_eq!(format_variable_value(input.to_string()), input);
+    }
+
+    // ── is_json_value_position ─────────────────────────────────────────────
+
+    #[test]
+    fn test_is_json_value_position_not_after_colon() {
+        // Pattern present but not preceded by ':'
+        assert!(!is_json_value_position(
+            r#"some "{rows}" text"#,
+            r#""{rows}""#
+        ));
+    }
+
+    #[test]
+    fn test_is_json_value_position_followed_by_other_char() {
+        // Preceded by ':' but followed by a regular char, not ',' or '}'
+        assert!(!is_json_value_position(
+            r#""k": "{rows}" "other""#,
+            r#""{rows}""#
+        ));
+    }
+
+    #[test]
+    fn test_is_json_value_position_pattern_absent() {
+        assert!(!is_json_value_position(r#""k": "value"}"#, r#""{rows}""#));
+    }
+
+    #[test]
+    fn test_is_json_value_position_valid_with_closing_brace() {
+        assert!(is_json_value_position(r#""k": "{rows}"}"#, r#""{rows}""#));
+    }
+
+    // ── check_json_context_with_prefix ────────────────────────────────────
+
+    #[test]
+    fn test_check_json_context_with_prefix_non_numeric_suffix() {
+        // Prefix found but the part between prefix and `}"` is not a number
+        let tpl = r#""data": "{rows:abc}""#;
+        assert!(!check_json_context_with_prefix(tpl, "\"{rows:"));
+    }
+
+    #[test]
+    fn test_check_json_context_with_prefix_no_closing() {
+        // Prefix present but no `}"` terminator
+        let tpl = r#""data": "{rows:3"#;
+        assert!(!check_json_context_with_prefix(tpl, "\"{rows:"));
+    }
+
+    #[test]
+    fn test_check_json_context_with_prefix_valid() {
+        let tpl = r#""data": "{rows:5}"}"#;
+        assert!(check_json_context_with_prefix(tpl, "\"{rows:"));
+    }
+
+    // ── extract_limit_with_prefix ──────────────────────────────────────────
+
+    #[test]
+    fn test_extract_limit_with_prefix_no_prefix() {
+        assert_eq!(
+            extract_limit_with_prefix(r#""data": "{rows}""#, "\"{rows:"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_limit_with_prefix_non_numeric() {
+        // The value between prefix and `}"` is not a valid usize
+        assert_eq!(
+            extract_limit_with_prefix(r#""data": "{rows:xyz}""#, "\"{rows:"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_limit_with_prefix_zero() {
+        // "0" parses to 0 as usize
+        assert_eq!(
+            extract_limit_with_prefix(r#""data": "{rows:0}""#, "\"{rows:"),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn test_extract_rows_limit_large_number() {
+        assert_eq!(extract_rows_limit(r#""data": "{rows:1000}""#), Some(1000));
+    }
+
+    // ── process_variable_replace edge cases ───────────────────────────────
+
+    #[test]
+    fn test_process_variable_replace_with_zero_length_spec() {
+        // {msg:0} → len is 0, which means no-op truncation (len guard: len > 0)
+        let mut tpl = "Message: {msg:0}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello"), false);
+        // len == 0 parsed → no replacement (the guard `if len > 0` is false)
+        assert_eq!(tpl, "Message: {msg:0}");
+    }
+
+    #[test]
+    fn test_process_variable_replace_length_exceeds_value() {
+        // Requested length larger than actual value length → full value
+        let mut tpl = "Data: {val:100}".to_string();
+        process_variable_replace(&mut tpl, "val", &VarValue::Str("short"), false);
+        assert_eq!(tpl, "Data: short");
+    }
+
+    #[test]
+    fn test_process_variable_replace_email_separator() {
+        let values = vec![json!("a"), json!("b"), json!("c")];
+        let mut tpl = "Items: {rows}".to_string();
+        process_variable_replace(&mut tpl, "rows", &VarValue::JsonArray(&values), true);
+        // email=true → empty separator
+        assert_eq!(tpl, "Items: abc");
+    }
+
+    // ── VarValue edge cases ────────────────────────────────────────────────
+
+    #[test]
+    fn test_var_value_str_to_string_exact_length() {
+        let val = VarValue::Str("abcde");
+        assert_eq!(val.to_string_with_length(5, false), "abcde");
+    }
+
+    #[test]
+    fn test_var_value_json_array_empty_to_string() {
+        let empty: Vec<Value> = vec![];
+        let val = VarValue::JsonArray(&empty);
+        assert_eq!(val.to_string_with_length(0, false), "");
+        assert_eq!(val.to_string_with_length(5, false), "");
+    }
+
+    #[test]
+    fn test_var_value_json_null_and_bool() {
+        let values = vec![json!(null), json!(true), json!(false)];
+        let val = VarValue::JsonArray(&values);
+        let result = val.to_string_with_length(3, false);
+        // null → "null", true → "true", false → "false" (JSON serialisation)
+        assert!(result.contains("null"));
+        assert!(result.contains("true"));
+        assert!(result.contains("false"));
+    }
+
+    // ── get_row_column_map with non-string values ──────────────────────────
+
+    #[test]
+    fn test_get_row_column_map_null_value() {
+        let mut row = Map::new();
+        row.insert("field".to_string(), json!(null));
+        let result = get_row_column_map(&[row]);
+        // null is not string / not f64 → value.to_string() → "null"
+        assert!(result.get("field").unwrap().contains("null"));
+    }
+
+    #[test]
+    fn test_get_row_column_map_bool_value() {
+        let mut row = Map::new();
+        row.insert("active".to_string(), json!(true));
+        let result = get_row_column_map(&[row]);
+        assert!(result.get("active").unwrap().contains("true"));
+    }
+
+    #[test]
+    fn test_get_row_column_map_integer_value() {
+        let mut row = Map::new();
+        row.insert("count".to_string(), json!(42u64));
+        let result = get_row_column_map(&[row]);
+        // integers serialize as floats via as_f64: "42" or "42.0" depending on variant
+        let set = result.get("count").unwrap();
+        assert!(!set.is_empty());
+    }
+
+    // ── get_alert_start_end_time additional branches ───────────────────────
+
+    #[test]
+    fn test_get_alert_start_end_time_use_given_time_no_start() {
+        // use_given_time=true, start_time=None → falls back to rows_end_time - period
+        let vars = HashMap::new();
+        let period = 10i64; // 10 minutes
+        let rows_end_time = 1_000_000_000i64;
+        let (start, end) = get_alert_start_end_time(&vars, period, rows_end_time, None, true);
+        assert_eq!(end, rows_end_time);
+        let expected_start = rows_end_time
+            - Duration::try_minutes(period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        assert_eq!(start, expected_start);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_only_min_time() {
+        // Only zo_sql_min_time set, no max or timestamp.
+        // alert_end_time stays 0 → falls back to rows_end_time.
+        // Then end-start < 1 minute → start is reset to end - period_micros.
+        let mut vars = HashMap::new();
+        let mut min_times = HashSet::new();
+        min_times.insert("5000000".to_string());
+        vars.insert("zo_sql_min_time".to_string(), min_times);
+
+        let period = 5i64;
+        let rows_end_time = 10_000_000i64;
+        let one_min_us = Duration::try_minutes(1)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let period_us = Duration::try_minutes(period)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        let (start, end) = get_alert_start_end_time(&vars, period, rows_end_time, None, false);
+        // end: alert_end_time==0 → rows_end_time
+        assert_eq!(end, rows_end_time);
+        // end - start must be >= 1 minute (code resets start when it's too small)
+        assert!(end - start >= one_min_us);
+        // with start_time=None the reset puts start = end - period_us
+        assert_eq!(start, end - period_us);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_only_max_time() {
+        // Only zo_sql_max_time set. Use a value that parses cleanly (no underscores in string).
+        let mut vars = HashMap::new();
+        let mut max_times = HashSet::new();
+        // 9 million microseconds — write without underscores so .parse::<i64>() succeeds
+        max_times.insert("9000000".to_string());
+        vars.insert("zo_sql_max_time".to_string(), max_times);
+
+        let period = 2i64; // 2 minutes
+        let rows_end_time = 10_000_000i64;
+        let one_min_us = Duration::try_minutes(1)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let period_us = Duration::try_minutes(period)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        let (start, end) = get_alert_start_end_time(&vars, period, rows_end_time, None, false);
+        // end = max_time + 1 minute = 9_000_000 + 60_000_000 = 69_000_000
+        let expected_end = 9_000_000 + one_min_us;
+        assert_eq!(end, expected_end);
+        // end - start = period_us (reset because range < 1 min before adding 1 min)
+        // Actually end-start = 69_000_000 - start. The code resets when end-start < one_min_us.
+        // 69_000_000 - 9_000_000 = 60_000_000 = exactly one_min_us, NOT < one_min_us → no reset.
+        // So start stays at alert_start_time=0 → reset to end - period_us.
+        assert_eq!(start, expected_end - period_us);
+    }
+
+    // ── AlertError Display ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_alert_error_display_messages() {
+        assert_eq!(
+            AlertError::AlertNameMissing.to_string(),
+            "Alert name is required"
+        );
+        assert_eq!(
+            AlertError::AlertDestinationMissing.to_string(),
+            "Alert destinations is required"
+        );
+        assert_eq!(AlertError::AlertNotFound.to_string(), "Alert not found");
+        assert_eq!(
+            AlertError::SqlMissingQuery.to_string(),
+            "Alert with SQL mode should have a query"
+        );
+        assert_eq!(
+            AlertError::PromqlMissingQuery.to_string(),
+            "Alert with PromQL mode should have a query"
+        );
+        assert_eq!(
+            AlertError::SqlContainsSelectStar.to_string(),
+            "Alert with SQL can not contain SELECT * in the SQL query"
+        );
+        assert_eq!(
+            AlertError::RealtimeMissingCustomQuery.to_string(),
+            "Realtime alert should use Custom query type"
+        );
+        assert_eq!(
+            AlertError::AlertIdMissing.to_string(),
+            "Alert ID is required"
+        );
+        assert_eq!(
+            AlertError::AlertNameContainsForwardSlash.to_string(),
+            "Alert name cannot contain '/'"
+        );
+    }
+
+    #[test]
+    fn test_alert_error_display_with_params() {
+        let e = AlertError::AlertDestinationNotFound {
+            dest: "slack_channel".to_string(),
+        };
+        assert_eq!(e.to_string(), "Alert destination slack_channel not found");
+
+        let e = AlertError::StreamNotFound {
+            stream_name: "my_stream".to_string(),
+        };
+        assert_eq!(e.to_string(), "Stream my_stream not found");
+
+        let e = AlertError::AlertTemplateNotFound {
+            template: "default_tpl".to_string(),
+        };
+        assert_eq!(e.to_string(), "Alert template default_tpl not found");
+
+        let e = AlertError::PeriodExceedsMaxQueryRange {
+            max_query_range_hours: 24,
+            stream_name: "events".to_string(),
+        };
+        assert!(e.to_string().contains("24"));
+        assert!(e.to_string().contains("events"));
+
+        let e = AlertError::SendNotificationError {
+            error_message: "timeout".to_string(),
+        };
+        assert_eq!(e.to_string(), "timeout");
+
+        let e = AlertError::PermissionDenied;
+        assert_eq!(e.to_string(), "Permission denied");
+
+        let e = AlertError::UserNotFound;
+        assert_eq!(e.to_string(), "User not found");
+
+        let e = AlertError::CreateFolderNotFound;
+        assert_eq!(
+            e.to_string(),
+            "Error creating alert in folder that cannot be found"
+        );
+    }
+
+    // ── has_spread_rows additional branches ───────────────────────────────
+
+    #[test]
+    fn test_has_spread_rows_with_and_without_limit() {
+        // Both forms detected
+        assert!(has_spread_rows(r#""{...rows}""#));
+        assert!(has_spread_rows(r#""{...rows:5}""#));
+        // Neither form
+        assert!(!has_spread_rows(r#""{rows}""#));
+        assert!(!has_spread_rows("no rows here"));
+    }
+
+    // ── check_json_context spread patterns ────────────────────────────────
+
+    #[test]
+    fn test_check_json_context_spread_with_limit_not_in_json_pos() {
+        // "{...rows:3}" preceded by text prefix — not pure JSON value position
+        assert!(!check_json_context(r#""data": "prefix {rows:3}""#, "rows"));
+    }
+
+    #[test]
+    fn test_check_json_context_spread_different_var() {
+        // spread pattern for a different variable name
+        assert!(check_json_context(r#""fields": "{...items}"}"#, "items"));
+        // should not match "rows"
+        assert!(!check_json_context(r#""fields": "{...items}"}"#, "rows"));
+    }
 }

@@ -322,4 +322,79 @@ mod tests {
             expected
         );
     }
+
+    #[test]
+    fn test_index_visitor_no_where_count_star_can_optimize() {
+        // No WHERE clause but count(*) → can_optimize via is_simple_count_query
+        let sql = "SELECT count(*) FROM t";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let index_fields = HashSet::new();
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, false, true);
+        let _ = statement.visit(&mut index_visitor);
+        assert!(index_visitor.can_optimize);
+        assert!(index_visitor.index_condition.is_none());
+    }
+
+    #[test]
+    fn test_index_visitor_no_where_histogram_can_optimize() {
+        // No WHERE clause but histogram + count → can_optimize via is_simple_histogram_query
+        let sql = "SELECT histogram(_timestamp), count(*) FROM t";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let index_fields = HashSet::new();
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, false, true);
+        let _ = statement.visit(&mut index_visitor);
+        assert!(index_visitor.can_optimize);
+        assert!(index_visitor.index_condition.is_none());
+    }
+
+    #[test]
+    fn test_index_visitor_no_where_topn_field_in_index_can_optimize() {
+        // No WHERE clause, topn query with field in index → can_optimize
+        let sql = "SELECT id, count(*) as cnt FROM t GROUP BY id ORDER BY cnt DESC LIMIT 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("id".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, false, true);
+        let _ = statement.visit(&mut index_visitor);
+        assert!(index_visitor.can_optimize);
+    }
+
+    #[test]
+    fn test_index_visitor_no_where_distinct_field_in_index_can_optimize() {
+        // No WHERE clause, distinct pattern (GROUP BY single field) with field in index →
+        // can_optimize
+        let sql = "SELECT id FROM t GROUP BY id ORDER BY id ASC LIMIT 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("id".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, false, true);
+        let _ = statement.visit(&mut index_visitor);
+        assert!(index_visitor.can_optimize);
+    }
+
+    #[test]
+    fn test_index_visitor_no_where_topn_field_not_in_index_no_optimize() {
+        // topn query but field is NOT in index → can_optimize stays false
+        let sql = "SELECT id, count(*) as cnt FROM t GROUP BY id ORDER BY cnt DESC LIMIT 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let index_fields = HashSet::new(); // empty — id not in index
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, false, true);
+        let _ = statement.visit(&mut index_visitor);
+        assert!(!index_visitor.can_optimize);
+    }
 }

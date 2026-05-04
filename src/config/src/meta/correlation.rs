@@ -642,4 +642,39 @@ mod tests {
         };
         assert!(cfg.validate().is_ok());
     }
+
+    #[test]
+    fn test_field_alias_group_none_absent_from_json() {
+        let alias = FieldAlias::new("host", "Host", &["host", "hostname"]);
+        let json = serde_json::to_value(&alias).unwrap();
+        let obj = json.as_object().unwrap();
+        // group: None → skip_serializing_if = "Option::is_none" → absent
+        assert!(!obj.contains_key("group"));
+        // is_workload_type: false → skip_serializing_if = "std::ops::Not::not" → absent
+        assert!(!obj.contains_key("is_workload_type"));
+    }
+
+    #[test]
+    fn test_field_alias_group_some_present_in_json() {
+        let alias = FieldAlias::with_group("host", "Host", "Common", &["host"]);
+        let json = serde_json::to_value(&alias).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("group"));
+        assert_eq!(obj["group"], serde_json::json!("Common"));
+    }
+
+    #[test]
+    fn test_field_alias_is_workload_type_true_present_in_json() {
+        let mut alias = FieldAlias::new("service", "Service", &["service"]);
+        alias.is_workload_type = true;
+        let json = serde_json::to_value(&alias).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("is_workload_type"));
+        assert_eq!(obj["is_workload_type"], serde_json::json!(true));
+    }
+
+    #[test]
+    fn test_default_upgrade_window() {
+        assert_eq!(default_upgrade_window(), 30);
+    }
 }

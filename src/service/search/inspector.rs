@@ -273,4 +273,134 @@ mod tests {
         assert_eq!(fields.duration, Some(100));
         assert_eq!(fields.component, Some("test".to_string()));
     }
+
+    #[test]
+    fn test_search_inspector_fields_all_none_absent() {
+        let fields = SearchInspectorFields {
+            trace_id: None,
+            timestamp: None,
+            node_name: None,
+            search_role: None,
+            duration: None,
+            component: None,
+            desc: None,
+            sql: None,
+            time_range: None,
+            scan_size: None,
+            scan_records: None,
+            data_records: None,
+            region: None,
+            cluster: None,
+            events: None,
+        };
+        let json = serde_json::to_value(&fields).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("trace_id"));
+        assert!(!obj.contains_key("timestamp"));
+        assert!(!obj.contains_key("node_name"));
+        assert!(!obj.contains_key("search_role"));
+        assert!(!obj.contains_key("duration"));
+        assert!(!obj.contains_key("component"));
+        assert!(!obj.contains_key("desc"));
+        assert!(!obj.contains_key("sql"));
+        assert!(!obj.contains_key("time_range"));
+        assert!(!obj.contains_key("scan_size"));
+        assert!(!obj.contains_key("scan_records"));
+        assert!(!obj.contains_key("data_records"));
+        assert!(!obj.contains_key("region"));
+        assert!(!obj.contains_key("cluster"));
+        assert!(!obj.contains_key("events"));
+    }
+
+    #[test]
+    fn test_search_inspector_fields_some_present() {
+        let fields = SearchInspectorFields {
+            trace_id: Some("t1".to_string()),
+            timestamp: Some("2024-01-01".to_string()),
+            node_name: Some("node1".to_string()),
+            search_role: Some("leader".to_string()),
+            duration: Some(42),
+            component: Some("grpc".to_string()),
+            desc: Some("desc".to_string()),
+            sql: Some("SELECT 1".to_string()),
+            time_range: Some(("start".to_string(), "end".to_string())),
+            scan_size: Some(1024),
+            scan_records: Some(100),
+            data_records: Some(50),
+            region: Some("us-east".to_string()),
+            cluster: Some("cluster1".to_string()),
+            events: Some(vec![]),
+        };
+        let json = serde_json::to_value(&fields).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("timestamp"));
+        assert!(obj.contains_key("node_name"));
+        assert!(obj.contains_key("search_role"));
+        assert!(obj.contains_key("duration"));
+        assert!(obj.contains_key("component"));
+        assert!(obj.contains_key("desc"));
+        assert!(obj.contains_key("sql"));
+        assert!(obj.contains_key("time_range"));
+        assert!(obj.contains_key("scan_size"));
+        assert!(obj.contains_key("scan_records"));
+        assert!(obj.contains_key("data_records"));
+        assert!(obj.contains_key("region"));
+        assert!(obj.contains_key("cluster"));
+        assert!(obj.contains_key("events"));
+    }
+
+    #[test]
+    fn test_search_inspector_fields_inner_empty_msg() {
+        let fields = SearchInspectorFields::default();
+        let result = search_inspector_fields_inner("".to_string(), fields);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_search_inspector_fields_disabled_returns_msg() {
+        // Default config has search_inspector_enabled=false → returns msg unchanged
+        let msg = "original message".to_string();
+        let fields = SearchInspectorFields::default();
+        let result = search_inspector_fields(msg.clone(), fields);
+        // If disabled, result == msg; if enabled, result contains msg + json
+        assert!(result.contains("original message"));
+    }
+
+    #[test]
+    fn test_search_inspector_fields_builder_new_defaults() {
+        let builder = SearchInspectorFieldsBuilder::new();
+        let fields = builder.build();
+        // region and cluster are set from LOCAL_NODE
+        assert!(fields.trace_id.is_none());
+        assert!(fields.duration.is_none());
+    }
+
+    #[test]
+    fn test_search_inspector_fields_builder_all_setters() {
+        let fields = SearchInspectorFieldsBuilder::new()
+            .trace_id("tid".to_string())
+            .node_name("n1".to_string())
+            .search_role("follower".to_string())
+            .duration(10)
+            .component("comp".to_string())
+            .desc("d".to_string())
+            .sql("SELECT *".to_string())
+            .time_range(("a".to_string(), "b".to_string()))
+            .scan_size(512)
+            .scan_records(200)
+            .data_records(100)
+            .region("eu".to_string())
+            .cluster("cl2".to_string())
+            .build();
+        assert_eq!(fields.trace_id, Some("tid".to_string()));
+        assert_eq!(fields.node_name, Some("n1".to_string()));
+        assert_eq!(fields.search_role, Some("follower".to_string()));
+        assert_eq!(fields.duration, Some(10));
+        assert_eq!(fields.scan_size, Some(512));
+        assert_eq!(fields.scan_records, Some(200));
+        assert_eq!(fields.data_records, Some(100));
+        assert_eq!(fields.region, Some("eu".to_string()));
+        assert_eq!(fields.cluster, Some("cl2".to_string()));
+    }
 }

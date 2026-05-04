@@ -285,4 +285,12 @@ mod tests {
         let result = pickup_where(sql).unwrap();
         assert_eq!(result, Some("level = 'error'".to_string()));
     }
+
+    #[test]
+    fn test_pickup_where_table_function_returns_none() {
+        // TableFactor::Function in FROM (e.g. generate_series) → None
+        let sql = "SELECT * FROM generate_series(1, 5) AS gs(x)";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
 }

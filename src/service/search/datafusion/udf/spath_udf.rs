@@ -108,6 +108,7 @@ pub fn spath_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarV
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::{Array, StringArray};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -119,6 +120,45 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_spath_impl_direct_nested_path() {
+        let json_val = StringArray::from(vec![r#"{"a":{"b":"found"}}"#]);
+        let path = StringArray::from(vec!["a.b"]);
+        let args = [
+            ColumnarValue::Array(Arc::new(json_val)),
+            ColumnarValue::Array(Arc::new(path)),
+        ];
+        let result = spath_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert_eq!(out.value(0), "found");
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_spath_impl_missing_path_returns_null() {
+        let json_val = StringArray::from(vec![r#"{"a":1}"#]);
+        let path = StringArray::from(vec!["b.c"]);
+        let args = [
+            ColumnarValue::Array(Arc::new(json_val)),
+            ColumnarValue::Array(Arc::new(path)),
+        ];
+        let result = spath_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert!(out.is_null(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_spath_impl_wrong_arg_count_errors() {
+        assert!(spath_impl(&[]).is_err());
+    }
 
     #[tokio::test]
     async fn test_spath_udf() {

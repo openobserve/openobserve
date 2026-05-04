@@ -69,3 +69,106 @@ pub fn scalar_binary_operations(
     };
     Ok(value)
 }
+
+#[cfg(test)]
+mod tests {
+    use promql_parser::parser::token;
+
+    use super::*;
+
+    #[test]
+    fn test_add() {
+        let r = scalar_binary_operations(token::T_ADD, 3.0, 2.0, false, false);
+        assert_eq!(r.unwrap(), 5.0);
+    }
+
+    #[test]
+    fn test_sub() {
+        let r = scalar_binary_operations(token::T_SUB, 10.0, 4.0, false, false);
+        assert_eq!(r.unwrap(), 6.0);
+    }
+
+    #[test]
+    fn test_mul() {
+        let r = scalar_binary_operations(token::T_MUL, 3.0, 4.0, false, false);
+        assert_eq!(r.unwrap(), 12.0);
+    }
+
+    #[test]
+    fn test_div() {
+        let r = scalar_binary_operations(token::T_DIV, 10.0, 2.0, false, false);
+        assert_eq!(r.unwrap(), 5.0);
+    }
+
+    #[test]
+    fn test_pow() {
+        let r = scalar_binary_operations(token::T_POW, 2.0, 8.0, false, false);
+        assert_eq!(r.unwrap(), 256.0);
+    }
+
+    #[test]
+    fn test_mod() {
+        let r = scalar_binary_operations(token::T_MOD, 10.0, 3.0, false, false);
+        assert_eq!(r.unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_comparison_equal_return_bool_true() {
+        let r = scalar_binary_operations(token::T_EQLC, 5.0, 5.0, true, true);
+        assert_eq!(r.unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_comparison_equal_return_bool_false() {
+        let r = scalar_binary_operations(token::T_EQLC, 5.0, 6.0, true, true);
+        assert_eq!(r.unwrap(), 0.0);
+    }
+
+    #[test]
+    fn test_comparison_not_equal_return_bool() {
+        let r = scalar_binary_operations(token::T_NEQ, 5.0, 6.0, true, true);
+        assert_eq!(r.unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_comparison_greater_than_satisfied_returns_lhs() {
+        let r = scalar_binary_operations(token::T_GTR, 10.0, 5.0, false, true);
+        assert_eq!(r.unwrap(), 10.0);
+    }
+
+    #[test]
+    fn test_comparison_greater_than_not_satisfied_returns_err() {
+        let r = scalar_binary_operations(token::T_GTR, 3.0, 5.0, false, true);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn test_comparison_less_than_return_bool() {
+        let r = scalar_binary_operations(token::T_LSS, 3.0, 5.0, true, true);
+        assert_eq!(r.unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_comparison_gte_return_bool() {
+        let r = scalar_binary_operations(token::T_GTE, 5.0, 5.0, true, true);
+        assert_eq!(r.unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_comparison_lte_return_bool() {
+        let r = scalar_binary_operations(token::T_LTE, 4.0, 5.0, true, true);
+        assert_eq!(r.unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_unknown_arithmetic_token_returns_err() {
+        let r = scalar_binary_operations(0u8, 1.0, 2.0, false, false);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn test_unknown_comparison_token_returns_err() {
+        let r = scalar_binary_operations(0u8, 1.0, 2.0, false, true);
+        assert!(r.is_err());
+    }
+}

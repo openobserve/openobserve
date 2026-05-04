@@ -492,6 +492,59 @@ pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
     alert_id.map_or(DEFAULT_FOLDER.to_string(), |id| id.to_string())
 }
 
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+    use svix_ksuid::Ksuid;
+
+    use super::*;
+
+    #[test]
+    fn test_cache_stream_key_logs() {
+        let key = cache_stream_key("myorg", StreamType::Logs, "nginx");
+        assert_eq!(key, "myorg/logs/nginx");
+    }
+
+    #[test]
+    fn test_cache_stream_key_metrics() {
+        let key = cache_stream_key("acme", StreamType::Metrics, "cpu_usage");
+        assert_eq!(key, "acme/metrics/cpu_usage");
+    }
+
+    #[test]
+    fn test_cache_stream_key_traces() {
+        let key = cache_stream_key("default", StreamType::Traces, "http_spans");
+        assert_eq!(key, "default/traces/http_spans");
+    }
+
+    #[test]
+    fn test_cache_alert_key() {
+        let key = cache_alert_key("myorg", "alert-123");
+        assert_eq!(key, "myorg/alert-123");
+    }
+
+    #[test]
+    fn test_cache_alert_key_empty_org() {
+        let key = cache_alert_key("", "alert-456");
+        assert_eq!(key, "/alert-456");
+    }
+
+    #[test]
+    fn test_scheduler_key_none_returns_default_folder() {
+        let key = scheduler_key(None);
+        assert_eq!(key, "default");
+    }
+
+    #[test]
+    fn test_scheduler_key_some_ksuid() {
+        use svix_ksuid::KsuidLike;
+        let ksuid = Ksuid::new(None, None);
+        let expected = ksuid.to_string();
+        let key = scheduler_key(Some(ksuid));
+        assert_eq!(key, expected);
+    }
+}
+
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {

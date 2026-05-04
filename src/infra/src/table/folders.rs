@@ -244,3 +244,46 @@ async fn list_models(
         .all(db)
         .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_folder_type_into_i16() {
+        assert_eq!(folder_type_into_i16(FolderType::Dashboards), 0);
+        assert_eq!(folder_type_into_i16(FolderType::Alerts), 1);
+        assert_eq!(folder_type_into_i16(FolderType::Reports), 2);
+    }
+
+    #[test]
+    fn test_folder_from_model_with_description() {
+        let model = Model {
+            id: "folder-1".to_string(),
+            org: "myorg".to_string(),
+            folder_id: "fid-1".to_string(),
+            name: "Alerts".to_string(),
+            description: Some("My alert folder".to_string()),
+            r#type: 1,
+        };
+        let folder = Folder::from(model);
+        assert_eq!(folder.folder_id, "fid-1");
+        assert_eq!(folder.name, "Alerts");
+        assert_eq!(folder.description, "My alert folder");
+    }
+
+    #[test]
+    fn test_folder_from_model_no_description() {
+        let model = Model {
+            id: "folder-2".to_string(),
+            org: "myorg".to_string(),
+            folder_id: "fid-2".to_string(),
+            name: "Dashboards".to_string(),
+            description: None,
+            r#type: 0,
+        };
+        let folder = Folder::from(model);
+        assert_eq!(folder.folder_id, "fid-2");
+        assert_eq!(folder.description, "");
+    }
+}

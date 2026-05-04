@@ -529,3 +529,20 @@ impl Search for Searcher {
         Err(Status::unimplemented("Not Supported"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(not(feature = "enterprise"))]
+    fn test_searcher_new_unit_struct() {
+        let _ = Searcher::new();
+    }
+
+    #[test]
+    #[cfg(not(feature = "enterprise"))]
+    fn test_searcher_default_calls_new() {
+        let _ = Searcher::default();
+    }
+}
