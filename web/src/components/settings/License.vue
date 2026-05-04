@@ -400,40 +400,28 @@
     </div>
 
     <!-- License Key Modal -->
-    <q-dialog v-model="showLicenseKeyModal" persistent>
-      <q-card style="min-width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">{{ t("about.license_key") }}</div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
-
-        <q-card-section>
-          <div class="text-body2 q-mb-md">
-            {{ t("about.your_complete_license_key") }}
-          </div>
-          <q-input
-            data-test="modal-license-key-display"
-            v-model="licenseData.key"
-            outlined
-            readonly
-            type="textarea"
-            rows="8"
-            class="q-mb-md"
-            style="font-family: monospace; font-size: 12px"
-          />
-        </q-card-section>
-
-          <q-card-actions align="right" class="q-pt-none">
+    <ODialog v-model:open="showLicenseKeyModal" persistent size="md" :title="t('about.license_key')">
+      <div class="text-body2 q-mb-md">
+        {{ t('about.your_complete_license_key') }}
+      </div>
+      <q-input
+        data-test="modal-license-key-display"
+        v-model="licenseData.key"
+        outlined
+        readonly
+        type="textarea"
+        rows="8"
+        style="font-family: monospace; font-size: 12px"
+      />
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
             data-test="license-cancel-btn"
             variant="outline"
             size="sm-action"
-            v-close-popup
+            @click="showLicenseKeyModal = false"
           >
-            {{ t("common.cancel") }}
+            {{ t('common.cancel') }}
           </OButton>
           <OButton
             data-test="license-copy-key-btn"
@@ -442,11 +430,11 @@
             :disabled="!licenseData.key"
             @click="copyLicenseKey"
           >
-            {{ t("about.copy_key") }}
+            {{ t('about.copy_key') }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
   </div>
 </template>
 
@@ -465,6 +453,7 @@ import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -476,6 +465,7 @@ export default defineComponent({
     LicensePeriod,
     RenderDashboardCharts,
     OButton,
+    ODialog,
   },
   setup() {
     const $q = useQuasar();

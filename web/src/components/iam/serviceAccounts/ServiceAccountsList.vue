@@ -17,15 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 
-
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <q-page
+    class="q-pa-none"
+    style="min-height: inherit; height: calc(100vh - 44px)"
+  >
     <div>
       <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
-      >
-
         <div
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
+        >
+          <div
             class="q-table__title full-width tw:font-[600]"
             data-test="service-accounts-title-text"
           >
@@ -33,25 +35,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="full-width tw:flex tw:justify-end tw:gap-3">
             <q-input
-                v-model="filterQuery"
-                borderless
-                dense
-                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
-                :placeholder="t('serviceAccounts.search')"
-              >
-                <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
-                </template>
-              </q-input>
-              <OButton
-                variant="primary"
-                size="sm"
-                @click="addRoutePush({})"
-              >
-                {{ t('serviceAccounts.add') }}
-              </OButton>
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              :placeholder="t('serviceAccounts.search')"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+            <OButton variant="primary" size="sm" @click="addRoutePush({})">
+              {{ t("serviceAccounts.add") }}
+            </OButton>
           </div>
-      </div>
+        </div>
       </div>
       <div class="tw:w-full tw:h-full">
         <div class="card-container tw:h-[calc(100vh-127px)]">
@@ -65,7 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:selected="selectedAccounts"
             :pagination="pagination"
             :filter="filterQuery"
-            :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
+            :style="
+              hasVisibleRows
+                ? 'height: calc(100vh - 127px); overflow-y: auto;'
+                : ''
+            "
           >
             <template #no-data>
               <NoData></NoData>
@@ -73,7 +75,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:body-selection="scope">
               <q-td auto-width>
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" :disable="scope.row.is_system" />
+                <q-checkbox
+                  v-model="scope.selected"
+                  size="sm"
+                  class="o2-table-checkbox"
+                  :disable="scope.row.is_system"
+                />
               </q-td>
             </template>
 
@@ -81,7 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td :props="props">
                 <template v-if="props.row.is_system">
                   <span class="text-weight-medium">AI SRE Agent</span>
-                  <q-badge color="blue-2" text-color="blue-8" label="system" class="q-ml-sm q-px-xs" style="font-size: 10px;" />
+                  <q-badge
+                    color="blue-2"
+                    text-color="blue-8"
+                    label="system"
+                    class="q-ml-sm q-px-xs"
+                    style="font-size: 10px"
+                  />
                 </template>
                 <template v-else>{{ props.row.email }}</template>
               </q-td>
@@ -89,22 +102,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #body-cell-first_name="props">
               <q-td :props="props">
-                <template v-if="props.row.is_system && props.row.description">{{ props.row.description }}</template>
+                <template v-if="props.row.is_system && props.row.description">{{
+                  props.row.description
+                }}</template>
                 <template v-else>{{ props.row.first_name }}</template>
               </q-td>
             </template>
 
             <template #body-cell-token="props">
-            <q-td :props="props" side>
-              <span class="tw:font-mono">{{ props.row.token || '************' }}</span>
-            </q-td>
-          </template>
+              <q-td :props="props" side>
+                <span class="tw:font-mono">{{
+                  props.row.token || "************"
+                }}</span>
+              </q-td>
+            </template>
 
             <template #body-cell-actions="props">
               <q-td :props="props" side>
                 <template v-if="props.row.is_system">
-                  <q-badge color="grey-6" :label="t('serviceAccounts.systemManaged', 'System Managed')" class="q-px-sm q-py-xs">
-                    <q-tooltip v-if="props.row.description">{{ props.row.description }}</q-tooltip>
+                  <q-badge
+                    color="grey-6"
+                    :label="
+                      t('serviceAccounts.systemManaged', 'System Managed')
+                    "
+                    class="q-px-sm q-py-xs"
+                  >
+                    <q-tooltip v-if="props.row.description">{{
+                      props.row.description
+                    }}</q-tooltip>
                   </q-badge>
                 </template>
                 <template v-else>
@@ -139,9 +164,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
             <template #bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-                  {{ resultTotal }} {{ t('serviceAccounts.header') }}
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
+                <div
+                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
+                >
+                  {{ resultTotal }} {{ t("serviceAccounts.header") }}
                 </div>
                 <OButton
                   v-if="selectedAccounts.length > 0"
@@ -165,182 +194,210 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                      />
-                    </q-th>
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th v-if="columns.length > 0" auto-width>
+                  <q-checkbox
+                    v-model="props.selected"
+                    size="sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
+                    "
+                    class="o2-table-checkbox"
+                  />
+                </q-th>
 
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
+                <!-- Rendering the rest of the columns -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
           </q-table>
+        </div>
       </div>
-      </div>
-  </div>
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
+    </div>
+    <ODrawer
+      v-model:open="showAddUserDialog"
+      side="right"
+      size="lg"
+      :show-close="false"
+      @close="hideForm"
     >
       <add-service-account
-        style="width: 30vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
         @updated="addMember"
         @cancel:hideform="hideForm"
       />
-    </q-dialog>
+    </ODrawer>
 
-    <q-dialog v-model="confirmRefresh">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("serviceAccounts.confirmRefreshHead") }}</div>
-          <div class="para">{{ t("serviceAccounts.confirmRefreshMsg") }}</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
+    <ODialog
+      v-model:open="confirmRefresh"
+      size="xs"
+      :title="t('serviceAccounts.confirmRefreshHead')"
+    >
+      <p>{{ t("serviceAccounts.confirmRefreshMsg") }}</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
-            v-close-popup="true"
             variant="outline"
             size="sm-action"
-            data-test="cancel-button"
+            data-test="cancel-refresh-service-token"
+            @click="confirmRefresh = false"
           >
             {{ t("user.cancel") }}
           </OButton>
           <OButton
-            data-test="confirm-button"
-            v-close-popup="true"
+            data-test="confirm-refresh-service-token"
             variant="primary"
             size="sm-action"
             @click="refreshServiceToken(toBeRefreshed)"
           >
             {{ t("user.ok") }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("serviceAccounts.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("serviceAccounts.confirmDeleteMsg") }}</div>
-        </q-card-section>
+        </div>
+      </template>
+    </ODialog>
 
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action" data-test="cancel-button">
+    <ODialog
+      v-model:open="confirmDelete"
+      size="xs"
+      :title="t('serviceAccounts.confirmDeleteHead')"
+    >
+      <p>{{ t("serviceAccounts.confirmDeleteMsg") }}</p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="confirmDelete = false"
+          >
             {{ t("user.cancel") }}
           </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            data-test="confirm-button"
-            @click="deleteUser"
-          >
+          <OButton variant="primary" size="sm-action" @click="deleteUser">
             {{ t("user.ok") }}
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
 
-    <q-dialog v-model="confirmBulkDelete">
-      <q-card style="width: 280px">
-        <q-card-section class="confirmBody">
-          <div class="head">Delete Service Accounts</div>
-          <div class="para">Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            Cancel
-          </OButton>
+    <ODialog
+      v-model:open="confirmBulkDelete"
+      size="xs"
+      title="Delete Service Accounts"
+    >
+      <p>
+        Are you sure you want to delete {{ selectedAccounts.length }} service
+        account(s)?
+      </p>
+      <template #footer>
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <OButton
-            v-close-popup="true"
+            variant="outline"
+            size="sm-action"
+            @click="confirmBulkDelete = false"
+            >Cancel</OButton
+          >
+          <OButton
             variant="primary"
             size="sm-action"
             @click="bulkDeleteServiceAccounts"
+            >OK</OButton
           >
-            OK
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
 
-    <q-dialog v-model="isShowToken"  persistent>
-  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
-    <q-card-section  class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center" >
-      <div>Service Account Token </div>
-          <OButton data-test="sa-cancel-button" variant="ghost" size="icon-circle-sm" @click="isShowToken = false">
+    <ODialog v-model:open="isShowToken" persistent size="md">
+      <template #header>
+        <div class="tw:flex tw:justify-between tw:items-center tw:flex-1">
+          <span class="tw:font-semibold tw:text-sm">Service Account Token</span>
+          <OButton
+            data-test="sa-cancel-button"
+            variant="ghost"
+            size="icon-circle-sm"
+            @click="isShowToken = false"
+          >
             <q-icon name="cancel" />
           </OButton>
-    </q-card-section>
+        </div>
+      </template>
 
-    <q-card-section>
+      <div
+        class="tw:flex tw:items-center tw:gap-2 tw:rounded-lg"
+        style="padding: 0rem 0.5rem"
+      >
+        <!-- Token section taking 75% of the width -->
+        <div
+          class="text-h6 text-center tw:truncate el-border"
+          style="
+            flex: 3;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-family: monospace;
+            text-align: center;
+            overflow: hidden;
+          "
+        >
+          {{ serviceToken }}
+        </div>
+        <!-- Buttons section taking 25% of the width -->
+        <div
+          class="tw:flex tw:justify-end tw:gap-1"
+          style="flex: 1; max-width: 25%"
+        >
+          <OButton
+            variant="outline"
+            size="icon-md"
+            :title="t('serviceAccounts.copyToken')"
+            class="tw:mr-1"
+            @click.stop="copyToClipboard(serviceToken)"
+          >
+            <q-icon name="content_copy" />
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-md"
+            :title="t('serviceAccounts.downloadToken')"
+            @click.stop="downloadTokenAsFile(serviceToken)"
+          >
+            <q-icon name="file_download" />
+          </OButton>
+        </div>
+      </div>
 
-      <div class="tw:flex tw:items-center tw:gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
-  <!-- Token section taking 75% of the width -->
-  <div
-    class="text-h6 text-center tw:truncate el-border"
-    style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
-  >
-    {{  serviceToken }}
-  </div>
-  <!-- Buttons section taking 25% of the width -->
-  <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
-    <OButton
-      variant="outline"
-      size="icon-md"
-      :title="t('serviceAccounts.copyToken')"
-      class="tw:mr-1"
-      @click.stop="copyToClipboard(serviceToken)"
-    >
-      <q-icon name="content_copy" />
-    </OButton>
-    <OButton
-      variant="outline"
-      size="icon-md"
-      :title="t('serviceAccounts.downloadToken')"
-      @click.stop="downloadTokenAsFile(serviceToken)"
-    >
-      <q-icon name="file_download" />
-    </OButton>
-  </div>
-  
-</div>
-
-    <div class="q-pt-md flex items-center warning-text">
-      <q-icon name="info" class="q-mr-xs " size="16px" />
-      <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.
-      </span>
-    </div>
-   
-    </q-card-section>
-
-  </q-card>
-</q-dialog>
+      <div class="q-pt-md flex items-center warning-text">
+        <q-icon name="info" class="q-mr-xs" size="16px" />
+        <span class="text-p"
+          >Make sure to copy / download the token. You will not be able to see
+          it again.</span
+        >
+      </div>
+    </ODialog>
   </q-page>
 </template>
 
 <script lang="ts">
-
-import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  onActivated,
+  onBeforeMount,
+  onMounted,
+  watch,
+} from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -357,7 +414,10 @@ import {
   verifyOrganizationStatus,
   maskText,
 } from "@/utils/zincutils";
-import { outlinedDelete,outlinedVisibility } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedDelete,
+  outlinedVisibility,
+} from "@quasar/extras/material-icons-outlined";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -367,7 +427,14 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination, NoData, AddServiceAccount, OButton },
+  components: {
+    QTablePagination,
+    NoData,
+    AddServiceAccount,
+    OButton,
+    ODialog,
+    ODrawer,
+  },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -386,21 +453,19 @@ export default defineComponent({
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
     const isShowToken = ref(false);
-    const confirmRefresh  = ref(false);
+    const confirmRefresh = ref(false);
     const filterQuery = ref("");
-    const toBeRefreshed = ref({
+    const toBeRefreshed = ref({});
 
-    });
-
-    const serviceToken  = ref("");
+    const serviceToken = ref("");
 
     const serviceAccounts = ref([]);
     const selectedAccounts: any = ref([]);
     const confirmBulkDelete = ref(false);
 
-    onBeforeMount(()=>{
+    onBeforeMount(() => {
       getServiceAccountsUsers();
-    })
+    });
 
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -473,8 +538,6 @@ export default defineComponent({
 
     const currentUser = computed(() => store.state.userInfo.email);
 
-
-
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
     };
@@ -483,7 +546,7 @@ export default defineComponent({
       confirmDelete.value = true;
       deleteUserEmail = props.row.email;
     };
-    const getServiceAccountsUsers = async () =>{
+    const getServiceAccountsUsers = async () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading service accounts...",
@@ -491,25 +554,25 @@ export default defineComponent({
 
       return new Promise((resolve, reject) => {
         service_accounts
-          .list(
-            store.state.selectedOrganization.identifier
-          )
+          .list(store.state.selectedOrganization.identifier)
           .then((res) => {
             resultTotal.value = res.data.data.length;
             let counter = 1;
             currentUserRole.value = "";
-            serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
-              return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
-                email: maskText(data.email),
-                first_name: data.first_name,
-                last_name: data.last_name,
-                token: data.token || '',
-                role: data.role || 'ServiceAccount',
-                is_system: data.is_system || false,
-                description: data.description || null,
-              };
-            });
+            serviceAccountsState.service_accounts_users = res.data.data.map(
+              (data: any) => {
+                return {
+                  "#": counter <= 9 ? `0${counter++}` : counter++,
+                  email: maskText(data.email),
+                  first_name: data.first_name,
+                  last_name: data.last_name,
+                  token: data.token || "",
+                  role: data.role || "ServiceAccount",
+                  is_system: data.is_system || false,
+                  description: data.description || null,
+                };
+              },
+            );
 
             dismiss();
 
@@ -520,7 +583,7 @@ export default defineComponent({
             reject(false);
           });
       });
-    }
+    };
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
       selectedUser.value.organization =
@@ -549,12 +612,12 @@ export default defineComponent({
           {
             row: props.row,
           },
-          true
+          true,
         );
       } else {
         track("Button Click", {
           button: "Add Service Account",
-          page: "Service Accounts"
+          page: "Service Accounts",
         });
         addUser({}, false);
         router.push({
@@ -577,24 +640,24 @@ export default defineComponent({
     };
 
     const redactToken = (token: string): string => {
-      if (!token || token.length === 0) return '*'.repeat(12);
+      if (!token || token.length === 0) return "*".repeat(12);
       if (token.length < 4) {
         // For tokens shorter than 4 chars, show available chars and pad to 12
-        return token + '*'.repeat(12 - token.length);
+        return token + "*".repeat(12 - token.length);
       } else {
         // For tokens 4+ chars, show first 4 chars + asterisks (matches backend)
-        return token.slice(0, 4) + '*'.repeat(8);
+        return token.slice(0, 4) + "*".repeat(8);
       }
     };
 
     const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
-      if (res.code == 200 ) {
+      if (res.code == 200) {
         if (operationType == "created") {
-            $q.notify({
-              color: "positive",
-              message: "Service Account created successfully.",
-            });
+          $q.notify({
+            color: "positive",
+            message: "Service Account created successfully.",
+          });
 
           serviceToken.value = res.token;
           isShowToken.value = true;
@@ -603,17 +666,18 @@ export default defineComponent({
           ) {
             const user = {
               "#":
-              serviceAccountsState.service_accounts_users.length + 1 <= 9
+                serviceAccountsState.service_accounts_users.length + 1 <= 9
                   ? `0${serviceAccountsState.service_accounts_users.length + 1}`
                   : serviceAccountsState.service_accounts_users.length + 1,
               email: data.email,
               first_name: data.first_name,
               last_name: data.last_name,
-              token: res.token ? redactToken(res.token) : '',
+              token: res.token ? redactToken(res.token) : "",
             };
 
             serviceAccountsState.service_accounts_users.push(user);
-            resultTotal.value = serviceAccountsState.service_accounts_users.length;
+            resultTotal.value =
+              serviceAccountsState.service_accounts_users.length;
           }
         } else {
           setTimeout(() => {
@@ -622,14 +686,16 @@ export default defineComponent({
               message: "Service Account updated successfully.",
             });
           }, 2000);
-          serviceAccountsState.service_accounts_users.forEach((member: any, key: number) => {
-            if (member.email == data.email) {
-              serviceAccountsState.service_accounts_users[key] = {
-                ...serviceAccountsState.service_accounts_users[key],
-                ...data,
-              };
-            }
-          });
+          serviceAccountsState.service_accounts_users.forEach(
+            (member: any, key: number) => {
+              if (member.email == data.email) {
+                serviceAccountsState.service_accounts_users[key] = {
+                  ...serviceAccountsState.service_accounts_users[key],
+                  ...data,
+                };
+              }
+            },
+          );
         }
       }
       router.replace({
@@ -641,6 +707,7 @@ export default defineComponent({
     };
 
     const deleteUser = async () => {
+      confirmDelete.value = false;
       service_accounts
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
@@ -653,13 +720,13 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response?.status != 403){
+          if (err.response?.status != 403) {
             $q.notify({
-            color: "negative",
-            message: err.response?.data?.message || "Error while deleting user.",
+              color: "negative",
+              message:
+                err.response?.data?.message || "Error while deleting user.",
             });
           }
-
         });
     };
 
@@ -675,7 +742,7 @@ export default defineComponent({
       try {
         const res = await service_accounts.bulkDelete(
           store.state.selectedOrganization.identifier,
-          { ids: accountEmails }
+          { ids: accountEmails },
         );
         const { successful, unsuccessful } = res.data;
 
@@ -706,55 +773,65 @@ export default defineComponent({
         if (err.response?.status != 403 || err?.status != 403) {
           $q.notify({
             color: "negative",
-            message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
+            message:
+              err?.response?.data?.message ||
+              err?.message ||
+              "Error while deleting service accounts",
             timeout: 2000,
           });
         }
       }
     };
 
-    const refreshServiceToken = async (row:any) =>{
+    const refreshServiceToken = async (row: any) => {
+      confirmRefresh.value = false;
       row.isLoading = true;
-      await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
+      await service_accounts
+        .refresh_token(store.state.selectedOrganization.identifier, row.email)
+        .then((res) => {
           serviceToken.value = res.data.token;
           isShowToken.value = true;
 
-        $q.notify({
-          color: "positive",
-          message: "Service token refreshed successfully.",
-        });
-
-        getServiceAccountsUsers();
-      }).catch((err)=>{
-        if(err.response?.status != 403){
           $q.notify({
-          color: "negative",
-          message: err.response?.data?.message || "Error while refreshing token.",
+            color: "positive",
+            message: "Service token refreshed successfully.",
           });
-        }
 
-      }).finally(()=>{
-        row.isLoading = false;
-      });
-
-    }
-    const  copyToClipboard = (text:string) => {
-      navigator.clipboard.writeText(text).then(() => {
-        $q.notify({
+          getServiceAccountsUsers();
+        })
+        .catch((err) => {
+          if (err.response?.status != 403) {
+            $q.notify({
+              color: "negative",
+              message:
+                err.response?.data?.message || "Error while refreshing token.",
+            });
+          }
+        })
+        .finally(() => {
+          row.isLoading = false;
+        });
+    };
+    const copyToClipboard = (text: string) => {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          $q.notify({
             type: "positive",
             message: `token Copied Successfully!`,
             timeout: 5000,
           });
-      }).catch(() => {
+        })
+        .catch(() => {
           $q.notify({
             type: "negative",
             message: "Error while copy content.",
             timeout: 5000,
           });
-      });
-    }
+        });
+    };
 
-    const downloadTokenAsFile = (token:string) => {
+    const downloadTokenAsFile = (token: string) => {
       const blob = new Blob([token], { type: "text/plain" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
@@ -764,7 +841,10 @@ export default defineComponent({
     };
 
     const isSystemAccount = (email: string) => {
-      return email.startsWith('o2-sre-agent.org-') && email.endsWith('@openobserve.internal');
+      return (
+        email.startsWith("o2-sre-agent.org-") &&
+        email.endsWith("@openobserve.internal")
+      );
     };
 
     const confirmRefreshAction = (row: any) => {
@@ -788,15 +868,23 @@ export default defineComponent({
     };
 
     const visibleRows = computed(() => {
-      if (!filterQuery.value) return serviceAccountsState.service_accounts_users || []
-      return filterData(serviceAccountsState.service_accounts_users || [], filterQuery.value)
+      if (!filterQuery.value)
+        return serviceAccountsState.service_accounts_users || [];
+      return filterData(
+        serviceAccountsState.service_accounts_users || [],
+        filterQuery.value,
+      );
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     return {
       $q,
@@ -860,11 +948,8 @@ export default defineComponent({
 });
 </script>
 
-
 <style lang="scss" scoped>
 .warning-text {
   color: #ec960c;
 }
-
-
 </style>

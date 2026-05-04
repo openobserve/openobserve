@@ -21,32 +21,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!showAddJSTransformDialog">
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
+          <div
+            class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]"
+          >
             <div class="q-table__title tw:font-[600]">
-                {{ t("function.header") }}
-              </div>
-              <div class="q-ml-auto" data-test="functions-list-search-input">
-                <q-input
-                  v-model="filterQuery"
-                  borderless
-                  dense
-                  class="q-ml-auto no-border o2-search-input"
-                  :placeholder="t('function.search')"
-                >
-                  <template #prepend>
-                    <q-icon class="o2-search-input-icon" name="search" />
-                  </template>
-                </q-input>
-              </div>
-              <OButton
-                class="q-ml-sm"
-                variant="primary"
-                size="sm-action"
-                data-test="function-list-add-function-btn"
-                @click="showAddUpdateFn({})"
+              {{ t("function.header") }}
+            </div>
+            <div class="q-ml-auto" data-test="functions-list-search-input">
+              <q-input
+                v-model="filterQuery"
+                borderless
+                dense
+                class="q-ml-auto no-border o2-search-input"
+                :placeholder="t('function.search')"
               >
-                {{ t(`function.add`) }}
-              </OButton>
+                <template #prepend>
+                  <q-icon class="o2-search-input-icon" name="search" />
+                </template>
+              </q-input>
+            </div>
+            <OButton
+              class="q-ml-sm"
+              variant="primary"
+              size="sm-action"
+              data-test="function-list-add-function-btn"
+              @click="showAddUpdateFn({})"
+            >
+              {{ t(`function.add`) }}
+            </OButton>
           </div>
         </div>
         <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
@@ -61,9 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selection="multiple"
               v-model:selected="selectedFunctions"
               style="width: 100%"
-              :style="hasVisibleRows
+              :style="
+                hasVisibleRows
                   ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
-                  : 'width: 100%'"
+                  : 'width: 100%'
+              "
               class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             >
               <template #no-data>
@@ -112,14 +116,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template v-slot:body-selection="scope">
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                <q-checkbox
+                  v-model="scope.selected"
+                  size="sm"
+                  class="o2-table-checkbox"
+                />
               </template>
 
               <template #bottom="scope">
-                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
-                        {{ resultTotal }} {{ t('function.header') }}
-                      </div>
+                <div
+                  class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+                >
+                  <div
+                    class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md"
+                  >
+                    {{ resultTotal }} {{ t("function.header") }}
+                  </div>
                   <OButton
                     v-if="selectedFunctions.length > 0"
                     data-test="function-list-delete-functions-btn"
@@ -134,40 +146,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Delete
                   </OButton>
                   <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
+                    :scope="scope"
+                    :position="'bottom'"
+                    :resultTotal="resultTotal"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                  />
                 </div>
-
               </template>
 
               <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                      />
-                    </q-th>
+                <q-tr :props="props">
+                  <!-- Adding this block to render the select-all checkbox -->
+                  <q-th v-if="columns.length > 0" auto-width>
+                    <q-checkbox
+                      v-model="props.selected"
+                      size="sm"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-table-checkbox-dark'
+                          : 'o2-table-checkbox-light'
+                      "
+                      class="o2-table-checkbox"
+                    />
+                  </q-th>
 
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
+                  <!-- Rendering the rest of the columns -->
+                  <q-th
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    :class="col.classes"
+                    :style="col.style"
+                  >
+                    {{ col.label }}
+                  </q-th>
+                </q-tr>
+              </template>
             </q-table>
           </div>
         </div>
@@ -199,53 +214,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
-    <q-dialog v-model="confirmForceDelete" persistent>
-      <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto">
-        <q-card-section
-          class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center"
-        >
-          <div>
+    <ODialog v-model:open="confirmForceDelete" persistent size="md">
+      <template #header>
+        <div class="tw:flex tw:justify-between tw:items-center tw:flex-1">
+          <span class="tw:font-semibold tw:text-sm">
             Pipelines Associated with
             <strong> {{ selectedDelete.name }}</strong>
-          </div>
-          <q-icon
-            name="close"
-            size="18px"
-            @click="closeDialog"
-            style="cursor: pointer"
-          />
-        </q-card-section>
-        <q-card-section>
-          <div
-            v-if="transformedPipelineList.length > 0"
-            class="pipeline-list-container"
+          </span>
+          <OButton variant="ghost" size="icon-circle-sm" @click="closeDialog">
+            <q-icon name="close" />
+          </OButton>
+        </div>
+      </template>
+      <div
+        v-if="transformedPipelineList.length > 0"
+        class="pipeline-list-container"
+      >
+        <q-list class="scrollable-list">
+          <q-item
+            v-for="(pipeline, index) in transformedPipelineList"
+            :key="pipeline.value"
+            clickable
+            @click="onPipelineSelect(pipeline)"
           >
-            <q-list class="scrollable-list">
-              <q-item
-                v-for="(pipeline, index) in transformedPipelineList"
-                :key="pipeline.value"
-                clickable
-                @click="onPipelineSelect(pipeline)"
-              >
-                <q-item-section>
-                  {{ index + 1 }}. {{ pipeline.label }}
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
-          <div v-else>
-            <div class="text-h6 text-center">
-              No pipelines associated with this function
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
+            <q-item-section>
+              {{ index + 1 }}. {{ pipeline.label }}
+            </q-item-section>
+          </q-item>
+        </q-list>
+      </div>
+      <div v-else>
+        <div class="text-h6 text-center">
+          No pipelines associated with this function
+        </div>
+      </div>
+    </ODialog>
   </q-page>
 </template>
 
 <script lang="ts">
-
 import {
   defineAsyncComponent,
   defineComponent,
@@ -272,7 +279,8 @@ import {
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Pencil, Trash2 } from "lucide-vue-next";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { Pencil, Trash2, GitMerge } from "lucide-vue-next";
 
 export default defineComponent({
   name: "functionList",
@@ -282,6 +290,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
+    ODialog,
     Pencil,
     Trash2,
   },
@@ -289,7 +298,7 @@ export default defineComponent({
     "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
-    "sendToAiChat"
+    "sendToAiChat",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -332,7 +341,7 @@ export default defineComponent({
         label: t("function.actions"),
         align: "center",
         sortable: false,
-        classes:'actions-column'
+        classes: "actions-column",
       },
     ]);
 
@@ -465,7 +474,7 @@ export default defineComponent({
         });
         track("Button Click", {
           button: "Add Function",
-          page: "Functions"
+          page: "Functions",
         });
       } else {
         isUpdated.value = true;
@@ -480,7 +489,7 @@ export default defineComponent({
         });
         track("Button Click", {
           button: "Update Function",
-          page: "Functions"
+          page: "Functions",
         });
       }
       addTransform();
@@ -628,17 +637,20 @@ export default defineComponent({
     };
 
     const visibleRows = computed(() => {
-      if (!filterQuery.value) return jsTransforms.value || []
-      return filterData(jsTransforms.value || [], filterQuery.value)
+      if (!filterQuery.value) return jsTransforms.value || [];
+      return filterData(jsTransforms.value || [], filterQuery.value);
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
-    
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -668,7 +680,7 @@ export default defineComponent({
 
         const response = await jsTransformService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         dismiss();
@@ -718,7 +730,10 @@ export default defineComponent({
         console.error("Error deleting functions:", error);
 
         // Show error message from response if available
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting functions. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          "Error deleting functions. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
           $q.notify({
             type: "negative",

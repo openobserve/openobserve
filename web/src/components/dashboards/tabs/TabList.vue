@@ -67,12 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #icon-left><q-icon name="add" /></template>
       <q-tooltip>Add Tab</q-tooltip>
     </OButton>
-    <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
+    <ODrawer v-model:open="showAddTabDialog" size="md" :show-close="false" @close="showAddTabDialog = false">
       <AddTab
         :dashboard-id="dashboardData?.dashboardId"
         @refresh="refreshDashboard"
+        @close="showAddTabDialog = false"
       />
-    </q-dialog>
+    </ODrawer>
   </div>
 </template>
 
@@ -83,6 +84,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useRoute } from "vue-router";
 
@@ -94,6 +96,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    ODrawer,
   },
   props: {
     dashboardData: {

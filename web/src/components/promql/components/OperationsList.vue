@@ -15,29 +15,24 @@
         >
           <template v-for="(element, index) in props.operations">
             <div class="operation-item">
-              <OButtonGroup class="axis-field" radius="sm">
+              <OButtonGroup>
                 <OButton
-                  variant="outline"
-                  size="icon-chip"
-                  class="drag-handle cursor-grab"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="drag-handle"
                   :data-test="`promql-operation-drag-${index}`"
                 >
-                  <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
-                  </template>
+                  <GripVertical class="tw:size-3.5 tw:shrink-0" />
                   <q-tooltip>Drag to reorder</q-tooltip>
                 </OButton>
                 <OButton
                   variant="primary"
-                  size="chip"
-                  class="tw:!text-[12px]"
+                  size="sm"
                   :no-wrap="true"
                   :data-test="`promql-operation-${index}`"
                 >
                   {{ computedLabel(element) }}
-                  <template #icon-right
-                    ><q-icon name="arrow_drop_down"
-                  /></template>
+                  <template #icon-right><ChevronDown class="tw:size-3.5 tw:shrink-0" /></template>
                   <q-menu class="q-pa-md">
                     <div style="width: 350px">
                       <div class="text-weight-medium">
@@ -122,12 +117,12 @@
                   </q-menu>
                 </OButton>
                 <OButton
-                  variant="outline"
-                  size="icon-chip"
+                  variant="ghost"
+                  size="icon-xs-sq"
                   @click="removeOperation(index)"
                   :data-test="`promql-operation-remove-${index}`"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
+                  <q-icon name="close" size="14px" />
                 </OButton>
               </OButtonGroup>
             </div>
@@ -149,67 +144,54 @@
     </div>
 
     <!-- Operation Selector Dialog -->
-    <q-dialog v-model="showOperationSelector">
-      <q-card style="min-width: 500px">
-        <q-card-section class="tw:pt-[0.625rem]! tw:pb-[0.625rem]!">
-          <div class="tw:text-[1.2rem]">Add Operation</div>
-        </q-card-section>
+    <ODialog v-model:open="showOperationSelector" size="sm" title="Add Operation">
+      <q-input
+        v-model="searchQuery"
+        dense
+        borderless
+        stack-label
+        hide-bottom-space
+        class="showLabelOnTop"
+        clearable
+      >
+        <template v-slot:prepend>
+          <q-icon name="search" />
+        </template>
+      </q-input>
 
-        <q-card-section class="tw:py-[0.625rem]!">
-          <q-input
-            v-model="searchQuery"
-            dense
-            borderless
-            stack-label
-            hide-bottom-space
-            class="showLabelOnTop"
-            clearable
-          >
-            <template v-slot:prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-        </q-card-section>
-
-        <q-card-section
-          class="q-pt-none"
-          style="max-height: 400px; overflow-y: auto"
-        >
-          <q-list bordered separator>
-            <template v-for="category in categories" :key="category">
-              <q-expansion-item
-                :label="category"
-                default-opened
-                header-class="text-weight-medium"
-              >
-                <q-list>
-                  <q-item
-                    v-for="op in getFilteredOperationsForCategory(category)"
-                    :key="op.id"
-                    clickable
-                    v-close-popup
-                    @click="addOperation(op)"
-                  >
-                    <q-item-section>
-                      <q-item-label>{{ op.name }}</q-item-label>
-                      <q-item-label caption>{{
-                        op.documentation
-                      }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-expansion-item>
-            </template>
-          </q-list>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
+      <div style="max-height: 400px; overflow-y: auto">
+        <q-list bordered separator>
+          <template v-for="category in categories" :key="category">
+            <q-expansion-item
+              :label="category"
+              default-opened
+              header-class="text-weight-medium"
+            >
+              <q-list>
+                <q-item
+                  v-for="op in getFilteredOperationsForCategory(category)"
+                  :key="op.id"
+                  clickable
+                  @click="addOperation(op); showOperationSelector = false"
+                >
+                  <q-item-section>
+                    <q-item-label>{{ op.name }}</q-item-label>
+                    <q-item-label caption>{{ op.documentation }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-expansion-item>
+          </template>
+        </q-list>
+      </div>
+      <template #footer>
+        <div class="tw:flex tw:justify-end">
+          <OButton variant="outline" size="sm-action" @click="showOperationSelector = false">
             Close
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+    </ODialog>
   </div>
 </template>
 
@@ -217,6 +199,8 @@
 import { ref, computed, watch, onMounted } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { ChevronDown, GripVertical } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {

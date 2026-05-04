@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="o2-side-dialog column full-height ">
+  <q-card class="column full-height tw:w-full">
     <q-card-section class="q-py-md tw:w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col">
@@ -279,26 +279,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
   </q-card>
-  <q-dialog v-model="logout_confirm" persistent>
-    <q-card>
-      <q-card-section class="row items-center">
-        <q-avatar icon="info" color="primary" text-color="white" />
-        <span class="q-ml-sm"
-          >As you've chosen to change your password, you'll be automatically
-          logged out.</span
-        >
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <OButton variant="ghost-primary" @click="signout">Ok</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog v-model:open="logout_confirm" persistent size="xs" title="Password Changed">
+    <div class="tw:flex tw:items-center tw:gap-3">
+      <q-avatar icon="info" color="primary" text-color="white" />
+      <span>As you've chosen to change your password, you'll be automatically
+        logged out.</span
+      >
+    </div>
+    <template #footer>
+      <div class="tw:flex tw:justify-end">
+        <OButton variant="primary" size="sm-action" @click="signout">Ok</OButton>
+      </div>
+    </template>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -330,7 +329,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton },
+  components: { OButton, ODialog },
   props: {
     modelValue: {
       type: Object,

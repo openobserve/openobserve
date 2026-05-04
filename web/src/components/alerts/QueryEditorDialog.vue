@@ -16,19 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Editor Dialog -->
-  <q-dialog
-    v-model="isOpen"
-    position="right"
-    full-height
-    maximized
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  <ODrawer
+    v-model:open="isOpen"
+    size="full"
+    :show-close="false"
   >
     <div class="tw:flex tw:h-full tw:overflow-hidden editor-dialog-card">
       <div
-        class="tw:h-full tw:flex tw:overflow-hidden"
-        :style="{
-          width: isFullScreen ? '100vw' : store.state.isAiChatEnabled ? '75vw' : '100vw'
-        }"
+        class="tw:h-full tw:flex tw:overflow-hidden tw:flex-1"
       >
         <div class="tw:h-full tw:w-full tw:flex tw:flex-col">
           <!-- Header -->
@@ -434,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </q-dialog>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -443,6 +438,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { debounce } from "lodash-es";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";

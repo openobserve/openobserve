@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-auto">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="ghost"
             size="icon-circle"
             data-test="dashboard-tab-cancel"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex justify-start tw:gap-2">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="outline"
             size="sm-action"
             data-test="dashboard-add-cancel"
@@ -130,7 +130,7 @@ export default defineComponent({
       },
     },
   },
-  emits: ["refresh"],
+  emits: ["refresh", "close"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
     const route = useRoute();

@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-auto">
             <OButton
-              v-close-popup="true"
+              @click="$emit('close')"
               variant="ghost"
               size="icon-circle-sm"
               data-test="dashboard-folder-cancel"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
           <div class="tw:flex tw:gap-2 q-mt-sm">
             <OButton
-              v-close-popup="true"
+              @click="$emit('close')"
               variant="outline"
               size="sm-action"
               data-test="dashboard-folder-add-cancel"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         default: "alerts",
       },
     },
-    emits: ["update:modelValue"],
+    emits: ["update:modelValue", "close"],
     setup(props, { emit }) {
       const store: any = useStore();
       const addFolderForm: any = ref(null);

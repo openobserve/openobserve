@@ -16,12 +16,11 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div
-    class="scroll"
     data-test="dashboard-value-mapping-popup"
     style="padding: 0px 10px; min-width: min(1200px, 90vw)"
   >
     <div
-      class="flex justify-between items-center q-pa-md header"
+      class="flex justify-between items-center q-pa-md header tw:sticky tw:top-0 tw:bg-dialog-bg tw:z-[1]"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
@@ -183,22 +182,22 @@
           </div>
         </div>
       </draggable>
-      <div class="flex justify-between">
-        <OButton
-          variant="outline"
-          size="sm"
-          @click="addValueMapping"
-          data-test="dashboard-addpanel-config-value-mapping-add-btn"
-          >{{ t("dashboard.valueMappingAddNew") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm"
-          @click="applyValueMapping"
-          data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-          >{{ t("dashboard.valueMappingApply") }}</OButton
-        >
-      </div>
+    </div>
+    <div class="flex justify-between tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:pt-2 tw:z-[1]">
+      <OButton
+        variant="outline"
+        size="sm"
+        @click="addValueMapping"
+        data-test="dashboard-addpanel-config-value-mapping-add-btn"
+        >{{ t("dashboard.valueMappingAddNew") }}</OButton
+      >
+      <OButton
+        variant="primary"
+        size="sm"
+        @click="applyValueMapping"
+        data-test="dashboard-addpanel-config-value-mapping-apply-btn"
+        >{{ t("dashboard.valueMappingApply") }}</OButton
+      >
     </div>
   </div>
 </template>

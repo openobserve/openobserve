@@ -1,16 +1,13 @@
 <template>
-  <q-dialog v-model="dialogVisible" persistent>
-    <q-card style="min-width: 500px">
-      <q-card-section>
-        <div class="tw:flex tw:items-center tw:justify-between">
-          <div class="text-h6">
-            {{ isEditing ? t("crossLinks.editCrossLink") : t("crossLinks.addCrossLink") }}
-          </div>
-          <CrossLinkUserGuide />
+  <ODialog v-model:open="dialogVisible" persistent size="md" :show-close="false">
+    <template #header>
+      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
+        <div class="text-h6">
+          {{ isEditing ? t("crossLinks.editCrossLink") : t("crossLinks.addCrossLink") }}
         </div>
-      </q-card-section>
-
-      <q-card-section>
+        <CrossLinkUserGuide />
+      </div>
+    </template>
         <q-form @submit.prevent="onSubmit">
           <!-- Name -->
           <div class="tw:mb-3">
@@ -114,9 +111,8 @@
             </div>
           </div>
         </q-form>
-      </q-card-section>
-
-      <q-card-actions align="right" class="q-pa-md tw:gap-2">
+    <template #footer>
+      <div class="tw:flex tw:justify-end tw:gap-2">
         <OButton
           variant="outline"
           size="sm-action"
@@ -134,9 +130,9 @@
         >
           {{ isEditing ? t('crossLinks.update') : t('crossLinks.add') }}
         </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      </div>
+    </template>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -145,6 +141,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { Plus } from 'lucide-vue-next';
 
 export interface CrossLink {
@@ -155,7 +152,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OButton, Plus },
+  components: { CrossLinkUserGuide, OButton, ODialog, Plus },
   props: {
     modelValue: {
       type: Boolean,

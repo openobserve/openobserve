@@ -15,20 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onClose" maximized>
-    <q-card class="query-plan-dialog full-height">
-      <q-card-section class="row items-center q-pb-sm q-pt-sm">
+  <ODialog v-model:open="showDialog" size="full" :show-close="false" @update:open="(v) => !v && onClose()">
+    <template #header>
+      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
         <div class="text-h6">{{ t("search.queryPlan") }}</div>
-        <q-space />
         <OButton variant="ghost" size="icon" @click="onClose">
           <q-icon name="close" size="14px" />
           <q-tooltip>Close (ESC)</q-tooltip>
         </OButton>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section class="query-plan-content full-height q-pa-none">
+      </div>
+    </template>
+    <div class="query-plan-content full-height q-pa-none">
         <q-splitter v-model="splitterPosition" class="full-height">
           <!-- Left Pane: SQL Query -->
           <template #before>
@@ -190,9 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-splitter>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+      </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -201,6 +197,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -229,6 +226,7 @@ export default defineComponent({
     MetricsSummaryCard,
     QueryPlanTree,
     OButton,
+    ODialog,
   },
   props: {
     modelValue: {

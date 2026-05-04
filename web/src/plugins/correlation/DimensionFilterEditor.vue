@@ -15,32 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    :model-value="modelValue"
-    @update:model-value="$emit('update:modelValue', $event)"
-    @hide="handleClose"
+  <ODialog
+    :open="modelValue"
+    @update:open="(v) => { $emit('update:modelValue', v); if (!v) handleClose(); }"
+    size="md"
+    :title="t('correlation.logs.filters.title')"
     data-test="dimension-filter-editor-dialog"
   >
-    <q-card style="min-width: 600px; max-width: 800px">
-      <!-- Header -->
-      <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">{{ t('correlation.logs.filters.title') }}</div>
-        <q-space />
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          v-close-popup
-          :aria-label="t('common.close')"
-          data-test="close-dialog-btn"
-        >
-          <X :size="14" />
-        </OButton>
-      </q-card-section>
-
-      <q-separator class="q-mt-md" />
-
-      <!-- Content -->
-      <q-card-section class="q-pt-md">
         <!-- Description -->
         <div class="tw:mb-4 tw:text-sm tw:text-gray-600">
           {{ t('correlation.logs.filters.description') }}
@@ -158,10 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
 
-      <q-separator />
-
-      <!-- Actions -->
-      <q-card-actions align="right" class="q-pa-md">
+    <template #footer>
+      <div class="tw:flex tw:justify-end tw:gap-2">
         <OButton
           variant="outline"
           size="sm-action"
@@ -188,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t('common.apply') }}
         </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      </div>
+    </template>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
@@ -198,6 +177,7 @@ import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { X, Infinity, RotateCcw } from 'lucide-vue-next';
 
 interface Props {
