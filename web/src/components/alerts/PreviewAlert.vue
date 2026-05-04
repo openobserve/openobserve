@@ -444,8 +444,14 @@ const convertSchemaToFields = (
   return fields;
 };
 
+// Generation counter to discard stale async responses when the user switches
+// modes (e.g. builder → SQL) before a search query completes.
+const schemaRequestId = ref(0);
+
 // Fetch query schema from result_schema API for SQL mode
 const fetchQuerySchema = async () => {
+  const requestId = ++schemaRequestId.value;
+
   try {
     const startTime = dashboardPanelData.meta.dateTime.start_time;
     const endTime = dashboardPanelData.meta.dateTime.end_time;
@@ -561,6 +567,9 @@ const fetchQuerySchema = async () => {
       "ui",
     );
 
+    // Discard if a newer request was started (e.g. tab changed before response).
+    if (requestId !== schemaRequestId.value) return;
+
     const extractedFields = schemaRes.data;
     const chartType = determineChartType(extractedFields);
     dashboardPanelData.data.type = chartType;
@@ -608,6 +617,9 @@ const fetchQuerySchema = async () => {
 
     // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
   } catch (error) {
+    // Discard stale error fallback if a newer request has started.
+    if (requestId !== schemaRequestId.value) return;
+
     console.error("Failed to fetch query schema:", error);
     // Fallback to table view on error
     dashboardPanelData.data.type = "table";
