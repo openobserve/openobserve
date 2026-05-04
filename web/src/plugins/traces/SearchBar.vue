@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
+            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
           >
             <q-toggle
               data-test="traces-search-bar-show-metrics-toggle-btn"
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <!-- Error Only Toggle -->
           <div
-            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
+            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
           >
             <q-toggle
               data-test="traces-search-bar-error-only-toggle-btn"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <syntax-guide
             data-test="logs-search-bar-sql-mode-toggle-btn"
             :sqlmode="searchObj.meta.sqlMode"
-            class="tw:border! tw:border-[var(--o2-border-color)]! tw:h-[2rem]! tw:w-[2.25rem]!"
+            class="tw:border! tw:border-[var(--color-button-outline-border)]! tw:h-[2rem]! tw:w-[2.25rem]!"
           />
         </template>
       </div>

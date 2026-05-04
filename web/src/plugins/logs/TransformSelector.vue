@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs transform-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs transform-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
     <div class="tw:flex tw:items-center">
@@ -47,84 +47,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-toolbar"
           >
-            <img v-if="transformIcon?.startsWith('img:')" :src="transformIcon.slice(4)" alt="Transform" class="tw:size-4" />
+            <img
+              v-if="transformIcon?.startsWith('img:')"
+              :src="transformIcon.slice(4)"
+              alt="Transform"
+              class="tw:size-4"
+            />
             <q-icon v-else :name="transformIcon" size="16px" />
             <q-icon name="arrow_drop_down" size="18px" class="tw:ms-0.5" />
-            <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{ transformsLabel }}</q-tooltip>
+            <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
+              transformsLabel
+            }}</q-tooltip>
           </OButton>
         </template>
         <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
-        <!-- Search Input -->
-        <div
-          data-test="logs-search-bar-transform-type-select"
-          class="logs-transform-type o2-input q-mx-sm"
-          style="padding-top: 0"
-        >
-          <q-select
-            v-if="isActionsEnabled"
-            v-model="searchObj.data.transformType"
-            :options="transformTypes"
-            :label="t('search.transformType')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            outlined
-            emit-value
-            filled
-            dense
-            clearable
-            @update:model-value="updateTransforms()"
-          />
-        </div>
-        <div>
-          <q-input
-            v-model="searchTerm"
-            dense
-            filled
-            borderless
-            clearable
-            debounce="300"
-            :placeholder="t('search.searchSavedFunction')"
-            data-test="function-search-input"
+          <!-- Search Input -->
+          <div
+            data-test="logs-search-bar-transform-type-select"
+            class="logs-transform-type o2-input q-mx-sm"
+            style="padding-top: 0"
           >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-        </div>
+            <q-select
+              v-if="isActionsEnabled"
+              v-model="searchObj.data.transformType"
+              :options="transformTypes"
+              :label="t('search.transformType')"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-sm showLabelOnTop no-case"
+              stack-label
+              outlined
+              emit-value
+              filled
+              dense
+              clearable
+              @update:model-value="updateTransforms()"
+            />
+          </div>
+          <div>
+            <q-input
+              v-model="searchTerm"
+              dense
+              filled
+              borderless
+              clearable
+              debounce="300"
+              :placeholder="t('search.searchSavedFunction')"
+              data-test="function-search-input"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          </div>
 
-        <div v-if="filteredTransformOptions.length">
-          <q-item
-            class="tw:border-b saved-view-item"
-            clickable
-            v-for="(item, i) in filteredTransformOptions"
-            :key="'transform-' + item?.name"
-            @click="selectTransform(item, true)"
-          >
-            <q-item-section>
-              <q-item-label>{{ item.name }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </div>
-        <div v-else>
-          <q-item>
-            <q-item-section>
-              <q-item-label
-                v-if="searchObj.data.transformType === 'function'"
-                >{{ t("search.savedFunctionNotFound") }}</q-item-label
-              >
-              <q-item-label
-                v-if="searchObj.data.transformType === 'action'"
-                >{{ t("search.actionsNotFound") }}</q-item-label
-              >
-              <q-item-label v-if="!searchObj.data.transformType">{{
-                t("search.selectTransformType")
-              }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </div>
-      </q-list>
+          <div v-if="filteredTransformOptions.length">
+            <q-item
+              class="tw:border-b saved-view-item"
+              clickable
+              v-for="(item, i) in filteredTransformOptions"
+              :key="'transform-' + item?.name"
+              @click="selectTransform(item, true)"
+            >
+              <q-item-section>
+                <q-item-label>{{ item.name }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </div>
+          <div v-else>
+            <q-item>
+              <q-item-section>
+                <q-item-label
+                  v-if="searchObj.data.transformType === 'function'"
+                  >{{ t("search.savedFunctionNotFound") }}</q-item-label
+                >
+                <q-item-label
+                  v-if="searchObj.data.transformType === 'action'"
+                  >{{ t("search.actionsNotFound") }}</q-item-label
+                >
+                <q-item-label v-if="!searchObj.data.transformType">{{
+                  t("search.selectTransformType")
+                }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </div>
+        </q-list>
       </ODropdown>
     </div>
     <OButton
