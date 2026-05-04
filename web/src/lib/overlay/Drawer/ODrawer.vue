@@ -52,6 +52,24 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 function handleInteractOutside(e: Event) {
   if (props.persistent) {
     e.preventDefault();
+    return;
+  }
+
+  // Prevent the drawer from closing when a pointer-down lands inside a portaled
+  // floating element (e.g. a dropdown, select, combobox) that was opened from
+  // within the drawer. Those elements are teleported to document.body and
+  // therefore sit outside the DrawerContent DOM subtree, so reka-ui's
+  // DismissableLayer fires interactOutside for them — which would wrongly dismiss
+  // the drawer before the click on the item can register.
+  const originalEvent = (
+    e as CustomEvent & { detail?: { originalEvent?: PointerEvent } }
+  ).detail?.originalEvent;
+  const target = originalEvent?.target as Element | null;
+  if (
+    target?.closest("[data-reka-popper-content-wrapper]") || // reka-ui portals (ODropdown, OSelect, …)
+    target?.closest(".q-menu") // Quasar portals (q-select, q-btn-dropdown, …)
+  ) {
+    e.preventDefault();
   }
 }
 
