@@ -121,7 +121,7 @@ impl FieldAlias {
     /// `o2-enterprise/o2_enterprise/src/enterprise/alerts/default_semantic_groups.json`
     ///
     /// Enterprise code should call
-    /// `o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()`
+    /// `o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file()`
     /// instead.
     #[allow(dead_code)]
     pub fn default_presets() -> Vec<Self> {
@@ -132,7 +132,7 @@ impl FieldAlias {
     ///
     /// For OSS builds, this returns the minimal preset.
     /// For enterprise builds with full JSON, call
-    /// `o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()`
+    /// `o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file()`
     /// instead.
     pub fn load_defaults_from_file() -> Vec<Self> {
         // OSS fallback: return minimal preset
