@@ -46,15 +46,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alerts.all") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="scheduled" size="sm">
-                <template #icon-left><CalendarClock class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><q-icon name="schedule" size="14px" /></template>
                 {{ t("alerts.scheduled") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="realTime" size="sm">
-                <template #icon-left><Zap class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><q-icon name="bolt" size="14px" /></template>
                 {{ t("alerts.realTime") }}
               </OToggleGroupItem>
               <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm">
-                <template #icon-left><TrendingUp class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><q-icon name="query_stats" size="14px" /></template>
                 {{ t("alerts.anomalyDetection") }}
               </OToggleGroupItem>
             </OToggleGroup>
