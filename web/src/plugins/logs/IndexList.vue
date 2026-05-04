@@ -695,6 +695,13 @@ export default defineComponent({
       setDefaultFieldTab();
     });
 
+    // Reset to page 1 whenever the field search term changes so the user
+    // always sees results from the beginning of the filtered list.
+    watch(
+      () => searchObj.data.stream.filterField,
+      () => { pagination.value = { ...pagination.value, page: 1 }; },
+    );
+
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
         const needle = val.toLowerCase();
@@ -731,22 +738,41 @@ export default defineComponent({
     }
 
     const filterFieldFn = (rows: any, terms: any) => {
-      var filtered = [];
-      var includedFields: any = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) &&
-            includedFields.indexOf(rows[i]["name"]) == -1
-          ) {
-            filtered.push(rows[i]);
-            includedFields.push(rows[i]["name"]);
+      if (!terms) return rows;
+
+      const term = terms.toLowerCase();
+
+      // Build a label-row lookup from the current rows so we can re-inject
+      // the correct group header for each matched field.
+      const labelByGroup: Record<string, any> = {};
+      for (const row of rows) {
+        if (row.label && row.group) labelByGroup[row.group] = row;
+      }
+
+      const seen = new Set<string>();
+      const seenGroups = new Set<string>();
+      const filtered: any[] = [];
+
+      for (const row of rows) {
+        // Never include label rows directly — they'll be re-injected below
+        if (row.label) continue;
+
+        if (row.name.toLowerCase().includes(term) && !seen.has(row.name)) {
+          seen.add(row.name);
+
+          // Inject the group label row once, the first time a field from that group matches
+          const group = row.group;
+          if (group && labelByGroup[group] && !seenGroups.has(group)) {
+            seenGroups.add(group);
+            filtered.push(labelByGroup[group]);
           }
+
+          filtered.push(row);
         }
       }
+
       if (!filtered.length) {
-        return [{ name: "no-fields-found", label: "No matching fields found" }];
+        return [{ name: "No matching fields found", label: true, group: "__none__" }];
       }
       return filtered;
     };
@@ -1489,6 +1515,8 @@ export default defineComponent({
     const toggleFieldGroup = (group: string) => {
       searchObj.data.stream.expandGroupRows[group] =
         !searchObj.data.stream.expandGroupRows[group];
+      // Reset to page 1 so Quasar recalculates page count from the new row total
+      pagination.value = { ...pagination.value, page: 1 };
     };
 
     const hasUserDefinedSchemas = () => {
@@ -1899,47 +1927,23 @@ export default defineComponent({
       fieldListRef,
       toggleFieldGroup,
       streamFieldsRows: computed(() => {
-        let expandKeys = Object.keys(
-          searchObj.data.stream.expandGroupRows,
-        ).reverse();
+        const source = showOnlyInterestingFields.value
+          ? searchObj.data.stream.selectedInterestingStreamFields
+          : searchObj.data.stream.selectedStreamFields;
 
-        const expandGroupRowsFieldCount = showOnlyInterestingFields.value
-          ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount
-          : searchObj.data.stream.expandGroupRowsFieldCount;
+        if (!source?.length) return source;
 
-        let startIndex = 0;
-        // Iterate over the keys in reverse order
-        let selectedStreamFields = cloneDeep(
-          showOnlyInterestingFields.value
-            ? searchObj.data.stream.selectedInterestingStreamFields
-            : searchObj.data.stream.selectedStreamFields,
-        );
-        let count = 0;
-        for (let key of expandKeys) {
-          if (
-            searchObj.data.stream.expandGroupRows[key] == false &&
-            selectedStreamFields != undefined &&
-            selectedStreamFields?.length > 0
-          ) {
-            startIndex =
-              selectedStreamFields.length - expandGroupRowsFieldCount[key];
-            if (startIndex > 0) {
-              // console.log("startIndex", startIndex);
-              // console.log("count", count);
-              // console.log("selectedStreamFields", selectedStreamFields.length);
-              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key]);
-              // console.log("========");
-              selectedStreamFields.splice(
-                startIndex - count,
-                expandGroupRowsFieldCount[key],
-              );
-            }
-          } else {
-            count += expandGroupRowsFieldCount[key];
-          }
-          count++;
-        }
-        return selectedStreamFields;
+        const expandGroupRows = searchObj.data.stream.expandGroupRows;
+
+        // Keep label rows always; keep field rows only when their group is expanded.
+        // When no groups are defined (flat list), expandGroupRows is empty and every
+        // row passes through unchanged.
+        return source.filter((row: any) => {
+          if (row.label) return true;
+          const group = row.group;
+          if (group === undefined || !(group in expandGroupRows)) return true;
+          return expandGroupRows[group] !== false;
+        });
       }),
       formatLargeNumber,
       sortedStreamFields,
