@@ -4,9 +4,16 @@ import type { ButtonGroupProps, ButtonGroupSlots } from "./OButtonGroup.types";
 const props = withDefaults(defineProps<ButtonGroupProps>(), {
   orientation: "horizontal",
   align: "stretch",
+  radius: "md",
 });
 
 defineSlots<ButtonGroupSlots>();
+
+const radiusClasses: Record<NonNullable<ButtonGroupProps["radius"]>, string> = {
+  sm: "tw:rounded",
+  md: "tw:rounded-md",
+  lg: "tw:rounded-lg",
+};
 
 const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
   stretch: "tw:items-stretch",
@@ -19,7 +26,8 @@ const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
 <template>
   <div
     :class="[
-      'tw:inline-flex tw:rounded-md tw:overflow-hidden',
+      'tw:inline-flex tw:overflow-hidden',
+      radiusClasses[props.radius],
       alignClasses[props.align],
       props.orientation === 'vertical' ? 'tw:flex-col' : 'tw:flex-row',
       // Divider between sibling buttons
