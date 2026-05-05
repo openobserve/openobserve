@@ -38,11 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="1rem"
             class="q-mr-xs tw:text-[var(--o2-status-error-text)]!"
           />
-          <SpanStatusCodeBadge
-            v-if="spanStatusCode || spanGrpcStatusCode"
-            :code="spanStatusCode"
-            :grpc-code="spanGrpcStatusCode"
-          />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
         <q-badge
@@ -657,6 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-tab-panel name="error">
         <!-- Error Summary -->
         <div
+          v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
           class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
           :style="{
             background: 'var(--o2-status-error-bg)',
@@ -665,27 +661,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-error-summary"
         >
           <!-- Title row: icon + status badge + error title -->
-          <div
-            v-if="
-              spanStatusCode ||
-              spanGrpcStatusCode ||
-              span.status_message ||
-              hasExceptionEvents.length
-            "
-            class="tw:flex tw:items-center tw:gap-2 tw:mb-[0.25rem]"
-          >
+
+          <div class="tw:flex-col tw:items-center tw:gap-1">
+            <div
+              class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
+            >
+              {{ spanStatusCode ? "HTTP STATUS CODE" : "GRPC STATUS CODE" }}
+            </div>
+            <div class="tw:flex tw:items-center">
+              <SpanStatusCodeBadge
+                v-if="spanStatusCode || spanGrpcStatusCode"
+                :code="spanStatusCode"
+                :grpc-code="spanGrpcStatusCode"
+                class="tw:text-[0.9rem]! tw:flex! tw:items-center"
+              />
+              <span
+                class="tw:text-[0.9rem] tw:font-semibold"
+                :style="{ color: 'var(--o2-status-error-text)' }"
+                data-test="trace-details-sidebar-error-summary-title"
+              >
+                {{ statusCodeTitle }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div
+          v-if="hasSpanError && errorBannerTitle && errorBannerMessage"
+          class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
+          :style="{
+            background: 'var(--o2-status-error-bg)',
+            borderColor: 'var(--o2-status-error-text)',
+          }"
+          data-test="trace-details-sidebar-error-summary"
+        >
+          <!-- Title row: icon + status badge + error title -->
+          <div class="tw:flex tw:items-center tw:gap-2 tw:mb-[0.25rem]">
             <q-icon
               name="error"
               size="1rem"
-              class="tw:text-[var(--o2-status-error-text)]!"
-            />
-            <SpanStatusCodeBadge
-              v-if="spanStatusCode || spanGrpcStatusCode"
-              :code="spanStatusCode"
-              :grpc-code="spanGrpcStatusCode"
+              class="tw:text-[var(--o2-status-error-text)]"
             />
             <span
-              class="tw:text-[0.875rem] tw:font-semibold"
+              class="tw:text-[1rem] tw:font-semibold"
               :style="{ color: 'var(--o2-status-error-text)' }"
               data-test="trace-details-sidebar-error-summary-title"
             >
@@ -1169,23 +1186,23 @@ export default defineComponent({
     });
 
     const spanStatusCode = computed(() => {
-      const attrs = props.span?.attributes;
+      const attrs = props.span;
       if (!attrs) return null;
       return (
-        attrs["http.status_code"] ?? attrs["http.response.status_code"] ?? null
+        attrs["http_status_code"] ?? attrs["http_response_status_code"] ?? null
       );
     });
 
     const spanGrpcStatusCode = computed(() => {
-      const attrs = props.span?.attributes;
+      const attrs = props.span;
       if (!attrs) return null;
-      return attrs["rpc.grpc.status_code"] ?? null;
+      return attrs["rpc_grpc_status_code"] ?? null;
     });
 
     const spanErrorType = computed(() => {
-      const attrs = props.span?.attributes;
+      const attrs = props.span;
       if (!attrs) return null;
-      return attrs["error.type"] ?? null;
+      return attrs["error_type"] ?? null;
     });
 
     const hasSpanError = computed(() => {
@@ -1207,8 +1224,18 @@ export default defineComponent({
         return firstExc["exception.type"] || "Exception";
       }
       if (spanErrorType.value) return spanErrorType.value;
-      if (spanStatusCode.value) return `HTTP ${spanStatusCode.value}`;
       return "Error";
+    });
+
+    const statusCodeTitle = computed(() => {
+      if (spanGrpcStatusCode.value) {
+        const desc = GRPC_STATUS_MAP[String(spanGrpcStatusCode.value)];
+        return desc ? desc : `gRPC ${spanGrpcStatusCode.value}`;
+      }
+      if (spanStatusCode.value) {
+        const desc = HTTP_STATUS_MAP[String(spanStatusCode.value)];
+        return desc ? desc : `HTTP ${spanStatusCode.value}`;
+      }
     });
 
     const errorBannerMessage = computed(() => {
@@ -1218,6 +1245,45 @@ export default defineComponent({
       }
       return props.span?.status_message || "";
     });
+
+    // Map HTTP/gRPC status codes to short human-readable labels
+    const GRPC_STATUS_MAP: Record<string, string> = {
+      "0": "OK",
+      "1": "Cancelled",
+      "2": "Unknown",
+      "3": "Invalid Argument",
+      "4": "Deadline Exceeded",
+      "5": "Not Found",
+      "6": "Already Exists",
+      "7": "Permission Denied",
+      "8": "Resource Exhausted",
+      "9": "Failed Precondition",
+      "10": "Aborted",
+      "11": "Out of Range",
+      "12": "Unimplemented",
+      "13": "Internal",
+      "14": "Unavailable",
+      "15": "Data Loss",
+      "16": "Unauthenticated",
+    };
+
+    const HTTP_STATUS_MAP: Record<string, string> = {
+      "400": "Bad Request",
+      "401": "Unauthorized",
+      "402": "Payment Required",
+      "403": "Forbidden",
+      "404": "Not Found",
+      "405": "Method Not Allowed",
+      "408": "Request Timeout",
+      "409": "Conflict",
+      "410": "Gone",
+      "429": "Too Many Requests",
+      "500": "Internal Server Error",
+      "501": "Not Implemented",
+      "502": "Bad Gateway",
+      "503": "Service Unavailable",
+      "504": "Gateway Timeout",
+    };
 
     const activeTab = ref(
       hasSpanError.value ? "error" : isLLMSpan.value ? "preview" : "attributes",
@@ -2492,6 +2558,7 @@ export default defineComponent({
       exceptionEventColumns,
       hasSpanError,
       errorBannerTitle,
+      statusCodeTitle,
       errorBannerMessage,
       spanStatusCode,
       spanGrpcStatusCode,
