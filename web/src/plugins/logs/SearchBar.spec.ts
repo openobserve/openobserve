@@ -4162,4 +4162,210 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       expect(typeof testInstance.onLogsVisualizeToggleUpdate).toBe("function");
     });
   });
+
+  describe("addFieldTerm — WHERE clause placement for SQL aggregation queries", () => {
+    /**
+     * Helper that mirrors the fixed algorithm in SearchBar.vue addFieldTerm().
+     * Given a SQL query that has NO existing WHERE clause, finds the earliest
+     * terminating clause (GROUP BY, HAVING, ORDER BY, LIMIT) and inserts the
+     * filter with the given operator BEFORE that clause.
+     *
+     * SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+     */
+    const insertFilterBeforeEarliestClause = (
+      query: string,
+      filter: string,
+      operator: "where" | "AND" = "where",
+    ): string => {
+      const terminatingClauses = ["group by", "having", "order by", "limit"];
+      const lowerQuery = query.toLowerCase();
+      let firstClause: string | null = null;
+      let firstIndex = Infinity;
+      for (const clause of terminatingClauses) {
+        const idx = lowerQuery.indexOf(clause);
+        if (idx !== -1 && idx < firstIndex) {
+          firstIndex = idx;
+          firstClause = clause;
+        }
+      }
+      if (firstClause) {
+        const [beforeClause, afterClause] = queryIndexSplit(
+          query,
+          firstClause,
+        );
+        return (
+          beforeClause.trim() +
+          " " +
+          operator +
+          " " +
+          filter +
+          " " +
+          firstClause +
+          afterClause
+        );
+      }
+      return query + " " + operator + " " + filter;
+    };
+
+    // ── WHERE (new clause) tests ──────────────────────────────────────
+
+    describe("inserting WHERE into query without existing WHERE clause", () => {
+      it("should insert WHERE before GROUP BY when query has GROUP BY", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT count(*) FROM "logs" GROUP BY level',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT count(*) FROM "logs" where status = 200 GROUP BY level',
+        );
+      });
+
+      it("should insert WHERE before GROUP BY, not ORDER BY, when both are present (bug fix)", () => {
+        // This is the exact bug: old code checked ORDER BY first and would
+        // insert WHERE before ORDER BY instead of GROUP BY, producing
+        // invalid SQL like:  ...WHERE x GROUP BY y ORDER BY z
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT count(*) FROM "logs" GROUP BY level ORDER BY count(*) DESC',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT count(*) FROM "logs" where status = 200 GROUP BY level ORDER BY count(*) DESC',
+        );
+      });
+
+      it("should insert WHERE before ORDER BY when no GROUP BY exists", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT * FROM "logs" ORDER BY timestamp DESC',
+          "level = 'error'",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where level = \'error\' ORDER BY timestamp DESC',
+        );
+      });
+
+      it("should insert WHERE before LIMIT when no GROUP BY or ORDER BY exists", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT * FROM "logs" LIMIT 100',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where status = 200 LIMIT 100',
+        );
+      });
+
+      it("should insert WHERE before GROUP BY when GROUP BY, HAVING, ORDER BY, and LIMIT are all present", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT level, count(*) as cnt FROM "logs" GROUP BY level HAVING cnt > 5 ORDER BY cnt DESC LIMIT 10',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT level, count(*) as cnt FROM "logs" where status = 200 GROUP BY level HAVING cnt > 5 ORDER BY cnt DESC LIMIT 10',
+        );
+      });
+
+      it("should append WHERE at end when no terminating clauses exist", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT * FROM "logs"',
+          "status = 200",
+        );
+        expect(result).toBe('SELECT * FROM "logs" where status = 200');
+      });
+
+      it("should insert WHERE before HAVING when HAVING is the earliest clause", () => {
+        // HAVING was missing from the old code's clause list
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT level, count(*) as cnt FROM "logs" HAVING cnt > 5',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT level, count(*) as cnt FROM "logs" where status = 200 HAVING cnt > 5',
+        );
+      });
+
+      it("should handle case-insensitive clause matching", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT * FROM "logs" Group By level Order By timestamp DESC',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where status = 200 Group By level Order By timestamp DESC',
+        );
+      });
+    });
+
+    // ── AND (append to existing WHERE) tests ──────────────────────────
+
+    describe("inserting AND into query with existing WHERE clause", () => {
+      it("should insert AND before GROUP BY when WHERE already exists and GROUP BY follows", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' GROUP BY status',
+          "code = 500",
+          "AND",
+        );
+        expect(result).toBe(
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 GROUP BY status',
+        );
+      });
+
+      it("should insert AND before earliest clause when multiple clauses follow WHERE", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' GROUP BY status ORDER BY count(*) DESC LIMIT 50',
+          "code = 500",
+          "AND",
+        );
+        expect(result).toBe(
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 GROUP BY status ORDER BY count(*) DESC LIMIT 50',
+        );
+      });
+
+      it("should append AND at end when WHERE exists but no other clauses follow", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT * FROM "logs" WHERE level = \'error\'',
+          "status = 200",
+          "AND",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" WHERE level = \'error\' AND status = 200',
+        );
+      });
+    });
+
+    // ── Edge cases ────────────────────────────────────────────────────
+
+    describe("edge cases", () => {
+      it("should not be confused by column names containing clause keywords", () => {
+        // "order_count" contains "order" but is not "order by"
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT order_count, group_name FROM "logs" GROUP BY group_name ORDER BY order_count DESC',
+          "status = 200",
+        );
+        // The algorithm uses .indexOf which might find "order" in "order_count"
+        // followed by "by" ... actually "order_count" doesn't contain "order by"
+        // so this test is fine. But let's check if "group" in "group_name" could
+        // falsely match "group by" — it does because "group_name" contains "group"
+        // but not "group by". The algorithm looks for "group by" not just "group".
+        expect(result).toBe(
+          'SELECT order_count, group_name FROM "logs" where status = 200 GROUP BY group_name ORDER BY order_count DESC',
+        );
+      });
+
+      it("should handle simple query with no clauses", () => {
+        const result = insertFilterBeforeEarliestClause(
+          "SELECT 1",
+          "status = 200",
+        );
+        expect(result).toBe("SELECT 1 where status = 200");
+      });
+
+      it("should handle filter with special characters in value", () => {
+        const result = insertFilterBeforeEarliestClause(
+          'SELECT * FROM "logs" GROUP BY level',
+          "message = 'error: 500 - internal'",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where message = \'error: 500 - internal\' GROUP BY level',
+        );
+      });
+    });
+  });
 });
