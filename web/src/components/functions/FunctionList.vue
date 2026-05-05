@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <Pencil :size="14" />
                   </OButton>
                   <OButton
-                    variant="ghost-destructive"
+                    variant="outline"
                     size="icon-sm"
                     :title="t('function.delete')"
                     @click="showDeleteDialogFn(props)"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="'Associated Pipelines'"
                     @click="getAssociatedPipelines(props)"
                   >
-                    <GitMerge :size="14" />
+                    <q-icon :name="outlinedAccountTree" size="14px" />
                   </OButton>
                 </q-td>
               </template>
@@ -268,7 +268,7 @@ import {
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Pencil, Trash2, GitMerge } from "lucide-vue-next";
+import { Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
   name: "functionList",
@@ -280,7 +280,6 @@ export default defineComponent({
     OButton,
     Pencil,
     Trash2,
-    GitMerge,
   },
   emits: [
     "updated:fields",
