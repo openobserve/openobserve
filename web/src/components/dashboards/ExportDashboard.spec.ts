@@ -100,8 +100,10 @@ describe("ExportDashboard", () => {
       },
     });
 
-    const exportButton = wrapper.findComponent({ name: "QBtn" });
-    expect(exportButton.props("icon")).toBe("download");
+    const exportButton = wrapper.find('[data-test="export-dashboard"]');
+    expect(exportButton.exists()).toBe(true);
+    // The download icon is rendered via the icon-left slot as q-icon
+    expect(exportButton.html()).toContain("download");
   });
 
   it("should call downloadDashboard when button is clicked", async () => {
@@ -249,6 +251,7 @@ describe("ExportDashboard", () => {
     });
 
     const exportButton = wrapper.find('[data-test="export-dashboard"]');
-    expect(exportButton.classes()).toContain("dashboard-icons");
+    // OButton renders with Tailwind classes instead of Quasar's dashboard-icons class
+    expect(exportButton.exists()).toBe(true);
   });
 });

@@ -89,13 +89,17 @@ describe("PerformanceFieldsDialog", () => {
     it("should render Skip button", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      expect(document.querySelector(".o2-secondary-button")).not.toBeNull();
+      const allBtns = Array.from(document.querySelectorAll('button[data-o2-btn]')) as HTMLElement[];
+      const skipBtn = allBtns.find(btn => btn.textContent?.trim() === 'Skip');
+      expect(skipBtn).not.toBeUndefined();
     });
 
     it("should render Add Fields button", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      expect(document.querySelector(".o2-primary-button")).not.toBeNull();
+      const allBtns = Array.from(document.querySelectorAll('button[data-o2-btn]')) as HTMLElement[];
+      const addBtn = allBtns.find(btn => btn.textContent?.trim() === 'Add Fields');
+      expect(addBtn).not.toBeUndefined();
     });
 
     it("should render the close button area", async () => {
@@ -230,9 +234,11 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
 
       // Buttons are inside the teleported dialog — find via document
-      const skipBtn = document.querySelector(".o2-secondary-button") as HTMLElement;
-      expect(skipBtn).not.toBeNull();
-      skipBtn.click();
+      // OButton renders as <button data-o2-btn ...>; skip is first button (outline variant)
+      const allBtns = Array.from(document.querySelectorAll('button[data-o2-btn]')) as HTMLElement[];
+      const skipBtn = allBtns.find(btn => btn.textContent?.trim() === 'Skip') as HTMLElement | undefined;
+      expect(skipBtn).not.toBeUndefined();
+      skipBtn!.click();
       await flushPromises();
 
       expect(wrapper.emitted("skip")).toBeTruthy();
@@ -242,9 +248,11 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      const addBtn = document.querySelector(".o2-primary-button") as HTMLElement;
-      expect(addBtn).not.toBeNull();
-      addBtn.click();
+      // OButton renders as <button data-o2-btn ...>; add-fields is primary variant button
+      const allBtns = Array.from(document.querySelectorAll('button[data-o2-btn]')) as HTMLElement[];
+      const addBtn = allBtns.find(btn => btn.textContent?.trim() === 'Add Fields') as HTMLElement | undefined;
+      expect(addBtn).not.toBeUndefined();
+      addBtn!.click();
       await flushPromises();
 
       expect(wrapper.emitted("add-fields")).toBeTruthy();

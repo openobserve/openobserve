@@ -87,6 +87,10 @@ describe('ScriptToolbar.vue', () => {
             template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')">{{ label }}</button>',
             props: ['label', 'color', 'padding', 'type', 'textColor', 'noEaps', 'icon']
           },
+          OButton: {
+            template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
+            props: ['variant', 'size', 'disabled', 'loading', 'type']
+          },
           'q-form': {
             template: '<form class="q-form-stub"><slot></slot></form>',
             props: []
@@ -373,10 +377,10 @@ describe('ScriptToolbar.vue', () => {
     it('has correct actions section structure', () => {
       wrapper = createWrapper();
       const actionsSection = wrapper.find('.add-script-actions');
-      
+
       expect(actionsSection.exists()).toBe(true);
-      expect(actionsSection.classes()).toContain('flex');
-      expect(actionsSection.classes()).toContain('justify-center');
+      expect(actionsSection.classes()).toContain('tw:flex');
+      expect(actionsSection.classes()).toContain('tw:items-center');
     });
   });
 

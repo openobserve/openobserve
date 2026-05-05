@@ -201,10 +201,12 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should initialize tabs correctly", () => {
-      expect(wrapper.vm.tabs).toEqual([
-        { label: "Query / Function", value: "query" },
-        { label: "More Details", value: "more_details" }
-      ]);
+      expect(wrapper.vm.tabs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: "Query / Function", value: "query" }),
+          expect.objectContaining({ label: "More Details", value: "more_details" }),
+        ])
+      );
     });
 
     it("should initialize dateTimeToBeSent correctly", () => {

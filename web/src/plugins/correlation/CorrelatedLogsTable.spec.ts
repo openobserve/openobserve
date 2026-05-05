@@ -116,6 +116,18 @@ describe("CorrelatedLogsTable.vue", () => {
         stubs: {
           TenstackTable: true,
           DimensionFiltersBar: true,
+          // Render ODropdown inline so data-test attrs are findable in tests
+          ODropdown: {
+            name: "ODropdown",
+            template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+            emits: ["update:open"],
+            props: ["open", "side", "align", "sideOffset"],
+          },
+          ODropdownItem: {
+            name: "ODropdownItem",
+            template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+            emits: ["select"],
+          },
         },
       },
       ...options,
