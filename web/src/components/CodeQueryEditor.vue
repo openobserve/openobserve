@@ -116,7 +116,7 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
-    stickScroll: {
+    stickyScroll: {
       type: Boolean,
       default: true,
     },
@@ -691,7 +691,7 @@ export default defineComponent({
         readOnly: props.readOnly,
         renderValidationDecorations: "on",
         stickyScroll: {
-          enabled: props.stickScroll,
+          enabled: props.stickyScroll,
         },
       });
 

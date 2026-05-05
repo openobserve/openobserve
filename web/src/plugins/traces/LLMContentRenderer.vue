@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :read-only="true"
           :show-auto-complete="false"
           :show-line-numbers="false"
-          :stick-scroll="false"
+          :sticky-scroll="false"
           class="json-viewer-editor tw:max-h-full! tw:h-full!"
         />
       </div>
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :read-only="true"
                   :show-auto-complete="false"
                   :show-line-numbers="false"
-                  :stick-scroll="false"
+                  :sticky-scroll="false"
                   class="json-viewer-editor tw:max-h-full! tw:h-full!"
                 />
               </div>
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :read-only="true"
               :show-auto-complete="false"
               :show-line-numbers="false"
-              :stick-scroll="false"
+              :sticky-scroll="false"
               class="json-viewer-editor tw:max-h-full! tw:h-full!"
             />
           </div>
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :read-only="true"
             :show-auto-complete="false"
             :show-line-numbers="false"
-            :stick-scroll="false"
+            :sticky-scroll="false"
             class="json-viewer-editor tw:max-h-full! tw:h-full!"
           />
         </div>
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :read-only="true"
                   :show-auto-complete="false"
                   :show-line-numbers="false"
-                  :stick-scroll="false"
+                  :sticky-scroll="false"
                   class="json-viewer-editor tw:max-h-full! tw:h-full!"
                 />
               </div>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :read-only="true"
               :show-auto-complete="false"
               :show-line-numbers="false"
-              :stick-scroll="false"
+              :sticky-scroll="false"
               class="json-viewer-editor tw:max-h-full! tw:h-full"
             />
           </div>
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :read-only="true"
             :show-auto-complete="false"
             :show-line-numbers="false"
-            :stick-scroll="false"
+            :sticky-scroll="false"
             class="json-viewer-editor"
           />
         </div>
