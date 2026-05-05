@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     :title="t('function.updateTitle')"
+                    data-test="function-list-edit-function-btn"
                     @click="showAddUpdateFn(props)"
                   >
                     <Pencil :size="14" />
@@ -83,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost-destructive"
                     size="icon-sm"
                     :title="t('function.delete')"
+                    data-test="function-list-delete-function-btn"
                     @click="showDeleteDialogFn(props)"
                   >
                     <Trash2 :size="14" />
