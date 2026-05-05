@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- CREATE MODE: Alert Name + Folder -->
           <template v-else>
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="alert-v3-inline-label">Alert Name <span class="tw:text-red-500">*</span></label>
+              <label class="alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-red-500">*</span></label>
               <q-input
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
