@@ -167,6 +167,46 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-white/50",
     "tw:disabled:opacity-50",
   ].join(" "),
+  // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
+  // preview-slack: Slack green (#007a5a)
+  "preview-slack": [
+    "tw:bg-[#007a5a] tw:text-white tw:border-0 tw:!rounded tw:!text-sm tw:!h-auto tw:!py-2 tw:!px-3",
+    "tw:enabled:hover:bg-[#005a42]",
+    "tw:disabled:opacity-60",
+  ].join(" "),
+  // preview-teams: Microsoft Teams purple (#6264a7)
+  "preview-teams": [
+    "tw:bg-[#6264a7] tw:text-white tw:border-0 tw:!rounded tw:!h-auto tw:!py-2 tw:!px-4",
+    "tw:enabled:hover:bg-[#464775]",
+    "tw:disabled:opacity-60",
+  ].join(" "),
+  // preview-email: Email blue (#007bff)
+  "preview-email": [
+    "tw:bg-[#007bff] tw:text-white tw:border-0 tw:!rounded tw:!h-auto tw:!py-3 tw:!px-6",
+    "tw:enabled:hover:bg-[#0056b3]",
+    "tw:disabled:opacity-60",
+  ].join(" "),
+  // preview-action: Generic action button for destination previews with no brand color
+  "preview-action": [
+    "tw:bg-transparent tw:text-button-outline-text tw:border tw:border-button-outline-border tw:!rounded tw:!h-auto tw:!py-2 tw:!px-3 tw:!text-sm",
+    "tw:enabled:hover:bg-button-outline-hover-bg",
+    "tw:disabled:opacity-60",
+  ].join(" "),
+  // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
+  "webinar-dismiss": [
+    "tw:bg-transparent tw:border-0 tw:text-[#1e3a8a] tw:underline tw:font-bold tw:text-[0.8125rem] tw:whitespace-nowrap",
+    "tw:!h-auto tw:!p-0",
+    "tw:enabled:hover:text-[#1e40af]",
+    "tw:disabled:opacity-60",
+  ].join(" "),
+  // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
+  "pricing-chip": [
+    "tw:bg-transparent tw:text-inherit tw:border tw:border-[var(--o2-border-color)]",
+    "tw:!rounded-[20px] tw:!text-xs tw:!font-medium tw:!h-auto tw:!py-[5px] tw:!px-[14px] tw:!gap-[6px]",
+    "tw:transition-colors tw:duration-150",
+    "tw:enabled:hover:border-[var(--q-primary)] tw:enabled:hover:text-[var(--q-primary)] tw:enabled:hover:bg-[color-mix(in_srgb,var(--q-primary)_8%,transparent)]",
+    "tw:disabled:opacity-60",
+  ].join(" "),
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {

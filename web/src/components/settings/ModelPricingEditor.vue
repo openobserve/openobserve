@@ -315,16 +315,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="sub-label">{{
                     t("modelPricing.quickSetup")
                   }}</span>
-                  <button
+                  <OButton
                     v-for="tpl in usageTemplates"
                     :key="tpl.name"
-                    class="template-chip"
-                    :class="{
-                      'template-chip--active': isTemplateActive(tier, tpl.keys),
-                    }"
-                    :style="{ '--chip-dot-color': tpl.color }"
+                    variant="pricing-chip"
+                    :active="isTemplateActive(tier, tpl.keys)"
                     @click="applyTemplate(tier, tpl.keys)"
                   >
+                    <template #icon-left>
+                      <span class="pricing-chip-dot" :style="{ background: tpl.color }" />
+                    </template>
                     {{ tpl.name }}
                     <span
                       v-if="isTemplateActive(tier, tpl.keys)"
@@ -332,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="clearTemplate(tier, tpl.keys)"
                       >×</span
                     >
-                  </button>
+                  </OButton>
                 </div>
 
                 <!-- Price Table -->
@@ -1181,51 +1181,12 @@ onBeforeMount(async () => {
   white-space: nowrap;
 }
 
-.template-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-
-  &::before {
-    content: "";
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--chip-dot-color, currentColor);
-    flex-shrink: 0;
-  }
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
-  border: 1px solid var(--o2-border-color);
-  background: transparent;
-  color: inherit;
-  outline: none;
-  user-select: none;
-
-  &:hover:not(&--active) {
-    border-color: var(--q-primary);
-    color: var(--q-primary);
-    background: color-mix(in srgb, var(--q-primary) 8%, transparent);
-  }
-
-  &--active {
-    background: var(--q-primary);
-    border-color: var(--q-primary);
-    color: white;
-
-    &:hover {
-      background: color-mix(in srgb, var(--q-primary) 85%, black 15%);
-      border-color: color-mix(in srgb, var(--q-primary) 85%, black 15%);
-    }
-  }
+.pricing-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
 }
 
 .template-chip-close {

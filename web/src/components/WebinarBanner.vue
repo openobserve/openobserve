@@ -43,14 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <span class="webinar-top-bar-sep" aria-hidden="true">|</span>
 
-      <button
-        class="webinar-top-bar-link webinar-top-bar-dismiss"
+      <OButton
+        variant="webinar-dismiss"
         aria-label="Dismiss webinar banner"
         @click="dismiss"
         data-test="webinar-top-bar-dismiss-btn"
       >
         Dismiss
-      </button>
+      </OButton>
     </div>
   </div>
 

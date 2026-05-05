@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="selectedDestinations.length > 0"
               data-test="pipeline-destination-list-delete-destinations-btn"
-              variant="secondary"
+              variant="outline"
               size="sm"
               class="q-mr-sm"
               @click="openBulkDeleteDialog"

@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="selectedUsers.length > 0"
                 data-test="users-list-delete-users-btn"
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 class="tw:mr-2"
                 @click="openBulkDeleteDialog"
