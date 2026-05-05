@@ -78,7 +78,7 @@ export class CrossLinkPage {
 
     async isCrossLinkingTabVisible() {
         testLogger.debug('Checking if cross-linking tab is visible');
-        const tab = this.page.locator('.q-tab').filter({ hasText: /cross.link/i });
+        const tab = this.page.locator('[role="tab"]').filter({ hasText: /cross.link/i });
         try {
             await tab.waitFor({ state: 'visible', timeout: 5000 });
             return true;
@@ -89,7 +89,7 @@ export class CrossLinkPage {
 
     async clickCrossLinkingTab() {
         testLogger.debug('Clicking cross-linking tab');
-        const tab = this.page.locator('.q-tab').filter({ hasText: /cross.link/i });
+        const tab = this.page.locator('[role="tab"]').filter({ hasText: /cross.link/i });
         await tab.waitFor({ state: 'visible', timeout: 10000 });
         await tab.click();
         // Wait for cross-link tab content to render

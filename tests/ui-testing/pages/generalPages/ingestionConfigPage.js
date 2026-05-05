@@ -118,7 +118,7 @@ export class IngestionConfigPage {
         await this.waitForRecommendedTabs();
         // Count only the integration tabs within the data-sources-recommended-tabs container
         // This excludes the top-level navigation tabs
-        return await this.page.locator('.data-sources-recommended-tabs .q-tab').count();
+        return await this.page.locator('.data-sources-recommended-tabs [role="tab"]').count();
     }
 
     // ==================== Assertions ====================

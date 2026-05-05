@@ -207,11 +207,11 @@ export class AlertsPage {
             relatedAlertCountText: '[style*="width: 120px"]',
             severityBadge: '.q-badge',
 
-            // Incident detail — tab selectors (Quasar q-tab)
-            serviceGraphTab: '.q-tab[name="serviceGraph"]',
-            logsTab: '.q-tab[name="logs"]',
-            metricsTab: '.q-tab[name="metrics"]',
-            tracesTab: '.q-tab[name="traces"]',
+            // Incident detail — tab selectors (Reka TabsTrigger)
+            serviceGraphTab: '[role="tab"]:has-text("Alert Graph")',
+            logsTab: '[role="tab"]:has-text("Logs")',
+            metricsTab: '[role="tab"]:has-text("Metrics")',
+            tracesTab: '[role="tab"]:has-text("Traces")',
 
             // Incident detail — Service Graph content
             serviceGraphContainer: '.incident-service-graph',
@@ -721,7 +721,7 @@ export class AlertsPage {
         await folderRow.hover();
         await this.page.waitForTimeout(500);
 
-        const dotButton = this.page.locator(`div.folder-item:has-text("${folderName}") button.q-btn`);
+        const dotButton = this.page.locator(`div.folder-item:has-text("${folderName}") button[data-o2-btn]`);
         await dotButton.waitFor({ state: 'visible', timeout: 3000 });
 
         testLogger.info('Button state', {
@@ -1504,11 +1504,11 @@ export class AlertsPage {
 
     /**
      * Click the "Alert Triggers" tab on the incident detail page.
-     * The tab uses Quasar q-tab with name="alertTriggers".
+     * The tab uses Reka TabsTrigger with role="tab".
      */
     async clickAlertTriggersTab() {
         testLogger.info('Clicking Alert Triggers tab');
-        await this.page.locator('.q-tab[name="alertTriggers"], .q-tab:has-text("Alert Triggers")').first().click();
+        await this.page.locator('[role="tab"]:has-text("Alert Triggers")').first().click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked Alert Triggers tab');
     }
@@ -1688,14 +1688,14 @@ export class AlertsPage {
     };
 
     /**
-     * Click a tab on the incident detail page by its Quasar tab name.
-     * Uses attribute selector with text-based fallback.
+     * Click a tab on the incident detail page by its Reka tab label.
+     * Uses role="tab" with has-text for label-based matching.
      * @param {string} tabName - One of: overview, incidentAnalysis, serviceGraph, alertTriggers, logs, metrics, traces
      */
     async clickIncidentDetailTab(tabName) {
         testLogger.info(`Clicking incident detail tab: ${tabName}`);
         const label = AlertsPage.TAB_LABELS[tabName] || tabName;
-        const tab = this.page.locator(`.q-tab[name="${tabName}"], .q-tab:has-text("${label}")`);
+        const tab = this.page.locator(`[role="tab"]:has-text("${label}")`);
         await tab.first().waitFor({ state: 'visible', timeout: 10000 });
         await tab.first().click();
         await this.page.waitForTimeout(1500);
