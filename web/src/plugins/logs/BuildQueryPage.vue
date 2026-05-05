@@ -77,6 +77,41 @@ const AddToDashboard = defineAsyncComponent(
 );
 
 // ============================================================================
+// Default Builder Fields
+// ============================================================================
+
+/** Default x-axis field: histogram(_timestamp) */
+const DEFAULT_X_AXIS_FIELD = () => ({
+  label: "_timestamp",
+  alias: "x_axis_1",
+  column: "_timestamp",
+  color: null,
+  type: "build",
+  functionName: "histogram",
+  args: [
+    { type: "field", value: { field: "_timestamp" } },
+    { type: "histogramInterval", value: null },
+  ],
+  sortBy: "ASC",
+  isDerived: false,
+  havingConditions: [],
+});
+
+/** Default y-axis field: count(_timestamp) */
+const DEFAULT_Y_AXIS_FIELD = () => ({
+  label: "_timestamp",
+  alias: "y_axis_1",
+  column: "_timestamp",
+  color: "#5960b2",
+  type: "build",
+  functionName: "count",
+  args: [{ type: "field", value: { field: "_timestamp" } }],
+  sortBy: null,
+  isDerived: false,
+  havingConditions: [],
+});
+
+// ============================================================================
 // Props and Emits
 // ============================================================================
 
@@ -282,40 +317,9 @@ const initializeFromQuery = async () => {
 
     dashboardPanelData.data.queries[0].customQuery = false;
 
-    // Default x-axis: histogram(_timestamp)
-    dashboardPanelData.data.queries[0].fields.x = [
-      {
-        label: "_timestamp",
-        alias: "x_axis_1",
-        column: "_timestamp",
-        color: null,
-        type: "build",
-        functionName: "histogram",
-        args: [
-          { type: "field", value: { field: "_timestamp" } },
-          { type: "histogramInterval", value: null },
-        ],
-        sortBy: "ASC",
-        isDerived: false,
-        havingConditions: [],
-      },
-    ];
-
-    // Default y-axis: count(_timestamp)
-    dashboardPanelData.data.queries[0].fields.y = [
-      {
-        label: "_timestamp",
-        alias: "y_axis_1",
-        column: "_timestamp",
-        color: "#5960b2",
-        type: "build",
-        functionName: "count",
-        args: [{ type: "field", value: { field: "_timestamp" } }],
-        sortBy: null,
-        isDerived: false,
-        havingConditions: [],
-      },
-    ];
+    // Default x-axis and y-axis fields
+    dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
+    dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
 
     // Parse WHERE clause into builder filter
     if (props.whereClause?.trim()) {
@@ -347,40 +351,9 @@ const initializeFromQuery = async () => {
     }
     dashboardPanelData.data.queries[0].customQuery = false;
 
-    // Default x-axis: histogram(_timestamp)
-    dashboardPanelData.data.queries[0].fields.x = [
-      {
-        label: "_timestamp",
-        alias: "x_axis_1",
-        column: "_timestamp",
-        color: null,
-        type: "build",
-        functionName: "histogram",
-        args: [
-          { type: "field", value: { field: "_timestamp" } },
-          { type: "histogramInterval", value: null },
-        ],
-        sortBy: "ASC",
-        isDerived: false,
-        havingConditions: [],
-      },
-    ];
-
-    // Default y-axis: count(_timestamp)
-    dashboardPanelData.data.queries[0].fields.y = [
-      {
-        label: "_timestamp",
-        alias: "y_axis_1",
-        column: "_timestamp",
-        color: "#5960b2",
-        type: "build",
-        functionName: "count",
-        args: [{ type: "field", value: { field: "_timestamp" } }],
-        sortBy: null,
-        isDerived: false,
-        havingConditions: [],
-      },
-    ];
+    // Default x-axis and y-axis fields
+    dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
+    dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
 
     emit("initialized");
     const generatedQuery = await makeAutoSQLQuery();

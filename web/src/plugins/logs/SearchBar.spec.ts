@@ -3985,10 +3985,6 @@ describe("BuildQueryPage prop computation", () => {
     expect(whereClauseProp).toBe("");
   });
 
-  it("should pass isSqlMode matching the current sqlMode state", () => {
-    expect(false).toBe(false);
-    expect(true).toBe(true);
-  });
 });
 
 /**

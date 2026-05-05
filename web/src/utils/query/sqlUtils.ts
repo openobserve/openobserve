@@ -1,7 +1,7 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 
 let parser: any;
-let parserInitialized = false;
+let parserImportPromise: Promise<any> | null = null;
 
 /**
  * Helper function to check if the query is a simple "SELECT * FROM....." query
@@ -21,13 +21,15 @@ export const isSimpleSelectAllQuery = (query: string): boolean => {
 };
 
 const importSqlParser = async () => {
-  if (!parserInitialized) {
-    const useSqlParser: any = await import("@/composables/useParser");
-    const { sqlParser }: any = useSqlParser.default();
-    parser = await sqlParser();
-    parserInitialized = true;
+  if (!parserImportPromise) {
+    parserImportPromise = (async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+      return parser;
+    })();
   }
-  return parser;
+  return parserImportPromise;
 };
 
 export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {

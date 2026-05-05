@@ -2241,12 +2241,12 @@ export default defineComponent({
     //   OFF → show only the WHERE clause (filter text)
     watch(
       () => searchObj.meta.sqlMode,
-      () => {
+      async () => {
         if (searchObj.meta.logsVisualizeToggle !== "build") return;
 
         const generatedQuery =
           buildDashboardPanelData.data.queries?.[0]?.query || "";
-        onBuildQueryGenerated(generatedQuery);
+        await onBuildQueryGenerated(generatedQuery);
       },
     );
 
