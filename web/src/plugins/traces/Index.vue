@@ -25,10 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-splitter
         class="traces-horizontal-splitter full-height"
         v-model="splitterModel"
-        :disable="activeTab === 'service-graph'"
+        :disable="
+          activeTab === 'service-graph' || activeTab === 'services-catalog'
+        "
         horizontal
         :before-class="
-          activeTab === 'service-graph' ? 'tw:max-h-[3.54rem]!' : ''
+          activeTab === 'service-graph' || activeTab === 'services-catalog'
+            ? 'tw:max-h-[3.54rem]!'
+            : ''
         "
         @update:model-value="onSplitterUpdate"
       >
@@ -52,6 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
               @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
+              @services-catalog-refresh="
+                servicesCatalogRef?.loadServicesCatalog()
+              "
             />
           </div>
         </template>
@@ -67,6 +74,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="serviceGraphRef"
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
+            />
+          </div>
+
+          <!-- Services Catalog Tab Content -->
+          <div
+            v-if="activeTab === 'services-catalog'"
+            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+          >
+            <services-catalog
+              ref="servicesCatalogRef"
+              class="tw:h-full"
+              @view-traces="handleServicesCatalogViewTraces"
             />
           </div>
 
@@ -303,6 +322,17 @@ import { cloneDeep, debounce } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import {
+  applyFieldGrouping,
+  buildSemanticIndex,
+  CATEGORY,
+  type FieldObj,
+} from "@/utils/fieldCategories";
+import {
+  useServiceCorrelation,
+  type KeyFieldsConfig,
+  type FieldGroupingConfig,
+} from "@/composables/useServiceCorrelation";
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
@@ -318,11 +348,17 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
+const ServicesCatalog = defineAsyncComponent(
+  () => import("./ServicesCatalog.vue"),
+);
 
 const store = useStore();
-const activeTab = computed(() =>
-  searchObj.meta.searchMode === "service-graph" ? "service-graph" : "search",
-);
+const activeTab = computed(() => {
+  if (searchObj.meta.searchMode === "service-graph") return "service-graph";
+  if (searchObj.meta.searchMode === "services-catalog")
+    return "services-catalog";
+  return "search";
+});
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
@@ -355,6 +391,7 @@ let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
+const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
@@ -365,6 +402,8 @@ const toggleErrorDetails = () => {
 };
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams();
+const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } =
+  useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
@@ -943,14 +982,24 @@ async function getQueryData(
     tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
+    const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
+    const sortOrd = (
+      searchObj.meta.resultGrid.sortOrder || "desc"
+    ).toUpperCase();
+    const schemaFieldNames = searchObj.data.stream.selectedStreamFields.map(
+      (f: any) => f.name,
+    );
+    const validSortCol = (() => {
+      if (schemaFieldNames.length === 0) return sortCol;
+      return sortCol === "start_time" || schemaFieldNames.includes(sortCol)
+        ? sortCol
+        : "start_time";
+    })();
+
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
-      const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
-      const sortOrd = (
-        searchObj.meta.resultGrid.sortOrder || "desc"
-      ).toUpperCase();
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${sortCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${validSortCol} ${sortOrd}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -962,6 +1011,10 @@ async function getQueryData(
         encoding: "base64",
       };
     })();
+
+    if (validSortCol !== sortCol) {
+      searchObj.meta.resultGrid.sortBy = "start_time";
+    }
 
     fetchQueryDataWithHttpStream(
       {
@@ -1096,9 +1149,9 @@ async function getQueryData(
           if (!isPagination) {
             fetchTracesCount();
           }
-          correlationFilters.save().catch((e) =>
-            console.error("[correlation:save] error:", e),
-          );
+          correlationFilters
+            .save()
+            .catch((e) => console.error("[correlation:save] error:", e));
         },
         reset: (_payload: any) => {
           searchObj.data.queryResults = {};
@@ -1240,22 +1293,17 @@ async function extractFields() {
         schema.map((row: any) => [row.name, row.type]),
       );
       Object.keys(importantFields).forEach((rowName) => {
-        if (fields[rowName] == undefined) {
-          fields[rowName] = {};
-          searchObj.data.stream.selectedStreamFields.push({
-            name: rowName,
-            ftsKey: ftsKeys.has(rowName),
-            showValues: !idFields[rowName],
-            label: rowName,
-            dataType: schemaTypeMap.get(rowName),
-            isSchemaField: true,
-          });
-        }
+        fields[rowName] = {};
+        searchObj.data.stream.selectedStreamFields.push({
+          name: rowName,
+          ftsKey: ftsKeys.has(rowName),
+          showValues: !idFields[rowName],
+          dataType: schemaTypeMap.get(rowName),
+          isSchemaField: true,
+        });
       });
 
       schema.forEach((row: any) => {
-        // let keys = deepKeys(row);
-        // for (let i in row) {
         if (!importantFields[row.name] && !ignoreFields.includes(row.name)) {
           if (fields[row.name] == undefined) {
             fields[row.name] = {};
@@ -1269,6 +1317,47 @@ async function extractFields() {
           }
         }
       });
+
+      // Apply field grouping
+      try {
+        const isEnterprise =
+          config.isEnterprise === "true" || config.isCloud === "true";
+        const [semanticAliases, keyFieldsConfig, fieldGrouping] =
+          await Promise.all([
+            isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
+            loadKeyFields(),
+            loadFieldGrouping(),
+          ]);
+        const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
+          ? (fieldGrouping as FieldGroupingConfig)
+          : null;
+        const semanticIndex =
+          semanticAliases.length > 0
+            ? buildSemanticIndex(semanticAliases, grouping)
+            : null;
+        const keySpec = (keyFieldsConfig as KeyFieldsConfig)["traces"] ?? {
+          fields: [],
+          groups: [],
+        };
+        const keyFieldSet = new Set(
+          keySpec.fields.map((f: string) => f.toLowerCase()),
+        );
+        const keyGroupSet = new Set(
+          keySpec.groups.map((g: string) => g.toLowerCase()),
+        );
+
+        searchObj.data.stream.selectedStreamFields = applyFieldGrouping(
+          searchObj.data.stream.selectedStreamFields as FieldObj[],
+          semanticIndex,
+          keyFieldSet,
+          keyGroupSet,
+        );
+      } catch (groupErr) {
+        console.warn(
+          "Field grouping failed for traces, using flat list",
+          groupErr,
+        );
+      }
     }
   } catch (e) {
     searchObj.loading = false;
@@ -1503,9 +1592,9 @@ function restoreUrlQueryParams() {
   const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
   if (
     tab !== undefined &&
-    (["service-graph", "traces", "spans"] as const).includes(
-      tab as "service-graph" | "traces" | "spans",
-    )
+    (
+      ["service-graph", "traces", "spans", "services-catalog"] as const
+    ).includes(tab as "service-graph" | "traces" | "spans" | "services-catalog")
   ) {
     if (tab === "service-graph" && config.isEnterprise !== "true") return;
     searchObj.meta.searchMode = tab as TraceSearchMode;
@@ -1601,10 +1690,12 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Service Graph / Traces / Spans)
-const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
+// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
+const onSearchModeChange = (
+  mode: "traces" | "spans" | "service-graph" | "services-catalog",
+) => {
   searchObj.meta.searchMode = mode;
-  if (mode === "service-graph") return;
+  if (mode === "service-graph" || mode === "services-catalog") return;
   if (
     mode === "traces" &&
     searchObj.meta.resultGrid.sortBy !== "start_time" &&
@@ -1774,6 +1865,12 @@ const searchData = () => {
   ) {
     return;
   }
+
+  if (
+    activeTab.value === "service-graph" ||
+    activeTab.value === "services-catalog"
+  )
+    return;
 
   // Clear brush selections when running query
   // The filters are now part of the query, so brush selections should be cleared
@@ -2035,6 +2132,18 @@ const handleServiceGraphViewTraces = (data: any) => {
   }
 
   // Run the query
+  nextTick(() => {
+    runQueryFn();
+  });
+};
+
+// Handler for services catalog row click — switches to traces mode filtered by service
+const handleServicesCatalogViewTraces = (serviceName: string) => {
+  const escapedName = escapeSingleQuotes(serviceName);
+  searchObj.data.editorValue = `service_name = '${escapedName}'`;
+  searchObj.data.query = searchObj.data.editorValue;
+  searchObj.meta.sqlMode = false;
+  searchObj.meta.searchMode = "traces";
   nextTick(() => {
     runQueryFn();
   });

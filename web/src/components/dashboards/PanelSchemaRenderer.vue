@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             panelSchema.type == 'table' && panelSchema.queryType === 'promql'
           "
+          ref="tableRendererRef"
           :data="tableRendererData"
           :config="panelSchema.config"
           @row-click="onChartClick"

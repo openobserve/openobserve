@@ -33,6 +33,9 @@ describe("SearchResult Component", () => {
   let wrapper: any;
 
   beforeEach(async () => {
+    // jsdom does not implement HTMLElement.scrollTo
+    HTMLElement.prototype.scrollTo = vi.fn();
+
     // Mock store state
     store.state.zoConfig = {
       sql_mode: false,
@@ -102,18 +105,16 @@ describe("SearchResult Component", () => {
 
     it("should scroll table to top", async () => {
       const scrollToSpy = vi.fn();
-      wrapper.vm.searchTableRef = {
-        parentRef: {
-          scrollTo: scrollToSpy,
-        },
+      wrapper.vm.scrollContainerRef = {
+        scrollTo: scrollToSpy,
       };
 
       await wrapper.vm.scrollTableToTop(0);
       expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
     });
 
-    it("should handle missing searchTableRef in scrollTableToTop", () => {
-      wrapper.vm.searchTableRef = null;
+    it("should handle missing scrollContainerRef in scrollTableToTop", () => {
+      wrapper.vm.scrollContainerRef = null;
       expect(() => wrapper.vm.scrollTableToTop(0)).not.toThrow();
     });
   });
@@ -434,10 +435,8 @@ describe("SearchResult Component", () => {
   describe("Additional Methods Coverage", () => {
     it("should handle scroll table to top with valid ref", async () => {
       const scrollToSpy = vi.fn();
-      wrapper.vm.searchTableRef = {
-        parentRef: {
-          scrollTo: scrollToSpy,
-        },
+      wrapper.vm.scrollContainerRef = {
+        scrollTo: scrollToSpy,
       };
 
       await wrapper.vm.scrollTableToTop(100);
@@ -615,7 +614,10 @@ describe("SearchResult Component", () => {
     it("should open pattern details and set selectedPattern", () => {
       const mockPattern = { template: "INFO action <*> at 14:47", count: 10 };
       wrapper.vm.openPatternDetails(mockPattern, 2);
-      expect(wrapper.vm.selectedPattern).toEqual({ pattern: mockPattern, index: 2 });
+      expect(wrapper.vm.selectedPattern).toEqual({
+        pattern: mockPattern,
+        index: 2,
+      });
       expect(wrapper.vm.showPatternDetails).toBe(true);
     });
 

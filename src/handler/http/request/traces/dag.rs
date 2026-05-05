@@ -371,3 +371,52 @@ struct SpanEdge {
     from: String,
     to: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_span_node_serializes() {
+        let node = SpanNode {
+            span_id: "span1".to_string(),
+            parent_span_id: None,
+            service_name: "svc".to_string(),
+            operation_name: "GET /api".to_string(),
+            span_status: "OK".to_string(),
+            start_time: 100,
+            end_time: 200,
+            llm_observation_type: None,
+        };
+        let json = serde_json::to_string(&node).unwrap();
+        assert!(json.contains("span1"));
+        assert!(json.contains("svc"));
+    }
+
+    #[test]
+    fn test_span_node_with_parent_serializes() {
+        let node = SpanNode {
+            span_id: "child".to_string(),
+            parent_span_id: Some("parent".to_string()),
+            service_name: "svc".to_string(),
+            operation_name: "op".to_string(),
+            span_status: "OK".to_string(),
+            start_time: 0,
+            end_time: 1,
+            llm_observation_type: None,
+        };
+        let json = serde_json::to_string(&node).unwrap();
+        assert!(json.contains("parent"));
+    }
+
+    #[test]
+    fn test_span_edge_serializes() {
+        let edge = SpanEdge {
+            from: "a".to_string(),
+            to: "b".to_string(),
+        };
+        let json = serde_json::to_string(&edge).unwrap();
+        assert!(json.contains("\"from\":\"a\""));
+        assert!(json.contains("\"to\":\"b\""));
+    }
+}

@@ -328,4 +328,101 @@ mod tests {
         // Should not contain __name__ label (which is NAME_LABEL)
         assert!(!result.iter().any(|l| l.name == "__name__"));
     }
+
+    #[test]
+    fn test_labels_to_include_empty_include_list() {
+        let actual_labels = create_test_labels();
+        let result = labels_to_include(&[], actual_labels);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_labels_to_exclude_empty_exclude_list() {
+        let actual_labels = create_test_labels();
+        let result = labels_to_exclude(&[], actual_labels);
+        // NAME_LABEL (__name__) is always excluded
+        assert!(!result.iter().any(|l| l.name == "__name__"));
+        assert!(result.iter().any(|l| l.name == "instance"));
+        assert!(result.iter().any(|l| l.name == "job"));
+    }
+
+    #[test]
+    fn test_group_series_by_labels_none_modifier() {
+        use std::time::Duration;
+
+        use config::meta::promql::value::TimeWindow;
+
+        let labels1 = vec![Arc::new(Label::new("job", "a"))];
+        let labels2 = vec![Arc::new(Label::new("job", "b"))];
+        let matrix = vec![
+            RangeValue {
+                labels: labels1,
+                samples: vec![Sample::new(1000, 1.0)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    range: Duration::from_secs(1),
+                    offset: Duration::ZERO,
+                }),
+            },
+            RangeValue {
+                labels: labels2,
+                samples: vec![Sample::new(1000, 2.0)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    range: Duration::from_secs(1),
+                    offset: Duration::ZERO,
+                }),
+            },
+        ];
+
+        // None modifier → all labels stripped → all series get same empty-labels hash
+        let groups = group_series_by_labels(&matrix, &None);
+        assert_eq!(groups.len(), 1);
+        let indices = groups.values().next().unwrap();
+        assert_eq!(indices.len(), 2);
+    }
+
+    #[test]
+    fn test_group_series_by_labels_include_modifier() {
+        use std::time::Duration;
+
+        use config::meta::promql::value::TimeWindow;
+        use promql_parser::label::Labels as ParserLabels;
+
+        let labels_a = vec![
+            Arc::new(Label::new("job", "api")),
+            Arc::new(Label::new("env", "prod")),
+        ];
+        let labels_b = vec![
+            Arc::new(Label::new("job", "api")),
+            Arc::new(Label::new("env", "staging")),
+        ];
+        let matrix = vec![
+            RangeValue {
+                labels: labels_a,
+                samples: vec![Sample::new(1000, 1.0)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    range: Duration::from_secs(1),
+                    offset: Duration::ZERO,
+                }),
+            },
+            RangeValue {
+                labels: labels_b,
+                samples: vec![Sample::new(1000, 2.0)],
+                exemplars: None,
+                time_window: Some(TimeWindow {
+                    range: Duration::from_secs(1),
+                    offset: Duration::ZERO,
+                }),
+            },
+        ];
+
+        // Include only "job" → both series have same "job=api" → 1 group
+        let modifier = Some(LabelModifier::Include(ParserLabels {
+            labels: vec!["job".to_string()],
+        }));
+        let groups = group_series_by_labels(&matrix, &modifier);
+        assert_eq!(groups.len(), 1);
+    }
 }

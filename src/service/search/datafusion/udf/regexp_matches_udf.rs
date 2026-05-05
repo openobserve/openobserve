@@ -237,9 +237,40 @@ mod tests {
 
     use arrow::array::{RecordBatch, StringArray};
     use arrow_schema::Schema;
-    use datafusion::{assert_batches_eq, datasource::MemTable, prelude::SessionContext};
+    use datafusion::{
+        assert_batches_eq, datasource::MemTable, logical_expr::ScalarUDFImpl,
+        prelude::SessionContext,
+    };
 
     use super::*;
+
+    #[test]
+    fn test_regexp_matches_func_name() {
+        let func = RegexpMatchesFunc::new();
+        assert_eq!(func.name(), REGEX_MATCHES_UDF_NAME);
+    }
+
+    #[test]
+    fn test_regexp_matches_direct_finds_matches() {
+        let values = StringArray::from(vec!["abc123def456"]);
+        let pattern = StringArray::from(vec!["(\\d+)"]);
+        let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
+        let result = regexp_matches::<i32>(&args).unwrap();
+        use arrow::array::{Array, ListArray};
+        let list = result.as_any().downcast_ref::<ListArray>().unwrap();
+        assert!(!list.is_null(0));
+    }
+
+    #[test]
+    fn test_regexp_matches_direct_no_match_returns_null_row() {
+        let values = StringArray::from(vec!["no digits here"]);
+        let pattern = StringArray::from(vec!["(\\d+)"]);
+        let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
+        let result = regexp_matches::<i32>(&args).unwrap();
+        use arrow::array::{Array, ListArray};
+        let list = result.as_any().downcast_ref::<ListArray>().unwrap();
+        assert!(list.is_null(0));
+    }
 
     #[tokio::test]
     async fn test_re_matches_extract_all_numbers_as_scalar() {

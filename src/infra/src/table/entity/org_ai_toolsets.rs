@@ -22,3 +22,28 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "ts-1".to_string(),
+            org: "myorg".to_string(),
+            name: "My Toolset".to_string(),
+            kind: "mcp".to_string(),
+            description: Some("test toolset".to_string()),
+            data: Some("encrypted-data".to_string()),
+            created_by: "admin@example.com".to_string(),
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        assert_eq!(m.id, "ts-1");
+        assert_eq!(m.org, "myorg");
+        assert_eq!(m.kind, "mcp");
+        assert!(m.description.is_some());
+        assert!(m.data.is_some());
+    }
+}

@@ -1721,3 +1721,28 @@ struct TraceServiceNameItem {
     count: u16,
     duration: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trace_service_name_item_default() {
+        let item = TraceServiceNameItem::default();
+        assert_eq!(item.service_name, "");
+        assert_eq!(item.count, 0);
+        assert_eq!(item.duration, 0);
+    }
+
+    #[test]
+    fn test_trace_service_name_item_fields() {
+        let item = TraceServiceNameItem {
+            service_name: "my-service".to_string(),
+            count: 42,
+            duration: 1000,
+        };
+        assert_eq!(item.service_name, "my-service");
+        assert_eq!(item.count, 42);
+        assert_eq!(item.duration, 1000);
+    }
+}

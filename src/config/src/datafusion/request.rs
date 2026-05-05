@@ -167,3 +167,152 @@ impl From<FlightSearchRequest> for cluster_rpc::FlightSearchRequest {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use proto::cluster_rpc::{IndexInfo, QueryIdentifier, SearchInfo, SuperClusterInfo};
+
+    use super::*;
+
+    fn make_flight_request() -> FlightSearchRequest {
+        FlightSearchRequest {
+            query_identifier: QueryIdentifier {
+                trace_id: "trace-1".to_string(),
+                org_id: "myorg".to_string(),
+                stream_type: "logs".to_string(),
+                ..Default::default()
+            },
+            search_info: SearchInfo {
+                start_time: 1_000,
+                end_time: 2_000,
+                timeout: 30,
+                use_cache: true,
+                clear_cache: false,
+                histogram_interval: 60,
+                ..Default::default()
+            },
+            index_info: IndexInfo::default(),
+            super_cluster_info: SuperClusterInfo {
+                user_id: Some("alice".to_string()),
+                work_group: Some("wg1".to_string()),
+                local_mode: Some(true),
+                ..Default::default()
+            },
+        }
+    }
+
+    #[test]
+    fn test_from_flight_request_to_request_maps_fields() {
+        let flight = make_flight_request();
+        let req = Request::from(flight);
+        assert_eq!(req.trace_id, "trace-1");
+        assert_eq!(req.org_id, "myorg");
+        assert_eq!(req.timeout, 30);
+        assert_eq!(req.time_range, Some((1_000, 2_000)));
+        assert!(req.use_cache);
+        assert!(!req.overwrite_cache);
+        assert_eq!(req.histogram_interval, 60);
+        assert_eq!(req.user_id, Some("alice".to_string()));
+        assert_eq!(req.work_group, Some("wg1".to_string()));
+        assert_eq!(req.local_mode, Some(true));
+        assert!(!req.streaming_output);
+        assert!(req.streaming_id.is_none());
+    }
+
+    #[test]
+    fn test_from_flight_to_proto_and_back_roundtrip() {
+        let original = make_flight_request();
+        let proto: cluster_rpc::FlightSearchRequest = original.clone().into();
+        let recovered = FlightSearchRequest::from(proto);
+        assert_eq!(recovered.query_identifier.trace_id, "trace-1");
+        assert_eq!(recovered.search_info.start_time, 1_000);
+        assert_eq!(
+            recovered.super_cluster_info.user_id,
+            Some("alice".to_string())
+        );
+    }
+
+    #[test]
+    fn test_from_flight_to_proto_wraps_in_some() {
+        let flight = make_flight_request();
+        let proto: cluster_rpc::FlightSearchRequest = flight.into();
+        assert!(proto.query_identifier.is_some());
+        assert!(proto.search_info.is_some());
+        assert!(proto.index_info.is_some());
+        assert!(proto.super_cluster_info.is_some());
+    }
+
+    #[test]
+    fn test_add_work_group_sets_field() {
+        let mut req = Request::default();
+        assert!(req.work_group.is_none());
+        req.add_work_group(Some("my_group".to_string()));
+        assert_eq!(req.work_group, Some("my_group".to_string()));
+    }
+
+    #[test]
+    fn test_add_work_group_clears_field() {
+        let mut req = Request::default();
+        req.add_work_group(Some("group".to_string()));
+        req.add_work_group(None);
+        assert!(req.work_group.is_none());
+    }
+
+    #[test]
+    fn test_set_streaming_output_sets_both_fields() {
+        let mut req = Request::default();
+        assert!(!req.streaming_output);
+        assert!(req.streaming_id.is_none());
+        req.set_streaming_output(true, Some("stream_123".to_string()));
+        assert!(req.streaming_output);
+        assert_eq!(req.streaming_id, Some("stream_123".to_string()));
+    }
+
+    #[test]
+    fn test_set_local_mode_sets_field() {
+        let mut req = Request::default();
+        assert!(req.local_mode.is_none());
+        req.set_local_mode(Some(true));
+        assert_eq!(req.local_mode, Some(true));
+        req.set_local_mode(None);
+        assert!(req.local_mode.is_none());
+    }
+
+    #[test]
+    fn test_set_use_cache_overrides_default() {
+        let mut req = Request::default();
+        req.set_use_cache(true);
+        assert!(req.use_cache);
+        req.set_use_cache(false);
+        assert!(!req.use_cache);
+    }
+
+    #[test]
+    fn test_set_partition_stores_value() {
+        let mut req = make_flight_request();
+        req.set_partition(7);
+        assert_eq!(req.query_identifier.partition, 7);
+    }
+
+    #[test]
+    fn test_set_job_id_stores_value() {
+        let mut req = make_flight_request();
+        req.set_job_id("job-123".to_string());
+        assert_eq!(req.query_identifier.job_id, "job-123");
+    }
+
+    #[test]
+    fn test_from_proto_flight_to_flight_roundtrip() {
+        let original = make_flight_request();
+        let proto: cluster_rpc::FlightSearchRequest = original.clone().into();
+        let restored = FlightSearchRequest::from(proto);
+        assert_eq!(
+            restored.query_identifier.trace_id,
+            original.query_identifier.trace_id
+        );
+        assert_eq!(
+            restored.search_info.start_time,
+            original.search_info.start_time
+        );
+    }
+}

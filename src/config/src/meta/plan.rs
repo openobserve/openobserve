@@ -30,3 +30,39 @@ pub fn print_plan(plan: &dyn ExecutionPlan) {
     let plan = displayable(plan).indent(false).to_string();
     println!("\n{plan}\n");
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::physical_plan::empty::EmptyExec;
+
+    use super::*;
+
+    fn empty_plan() -> Arc<dyn ExecutionPlan> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        Arc::new(EmptyExec::new(schema))
+    }
+
+    #[test]
+    fn test_generate_plan_string_contains_trace_id() {
+        let plan = empty_plan();
+        let result = generate_plan_string("trace-xyz", plan.as_ref());
+        assert!(result.contains("trace-xyz"));
+        assert!(result.contains("EmptyExec"));
+    }
+
+    #[test]
+    fn test_generate_plan_string_nonempty() {
+        let plan = empty_plan();
+        let result = generate_plan_string("t1", plan.as_ref());
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_print_plan_does_not_panic() {
+        let plan = empty_plan();
+        print_plan(plan.as_ref());
+    }
+}

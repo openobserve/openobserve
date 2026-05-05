@@ -988,6 +988,268 @@ mod tests {
         );
     }
 
+    // ---------------------------------------------------------------------------
+    // Values::len() tests
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_values_json_len_empty() {
+        let v = Values::Json(Arc::new(vec![]));
+        assert_eq!(v.len(), 0);
+    }
+
+    #[test]
+    fn test_values_json_len_nonempty() {
+        let v = Values::Json(Arc::new(vec![
+            serde_json::json!({"a": 1}),
+            serde_json::json!({"a": 2}),
+            serde_json::json!({"a": 3}),
+        ]));
+        assert_eq!(v.len(), 3);
+    }
+
+    #[test]
+    fn test_values_vrl_len_empty() {
+        let v = Values::Vrl(Arc::new(vec![]));
+        assert_eq!(v.len(), 0);
+    }
+
+    #[test]
+    fn test_values_vrl_len_nonempty() {
+        use vrl::value::Value as VrlValue;
+        let v = Values::Vrl(Arc::new(vec![VrlValue::Null, VrlValue::Null]));
+        assert_eq!(v.len(), 2);
+    }
+
+    #[test]
+    fn test_values_recordbatch_len_empty_vec() {
+        let v = Values::RecordBatch(vec![]);
+        assert_eq!(v.len(), 0);
+    }
+
+    #[test]
+    fn test_values_recordbatch_len_single_batch() {
+        use arrow::array::Int64Array;
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "val",
+            arrow::datatypes::DataType::Int64,
+            false,
+        )]));
+        let arr = Int64Array::from(vec![1, 2, 3, 4]);
+        let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)]).unwrap();
+        let v = Values::RecordBatch(vec![batch]);
+        assert_eq!(v.len(), 4);
+    }
+
+    #[test]
+    fn test_values_recordbatch_len_multiple_batches_summed() {
+        use arrow::array::Int64Array;
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "val",
+            arrow::datatypes::DataType::Int64,
+            false,
+        )]));
+        let arr1 = Int64Array::from(vec![10, 20]);
+        let arr2 = Int64Array::from(vec![30, 40, 50]);
+        let batch1 = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr1)]).unwrap();
+        let batch2 = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr2)]).unwrap();
+        let v = Values::RecordBatch(vec![batch1, batch2]);
+        assert_eq!(v.len(), 5);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Values::is_empty() tests
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_values_json_is_empty_true() {
+        let v = Values::Json(Arc::new(vec![]));
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn test_values_json_is_empty_false() {
+        let v = Values::Json(Arc::new(vec![serde_json::json!({"x": 1})]));
+        assert!(!v.is_empty());
+    }
+
+    #[test]
+    fn test_values_vrl_is_empty_true() {
+        let v = Values::Vrl(Arc::new(vec![]));
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn test_values_vrl_is_empty_false() {
+        use vrl::value::Value as VrlValue;
+        let v = Values::Vrl(Arc::new(vec![VrlValue::Null]));
+        assert!(!v.is_empty());
+    }
+
+    #[test]
+    fn test_values_recordbatch_is_empty_empty_vec() {
+        let v = Values::RecordBatch(vec![]);
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn test_values_recordbatch_is_empty_all_zero_row_batches() {
+        use arrow::array::Int64Array;
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "val",
+            arrow::datatypes::DataType::Int64,
+            false,
+        )]));
+        // A batch with 0 rows
+        let empty_arr: Int64Array = Int64Array::from(Vec::<i64>::new());
+        let empty_batch =
+            RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(empty_arr)]).unwrap();
+        let v = Values::RecordBatch(vec![empty_batch]);
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn test_values_recordbatch_is_empty_has_rows() {
+        use arrow::array::Int64Array;
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "val",
+            arrow::datatypes::DataType::Int64,
+            false,
+        )]));
+        let arr = Int64Array::from(vec![1]);
+        let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)]).unwrap();
+        let v = Values::RecordBatch(vec![batch]);
+        assert!(!v.is_empty());
+    }
+
+    // ---------------------------------------------------------------------------
+    // Values::last_updated_at() — Json variant
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_last_updated_at_json_single_row() {
+        let data = vec![serde_json::json!({"_timestamp": 5000_i64})];
+        let v = Values::Json(Arc::new(data));
+        assert_eq!(v.last_updated_at(), 5000);
+    }
+
+    #[test]
+    fn test_last_updated_at_json_multiple_rows_returns_max() {
+        let data = vec![
+            serde_json::json!({"_timestamp": 100_i64}),
+            serde_json::json!({"_timestamp": 9999_i64}),
+            serde_json::json!({"_timestamp": 500_i64}),
+        ];
+        let v = Values::Json(Arc::new(data));
+        assert_eq!(v.last_updated_at(), 9999);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Values clone / Debug
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_values_json_clone_and_debug() {
+        let v = Values::Json(Arc::new(vec![serde_json::json!({"k": "v"})]));
+        let cloned = v.clone();
+        assert_eq!(cloned.len(), 1);
+        // Debug should not panic
+        let _ = format!("{:?}", v);
+    }
+
+    #[test]
+    fn test_values_vrl_clone_and_debug() {
+        use vrl::value::Value as VrlValue;
+        let v = Values::Vrl(Arc::new(vec![VrlValue::Null]));
+        let cloned = v.clone();
+        assert_eq!(cloned.len(), 1);
+        let _ = format!("{:?}", v);
+    }
+
+    #[test]
+    fn test_values_recordbatch_clone_and_debug() {
+        use arrow::array::Int64Array;
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "val",
+            arrow::datatypes::DataType::Int64,
+            false,
+        )]));
+        let arr = Int64Array::from(vec![42]);
+        let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)]).unwrap();
+        let v = Values::RecordBatch(vec![batch]);
+        let cloned = v.clone();
+        assert_eq!(cloned.len(), 1);
+        let _ = format!("{:?}", v);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Values::to_json() — RecordBatch with multiple batches
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_values_recordbatch_to_json_multiple_batches() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", arrow::datatypes::DataType::Int64, false),
+            Field::new("name", arrow::datatypes::DataType::Utf8, false),
+        ]));
+
+        let batch1 = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["a"])),
+            ],
+        )
+        .unwrap();
+        let batch2 = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(Int64Array::from(vec![2, 3])),
+                Arc::new(StringArray::from(vec!["b", "c"])),
+            ],
+        )
+        .unwrap();
+
+        let v = Values::RecordBatch(vec![batch1, batch2]);
+        let json = v.to_json().unwrap();
+        assert_eq!(json.len(), 3);
+    }
+
+    #[test]
+    fn test_values_recordbatch_to_json_empty_batches_vec() {
+        let v = Values::RecordBatch(vec![]);
+        let json = v.to_json().unwrap();
+        assert_eq!(json.len(), 0);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Values::to_record_batch() — RecordBatch passthrough
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_values_recordbatch_to_record_batch_passthrough() {
+        use arrow::array::Int64Array;
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "x",
+            arrow::datatypes::DataType::Int64,
+            false,
+        )]));
+        let arr = Int64Array::from(vec![7, 8]);
+        let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(arr)]).unwrap();
+        let v = Values::RecordBatch(vec![batch]);
+        let result = v.to_record_batch(&schema).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].num_rows(), 2);
+    }
+
     #[test]
     fn test_values_conversions() {
         // Test JSON -> JSON (no conversion)

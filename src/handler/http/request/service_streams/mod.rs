@@ -205,7 +205,7 @@ pub async fn correlate_streams(
             identity_config.tracked_alias_ids
         );
         let semantic_groups =
-            o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+            o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file();
 
         // Enhanced debug logging for correlation troubleshooting
         log::debug!(
@@ -377,7 +377,7 @@ pub async fn save_identity_config(
     {
         use std::collections::HashSet;
         let known_ids: HashSet<String> =
-            o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()
+            o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file()
                 .into_iter()
                 .map(|g| g.id)
                 .collect();

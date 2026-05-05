@@ -1269,4 +1269,41 @@ mod tests {
         . = arr1_final"#;
         assert!(is_result_array_skip_vrl(query_fn));
     }
+
+    #[test]
+    fn test_convert_ts_value_to_datetime_number() {
+        // 1_000_000 microseconds = 1 second after epoch
+        let val = serde_json::Value::Number(serde_json::Number::from(1_000_000i64));
+        let result = convert_ts_value_to_datetime(&val);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().timestamp(), 1);
+    }
+
+    #[test]
+    fn test_convert_ts_value_to_datetime_string() {
+        let val = serde_json::Value::String("2024-01-15T10:30:00".to_string());
+        let result = convert_ts_value_to_datetime(&val);
+        assert!(result.is_some());
+        // 2024-01-15 00:00:00 UTC in seconds since epoch
+        assert!(result.unwrap().timestamp() > 0);
+    }
+
+    #[test]
+    fn test_convert_ts_value_to_datetime_invalid_string_returns_none() {
+        let val = serde_json::Value::String("not-a-date".to_string());
+        let result = convert_ts_value_to_datetime(&val);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_convert_ts_value_to_datetime_null_returns_none() {
+        let result = convert_ts_value_to_datetime(&serde_json::Value::Null);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_is_result_array_skip_vrl_no_marker() {
+        let query_fn = "just a normal query";
+        assert!(!is_result_array_skip_vrl(query_fn));
+    }
 }

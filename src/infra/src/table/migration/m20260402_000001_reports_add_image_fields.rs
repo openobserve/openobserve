@@ -140,3 +140,18 @@ enum ReportDashboards {
     EmailAttachmentType,
     AttachmentDimensions,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20260402_000001_reports_add_image_fields"
+        );
+    }
+}

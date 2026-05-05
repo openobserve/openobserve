@@ -16,8 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="traces-metrics-dashboard tw:w-full">
-
-
     <!-- Charts Section -->
     <transition name="slide-fade">
       <div
@@ -136,7 +134,6 @@ const currentTimeObj = ref({
 });
 
 const dashboardData = ref(null);
-
 
 // Unified Analysis Dashboard state
 const showAnalysisDashboard = ref(false);
@@ -312,8 +309,8 @@ const loadDashboard = async () => {
 
       // Build the final query: substitute placeholders then apply mode transforms
       let query = panel["queries"][0].query
-        .replace("[STREAM_NAME]", `"${streamName}"`)
-        .replace("[WHERE_CLAUSE]", whereClause);
+        .replace("[STREAM_NAME]", () => `"${streamName}"`)
+        .replace("[WHERE_CLAUSE]", () => whereClause);
 
       // Spans mode: replace trace-level distinct counts with span-level counts
       // in the Rate and Errors panels.
@@ -733,8 +730,6 @@ defineExpose({
   }
 }
 
-
-
 // Slide fade transition
 .slide-fade-enter-active,
 .slide-fade-leave-active {
@@ -774,7 +769,6 @@ defineExpose({
 
 // Dark mode support
 body.body--dark {
-
   .charts-container {
     border-color: rgba(255, 255, 255, 0.1);
 

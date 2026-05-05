@@ -113,7 +113,11 @@ const makeSearchObj = () =>
       showDetailTab: false,
       showTraceDetails: false,
       sqlMode: false,
-      searchMode: "traces" as "traces" | "spans",
+      searchMode: "traces" as
+        | "traces"
+        | "spans"
+        | "service-graph"
+        | "services-catalog",
       showErrorOnly: false,
       queryEditorPlaceholderFlag: true,
       metricsRangeFilters: new Map<
@@ -375,6 +379,11 @@ describe("SearchBar", () => {
       expect(
         wrapper.find('[data-test="traces-service-graph-toggle"]').exists(),
       ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="traces-search-mode-services-catalog-btn"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 
@@ -391,6 +400,22 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("update:searchMode")).toBeTruthy();
       expect(wrapper.emitted("update:searchMode")![0]).toEqual([
         "service-graph",
+      ]);
+    });
+
+    it("should emit update:searchMode with 'services-catalog' when the services-catalog button is clicked", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const scBtn = wrapper.find(
+        '[data-test="traces-search-mode-services-catalog-btn"]',
+      );
+      expect(scBtn.exists()).toBe(true);
+      await scBtn.trigger("click");
+
+      expect(wrapper.emitted("update:searchMode")).toBeTruthy();
+      expect(wrapper.emitted("update:searchMode")![0]).toEqual([
+        "services-catalog",
       ]);
     });
   });
@@ -419,6 +444,26 @@ describe("SearchBar", () => {
 
     it("should hide search controls when searchMode is 'service-graph'", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-test="traces-search-bar-reset-filters-btn"]')
+          .exists(),
+      ).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="logs-search-bar-date-time-dropdown"]')
+          .exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should hide search controls when searchMode is 'services-catalog'", async () => {
+      searchObjInstance.meta.searchMode = "services-catalog";
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -505,6 +550,21 @@ describe("SearchBar", () => {
 
       expect(
         wrapper.find('[data-test="traces-search-mode-spans-btn"]').classes(),
+      ).toContain("selected");
+      expect(
+        wrapper.find('[data-test="traces-search-mode-traces-btn"]').classes(),
+      ).not.toContain("selected");
+    });
+
+    it("should apply 'selected' class to Services Catalog button when searchMode is 'services-catalog'", async () => {
+      searchObjInstance.meta.searchMode = "services-catalog";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-test="traces-search-mode-services-catalog-btn"]')
+          .classes(),
       ).toContain("selected");
       expect(
         wrapper.find('[data-test="traces-search-mode-traces-btn"]').classes(),
@@ -703,8 +763,12 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar({ isLoading: true });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists(),
+      ).toBe(false);
     });
 
     it("should not emit searchdata when searchObj.loading is true", async () => {
@@ -1206,7 +1270,9 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      const refreshBtn = wrapper.find('[data-test="service-graph-refresh-btn"]');
+      const refreshBtn = wrapper.find(
+        '[data-test="service-graph-refresh-btn"]',
+      );
       expect(refreshBtn.exists()).toBe(true);
       await refreshBtn.trigger("click");
 
@@ -1265,6 +1331,62 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("services-catalog mode toolbar", () => {
+    beforeEach(() => {
+      searchObjInstance.meta.searchMode = "services-catalog";
+    });
+
+    it("should render services-catalog-date-time-picker when searchMode is services-catalog", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-test="services-catalog-date-time-picker"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("should render services-catalog-refresh-btn when searchMode is services-catalog", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="services-catalog-refresh-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should emit services-catalog-refresh when refresh btn is clicked", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const refreshBtn = wrapper.find(
+        '[data-test="services-catalog-refresh-btn"]',
+      );
+      expect(refreshBtn.exists()).toBe(true);
+      await refreshBtn.trigger("click");
+
+      expect(wrapper.emitted("services-catalog-refresh")).toBeTruthy();
+      expect(wrapper.emitted("services-catalog-refresh")).toHaveLength(1);
+    });
+
+    it("should hide services-catalog toolbar when searchMode is not services-catalog", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-test="services-catalog-date-time-picker"]')
+          .exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="services-catalog-refresh-btn"]').exists(),
+      ).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("props", () => {
     it("should accept updated fieldValues without errors", async () => {
       wrapper = mountSearchBar({ fieldValues: {} });
@@ -1286,13 +1408,19 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar({ isLoading: false });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists(),
+      ).toBe(true);
 
       await wrapper.setProps({ isLoading: true });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="traces-search-bar-cancel-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists(),
+      ).toBe(false);
     });
   });
 });

@@ -577,3 +577,20 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sqlite_scheduler_new() {
+        let s = SqliteScheduler::new();
+        drop(s);
+    }
+
+    #[test]
+    fn test_sqlite_scheduler_default() {
+        let s = SqliteScheduler::default();
+        drop(s);
+    }
+}

@@ -283,26 +283,8 @@ pub async fn get_latest_sessions(
     }
 
     // Parse session_id -> trace_ids from Phase 1 results
-    let mut session_trace_ids: HashMap<String, Vec<String>> =
-        HashMap::with_capacity(resp_search.hits.len());
-    let mut session_ids: Vec<String> = Vec::with_capacity(resp_search.hits.len());
-    for item in resp_search.hits {
-        let session_id = match item.get(session_id_col).and_then(|v| v.as_str()) {
-            Some(s) => s.to_string(),
-            None => continue,
-        };
-        let trace_ids: Vec<String> = item
-            .get("trace_ids")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        session_ids.push(session_id.clone());
-        session_trace_ids.insert(session_id, trace_ids);
-    }
+    let (session_ids, session_trace_ids) =
+        parse_session_trace_ids(&resp_search.hits, session_id_col);
 
     // Collect all unique trace_ids across sessions
     let all_trace_ids: Vec<String> = session_trace_ids
@@ -399,50 +381,7 @@ pub async fn get_latest_sessions(
     }
 
     // Aggregate per session from trace details
-    let mut sessions_data: Vec<SessionResponseItem> = Vec::with_capacity(session_ids.len());
-    for session_id in &session_ids {
-        let trace_ids = match session_trace_ids.get(session_id) {
-            Some(ids) => ids,
-            None => continue,
-        };
-        let mut session_start_time: i64 = 0;
-        let mut session_end_time: i64 = 0;
-        let mut usage_input: i64 = 0;
-        let mut usage_output: i64 = 0;
-        let mut usage_total: i64 = 0;
-        let mut cost_total: f64 = 0.0;
-        for tid in trace_ids {
-            if let Some(detail) = trace_details.get(tid) {
-                if session_start_time == 0 || detail.start_time < session_start_time {
-                    session_start_time = detail.start_time;
-                }
-                if detail.end_time > session_end_time {
-                    session_end_time = detail.end_time;
-                }
-                usage_input += detail.llm_usage_input;
-                usage_output += detail.llm_usage_output;
-                usage_total += detail.llm_usage_total;
-                cost_total += detail.llm_cost_total;
-            }
-        }
-        let duration = if session_end_time > session_start_time {
-            session_end_time - session_start_time
-        } else {
-            0
-        };
-        sessions_data.push(SessionResponseItem {
-            session_id: session_id.clone(),
-            start_time: session_start_time,
-            end_time: session_end_time,
-            duration,
-            trace_count: trace_ids.len() as u16,
-            llm_usage_tokens_input: usage_input,
-            llm_usage_tokens_output: usage_output,
-            llm_usage_tokens_total: usage_total,
-            llm_usage_cost_total: cost_total,
-        });
-    }
-    sessions_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+    let sessions_data = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -499,4 +438,280 @@ struct SessionResponseItem {
     llm_usage_tokens_output: i64,
     llm_usage_tokens_total: i64,
     llm_usage_cost_total: f64,
+}
+
+fn parse_session_trace_ids(
+    hits: &[json::Value],
+    session_id_col: &str,
+) -> (Vec<String>, HashMap<String, Vec<String>>) {
+    let mut session_trace_ids: HashMap<String, Vec<String>> = HashMap::with_capacity(hits.len());
+    let mut session_ids: Vec<String> = Vec::with_capacity(hits.len());
+    for item in hits {
+        let session_id = match item.get(session_id_col).and_then(|v| v.as_str()) {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+        let trace_ids: Vec<String> = item
+            .get("trace_ids")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        session_ids.push(session_id.clone());
+        session_trace_ids.insert(session_id, trace_ids);
+    }
+    (session_ids, session_trace_ids)
+}
+
+fn aggregate_sessions(
+    session_ids: &[String],
+    session_trace_ids: &HashMap<String, Vec<String>>,
+    trace_details: &HashMap<String, TraceDetail>,
+) -> Vec<SessionResponseItem> {
+    let mut sessions_data: Vec<SessionResponseItem> = Vec::with_capacity(session_ids.len());
+    for session_id in session_ids {
+        let trace_ids = match session_trace_ids.get(session_id) {
+            Some(ids) => ids,
+            None => continue,
+        };
+        let mut session_start_time: i64 = 0;
+        let mut session_end_time: i64 = 0;
+        let mut usage_input: i64 = 0;
+        let mut usage_output: i64 = 0;
+        let mut usage_total: i64 = 0;
+        let mut cost_total: f64 = 0.0;
+        for tid in trace_ids {
+            if let Some(detail) = trace_details.get(tid) {
+                if session_start_time == 0 || detail.start_time < session_start_time {
+                    session_start_time = detail.start_time;
+                }
+                if detail.end_time > session_end_time {
+                    session_end_time = detail.end_time;
+                }
+                usage_input += detail.llm_usage_input;
+                usage_output += detail.llm_usage_output;
+                usage_total += detail.llm_usage_total;
+                cost_total += detail.llm_cost_total;
+            }
+        }
+        let duration = if session_end_time > session_start_time {
+            session_end_time - session_start_time
+        } else {
+            0
+        };
+        sessions_data.push(SessionResponseItem {
+            session_id: session_id.clone(),
+            start_time: session_start_time,
+            end_time: session_end_time,
+            duration,
+            trace_count: trace_ids.len() as u16,
+            llm_usage_tokens_input: usage_input,
+            llm_usage_tokens_output: usage_output,
+            llm_usage_tokens_total: usage_total,
+            llm_usage_cost_total: cost_total,
+        });
+    }
+    sessions_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+    sessions_data
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_session_trace_ids_empty() {
+        let (ids, map) = parse_session_trace_ids(&[], "session_id");
+        assert!(ids.is_empty());
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn test_parse_session_trace_ids_basic() {
+        let hits = vec![
+            json!({"session_id": "sess-1", "trace_ids": ["t1", "t2"]}),
+            json!({"session_id": "sess-2", "trace_ids": ["t3"]}),
+        ];
+        let (ids, map) = parse_session_trace_ids(&hits, "session_id");
+        assert_eq!(ids, vec!["sess-1", "sess-2"]);
+        assert_eq!(
+            map.get("sess-1").unwrap(),
+            &vec!["t1".to_string(), "t2".to_string()]
+        );
+        assert_eq!(map.get("sess-2").unwrap(), &vec!["t3".to_string()]);
+    }
+
+    #[test]
+    fn test_parse_session_trace_ids_skips_missing_col() {
+        let hits = vec![
+            json!({"other": "value"}),
+            json!({"session_id": "sess-1", "trace_ids": ["t1"]}),
+        ];
+        let (ids, map) = parse_session_trace_ids(&hits, "session_id");
+        assert_eq!(ids.len(), 1);
+        assert!(map.contains_key("sess-1"));
+    }
+
+    #[test]
+    fn test_parse_session_trace_ids_no_trace_ids_array() {
+        let hits = vec![json!({"session_id": "sess-1"})];
+        let (ids, map) = parse_session_trace_ids(&hits, "session_id");
+        assert_eq!(ids, vec!["sess-1"]);
+        assert!(map.get("sess-1").unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_sessions_empty() {
+        let result = aggregate_sessions(&[], &HashMap::new(), &HashMap::new());
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_sessions_single_session_two_traces() {
+        let session_ids = vec!["sess-1".to_string()];
+        let mut session_trace_ids = HashMap::new();
+        session_trace_ids.insert(
+            "sess-1".to_string(),
+            vec!["t1".to_string(), "t2".to_string()],
+        );
+        let mut trace_details = HashMap::new();
+        trace_details.insert(
+            "t1".to_string(),
+            TraceDetail {
+                start_time: 1000,
+                end_time: 2000,
+                llm_usage_input: 100,
+                llm_usage_output: 50,
+                llm_usage_total: 150,
+                llm_cost_total: 0.01,
+            },
+        );
+        trace_details.insert(
+            "t2".to_string(),
+            TraceDetail {
+                start_time: 1500,
+                end_time: 3000,
+                llm_usage_input: 200,
+                llm_usage_output: 100,
+                llm_usage_total: 300,
+                llm_cost_total: 0.02,
+            },
+        );
+
+        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
+        assert_eq!(result.len(), 1);
+        let s = &result[0];
+        assert_eq!(s.session_id, "sess-1");
+        assert_eq!(s.start_time, 1000);
+        assert_eq!(s.end_time, 3000);
+        assert_eq!(s.duration, 2000);
+        assert_eq!(s.trace_count, 2);
+        assert_eq!(s.llm_usage_tokens_input, 300);
+        assert_eq!(s.llm_usage_tokens_output, 150);
+        assert_eq!(s.llm_usage_tokens_total, 450);
+        assert!((s.llm_usage_cost_total - 0.03).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_aggregate_sessions_sorted_descending_by_start_time() {
+        let session_ids = vec!["sess-1".to_string(), "sess-2".to_string()];
+        let mut session_trace_ids = HashMap::new();
+        session_trace_ids.insert("sess-1".to_string(), vec!["t1".to_string()]);
+        session_trace_ids.insert("sess-2".to_string(), vec!["t2".to_string()]);
+        let mut trace_details = HashMap::new();
+        trace_details.insert(
+            "t1".to_string(),
+            TraceDetail {
+                start_time: 1000,
+                end_time: 2000,
+                llm_usage_input: 0,
+                llm_usage_output: 0,
+                llm_usage_total: 0,
+                llm_cost_total: 0.0,
+            },
+        );
+        trace_details.insert(
+            "t2".to_string(),
+            TraceDetail {
+                start_time: 5000,
+                end_time: 6000,
+                llm_usage_input: 0,
+                llm_usage_output: 0,
+                llm_usage_total: 0,
+                llm_cost_total: 0.0,
+            },
+        );
+
+        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
+        assert_eq!(result.len(), 2);
+        assert!(result[0].start_time >= result[1].start_time);
+    }
+
+    #[test]
+    fn test_aggregate_sessions_missing_trace_detail() {
+        let session_ids = vec!["sess-1".to_string()];
+        let mut session_trace_ids = HashMap::new();
+        session_trace_ids.insert("sess-1".to_string(), vec!["missing".to_string()]);
+
+        let result = aggregate_sessions(&session_ids, &session_trace_ids, &HashMap::new());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].start_time, 0);
+        assert_eq!(result[0].trace_count, 1);
+        assert_eq!(result[0].duration, 0);
+    }
+
+    #[test]
+    fn test_aggregate_sessions_duration_zero_when_times_equal() {
+        let session_ids = vec!["sess-1".to_string()];
+        let mut session_trace_ids = HashMap::new();
+        session_trace_ids.insert("sess-1".to_string(), vec!["t1".to_string()]);
+        let mut trace_details = HashMap::new();
+        trace_details.insert(
+            "t1".to_string(),
+            TraceDetail {
+                start_time: 1000,
+                end_time: 1000,
+                llm_usage_input: 0,
+                llm_usage_output: 0,
+                llm_usage_total: 0,
+                llm_cost_total: 0.0,
+            },
+        );
+
+        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
+        assert_eq!(result[0].duration, 0);
+    }
+
+    #[test]
+    fn test_aggregate_sessions_start_time_uses_earliest() {
+        let session_ids = vec!["sess-1".to_string()];
+        let mut session_trace_ids = HashMap::new();
+        session_trace_ids.insert(
+            "sess-1".to_string(),
+            vec!["t1".to_string(), "t2".to_string(), "t3".to_string()],
+        );
+        let mut trace_details = HashMap::new();
+        for (id, start) in [("t1", 500i64), ("t2", 100i64), ("t3", 300i64)] {
+            trace_details.insert(
+                id.to_string(),
+                TraceDetail {
+                    start_time: start,
+                    end_time: start + 100,
+                    llm_usage_input: 0,
+                    llm_usage_output: 0,
+                    llm_usage_total: 0,
+                    llm_cost_total: 0.0,
+                },
+            );
+        }
+
+        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
+        assert_eq!(result[0].start_time, 100);
+        assert_eq!(result[0].end_time, 600); // max(500+100, 100+100, 300+100)
+    }
 }

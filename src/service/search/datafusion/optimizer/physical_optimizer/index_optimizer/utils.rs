@@ -43,6 +43,7 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
         common::{
             Result,
             tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
@@ -50,10 +51,30 @@ pub(crate) mod tests {
         physical_plan::{
             ExecutionPlan,
             aggregates::{AggregateExec, AggregateMode},
+            empty::EmptyExec,
         },
     };
 
+    use super::*;
     use crate::service::search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
+
+    fn empty_plan() -> Arc<dyn ExecutionPlan> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        Arc::new(EmptyExec::new(schema))
+    }
+
+    #[test]
+    fn test_is_complex_plan_empty_exec_returns_false() {
+        let plan = empty_plan();
+        assert!(!is_complex_plan(&plan));
+    }
+
+    #[test]
+    fn test_is_complex_plan_single_child_no_join() {
+        let plan = empty_plan();
+        assert!(!is_complex_plan(&plan));
+        assert_eq!(plan.children().len(), 0);
+    }
 
     // get the first final aggregate plan from bottom to top
     pub(crate) fn get_partial_aggregate_plan(

@@ -203,4 +203,22 @@ mod tests {
             assert_batches_eq!(item.1, &data);
         }
     }
+
+    #[test]
+    fn test_add_sort_and_limit_rule_new_metadata() {
+        use datafusion::optimizer::OptimizerRule;
+        let rule = AddSortAndLimitRule::new(10, 5);
+        assert_eq!(rule.name(), "add_sort_and_limit");
+        assert_eq!(
+            rule.apply_order(),
+            Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
+        );
+    }
+
+    #[test]
+    fn test_add_sort_and_limit_rule_new_zero_limit() {
+        let rule = AddSortAndLimitRule::new(0, 0);
+        use datafusion::optimizer::OptimizerRule;
+        assert_eq!(rule.name(), "add_sort_and_limit");
+    }
 }

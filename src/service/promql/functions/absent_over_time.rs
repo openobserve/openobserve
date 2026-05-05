@@ -57,6 +57,31 @@ mod tests {
     }
 
     #[test]
+    fn test_absent_over_time_value_none_input() {
+        let result = absent_over_time_test_helper(Value::None).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_absent_over_time_invalid_input_returns_err() {
+        let result = absent_over_time_test_helper(Value::Float(1.0));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_absent_over_time_exec_samples_present_returns_none() {
+        let func = AbsentOverTimeFunc::new();
+        let samples = vec![Sample::new(1000, 5.0)];
+        assert!(func.exec(&samples, 0, &Duration::ZERO).is_none());
+    }
+
+    #[test]
+    fn test_absent_over_time_exec_empty_returns_one() {
+        let func = AbsentOverTimeFunc::new();
+        assert_eq!(func.exec(&[], 0, &Duration::ZERO), Some(1.0));
+    }
+
+    #[test]
     fn test_absent_over_time_function() {
         // Test with empty matrix - should return 1.0
         let empty_matrix = Value::Matrix(vec![]);

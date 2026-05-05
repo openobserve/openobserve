@@ -17,3 +17,22 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: 1,
+            org: "myorg".to_string(),
+            name: "geo_lookup".to_string(),
+            data: vec![1, 2, 3],
+            created_at: 1000,
+        };
+        assert_eq!(m.id, 1);
+        assert_eq!(m.name, "geo_lookup");
+        assert_eq!(m.data.len(), 3);
+    }
+}
