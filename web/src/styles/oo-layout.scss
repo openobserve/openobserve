@@ -8,17 +8,12 @@
 
 /* ---- root app ---- */
 .oo_app {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+  min-height: 100vh;
 }
 
 /* ---- header area ---- */
 .oo_header {
   flex-shrink: 0;
-  background: var(--o2-card-bg);
-  border-bottom: 1px solid var(--o2-border-color);
-  margin-bottom: 0.5rem;
 }
 
 .oo_banner {
@@ -27,22 +22,26 @@
   text-align: center;
 }
 
-/* ---- body area (grid: left sidebar | main | right sidebar) ---- */
+/* ---- body area (grid: main | right sidebar) ---- */
+/* grid-template-columns set dynamically via :style based on AI chat state */
 .oo_body {
   flex: 1;
   display: grid;
-  grid-template-columns: 84px 1fr 25%;
   min-height: 0;
 }
 
 /* ---- sidebars ---- */
 .oo_sidebar {
   overflow-y: auto;
-  border-right: 1px solid var(--o2-border-color);
 
   &.oo_right {
-    border-left: 1px solid var(--o2-border-color);
     border-right: none;
+  }
+
+  &.oo_sidebar--expanded {
+    background: var(--o2-card-bg-solid);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    padding-top: calc(var(--navbar-height) + 8px);
   }
 }
 
