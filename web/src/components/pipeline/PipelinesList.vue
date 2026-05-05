@@ -414,58 +414,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ resultTotal }} {{ t("pipeline.header") }}
                 </div>
-                <OButton
+                <div
                   v-if="selectedPipelines.length > 0"
-                  data-test="pipeline-list-export-pipelines-btn"
-                  variant="outline"
-                  size="sm-action"
-                  class="tw:mr-2"
-                  @click="exportBulkPipelines"
+                  class="tw:flex tw:items-center tw:gap-2"
                 >
-                  <template #icon-left>
-                    <Download class="tw:size-4 tw:shrink-0" />
-                  </template>
-                  {{ t("pipeline_list.export") }}
-                </OButton>
-                <OButton
-                  v-if="selectedPipelines.length > 0"
-                  data-test="pipeline-list-pause-pipelines-btn"
-                  variant="outline"
-                  size="sm-action"
-                  class="tw:mr-2"
-                  @click="bulkTogglePipelines('pause')"
-                >
-                  <template #icon-left>
-                    <Pause class="tw:size-4 tw:shrink-0" />
-                  </template>
-                  {{ t("pipeline_list.pause") }}
-                </OButton>
-                <OButton
-                  v-if="selectedPipelines.length > 0"
-                  data-test="pipeline-list-resume-pipelines-btn"
-                  variant="outline"
-                  size="sm-action"
-                  class="tw:mr-2"
-                  @click="bulkTogglePipelines('resume')"
-                >
-                  <template #icon-left>
-                    <Play class="tw:size-4 tw:shrink-0" />
-                  </template>
-                  {{ t("pipeline_list.resume") }}
-                </OButton>
-                <OButton
-                  v-if="selectedPipelines.length > 0"
-                  data-test="pipeline-list-delete-pipelines-btn"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  class="tw:mr-2"
-                  @click="openBulkDeleteDialog"
-                >
-                  <template #icon-left>
-                    <Trash2 class="tw:size-4 tw:shrink-0" />
-                  </template>
-                  Delete
-                </OButton>
+                  <OButton
+                    data-test="pipeline-list-export-pipelines-btn"
+                    variant="outline"
+                    size="sm-action"
+                    @click="exportBulkPipelines"
+                  >
+                    <template #icon-left>
+                      <Download class="tw:size-4 tw:shrink-0" />
+                    </template>
+                    {{ t("pipeline_list.export") }}
+                  </OButton>
+                  <OButton
+                    data-test="pipeline-list-pause-pipelines-btn"
+                    variant="outline"
+                    size="sm-action"
+                    @click="bulkTogglePipelines('pause')"
+                  >
+                    <template #icon-left>
+                      <Pause class="tw:size-4 tw:shrink-0" />
+                    </template>
+                    {{ t("pipeline_list.pause") }}
+                  </OButton>
+                  <OButton
+                    data-test="pipeline-list-resume-pipelines-btn"
+                    variant="outline"
+                    size="sm-action"
+                    @click="bulkTogglePipelines('resume')"
+                  >
+                    <template #icon-left>
+                      <Play class="tw:size-4 tw:shrink-0" />
+                    </template>
+                    {{ t("pipeline_list.resume") }}
+                  </OButton>
+                  <OButton
+                    data-test="pipeline-list-delete-pipelines-btn"
+                    variant="outline-destructive"
+                    size="sm-action"
+                    @click="openBulkDeleteDialog"
+                  >
+                    <template #icon-left>
+                      <Trash2 class="tw:size-4 tw:shrink-0" />
+                    </template>
+                    Delete
+                  </OButton>
+                </div>
                 <QTablePagination
                   :scope="scope"
                   :position="'bottom'"

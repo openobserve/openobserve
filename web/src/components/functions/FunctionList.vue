@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <Pencil :size="14" />
                   </OButton>
                   <OButton
-                    variant="outline"
+                    variant="ghost-destructive"
                     size="icon-sm"
                     :title="t('function.delete')"
                     @click="showDeleteDialogFn(props)"
@@ -122,11 +122,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="selectedFunctions.length > 0"
                     data-test="function-list-delete-functions-btn"
                     variant="outline"
-                    size="sm-action"
-                    class="q-mr-sm"
+                    size="sm"
+                    class="tw:mr-2"
                     @click="openBulkDeleteDialog"
                   >
-                    <Trash2 :size="14" class="tw:mr-1" />
+                    <template #icon-left>
+                      <Trash2 class="tw:size-4 tw:shrink-0" />
+                    </template>
                     Delete
                   </OButton>
                   <QTablePagination
