@@ -266,7 +266,7 @@ class TestFullTextSearchKeysDedup:
         # Pick two fields not already in FTS
         available = [f for f in FTS_SAFE_FIELDS if f not in set(original_fts)]
         if len(available) < 2:
-            available = FTS_SAFE_FIELDS  # fallback: use known fields anyway
+            pytest.skip("Fewer than 2 FTS-safe fields available outside current settings")
         field_a, field_b = available[:2]
 
         try:
@@ -514,6 +514,8 @@ class TestStreamSettingsDedupEdgeCases:
         session = create_session
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
         field_name = get_field_for_fts(settings)
+        idx_added = False
+        fts_added = False
 
         try:
             # Add to index_fields twice
