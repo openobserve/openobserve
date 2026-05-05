@@ -128,7 +128,7 @@
           <OButton
             data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
-            variant="ghost"
+            variant="outline"
             size="icon-sm"
             class="q-ml-xs"
             :disabled="
@@ -141,7 +141,7 @@
           </OButton>
           <OButton
             data-test="add-stream-delete-field-btn"
-            variant="ghost-destructive"
+            variant="outline-destructive"
             size="icon-sm"
             class="q-ml-xs"
             :title="t('alert_templates.edit')"

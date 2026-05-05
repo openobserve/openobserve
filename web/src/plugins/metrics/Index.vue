@@ -73,7 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="metrics-cancel"
               @click="cancelAddPanelQuery"
             >
-              {{ t("panel.cancel") }}
+              <span
+                class="tw:relative tw:flex tw:items-center tw:justify-center"
+              >
+                <span class="tw:invisible">{{ t("metrics.runQuery") }}</span>
+                <span class="tw:absolute">{{ t("panel.cancel") }}</span>
+              </span>
             </OButton>
             <OButton
               v-else

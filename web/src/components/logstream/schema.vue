@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="isSchemaUDSEnabled"
                       data-test="schema-add-fields-title"
                       :disabled="isDialogOpen"
-                      variant="ghost"
+                      variant="outline"
                       size="icon-sm"
                       class="q-my-sm"
                       @click.stop="openDialog"

@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ scope.pagination.rowsNumber }} Stream(s)
                   <OButton
                     v-if="selected.length > 0"
-                    variant="outline-destructive"
+                    variant="outline"
                     size="sm-action"
                     class="tw:ml-4"
                     :disabled="isDeleting"
