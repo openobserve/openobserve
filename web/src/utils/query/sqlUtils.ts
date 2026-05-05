@@ -1320,7 +1320,13 @@ export const extractWhereClause = async (
     const ast: any = parser.astify(sql);
     if (!ast?.where) return "";
 
-    // Build a dummy query with only the WHERE clause, then strip the prefix
+    // Use exprToSQL if available (preferred: doesn't rely on AST schema for full SELECT)
+    if (typeof parser.exprToSQL === "function") {
+      const whereStr = parser.exprToSQL(ast.where);
+      return whereStr ? whereStr.replace(/`/g, '"') : "";
+    }
+
+    // Fallback: build a minimal SELECT with the WHERE clause, then strip the prefix
     const dummyAst = {
       type: "select",
       columns: [{ expr: { type: "column_ref", table: null, column: "*" }, as: null }],

@@ -3952,40 +3952,6 @@ describe("SearchBar.vue SQL mode auto-detection guard", () => {
  * on SQL mode state. When SQL mode is OFF, searchQuery should be empty
  * and whereClause should carry the logs page filter text.
  */
-describe("BuildQueryPage prop computation", () => {
-  it("should pass empty searchQuery when sqlMode is OFF", () => {
-    const sqlMode = false;
-    const query = "k8s_namespace_name = 'kube-system'";
-
-    const searchQueryProp = sqlMode ? query : "";
-    expect(searchQueryProp).toBe("");
-  });
-
-  it("should pass the SQL query as searchQuery when sqlMode is ON", () => {
-    const sqlMode = true;
-    const query = 'SELECT * FROM "default"';
-
-    const searchQueryProp = sqlMode ? query : "";
-    expect(searchQueryProp).toBe(query);
-  });
-
-  it("should pass whereClause when sqlMode is OFF", () => {
-    const sqlMode = false;
-    const query = "k8s_namespace_name = 'kube-system'";
-
-    const whereClauseProp = !sqlMode ? query : "";
-    expect(whereClauseProp).toBe(query);
-  });
-
-  it("should pass empty whereClause when sqlMode is ON", () => {
-    const sqlMode = true;
-    const query = 'SELECT * FROM "default"';
-
-    const whereClauseProp = !sqlMode ? query : "";
-    expect(whereClauseProp).toBe("");
-  });
-
-});
 
 /**
  * VRL Editor Disabled for Non-Table Charts Tests

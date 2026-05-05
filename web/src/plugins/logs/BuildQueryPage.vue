@@ -339,10 +339,13 @@ const initializeFromQuery = async () => {
 
   // ---- Case 3: SQL mode ON (existing behavior) ----
 
-  // If no query or SELECT * query, use builder mode with default histogram/count fields
+  // If no query or bare SELECT * FROM "stream" (without WHERE/GROUP BY/etc.),
+  // use builder mode with default histogram/count fields.
+  // Queries with WHERE clause should be parsed so the filter is preserved.
+  const trimmedQuery = props.searchQuery?.trim() || "";
   const isEmptyOrSelectAll =
-    !props.searchQuery?.trim() ||
-    /^\s*select\s+\*\s+from\s+/i.test(props.searchQuery);
+    !trimmedQuery ||
+    /^\s*select\s+\*\s+from\s+["'`]?\w+["'`]?\s*$/i.test(trimmedQuery);
   if (isEmptyOrSelectAll) {
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
