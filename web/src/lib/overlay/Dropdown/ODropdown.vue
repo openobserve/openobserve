@@ -13,7 +13,7 @@ import {
 import { ref, watch } from "vue";
 
 const props = withDefaults(defineProps<DropdownProps>(), {
-  modal: true,
+  modal: false,
   side: "bottom",
   align: "start",
   sideOffset: 4,
@@ -40,6 +40,35 @@ function handleOpenChange(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
 }
+
+/**
+ * Prevent Reka UI from closing the dropdown when a pointer-down occurs inside
+ * a Quasar body-portaled element (e.g. q-select menu, q-btn-dropdown).
+ * Reka's DismissableLayer considers those clicks "outside" because Quasar
+ * renders .q-menu nodes directly to <body>, not inside DropdownMenuContent.
+ */
+function handlePointerDownOutside(event: Event) {
+  const target = (event as CustomEvent<{ originalEvent: PointerEvent }>).detail
+    ?.originalEvent?.target as Element | null;
+  if (target?.closest('.q-menu')) {
+    event.preventDefault();
+  }
+}
+
+/**
+ * When the Quasar q-select popup opens, focus moves into the .q-menu node
+ * which lives outside DropdownMenuContent in the DOM. Reka UI fires
+ * focus-outside and tries to return focus to the trigger, which causes the
+ * browser to land on whatever is behind the dropdown (e.g. the search input).
+ * Prevent default so focus stays inside the Quasar popup as intended.
+ */
+function handleFocusOutside(event: Event) {
+  const target = (event as CustomEvent<{ originalEvent: FocusEvent }>).detail
+    ?.originalEvent?.target as Element | null;
+  if (target?.closest('.q-menu')) {
+    event.preventDefault();
+  }
+}
 </script>
 
 <template>
@@ -57,6 +86,8 @@ function handleOpenChange(v: boolean) {
         :side="side"
         :align="align"
         :side-offset="sideOffset"
+        @pointer-down-outside="handlePointerDownOutside"
+        @focus-outside="handleFocusOutside"
         :class="[
           // Layout + stacking (must be above Quasar header/drawer: 2000/3000)
           'tw:min-w-40 tw:p-1 tw:z-[6000]',
