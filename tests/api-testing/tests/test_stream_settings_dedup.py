@@ -20,7 +20,6 @@ import time
 import logging
 import os
 import random
-import string
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -47,10 +46,11 @@ INDEX_SAFE_FIELDS = ["_timestamp", "FloatValue"]
 BLOOM_SAFE_FIELDS = ["level", "message", "log", "stream", "_timestamp", "FloatValue"]
 
 
-def get_field_for_fts(settings=None):
+def get_field_for_fts(settings):
     """Return a field safe for FTS (text type, not in FTS already)."""
-    # Filter out _timestamp since it's not a text field
-    return random.choice(FTS_SAFE_FIELDS)
+    current = set(settings.get("full_text_search_keys", []))
+    available = [f for f in FTS_SAFE_FIELDS if f not in current]
+    return random.choice(available) if available else random.choice(FTS_SAFE_FIELDS)
 
 
 def get_field_for_index(settings):
@@ -62,9 +62,11 @@ def get_field_for_index(settings):
     return random.choice(safe)
 
 
-def get_field_for_bloom():
-    """Return a field safe for bloom filter."""
-    return random.choice(BLOOM_SAFE_FIELDS)
+def get_field_for_bloom(settings):
+    """Return a field safe for bloom filter (not already in bloom_filter_fields)."""
+    current = set(settings.get("bloom_filter_fields", []))
+    available = [f for f in BLOOM_SAFE_FIELDS if f not in current]
+    return random.choice(available) if available else random.choice(BLOOM_SAFE_FIELDS)
 
 
 def get_stream_settings(session, base_url, org_id, stream_name, stream_type=STREAM_TYPE):
@@ -115,38 +117,38 @@ class TestIndexFieldsDedup:
         original_idx = list(settings.get("index_fields", []))
         logger.info(f"Original index_fields ({len(original_idx)}): {original_idx}")
 
-        # Add field
-        payload = {"index_fields": {"add": [field_name], "remove": []}}
-        resp1 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp1.status_code == 200, f"First add failed: {resp1.text[:500]}"
-        time.sleep(1)
+        try:
+            # Add field
+            payload = {"index_fields": {"add": [field_name], "remove": []}}
+            resp1 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp1.status_code == 200, f"First add failed: {resp1.text[:500]}"
+            time.sleep(1)
 
-        # Verify added
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        idx_after = settings.get("index_fields", [])
-        logger.info(f"After first add: {idx_after}")
-        assert field_name in idx_after, f"Field should be in index_fields: {idx_after}"
+            # Verify added
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            idx_after = settings.get("index_fields", [])
+            logger.info(f"After first add: {idx_after}")
+            assert field_name in idx_after, f"Field should be in index_fields: {idx_after}"
 
-        # Add same field again
-        resp2 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp2.status_code == 200, f"Second add failed: {resp2.text[:500]}"
-        time.sleep(1)
+            # Add same field again
+            resp2 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp2.status_code == 200, f"Second add failed: {resp2.text[:500]}"
+            time.sleep(1)
 
-        # Verify no duplicates
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        idx_final = settings.get("index_fields", [])
-        logger.info(f"After second add: {idx_final}")
+            # Verify no duplicates
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            idx_final = settings.get("index_fields", [])
+            logger.info(f"After second add: {idx_final}")
 
-        assert idx_final.count(field_name) == 1, \
-            f"Field appears {idx_final.count(field_name)} times (expected 1): {idx_final}"
-        assert len(idx_final) == len(original_idx) + 1, \
-            f"Expected {len(original_idx) + 1} index fields, got {len(idx_final)}"
+            assert idx_final.count(field_name) == 1, \
+                f"Field appears {idx_final.count(field_name)} times (expected 1): {idx_final}"
+            assert len(idx_final) == len(original_idx) + 1, \
+                f"Expected {len(original_idx) + 1} index fields, got {len(idx_final)}"
 
-        logger.info("=== PASSED: index_fields dedup ===")
-
-        # Cleanup
-        cleanup = {"index_fields": {"add": [], "remove": [field_name]}}
-        update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
+            logger.info("=== PASSED: index_fields dedup ===")
+        finally:
+            cleanup = {"index_fields": {"add": [], "remove": [field_name]}}
+            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
 
 
 class TestBloomFilterFieldsDedup:
@@ -158,39 +160,39 @@ class TestBloomFilterFieldsDedup:
         """
         logger.info("=== TEST: bloom_filter_fields dedup ===")
         session = create_session
-        field_name = get_field_for_bloom()
-
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+        field_name = get_field_for_bloom(settings)
         original_bf = list(settings.get("bloom_filter_fields", []))
         logger.info(f"Original bloom_filter_fields ({len(original_bf)}): {original_bf}")
 
-        payload = {"bloom_filter_fields": {"add": [field_name], "remove": []}}
-        resp1 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp1.status_code == 200, f"First add failed: {resp1.text[:500]}"
-        time.sleep(1)
+        try:
+            payload = {"bloom_filter_fields": {"add": [field_name], "remove": []}}
+            resp1 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp1.status_code == 200, f"First add failed: {resp1.text[:500]}"
+            time.sleep(1)
 
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        bf_after = settings.get("bloom_filter_fields", [])
-        logger.info(f"After first add: {bf_after}")
-        assert field_name in bf_after, f"Field should be in bloom filter: {bf_after}"
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            bf_after = settings.get("bloom_filter_fields", [])
+            logger.info(f"After first add: {bf_after}")
+            assert field_name in bf_after, f"Field should be in bloom filter: {bf_after}"
 
-        resp2 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp2.status_code == 200, f"Second add failed: {resp2.text[:500]}"
-        time.sleep(1)
+            resp2 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp2.status_code == 200, f"Second add failed: {resp2.text[:500]}"
+            time.sleep(1)
 
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        bf_final = settings.get("bloom_filter_fields", [])
-        logger.info(f"After second add: {bf_final}")
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            bf_final = settings.get("bloom_filter_fields", [])
+            logger.info(f"After second add: {bf_final}")
 
-        assert bf_final.count(field_name) == 1, \
-            f"Field appears {bf_final.count(field_name)} times (expected 1): {bf_final}"
-        assert len(bf_final) == len(original_bf) + 1, \
-            f"Expected {len(original_bf) + 1} bloom filter fields, got {len(bf_final)}"
+            assert bf_final.count(field_name) == 1, \
+                f"Field appears {bf_final.count(field_name)} times (expected 1): {bf_final}"
+            assert len(bf_final) == len(original_bf) + 1, \
+                f"Expected {len(original_bf) + 1} bloom filter fields, got {len(bf_final)}"
 
-        logger.info("=== PASSED: bloom_filter_fields dedup ===")
-
-        cleanup = {"bloom_filter_fields": {"add": [], "remove": [field_name]}}
-        update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
+            logger.info("=== PASSED: bloom_filter_fields dedup ===")
+        finally:
+            cleanup = {"bloom_filter_fields": {"add": [], "remove": [field_name]}}
+            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
 
 
 class TestFullTextSearchKeysDedup:
@@ -207,46 +209,47 @@ class TestFullTextSearchKeysDedup:
         """
         logger.info("=== TEST: full_text_search_keys dedup ===")
         session = create_session
-        field_name = get_field_for_fts()
 
         # Get current FTS keys
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+        field_name = get_field_for_fts(settings)
         original_fts = list(settings.get("full_text_search_keys", []))
         logger.info(f"Original full_text_search_keys ({len(original_fts)}): {original_fts}")
 
-        # Add field
-        payload = {"full_text_search_keys": {"add": [field_name], "remove": []}}
-        resp1 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp1.status_code == 200, f"First add failed ({resp1.status_code}): {resp1.text[:500]}"
-        time.sleep(1)
+        try:
+            # Add field
+            payload = {"full_text_search_keys": {"add": [field_name], "remove": []}}
+            resp1 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp1.status_code == 200, f"First add failed ({resp1.status_code}): {resp1.text[:500]}"
+            time.sleep(1)
 
-        # Verify added
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        fts_after = settings.get("full_text_search_keys", [])
-        logger.info(f"After first add: {fts_after}")
-        assert field_name in fts_after, \
-            f"Field '{field_name}' should be in FTS after add. FTS: {fts_after}"
+            # Verify added
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            fts_after = settings.get("full_text_search_keys", [])
+            logger.info(f"After first add: {fts_after}")
+            assert field_name in fts_after, \
+                f"Field '{field_name}' should be in FTS after add. FTS: {fts_after}"
 
-        # Add same field again
-        resp2 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp2.status_code == 200, f"Second add failed: {resp2.text[:500]}"
-        time.sleep(1)
+            # Add same field again
+            resp2 = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp2.status_code == 200, f"Second add failed: {resp2.text[:500]}"
+            time.sleep(1)
 
-        # Verify no duplicates
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        fts_final = settings.get("full_text_search_keys", [])
-        logger.info(f"After second add: {fts_final}")
+            # Verify no duplicates
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            fts_final = settings.get("full_text_search_keys", [])
+            logger.info(f"After second add: {fts_final}")
 
-        assert fts_final.count(field_name) == 1, \
-            f"Field '{field_name}' appears {fts_final.count(field_name)} times (expected 1). FTS: {fts_final}"
-        assert len(fts_final) == len(original_fts) + 1, \
-            f"Expected {len(original_fts) + 1} FTS keys, got {len(fts_final)}"
+            assert fts_final.count(field_name) == 1, \
+                f"Field '{field_name}' appears {fts_final.count(field_name)} times (expected 1). FTS: {fts_final}"
+            assert len(fts_final) == len(original_fts) + 1, \
+                f"Expected {len(original_fts) + 1} FTS keys, got {len(fts_final)}"
 
-        logger.info("=== PASSED: full_text_search_keys dedup ===")
-
-        # Cleanup
-        cleanup = {"full_text_search_keys": {"add": [], "remove": [field_name]}}
-        update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
+            logger.info("=== PASSED: full_text_search_keys dedup ===")
+        finally:
+            # Cleanup
+            cleanup = {"full_text_search_keys": {"add": [], "remove": [field_name]}}
+            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
 
     def test_dedup_fts_multiple_known_fields(self, create_session, base_url):
         """
@@ -258,45 +261,47 @@ class TestFullTextSearchKeysDedup:
         logger.info("=== TEST: FTS multiple known fields ===")
         session = create_session
 
-        # Use two different text-type fields (not _timestamp)
-        field_a = FTS_SAFE_FIELDS[0]
-        field_b = FTS_SAFE_FIELDS[1]
-
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
         original_fts = list(settings.get("full_text_search_keys", []))
+        # Pick two fields not already in FTS
+        available = [f for f in FTS_SAFE_FIELDS if f not in set(original_fts)]
+        if len(available) < 2:
+            available = FTS_SAFE_FIELDS  # fallback: use known fields anyway
+        field_a, field_b = available[:2]
 
-        # Add both fields one at a time
-        for field_name in [field_a, field_b]:
-            payload = {"full_text_search_keys": {"add": [field_name], "remove": []}}
-            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-            assert resp.status_code == 200, f"Add '{field_name}' failed: {resp.text[:200]}"
+        try:
+            # Add both fields one at a time
+            for field_name in [field_a, field_b]:
+                payload = {"full_text_search_keys": {"add": [field_name], "remove": []}}
+                resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+                assert resp.status_code == 200, f"Add '{field_name}' failed: {resp.text[:200]}"
+                time.sleep(1)
 
-        # Add both fields again (should be deduped)
-        for field_name in [field_a, field_b]:
-            payload = {"full_text_search_keys": {"add": [field_name], "remove": []}}
-            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-            assert resp.status_code == 200, f"Second add '{field_name}' failed: {resp.text[:200]}"
+            # Add both fields again (should be deduped)
+            for field_name in [field_a, field_b]:
+                payload = {"full_text_search_keys": {"add": [field_name], "remove": []}}
+                resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+                assert resp.status_code == 200, f"Second add '{field_name}' failed: {resp.text[:200]}"
+                time.sleep(1)
 
-        time.sleep(1)
+            # Verify each field appears exactly once
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            fts_final = settings.get("full_text_search_keys", [])
+            logger.info(f"FTS after adds: {fts_final}")
 
-        # Verify each field appears exactly once
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        fts_final = settings.get("full_text_search_keys", [])
-        logger.info(f"FTS after adds: {fts_final}")
+            for field_name in [field_a, field_b]:
+                count = fts_final.count(field_name)
+                assert count == 1, \
+                    f"Field '{field_name}' appears {count} times (expected 1): {fts_final}"
 
-        for field_name in [field_a, field_b]:
-            count = fts_final.count(field_name)
-            assert count == 1, \
-                f"Field '{field_name}' appears {count} times (expected 1): {fts_final}"
+            assert len(fts_final) == len(original_fts) + 2, \
+                f"Expected {len(original_fts) + 2} FTS keys, got {len(fts_final)}"
 
-        assert len(fts_final) == len(original_fts) + 2, \
-            f"Expected {len(original_fts) + 2} FTS keys, got {len(fts_final)}"
-
-        logger.info("=== PASSED: FTS multiple fields dedup ===")
-
-        # Cleanup
-        cleanup = {"full_text_search_keys": {"add": [], "remove": [field_a, field_b]}}
-        update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
+            logger.info("=== PASSED: FTS multiple fields dedup ===")
+        finally:
+            # Cleanup
+            cleanup = {"full_text_search_keys": {"add": [], "remove": [field_a, field_b]}}
+            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
 
 
 class TestStreamSettingsDedupEdgeCases:
@@ -327,38 +332,40 @@ class TestStreamSettingsDedupEdgeCases:
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
         field_a = get_field_for_index(settings)
         # Get a second field different from field_a
-        field_b = field_a
-        while field_b == field_a:
-            field_b = get_field_for_index(settings)
+        available = [f for f in INDEX_SAFE_FIELDS if f != field_a]
+        filtered = [f for f in available if f not in set(settings.get("full_text_search_keys", []))]
+        candidates = filtered if filtered else available
+        field_b = candidates[0] if candidates else pytest.skip("Only one index-safe field available")
         original_idx = list(settings.get("index_fields", []))
 
-        # Add first field
-        payload = {"index_fields": {"add": [field_a], "remove": []}}
-        resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp.status_code == 200
+        try:
+            # Add first field
+            payload = {"index_fields": {"add": [field_a], "remove": []}}
+            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp.status_code == 200
 
-        # Add second field
-        payload = {"index_fields": {"add": [field_b], "remove": []}}
-        resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp.status_code == 200
-        time.sleep(1)
+            # Add second field
+            payload = {"index_fields": {"add": [field_b], "remove": []}}
+            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp.status_code == 200
+            time.sleep(1)
 
-        # Verify both present
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        idx_keys = settings.get("index_fields", [])
-        logger.info(f"Index fields after adds: {idx_keys}")
+            # Verify both present
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            idx_keys = settings.get("index_fields", [])
+            logger.info(f"Index fields after adds: {idx_keys}")
 
-        assert field_a in idx_keys, f"'{field_a}' should be present"
-        assert field_b in idx_keys, f"'{field_b}' should be present"
-        assert idx_keys.count(field_a) == 1
-        assert idx_keys.count(field_b) == 1
-        assert len(idx_keys) == len(original_idx) + 2, \
-            f"Expected {len(original_idx) + 2}, got {len(idx_keys)}"
+            assert field_a in idx_keys, f"'{field_a}' should be present"
+            assert field_b in idx_keys, f"'{field_b}' should be present"
+            assert idx_keys.count(field_a) == 1
+            assert idx_keys.count(field_b) == 1
+            assert len(idx_keys) == len(original_idx) + 2, \
+                f"Expected {len(original_idx) + 2}, got {len(idx_keys)}"
 
-        logger.info("=== PASSED ===")
-
-        cleanup = {"index_fields": {"add": [], "remove": [field_a, field_b]}}
-        update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
+            logger.info("=== PASSED ===")
+        finally:
+            cleanup = {"index_fields": {"add": [], "remove": [field_a, field_b]}}
+            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
 
     def test_repeated_adds_of_same_field(self, create_session, base_url):
         """
@@ -373,28 +380,28 @@ class TestStreamSettingsDedupEdgeCases:
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
         field_name = get_field_for_index(settings)
         original_idx = list(settings.get("index_fields", []))
-
         payload = {"index_fields": {"add": [field_name], "remove": []}}
 
-        # Add field 4 times
-        for i in range(4):
-            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-            assert resp.status_code == 200, f"Attempt {i+1} failed: {resp.text[:200]}"
-        time.sleep(1)
+        try:
+            # Add field 4 times
+            for i in range(4):
+                resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+                assert resp.status_code == 200, f"Attempt {i+1} failed: {resp.text[:200]}"
+            time.sleep(1)
 
-        # Verify exactly once
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        idx_keys = settings.get("index_fields", [])
-        count = idx_keys.count(field_name)
-        logger.info(f"Field count after 4 adds: {count}, fields: {idx_keys}")
+            # Verify exactly once
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            idx_keys = settings.get("index_fields", [])
+            count = idx_keys.count(field_name)
+            logger.info(f"Field count after 4 adds: {count}, fields: {idx_keys}")
 
-        assert count == 1, f"Field appears {count} times (expected 1): {idx_keys}"
-        assert len(idx_keys) == len(original_idx) + 1
+            assert count == 1, f"Field appears {count} times (expected 1): {idx_keys}"
+            assert len(idx_keys) == len(original_idx) + 1
 
-        logger.info("=== PASSED: Repeated adds prevented duplicates ===")
-
-        cleanup = {"index_fields": {"add": [], "remove": [field_name]}}
-        update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
+            logger.info("=== PASSED: Repeated adds prevented duplicates ===")
+        finally:
+            cleanup = {"index_fields": {"add": [], "remove": [field_name]}}
+            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
 
     def test_remove_and_re_add_field(self, create_session, base_url):
         """
@@ -406,36 +413,38 @@ class TestStreamSettingsDedupEdgeCases:
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
         field_name = get_field_for_index(settings)
 
-        # Add
-        payload = {"index_fields": {"add": [field_name], "remove": []}}
-        resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp.status_code == 200
-        time.sleep(1)
+        try:
+            # Add
+            payload = {"index_fields": {"add": [field_name], "remove": []}}
+            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp.status_code == 200
+            time.sleep(1)
 
-        # Remove
-        remove_payload = {"index_fields": {"add": [], "remove": [field_name]}}
-        resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, remove_payload)
-        assert resp.status_code == 200
-        time.sleep(1)
+            # Remove
+            remove_payload = {"index_fields": {"add": [], "remove": [field_name]}}
+            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, remove_payload)
+            assert resp.status_code == 200
+            time.sleep(1)
 
-        # Verify removed
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        assert field_name not in settings.get("index_fields", []), "Field should be removed"
+            # Verify removed
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            assert field_name not in settings.get("index_fields", []), "Field should be removed"
 
-        # Re-add
-        resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
-        assert resp.status_code == 200
-        time.sleep(1)
+            # Re-add
+            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
+            assert resp.status_code == 200
+            time.sleep(1)
 
-        # Verify present once
-        settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        idx_keys = settings.get("index_fields", [])
-        assert idx_keys.count(field_name) == 1, \
-            f"Field appears {idx_keys.count(field_name)} times after re-add: {idx_keys}"
+            # Verify present once
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            idx_keys = settings.get("index_fields", [])
+            assert idx_keys.count(field_name) == 1, \
+                f"Field appears {idx_keys.count(field_name)} times after re-add: {idx_keys}"
 
-        logger.info("=== PASSED: Remove and re-add works ===")
-
-        update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, remove_payload)
+            logger.info("=== PASSED: Remove and re-add works ===")
+        finally:
+            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME,
+                                  {"index_fields": {"add": [], "remove": [field_name]}})
 
     def test_empty_add_does_not_break(self, create_session, base_url):
         """
@@ -472,25 +481,26 @@ class TestStreamSettingsDedupEdgeCases:
         field_name = get_field_for_index(settings_before)
         original_bf = list(settings_before.get("bloom_filter_fields", []))
 
-        # Add to index_fields only
-        idx_payload = {"index_fields": {"add": [field_name], "remove": []}}
-        resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, idx_payload)
-        assert resp.status_code == 200
-        time.sleep(1)
+        try:
+            # Add to index_fields only
+            idx_payload = {"index_fields": {"add": [field_name], "remove": []}}
+            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, idx_payload)
+            assert resp.status_code == 200
+            time.sleep(1)
 
-        # Verify index updated, bloom filter unchanged
-        settings_after = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
-        bf_after = settings_after.get("bloom_filter_fields", [])
-        assert bf_after == original_bf, \
-            f"Bloom filter changed. Before: {original_bf}, After: {bf_after}"
+            # Verify index updated, bloom filter unchanged
+            settings_after = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+            bf_after = settings_after.get("bloom_filter_fields", [])
+            assert bf_after == original_bf, \
+                f"Bloom filter changed. Before: {original_bf}, After: {bf_after}"
 
-        idx_after = settings_after.get("index_fields", [])
-        assert field_name in idx_after, f"Field should be in index: {idx_after}"
+            idx_after = settings_after.get("index_fields", [])
+            assert field_name in idx_after, f"Field should be in index: {idx_after}"
 
-        logger.info("=== PASSED: Partial updates preserve other settings ===")
-
-        cleanup = {"index_fields": {"add": [], "remove": [field_name]}}
-        update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
+            logger.info("=== PASSED: Partial updates preserve other settings ===")
+        finally:
+            cleanup = {"index_fields": {"add": [], "remove": [field_name]}}
+            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, cleanup)
 
     def test_dedup_works_for_both_fts_and_index_separately(self, create_session, base_url):
         """
@@ -502,36 +512,41 @@ class TestStreamSettingsDedupEdgeCases:
         """
         logger.info("=== TEST: FTS and index dedup independently ===")
         session = create_session
-        field_name = get_field_for_fts()
-
-        # Add to index_fields twice
-        idx_payload = {"index_fields": {"add": [field_name], "remove": []}}
-        resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, idx_payload)
-        idx_added = resp.status_code == 200
-        if idx_added:
-            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, idx_payload)
-
-        # Add to FTS twice
-        fts_payload = {"full_text_search_keys": {"add": [field_name], "remove": []}}
-        resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, fts_payload)
-        fts_added = resp.status_code == 200
-
-        logger.info(f"Index add: {'accepted' if idx_added else 'rejected'}, "
-                    f"FTS add: {'accepted' if fts_added else 'rejected'}")
-
-        time.sleep(1)
         settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+        field_name = get_field_for_fts(settings)
 
-        if idx_added:
-            idx = settings.get("index_fields", [])
-            assert idx.count(field_name) == 1, f"Index dedup failed: {idx}"
-            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME,
-                                  {"index_fields": {"add": [], "remove": [field_name]}})
+        try:
+            # Add to index_fields twice
+            idx_payload = {"index_fields": {"add": [field_name], "remove": []}}
+            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, idx_payload)
+            idx_added = resp.status_code == 200
+            if idx_added:
+                resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, idx_payload)
 
-        if fts_added:
-            fts = settings.get("full_text_search_keys", [])
-            assert fts.count(field_name) == 1, f"FTS dedup failed: {fts}"
-            update_stream_settings(session, base_url, ORG_ID, STREAM_NAME,
-                                  {"full_text_search_keys": {"add": [], "remove": [field_name]}})
+            # Add to FTS twice
+            fts_payload = {"full_text_search_keys": {"add": [field_name], "remove": []}}
+            resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, fts_payload)
+            fts_added = resp.status_code == 200
 
-        logger.info("=== PASSED: FTS and index dedup test completed ===")
+            logger.info(f"Index add: {'accepted' if idx_added else 'rejected'}, "
+                        f"FTS add: {'accepted' if fts_added else 'rejected'}")
+
+            time.sleep(1)
+            settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
+
+            if idx_added:
+                idx = settings.get("index_fields", [])
+                assert idx.count(field_name) == 1, f"Index dedup failed: {idx}"
+
+            if fts_added:
+                fts = settings.get("full_text_search_keys", [])
+                assert fts.count(field_name) == 1, f"FTS dedup failed: {fts}"
+
+            logger.info("=== PASSED: FTS and index dedup test completed ===")
+        finally:
+            if idx_added:
+                update_stream_settings(session, base_url, ORG_ID, STREAM_NAME,
+                                      {"index_fields": {"add": [], "remove": [field_name]}})
+            if fts_added:
+                update_stream_settings(session, base_url, ORG_ID, STREAM_NAME,
+                                      {"full_text_search_keys": {"add": [], "remove": [field_name]}})
