@@ -114,6 +114,7 @@ mod m20260414_000001_add_is_system_to_cipher_keys;
 mod m20260414_000002_create_org_ai_toolsets;
 mod m20260415_000001_create_model_pricing_table;
 mod m20260415_000002_add_source_to_model_pricing;
+mod m20260504_000001_add_anomaly_detection_config_folder_fk;
 
 pub struct Migrator;
 
@@ -217,6 +218,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260414_000002_create_org_ai_toolsets::Migration),
             Box::new(m20260415_000001_create_model_pricing_table::Migration),
             Box::new(m20260415_000002_add_source_to_model_pricing::Migration),
+            Box::new(m20260504_000001_add_anomaly_detection_config_folder_fk::Migration),
         ]
     }
 }
