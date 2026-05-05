@@ -22,7 +22,7 @@
     :style="{
         opacity: computedOpacity,
         backgroundColor: computedStyleMap,
-        marginLeft: store.state.isAiChatEnabled ? (depth * 10 + 'px') : (depth * 20 + 'px')
+        marginLeft: store.state.isAiChatEnabled ? (depth * 0.625 + 'rem') : (depth * 1.25 + 'rem')
     }"
     >
       <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
