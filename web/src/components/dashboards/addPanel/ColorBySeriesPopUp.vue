@@ -17,10 +17,11 @@
 <template>
   <div
     data-test="dashboard-color-by-series-popup"
+    class="tw:flex tw:flex-col tw:h-full"
     style="padding: 5px 10px; min-width: min(1200px, 90vw)"
   >
     <div
-      class="flex justify-between items-center q-pa-md header tw:top-0 tw:sticky tw:bg-dialog-bg tw:z-[1]"
+      class="flex justify-between items-center q-pa-md header tw:shrink-0 tw:bg-dialog-bg tw:z-[1]"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
@@ -36,8 +37,8 @@
         <template #icon-left><q-icon name="close" /></template>
       </OButton>
     </div>
-    <div class="flex tw:justify-between tw:flex-col">
-      <div class="tw:mt-2 scrollable-content scroll tw:min-h-52">
+    <div class="tw:flex-1 tw:min-h-0">
+      <div class="tw:mt-2 scrollable-content tw:h-full">
         <draggable
           v-model="editColorBySeries"
           :options="dragOptions"
@@ -147,7 +148,7 @@
       </div>
       <!-- Footer Buttons -->
     </div>
-    <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer tw:bg-dialog-bg tw:pt-2 tw:z-[1]">
+    <div class="flex justify-between sticky-footer tw:shrink-0 tw:bg-dialog-bg tw:pt-2">
       <OButton
         variant="outline"
         size="sm-action"
@@ -354,7 +355,6 @@ export default defineComponent({
 }
 .scrollable-content {
   overflow-y: auto;
-  max-height: calc(100vh - 190px);
   &::-webkit-scrollbar {
     width: 6px;
     background: transparent;
