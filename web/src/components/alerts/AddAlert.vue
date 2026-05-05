@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px;">
 
       <!-- Stream Name & Stream Type -->
-      <div class="card-container tw:shrink-0">
+      <div class="card-container tw:shrink-0 stream-config-card">
         <div class="section-header">
           <div class="section-header-accent" />
           <span class="section-header-title">Stream Config <span class="tw:text-red-500">*</span></span>
@@ -134,8 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.stream_type"
             :options="streamTypes"
             :popup-content-style="{ textTransform: 'lowercase' }"
-            class="no-case alert-v3-field"
-            style="width: 150px;"
+            class="no-case alert-v3-field stream-type-select"
             :class="streamTypeError ? 'field-error' : ''"
             dense
             borderless
@@ -162,8 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="filteredStreams"
             :loading="isFetchingStreams"
             color="input-border"
-            class="no-case alert-v3-field"
-            style="width: 150px;"
+            class="no-case alert-v3-field stream-name-select"
             :class="streamNameError ? 'field-error' : ''"
             dense
             borderless
@@ -193,8 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             hide-bottom-space
             :disable="beingUpdated || anomalyEditMode"
-            class="alert-v3-field"
-            style="min-width: 110px;"
+            class="alert-v3-field alert-type-select"
           />
         </div>
         </div>
@@ -1134,6 +1131,33 @@ body.body--dark .query-mode-tabs {
   .topbar-name-input  { min-width: 70px; }
   .topbar-stream-type { width: 75px; }
   .topbar-stream-name { width: 80px; }
+}
+// ── Stream Config card responsive container queries ───────────────────────
+.stream-config-card {
+  container-type: inline-size;
+  container-name: stream-config;
+}
+
+.stream-type-select { width: 150px; }
+.stream-name-select { width: 160px; }
+.alert-type-select  { min-width: 110px; }
+
+@container stream-config (max-width: 900px) {
+  .stream-type-select { width: 110px; }
+  .stream-name-select { width: 120px; }
+  .alert-type-select  { min-width: 95px; }
+}
+
+@container stream-config (max-width: 750px) {
+  .stream-type-select { width: 110px; }
+  .stream-name-select { width: 110px; }
+  .alert-type-select  { min-width: 85px; }
+}
+
+@container stream-config (max-width: 600px) {
+  .stream-type-select { width: 70px; }
+  .stream-name-select { width: 80px; }
+  .alert-type-select  { min-width: 75px; }
 }
 // ───────────────────────────────────────────────────────────────────────────
 </style>
