@@ -23,7 +23,7 @@ export type DropdownSide = "top" | "right" | "bottom" | "left";
 export interface DropdownProps {
   /** Controlled open state — use with v-model:open */
   open?: boolean;
-  /** Whether the dropdown blocks interaction with the rest of the page */
+  /** Whether the dropdown blocks interaction with the rest of the page (default: false) */
   modal?: DropdownMenuRootProps["modal"];
   /** Preferred side to open relative to the trigger */
   side?: DropdownSide;
