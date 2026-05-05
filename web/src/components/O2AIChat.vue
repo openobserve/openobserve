@@ -1,23 +1,10 @@
 <template>
-  <div
-    class="chat-container"
-    :class="[
-      { 'chat-open': isOpen },
-      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
-    ]"
+  <div class="chat-container" :class="[{ 'chat-open': isOpen }, store.state.theme == 'dark' ? 'dark-mode' : 'light-mode']" 
   >
-    <div
-      v-if="isOpen"
-      class="chat-content-wrapper"
-      :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
-    >
-      <div
-        class="chat-header"
-        :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
-      >
-        <div
-          class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full"
-        >
+    <div v-if="isOpen" class="chat-content-wrapper" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+      <div class="chat-header" :style="{ height:  headerHeight ? headerHeight + 'px' : '' }">
+        <div class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full">
+
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-avatar size="24px">
               <img :src="o2AiTitleLogo" />
@@ -31,10 +18,8 @@
               @click="loadHistory"
             >
               <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
-                <span
-                  class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block"
-                >
-                  {{ displayedTitle || "New Chat" }}
+                <span class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block">
+                  {{ displayedTitle || 'New Chat' }}
                   <q-tooltip
                     v-if="displayedTitle && displayedTitle.length > 25"
                     :delay="500"
@@ -45,11 +30,7 @@
                     {{ displayedTitle }}
                   </q-tooltip>
                 </span>
-                <q-icon
-                  name="arrow_drop_down"
-                  size="20px"
-                  class="tw:flex-shrink-0"
-                />
+                <q-icon name="arrow_drop_down" size="20px" class="tw:flex-shrink-0" />
               </div>
               <q-menu>
                 <!-- History menu with search -->
@@ -68,15 +49,7 @@
                     </q-input>
                   </div>
                   <div class="history-list-container">
-                    <q-list
-                      style="
-                        min-width: 200px;
-                        width: 300px;
-                        max-width: 300px;
-                        border: 1px solid var(--q-separator-color);
-                      "
-                      padding
-                    >
+                    <q-list style="min-width: 200px; width: 300px; max-width: 300px; border: 1px solid var(--q-separator-color);" padding>
                       <q-item
                         v-for="chat in filteredChatHistory"
                         :key="chat.id"
@@ -88,16 +61,10 @@
                         class="history-item"
                       >
                         <q-item-section>
-                          <div
-                            class="tw:flex tw:items-center tw:justify-between tw:w-full"
-                          >
+                          <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
                             <div class="tw:flex-1 tw:overflow-hidden">
-                              <div class="tw:text-[13px] tw:truncate">
-                                {{ chat.title }}
-                              </div>
-                              <div class="tw:text-[11px] tw:text-gray-500">
-                                {{ formatTime(chat.timestamp) }}
-                              </div>
+                              <div class="tw:text-[13px] tw:truncate">{{ chat.title }}</div>
+                              <div class="tw:text-[11px] tw:text-gray-500">{{ formatTime(chat.timestamp) }}</div>
                             </div>
                             <q-btn
                               flat
@@ -122,10 +89,7 @@
                   </div>
 
                   <!-- Clear all conversations button -->
-                  <div
-                    v-if="filteredChatHistory.length > 0"
-                    class="clear-all-container"
-                  >
+                  <div v-if="filteredChatHistory.length > 0" class="clear-all-container">
                     <q-separator />
                     <q-btn
                       flat
@@ -160,28 +124,13 @@
               round
               dense
               size="md"
-              :icon="
-                store.state.isAiChatExpanded
-                  ? 'close_fullscreen'
-                  : 'open_in_full'
-              "
+              :icon="store.state.isAiChatExpanded ? 'close_fullscreen' : 'open_in_full'"
               data-test="ai-chat-expand-btn"
               @click="toggleExpand"
             >
-              <q-tooltip :delay="500"
-                >{{ store.state.isAiChatExpanded ? "Collapse" : "Expand" }} ({{
-                  isMac ? "⌘" : "Ctrl+"
-                }}B)</q-tooltip
-              >
+              <q-tooltip :delay="500">{{ store.state.isAiChatExpanded ? 'Collapse' : 'Expand' }} ({{ isMac ? '⌘' : 'Ctrl+' }}B)</q-tooltip>
             </q-btn>
-            <q-btn
-              flat
-              round
-              dense
-              size="md"
-              icon="close"
-              @click="$emit('close')"
-            />
+            <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
           </div>
         </div>
       </div>
@@ -189,12 +138,11 @@
 
       <!-- History Panel -->
       <q-dialog v-model="showHistory" position="right">
-        <q-card style="width: 350px; max-width: 100vw; height: 100vh">
+        <q-card style="width: 350px; max-width: 100vw; height: 100vh;">
           <q-card-section class="row items-center q-pb-none">
             <div class="text-h6">Chat History</div>
             <q-space />
-            <q-btn icon="close"
-flat round dense v-close-popup />
+            <q-btn icon="close" flat round dense v-close-popup />
           </q-card-section>
 
           <q-card-section class="q-pa-md">
@@ -211,7 +159,9 @@ flat round dense v-close-popup />
                   <q-item-label caption>
                     {{ new Date(chat.timestamp).toLocaleString() }}
                   </q-item-label>
-                  <q-item-label caption> Model: {{ chat.model }} </q-item-label>
+                  <q-item-label caption>
+                    Model: {{ chat.model }}
+                  </q-item-label>
                 </q-item-section>
               </q-item>
             </q-list>
@@ -272,23 +222,21 @@ flat round dense v-close-popup />
         @update:cancel="showClearAllConfirmDialog = false"
       />
 
+
       <!-- Image Preview Dialog -->
       <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
-        <q-card class="image-preview-dialog" style="max-width: 90vw">
+        <q-card class="image-preview-dialog" style="max-width: 90vw;">
           <q-card-section class="row items-center q-pb-none">
             <div class="text-subtitle1">{{ previewImage?.filename }}</div>
             <q-space />
-            <q-btn icon="close"
-flat round dense v-close-popup />
+            <q-btn icon="close" flat round dense v-close-popup />
           </q-card-section>
           <q-card-section class="q-pa-md tw:flex tw:justify-center">
             <img
               v-if="previewImage"
-              :src="
-                'data:' + previewImage.mimeType + ';base64,' + previewImage.data
-              "
+              :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
               :alt="previewImage.filename"
-              style="max-width: 100%; object-fit: contain"
+              style="max-width: 100%; object-fit: contain;"
             />
           </q-card-section>
         </q-card>
@@ -347,69 +295,47 @@ flat round dense v-close-popup />
         @update:cancel="showClearAllConfirmDialog = false"
       />
 
+
       <!-- Image Preview Dialog -->
       <q-dialog v-model="showImagePreview" @hide="closeImagePreview">
-        <q-card class="image-preview-dialog" style="max-width: 90vw">
+        <q-card class="image-preview-dialog" style="max-width: 90vw; ">
           <q-card-section class="row items-center q-pb-none">
             <div class="text-subtitle1">{{ previewImage?.filename }}</div>
             <q-space />
-            <q-btn icon="close"
-flat round dense v-close-popup />
+            <q-btn icon="close" flat round dense v-close-popup />
           </q-card-section>
           <q-card-section class="q-pa-md tw:flex tw:justify-center">
             <img
               v-if="previewImage"
-              :src="
-                'data:' + previewImage.mimeType + ';base64,' + previewImage.data
-              "
+              :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
               :alt="previewImage.filename"
-              style="max-width: 100%; object-fit: contain"
+              style="max-width: 100%; object-fit: contain;"
             />
           </q-card-section>
         </q-card>
       </q-dialog>
 
-      <div
-        class="chat-content"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
-      >
-        <div
-          class="messages-container"
-          ref="messagesContainer"
-          @scroll="checkIfShouldAutoScroll"
-        >
-          <div
-            v-if="chatMessages.length === 0"
-            class="welcome-section"
-            :class="{ 'welcome-section--centered': centeredStart }"
-          >
-            <div
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full"
-              :class="{ 'tw:relative': centeredStart }"
-            >
+
+      <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+        <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
+          <div v-if="chatMessages.length === 0" class="welcome-section" :class="{ 'welcome-section--centered': centeredStart }">
+            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full" :class="{ 'tw:relative': centeredStart }">
               <div
                 class="tw:flex tw:flex-col tw:items-center"
-                :class="{
-                  'tw:absolute tw:left-1/2 tw:-translate-x-1/2': centeredStart,
-                }"
+                :class="{ 'tw:absolute tw:left-1/2 tw:-translate-x-1/2': centeredStart }"
                 :style="centeredStart ? { top: 'calc(50% - 150px)' } : {}"
               >
                 <img :src="o2AiTitleLogo" />
                 <div class="tw:relative tw:inline-block">
-                  <span
-                    class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center"
-                    >O2 Assistant</span
-                  >
+                  <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
                   <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
                 </div>
               </div>
               <!-- Input rendered here when centeredStart so it appears mid-screen -->
               <div v-if="centeredStart" class="centered-input-wrap">
-                <div
-                  class="unified-input-box"
-                  :class="
-                    store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                  "
+                  <div
+                    class="unified-input-box"
+                  :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
                   @dragover="handleDragOver"
                   @drop="handleDrop"
                   @paste="handlePaste"
@@ -432,14 +358,10 @@ flat round dense v-close-popup />
                       <q-btn
                         v-if="inputMessage.trim() || pendingImages.length > 0"
                         @click="sendMessage"
-                        round
-                        dense
-                        flat
-                        size="sm"
+                        round dense flat size="sm"
                         class="send-button"
                       >
-                        <q-icon name="send"
-size="16px" color="white" />
+                        <q-icon name="send" size="16px" color="white" />
                       </q-btn>
                     </div>
                   </div>
@@ -447,57 +369,25 @@ size="16px" color="white" />
               </div>
             </div>
           </div>
-          <div
-            v-for="(message, index) in processedMessages"
-            :key="index"
-            class="message"
+          <div v-for="(message, index) in processedMessages"
+            :key="index" 
+            class="message" 
             :class="[
               message.role,
-              { 'error-message': message.content.startsWith('Error:') },
-            ]"
-          >
-            <div class="message-content">
-              <q-avatar
-                v-if="message.role === 'user'"
-                size="24px"
-                :class="
-                  store.state.theme == 'dark'
-                    ? 'dark-user-avatar'
-                    : 'light-user-avatar'
-                "
-              >
-                <q-icon
-                  size="16px"
-                  name="person"
-                  :color="store.state.theme == 'dark' ? 'white' : '#4a5568'"
-                />
+              { 'error-message': message.content.startsWith('Error:') }
+            ]">
+            <div class="message-content" >
+              <q-avatar v-if="message.role === 'user'" size="24px" :class="store.state.theme == 'dark' ? 'dark-user-avatar' : 'light-user-avatar'">
+                <q-icon size="16px" name="person" :color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
               </q-avatar>
-              <div
-                class="message-blocks"
-                style="background-color: transparent"
-                :class="
-                  store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                "
-              >
+              <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
                 <!-- Loading indicator inside message box for empty assistant messages -->
-                <div
-                  v-if="
-                    message.role === 'assistant' &&
-                    (!message.contentBlocks ||
-                      message.contentBlocks.length === 0) &&
-                    (!message.content || message.content.trim() === '') &&
-                    isLoading
-                  "
-                  class="inline-loading"
-                >
+                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
                   <q-spinner-dots color="primary" size="1.5em" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
                 <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
-                <template
-                  v-for="(block, blockIndex) in message.contentBlocks"
-                  :key="'cb-' + blockIndex"
-                >
+                <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
                   <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
@@ -505,161 +395,78 @@ size="16px" color="white" />
                     :class="[
                       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
                       { 'has-details': hasToolCallDetails(block) },
-                      {
-                        error:
-                          block.success === false && !block.pendingConfirmation,
-                      },
-                      {
-                        'pending-confirmation':
-                          block.pendingConfirmation &&
-                          block.tool !== 'navigation_action',
-                      },
-                      {
-                        'pending-navigation':
-                          block.pendingConfirmation &&
-                          block.tool === 'navigation_action',
-                      },
+                      { 'error': block.success === false && !block.pendingConfirmation },
+                      { 'pending-confirmation': block.pendingConfirmation && block.tool !== 'navigation_action' },
+                      { 'pending-navigation': block.pendingConfirmation && block.tool === 'navigation_action' },
                     ]"
-                    @click="
-                      hasToolCallDetails(block) &&
-                      !block.pendingConfirmation &&
-                      toggleToolCallExpanded(index, blockIndex)
-                    "
+                    @click="hasToolCallDetails(block) && !block.pendingConfirmation && toggleToolCallExpanded(index, blockIndex)"
                   >
                     <div class="tool-call-header">
                       <q-icon
-                        :name="
-                          block.pendingConfirmation
-                            ? block.tool === 'navigation_action'
-                              ? 'open_in_new'
-                              : 'help_outline'
-                            : block.success === false
-                              ? 'error'
-                              : 'check_circle'
-                        "
+                        :name="block.pendingConfirmation ? (block.tool === 'navigation_action' ? 'open_in_new' : 'help_outline') : (block.success === false ? 'error' : 'check_circle')"
                         size="14px"
-                        :color="
-                          block.pendingConfirmation
-                            ? block.tool === 'navigation_action'
-                              ? 'primary'
-                              : 'warning'
-                            : block.success === false
-                              ? 'negative'
-                              : 'positive'
-                        "
+                        :color="block.pendingConfirmation ? (block.tool === 'navigation_action' ? 'primary' : 'warning') : (block.success === false ? 'negative' : 'positive')"
                       />
                       <span class="tool-call-name">
-                        {{ formatToolCallMessage(block).text
-                        }}<strong
-                          v-if="formatToolCallMessage(block).highlight"
-                          >{{ formatToolCallMessage(block).highlight }}</strong
-                        >{{ formatToolCallMessage(block).suffix }}
+                        {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
                       </span>
                       <!-- Navigation icon -->
                       <q-icon
-                        v-if="
-                          block.navigationAction && !block.pendingConfirmation
-                        "
+                        v-if="block.navigationAction && !block.pendingConfirmation"
                         name="open_in_new"
                         size="14px"
                         color="primary"
                         class="navigation-icon"
-                        @click.stop="
-                          handleNavigationAction(block.navigationAction)
-                        "
+                        @click.stop="handleNavigationAction(block.navigationAction)"
                       >
-                        <q-tooltip>{{
-                          block.navigationAction.label
-                        }}</q-tooltip>
+                        <q-tooltip>{{ block.navigationAction.label }}</q-tooltip>
                       </q-icon>
                       <q-icon
-                        v-if="
-                          hasToolCallDetails(block) &&
-                          !block.pendingConfirmation
-                        "
-                        :name="
-                          isToolCallExpanded(index, blockIndex)
-                            ? 'expand_less'
-                            : 'expand_more'
-                        "
+                        v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
+                        :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
                         size="16px"
                         class="expand-icon"
                       />
                     </div>
                     <!-- Expandable details -->
-                    <div
-                      v-if="isToolCallExpanded(index, blockIndex)"
-                      class="tool-call-details"
-                      @click.stop
-                    >
+                    <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
                       <!-- Error details for failed tool calls -->
                       <template v-if="block.success === false">
                         <div v-if="block.resultMessage" class="detail-item">
                           <span class="detail-label">Error</span>
-                          <span class="detail-value tool-error-message">{{
-                            block.resultMessage
-                          }}</span>
+                          <span class="detail-value tool-error-message">{{ block.resultMessage }}</span>
                         </div>
                         <div v-if="block.errorType" class="detail-item">
                           <span class="detail-label">Type</span>
-                          <code class="detail-value">{{
-                            block.errorType
-                          }}</code>
+                          <code class="detail-value">{{ block.errorType }}</code>
                         </div>
                         <div v-if="block.suggestion" class="detail-item">
                           <span class="detail-label">Suggestion</span>
-                          <span class="detail-value tool-suggestion">{{
-                            block.suggestion
-                          }}</span>
+                          <span class="detail-value tool-suggestion">{{ block.suggestion }}</span>
                         </div>
                       </template>
                       <!-- Summary details for successful tool calls with summary -->
                       <template v-if="block.success !== false && block.summary">
-                        <div
-                          v-if="block.summary.count !== undefined"
-                          class="detail-item"
-                        >
+                        <div v-if="block.summary.count !== undefined" class="detail-item">
                           <span class="detail-label">Results</span>
-                          <span class="detail-value"
-                            >{{ block.summary.count }} records</span
-                          >
+                          <span class="detail-value">{{ block.summary.count }} records</span>
                         </div>
-                        <div
-                          v-if="block.summary.took !== undefined"
-                          class="detail-item"
-                        >
+                        <div v-if="block.summary.took !== undefined" class="detail-item">
                           <span class="detail-label">Duration</span>
-                          <span class="detail-value"
-                            >{{ block.summary.took }}ms</span
-                          >
+                          <span class="detail-value">{{ block.summary.took }}ms</span>
                         </div>
                         <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
-                        <div
-                          v-if="block.summary.return_code !== undefined"
-                          class="detail-item"
-                        >
+                        <div v-if="block.summary.return_code !== undefined" class="detail-item">
                           <span class="detail-label">Exit code</span>
-                          <code class="detail-value">{{
-                            block.summary.return_code
-                          }}</code>
+                          <code class="detail-value">{{ block.summary.return_code }}</code>
                         </div>
-                        <div
-                          v-if="block.summary.stdout_lines !== undefined"
-                          class="detail-item"
-                        >
+                        <div v-if="block.summary.stdout_lines !== undefined" class="detail-item">
                           <span class="detail-label">Stdout</span>
-                          <span class="detail-value"
-                            >{{ block.summary.stdout_lines }} lines</span
-                          >
+                          <span class="detail-value">{{ block.summary.stdout_lines }} lines</span>
                         </div>
-                        <div
-                          v-if="block.summary.stderr_lines"
-                          class="detail-item"
-                        >
+                        <div v-if="block.summary.stderr_lines" class="detail-item">
                           <span class="detail-label">Stderr</span>
-                          <span class="detail-value"
-                            >{{ block.summary.stderr_lines }} lines</span
-                          >
+                          <span class="detail-value">{{ block.summary.stderr_lines }} lines</span>
                         </div>
                         <div v-if="block.summary.truncated" class="detail-item">
                           <span class="detail-label">Output</span>
@@ -667,10 +474,7 @@ size="16px" color="white" />
                         </div>
                       </template>
                       <!-- Existing context details -->
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.query"
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.query" class="detail-item">
                         <div class="detail-header">
                           <span class="detail-label">Query</span>
                           <q-btn
@@ -679,96 +483,42 @@ size="16px" color="white" />
                             size="xs"
                             icon="content_copy"
                             class="copy-btn"
-                            @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.query,
-                              )
-                            "
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.query)"
                           >
                             <q-tooltip>Copy query</q-tooltip>
                           </q-btn>
                         </div>
-                        <code class="detail-value query-value">{{
-                          getToolCallDisplayData(block.context)?.query
-                        }}</code>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.query }}</code>
                       </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.stream"
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.stream" class="detail-item">
                         <span class="detail-label">Stream</span>
-                        <code class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.stream
-                        }}</code>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.stream }}</code>
                       </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.type"
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.type" class="detail-item">
                         <span class="detail-label">Type</span>
-                        <code class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.type
-                        }}</code>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.type }}</code>
                       </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.start_time"
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.start_time" class="detail-item">
                         <span class="detail-label">Start</span>
-                        <span class="detail-value">{{
-                          formatTimestamp(
-                            getToolCallDisplayData(block.context)?.start_time,
-                          )
-                        }}</span>
+                        <span class="detail-value">{{ formatTimestamp(getToolCallDisplayData(block.context)?.start_time) }}</span>
                       </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.end_time"
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.end_time" class="detail-item">
                         <span class="detail-label">End</span>
-                        <span class="detail-value">{{
-                          formatTimestamp(
-                            getToolCallDisplayData(block.context)?.end_time,
-                          )
-                        }}</span>
+                        <span class="detail-value">{{ formatTimestamp(getToolCallDisplayData(block.context)?.end_time) }}</span>
                       </div>
-                      <div
-                        v-if="
-                          getToolCallDisplayData(block.context)?.from !==
-                          undefined
-                        "
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.from !== undefined" class="detail-item">
                         <span class="detail-label">From</span>
-                        <span class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.from
-                        }}</span>
+                        <span class="detail-value">{{ getToolCallDisplayData(block.context)?.from }}</span>
                       </div>
-                      <div
-                        v-if="
-                          getToolCallDisplayData(block.context)?.size !==
-                          undefined
-                        "
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.size !== undefined" class="detail-item">
                         <span class="detail-label">Size</span>
-                        <span class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.size
-                        }}</span>
+                        <span class="detail-value">{{ getToolCallDisplayData(block.context)?.size }}</span>
                       </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.query_type"
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.query_type" class="detail-item">
                         <span class="detail-label">Query Type</span>
-                        <code class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.query_type
-                        }}</code>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.query_type }}</code>
                       </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.vrl"
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.vrl" class="detail-item">
                         <div class="detail-header">
                           <span class="detail-label">VRL</span>
                           <q-btn
@@ -777,23 +527,14 @@ size="16px" color="white" />
                             size="xs"
                             icon="content_copy"
                             class="copy-btn"
-                            @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.vrl,
-                              )
-                            "
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.vrl)"
                           >
                             <q-tooltip>Copy VRL</q-tooltip>
                           </q-btn>
                         </div>
-                        <code class="detail-value query-value">{{
-                          getToolCallDisplayData(block.context)?.vrl
-                        }}</code>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.vrl }}</code>
                       </div>
-                      <div
-                        v-if="getToolCallDisplayData(block.context)?.command"
-                        class="detail-item"
-                      >
+                      <div v-if="getToolCallDisplayData(block.context)?.command" class="detail-item">
                         <div class="detail-header">
                           <span class="detail-label">Command</span>
                           <q-btn
@@ -802,18 +543,12 @@ size="16px" color="white" />
                             size="xs"
                             icon="content_copy"
                             class="copy-btn"
-                            @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.command,
-                              )
-                            "
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.command)"
                           >
                             <q-tooltip>Copy command</q-tooltip>
                           </q-btn>
                         </div>
-                        <code class="detail-value query-value">{{
-                          getToolCallDisplayData(block.context)?.command
-                        }}</code>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.command }}</code>
                       </div>
                       <!-- Tool response: SearchSQL hits -->
                       <template v-if="block.response && block.response.hits">
@@ -826,77 +561,33 @@ size="16px" color="white" />
                               size="xs"
                               icon="content_copy"
                               class="copy-btn"
-                              @click.stop="
-                                copyToClipboard(
-                                  JSON.stringify(block.response.hits, null, 2),
-                                )
-                              "
+                              @click.stop="copyToClipboard(JSON.stringify(block.response.hits, null, 2))"
                             >
                               <q-tooltip>Copy results</q-tooltip>
                             </q-btn>
                           </div>
                           <div class="tool-response-hits">
-                            <div
-                              v-for="(hit, hIdx) in block.response.hits"
-                              :key="hIdx"
-                              class="tool-response-hit"
-                            >
-                              <span
-                                v-for="(val, key) in hit"
-                                :key="key"
-                                class="hit-field"
-                              >
-                                <span class="hit-key">{{ key }}:</span>
-                                {{ val }}
+                            <div v-for="(hit, hIdx) in block.response.hits" :key="hIdx" class="tool-response-hit">
+                              <span v-for="(val, key) in hit" :key="key" class="hit-field">
+                                <span class="hit-key">{{ key }}:</span> {{ val }}
                               </span>
                             </div>
                           </div>
                         </div>
                         <div class="tool-response-meta">
-                          <span
-                            v-if="block.response.total !== undefined"
-                            class="context-tag"
-                            >Total: {{ block.response.total }}</span
-                          >
-                          <span
-                            v-if="block.response.took !== undefined"
-                            class="context-tag"
-                            >Took: {{ block.response.took }}ms</span
-                          >
-                          <span
-                            v-if="block.response.hits_truncated"
-                            class="context-tag"
-                            >Showing first
-                            {{ block.response.hits.length }}</span
-                          >
+                          <span v-if="block.response.total !== undefined" class="context-tag">Total: {{ block.response.total }}</span>
+                          <span v-if="block.response.took !== undefined" class="context-tag">Took: {{ block.response.took }}ms</span>
+                          <span v-if="block.response.hits_truncated" class="context-tag">Showing first {{ block.response.hits.length }}</span>
                         </div>
                       </template>
                       <!-- Tool response: testFunction input/output -->
-                      <template
-                        v-else-if="
-                          block.response &&
-                          (block.response.input || block.response.output)
-                        "
-                      >
+                      <template v-else-if="block.response && (block.response.input || block.response.output)">
                         <div v-if="block.response.input" class="detail-item">
                           <span class="detail-label">Input Events</span>
                           <div class="tool-response-hits">
-                            <div
-                              v-for="(evt, eIdx) in block.response.input"
-                              :key="eIdx"
-                              class="tool-response-hit"
-                            >
-                              <span
-                                v-for="(val, key) in evt"
-                                :key="key"
-                                class="hit-field"
-                              >
-                                <span class="hit-key">{{ key }}:</span>
-                                {{
-                                  typeof val === "string" && val.length > 120
-                                    ? val.substring(0, 120) + "..."
-                                    : val
-                                }}
+                            <div v-for="(evt, eIdx) in block.response.input" :key="eIdx" class="tool-response-hit">
+                              <span v-for="(val, key) in evt" :key="key" class="hit-field">
+                                <span class="hit-key">{{ key }}:</span> {{ typeof val === 'string' && val.length > 120 ? val.substring(0, 120) + '...' : val }}
                               </span>
                             </div>
                           </div>
@@ -904,48 +595,22 @@ size="16px" color="white" />
                         <div v-if="block.response.output" class="detail-item">
                           <span class="detail-label">Output</span>
                           <div class="tool-response-hits">
-                            <div
-                              v-for="(res, rIdx) in block.response.output"
-                              :key="rIdx"
-                              class="tool-response-hit"
-                            >
+                            <div v-for="(res, rIdx) in block.response.output" :key="rIdx" class="tool-response-hit">
                               <template v-if="res.event">
-                                <span
-                                  v-for="(val, key) in res.event"
-                                  :key="key"
-                                  class="hit-field"
-                                >
-                                  <span class="hit-key">{{ key }}:</span>
-                                  {{
-                                    typeof val === "string" && val.length > 120
-                                      ? val.substring(0, 120) + "..."
-                                      : val
-                                  }}
+                                <span v-for="(val, key) in res.event" :key="key" class="hit-field">
+                                  <span class="hit-key">{{ key }}:</span> {{ typeof val === 'string' && val.length > 120 ? val.substring(0, 120) + '...' : val }}
                                 </span>
                               </template>
-                              <span
-                                v-if="res.message"
-                                class="hit-field hit-error"
-                              >
-                                <span class="hit-key">error:</span>
-                                {{ res.message }}
+                              <span v-if="res.message" class="hit-field hit-error">
+                                <span class="hit-key">error:</span> {{ res.message }}
                               </span>
                             </div>
                           </div>
                         </div>
                       </template>
                       <!-- Tool response: list items from normalized { total, items } -->
-                      <template
-                        v-else-if="
-                          block.response &&
-                          block.response.items &&
-                          Array.isArray(block.response.items)
-                        "
-                      >
-                        <div
-                          v-if="block.response.items.length > 0"
-                          class="detail-item"
-                        >
+                      <template v-else-if="block.response && block.response.items && Array.isArray(block.response.items)">
+                        <div v-if="block.response.items.length > 0" class="detail-item">
                           <div class="detail-header">
                             <span class="detail-label">Items</span>
                             <q-btn
@@ -954,32 +619,15 @@ size="16px" color="white" />
                               size="xs"
                               icon="content_copy"
                               class="copy-btn"
-                              @click.stop="
-                                copyToClipboard(
-                                  JSON.stringify(block.response.items, null, 2),
-                                )
-                              "
+                              @click.stop="copyToClipboard(JSON.stringify(block.response.items, null, 2))"
                             >
                               <q-tooltip>Copy items</q-tooltip>
                             </q-btn>
                           </div>
                           <div class="tool-response-hits">
-                            <div
-                              v-for="(item, iIdx) in block.response.items"
-                              :key="iIdx"
-                              class="tool-response-list-item"
-                            >
-                              <div
-                                v-for="(val, key) in item"
-                                :key="key"
-                                class="hit-field"
-                              >
-                                <span class="hit-key">{{ key }}:</span>
-                                {{
-                                  typeof val === "object"
-                                    ? JSON.stringify(val)
-                                    : val
-                                }}
+                            <div v-for="(item, iIdx) in block.response.items" :key="iIdx" class="tool-response-list-item">
+                              <div v-for="(val, key) in item" :key="key" class="hit-field">
+                                <span class="hit-key">{{ key }}:</span> {{ typeof val === 'object' ? JSON.stringify(val) : val }}
                               </div>
                             </div>
                           </div>
@@ -995,22 +643,12 @@ size="16px" color="white" />
                             size="xs"
                             icon="content_copy"
                             class="copy-btn"
-                            @click.stop="
-                              copyToClipboard(
-                                typeof block.response === 'string'
-                                  ? block.response
-                                  : JSON.stringify(block.response, null, 2),
-                              )
-                            "
+                            @click.stop="copyToClipboard(typeof block.response === 'string' ? block.response : JSON.stringify(block.response, null, 2))"
                           >
                             <q-tooltip>Copy response</q-tooltip>
                           </q-btn>
                         </div>
-                        <code class="detail-value query-value">{{
-                          typeof block.response === "string"
-                            ? block.response
-                            : JSON.stringify(block.response, null, 2)
-                        }}</code>
+                        <code class="detail-value query-value">{{ typeof block.response === 'string' ? block.response : JSON.stringify(block.response, null, 2) }}</code>
                       </div>
                     </div>
                   </div>
@@ -1019,32 +657,27 @@ size="16px" color="white" />
                     v-else-if="block.type === 'log_entry'"
                     class="log-entry-item"
                     :class="[
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
+                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
                     ]"
                     @click="toggleLogEntryExpanded(index, blockIndex)"
                   >
                     <div class="log-entry-header">
-                      <q-icon name="description" size="14px"
-color="primary" />
+                      <q-icon
+                        name="description"
+                        size="14px"
+                        color="primary"
+                      />
                       <span class="log-entry-info">
                         {{ block.preview }}
                       </span>
                       <q-icon
-                        :name="
-                          isLogEntryExpanded(index, blockIndex)
-                            ? 'expand_less'
-                            : 'expand_more'
-                        "
+                        :name="isLogEntryExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
                         size="16px"
                         class="expand-icon"
                       />
                     </div>
                     <!-- Expandable details -->
-                    <div
-                      v-if="isLogEntryExpanded(index, blockIndex)"
-                      class="log-entry-details"
-                      @click.stop
-                    >
+                    <div v-if="isLogEntryExpanded(index, blockIndex)" class="log-entry-details" @click.stop>
                       <div class="log-entry-content">
                         <q-btn
                           flat
@@ -1056,10 +689,7 @@ color="primary" />
                         >
                           <q-tooltip>Copy content</q-tooltip>
                         </q-btn>
-                        <code
-                          class="log-entry-code"
-                          v-html="formatLogEntryContent(block.content)"
-                        ></code>
+                        <code class="log-entry-code" v-html="formatLogEntryContent(block.content)"></code>
                       </div>
                     </div>
                   </div>
@@ -1067,39 +697,24 @@ color="primary" />
                   <div
                     v-else-if="block.type === 'error'"
                     class="stream-error-block"
-                    :class="
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                    "
+                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
                   >
                     <div class="stream-error-header">
-                      <q-icon name="warning"
-size="16px" color="negative" />
-                      <span class="stream-error-message">{{
-                        block.message
-                      }}</span>
+                      <q-icon name="warning" size="16px" color="negative" />
+                      <span class="stream-error-message">{{ block.message }}</span>
                     </div>
-                    <div
-                      v-if="block.suggestion"
-                      class="stream-error-suggestion"
-                    >
+                    <div v-if="block.suggestion" class="stream-error-suggestion">
                       {{ block.suggestion }}
                     </div>
-                    <div
-                      v-if="block.recoverable"
-                      class="stream-error-recoverable"
-                    >
+                    <div v-if="block.recoverable" class="stream-error-recoverable">
                       This error may be temporary. You can try again.
                     </div>
                   </div>
                   <!-- Navigation block - standalone navigation button -->
                   <div
-                    v-else-if="
-                      block.type === 'navigation' && block.navigationAction
-                    "
+                    v-else-if="block.type === 'navigation' && block.navigationAction"
                     class="navigation-block"
-                    :class="
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                    "
+                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
                   >
                     <q-btn
                       dense
@@ -1114,18 +729,10 @@ size="16px" color="negative" />
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
-                    <template
-                      v-for="(textBlock, tbIndex) in processTextBlock(
-                        block.text,
-                      )"
-                      :key="'tb-' + blockIndex + '-' + tbIndex"
-                    >
+                    <template v-for="(textBlock, tbIndex) in processTextBlock(block.text)" :key="'tb-' + blockIndex + '-' + tbIndex">
                       <div v-if="textBlock.type === 'code'" class="code-block">
                         <div class="code-block-header code-block-theme">
-                          <span
-                            v-if="textBlock.language"
-                            class="code-type-label"
-                          >
+                          <span v-if="textBlock.language" class="code-type-label">
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
                           <q-btn
@@ -1143,14 +750,9 @@ size="16px" color="negative" />
                           </q-btn>
                         </div>
                         <span class="generated-code-block">
-                          <code
-                            :class="['hljs', textBlock.language]"
-                            v-html="textBlock.highlightedContent"
-                          ></code>
+                          <code :class="['hljs', textBlock.language]" v-html="textBlock.highlightedContent"></code>
                         </span>
-                        <div
-                          class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full"
-                        >
+                        <div class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full">
                           <q-btn
                             flat
                             dense
@@ -1166,29 +768,14 @@ size="16px" color="negative" />
                           </q-btn>
                         </div>
                       </div>
-                      <div
-                        v-else
-                        class="text-block"
-                        v-html="processHtmlBlock(textBlock.content)"
-                      ></div>
+                      <div v-else class="text-block" v-html="processHtmlBlock(textBlock.content)"></div>
                     </template>
                   </template>
                 </template>
                 <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
-                <template
-                  v-if="
-                    !message.contentBlocks || message.contentBlocks.length === 0
-                  "
-                >
+                <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
                   <!-- Display images for user messages -->
-                  <div
-                    v-if="
-                      message.role === 'user' &&
-                      message.images &&
-                      message.images.length > 0
-                    "
-                    class="message-images tw:flex tw:flex-wrap tw:gap-2 tw:mb-2"
-                  >
+                  <div v-if="message.role === 'user' && message.images && message.images.length > 0" class="message-images tw:flex tw:flex-wrap tw:gap-2 tw:mb-2">
                     <div
                       v-for="(img, imgIndex) in message.images"
                       :key="'img-' + imgIndex"
@@ -1203,10 +790,7 @@ size="16px" color="negative" />
                       <q-tooltip>{{ img.filename }}</q-tooltip>
                     </div>
                   </div>
-                  <template
-                    v-for="(block, blockIndex) in message.blocks"
-                    :key="'fb-' + blockIndex"
-                  >
+                  <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
                     <div v-if="block.type === 'code'" class="code-block">
                       <div class="code-block-header code-block-theme">
                         <span v-if="block.language" class="code-type-label">
@@ -1227,49 +811,25 @@ size="16px" color="negative" />
                         </q-btn>
                       </div>
                       <span class="generated-code-block">
-                        <code
-                          :class="['hljs', block.language]"
-                          v-html="block.highlightedContent"
-                        ></code>
+                        <code :class="['hljs', block.language]" v-html="block.highlightedContent"></code>
                       </span>
                     </div>
-                    <div
-                      v-else
-                      class="text-block"
-                      v-html="processHtmlBlock(block.content)"
-                    ></div>
+                    <div v-else class="text-block" v-html="processHtmlBlock(block.content)"></div>
                   </template>
                 </template>
                 <!-- Feedback buttons for assistant messages -->
-                <div
-                  v-if="
-                    message.role === 'assistant' &&
-                    message.content &&
-                    message.content.trim() !== ''
-                  "
-                  class="feedback-buttons"
-                  :class="{ 'feedback-active': message.feedback }"
-                >
+                <div v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''" class="feedback-buttons" :class="{ 'feedback-active': message.feedback }">
                   <q-btn
                     flat
                     dense
                     round
                     size="xs"
                     :disable="message.feedback === 'thumbs_up'"
-                    :class="{
-                      'feedback-selected': message.feedback === 'thumbs_up',
-                    }"
+                    :class="{ 'feedback-selected': message.feedback === 'thumbs_up' }"
                     data-test="o2-ai-chat-thumbs-up-btn"
                     @click="likeCodeBlock(index)"
                   >
-                    <q-icon
-                      :name="
-                        message.feedback === 'thumbs_up'
-                          ? matThumbUpAlt
-                          : outlinedThumbUpOffAlt
-                      "
-                      size="14px"
-                    />
+                    <q-icon :name="message.feedback === 'thumbs_up' ? matThumbUpAlt : outlinedThumbUpOffAlt" size="14px" />
                     <q-tooltip>Helpful</q-tooltip>
                   </q-btn>
                   <q-btn
@@ -1278,20 +838,11 @@ size="16px" color="negative" />
                     round
                     size="xs"
                     :disable="message.feedback === 'thumbs_down'"
-                    :class="{
-                      'feedback-selected': message.feedback === 'thumbs_down',
-                    }"
+                    :class="{ 'feedback-selected': message.feedback === 'thumbs_down' }"
                     data-test="o2-ai-chat-thumbs-down-btn"
                     @click="dislikeCodeBlock(index)"
                   >
-                    <q-icon
-                      :name="
-                        message.feedback === 'thumbs_down'
-                          ? matThumbDownAlt
-                          : outlinedThumbDownOffAlt
-                      "
-                      size="14px"
-                    />
+                    <q-icon :name="message.feedback === 'thumbs_down' ? matThumbDownAlt : outlinedThumbDownOffAlt" size="14px" />
                     <q-tooltip>Not helpful</q-tooltip>
                   </q-btn>
                 </div>
@@ -1299,85 +850,42 @@ size="16px" color="negative" />
             </div>
           </div>
           <!-- Tool call indicator - shows outside message box -->
-          <div
-            v-if="activeToolCall"
-            class="tool-call-indicator"
-            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
-          >
+          <div v-if="activeToolCall" class="tool-call-indicator" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
             <div class="tool-call-content">
               <q-spinner-dots color="primary" size="1.5em" />
               <div class="tool-call-info">
-                <span class="tool-call-message">{{
-                  activeToolCall.message
-                }}</span>
-                <div
-                  v-if="getToolCallDisplayData(activeToolCall.context)"
-                  class="tool-call-context"
-                >
-                  <div
-                    v-if="getToolCallDisplayData(activeToolCall.context)?.query"
-                    class="context-item"
-                  >
-                    <code class="context-query">{{
-                      truncateQuery(
-                        getToolCallDisplayData(activeToolCall.context)?.query,
-                      )
-                    }}</code>
+                <span class="tool-call-message">{{ activeToolCall.message }}</span>
+                <div v-if="getToolCallDisplayData(activeToolCall.context)" class="tool-call-context">
+                  <div v-if="getToolCallDisplayData(activeToolCall.context)?.query" class="context-item">
+                    <code class="context-query">{{ truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query) }}</code>
                   </div>
-                  <div
-                    v-if="
-                      getToolCallDisplayData(activeToolCall.context)?.vrl &&
-                      !getToolCallDisplayData(activeToolCall.context)?.query
-                    "
-                    class="context-item"
-                  >
-                    <code class="context-query">{{
-                      truncateQuery(
-                        getToolCallDisplayData(activeToolCall.context)?.vrl,
-                      )
-                    }}</code>
+                  <div v-if="getToolCallDisplayData(activeToolCall.context)?.vrl && !getToolCallDisplayData(activeToolCall.context)?.query" class="context-item">
+                    <code class="context-query">{{ truncateQuery(getToolCallDisplayData(activeToolCall.context)?.vrl) }}</code>
                   </div>
-                  <span
-                    v-if="
-                      getToolCallDisplayData(activeToolCall.context)?.stream
-                    "
-                    class="context-tag"
-                  >
-                    Stream:
-                    {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
+                  <span v-if="getToolCallDisplayData(activeToolCall.context)?.stream" class="context-tag">
+                    Stream: {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
                   </span>
-                  <span
-                    v-if="
-                      getToolCallDisplayData(activeToolCall.context)?.query_type
-                    "
-                    class="context-tag"
-                  >
-                    Type:
-                    {{
-                      getToolCallDisplayData(activeToolCall.context)?.query_type
-                    }}
+                  <span v-if="getToolCallDisplayData(activeToolCall.context)?.query_type" class="context-tag">
+                    Type: {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
                   </span>
                 </div>
               </div>
             </div>
           </div>
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
-          <div
-            v-if="isLoading && !activeToolCall"
-            class="tool-call-indicator"
-            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
-          >
+          <div v-if="isLoading && !activeToolCall" class="tool-call-indicator" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
             <div class="tool-call-content">
               <q-spinner-dots color="primary" size="1.5em" />
-              <span class="tool-call-message">{{
-                currentAnalyzingMessage
-              }}</span>
+              <span class="tool-call-message">{{ currentAnalyzingMessage }}</span>
             </div>
           </div>
         </div>
-
+        
         <!-- Scroll to bottom button -->
-        <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
+        <div 
+          v-show="showScrollToBottom" 
+          class="scroll-to-bottom-container"
+        >
           <q-btn
             round
             flat
@@ -1411,10 +919,7 @@ size="16px" color="negative" />
         </div>
       </div>
 
-      <div
-        v-if="!(centeredStart && chatMessages.length === 0)"
-        class="chat-input-container q-ma-md"
-      >
+      <div v-if="!(centeredStart && chatMessages.length === 0)" class="chat-input-container q-ma-md">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1430,7 +935,7 @@ size="16px" color="negative" />
           type="file"
           accept="image/png,image/jpeg"
           multiple
-          style="display: none"
+          style="display: none;"
           @change="handleImageSelect"
         />
 
@@ -1462,14 +967,9 @@ size="16px" color="negative" />
                 class="image-remove-btn"
                 @click.stop="removeImage(index)"
               >
-                <q-icon name="close"
-size="12px" color="white" />
+                <q-icon name="close" size="12px" color="white" />
               </q-btn>
-              <q-tooltip
-                >{{ img.filename }} ({{
-                  (img.size / 1024).toFixed(0)
-                }}KB)</q-tooltip
-              >
+              <q-tooltip>{{ img.filename }} ({{ (img.size / 1024).toFixed(0) }}KB)</q-tooltip>
             </div>
           </div>
 
@@ -1499,11 +999,7 @@ size="12px" color="white" />
                 size="sm"
                 class="image-upload-btn"
               >
-                <q-icon
-                  name="image"
-                  size="18px"
-                  :color="store.state.theme == 'dark' ? 'white' : 'grey-7'"
-                />
+                <q-icon name="image" size="18px" :color="store.state.theme == 'dark' ? 'white' : 'grey-7'" />
                 <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
               </q-btn>
               <div v-else class="tw:w-8"></div>
@@ -1520,28 +1016,14 @@ size="12px" color="white" />
                 :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
               >
                 <q-icon
-                  :name="
-                    isAutoNavigationEnabled
-                      ? 'check_circle'
-                      : 'radio_button_unchecked'
-                  "
+                  :name="isAutoNavigationEnabled ? 'check_circle' : 'radio_button_unchecked'"
                   size="14px"
-                  :color="
-                    !isAutoNavigationEnabled
-                      ? store.state.theme == 'dark'
-                        ? 'grey-5'
-                        : 'grey-7'
-                      : undefined
-                  "
+                  :color="!isAutoNavigationEnabled ? (store.state.theme == 'dark' ? 'grey-5' : 'grey-7') : undefined"
                   class="auto-nav-icon"
                 />
                 <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
                 <q-tooltip>
-                  {{
-                    isAutoNavigationEnabled
-                      ? "Auto navigation enabled - O2 Assistant will auto navigate without confirmation"
-                      : "Auto navigation disabled - O2 Assistant will ask before navigating"
-                  }}
+                  {{ isAutoNavigationEnabled ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation' : 'Auto navigation disabled - O2 Assistant will ask before navigating' }}
                 </q-tooltip>
               </q-btn>
             </div>
@@ -1558,8 +1040,7 @@ size="12px" color="white" />
                 size="sm"
                 class="send-button"
               >
-                <q-icon name="send"
-size="16px" color="white" />
+                <q-icon name="send" size="16px" color="white" />
               </q-btn>
 
               <!-- Stop button - shown when loading/streaming -->
@@ -1572,8 +1053,7 @@ size="16px" color="white" />
                 size="sm"
                 class="stop-button"
               >
-                <q-icon name="stop"
-size="16px" color="white" />
+                <q-icon name="stop" size="16px" color="white" />
               </q-btn>
             </div>
           </div>
@@ -1584,73 +1064,51 @@ size="16px" color="white" />
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  nextTick,
-  watch,
-  computed,
-  onUnmounted,
-} from "vue";
-import { useRouter } from "vue-router";
-import hljs from "highlight.js";
-import "highlight.js/styles/github.css";
-import "highlight.js/styles/github-dark.css";
-import { marked } from "marked";
-import { MarkedOptions } from "marked";
-import DOMPurify from "dompurify";
-import { useQuasar } from "quasar";
-import { useStore } from "vuex";
-import useAiChat from "@/composables/useAiChat";
-import {
-  outlinedThumbUpOffAlt,
-  outlinedThumbDownOffAlt,
-} from "@quasar/extras/material-icons-outlined";
-import { matThumbUpAlt, matThumbDownAlt } from "@quasar/extras/material-icons";
-import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
-import {
-  ChatMessage,
-  ChatHistoryEntry,
-  ToolCall,
-  ContentBlock,
-  ImageAttachment,
-  MAX_IMAGE_SIZE_BYTES,
-  ALLOWED_IMAGE_TYPES,
-} from "@/ts/interfaces/chat";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import RichTextInput, { ReferenceChip } from "@/components/RichTextInput.vue";
-import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
-import { useChatHistory } from "@/composables/useChatHistory";
-import useKeyboardShortcuts from "@/composables/useKeyboardShortcuts";
-import {
-  useAiDashboardEvents,
-  getDashboardEventType,
-} from "@/composables/useAiDashboardEvents";
+import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/github-dark.css';
+import { marked } from 'marked';
+import { MarkedOptions } from 'marked';
+import DOMPurify from 'dompurify';
+import { useQuasar } from 'quasar';
+import { useStore } from 'vuex';
+import useAiChat from '@/composables/useAiChat';
+import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
+import { matThumbUpAlt, matThumbDownAlt } from '@quasar/extras/material-icons';
+import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
+import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/ts/interfaces/chat';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
+import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
+import { useChatHistory } from '@/composables/useChatHistory';
+import useKeyboardShortcuts from '@/composables/useKeyboardShortcuts';
+import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
 // Register VRL as a JavaScript alias (type assertion)
-hljs.registerLanguage("vrl", () => hljs.getLanguage("javascript") as any);
+hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
 
 // Configure marked options with custom language support
 const markedOptions = {
   breaks: true,
   gfm: true,
-  langPrefix: "hljs language-",
+  langPrefix: 'hljs language-',
   headerIds: false,
   mangle: false,
   sanitize: false, // Allow HTML in markdown
   highlight: (code: string, lang: string) => {
-    if (lang === "vrl") {
-      return hljs.highlight(code, { language: "javascript" }).value;
+    if (lang === 'vrl') {
+      return hljs.highlight(code, { language: 'javascript' }).value;
     }
     if (lang && hljs.getLanguage(lang)) {
       return hljs.highlight(code, { language: lang }).value;
     }
     return hljs.highlightAuto(code).value;
-  },
+  }
 } as MarkedOptions;
 
 marked.setOptions(markedOptions);
@@ -1661,7 +1119,7 @@ function renderMarkdown(content: any) {
 }
 
 export default defineComponent({
-  name: "O2AIChat",
+  name: 'O2AIChat',
   components: {
     ConfirmDialog,
     RichTextInput,
@@ -1670,7 +1128,7 @@ export default defineComponent({
   props: {
     isOpen: {
       type: Boolean,
-      default: false,
+      default: false
     },
     headerHeight: {
       type: Number,
@@ -1679,45 +1137,39 @@ export default defineComponent({
     //this will be used to set the input message if the user sends the data from any page by clicking on the ai chat button
     aiChatInputContext: {
       type: String,
-      default: "",
+      default: ''
     },
     appendMode: {
       type: Boolean,
-      default: true,
+      default: true
     },
     aiChatPayload: {
-      type: Object as () => {
-        text: string;
-        autoSend: boolean;
-        id: number;
-      } | null,
-      default: null,
+      type: Object as () => { text: string; autoSend: boolean; id: number } | null,
+      default: null
     },
     centeredStart: {
       type: Boolean,
-      default: false,
-    },
+      default: false
+    }
   },
   setup(props) {
     const $q = useQuasar();
     const router = useRouter();
-    const inputMessage = ref(
-      props.aiChatInputContext ? props.aiChatInputContext : "",
-    );
+    const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : '');
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<any>(null); // RichTextInput component instance
     const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
-    const currentStreamingMessage = ref("");
-    const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
+    const currentStreamingMessage = ref('');
+    const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
     const showHistory = ref(false);
     const chatHistory = ref<ChatHistoryEntry[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
-    const store = useStore();
-    const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+    const store = useStore ();
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
     // Chat history composable
@@ -1729,19 +1181,19 @@ export default defineComponent({
       clearAllHistory: dbClearAllHistory,
       updateChatTitle: dbUpdateChatTitle,
     } = useChatHistory(
-      () => store.state.userInfo.email ?? "",
-      () => store.state.selectedOrganization.identifier ?? "",
+      () => store.state.userInfo.email ?? '',
+      () => store.state.selectedOrganization.identifier ?? '',
     );
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
-    const historySearchTerm = ref("");
+    const historySearchTerm = ref('');
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
 
     // Edit title state
     const showEditTitleDialog = ref(false);
-    const editingTitle = ref("");
+    const editingTitle = ref('');
 
     // Clear all confirmation state
     const showClearAllConfirmDialog = ref(false);
@@ -1751,12 +1203,9 @@ export default defineComponent({
     const chatToDelete = ref<number | null>(null);
 
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
-    const pendingConfirmation = ref<{
-      tool: string;
-      args: Record<string, any>;
-      message: string;
-      navAction?: NavigationAction;
-    } | null>(null);
+    const pendingConfirmation = ref<{ tool: string; args: Record<string, any>; message: string; navAction?: NavigationAction } | null>(null);
+
+
 
     // Auto navigation state - per chat ID
     // Stores chat ID -> boolean mapping for auto navigation preference
@@ -1779,12 +1228,12 @@ export default defineComponent({
           // Store temporarily for new chats
           pendingAutoNavigation.value = value;
         }
-      },
+      }
     });
 
     // AI-generated chat title state
     const aiGeneratedTitle = ref<string | null>(null);
-    const displayedTitle = ref<string>("");
+    const displayedTitle = ref<string>('');
     const isTypingTitle = ref(false);
     const titleAnimationId = ref<number>(0); // Used to cancel stale animations
 
@@ -1795,11 +1244,7 @@ export default defineComponent({
     const expandedLogEntries = ref<Set<string>>(new Set());
 
     // Active tool call state - for showing tool progress outside message box
-    const activeToolCall = ref<{
-      tool: string;
-      message: string;
-      context: Record<string, any>;
-    } | null>(null);
+    const activeToolCall = ref<{ tool: string; message: string; context: Record<string, any> } | null>(null);
 
     // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
     const pendingToolCalls = ref<ContentBlock[]>([]);
@@ -1815,17 +1260,14 @@ export default defineComponent({
     // Map sessionId → live stream context for re-attachment when user navigates back.
     // This allows loadChat to swap chatMessages.value back to the live array so that
     // processStream's isActive() becomes true again and the UI updates in real-time.
-    const backgroundStreamMap = new Map<
-      string,
-      {
-        msgs: ChatMessage[];
-        controller: AbortController;
-        chatId: number | null;
-      }
-    >();
+    const backgroundStreamMap = new Map<string, {
+      msgs: ChatMessage[];
+      controller: AbortController;
+      chatId: number | null;
+    }>();
 
     // Typewriter animation state for LLM responses
-    const displayedStreamingContent = ref("");
+    const displayedStreamingContent = ref('');
     const typewriterAnimationId = ref<number | null>(null);
     const TYPEWRITER_SPEED = 8; // ms per character - fast like ChatGPT (5-10ms range)
 
@@ -1868,7 +1310,7 @@ export default defineComponent({
       "Refining answer...",
       "Still thinking...",
       "Making progress...",
-      "Piecing together...",
+      "Piecing together..."
     ];
     const currentAnalyzingMessage = ref(ANALYZING_MESSAGES[0]);
     const analyzingRotationInterval = ref<NodeJS.Timeout | null>(null);
@@ -1877,15 +1319,9 @@ export default defineComponent({
      * Start rotating the analyzing message every 5 seconds
      */
     const startAnalyzingRotation = () => {
-      currentAnalyzingMessage.value =
-        ANALYZING_MESSAGES[
-          Math.floor(Math.random() * ANALYZING_MESSAGES.length)
-        ];
+      currentAnalyzingMessage.value = ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
       analyzingRotationInterval.value = setInterval(() => {
-        currentAnalyzingMessage.value =
-          ANALYZING_MESSAGES[
-            Math.floor(Math.random() * ANALYZING_MESSAGES.length)
-          ];
+        currentAnalyzingMessage.value = ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
       }, 5000);
     };
 
@@ -1906,9 +1342,9 @@ export default defineComponent({
     const finalizeTextBlock = () => {
       if (currentTextSegment.value) {
         const lm = chatMessages.value[chatMessages.value.length - 1];
-        if (lm && lm.role === "assistant" && lm.contentBlocks) {
+        if (lm && lm.role === 'assistant' && lm.contentBlocks) {
           const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-          if (lb && lb.type === "text") {
+          if (lb && lb.type === 'text') {
             lb.text = currentTextSegment.value;
           }
         }
@@ -1917,8 +1353,8 @@ export default defineComponent({
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
       }
-      currentTextSegment.value = "";
-      displayedStreamingContent.value = "";
+      currentTextSegment.value = '';
+      displayedStreamingContent.value = '';
     };
 
     // Interval ID for title animation
@@ -1940,7 +1376,7 @@ export default defineComponent({
       const currentAnimationId = ++titleAnimationId.value;
 
       isTypingTitle.value = true;
-      displayedTitle.value = "";
+      displayedTitle.value = '';
       let charIndex = 0;
 
       titleIntervalId = setInterval(() => {
@@ -1978,7 +1414,7 @@ export default defineComponent({
         titleIntervalId = null;
       }
       aiGeneratedTitle.value = null;
-      displayedTitle.value = "";
+      displayedTitle.value = '';
       isTypingTitle.value = false;
     };
 
@@ -1986,7 +1422,7 @@ export default defineComponent({
      * Reset typewriter animation state
      */
     const resetTypewriterState = () => {
-      displayedStreamingContent.value = "";
+      displayedStreamingContent.value = '';
       if (typewriterAnimationId.value) {
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
@@ -2016,19 +1452,13 @@ export default defineComponent({
 
       if (codeBlockStart) {
         // Find the closing ``` and reveal entire code block instantly
-        const codeBlockEnd = remaining.indexOf("```", codeBlockStart[0].length);
+        const codeBlockEnd = remaining.indexOf('```', codeBlockStart[0].length);
         if (codeBlockEnd !== -1) {
           const endPos = codeBlockEnd + 3;
-          displayedStreamingContent.value = target.slice(
-            0,
-            current.length + endPos,
-          );
+          displayedStreamingContent.value = target.slice(0, current.length + endPos);
         } else {
           // Code block not complete yet, reveal opening and wait
-          displayedStreamingContent.value = target.slice(
-            0,
-            current.length + codeBlockStart[0].length,
-          );
+          displayedStreamingContent.value = target.slice(0, current.length + codeBlockStart[0].length);
         }
       } else {
         // Regular text - reveal one character
@@ -2044,37 +1474,42 @@ export default defineComponent({
     // Query history functionality
     const queryHistory = ref<string[]>([]);
     const historyIndex = ref(-1);
-    const HISTORY_KEY = "ai-chat-query-history";
+    const HISTORY_KEY = 'ai-chat-query-history';
     const MAX_HISTORY_SIZE = 10;
-
+    
     const modelConfig: any = {
-      openai: ["gpt-4.1"],
-      groq: [
-        "llama-3.3-70b-versatile",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
+      openai: [
+        'gpt-4.1'
       ],
-      xai: ["xai/grok-3-mini-beta", "xai/grok-3-latest"],
+      groq: [
+        'llama-3.3-70b-versatile',
+        'meta-llama/llama-4-scout-17b-16e-instruct',
+        'meta-llama/llama-4-maverick-17b-128e-instruct'
+      ],
+      xai: [
+        'xai/grok-3-mini-beta',
+        'xai/grok-3-latest'
+      ]
     };
 
     const capabilities = [
-      "1. Create a SQL query for me",
-      "2. Convert this SPL query to SQL",
-      "3. What is happening on this log line",
-      "4. Write a VRL function to parse these log lines",
-      "5. What are golden signals for observability",
-      "6. How to monitor kubernetes cluster",
-      "7. How to monitor docker containers",
-      "8. How to monitor aws services",
-      "9. How to monitor azure services",
-      "10. How to monitor google cloud services",
+      '1. Create a SQL query for me',
+      '2. Convert this SPL query to SQL',
+      '3. What is happening on this log line',
+      '4. Write a VRL function to parse these log lines',
+      '5. What are golden signals for observability',
+      '6. How to monitor kubernetes cluster',
+      '7. How to monitor docker containers',
+      '8. How to monitor aws services',
+      '9. How to monitor azure services',
+      '10. How to monitor google cloud services'
     ];
 
     const formatMessage = (content: string) => {
       try {
         return renderMarkdown(content);
       } catch (e) {
-        console.error("Error formatting message:", e);
+        console.error('Error formatting message:', e);
         return content;
       }
     };
@@ -2085,26 +1520,25 @@ export default defineComponent({
 
     const checkIfShouldAutoScroll = () => {
       if (!messagesContainer.value) return;
-
+      
       const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
       const threshold = getScrollThreshold();
       const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
-
+      
       shouldAutoScroll.value = isAtBottom;
-
+      
       // Show scroll to bottom button when user scrolls up significantly
       // Only show if there's enough content to scroll and user is not at bottom
       const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
       const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
-
+      
       showScrollToBottom.value = hasScrollableContent && isScrolledUp;
     };
 
     const scrollToBottom = async () => {
       await nextTick();
       if (messagesContainer.value && shouldAutoScroll.value) {
-        messagesContainer.value.scrollTop =
-          messagesContainer.value.scrollHeight;
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
       }
     };
 
@@ -2113,7 +1547,7 @@ export default defineComponent({
       if (messagesContainer.value) {
         messagesContainer.value.scrollTo({
           top: messagesContainer.value.scrollHeight,
-          behavior: "smooth",
+          behavior: 'smooth'
         });
         // Hide the button immediately when user clicks it
         showScrollToBottom.value = false;
@@ -2122,11 +1556,12 @@ export default defineComponent({
       }
     };
 
+
     const scrollToLoadingIndicator = async () => {
       await nextTick();
-      const loadingElement = document.getElementById("loading-indicator");
+      const loadingElement = document.getElementById('loading-indicator');
       if (loadingElement) {
-        loadingElement.scrollIntoView({ behavior: "smooth", block: "end" });
+        loadingElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
     };
 
@@ -2134,23 +1569,23 @@ export default defineComponent({
      * Cancels the currently ongoing AI chat request if one exists
      * This will stop the streaming response and clean up the request state
      * Shows a user-friendly notification about the cancellation
-     *
+     * 
      * Called when user clicks the "Stop" button during message generation
      */
     const cancelCurrentRequest = async () => {
       if (currentAbortController.value) {
         currentAbortController.value.abort();
         currentAbortController.value = null;
-
+        
         // Show user notification about successful cancellation
         $q.notify({
-          message: "Response generation stopped",
-          color: "secondary",
-          position: "bottom",
+          message: 'Response generation stopped',
+          color: 'secondary',
+          position: 'bottom',
           timeout: 2000,
-          icon: "stop",
+          icon: 'stop'
         });
-
+        
         // Update UI state to reflect cancellation
         isLoading.value = false;
         activeToolCall.value = null;
@@ -2166,35 +1601,32 @@ export default defineComponent({
         // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
           const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-          if (lastMessage.role === "assistant") {
+          if (lastMessage.role === 'assistant') {
             if (!lastMessage.content) {
               // Remove empty assistant message that was added for streaming
               chatMessages.value.pop();
             } else if (currentStreamingMessage.value) {
               // Update final text in contentBlocks to show all buffered content
               if (lastMessage.contentBlocks) {
-                const lastBlock =
-                  lastMessage.contentBlocks[
-                    lastMessage.contentBlocks.length - 1
-                  ];
-                if (lastBlock && lastBlock.type === "text") {
+                const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                if (lastBlock && lastBlock.type === 'text') {
                   lastBlock.text = currentTextSegment.value;
                 }
               }
               // Keep partial content but indicate it was cancelled
-              lastMessage.content += "\n\n_[Response stopped by user]_";
+              lastMessage.content += '\n\n_[Response stopped by user]_';
             }
           }
         }
 
         // Reset streaming state
-        currentStreamingMessage.value = "";
-        currentTextSegment.value = "";
-        displayedStreamingContent.value = "";
+        currentStreamingMessage.value = '';
+        currentTextSegment.value = '';
+        displayedStreamingContent.value = '';
 
         // Save the current state including cancellation
         await saveToHistory();
-
+        
         // Scroll to show the final state
         await scrollToBottom();
       }
@@ -2204,21 +1636,15 @@ export default defineComponent({
     const processPendingChips = () => {
       if (pendingChips.value.length > 0) {
         nextTick(() => {
-          if (
-            chatInput.value &&
-            typeof chatInput.value.insertChip === "function"
-          ) {
+          if (chatInput.value && typeof chatInput.value.insertChip === 'function') {
             // Focus input first to ensure cursor is positioned correctly
             focusInput();
 
             // Only clear if appendMode is false and there are no existing chips
             // Check DOM directly for existing chips instead of relying on reactive state
             const inputElement = chatInput.value.$el || chatInput.value;
-            const editableDiv =
-              inputElement?.querySelector(".rich-text-input") ||
-              inputElement?.querySelector("[contenteditable]");
-            const hasExistingChips =
-              editableDiv?.querySelector(".reference-chip") !== null;
+            const editableDiv = inputElement?.querySelector('.rich-text-input') || inputElement?.querySelector('[contenteditable]');
+            const hasExistingChips = editableDiv?.querySelector('.reference-chip') !== null;
             const hasExistingText = editableDiv?.textContent?.trim().length > 0;
 
             // Only clear if:
@@ -2226,17 +1652,14 @@ export default defineComponent({
             // 2. AND there are no existing chips
             // 3. AND there is no existing text
             if (!props.appendMode && !hasExistingChips && !hasExistingText) {
-              if (
-                chatInput.value &&
-                typeof chatInput.value.clear === "function"
-              ) {
+              if (chatInput.value && typeof chatInput.value.clear === 'function') {
                 chatInput.value.clear();
               }
-              inputMessage.value = "";
+              inputMessage.value = '';
             }
 
             // Insert all pending chips at the cursor position
-            pendingChips.value.forEach((chip) => {
+            pendingChips.value.forEach(chip => {
               chatInput.value.insertChip(chip);
             });
             pendingChips.value = [];
@@ -2253,91 +1676,79 @@ export default defineComponent({
       // Try to detect JSON and create a meaningful preview
       try {
         const parsed = JSON.parse(content);
-        if (typeof parsed === "object" && parsed !== null) {
+        if (typeof parsed === 'object' && parsed !== null) {
           // For objects, show first few keys
           const keys = Object.keys(parsed);
           if (keys.length > 0) {
-            const firstKeys = keys
-              .slice(0, 3)
-              .map((k) => {
-                const val = parsed[k];
-                if (typeof val === "string") {
-                  const truncatedVal =
-                    val.length > 8 ? val.substring(0, 8) + "..." : val;
-                  return k + ': "' + truncatedVal + '"';
-                }
-                return k + ": " + String(val).substring(0, 8);
-              })
-              .join(", ");
-            const moreKeys = keys.length > 3 ? ", ..." : "";
-            preview = "{" + firstKeys + moreKeys + "}";
+            const firstKeys = keys.slice(0, 3).map(k => {
+              const val = parsed[k];
+              if (typeof val === 'string') {
+                const truncatedVal = val.length > 8 ? val.substring(0, 8) + '...' : val;
+                return k + ': "' + truncatedVal + '"';
+              }
+              return k + ': ' + String(val).substring(0, 8);
+            }).join(', ');
+            const moreKeys = keys.length > 3 ? ', ...' : '';
+            preview = '{' + firstKeys + moreKeys + '}';
           }
         }
       } catch {
         // Not JSON, use plain text preview
         // Replace newlines and multiple spaces with single space
-        preview = preview.replace(/\s+/g, " ");
+        preview = preview.replace(/\s+/g, ' ');
       }
 
       // Truncate if still too long
       if (preview.length > maxLength) {
-        preview = preview.substring(0, maxLength) + "...";
+        preview = preview.substring(0, maxLength) + '...';
       }
 
       return preview;
     };
 
-    watch(
-      () => props.aiChatInputContext,
-      (newAiChatInputContext: string) => {
-        if (newAiChatInputContext) {
-          // Create a reference chip from the context
-          const contextChip: ReferenceChip = {
-            id: `context-${Date.now()}`,
-            filename: "Log Entry",
-            preview: createPreview(newAiChatInputContext, 10),
-            fullContent: newAiChatInputContext,
-            charCount: newAiChatInputContext.length,
-            type: "context",
-          };
+    watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
+      if(newAiChatInputContext) {
 
-          // Always queue the chip first for consistent behavior
-          pendingChips.value.push(contextChip);
+        // Create a reference chip from the context
+        const contextChip: ReferenceChip = {
+          id: `context-${Date.now()}`,
+          filename: 'Log Entry',
+          preview: createPreview(newAiChatInputContext, 10),
+          fullContent: newAiChatInputContext,
+          charCount: newAiChatInputContext.length,
+          type: 'context'
+        };
 
-          // If component is ready, process immediately with proper timing
-          if (
-            componentReady.value &&
-            chatInput.value &&
-            typeof chatInput.value.insertChip === "function"
-          ) {
-            // Use a small delay to ensure input is focused and ready
-            nextTick(() => {
-              setTimeout(() => {
-                processPendingChips();
-              }, 50);
-            });
-          }
-          // If component not ready, chips will be processed when componentReady becomes true
-          // No fallback text needed - avoids flickering when chat opens
-        }
-      },
-    );
+        // Always queue the chip first for consistent behavior
+        pendingChips.value.push(contextChip);
 
-    // Atomic payload watcher — text + autoSend arrive together, no timing race
-    watch(
-      () => props.aiChatPayload,
-      (payload) => {
-        if (!payload?.text) return;
-        if (payload.autoSend) {
-          inputMessage.value = payload.text;
+        // If component is ready, process immediately with proper timing
+        if (componentReady.value && chatInput.value && typeof chatInput.value.insertChip === 'function') {
+          // Use a small delay to ensure input is focused and ready
           nextTick(() => {
             setTimeout(() => {
-              sendMessage();
+              processPendingChips();
             }, 50);
           });
         }
-      },
-    );
+        // If component not ready, chips will be processed when componentReady becomes true
+        // No fallback text needed - avoids flickering when chat opens
+      }
+    });
+
+    // Atomic payload watcher — text + autoSend arrive together, no timing race
+    watch(() => props.aiChatPayload, (payload) => {
+      if (!payload?.text) return;
+      if (payload.autoSend) {
+        inputMessage.value = payload.text;
+        nextTick(() => {
+          setTimeout(() => {
+            sendMessage();
+          }, 50);
+        });
+      }
+    });
+
 
     //fetchInitialMessage is called when the component is mounted and the isOpen prop is true
 
@@ -2346,24 +1757,20 @@ export default defineComponent({
       try {
         chatMessages.value = [];
       } catch (error) {
-        chatMessages.value = [
-          {
-            role: "assistant",
-            content: "Error: Unable to connect to backend",
-          },
-        ];
-        console.error("Error fetching initial message:", error);
+        chatMessages.value = [{
+          role: 'assistant',
+          content: 'Error: Unable to connect to backend'
+        }];
+        console.error('Error fetching initial message:', error);
       }
       isLoading.value = false;
       stopAnalyzingRotation();
       scrollToBottom();
     };
 
-    const processStream = async (
-      reader: ReadableStreamDefaultReader<Uint8Array>,
-    ) => {
+    const processStream = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
       const decoder = new TextDecoder();
-      let buffer = "";
+      let buffer = '';
       let messageComplete = false;
 
       // --- Stream context: captured at call time ---
@@ -2395,16 +1802,9 @@ export default defineComponent({
           ctxSessionId = getUUIDv7();
           if (isActive()) currentSessionId.value = ctxSessionId;
         }
-        const title = isActive()
-          ? aiGeneratedTitle.value || undefined
-          : ctxTitle;
+        const title = isActive() ? (aiGeneratedTitle.value || undefined) : ctxTitle;
         const chatId = isActive() ? currentChatId.value : ctxChatId;
-        const resultId = await dbSaveToHistory(
-          msgs,
-          ctxSessionId,
-          title,
-          chatId,
-        );
+        const resultId = await dbSaveToHistory(msgs, ctxSessionId, title, chatId);
         if (!chatId && resultId) {
           if (isActive()) {
             currentChatId.value = resultId;
@@ -2421,7 +1821,7 @@ export default defineComponent({
       let lastSaveTime = lastStreamingSaveTime.value;
       const throttledSaveCtx = async (force = false) => {
         const now = Date.now();
-        if (force || now - lastSaveTime >= STREAMING_SAVE_INTERVAL) {
+        if (force || (now - lastSaveTime >= STREAMING_SAVE_INTERVAL)) {
           lastSaveTime = now;
           if (isActive()) lastStreamingSaveTime.value = now;
           await saveCtx();
@@ -2432,9 +1832,9 @@ export default defineComponent({
       const localFinalizeTextBlock = () => {
         if (textSegment) {
           const lm = msgs[msgs.length - 1];
-          if (lm && lm.role === "assistant" && lm.contentBlocks) {
+          if (lm && lm.role === 'assistant' && lm.contentBlocks) {
             const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-            if (lb && lb.type === "text") {
+            if (lb && lb.type === 'text') {
               lb.text = textSegment;
             }
           }
@@ -2444,9 +1844,9 @@ export default defineComponent({
             cancelAnimationFrame(typewriterAnimationId.value);
             typewriterAnimationId.value = null;
           }
-          displayedStreamingContent.value = "";
+          displayedStreamingContent.value = '';
         }
-        textSegment = "";
+        textSegment = '';
         syncStreamingRefs();
       };
       // --- End stream context ---
@@ -2458,26 +1858,26 @@ export default defineComponent({
 
           // Append new chunk to existing buffer
           buffer += decoder.decode(value, { stream: true });
-
+          
           // Process each line that starts with 'data: '
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep last potentially incomplete line
-
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep last potentially incomplete line
+          
           for (const line of lines) {
-            if (line.trim().startsWith("data: ")) {
+            if (line.trim().startsWith('data: ')) {
               try {
                 // Extract everything after 'data: ' and before any line break
-                const jsonStr = line.substring(line.indexOf("{"));
-
+                const jsonStr = line.substring(line.indexOf('{'));
+                
                 // Skip empty or invalid JSON strings
                 if (!jsonStr || !jsonStr.trim()) continue;
-
+                
                 // Try to parse the JSON, handling potential errors
                 try {
                   const data = JSON.parse(jsonStr);
 
                   // Handle title events - AI-generated chat title from first message
-                  if (data && data.type === "title") {
+                  if (data && data.type === 'title') {
                     ctxTitle = data.title;
                     if (isActive()) {
                       aiGeneratedTitle.value = data.title;
@@ -2487,55 +1887,44 @@ export default defineComponent({
                   }
 
                   // Handle confirmation_required events - add inline confirmation block in chat
-                  if (data && data.type === "confirmation_required") {
+                  if (data && data.type === 'confirmation_required') {
                     localFinalizeTextBlock();
 
                     // When detached, auto-deny confirmations to unblock the stream
                     if (!isActive()) {
                       try {
-                        const orgId =
-                          store.state.selectedOrganization.identifier;
+                        const orgId = store.state.selectedOrganization.identifier;
                         await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
                             body: JSON.stringify({ approved: false }),
-                          },
+                          }
                         );
                       } catch (error) {
-                        console.error(
-                          "Error auto-denying confirmation for background stream:",
-                          error,
-                        );
+                        console.error('Error auto-denying confirmation for background stream:', error);
                       }
                       continue;
                     }
 
                     // Check if this is a navigation action and auto navigation is enabled
-                    if (
-                      data.tool === "navigation_action" &&
-                      isAutoNavigationEnabled.value
-                    ) {
+                    if (data.tool === 'navigation_action' && isAutoNavigationEnabled.value) {
                       // Auto-approve navigation without showing confirmation
                       try {
-                        const orgId =
-                          store.state.selectedOrganization.identifier;
+                        const orgId = store.state.selectedOrganization.identifier;
                         await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
                             body: JSON.stringify({ approved: true }),
-                          },
+                          }
                         );
                       } catch (error) {
-                        console.error(
-                          "Error auto-confirming navigation:",
-                          error,
-                        );
+                        console.error('Error auto-confirming navigation:', error);
                       }
                       continue;
                     }
@@ -2544,14 +1933,11 @@ export default defineComponent({
                     // - Navigation: validated label (e.g. "View in Logs")
                     // - Other tools: "Confirm execution of {tool}?"
                     const confirmBlock: ContentBlock = {
-                      type: "tool_call",
+                      type: 'tool_call',
                       tool: data.tool,
                       message: activeToolCall.value?.message || data.message,
                       context: activeToolCall.value?.context || {},
-                      call_id:
-                        data.call_id ||
-                        activeToolCall.value?.call_id ||
-                        undefined,
+                      call_id: data.call_id || activeToolCall.value?.call_id || undefined,
                       pendingConfirmation: true,
                       confirmationMessage: data.message,
                       confirmationArgs: data.args || {},
@@ -2559,46 +1945,40 @@ export default defineComponent({
                     activeToolCall.value = null;
 
                     let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(confirmBlock);
                     } else {
                       msgs.push({
-                        role: "assistant",
-                        content: "",
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          confirmBlock,
-                        ],
+                        role: 'assistant',
+                        content: '',
+                        contentBlocks: [...pendingToolCalls.value, confirmBlock],
                       });
                       pendingToolCalls.value = [];
                     }
                     pendingConfirmation.value = {
                       tool: data.tool,
                       args: data.args || {},
-                      message:
-                        data.message || `Confirm execution of ${data.tool}?`,
+                      message: data.message || `Confirm execution of ${data.tool}?`,
                     };
                     await scrollToBottom();
                     continue;
                   }
 
                   // Handle tool_call events - show spinner indicator, don't add to chat yet
-                  if (data && data.type === "tool_call") {
+                  if (data && data.type === 'tool_call') {
                     // If there's already an active tool call, complete it first
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
+                        type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2611,7 +1991,7 @@ export default defineComponent({
                         tool: data.tool,
                         message: data.message,
                         context: data.context || {},
-                        call_id: data.call_id || undefined,
+                        call_id: data.call_id || undefined
                       };
                     }
 
@@ -2621,20 +2001,19 @@ export default defineComponent({
                   }
 
                   // Handle error events - display error message to user
-                  if (data && data.type === "error") {
+                  if (data && data.type === 'error') {
                     // Complete any active tool call first
                     let lastMessage = msgs[msgs.length - 1];
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
+                        type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
+                        call_id: activeToolCall.value.call_id
                       };
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2644,14 +2023,8 @@ export default defineComponent({
 
                     // Format error message with suggestion if available
                     // Handle case where error/message might be an object instead of string
-                    const rawError =
-                      data.error ??
-                      data.message ??
-                      "An unexpected error occurred";
-                    const errorText =
-                      typeof rawError === "string"
-                        ? rawError
-                        : JSON.stringify(rawError, null, 2);
+                    const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
+                    const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
 
                     let errorMessage = `Error: ${errorText}`;
                     if (data.suggestion) {
@@ -2660,36 +2033,30 @@ export default defineComponent({
 
                     // Get or create assistant message for error (reuse lastMessage)
                     lastMessage = msgs[msgs.length - 1];
-                    if (!lastMessage || lastMessage.role !== "assistant") {
+                    if (!lastMessage || lastMessage.role !== 'assistant') {
                       msgs.push({
-                        role: "assistant",
+                        role: 'assistant',
                         content: errorMessage,
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          { type: "text", text: errorMessage },
-                        ],
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
                       });
                       pendingToolCalls.value = [];
                     } else {
                       // Append error to existing message
                       if (lastMessage.content) {
-                        lastMessage.content += "\n\n" + errorMessage;
+                        lastMessage.content += '\n\n' + errorMessage;
                       } else {
                         lastMessage.content = errorMessage;
                       }
                       if (!lastMessage.contentBlocks) {
                         lastMessage.contentBlocks = [];
                       }
-                      lastMessage.contentBlocks.push({
-                        type: "text",
-                        text: errorMessage,
-                      });
+                      lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
                       // Clear pending tool calls to avoid leaking into later messages
                       pendingToolCalls.value = [];
                     }
 
                     // Reset streaming state
-                    textSegment = "";
+                    textSegment = '';
                     syncStreamingRefs();
 
                     // Save error message to history
@@ -2701,23 +2068,22 @@ export default defineComponent({
                   }
 
                   // Handle complete events - complete any active tool call
-                  if (data && data.type === "complete") {
+                  if (data && data.type === 'complete') {
                     // Capture trace_id for feedback correlation
                     if (data.trace_id && isActive()) {
                       lastTraceId.value = data.trace_id;
                     }
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
+                        type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2728,10 +2094,10 @@ export default defineComponent({
                   }
 
                   // Handle tool_result events - enrich tool call with result data
-                  if (data && data.type === "tool_result") {
+                  if (data && data.type === 'tool_result') {
                     const resultData = {
                       success: data.success !== false,
-                      resultMessage: data.message || "",
+                      resultMessage: data.message || '',
                       summary: data.summary || undefined,
                       errorType: data.error_type || undefined,
                       suggestion: data.suggestion || undefined,
@@ -2745,29 +2111,19 @@ export default defineComponent({
                       navigationAction = generateNavigationFromToolResult(
                         data.tool,
                         data.call_args,
-                        data,
+                        data
                       );
                     }
 
                     // Emit dashboard event only when stream is active (foreground)
                     if (data.success !== false && isActive()) {
-                      const resolvedToolName =
-                        data.tool && data.tool !== "tools_call"
-                          ? data.tool
-                          : "";
+                      const resolvedToolName = data.tool && data.tool !== 'tools_call' ? data.tool : '';
                       const callArgs = data.call_args || {};
-                      const dashboardEventType =
-                        getDashboardEventType(resolvedToolName);
+                      const dashboardEventType = getDashboardEventType(resolvedToolName);
                       if (dashboardEventType) {
-                        const dashboardId =
-                          callArgs.dashboard_id ||
-                          callArgs.args?.dashboard_id ||
-                          callArgs.request_body?.dashboard_id;
+                        const dashboardId = callArgs.dashboard_id || callArgs.args?.dashboard_id || callArgs.request_body?.dashboard_id;
                         if (dashboardId) {
-                          const folderId =
-                            callArgs.folder ||
-                            callArgs.args?.folder ||
-                            callArgs.request_body?.folder;
+                          const folderId = callArgs.folder || callArgs.args?.folder || callArgs.request_body?.folder;
                           emitDashboardEvent({
                             type: dashboardEventType,
                             dashboardId,
@@ -2776,35 +2132,32 @@ export default defineComponent({
                         } else {
                           console.warn(
                             `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
-                            callArgs,
+                            callArgs
                           );
                         }
                       }
                     }
 
                     // Match by call_id if available, fall back to tool name
-                    const matchesActiveToolCall =
-                      activeToolCall.value &&
-                      ((data.call_id &&
-                        activeToolCall.value.call_id === data.call_id) ||
-                        (!data.call_id &&
-                          activeToolCall.value.tool === data.tool));
+                    const matchesActiveToolCall = activeToolCall.value && (
+                      (data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                      (!data.call_id && activeToolCall.value.tool === data.tool)
+                    );
 
                     // If active tool call matches, complete it with result data
                     if (matchesActiveToolCall) {
                       const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
+                        type: 'tool_call',
                         tool: activeToolCall.value!.tool,
                         message: activeToolCall.value!.message,
                         context: activeToolCall.value!.context,
                         call_id: activeToolCall.value!.call_id,
                         ...resultData,
-                        ...(navigationAction && { navigationAction }),
+                        ...(navigationAction && { navigationAction })
                       };
                       let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2814,17 +2167,11 @@ export default defineComponent({
                       // Tool was already completed — retroactively enrich the matching block
                       const lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.contentBlocks) {
-                        for (
-                          let i = lastMessage.contentBlocks.length - 1;
-                          i >= 0;
-                          i--
-                        ) {
+                        for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                           const block = lastMessage.contentBlocks[i];
                           const blockMatches = data.call_id
-                            ? block.call_id === data.call_id
-                            : block.type === "tool_call" &&
-                              block.tool === data.tool &&
-                              block.success === undefined;
+                            ? (block.call_id === data.call_id)
+                            : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
                           if (blockMatches) {
                             Object.assign(block, resultData);
                             if (navigationAction) {
@@ -2835,17 +2182,11 @@ export default defineComponent({
                         }
                       }
                       // Also check pending tool calls
-                      for (
-                        let i = pendingToolCalls.value.length - 1;
-                        i >= 0;
-                        i--
-                      ) {
+                      for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                         const block = pendingToolCalls.value[i];
                         const blockMatches = data.call_id
-                          ? block.call_id === data.call_id
-                          : block.type === "tool_call" &&
-                            block.tool === data.tool &&
-                            block.success === undefined;
+                          ? (block.call_id === data.call_id)
+                          : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
                         if (blockMatches) {
                           Object.assign(block, resultData);
                           break;
@@ -2858,7 +2199,7 @@ export default defineComponent({
 
                   // Handle navigation_action events - check auto navigation setting
                   // (clickable buttons on tool results are generated by frontend from tool_result data)
-                  if (data && data.type === "navigation_action") {
+                  if (data && data.type === 'navigation_action') {
                     localFinalizeTextBlock();
 
                     // Skip navigation when stream is detached (background)
@@ -2879,9 +2220,9 @@ export default defineComponent({
                       // Show confirmation dialog
                       // Store the navigation action for later use
                       const confirmBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: "navigation_action",
-                        message: data.label || "Navigate",
+                        type: 'tool_call',
+                        tool: 'navigation_action',
+                        message: data.label || 'Navigate',
                         context: { navAction },
                         pendingConfirmation: true,
                         confirmationMessage: data.label,
@@ -2890,27 +2231,23 @@ export default defineComponent({
                       activeToolCall.value = null;
 
                       let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(confirmBlock);
                       } else {
                         msgs.push({
-                          role: "assistant",
-                          content: "",
-                          contentBlocks: [
-                            ...pendingToolCalls.value,
-                            confirmBlock,
-                          ],
+                          role: 'assistant',
+                          content: '',
+                          contentBlocks: [...pendingToolCalls.value, confirmBlock],
                         });
                         pendingToolCalls.value = [];
                       }
 
                       // Set pending confirmation with navigation action data
                       pendingConfirmation.value = {
-                        tool: "navigation_action",
+                        tool: 'navigation_action',
                         args: data.target || {},
-                        message: data.label || "Navigate",
+                        message: data.label || 'Navigate',
                       };
 
                       // Store the navigation action for later execution
@@ -2922,24 +2259,23 @@ export default defineComponent({
                   }
 
                   // Handle error events - stream-level errors
-                  if (data && data.type === "error") {
+                  if (data && data.type === 'error') {
                     // Complete any active tool call as failed
                     if (activeToolCall.value) {
                       const failedToolBlock: ContentBlock = {
-                        type: "tool_call",
+                        type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id,
                         success: false,
-                        resultMessage: data.message || "Tool execution failed",
+                        resultMessage: data.message || 'Tool execution failed',
                         errorType: data.error_type || undefined,
                         suggestion: data.suggestion || undefined,
                       };
                       let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(failedToolBlock);
                       } else {
                         pendingToolCalls.value.push(failedToolBlock);
@@ -2949,22 +2285,21 @@ export default defineComponent({
 
                     // Add inline error block
                     const errorBlock: ContentBlock = {
-                      type: "error",
-                      message: data.message || "An error occurred",
+                      type: 'error',
+                      message: data.message || 'An error occurred',
                       errorType: data.error_type || undefined,
                       suggestion: data.suggestion || undefined,
                       recoverable: data.recoverable ?? undefined,
                     };
                     let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(errorBlock);
                     } else {
                       msgs.push({
-                        role: "assistant",
-                        content: "",
-                        contentBlocks: [...pendingToolCalls.value, errorBlock],
+                        role: 'assistant',
+                        content: '',
+                        contentBlocks: [...pendingToolCalls.value, errorBlock]
                       });
                       pendingToolCalls.value = [];
                     }
@@ -2974,20 +2309,19 @@ export default defineComponent({
                   }
 
                   // Handle message content (type === 'message' or legacy format with just content)
-                  if (data && typeof data.content === "string") {
+                  if (data && typeof data.content === 'string') {
                     // Complete any active tool call first (add green checkmark to chat)
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
+                        type: 'tool_call',
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
                         context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
+                        call_id: activeToolCall.value.call_id
                       };
                       let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2997,24 +2331,19 @@ export default defineComponent({
 
                     // Format code blocks with proper line breaks
                     let content = data.content;
-                    content = content.replace(
-                      /```(\w*)\s*([^`])/g,
-                      "```$1\n$2",
-                    );
-                    content = content.replace(/([^`])\s*```/g, "$1\n```");
+                    content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
+                    content = content.replace(/([^`])\s*```/g, '$1\n```');
 
                     // Add newline separator if starting a new text segment after tool call
-                    if (streamingMsg && textSegment === "") {
-                      streamingMsg += "\n\n";
+                    if (streamingMsg && textSegment === '') {
+                      streamingMsg += '\n\n';
                     }
                     // Add newline between consecutive message events if needed
-                    else if (
-                      streamingMsg &&
-                      !streamingMsg.endsWith("\n") &&
-                      !content.startsWith("\n")
-                    ) {
-                      streamingMsg += "\n\n";
-                      textSegment += "\n\n";
+                    else if (streamingMsg &&
+                             !streamingMsg.endsWith('\n') &&
+                             !content.startsWith('\n')) {
+                      streamingMsg += '\n\n';
+                      textSegment += '\n\n';
                     }
 
                     // Accumulate to both total content and current segment
@@ -3029,15 +2358,12 @@ export default defineComponent({
 
                     // Get or create assistant message
                     let lastMessage = msgs[msgs.length - 1];
-                    if (!lastMessage || lastMessage.role !== "assistant") {
+                    if (!lastMessage || lastMessage.role !== 'assistant') {
                       // Create new assistant message with pending tool calls + text
                       msgs.push({
-                        role: "assistant",
+                        role: 'assistant',
                         content: streamingMsg,
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          { type: "text", text: textSegment },
-                        ],
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: textSegment }]
                       });
                       pendingToolCalls.value = []; // Clear pending
                       // Save immediately when assistant message is first created to prevent data loss on reload
@@ -3052,19 +2378,13 @@ export default defineComponent({
                       }
 
                       // Find the last text block and update it, or create new one
-                      const lastBlock =
-                        lastMessage.contentBlocks[
-                          lastMessage.contentBlocks.length - 1
-                        ];
-                      if (lastBlock && lastBlock.type === "text") {
+                      const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                      if (lastBlock && lastBlock.type === 'text') {
                         // Append to existing text block (same segment)
                         lastBlock.text = textSegment;
                       } else {
                         // Add new text block (after tool call - new segment)
-                        lastMessage.contentBlocks.push({
-                          type: "text",
-                          text: textSegment,
-                        });
+                        lastMessage.contentBlocks.push({ type: 'text', text: textSegment });
                       }
                       // Throttled save during streaming to preserve progress
                       await throttledSaveCtx();
@@ -3073,16 +2393,11 @@ export default defineComponent({
                     if (isActive()) await scrollToBottom();
                   }
                 } catch (jsonError) {
-                  console.debug(
-                    "JSON parse error:",
-                    jsonError,
-                    "for line:",
-                    jsonStr,
-                  );
+                  console.debug('JSON parse error:', jsonError, 'for line:', jsonStr);
                   continue;
                 }
               } catch (e) {
-                console.debug("Error processing line:", e, "Line:", line);
+                console.debug('Error processing line:', e, 'Line:', line);
                 continue;
               }
             }
@@ -3091,17 +2406,17 @@ export default defineComponent({
 
         // Process any remaining complete data in buffer
         if (buffer.trim()) {
-          const lines = buffer.split("\n");
+          const lines = buffer.split('\n');
           for (const line of lines) {
-            if (line.trim().startsWith("data: ")) {
+            if (line.trim().startsWith('data: ')) {
               try {
-                const jsonStr = line.substring(line.indexOf("{"));
+                const jsonStr = line.substring(line.indexOf('{'));
                 if (!jsonStr || !jsonStr.trim()) continue;
 
                 const data = JSON.parse(jsonStr);
 
                 // Handle title events
-                if (data && data.type === "title") {
+                if (data && data.type === 'title') {
                   ctxTitle = data.title;
                   if (isActive()) {
                     aiGeneratedTitle.value = data.title;
@@ -3111,19 +2426,18 @@ export default defineComponent({
                 }
 
                 // Handle tool_call events
-                if (data && data.type === "tool_call") {
+                if (data && data.type === 'tool_call') {
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
+                      type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
                       context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3135,7 +2449,7 @@ export default defineComponent({
                       tool: data.tool,
                       message: data.message,
                       context: data.context || {},
-                      call_id: data.call_id || undefined,
+                      call_id: data.call_id || undefined
                     };
                   }
 
@@ -3144,19 +2458,18 @@ export default defineComponent({
                 }
 
                 // Handle error events
-                if (data && data.type === "error") {
+                if (data && data.type === 'error') {
                   let lastMessage = msgs[msgs.length - 1];
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
+                      type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
                       context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
+                      call_id: activeToolCall.value.call_id
                     };
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3164,14 +2477,8 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawError =
-                    data.error ??
-                    data.message ??
-                    "An unexpected error occurred";
-                  const errorText =
-                    typeof rawError === "string"
-                      ? rawError
-                      : JSON.stringify(rawError, null, 2);
+                  const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
+                  const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
 
                   let errorMessage = `Error: ${errorText}`;
                   if (data.suggestion) {
@@ -3179,33 +2486,27 @@ export default defineComponent({
                   }
 
                   lastMessage = msgs[msgs.length - 1];
-                  if (!lastMessage || lastMessage.role !== "assistant") {
+                  if (!lastMessage || lastMessage.role !== 'assistant') {
                     msgs.push({
-                      role: "assistant",
+                      role: 'assistant',
                       content: errorMessage,
-                      contentBlocks: [
-                        ...pendingToolCalls.value,
-                        { type: "text", text: errorMessage },
-                      ],
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
                     });
                     pendingToolCalls.value = [];
                   } else {
                     if (lastMessage.content) {
-                      lastMessage.content += "\n\n" + errorMessage;
+                      lastMessage.content += '\n\n' + errorMessage;
                     } else {
                       lastMessage.content = errorMessage;
                     }
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
                     }
-                    lastMessage.contentBlocks.push({
-                      type: "text",
-                      text: errorMessage,
-                    });
+                    lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
                     pendingToolCalls.value = [];
                   }
 
-                  textSegment = "";
+                  textSegment = '';
                   syncStreamingRefs();
 
                   await saveCtx();
@@ -3214,22 +2515,21 @@ export default defineComponent({
                 }
 
                 // Handle complete events
-                if (data && data.type === "complete") {
+                if (data && data.type === 'complete') {
                   if (data.trace_id && isActive()) {
                     lastTraceId.value = data.trace_id;
                   }
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
+                      type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
                       context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3240,10 +2540,10 @@ export default defineComponent({
                 }
 
                 // Handle tool_result events
-                if (data && data.type === "tool_result") {
+                if (data && data.type === 'tool_result') {
                   const resultData = {
                     success: data.success !== false,
-                    resultMessage: data.message || "",
+                    resultMessage: data.message || '',
                     summary: data.summary || undefined,
                     errorType: data.error_type || undefined,
                     suggestion: data.suggestion || undefined,
@@ -3251,26 +2551,23 @@ export default defineComponent({
                     response: data.response || undefined,
                   };
 
-                  const matchesActive =
-                    activeToolCall.value &&
-                    ((data.call_id &&
-                      activeToolCall.value.call_id === data.call_id) ||
-                      (!data.call_id &&
-                        activeToolCall.value.tool === data.tool));
+                  const matchesActive = activeToolCall.value && (
+                    (data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                    (!data.call_id && activeToolCall.value.tool === data.tool)
+                  );
 
                   if (matchesActive) {
                     const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
+                      type: 'tool_call',
                       tool: activeToolCall.value!.tool,
                       message: activeToolCall.value!.message,
                       context: activeToolCall.value!.context,
                       call_id: activeToolCall.value!.call_id,
-                      ...resultData,
+                      ...resultData
                     };
                     let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3279,34 +2576,22 @@ export default defineComponent({
                   } else {
                     const lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.contentBlocks) {
-                      for (
-                        let i = lastMessage.contentBlocks.length - 1;
-                        i >= 0;
-                        i--
-                      ) {
+                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                         const block = lastMessage.contentBlocks[i];
                         const blockMatches = data.call_id
-                          ? block.call_id === data.call_id
-                          : block.type === "tool_call" &&
-                            block.tool === data.tool &&
-                            block.success === undefined;
+                          ? (block.call_id === data.call_id)
+                          : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
                         if (blockMatches) {
                           Object.assign(block, resultData);
                           break;
                         }
                       }
                     }
-                    for (
-                      let i = pendingToolCalls.value.length - 1;
-                      i >= 0;
-                      i--
-                    ) {
+                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                       const block = pendingToolCalls.value[i];
                       const blockMatches = data.call_id
-                        ? block.call_id === data.call_id
-                        : block.type === "tool_call" &&
-                          block.tool === data.tool &&
-                          block.success === undefined;
+                        ? (block.call_id === data.call_id)
+                        : (block.type === 'tool_call' && block.tool === data.tool && block.success === undefined);
                       if (blockMatches) {
                         Object.assign(block, resultData);
                         break;
@@ -3317,23 +2602,22 @@ export default defineComponent({
                 }
 
                 // Handle error events - stream-level errors
-                if (data && data.type === "error") {
+                if (data && data.type === 'error') {
                   if (activeToolCall.value) {
                     const failedToolBlock: ContentBlock = {
-                      type: "tool_call",
+                      type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id,
                       success: false,
-                      resultMessage: data.message || "Tool execution failed",
+                      resultMessage: data.message || 'Tool execution failed',
                       errorType: data.error_type || undefined,
                       suggestion: data.suggestion || undefined,
                     };
                     let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(failedToolBlock);
                     } else {
                       pendingToolCalls.value.push(failedToolBlock);
@@ -3342,22 +2626,21 @@ export default defineComponent({
                   }
 
                   const errorBlock: ContentBlock = {
-                    type: "error",
-                    message: data.message || "An error occurred",
+                    type: 'error',
+                    message: data.message || 'An error occurred',
                     errorType: data.error_type || undefined,
                     suggestion: data.suggestion || undefined,
                     recoverable: data.recoverable ?? undefined,
                   };
                   let lastMessage = msgs[msgs.length - 1];
-                  if (lastMessage && lastMessage.role === "assistant") {
-                    if (!lastMessage.contentBlocks)
-                      lastMessage.contentBlocks = [];
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                     lastMessage.contentBlocks.push(errorBlock);
                   } else {
                     msgs.push({
-                      role: "assistant",
-                      content: "",
-                      contentBlocks: [...pendingToolCalls.value, errorBlock],
+                      role: 'assistant',
+                      content: '',
+                      contentBlocks: [...pendingToolCalls.value, errorBlock]
                     });
                     pendingToolCalls.value = [];
                   }
@@ -3366,19 +2649,18 @@ export default defineComponent({
                 }
 
                 // Handle message content
-                if (data && typeof data.content === "string") {
+                if (data && typeof data.content === 'string') {
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
+                      type: 'tool_call',
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
                       context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
+                      call_id: activeToolCall.value.call_id
                     };
                     let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3387,18 +2669,17 @@ export default defineComponent({
                   }
 
                   let content = data.content;
-                  content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
-                  content = content.replace(/([^`])\s*```/g, "$1\n```");
+                  content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
+                  content = content.replace(/([^`])\s*```/g, '$1\n```');
 
-                  if (streamingMsg && textSegment === "") {
-                    streamingMsg += "\n\n";
-                  } else if (
-                    streamingMsg &&
-                    !streamingMsg.endsWith("\n") &&
-                    !content.startsWith("\n")
-                  ) {
-                    streamingMsg += "\n\n";
-                    textSegment += "\n\n";
+                  if (streamingMsg && textSegment === '') {
+                    streamingMsg += '\n\n';
+                  }
+                  else if (streamingMsg &&
+                           !streamingMsg.endsWith('\n') &&
+                           !content.startsWith('\n')) {
+                    streamingMsg += '\n\n';
+                    textSegment += '\n\n';
                   }
 
                   streamingMsg += content;
@@ -3410,14 +2691,11 @@ export default defineComponent({
                   }
 
                   let lastMessage = msgs[msgs.length - 1];
-                  if (!lastMessage || lastMessage.role !== "assistant") {
+                  if (!lastMessage || lastMessage.role !== 'assistant') {
                     msgs.push({
-                      role: "assistant",
+                      role: 'assistant',
                       content: streamingMsg,
-                      contentBlocks: [
-                        ...pendingToolCalls.value,
-                        { type: "text", text: textSegment },
-                      ],
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: textSegment }]
                     });
                     pendingToolCalls.value = [];
                     await throttledSaveCtx(true);
@@ -3427,24 +2705,18 @@ export default defineComponent({
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
                     }
-                    const lastBlock =
-                      lastMessage.contentBlocks[
-                        lastMessage.contentBlocks.length - 1
-                      ];
-                    if (lastBlock && lastBlock.type === "text") {
+                    const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                    if (lastBlock && lastBlock.type === 'text') {
                       lastBlock.text = textSegment;
                     } else {
-                      lastMessage.contentBlocks.push({
-                        type: "text",
-                        text: textSegment,
-                      });
+                      lastMessage.contentBlocks.push({ type: 'text', text: textSegment });
                     }
                     await throttledSaveCtx();
                   }
                   messageComplete = true;
                 }
               } catch (e) {
-                console.debug("Error processing remaining buffer:", e);
+                console.debug('Error processing remaining buffer:', e);
                 continue;
               }
             }
@@ -3463,14 +2735,9 @@ export default defineComponent({
           }
           // Update final text in contentBlocks
           const lastMessage = msgs[msgs.length - 1];
-          if (
-            lastMessage &&
-            lastMessage.role === "assistant" &&
-            lastMessage.contentBlocks
-          ) {
-            const lastBlock =
-              lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-            if (lastBlock && lastBlock.type === "text") {
+          if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
+            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+            if (lastBlock && lastBlock.type === 'text') {
               lastBlock.text = textSegment;
             }
           }
@@ -3478,7 +2745,7 @@ export default defineComponent({
         }
       } catch (error) {
         // Handle different types of errors appropriately
-        if (error instanceof Error && error.name === "AbortError") {
+        if (error instanceof Error && error.name === 'AbortError') {
           // Request was cancelled by user - this is expected behavior, not an error
           // Do a final save for background streams before exiting
           if (!isActive() && msgs.length > 0 && ctxSessionId) {
@@ -3487,7 +2754,7 @@ export default defineComponent({
           return; // Exit gracefully without logging as error
         } else {
           // Genuine error occurred during stream processing
-          console.error("Error reading stream:", error);
+          console.error('Error reading stream:', error);
         }
       }
     };
@@ -3513,7 +2780,7 @@ export default defineComponent({
           chatMessages.value,
           currentSessionId.value,
           title,
-          currentChatId.value,
+          currentChatId.value
         );
 
         // Update current chat ID if this is a new chat
@@ -3527,7 +2794,7 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.error("Error saving chat history:", error);
+        console.error('Error saving chat history:', error);
       } finally {
         saveHistoryLoading.value = false;
       }
@@ -3540,10 +2807,7 @@ export default defineComponent({
      */
     const throttledStreamingSave = async (force: boolean = false) => {
       const now = Date.now();
-      if (
-        force ||
-        now - lastStreamingSaveTime.value >= STREAMING_SAVE_INTERVAL
-      ) {
+      if (force || (now - lastStreamingSaveTime.value >= STREAMING_SAVE_INTERVAL)) {
         lastStreamingSaveTime.value = now;
         await saveToHistory();
       }
@@ -3556,7 +2820,7 @@ export default defineComponent({
         chatHistory.value = history;
         return chatHistory.value;
       } catch (error) {
-        console.error("Error loading chat history:", error);
+        console.error('Error loading chat history:', error);
         return [];
       }
     };
@@ -3602,38 +2866,28 @@ export default defineComponent({
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
       }
-      currentStreamingMessage.value = "";
-      currentTextSegment.value = "";
-      displayedStreamingContent.value = "";
+      currentStreamingMessage.value = '';
+      currentTextSegment.value = '';
+      displayedStreamingContent.value = '';
     };
 
     const toggleExpand = () => {
-      if (!store.state.isAiChatEnabled) {
-        // Closed → Open inline sidebar
-        store.dispatch("setIsAiChatEnabled", true);
-        store.dispatch("setIsAiChatExpanded", false);
-      } else if (!store.state.isAiChatExpanded) {
-        // Inline sidebar → Expanded overlay
-        store.dispatch("setIsAiChatExpanded", true);
-      } else {
-        // Expanded overlay → Back to inline sidebar
-        store.dispatch("setIsAiChatExpanded", false);
-      }
-      window.dispatchEvent(new Event("resize"));
+      store.dispatch('setIsAiChatExpanded', !store.state.isAiChatExpanded);
+      window.dispatchEvent(new Event('resize'));
     };
 
     useKeyboardShortcuts([
       {
-        key: "Escape",
+        key: 'Escape',
         handler: () => {
           if (store.state.isAiChatExpanded) {
-            store.dispatch("setIsAiChatExpanded", false);
-            window.dispatchEvent(new Event("resize"));
+            store.dispatch('setIsAiChatExpanded', false);
+            window.dispatchEvent(new Event('resize'));
           }
         },
       },
       {
-        key: "b",
+        key: 'b',
         ctrlOrMeta: true,
         handler: () => toggleExpand(),
       },
@@ -3653,8 +2907,8 @@ export default defineComponent({
       resetTypewriterState(); // Clear typewriter animation state for new chat
       pendingAutoNavigation.value = false; // Reset auto navigation for new chat
       showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
-      store.dispatch("setCurrentChatTimestamp", null);
-      store.dispatch("setChatUpdated", true);
+      store.dispatch('setCurrentChatTimestamp', null);
+      store.dispatch('setChatUpdated', true);
     };
 
     const openHistory = async () => {
@@ -3663,7 +2917,7 @@ export default defineComponent({
     };
 
     const openEditTitleDialog = () => {
-      editingTitle.value = displayedTitle.value || "";
+      editingTitle.value = displayedTitle.value || '';
       showEditTitleDialog.value = true;
     };
 
@@ -3675,10 +2929,7 @@ export default defineComponent({
 
       try {
         // Update title using the composable
-        const success = await dbUpdateChatTitle(
-          currentChatId.value,
-          editingTitle.value.trim(),
-        );
+        const success = await dbUpdateChatTitle(currentChatId.value, editingTitle.value.trim());
 
         if (success) {
           // Update the displayed title
@@ -3689,7 +2940,7 @@ export default defineComponent({
           loadHistory();
         }
       } catch (error) {
-        console.error("Error updating chat title:", error);
+        console.error('Error updating chat title:', error);
       } finally {
         showEditTitleDialog.value = false;
       }
@@ -3717,7 +2968,7 @@ export default defineComponent({
           loadHistory();
         }
       } catch (error) {
-        console.error("Error deleting chat:", error);
+        console.error('Error deleting chat:', error);
       } finally {
         // Reset state
         chatToDelete.value = null;
@@ -3738,7 +2989,7 @@ export default defineComponent({
               block.pendingConfirmation = false;
               if (!approved) {
                 block.success = false;
-                block.resultMessage = "Action cancelled by user";
+                block.resultMessage = 'Action cancelled by user';
               }
               return;
             }
@@ -3751,7 +3002,7 @@ export default defineComponent({
       resolveConfirmationBlock(true);
 
       // Check if this is a navigation action
-      if (pendingConfirmation.value?.tool === "navigation_action") {
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
         const navAction = pendingConfirmation.value?.navAction;
         if (navAction) {
           await handleNavigationAction(navAction);
@@ -3767,14 +3018,14 @@ export default defineComponent({
         await fetch(
           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
           {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ approved: true }),
-          },
+          }
         );
       } catch (error) {
-        console.error("Error confirming action:", error);
+        console.error('Error confirming action:', error);
       }
       pendingConfirmation.value = null;
     };
@@ -3783,7 +3034,7 @@ export default defineComponent({
       resolveConfirmationBlock(false);
 
       // Check if this is a navigation action
-      if (pendingConfirmation.value?.tool === "navigation_action") {
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
         // Just clear the confirmation, don't navigate
         pendingConfirmation.value = null;
         return;
@@ -3796,14 +3047,14 @@ export default defineComponent({
         await fetch(
           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
           {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ approved: false }),
-          },
+          }
         );
       } catch (error) {
-        console.error("Error cancelling action:", error);
+        console.error('Error cancelling action:', error);
       }
       pendingConfirmation.value = null;
     };
@@ -3816,7 +3067,7 @@ export default defineComponent({
       resolveConfirmationBlock(true);
 
       // Check if this is a navigation action
-      if (pendingConfirmation.value?.tool === "navigation_action") {
+      if (pendingConfirmation.value?.tool === 'navigation_action') {
         const navAction = pendingConfirmation.value?.navAction;
         if (navAction) {
           await handleNavigationAction(navAction);
@@ -3832,14 +3083,14 @@ export default defineComponent({
         await fetch(
           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
           {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ approved: true }),
-          },
+          }
         );
       } catch (error) {
-        console.error("Error confirming action:", error);
+        console.error('Error confirming action:', error);
       }
       pendingConfirmation.value = null;
     };
@@ -3851,11 +3102,7 @@ export default defineComponent({
     // - Create/Get/Update/Delete tools: Must return {resource}_id in response
     //   Examples: alert_id, dashboard_id, pipeline_id, stream_id, etc.
     //   Optional fields: name, folder (will use 'default' if not provided)
-    const generateNavigationFromToolResult = (
-      toolName: string,
-      callArgs: any,
-      responseBody: any,
-    ): NavigationAction | null => {
+    const generateNavigationFromToolResult = (toolName: string, callArgs: any, responseBody: any): NavigationAction | null => {
       if (!callArgs) {
         return null;
       }
@@ -3863,11 +3110,11 @@ export default defineComponent({
       // Pattern 1: Search tools (has SQL query) → load_query navigation
       const requestBody = callArgs.request_body || {};
       const query = requestBody.query || {};
-      const sql = query.sql || "";
+      const sql = query.sql || '';
 
       if (sql) {
-        const streamType = callArgs.stream_type || "logs";
-        let streamName = callArgs.stream_name || "";
+        const streamType = callArgs.stream_type || 'logs';
+        let streamName = callArgs.stream_name || '';
 
         // If stream_name is not in callArgs, try to extract it from the SQL query
         if (!streamName) {
@@ -3878,10 +3125,7 @@ export default defineComponent({
           }
         }
 
-        const vrlFunction =
-          query.functionContent ||
-          requestBody.function ||
-          requestBody.functionContent;
+        const vrlFunction = query.functionContent || requestBody.function || requestBody.functionContent;
 
         // Don't generate navigation if time range is missing
         if (query.start_time === undefined || query.end_time === undefined) {
@@ -3898,7 +3142,7 @@ export default defineComponent({
           sql_mode: true,
           from: query.start_time,
           to: query.end_time,
-          stream: streamName.split(","),
+          stream: streamName.split(','),
         };
 
         if (vrlFunction) {
@@ -3907,17 +3151,15 @@ export default defineComponent({
 
         return {
           resource_type: streamType,
-          action: "load_query",
+          action: 'load_query',
           label: `View in ${streamType.charAt(0).toUpperCase() + streamType.slice(1)}`,
-          target,
+          target
         };
       }
 
       // Pattern 2: Create/Get tools (has ID) → navigate_direct
       // Extract resource type from tool name (CreateAlert → alert, GetDashboard → dashboard, createPipeline → pipeline)
-      const resourceTypeMatch = toolName.match(
-        /^(create|get|update|delete)(.+)$/i,
-      );
+      const resourceTypeMatch = toolName.match(/^(create|get|update|delete)(.+)$/i);
       if (!resourceTypeMatch) return null;
 
       const resourceType = resourceTypeMatch[2].toLowerCase(); // Alert → alert, Dashboard → dashboard, Pipeline → pipeline
@@ -3929,39 +3171,29 @@ export default defineComponent({
         if (responseBody.response) {
           let responseData = responseBody.response;
           // If response is a JSON string, parse it
-          if (typeof responseData === "string") {
+          if (typeof responseData === 'string') {
             try {
               responseData = JSON.parse(responseData);
             } catch (e) {
-              console.warn("[Navigation] Failed to parse response string:", e);
+              console.warn('[Navigation] Failed to parse response string:', e);
             }
           }
           // Extract from versioned response (v8, v7, etc.) for dashboards
-          if (typeof responseData === "object" && responseData !== null) {
-            parsedResponse =
-              responseData.v8 ||
-              responseData.v7 ||
-              responseData.v6 ||
-              responseData.v5 ||
-              responseData;
+          if (typeof responseData === 'object' && responseData !== null) {
+            parsedResponse = responseData.v8 || responseData.v7 || responseData.v6 || responseData.v5 || responseData;
           } else {
             parsedResponse = responseData;
           }
         }
         // If responseBody has 'content' array (MCP format)
-        else if (
-          responseBody.content &&
-          Array.isArray(responseBody.content) &&
-          responseBody.content[0]?.text
-        ) {
+        else if (responseBody.content && Array.isArray(responseBody.content) && responseBody.content[0]?.text) {
           try {
             const textContent = responseBody.content[0].text;
             const parsed = JSON.parse(textContent);
             // Extract from versioned response (v8, v7, etc.)
-            parsedResponse =
-              parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
+            parsedResponse = parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
           } catch (e) {
-            console.warn("[Navigation] Failed to parse content text:", e);
+            console.warn('[Navigation] Failed to parse content text:', e);
           }
         }
         // Otherwise use responseBody as-is
@@ -3972,11 +3204,7 @@ export default defineComponent({
 
       // Merge data from parsed response, call args, and call args request_body for ID/field lookup
       const requestBodyFromArgs = (callArgs || {}).request_body || {};
-      const data = {
-        ...parsedResponse,
-        ...(callArgs || {}),
-        ...requestBodyFromArgs,
-      };
+      const data = { ...parsedResponse, ...(callArgs || {}), ...requestBodyFromArgs };
 
       // Standard pattern: {resource}_id (e.g., alert_id, dashboard_id, pipeline_id)
       const resourceIdField = `${resourceType}_id`;
@@ -3984,7 +3212,7 @@ export default defineComponent({
 
       // Also check camelCase variants (dashboardId, alertId)
       if (!resourceId) {
-        const camelCaseField = resourceType + "Id";
+        const camelCaseField = resourceType + 'Id';
         resourceId = data[camelCaseField];
       }
 
@@ -3994,7 +3222,7 @@ export default defineComponent({
 
       // Build target with consistent {resource}_id pattern
       const target: any = {
-        [resourceIdField]: resourceId, // e.g., alert_id, dashboard_id, pipeline_id
+        [resourceIdField]: resourceId  // e.g., alert_id, dashboard_id, pipeline_id
       };
 
       // Add name if available (required for some resources like alerts)
@@ -4005,35 +3233,32 @@ export default defineComponent({
 
       // Add folder if available (default to 'default' for resources that use folders)
       const folder = data.folder;
-      if (folder || resourceType === "alert" || resourceType === "dashboard") {
-        target.folder = folder || "default";
+      if (folder || resourceType === 'alert' || resourceType === 'dashboard') {
+        target.folder = folder || 'default';
       }
 
       return {
         resource_type: resourceType,
-        action: "navigate_direct",
+        action: 'navigate_direct',
         label: `View ${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)}`,
-        target,
+        target
       };
     };
 
     const handleNavigationAction = async (action: NavigationAction) => {
       // Helper to encode strings for URL (same as search history)
-      const encodeForUrl = (str: string) =>
-        btoa(unescape(encodeURIComponent(str)));
+      const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
 
       // Extract page name for success message
-      let pageName = action.label || "";
+      let pageName = action.label || '';
       if (!pageName) {
         // Fallback: use target name or resource type
-        pageName =
-          action.target.name ||
-          action.resource_type.charAt(0).toUpperCase() +
-            action.resource_type.slice(1);
+        pageName = action.target.name ||
+                   action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
       }
 
       // Perform navigation FIRST
-      if (action.action === "load_query") {
+      if (action.action === 'load_query') {
         const targetPath = `/${action.resource_type}`;
         const target = action.target;
 
@@ -4041,17 +3266,17 @@ export default defineComponent({
         const queryParams: Record<string, string> = {
           org_identifier: store.state.selectedOrganization.identifier,
           stream_type: action.resource_type, // logs, metrics, traces
-          refresh: "0",
-          sql_mode: target.sql_mode?.toString() || "false",
-          quick_mode: "false",
-          show_histogram: "true",
-          type: "ai_chat_query",
+          refresh: '0',
+          sql_mode: target.sql_mode?.toString() || 'false',
+          quick_mode: 'false',
+          show_histogram: 'true',
+          type: 'ai_chat_query',
         };
 
         // Add stream (comma-separated if array)
         if (target.stream) {
           queryParams.stream = Array.isArray(target.stream)
-            ? target.stream.join(",")
+            ? target.stream.join(',')
             : target.stream;
         }
 
@@ -4071,57 +3296,49 @@ export default defineComponent({
         // Add VRL function if present
         if (target.functionContent) {
           queryParams.functionContent = encodeForUrl(target.functionContent);
-          queryParams.fn_editor = "true";
+          queryParams.fn_editor = 'true';
         } else {
-          queryParams.fn_editor = "false";
+          queryParams.fn_editor = 'false';
         }
 
         // Navigate using same pattern as search history
         await router.push({
           path: targetPath,
-          query: queryParams,
+          query: queryParams
         });
-      } else if (action.action === "navigate_direct") {
+
+      } else if (action.action === 'navigate_direct') {
         // Direct navigation - build proper URLs based on resource type
         let path = action.target.path || `/${action.resource_type}`;
         const queryParams: Record<string, string> = {
           org_identifier: store.state.selectedOrganization.identifier,
-          ...action.target.query,
+          ...action.target.query
         };
 
         // Resource-type-specific URL handling
-        if (action.resource_type === "alert") {
-          path = "/alerts";
-          const alertId =
-            action.target.alert_id || action.target.query?.alert_id;
+        if (action.resource_type === 'alert') {
+          path = '/alerts';
+          const alertId = action.target.alert_id || action.target.query?.alert_id;
           if (alertId) {
             // Navigate to specific alert with update action
-            queryParams.action = "update";
+            queryParams.action = 'update';
             queryParams.alert_id = alertId;
             queryParams.name = action.target.name || action.target.query?.name;
           }
-          queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
-        } else if (action.resource_type === "dashboard") {
+          queryParams.folder = action.target.folder || action.target.query?.folder || 'default';
+        } else if (action.resource_type === 'dashboard') {
           // Dashboards use /dashboards/view path
-          path = "/dashboards/view";
-          queryParams.dashboard =
-            action.target.dashboard_id ||
-            action.target.dashboardId ||
-            action.target.query?.dashboardId;
-          queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
-          queryParams.tab = action.target.tab || "tab-1";
-          queryParams.refresh = "Off";
-          queryParams.period = "15m";
-          queryParams.print = "false";
-        } else if (action.resource_type === "pipeline") {
+          path = '/dashboards/view';
+          queryParams.dashboard = action.target.dashboard_id || action.target.dashboardId || action.target.query?.dashboardId;
+          queryParams.folder = action.target.folder || action.target.query?.folder || 'default';
+          queryParams.tab = action.target.tab || 'tab-1';
+          queryParams.refresh = 'Off';
+          queryParams.period = '15m';
+          queryParams.print = 'false';
+        } else if (action.resource_type === 'pipeline') {
           // Pipelines use /pipeline/pipelines/edit path
-          path = "/pipeline/pipelines/edit";
-          queryParams.id =
-            action.target.pipeline_id ||
-            action.target.id ||
-            action.target.query?.id;
+          path = '/pipeline/pipelines/edit';
+          queryParams.id = action.target.pipeline_id || action.target.id || action.target.query?.id;
           queryParams.name = action.target.name || action.target.query?.name;
         }
 
@@ -4135,34 +3352,31 @@ export default defineComponent({
           const successMessage = `Successfully navigated to ${pageName}`;
           let lastMessage = chatMessages.value[chatMessages.value.length - 1];
 
-          if (!lastMessage || lastMessage.role !== "assistant") {
+          if (!lastMessage || lastMessage.role !== 'assistant') {
             // Create new assistant message
             chatMessages.value.push({
-              role: "assistant",
+              role: 'assistant',
               content: successMessage,
-              contentBlocks: [{ type: "text", text: successMessage }],
+              contentBlocks: [{ type: 'text', text: successMessage }]
             });
           } else {
             // Append to existing assistant message
             if (lastMessage.content) {
-              lastMessage.content += "\n\n" + successMessage;
+              lastMessage.content += '\n\n' + successMessage;
             } else {
               lastMessage.content = successMessage;
             }
             if (!lastMessage.contentBlocks) {
               lastMessage.contentBlocks = [];
             }
-            lastMessage.contentBlocks.push({
-              type: "text",
-              text: successMessage,
-            });
+            lastMessage.contentBlocks.push({ type: 'text', text: successMessage });
           }
 
           // Save to history after adding message
           await saveToHistory();
           await scrollToBottom();
         } catch (error) {
-          console.error("Error adding navigation success message:", error);
+          console.error('Error adding navigation success message:', error);
         }
       }, 500);
     };
@@ -4180,7 +3394,7 @@ export default defineComponent({
           chatHistory.value = [];
         }
       } catch (error) {
-        console.error("Error clearing all conversations:", error);
+        console.error('Error clearing all conversations:', error);
       } finally {
         showClearAllConfirmDialog.value = false;
       }
@@ -4204,9 +3418,7 @@ export default defineComponent({
           // If so, re-attach by using the LIVE array that processStream is writing to
           // instead of the stale IndexedDB snapshot. Setting chatMessages.value to the
           // same array makes processStream's isActive() true again, so UI updates resume.
-          const bgCtx = chat.sessionId
-            ? backgroundStreamMap.get(chat.sessionId)
-            : null;
+          const bgCtx = chat.sessionId ? backgroundStreamMap.get(chat.sessionId) : null;
 
           if (bgCtx) {
             // Re-attach: use the live streaming array
@@ -4227,11 +3439,9 @@ export default defineComponent({
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
               content: msg.content,
-              ...(msg.contentBlocks
-                ? { contentBlocks: msg.contentBlocks }
-                : {}),
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
               ...(msg.images ? { images: msg.images } : {}),
-              ...(msg.feedback ? { feedback: msg.feedback } : {}),
+              ...(msg.feedback ? { feedback: msg.feedback } : {})
             }));
 
             chatMessages.value = formattedMessages;
@@ -4243,13 +3453,13 @@ export default defineComponent({
           shouldAutoScroll.value = true;
 
           // Load title from history (no animation for existing chats)
-          displayedTitle.value = chat.title || "";
+          displayedTitle.value = chat.title || '';
           aiGeneratedTitle.value = chat.title || null;
           isTypingTitle.value = false;
 
           if (chatId !== store.state.currentChatTimestamp) {
-            store.dispatch("setCurrentChatTimestamp", chatId);
-            store.dispatch("setChatUpdated", true);
+            store.dispatch('setCurrentChatTimestamp', chatId);
+            store.dispatch('setChatUpdated', true);
           }
 
           // Scroll to bottom after loading chat
@@ -4258,7 +3468,7 @@ export default defineComponent({
           });
         }
       } catch (error) {
-        console.error("Error loading chat:", error);
+        console.error('Error loading chat:', error);
       }
     };
 
@@ -4275,10 +3485,7 @@ export default defineComponent({
 
       // Get the message for backend (with unwrapped chips)
       let backendMessage = inputMessage.value;
-      if (
-        chatInput.value &&
-        typeof chatInput.value.getMessageForBackend === "function"
-      ) {
+      if (chatInput.value && typeof chatInput.value.getMessageForBackend === 'function') {
         backendMessage = chatInput.value.getMessageForBackend();
       }
 
@@ -4294,13 +3501,13 @@ export default defineComponent({
       // Push user message with images for display
       // But we'll use backendMessage for the API call
       chatMessages.value.push({
-        role: "user",
+        role: 'user',
         content: backendMessage, // Use backend message with full context
-        ...(hasImages && { images: messagesToSend }),
+        ...(hasImages && { images: messagesToSend })
       });
-      inputMessage.value = "";
+      inputMessage.value = '';
       contextReferences.value = []; // Clear reference chips
-      if (chatInput.value && typeof chatInput.value.clear === "function") {
+      if (chatInput.value && typeof chatInput.value.clear === 'function') {
         chatInput.value.clear(); // Clear the rich text input
       }
       clearPendingImages(); // Clear pending images after capturing
@@ -4309,8 +3516,8 @@ export default defineComponent({
       await saveToHistory(); // Save after user message
 
       isLoading.value = true;
-      currentStreamingMessage.value = "";
-      currentTextSegment.value = "";
+      currentStreamingMessage.value = '';
+      currentTextSegment.value = '';
       resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
@@ -4336,10 +3543,10 @@ export default defineComponent({
             currentAbortController.value.signal,
             undefined, // explicitContext
             currentSessionId.value, // sessionId for x-o2-session-id header
-            hasImages ? messagesToSend : undefined, // images for multimodal queries
+            hasImages ? messagesToSend : undefined // images for multimodal queries
           );
         } catch (error) {
-          console.error("Error fetching AI chat:", error);
+          console.error('Error fetching AI chat:', error);
           return;
         }
 
@@ -4357,7 +3564,7 @@ export default defineComponent({
             // body may not be JSON
           }
           const err: any = new Error(
-            errorBody?.message || `Server error (${response.status})`,
+            errorBody?.message || `Server error (${response.status})`
           );
           err.status = response.status;
           err.errorBody = errorBody;
@@ -4365,7 +3572,7 @@ export default defineComponent({
         }
 
         if (!response.body) {
-          throw new Error("No response body");
+          throw new Error('No response body');
         }
 
         const reader = response.body.getReader();
@@ -4385,33 +3592,27 @@ export default defineComponent({
         // Only update UI/store if stream was NOT detached (session is still the same)
         const wasDetached = chatMessages.value !== streamMsgs;
         if (!wasDetached) {
-          store.dispatch("setCurrentChatTimestamp", currentChatId.value);
-          store.dispatch("setChatUpdated", true);
+          store.dispatch('setCurrentChatTimestamp', currentChatId.value);
+          store.dispatch('setChatUpdated', true);
         }
+
       } catch (error: any) {
         // Remove the empty assistant message that was added before the error
         //this will impact in the case of error showing empty message above the error message in the chat
-        if (
-          chatMessages.value.length > 0 &&
-          chatMessages.value[chatMessages.value.length - 1].role ===
-            "assistant" &&
-          !chatMessages.value[chatMessages.value.length - 1].content
-        ) {
+        if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant' && !chatMessages.value[chatMessages.value.length - 1].content) {
           chatMessages.value.pop();
         }
         let errorMessage: string;
         if (error.status === 403) {
-          errorMessage =
-            "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.";
-        } else if (error.message && error.message !== "No response body") {
+          errorMessage = 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.';
+        } else if (error.message && error.message !== 'No response body') {
           errorMessage = error.message;
         } else {
-          errorMessage =
-            "Error: Unable to get response from the server. Please try again later.";
+          errorMessage = 'Error: Unable to get response from the server. Please try again later.';
         }
         chatMessages.value.push({
-          role: "assistant",
-          content: errorMessage,
+          role: 'assistant',
+          content: errorMessage
         });
         await saveToHistory(); // Save after error
       }
@@ -4428,19 +3629,17 @@ export default defineComponent({
 
     const selectCapability = (capability: string) => {
       // Remove the number prefix and set as input
-      inputMessage.value = capability.replace(/^\d+\.\s/, "");
+      inputMessage.value = capability.replace(/^\d+\.\s/, '');
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault(); // Prevent the default enter behavior
         sendMessage();
-      } else if (e.key === "Backspace") {
+      } else if (e.key === 'Backspace') {
         // Handle backspace for RichTextInput (contenteditable)
         const target = e.target as HTMLElement;
-        const contenteditable =
-          target.closest('[contenteditable="true"]') ||
-          target.querySelector('[contenteditable="true"]');
+        const contenteditable = target.closest('[contenteditable="true"]') || target.querySelector('[contenteditable="true"]');
 
         if (contenteditable) {
           // Check if cursor is right after an image reference span
@@ -4452,29 +3651,17 @@ export default defineComponent({
           let imageRefSpan: Element | null = null;
 
           // Case 1: Cursor is in a text node at position 0, check previous sibling
-          if (
-            cursorNode.nodeType === Node.TEXT_NODE &&
-            range.startOffset === 0
-          ) {
+          if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
             const prevSibling = cursorNode.previousSibling;
-            if (
-              prevSibling &&
-              (prevSibling as Element).classList?.contains("image-reference")
-            ) {
+            if (prevSibling && (prevSibling as Element).classList?.contains('image-reference')) {
               imageRefSpan = prevSibling as Element;
             }
           }
           // Case 2: Cursor is in an element node, check the child before cursor
-          else if (
-            cursorNode.nodeType === Node.ELEMENT_NODE &&
-            range.startOffset > 0
-          ) {
+          else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
             const element = cursorNode as Element;
             const prevChild = element.childNodes[range.startOffset - 1];
-            if (
-              prevChild &&
-              (prevChild as Element).classList?.contains("image-reference")
-            ) {
+            if (prevChild && (prevChild as Element).classList?.contains('image-reference')) {
               imageRefSpan = prevChild as Element;
             }
           }
@@ -4484,16 +3671,14 @@ export default defineComponent({
             e.preventDefault();
 
             // Extract filename from the span text
-            const refText = imageRefSpan.textContent || "";
+            const refText = imageRefSpan.textContent || '';
             const match = refText.match(/@\[([^\]]+)\]/);
 
             if (match) {
               const filename = match[1];
 
               // Remove the associated image from pendingImages
-              const imageIndex = pendingImages.value.findIndex(
-                (img) => img.filename === filename,
-              );
+              const imageIndex = pendingImages.value.findIndex(img => img.filename === filename);
               if (imageIndex !== -1) {
                 pendingImages.value.splice(imageIndex, 1);
               }
@@ -4504,9 +3689,7 @@ export default defineComponent({
 
             // Trigger input event to update model
             if (contenteditable) {
-              contenteditable.dispatchEvent(
-                new Event("input", { bubbles: true }),
-              );
+              contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
             }
           }
         } else {
@@ -4525,13 +3708,10 @@ export default defineComponent({
             const refStart = cursorPos - match[0].length;
 
             // Remove the entire @[filename] reference from text
-            inputMessage.value =
-              text.substring(0, refStart) + text.substring(cursorPos);
+            inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
 
             // Remove the associated image from pendingImages
-            const imageIndex = pendingImages.value.findIndex(
-              (img) => img.filename === filename,
-            );
+            const imageIndex = pendingImages.value.findIndex(img => img.filename === filename);
             if (imageIndex !== -1) {
               pendingImages.value.splice(imageIndex, 1);
             }
@@ -4542,49 +3722,46 @@ export default defineComponent({
             });
           }
         }
-      } else if (e.key === "ArrowUp") {
+      } else if (e.key === 'ArrowUp') {
         const target = e.target as HTMLElement;
-        const textarea =
-          target.tagName === "TEXTAREA"
-            ? (target as HTMLTextAreaElement)
-            : null;
+        const textarea = target.tagName === 'TEXTAREA' ? target as HTMLTextAreaElement : null;
         if (textarea && isOnFirstLine(textarea)) {
           e.preventDefault();
-          navigateHistory("up");
+          navigateHistory('up');
         }
-      } else if (e.key === "ArrowDown" && historyIndex.value > -1) {
+      } else if (e.key === 'ArrowDown' && historyIndex.value > -1) {
         e.preventDefault();
-        navigateHistory("down");
+        navigateHistory('down');
       }
     };
 
     // Check if cursor is on the first line of textarea
     const isOnFirstLine = (textarea: HTMLTextAreaElement) => {
       if (!textarea) return false;
-
+      
       const cursorPosition = textarea.selectionStart;
       const textBeforeCursor = textarea.value.substring(0, cursorPosition);
-
+      
       // Check if there are any newlines before cursor position
-      return !textBeforeCursor.includes("\n");
+      return !textBeforeCursor.includes('\n');
     };
 
     // Navigate through query history
-    const navigateHistory = (direction: "up" | "down") => {
+    const navigateHistory = (direction: 'up' | 'down') => {
       if (queryHistory.value.length === 0) return;
-
-      if (direction === "up") {
+      
+      if (direction === 'up') {
         if (historyIndex.value < queryHistory.value.length - 1) {
           historyIndex.value++;
           inputMessage.value = queryHistory.value[historyIndex.value];
         }
-      } else if (direction === "down") {
+      } else if (direction === 'down') {
         if (historyIndex.value > 0) {
           historyIndex.value--;
           inputMessage.value = queryHistory.value[historyIndex.value];
         } else if (historyIndex.value === 0) {
           historyIndex.value = -1;
-          inputMessage.value = "";
+          inputMessage.value = '';
         }
       }
     };
@@ -4592,7 +3769,7 @@ export default defineComponent({
     const focusInput = () => {
       if (chatInput.value) {
         // For RichTextInput component, call its focusInput method
-        if (typeof chatInput.value.focusInput === "function") {
+        if (typeof chatInput.value.focusInput === 'function') {
           chatInput.value.focusInput();
         } else {
           // Fallback for other input types
@@ -4620,16 +3797,16 @@ export default defineComponent({
         await addImage(file);
       }
       // Reset input so the same file can be selected again
-      input.value = "";
+      input.value = '';
     };
 
     const addImage = async (file: File): Promise<boolean> => {
       // Validate file size first (before reading)
       if (file.size > MAX_IMAGE_SIZE_BYTES) {
         $q.notify({
-          type: "negative",
+          type: 'negative',
           message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
-          position: "top",
+          position: 'top'
         });
         return false;
       }
@@ -4637,9 +3814,9 @@ export default defineComponent({
       // Basic file type check for immediate feedback (backend will detect actual type)
       if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
         $q.notify({
-          type: "negative",
-          message: "Only PNG and JPEG images are supported",
-          position: "top",
+          type: 'negative',
+          message: 'Only PNG and JPEG images are supported',
+          position: 'top'
         });
         return false;
       }
@@ -4648,68 +3825,60 @@ export default defineComponent({
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
-          const base64 = (e.target?.result as string).split(",")[1]; // Remove data:image/...;base64, prefix
+          const base64 = (e.target?.result as string).split(',')[1]; // Remove data:image/...;base64, prefix
           const imageRef = `@[${file.name}]`;
 
           // Use file.type for display - backend will detect and correct actual mime type
           pendingImages.value.push({
             data: base64,
-            mimeType: file.type as "image/png" | "image/jpeg",
+            mimeType: file.type as 'image/png' | 'image/jpeg',
             filename: file.name,
-            size: file.size,
+            size: file.size
           });
 
           // Insert image reference at cursor position
           // Check if we're using RichTextInput (contenteditable)
-          const contenteditable =
-            chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
-            chatInput.value?.$el?.querySelector(".rich-text-input");
+          const contenteditable = chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
+                                   chatInput.value?.$el?.querySelector('.rich-text-input');
 
           if (contenteditable) {
             // RichTextInput - insert at cursor position in contenteditable
             const selection = window.getSelection();
-            const range =
-              selection && selection.rangeCount > 0
-                ? selection.getRangeAt(0)
-                : null;
+            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
 
             // Create a non-editable span for the image reference
-            const imageRefSpan = document.createElement("span");
-            imageRefSpan.contentEditable = "false";
-            imageRefSpan.className = "image-reference";
-            imageRefSpan.style.cssText =
-              "display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; font-size: 13px; color: #2e7d32; user-select: none;";
+            const imageRefSpan = document.createElement('span');
+            imageRefSpan.contentEditable = 'false';
+            imageRefSpan.className = 'image-reference';
+            imageRefSpan.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; font-size: 13px; color: #2e7d32; user-select: none;';
 
             // Add image icon
-            const imageIcon = document.createElement("span");
-            imageIcon.textContent = "🖼️";
-            imageIcon.style.cssText = "font-size: 12px;";
+            const imageIcon = document.createElement('span');
+            imageIcon.textContent = '🖼️';
+            imageIcon.style.cssText = 'font-size: 12px;';
 
             // Add filename text
-            const filenameText = document.createElement("span");
+            const filenameText = document.createElement('span');
             filenameText.textContent = file.name;
 
             // Add remove button
-            const removeBtn = document.createElement("button");
-            removeBtn.textContent = "×";
-            removeBtn.style.cssText =
-              "display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: 16px; line-height: 1; cursor: pointer; color: #2e7d32; transition: all 0.15s ease;";
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '×';
+            removeBtn.style.cssText = 'display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: 16px; line-height: 1; cursor: pointer; color: #2e7d32; transition: all 0.15s ease;';
             removeBtn.onmouseover = () => {
-              removeBtn.style.background = "#c62828";
-              removeBtn.style.color = "white";
+              removeBtn.style.background = '#c62828';
+              removeBtn.style.color = 'white';
             };
             removeBtn.onmouseout = () => {
-              removeBtn.style.background = "transparent";
-              removeBtn.style.color = "#2e7d32";
+              removeBtn.style.background = 'transparent';
+              removeBtn.style.color = '#2e7d32';
             };
             removeBtn.onclick = (e) => {
               e.preventDefault();
               e.stopPropagation();
 
               // Find and remove the image from pendingImages
-              const imageIndex = pendingImages.value.findIndex(
-                (img) => img.filename === file.name,
-              );
+              const imageIndex = pendingImages.value.findIndex(img => img.filename === file.name);
               if (imageIndex !== -1) {
                 pendingImages.value.splice(imageIndex, 1);
               }
@@ -4718,9 +3887,7 @@ export default defineComponent({
               imageRefSpan.remove();
 
               // Trigger input event
-              contenteditable.dispatchEvent(
-                new Event("input", { bubbles: true }),
-              );
+              contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
             };
 
             imageRefSpan.appendChild(imageIcon);
@@ -4732,19 +3899,15 @@ export default defineComponent({
               range.deleteContents();
 
               // Add space before if needed
-              const textBefore = range.startContainer.textContent || "";
-              if (
-                textBefore.length > 0 &&
-                !textBefore.endsWith(" ") &&
-                !textBefore.endsWith("\n")
-              ) {
-                range.insertNode(document.createTextNode(" "));
+              const textBefore = range.startContainer.textContent || '';
+              if (textBefore.length > 0 && !textBefore.endsWith(' ') && !textBefore.endsWith('\n')) {
+                range.insertNode(document.createTextNode(' '));
               }
 
               range.insertNode(imageRefSpan);
 
               // Add space after for cursor positioning
-              const spaceAfter = document.createTextNode(" ");
+              const spaceAfter = document.createTextNode(' ');
               range.setStartAfter(imageRefSpan);
               range.insertNode(spaceAfter);
 
@@ -4755,15 +3918,14 @@ export default defineComponent({
               selection?.addRange(range);
             } else {
               // No selection or selection outside - append to end
-              const spaceNeeded =
-                contenteditable.textContent &&
-                !contenteditable.textContent.endsWith(" ") &&
-                !contenteditable.textContent.endsWith("\n");
+              const spaceNeeded = contenteditable.textContent &&
+                                 !contenteditable.textContent.endsWith(' ') &&
+                                 !contenteditable.textContent.endsWith('\n');
               if (spaceNeeded) {
-                contenteditable.appendChild(document.createTextNode(" "));
+                contenteditable.appendChild(document.createTextNode(' '));
               }
               contenteditable.appendChild(imageRefSpan);
-              const spaceAfter = document.createTextNode(" ");
+              const spaceAfter = document.createTextNode(' ');
               contenteditable.appendChild(spaceAfter);
 
               // Move cursor to end
@@ -4775,15 +3937,11 @@ export default defineComponent({
             }
 
             // Trigger input event to update model
-            contenteditable.dispatchEvent(
-              new Event("input", { bubbles: true }),
-            );
+            contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
             focusInput();
           } else {
             // Legacy textarea fallback
-            const textarea = chatInput.value?.$el?.querySelector(
-              "textarea",
-            ) as HTMLTextAreaElement | null;
+            const textarea = chatInput.value?.$el?.querySelector('textarea') as HTMLTextAreaElement | null;
             if (textarea) {
               const start = textarea.selectionStart || 0;
               const end = textarea.selectionEnd || 0;
@@ -4792,19 +3950,10 @@ export default defineComponent({
               const after = text.substring(end);
 
               // Add space before if needed
-              const needsSpaceBefore =
-                before.length > 0 &&
-                !before.endsWith(" ") &&
-                !before.endsWith("\n");
-              const needsSpaceAfter =
-                after.length > 0 &&
-                !after.startsWith(" ") &&
-                !after.startsWith("\n");
+              const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+              const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
 
-              const insertion =
-                (needsSpaceBefore ? " " : "") +
-                imageRef +
-                (needsSpaceAfter ? " " : "");
+              const insertion = (needsSpaceBefore ? ' ' : '') + imageRef + (needsSpaceAfter ? ' ' : '');
               inputMessage.value = before + insertion + after;
 
               // Set cursor position after the inserted reference
@@ -4816,13 +3965,8 @@ export default defineComponent({
             } else {
               // Final fallback: append to end
               const currentText = inputMessage.value;
-              const separator =
-                currentText &&
-                !currentText.endsWith(" ") &&
-                !currentText.endsWith("\n")
-                  ? " "
-                  : "";
-              inputMessage.value = currentText + separator + imageRef + " ";
+              const separator = currentText && !currentText.endsWith(' ') && !currentText.endsWith('\n') ? ' ' : '';
+              inputMessage.value = currentText + separator + imageRef + ' ';
             }
           }
 
@@ -4830,9 +3974,9 @@ export default defineComponent({
         };
         reader.onerror = () => {
           $q.notify({
-            type: "negative",
+            type: 'negative',
             message: `Failed to read image: ${file.name}`,
-            position: "top",
+            position: 'top'
           });
           resolve(false);
         };
@@ -4847,14 +3991,12 @@ export default defineComponent({
         const imageRef = `@[${image.filename}]`;
 
         // Check if we're using RichTextInput (contenteditable)
-        const contenteditable =
-          chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
-          chatInput.value?.$el?.querySelector(".rich-text-input");
+        const contenteditable = chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
+                                 chatInput.value?.$el?.querySelector('.rich-text-input');
 
         if (contenteditable) {
           // Find and remove all image reference spans with this filename
-          const imageRefSpans =
-            contenteditable.querySelectorAll(".image-reference");
+          const imageRefSpans = contenteditable.querySelectorAll('.image-reference');
           imageRefSpans.forEach((span: Element) => {
             if (span.textContent === imageRef) {
               span.remove();
@@ -4862,11 +4004,11 @@ export default defineComponent({
           });
 
           // Trigger input event to update model
-          contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
+          contenteditable.dispatchEvent(new Event('input', { bubbles: true }));
         } else {
           // Legacy textarea - remove from text
           inputMessage.value = inputMessage.value
-            .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, "g"), " ")
+            .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, 'g'), ' ')
             .trim();
         }
       }
@@ -4875,7 +4017,7 @@ export default defineComponent({
 
     // Helper to escape special regex characters
     const escapeRegExp = (str: string) => {
-      return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     };
 
     const clearPendingImages = () => {
@@ -4896,7 +4038,7 @@ export default defineComponent({
       if (!files) return;
 
       for (const file of Array.from(files)) {
-        if (file.type.startsWith("image/")) {
+        if (file.type.startsWith('image/')) {
           await addImage(file);
         }
       }
@@ -4908,7 +4050,7 @@ export default defineComponent({
       if (!items) return;
 
       for (const item of Array.from(items)) {
-        if (item.type.startsWith("image/")) {
+        if (item.type.startsWith('image/')) {
           const file = item.getAsFile();
           if (file) {
             event.preventDefault();
@@ -4938,14 +4080,11 @@ export default defineComponent({
 
       // Set new timeout for scroll
       scrollTimeoutId.value = setTimeout(() => {
-        const textarea = chatInput.value?.$el?.querySelector("textarea");
+        const textarea = chatInput.value?.$el?.querySelector('textarea');
         if (!textarea) return;
 
         textarea.focus();
-        textarea.setSelectionRange(
-          textarea.value.length,
-          textarea.value.length,
-        );
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
 
         // Scroll all scrollable parent elements
         let element = textarea;
@@ -4968,7 +4107,7 @@ export default defineComponent({
           queryHistory.value = JSON.parse(stored);
         }
       } catch (error) {
-        console.error("Error loading query history:", error);
+        console.error('Error loading query history:', error);
         queryHistory.value = [];
       }
     };
@@ -4978,24 +4117,22 @@ export default defineComponent({
       try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(queryHistory.value));
       } catch (error) {
-        console.error("Error saving query history:", error);
+        console.error('Error saving query history:', error);
       }
     };
 
     // Auto navigation preferences localStorage functions
-    const AUTO_NAV_KEY = "ai-chat-auto-navigation";
+    const AUTO_NAV_KEY = 'ai-chat-auto-navigation';
 
     const loadAutoNavigationPreferences = () => {
       try {
         const stored = localStorage.getItem(AUTO_NAV_KEY);
         if (stored) {
           const data = JSON.parse(stored);
-          autoNavigationPreferences.value = new Map(
-            Object.entries(data).map(([k, v]) => [parseInt(k), v as boolean]),
-          );
+          autoNavigationPreferences.value = new Map(Object.entries(data).map(([k, v]) => [parseInt(k), v as boolean]));
         }
       } catch (error) {
-        console.error("Error loading auto navigation preferences:", error);
+        console.error('Error loading auto navigation preferences:', error);
         autoNavigationPreferences.value = new Map();
       }
     };
@@ -5005,7 +4142,7 @@ export default defineComponent({
         const data = Object.fromEntries(autoNavigationPreferences.value);
         localStorage.setItem(AUTO_NAV_KEY, JSON.stringify(data));
       } catch (error) {
-        console.error("Error saving auto navigation preferences:", error);
+        console.error('Error saving auto navigation preferences:', error);
       }
     };
 
@@ -5013,47 +4150,44 @@ export default defineComponent({
     const addToHistory = (query: string) => {
       const trimmedQuery = query.trim();
       if (!trimmedQuery) return;
-
+      
       // Remove if already exists to avoid duplicates
       const existingIndex = queryHistory.value.indexOf(trimmedQuery);
       if (existingIndex > -1) {
         queryHistory.value.splice(existingIndex, 1);
       }
-
+      
       // Add to beginning of array
       queryHistory.value.unshift(trimmedQuery);
-
+      
       // Keep only last MAX_HISTORY_SIZE entries
       if (queryHistory.value.length > MAX_HISTORY_SIZE) {
         queryHistory.value = queryHistory.value.slice(0, MAX_HISTORY_SIZE);
       }
-
+      
       saveQueryHistory();
       historyIndex.value = -1; // Reset index
     };
 
     // Watch for isOpen changes to fetch initial message when opened
-    watch(
-      () => props.isOpen,
-      (newValue) => {
-        if (newValue) {
-          if (chatMessages.value.length === 0) {
-            fetchInitialMessage();
-          }
-          loadHistory(); // Load history when chat is opened
-
-          // Mark component as ready and process any pending chips
-          // Use a slight delay to ensure RichTextInput is fully mounted
-          nextTick(() => {
-            setTimeout(() => {
-              componentReady.value = true;
-              processPendingChips();
-              focusInput();
-            }, 100);
-          });
+    watch(() => props.isOpen, (newValue) => {
+      if (newValue) {
+        if (chatMessages.value.length === 0) {
+          fetchInitialMessage();
         }
-      },
-    );
+        loadHistory(); // Load history when chat is opened
+
+        // Mark component as ready and process any pending chips
+        // Use a slight delay to ensure RichTextInput is fully mounted
+        nextTick(() => {
+          setTimeout(() => {
+            componentReady.value = true;
+            processPendingChips();
+            focusInput();
+          }, 100);
+        });
+      }
+    });
 
     // Auto-focus input when chat is expanded
     watch(
@@ -5107,7 +4241,7 @@ export default defineComponent({
       loadAutoNavigationPreferences();
     });
 
-    onUnmounted(() => {
+    onUnmounted(()=>{
       // Cancel any ongoing requests when component is unmounted to prevent memory leaks
       if (currentAbortController.value) {
         currentAbortController.value.abort();
@@ -5137,26 +4271,26 @@ export default defineComponent({
       //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
       //so we need to make sure that the currentChatTimestamp is set to the correct chatId
       //and the chat gets updated when the component is unmounted so that the main layout component can load the correct chat
-      store.dispatch("setCurrentChatTimestamp", currentChatId.value);
-      store.dispatch("setChatUpdated", true);
-      if (store.state.currentChatTimestamp) {
+      store.dispatch('setCurrentChatTimestamp', currentChatId.value);
+      store.dispatch('setChatUpdated', true);      if ( store.state.currentChatTimestamp) {
         loadChat(store.state.currentChatTimestamp);
       }
-      if (!store.state.currentChatTimestamp) {
+      if(!store.state.currentChatTimestamp) {
         addNewChat();
       }
-    });
+
+    })
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
-    watch(chatUpdated, (newChatUpdated: boolean) => {
-      if (newChatUpdated && store.state.currentChatTimestamp) {
-        loadChat(store.state.currentChatTimestamp);
-      }
-      if (newChatUpdated && !store.state.currentChatTimestamp) {
-        addNewChat();
-      }
-      store.dispatch("setChatUpdated", false);
-    });
+      watch(chatUpdated, (newChatUpdated: boolean) => {
+        if (newChatUpdated && store.state.currentChatTimestamp) {
+          loadChat(store.state.currentChatTimestamp);
+        }
+        if(newChatUpdated && !store.state.currentChatTimestamp) {
+          addNewChat();
+        }
+        store.dispatch('setChatUpdated', false);
+      });
 
     // Watch for typewriter animation updates to refresh the displayed text
     watch(displayedStreamingContent, (newContent) => {
@@ -5167,14 +4301,9 @@ export default defineComponent({
       if (!newContent) return;
 
       const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      if (
-        lastMessage &&
-        lastMessage.role === "assistant" &&
-        lastMessage.contentBlocks
-      ) {
-        const lastBlock =
-          lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-        if (lastBlock && lastBlock.type === "text") {
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
+        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+        if (lastBlock && lastBlock.type === 'text') {
           lastBlock.text = newContent;
         }
       }
@@ -5184,17 +4313,17 @@ export default defineComponent({
       try {
         await navigator.clipboard.writeText(text);
         $q.notify({
-          message: "Code copied to clipboard",
-          color: "positive",
-          position: "top",
-          timeout: 1000,
+          message: 'Code copied to clipboard',
+          color: 'positive',
+          position: 'top',
+          timeout: 1000
         });
       } catch (err) {
-        console.error("Failed to copy text: ", err);
+        console.error('Failed to copy text: ', err);
         $q.notify({
-          message: "Failed to copy code",
-          color: "negative",
-          position: "top",
+          message: 'Failed to copy code',
+          color: 'negative',
+          position: 'top'
         });
       }
     };
@@ -5210,18 +4339,15 @@ export default defineComponent({
       });
 
       // Convert ## headers to bold with colon (only outside code blocks)
-      filtered = filtered.replace(/^## (.+)$/gm, "**$1:**");
+      filtered = filtered.replace(/^## (.+)$/gm, '**$1:**');
 
       // Convert # headers to bold with colon (only outside code blocks)
-      filtered = filtered.replace(/^# (.+)$/gm, "**$1:**");
+      filtered = filtered.replace(/^# (.+)$/gm, '**$1:**');
 
       // Restore code blocks
-      filtered = filtered.replace(
-        /___CODE_BLOCK_(\d+)___/g,
-        (_match, index) => {
-          return codeBlocks[parseInt(index)];
-        },
-      );
+      filtered = filtered.replace(/___CODE_BLOCK_(\d+)___/g, (_match, index) => {
+        return codeBlocks[parseInt(index)];
+      });
 
       return filtered;
     };
@@ -5234,33 +4360,26 @@ export default defineComponent({
       const blocks = [];
 
       for (const token of tokens) {
-        if (token.type === "code") {
+        if (token.type === 'code') {
           let codeText = token.text.trim();
-          while (
-            codeText.startsWith("--") ||
-            codeText.startsWith("//") ||
-            codeText.startsWith("#")
-          ) {
-            codeText = codeText.split("\n").slice(1).join("\n").trim();
+          while (codeText.startsWith('--') || codeText.startsWith('//') || codeText.startsWith('#')) {
+            codeText = codeText.split('\n').slice(1).join('\n').trim();
           }
 
-          const highlightedContent =
-            token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(
-                  hljs.highlight(codeText, { language: token.lang }).value,
-                )
-              : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
+          const highlightedContent = token.lang && hljs.getLanguage(token.lang)
+            ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
+            : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
-            type: "code",
-            language: token.lang || "",
+            type: 'code',
+            language: token.lang || '',
             content: codeText,
-            highlightedContent,
+            highlightedContent
           });
         } else {
           blocks.push({
-            type: "text",
-            content: marked.parser([token]),
+            type: 'text',
+            content: marked.parser([token])
           });
         }
       }
@@ -5275,38 +4394,31 @@ export default defineComponent({
       const blocks = [];
 
       for (const token of tokens) {
-        if (token.type === "code") {
+        if (token.type === 'code') {
           // Remove comments at the beginning of code blocks
           let codeText = token.text.trim();
-          while (
-            codeText.startsWith("--") ||
-            codeText.startsWith("//") ||
-            codeText.startsWith("#")
-          ) {
-            codeText = codeText.split("\n").slice(1).join("\n").trim();
+          while (codeText.startsWith('--') || codeText.startsWith('//') || codeText.startsWith('#')) {
+            codeText = codeText.split('\n').slice(1).join('\n').trim();
           }
 
-          const highlightedContent =
-            token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(
-                  hljs.highlight(codeText, { language: token.lang }).value,
-                )
-              : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
+          const highlightedContent = token.lang && hljs.getLanguage(token.lang)
+            ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
+            : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
-            type: "code",
-            language: token.lang || "",
+            type: 'code',
+            language: token.lang || '',
             content: codeText,
-            highlightedContent,
+            highlightedContent
           });
         } else {
           blocks.push({
-            type: "text",
-            content: marked.parser([token]),
+            type: 'text',
+            content: marked.parser([token])
           });
         }
       }
-
+      
       return blocks;
     };
 
@@ -5316,43 +4428,38 @@ export default defineComponent({
         const parsed = JSON.parse(content);
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
-        const highlighted = formatted.replace(
-          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-          (match) => {
-            let cls = "json-number";
+        const highlighted = formatted
+          .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+            let cls = 'json-number';
             if (/^"/.test(match)) {
               if (/:$/.test(match)) {
-                cls = "json-key";
+                cls = 'json-key';
               } else {
-                cls = "json-string";
+                cls = 'json-string';
               }
             } else if (/true|false/.test(match)) {
-              cls = "json-boolean";
+              cls = 'json-boolean';
             } else if (/null/.test(match)) {
-              cls = "json-null";
+              cls = 'json-null';
             }
             return `<span class="${cls}">${match}</span>`;
-          },
-        );
+          });
         return DOMPurify.sanitize(highlighted);
       } catch {
         // Not JSON, return plain text with HTML escaping
-        return DOMPurify.sanitize(
-          content
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;")
-            .replace(/\n/g, "<br>"),
-        );
+        return DOMPurify.sanitize(content
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;')
+          .replace(/\n/g, '<br>'));
       }
     };
 
     // Parse log entries from message content and maintain order
     const parseLogEntries = (content: string) => {
-      const logEntryPattern =
-        /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
+      const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
       const orderedBlocks: any[] = [];
       let lastIndex = 0;
       let match;
@@ -5369,20 +4476,20 @@ export default defineComponent({
           const textBefore = content.substring(lastIndex, matchIndex).trim();
           if (textBefore) {
             orderedBlocks.push({
-              type: "text",
-              text: textBefore,
+              type: 'text',
+              text: textBefore
             });
           }
         }
 
         // Add the log entry
         orderedBlocks.push({
-          type: "log_entry",
+          type: 'log_entry',
           filename,
           lineStart: lineStart ? parseInt(lineStart) : undefined,
           lineEnd: lineEnd ? parseInt(lineEnd) : undefined,
           content: logContent.trim(),
-          preview: createPreview(logContent.trim(), 60),
+          preview: createPreview(logContent.trim(), 60)
         });
 
         lastIndex = matchIndex + fullMatch.length;
@@ -5393,8 +4500,8 @@ export default defineComponent({
         const textAfter = content.substring(lastIndex).trim();
         if (textAfter) {
           orderedBlocks.push({
-            type: "text",
-            text: textAfter,
+            type: 'text',
+            text: textAfter
           });
         }
       }
@@ -5403,24 +4510,20 @@ export default defineComponent({
     };
 
     const processedMessages = computed(() => {
-      return chatMessages.value.map((message) => {
+      return chatMessages.value.map(message => {
         // For user messages, check for log entries
-        if (message.role === "user") {
+        if (message.role === 'user') {
           const orderedBlocks = parseLogEntries(message.content);
 
           // If we have ordered blocks from parsing, combine them with existing contentBlocks
-          const combinedContentBlocks =
-            orderedBlocks.length > 0
-              ? [...orderedBlocks, ...(message.contentBlocks || [])]
-              : message.contentBlocks || [];
+          const combinedContentBlocks = orderedBlocks.length > 0
+            ? [...orderedBlocks, ...(message.contentBlocks || [])]
+            : message.contentBlocks || [];
 
           return {
             ...message,
-            blocks:
-              orderedBlocks.length > 0
-                ? []
-                : processMessageContent(message.content),
-            contentBlocks: combinedContentBlocks,
+            blocks: orderedBlocks.length > 0 ? [] : processMessageContent(message.content),
+            contentBlocks: combinedContentBlocks
           };
         }
 
@@ -5428,7 +4531,7 @@ export default defineComponent({
         return {
           ...message,
           blocks: processMessageContent(message.content),
-          contentBlocks: message.contentBlocks || [],
+          contentBlocks: message.contentBlocks || []
         };
       });
     });
@@ -5436,22 +4539,20 @@ export default defineComponent({
     // Check if there's an assistant message in progress (for loading indicator positioning)
     const hasAssistantMessage = computed(() => {
       const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      return lastMessage?.role === "assistant";
+      return lastMessage?.role === 'assistant';
     });
 
     const retryGeneration = async (message: any) => {
-      if (!message || message.role !== "assistant") return;
-
+      if (!message || message.role !== 'assistant') return;
+      
       // Find the index of this assistant message
-      const messageIndex = chatMessages.value.findIndex(
-        (m) => m.content === message.content,
-      );
+      const messageIndex = chatMessages.value.findIndex(m => m.content === message.content);
       if (messageIndex === -1) return;
 
       // Find the corresponding user message that came before this assistant message
       let userMessageIndex = messageIndex - 1;
       while (userMessageIndex >= 0) {
-        if (chatMessages.value[userMessageIndex].role === "user") {
+        if (chatMessages.value[userMessageIndex].role === 'user') {
           // Set the user message and trigger send without removing previous messages
           inputMessage.value = chatMessages.value[userMessageIndex].content;
           await sendMessage();
@@ -5463,26 +4564,26 @@ export default defineComponent({
 
     const getLanguageDisplay = (lang: string) => {
       const languageMap: { [key: string]: string } = {
-        js: "JavaScript",
-        javascript: "JavaScript",
-        ts: "TypeScript",
-        typescript: "TypeScript",
-        python: "Python",
-        py: "Python",
-        sql: "SQL",
-        vrl: "VRL",
-        json: "JSON",
-        html: "HTML",
-        css: "CSS",
-        scss: "SCSS",
-        bash: "Bash",
-        shell: "Shell",
-        yaml: "YAML",
-        yml: "YAML",
-        markdown: "Markdown",
-        md: "Markdown",
+        'js': 'JavaScript',
+        'javascript': 'JavaScript',
+        'ts': 'TypeScript',
+        'typescript': 'TypeScript',
+        'python': 'Python',
+        'py': 'Python',
+        'sql': 'SQL',
+        'vrl': 'VRL',
+        'json': 'JSON',
+        'html': 'HTML',
+        'css': 'CSS',
+        'scss': 'SCSS',
+        'bash': 'Bash',
+        'shell': 'Shell',
+        'yaml': 'YAML',
+        'yml': 'YAML',
+        'markdown': 'Markdown',
+        'md': 'Markdown'
       };
-
+      
       const normalizedLang = lang.toLowerCase();
       return languageMap[normalizedLang] || lang.toUpperCase();
     };
@@ -5491,9 +4592,8 @@ export default defineComponent({
       // Sanitize HTML to prevent XSS attacks
       const sanitized = DOMPurify.sanitize(content);
       // Replace pre tags with span and add our custom class
-      return sanitized
-        .replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
-        .replace(/<\/pre>/g, "</span>");
+      return sanitized.replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
+                     .replace(/<\/pre>/g, '</span>');
     };
 
     const formatTime = (timestamp: string) => {
@@ -5503,34 +4603,28 @@ export default defineComponent({
 
     // Tool call context formatting helpers
     const truncateQuery = (query: string) => {
-      if (!query) return "";
+      if (!query) return '';
       const maxLength = 100;
       if (query.length <= maxLength) return query;
-      return query.substring(0, maxLength) + "...";
+      return query.substring(0, maxLength) + '...';
     };
 
     const formatContextKey = (key: string) => {
       // Convert snake_case to Title Case
-      return key
-        .split("_")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
+      return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
 
     const formatContextValue = (value: any) => {
-      if (typeof value === "string") {
+      if (typeof value === 'string') {
         // Truncate long strings
-        if (value.length > 30) return value.substring(0, 30) + "...";
+        if (value.length > 30) return value.substring(0, 30) + '...';
         return value;
       }
       return String(value);
     };
 
     // Tool call expansion helpers
-    const toggleToolCallExpanded = (
-      messageIndex: number,
-      blockIndex: number,
-    ) => {
+    const toggleToolCallExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedToolCalls.value.has(key)) {
         expandedToolCalls.value.delete(key);
@@ -5544,10 +4638,7 @@ export default defineComponent({
     };
 
     // Log entry expansion helpers
-    const toggleLogEntryExpanded = (
-      messageIndex: number,
-      blockIndex: number,
-    ) => {
+    const toggleLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedLogEntries.value.has(key)) {
         expandedLogEntries.value.delete(key);
@@ -5580,8 +4671,7 @@ export default defineComponent({
 
       // Handle testFunction context (VRL validation)
       if (context.vrl) data.vrl = context.vrl;
-      if (context.request_body?.function)
-        data.vrl = context.request_body.function;
+      if (context.request_body?.function) data.vrl = context.request_body.function;
 
       // Handle flat SQL from SearchSQL enriched context
       if (context.sql) data.query = context.sql;
@@ -5607,84 +4697,55 @@ export default defineComponent({
     const formatToolCallMessage = (block: ContentBlock) => {
       // Show error message for failed tools
       // Tool-specific messages (both success and error)
-      if (block.tool === "testFunction") {
+      if (block.tool === 'testFunction') {
         if (block.success === false) {
-          return { text: "VRL validation failed", highlight: null, suffix: "" };
+          return { text: 'VRL validation failed', highlight: null, suffix: '' };
         }
-        return { text: "Validated VRL", highlight: null, suffix: "" };
+        return { text: 'Validated VRL', highlight: null, suffix: '' };
       }
-      if (block.tool === "SearchSQL") {
+      if (block.tool === 'SearchSQL') {
         if (block.success === false) {
-          return { text: "Query failed", highlight: null, suffix: "" };
+          return { text: 'Query failed', highlight: null, suffix: '' };
         }
         if (block.response?.total !== undefined) {
-          const streamType = block.context?.type || "logs";
-          return {
-            text: `Queried ${streamType} `,
-            highlight: `(${block.response.total} results)`,
-            suffix: "",
-          };
+          const streamType = block.context?.type || 'logs';
+          return { text: `Queried ${streamType} `, highlight: `(${block.response.total} results)`, suffix: '' };
         }
       }
-      if (block.tool === "StreamSchema" && block.context?.stream_name) {
-        return {
-          text: "Fetched ",
-          highlight: block.context.stream_name,
-          suffix: " stream schema",
-        };
+      if (block.tool === 'StreamSchema' && block.context?.stream_name) {
+        return { text: 'Fetched ', highlight: block.context.stream_name, suffix: ' stream schema' };
       }
-      if (block.tool === "GetIncident" && block.context?.incident_id) {
-        return {
-          text: "Retrieved incident ",
-          highlight: block.context.incident_id,
-          suffix: "",
-        };
+      if (block.tool === 'GetIncident' && block.context?.incident_id) {
+        return { text: 'Retrieved incident ', highlight: block.context.incident_id, suffix: '' };
       }
-      if (block.tool === "GetAlert" && block.context?.alert_id) {
-        return {
-          text: "Fetched alert ",
-          highlight: block.context.alert_id,
-          suffix: "",
-        };
+      if (block.tool === 'GetAlert' && block.context?.alert_id) {
+        return { text: 'Fetched alert ', highlight: block.context.alert_id, suffix: '' };
       }
-      if (block.tool === "GetDashboard" && block.context?.dashboard_id) {
-        return {
-          text: "Fetched dashboard ",
-          highlight: block.context.dashboard_id,
-          suffix: "",
-        };
+      if (block.tool === 'GetDashboard' && block.context?.dashboard_id) {
+        return { text: 'Fetched dashboard ', highlight: block.context.dashboard_id, suffix: '' };
       }
       // List tools: show count from normalized { total, items } response
       if (block.response?.total !== undefined && block.success !== false) {
-        const base = block.message || block.tool || "Listed";
-        return {
-          text: base + " ",
-          highlight: `(Found ${block.response.total})`,
-          suffix: "",
-        };
+        const base = block.message || block.tool || 'Listed';
+        return { text: base + ' ', highlight: `(Found ${block.response.total})`, suffix: '' };
       }
       // Generic fallback
       if (block.success === false && block.resultMessage) {
         // Truncate long error messages for the header
-        const msg =
-          block.resultMessage.length > 60
-            ? block.resultMessage.substring(0, 60) + "..."
-            : block.resultMessage;
-        return { text: msg, highlight: null, suffix: "" };
+        const msg = block.resultMessage.length > 60
+          ? block.resultMessage.substring(0, 60) + '...'
+          : block.resultMessage;
+        return { text: msg, highlight: null, suffix: '' };
       }
       if (block.success !== false && block.summary?.count !== undefined) {
-        const base = block.message || block.tool || "Tool";
-        return {
-          text: base + " ",
-          highlight: `(${block.summary.count} results)`,
-          suffix: "",
-        };
+        const base = block.message || block.tool || 'Tool';
+        return { text: base + ' ', highlight: `(${block.summary.count} results)`, suffix: '' };
       }
-      return { text: block.message, highlight: null, suffix: "" };
+      return { text: block.message, highlight: null, suffix: '' };
     };
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp || timestamp === 0) return "Not specified";
+      if (!timestamp || timestamp === 0) return 'Not specified';
       // Timestamp is in microseconds, convert to milliseconds
       const ms = timestamp > 1e15 ? timestamp / 1000 : timestamp;
       const date = new Date(ms);
@@ -5693,68 +4754,58 @@ export default defineComponent({
 
     const likeCodeBlock = async (messageIndex: number) => {
       const message = chatMessages.value[messageIndex];
-      if (!message || message.feedback === "thumbs_up") return;
+      if (!message || message.feedback === 'thumbs_up') return;
       const orgId = store.state.selectedOrganization?.identifier;
       if (!orgId) return;
       // Each user+assistant pair = 1 query turn, so queryIndex = floor(index / 2)
       const queryIndex = Math.floor(messageIndex / 2);
       const success = await submitFeedback(
-        "thumbs_up",
+        'thumbs_up',
         orgId,
         currentSessionId.value || undefined,
         queryIndex,
         lastTraceId.value || undefined,
       );
       if (success) {
-        message.feedback = "thumbs_up";
+        message.feedback = 'thumbs_up';
         await saveToHistory();
-        $q.notify({
-          type: "positive",
-          message: "Thanks for your feedback!",
-          timeout: 1500,
-        });
+        $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
       }
     };
 
     const dislikeCodeBlock = async (messageIndex: number) => {
       const message = chatMessages.value[messageIndex];
-      if (!message || message.feedback === "thumbs_down") return;
+      if (!message || message.feedback === 'thumbs_down') return;
       const orgId = store.state.selectedOrganization?.identifier;
       if (!orgId) return;
       const queryIndex = Math.floor(messageIndex / 2);
       const success = await submitFeedback(
-        "thumbs_down",
+        'thumbs_down',
         orgId,
         currentSessionId.value || undefined,
         queryIndex,
         lastTraceId.value || undefined,
       );
       if (success) {
-        message.feedback = "thumbs_down";
+        message.feedback = 'thumbs_down';
         await saveToHistory();
-        $q.notify({
-          type: "positive",
-          message: "Thanks for your feedback!",
-          timeout: 1500,
-        });
+        $q.notify({ type: 'positive', message: 'Thanks for your feedback!', timeout: 1500 });
       }
     };
     const o2AiTitleLogo = computed(() => {
-      return store.state.theme == "dark"
-        ? getImageURL("images/common/o2_ai_logo_dark.svg")
-        : getImageURL("images/common/o2_ai_logo.svg");
+      return store.state.theme == 'dark' ? getImageURL('images/common/o2_ai_logo_dark.svg') : getImageURL('images/common/o2_ai_logo.svg')
     });
-    const getGenerateAiIcon = computed(() => {
-      return getImageURL("images/common/ai_icon_dark.svg");
-    });
+    const getGenerateAiIcon = computed(()=> {
+      return getImageURL('images/common/ai_icon_dark.svg')
+    })
 
     const filteredChatHistory = computed(() => {
       if (!historySearchTerm.value) {
         return chatHistory.value;
       }
       const searchTerm = historySearchTerm.value.toLowerCase();
-      return chatHistory.value.filter((chat) =>
-        chat.title.toLowerCase().includes(searchTerm),
+      return chatHistory.value.filter(chat =>
+        chat.title.toLowerCase().includes(searchTerm)
       );
     });
 
@@ -5863,15 +4914,14 @@ export default defineComponent({
       closeImagePreview,
       contextReferences,
       handleReferencesUpdate,
-    };
-  },
+    }
+  }
 });
 </script>
 
 <style lang="scss" scoped>
 .chat-container {
   width: 100%;
-  height: 100%;
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
@@ -5886,6 +4936,8 @@ export default defineComponent({
     height: 100%;
     background: transparent;
   }
+
+
 
   .chat-header {
     padding: 0px 12px 4px 12px;
@@ -5941,20 +4993,12 @@ export default defineComponent({
 
     &.light-mode {
       color: #1a202c;
-      background: linear-gradient(
-        to right,
-        rgba(99, 102, 241, 0.08),
-        transparent
-      );
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.08), transparent);
     }
 
     &.dark-mode {
       color: #e2e8f0;
-      background: linear-gradient(
-        to right,
-        rgba(99, 102, 241, 0.15),
-        transparent
-      );
+      background: linear-gradient(to right, rgba(99, 102, 241, 0.15), transparent);
     }
 
     .title-text {
@@ -5969,14 +5013,8 @@ export default defineComponent({
   }
 
   @keyframes blink {
-    0%,
-    50% {
-      opacity: 1;
-    }
-    51%,
-    100% {
-      opacity: 0;
-    }
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
   }
 
   .chat-content {
@@ -6003,11 +5041,7 @@ export default defineComponent({
 
   .welcome-section {
     padding: 24px;
-    background: linear-gradient(
-      to right,
-      rgba(var(--q-primary-rgb), 0.05),
-      rgba(var(--q-primary-rgb), 0.1)
-    );
+    background: linear-gradient(to right, rgba(var(--q-primary-rgb), 0.05), rgba(var(--q-primary-rgb), 0.1));
     border-radius: 8px;
     margin-bottom: 24px;
     flex: 1;
@@ -6138,7 +5172,7 @@ export default defineComponent({
 
       &:focus-within {
         border: 1px solid transparent;
-        box-shadow: 0 0 0 2px #8b5cf6;
+        box-shadow: 0 0 0 2px #8B5CF6;
       }
     }
 
@@ -6209,16 +5243,19 @@ export default defineComponent({
     }
   }
 
-  .light-mode .message {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  }
-  .dark-mode .message {
-    box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
-  }
+
+.light-mode .message {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+.dark-mode .message {
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+}
   .message {
     width: 100%;
     padding: 12px;
     border-radius: 8px;
+
+
 
     .message-content {
       display: flex;
@@ -6265,8 +5302,7 @@ export default defineComponent({
         margin-bottom: 4px;
       }
 
-      :deep(pre),
-      :deep(.generated-code-block) {
+      :deep(pre), :deep(.generated-code-block) {
         white-space: pre-wrap;
         word-break: break-word;
         overflow-wrap: break-word;
@@ -6276,7 +5312,7 @@ export default defineComponent({
         display: block;
         max-width: 100%;
         overflow-x: auto;
-
+        
         code {
           padding: 8px;
           margin: 0;
@@ -6335,8 +5371,7 @@ export default defineComponent({
         white-space: nowrap;
       }
 
-      :deep(table th),
-      :deep(table td) {
+      :deep(table th), :deep(table td) {
         padding: 8px 12px;
         border: 1px solid #e2e8f0;
         word-wrap: break-word;
@@ -6346,9 +5381,7 @@ export default defineComponent({
       }
 
       // Force break long words and URLs
-      :deep(p),
-      :deep(div),
-      :deep(span) {
+      :deep(p), :deep(div), :deep(span) {
         word-wrap: break-word;
         overflow-wrap: break-word;
         word-break: break-word;
@@ -6382,7 +5415,7 @@ export default defineComponent({
     //   border: 1px solid #eee;
     // }
     // .dark-mode .code-block-header{
-    //   border: 1px solid rgba(225, 225, 225, 0.14);
+    //   border: 1px solid rgba(225, 225, 225, 0.14); 
     // }
 
     .code-block-header {
@@ -6399,10 +5432,10 @@ export default defineComponent({
       border-radius: 4px;
       background: rgba(var(--q-primary-rgb), 0.1);
     }
-    .light-mode .code-type-label {
+    .light-mode .code-type-label{
       color: var(--q-primary);
     }
-    .dark-mode .code-type-label {
+    .dark-mode .code-type-label{
       color: #e2e2e2;
     }
 
@@ -6417,20 +5450,21 @@ export default defineComponent({
         padding: 8px;
         margin: 0;
         display: block;
+        
       }
     }
 
-    .dark-mode .generated-code-block {
+    .dark-mode .generated-code-block{
       code {
         background-color: #181a1b;
-        border: 0.5px solid #e1e1e124;
+        border: 0.5px solid #E1E1E124;
         border-top: none;
       }
     }
-    .light-mode .generated-code-block {
+    .light-mode .generated-code-block{
       code {
         background-color: #ffffff;
-        border: 0.5px solid #00000024;
+        border: 0.5px solid #00000024 ;
         border-top: none;
         color: black;
       }
@@ -6441,7 +5475,7 @@ export default defineComponent({
       display: flex;
     }
   }
-  .light-mode .message {
+  .light-mode .message{
     &.user {
       background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
       border: 1px solid #e0e6ff;
@@ -6460,7 +5494,7 @@ export default defineComponent({
       width: 100%;
     }
   }
-  .dark-mode .message {
+  .dark-mode .message{
     &.user {
       background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
       border: 1px solid #3a3d5c;
@@ -6480,8 +5514,7 @@ export default defineComponent({
     }
   }
 
-  ul,
-  ol {
+  ul, ol {
     pre {
       white-space: pre-wrap;
       word-break: break-word;
@@ -6491,6 +5524,7 @@ export default defineComponent({
       code {
         background-color: white;
         color: black;
+        
       }
     }
   }
@@ -6498,7 +5532,7 @@ export default defineComponent({
 
 // Avatar styling for user messages
 .light-user-avatar {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   color: white;
 }
 
@@ -6509,12 +5543,12 @@ export default defineComponent({
 
 // Send button gradient styling
 .send-button {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
   transition: all 0.3s ease !important;
   box-shadow: 0 4px 15px 0 rgba(139, 92, 246, 0.3) !important;
 
   &:hover:not(.disabled):not([disabled]):not(:disabled) {
-    background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
+    background: linear-gradient(135deg, #7C3AED 0%, #DB2777 100%) !important;
     box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
     transform: translateY(-1px) !important;
   }
@@ -6523,6 +5557,7 @@ export default defineComponent({
     transform: translateY(0) !important;
     box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
   }
+
 }
 
 // Stop button gradient styling
@@ -6602,9 +5637,7 @@ export default defineComponent({
   .message-image-item {
     img {
       border-radius: 8px;
-      transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
 
       &:hover {
         transform: scale(1.02);
@@ -6623,29 +5656,32 @@ export default defineComponent({
   }
 }
 
-.dark-mode .code-block-header {
+.dark-mode .code-block-header{
   background-color: #3b3b3b;
   border: 1px 1px 0px 1px solid #e1e1e1;
+
 }
-.light-mode .code-block-header {
+.light-mode .code-block-header{
   background-color: #ecf0f5;
+
 }
 
-.model-selector {
+.model-selector{
   text-overflow: ellipsis;
 }
-.dark-mode-bottom-bar {
-  .model-selector {
+.dark-mode-bottom-bar{
+  .model-selector{
     background-color: #262626;
     border: 1px solid #3b3b3b;
     padding: 0px 4px;
     border-radius: 4px;
     padding-left: 4px;
   }
+
 }
 
-.light-mode-bottom-bar {
-  .model-selector {
+.light-mode-bottom-bar{
+  .model-selector{
     background-color: #ffffff;
     border: 1px solid #bdbbbb;
     padding: 0px 4px;
@@ -6653,19 +5689,19 @@ export default defineComponent({
     padding-left: 4px;
   }
 }
-.o2-ai-beta-text {
-  position: relative;
-  color: var(--q-primary);
-  font-size: 8px;
-  padding: 0px 4px;
-  border-radius: 10px;
-  text-align: center;
-  border: 1px solid var(--q-primary);
-  text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  width: 34px;
-}
+  .o2-ai-beta-text {
+    position: relative;
+    color: var(--q-primary);
+    font-size: 8px;
+    padding: 0px 4px;
+    border-radius: 10px;
+    text-align: center;
+    border: 1px solid var(--q-primary);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    width: 34px;
+  }
 
 .history-menu-container {
   position: relative;
@@ -6739,40 +5775,40 @@ export default defineComponent({
   pointer-events: auto;
   backdrop-filter: blur(8px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-
+  
   body.body--light & {
     border: 2px solid #2563eb !important;
     color: #2563eb !important;
     background: rgba(255, 255, 255, 0.95) !important;
   }
-
+  
   body.body--dark & {
-    border: 2px solid #8b5cf6 !important;
-    color: #8b5cf6 !important;
+    border: 2px solid #8B5CF6 !important;
+    color: #8B5CF6 !important;
     background: rgba(30, 30, 30, 0.9) !important;
   }
-
+  
   &:hover {
     transform: scale(1.1);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-
+    
     body.body--light & {
       border: 2px solid #1d4ed8 !important;
       color: #1d4ed8 !important;
       background: rgba(255, 255, 255, 1) !important;
     }
-
+    
     body.body--dark & {
       border: 2px solid #5a6fd8 !important;
       color: #5a6fd8 !important;
       background: rgba(40, 40, 40, 0.95) !important;
     }
   }
-
+  
   &:active {
     transform: scale(1);
   }
-
+  
   .q-icon {
     font-size: 18px;
     animation: bounce 2s infinite;
@@ -6782,11 +5818,7 @@ export default defineComponent({
 
 // Bounce animation for the arrow icon
 @keyframes bounce {
-  0%,
-  20%,
-  50%,
-  80%,
-  100% {
+  0%, 20%, 50%, 80%, 100% {
     transform: translateY(0);
   }
   40% {
@@ -6808,6 +5840,7 @@ export default defineComponent({
     transform: translateY(0) scale(1);
   }
 }
+
 
 // Tool call indicator styling
 .tool-call-indicator {
@@ -6884,7 +5917,7 @@ export default defineComponent({
 
   .context-query {
     display: block;
-    font-family: "Fira Code", "Consolas", monospace;
+    font-family: 'Fira Code', 'Consolas', monospace;
     font-size: 12px;
     padding: 8px 12px;
     border-radius: 6px;
@@ -6916,7 +5949,7 @@ export default defineComponent({
 
     .light-mode & {
       background: rgba(139, 92, 246, 0.1);
-      color: #8b5cf6;
+      color: #8B5CF6;
     }
 
     .dark-mode & {
@@ -7077,7 +6110,7 @@ export default defineComponent({
     flex: 1;
 
     code {
-      font-family: "Fira Code", "Consolas", monospace;
+      font-family: 'Fira Code', 'Consolas', monospace;
       font-size: 12px;
       padding: 1px 4px;
       border-radius: 3px;
@@ -7159,7 +6192,7 @@ export default defineComponent({
       user-select: text;
 
       &.query-value {
-        font-family: "Fira Code", "Consolas", monospace;
+        font-family: 'Fira Code', 'Consolas', monospace;
         padding: 8px;
         border-radius: 4px;
         white-space: pre-wrap;
@@ -7273,7 +6306,7 @@ export default defineComponent({
 
     .log-entry-code {
       display: block;
-      font-family: "Monaco", "Menlo", "Courier New", monospace;
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
       font-size: 11px;
       line-height: 1.5;
       padding: 12px;
@@ -7350,7 +6383,7 @@ export default defineComponent({
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
-    font-family: "Fira Code", "Consolas", monospace;
+    font-family: 'Fira Code', 'Consolas', monospace;
     padding: 6px 8px;
     border-radius: 4px;
     max-height: 200px;
@@ -7431,7 +6464,7 @@ export default defineComponent({
   }
 
   .tool-call-query {
-    font-family: "Fira Code", "Consolas", monospace;
+    font-family: 'Fira Code', 'Consolas', monospace;
     font-size: 11px;
     padding: 2px 6px;
     border-radius: 4px;
@@ -7477,7 +6510,7 @@ export default defineComponent({
   }
 
   &.dark-mode {
-    background: rgba(244, 67, 54, 0.1);
+    background: rgba(244, 67, 54, 0.10);
     color: #a0aec0;
   }
 
@@ -7507,6 +6540,7 @@ export default defineComponent({
     opacity: 0.7;
   }
 }
+
 
 // Theme-based syntax highlighting - both CSS files are loaded, we scope them by theme
 // Hide dark theme in light mode
@@ -7676,4 +6710,4 @@ export default defineComponent({
     background-color: #67060c;
   }
 }
-</style>
+</style> 
