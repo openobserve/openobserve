@@ -4922,6 +4922,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .chat-container {
   width: 100%;
+  height: 100%;
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
