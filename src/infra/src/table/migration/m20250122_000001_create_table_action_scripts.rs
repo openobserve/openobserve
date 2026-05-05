@@ -128,3 +128,16 @@ enum ActionScripts {
     Status,
     ServiceAccount,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_action_scripts() {
+        let sql = create_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("action_scripts"));
+    }
+}

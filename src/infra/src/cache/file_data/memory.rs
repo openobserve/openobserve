@@ -635,4 +635,35 @@ mod tests {
         assert!(after_used >= initial_used + min_expected_increase);
         assert!(after_len >= initial_len + 2); // Added 2 items
     }
+
+    #[test]
+    fn test_get_bucket_idx_valid_range() {
+        let idx = get_bucket_idx("some/file/path.parquet");
+        let cfg = config::get_config();
+        let max = cfg.memory_cache.bucket_num.max(1);
+        assert!(idx < max);
+    }
+
+    #[test]
+    fn test_get_bucket_idx_empty_string() {
+        let idx = get_bucket_idx("");
+        let cfg = config::get_config();
+        let max = cfg.memory_cache.bucket_num.max(1);
+        assert!(idx < max);
+    }
+
+    #[test]
+    fn test_file_data_new_is_empty() {
+        let fd = FileData::with_cache_strategy("lru");
+        assert!(fd.is_empty());
+        assert_eq!(fd.len(), 0);
+        assert_eq!(fd.size(), 0);
+    }
+
+    #[test]
+    fn test_file_data_default_is_empty() {
+        let fd = FileData::default();
+        assert!(fd.is_empty());
+        assert_eq!(fd.size(), 0);
+    }
 }

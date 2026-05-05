@@ -83,6 +83,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_count_value_none_input() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = count(&None, Value::None, &eval_ctx).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_count_invalid_input_returns_err() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = count(&None, Value::Float(1.0), &eval_ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_count_empty_matrix_returns_none() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = count(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
     fn test_count_range_function() {
         let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
 

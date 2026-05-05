@@ -73,6 +73,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_label_join_value_none_input() {
+        let result = label_join(Value::None, "dst", "-", vec![]).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_label_join_invalid_input_returns_err() {
+        let result = label_join(Value::Float(1.0), "dst", "-", vec![]);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_label_join_function() {
         use config::meta::promql::value::{RangeValue, Sample};
 

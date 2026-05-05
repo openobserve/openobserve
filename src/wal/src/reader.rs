@@ -289,3 +289,148 @@ where
         Ok(len)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{io::Read, path::PathBuf};
+
+    use super::*;
+
+    #[test]
+    fn test_reader_new_stores_path_and_header() {
+        let path = PathBuf::from("/tmp/test.wal");
+        let cursor = std::io::Cursor::new(vec![]);
+        let mut header = HashMap::new();
+        header.insert("key".to_string(), "val".to_string());
+        let reader = Reader::new(path.clone(), cursor, header.clone());
+        assert_eq!(reader.path(), &path);
+        assert_eq!(reader.header(), &header);
+    }
+
+    #[test]
+    fn test_crc_reader_empty_has_zero_bytes() {
+        let cursor = std::io::Cursor::new(Vec::<u8>::new());
+        let crc_reader = CrcReader::new(cursor);
+        let (bytes, _checksum) = crc_reader.checksum();
+        assert_eq!(bytes, 0);
+    }
+
+    #[test]
+    fn test_crc_reader_counts_bytes_read() {
+        let data = b"hello world";
+        let cursor = std::io::Cursor::new(data.to_vec());
+        let mut crc_reader = CrcReader::new(cursor);
+        let mut buf = vec![0u8; data.len()];
+        crc_reader.read_exact(&mut buf).unwrap();
+        let (bytes, _checksum) = crc_reader.checksum();
+        assert_eq!(bytes, data.len() as u64);
+        assert_eq!(&buf, data);
+    }
+
+    #[test]
+    fn test_crc_reader_same_data_same_checksum() {
+        let make_checksum = |data: &[u8]| -> u32 {
+            let cursor = std::io::Cursor::new(data.to_vec());
+            let mut crc_reader = CrcReader::new(cursor);
+            let mut buf = vec![0u8; data.len()];
+            let _ = crc_reader.read_exact(&mut buf);
+            crc_reader.checksum().1
+        };
+        assert_eq!(make_checksum(b"test"), make_checksum(b"test"));
+        assert_ne!(make_checksum(b"test"), make_checksum(b"TEST"));
+    }
+
+    #[test]
+    fn test_deserialize_header_empty() {
+        let result = Reader::<std::io::BufReader<std::fs::File>>::deserialize_header(&[]).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_header_single_entry() {
+        // Manually encode {"k": "v"}:
+        // key_len=1: [0,0,0,1], key="k": [107], val_len=1: [0,0,0,1], val="v": [118]
+        let bytes: &[u8] = &[0, 0, 0, 1, b'k', 0, 0, 0, 1, b'v'];
+        let result =
+            Reader::<std::io::BufReader<std::fs::File>>::deserialize_header(bytes).unwrap();
+        assert_eq!(result.get("k"), Some(&"v".to_string()));
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_from_path_roundtrip_no_header() {
+        use std::path::PathBuf;
+
+        use crate::writer::Writer;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path: PathBuf = dir.path().join("roundtrip.wal");
+        let p: &std::path::Path = path.as_path();
+        let (mut writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        writer.write(b"hello wal").unwrap();
+        writer.sync().unwrap();
+        drop(writer);
+
+        let mut reader = Reader::from_path(path.clone()).unwrap();
+        assert_eq!(reader.path(), &path);
+        let entry = reader.read_entry().unwrap();
+        assert_eq!(entry, Some(b"hello wal".to_vec()));
+    }
+
+    #[test]
+    fn test_from_path_roundtrip_with_header() {
+        use crate::writer::Writer;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("with_header.wal");
+        let p: &std::path::Path = path.as_path();
+        let mut header = HashMap::new();
+        header.insert("stream".to_string(), "test".to_string());
+        let (mut writer, _) = Writer::new(p, 0, 4096, Some(header)).unwrap();
+        writer.write(b"data with header").unwrap();
+        writer.sync().unwrap();
+        drop(writer);
+
+        let mut reader = Reader::from_path(path).unwrap();
+        assert_eq!(reader.header().get("stream"), Some(&"test".to_string()));
+        let entry = reader.read_entry().unwrap();
+        assert_eq!(entry, Some(b"data with header".to_vec()));
+    }
+
+    #[test]
+    fn test_from_path_read_entry_with_length() {
+        use crate::writer::Writer;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("len_test.wal");
+        let p: &std::path::Path = path.as_path();
+        let (mut writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        writer.write(b"len check").unwrap();
+        writer.sync().unwrap();
+        drop(writer);
+
+        let mut reader = Reader::from_path(path).unwrap();
+        let (data, compressed_len) = reader.read_entry_with_length().unwrap();
+        assert_eq!(data, Some(b"len check".to_vec()));
+        assert!(compressed_len > 0);
+    }
+
+    #[test]
+    fn test_from_path_current_position_advances() {
+        use crate::writer::Writer;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pos_test.wal");
+        let p: &std::path::Path = path.as_path();
+        let (mut writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        writer.write(b"position test").unwrap();
+        writer.sync().unwrap();
+        drop(writer);
+
+        let mut reader = Reader::from_path(path).unwrap();
+        let pos_before = reader.current_position().unwrap();
+        reader.read_entry().unwrap();
+        let pos_after = reader.current_position().unwrap();
+        assert!(pos_after > pos_before);
+    }
+}

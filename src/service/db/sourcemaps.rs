@@ -385,3 +385,23 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sourcemap_prefix_value() {
+        assert_eq!(SOURCEMAP_PREFIX, "/sourcemaps/");
+    }
+
+    #[test]
+    fn test_sourcemap_values_limit_value() {
+        assert_eq!(SOURCEMAP_VALUES_LIMIT, 10);
+    }
+
+    #[test]
+    fn test_sourcemap_values_limit_positive() {
+        assert!(SOURCEMAP_VALUES_LIMIT > 0);
+    }
+}

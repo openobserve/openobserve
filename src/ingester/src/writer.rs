@@ -718,3 +718,28 @@ impl MemorySize for WriterKey {
         std::mem::size_of::<WriterKey>() + self.org_id.len() + self.stream_type.len()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_writer_key_new_replay_sets_fields() {
+        let key = WriterKey::new_replay("myorg", "logs");
+        assert_eq!(key.org_id.as_ref(), "myorg");
+        assert_eq!(key.stream_type.as_ref(), "logs");
+    }
+
+    #[test]
+    fn test_writer_key_mem_size_at_least_struct_size() {
+        let key = WriterKey::new_replay("org", "metrics");
+        assert!(key.mem_size() >= std::mem::size_of::<WriterKey>());
+    }
+
+    #[test]
+    fn test_writer_key_mem_size_includes_string_lengths() {
+        let key = WriterKey::new_replay("abc", "xyz");
+        let min_expected = std::mem::size_of::<WriterKey>() + "abc".len() + "xyz".len();
+        assert_eq!(key.mem_size(), min_expected);
+    }
+}

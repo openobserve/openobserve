@@ -98,3 +98,18 @@ pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
     db::delete(&key, false, db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_saved_views_key_prefix_value() {
+        assert_eq!(SAVED_VIEWS_KEY_PREFIX, "/organization/savedviews");
+    }
+
+    #[test]
+    fn test_saved_views_key_prefix_starts_with_slash() {
+        assert!(SAVED_VIEWS_KEY_PREFIX.starts_with('/'));
+    }
+}

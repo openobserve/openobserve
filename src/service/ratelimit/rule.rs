@@ -159,3 +159,47 @@ pub async fn list(
         .await
         .map_err(RatelimitError::DbError)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rule_operation_as_str() {
+        assert_eq!(RuleOperation::Save.as_str(), "add");
+        assert_eq!(RuleOperation::Update.as_str(), "update");
+        assert_eq!(RuleOperation::Delete.as_str(), "delete");
+    }
+
+    #[test]
+    fn test_ratelimit_error_not_found_display() {
+        let err = RatelimitError::NotFound("rule-123".to_string());
+        assert_eq!(
+            err.to_string(),
+            "ratelimit rule with ID rule-123 not found."
+        );
+    }
+
+    #[test]
+    fn test_ratelimit_error_not_support_rule_entry_display() {
+        let err = RatelimitError::NotSupportRuleEntry("custom-type".to_string());
+        assert_eq!(
+            err.to_string(),
+            "ratelimit rule entry type not supported: custom-type"
+        );
+    }
+
+    #[test]
+    fn test_ratelimit_error_db_error_is_transparent() {
+        let inner = anyhow::anyhow!("connection refused");
+        let err = RatelimitError::DbError(inner);
+        assert!(err.to_string().contains("connection refused"));
+    }
+
+    #[test]
+    fn test_ratelimit_error_from_anyhow() {
+        let anyhow_err = anyhow::anyhow!("some db failure");
+        let err: RatelimitError = anyhow_err.into();
+        assert!(matches!(err, RatelimitError::DbError(_)));
+    }
+}

@@ -105,6 +105,18 @@ vi.mock("@/components/ingestion/others/Airbyte.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/others/Cribl.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/others/Vercel.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/others/Heroku.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/AIIntegrations.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/ai/data", () => ({
+  aiCategories: [
+    {
+      slug: "frameworks",
+      name: "AI Frameworks & Agents",
+      integrations: [
+        { slug: "agno", name: "Agno", routeName: "ai-agno", docURL: "", keywords: [] },
+      ],
+    },
+  ],
+}));
 
 describe("useIngestionRoutes", () => {
   describe("function execution", () => {
@@ -140,6 +152,7 @@ describe("useIngestionRoutes", () => {
       expect(childNames).toContain("servers");
       expect(childNames).toContain("message-queues");
       expect(childNames).toContain("languages");
+      expect(childNames).toContain("ai-integrations");
       expect(childNames).toContain("others");
     });
   });
@@ -567,6 +580,27 @@ describe("useIngestionRoutes", () => {
     });
   });
 
+  describe("ai integrations routes configuration", () => {
+    it("should have proper ai-integrations route configuration", () => {
+      const routes = useIngestionRoutes();
+      const aiRoute = routes[0].children.find((child: any) => child.name === "ai-integrations");
+
+      expect(aiRoute).toBeDefined();
+      expect(aiRoute.path).toBe("ai-integrations");
+      expect(aiRoute.component).toBeDefined();
+      expect(typeof aiRoute.beforeEnter).toBe("function");
+      expect(Array.isArray(aiRoute.children)).toBe(true);
+    });
+
+    it("should have ai integration child routes", () => {
+      const routes = useIngestionRoutes();
+      const aiRoute = routes[0].children.find((child: any) => child.name === "ai-integrations");
+      const aiRouteNames = aiRoute.children.map((child: any) => child.name);
+
+      expect(aiRouteNames).toContain("ai-agno");
+    });
+  });
+
   describe("route guards validation", () => {
     it("should have beforeEnter guard on main ingestion route", () => {
       const routes = useIngestionRoutes();
@@ -605,6 +639,7 @@ describe("useIngestionRoutes", () => {
       const routes = useIngestionRoutes();
       
       function validateRoute(route: any) {
+        if (route.redirect) return;
         expect(route).toHaveProperty("path");
         expect(route).toHaveProperty("name");
         expect(route).toHaveProperty("component");
@@ -643,6 +678,7 @@ describe("useIngestionRoutes", () => {
       
       function collectRouteNames(routeArray: any[]) {
         routeArray.forEach((route: any) => {
+          if (route.redirect) return;
           expect(routeNames.has(route.name)).toBe(false);
           routeNames.add(route.name);
           
@@ -660,6 +696,7 @@ describe("useIngestionRoutes", () => {
       
       function validatePaths(routeArray: any[]) {
         routeArray.forEach((route: any) => {
+          if (route.redirect) return;
           expect(route.path).toBeTruthy();
           expect(typeof route.path).toBe("string");
           
@@ -679,6 +716,7 @@ describe("useIngestionRoutes", () => {
       
       function validateComponents(routeArray: any[]) {
         routeArray.forEach((route: any) => {
+          if (route.redirect) return;
           expect(route.component).toBeDefined();
           
           if (route.children) {
@@ -695,6 +733,7 @@ describe("useIngestionRoutes", () => {
       
       function validateComponentTypes(routeArray: any[]) {
         routeArray.forEach((route: any) => {
+          if (route.redirect) return;
           expect(typeof route.component).toBe("object");
           
           if (route.children) {
@@ -799,8 +838,9 @@ describe("useIngestionRoutes", () => {
       
       function checkNamingConventions(routeArray: any[]) {
         routeArray.forEach((route: any) => {
+          if (route.redirect) return;
           expect(route.name).toMatch(/^[a-zA-Z][a-zA-Z0-9-_]*$/);
-          expect(route.path).toMatch(/^[a-zA-Z][a-zA-Z0-9-_]*$/);
+          expect(route.path).toMatch(/^[a-zA-Z][a-zA-Z0-9-_/]*$/);
           
           if (route.children) {
             checkNamingConventions(route.children);
@@ -816,6 +856,7 @@ describe("useIngestionRoutes", () => {
       
       function checkPathNameAlignment(routeArray: any[]) {
         routeArray.forEach((route: any) => {
+          if (route.redirect) return;
           if (route.path !== "ingestion") {
             expect(route.path.toLowerCase()).toBeTruthy();
             expect(route.name.toLowerCase()).toBeTruthy();

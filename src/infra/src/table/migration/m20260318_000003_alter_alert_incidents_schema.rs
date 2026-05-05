@@ -345,3 +345,32 @@ enum AlertIncidents {
     CreatedAt,
     UpdatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_postgres_gin_up_contains_index_name() {
+        assert!(POSTGRES_GIN_UP.contains("alert_incidents_group_idx"));
+    }
+
+    #[test]
+    fn test_postgres_gin_down_contains_index_name() {
+        assert!(POSTGRES_GIN_DOWN.contains("alert_incidents_group_idx"));
+    }
+
+    #[test]
+    fn test_create_alert_incidents_table_contains_table_name() {
+        let sql = create_alert_incidents_table().build(SqliteQueryBuilder);
+        assert!(sql.contains("alert_incidents"));
+    }
+
+    #[test]
+    fn test_recreate_alert_incident_alerts_table_contains_table_name() {
+        let sql = recreate_alert_incident_alerts_table().build(SqliteQueryBuilder);
+        assert!(sql.contains("alert_incident_alerts"));
+    }
+}

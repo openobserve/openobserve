@@ -912,3 +912,151 @@ pub async fn move_reports(
         Err(e) => e.into(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{http::StatusCode, response::Response};
+
+    use crate::service::dashboards::reports::ReportError;
+
+    fn status(err: ReportError) -> StatusCode {
+        Response::from(err).status()
+    }
+
+    // 500 Internal Server Error
+    #[test]
+    fn test_smtp_not_enabled_is_internal_error() {
+        assert_eq!(
+            status(ReportError::SmtpNotEnabled),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_chrome_not_enabled_is_internal_error() {
+        assert_eq!(
+            status(ReportError::ChromeNotEnabled),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_create_default_folder_error_is_internal_error() {
+        assert_eq!(
+            status(ReportError::CreateDefaultFolderError),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_db_error_is_internal_error() {
+        assert_eq!(
+            status(ReportError::DbError(anyhow::anyhow!("db fail"))),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    // 400 Bad Request
+    #[test]
+    fn test_report_username_password_not_set_is_bad_request() {
+        assert_eq!(
+            status(ReportError::ReportUsernamePasswordNotSet),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_name_contains_openfga_unsupported_chars_is_bad_request() {
+        assert_eq!(
+            status(ReportError::NameContainsOpenFgaUnsupportedCharacters),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_name_is_empty_is_bad_request() {
+        assert_eq!(status(ReportError::NameIsEmpty), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_name_contains_forward_slash_is_bad_request() {
+        assert_eq!(
+            status(ReportError::NameContainsForwardSlash),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_create_report_name_already_used_is_bad_request() {
+        assert_eq!(
+            status(ReportError::CreateReportNameAlreadyUsed),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_no_dashboards_is_bad_request() {
+        assert_eq!(status(ReportError::NoDashboards), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_inline_attachment_type_not_supported_for_pdf_is_bad_request() {
+        assert_eq!(
+            status(ReportError::InlineAttachmentTypeNotSupportedForPdf),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_no_dashboard_tabs_is_bad_request() {
+        assert_eq!(
+            status(ReportError::NoDashboardTabs),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_no_destinations_is_bad_request() {
+        assert_eq!(status(ReportError::NoDestinations), StatusCode::BAD_REQUEST);
+    }
+
+    // 404 Not Found
+    #[test]
+    fn test_report_not_found_is_not_found() {
+        assert_eq!(status(ReportError::ReportNotFound), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_dashboard_tab_not_found_is_not_found() {
+        assert_eq!(
+            status(ReportError::DashboardTabNotFound),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_folder_not_found_is_not_found() {
+        assert_eq!(status(ReportError::FolderNotFound), StatusCode::NOT_FOUND);
+    }
+
+    // 400 Bad Request
+    #[test]
+    fn test_parse_cron_error_is_bad_request() {
+        use std::str::FromStr as _;
+        let cron_err = cron::Schedule::from_str("not-a-cron").unwrap_err();
+        assert_eq!(
+            status(ReportError::ParseCronError(cron_err)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    // 500 Internal Server Error
+    #[test]
+    fn test_send_report_error_is_internal_server_error() {
+        use crate::service::dashboards::reports::SendReportError;
+        assert_eq!(
+            status(ReportError::SendReportError(SendReportError::NoDashboards)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+}

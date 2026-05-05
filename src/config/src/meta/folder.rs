@@ -45,3 +45,47 @@ pub enum FolderType {
 }
 
 pub const DEFAULT_FOLDER: &str = "default";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_folder_constant() {
+        assert_eq!(DEFAULT_FOLDER, "default");
+    }
+
+    #[test]
+    fn test_folder_default_has_empty_fields() {
+        let f = Folder::default();
+        assert!(f.folder_id.is_empty());
+        assert!(f.name.is_empty());
+        assert!(f.description.is_empty());
+    }
+
+    #[test]
+    fn test_folder_equality() {
+        let a = Folder {
+            folder_id: "id1".to_string(),
+            name: "My Folder".to_string(),
+            description: "desc".to_string(),
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_folder_type_default_is_dashboards() {
+        assert_eq!(FolderType::default(), FolderType::Dashboards);
+    }
+
+    #[test]
+    fn test_folder_mem_size_at_least_struct_size() {
+        let f = Folder {
+            folder_id: "abc".to_string(),
+            name: "n".to_string(),
+            description: "d".to_string(),
+        };
+        assert!(f.mem_size() >= std::mem::size_of::<Folder>());
+    }
+}

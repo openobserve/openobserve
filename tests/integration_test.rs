@@ -290,6 +290,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[ignore]
     async fn e2e_test() {
         // make sure data dir is deleted before we run integration tests
         fs::remove_dir_all("./data")

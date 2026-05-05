@@ -765,4 +765,87 @@ mod tests {
         assert!(!extractor.is_input_output_attribute("langfuse.observation.metadata.tool.name"));
         assert!(!extractor.is_input_output_attribute("langfuse.observation.type"));
     }
+
+    // --- convert_key_path_to_nested_object edge cases ---
+
+    #[test]
+    fn test_convert_key_path_direct_key_returns_value() {
+        let mut input = HashMap::new();
+        input.insert("messages".to_string(), json::json!([{"role": "user"}]));
+        // Direct key "messages" exists — should return it immediately
+        let result = convert_key_path_to_nested_object(&input, "messages");
+        assert!(result.is_array());
+        assert_eq!(result[0]["role"], "user");
+    }
+
+    #[test]
+    fn test_convert_key_path_no_keys_returns_null() {
+        let input: HashMap<String, json::Value> = HashMap::new();
+        let result = convert_key_path_to_nested_object(&input, "nonexistent");
+        assert!(result.is_null());
+    }
+
+    #[test]
+    fn test_convert_key_path_prefix_but_no_children_returns_null() {
+        let mut input = HashMap::new();
+        input.insert("other.field".to_string(), json::json!("value"));
+        let result = convert_key_path_to_nested_object(&input, "prefix");
+        assert!(result.is_null());
+    }
+
+    // --- set_nested_value edge cases ---
+
+    #[test]
+    fn test_set_nested_value_empty_path_is_noop() {
+        let mut target = json::json!({"existing": "value"});
+        set_nested_value(&mut target, &[], json::json!("ignored"));
+        assert_eq!(target["existing"], "value");
+    }
+
+    #[test]
+    fn test_set_nested_value_single_key() {
+        let mut target = json::json!({});
+        set_nested_value(&mut target, &["name"], json::json!("Alice"));
+        assert_eq!(target["name"], "Alice");
+    }
+
+    #[test]
+    fn test_set_nested_value_two_levels() {
+        let mut target = json::json!({});
+        set_nested_value(&mut target, &["user", "name"], json::json!("Bob"));
+        assert_eq!(target["user"]["name"], "Bob");
+    }
+
+    #[test]
+    fn test_set_nested_value_into_array_index() {
+        let mut target = json::json!([{}, {}]);
+        set_nested_value(&mut target, &["1", "key"], json::json!("val"));
+        assert_eq!(target[1]["key"], "val");
+    }
+
+    // --- build_array_from_keys: MAX_INDEX cap ---
+
+    #[test]
+    fn test_build_array_capped_at_max_index() {
+        // MAX_INDEX = 100, so an index of 200 should be ignored (>= array len)
+        let mut input = HashMap::new();
+        input.insert("msg.0.role".to_string(), json::json!("user"));
+        input.insert("msg.200.role".to_string(), json::json!("overflow"));
+        let result = convert_key_path_to_nested_object(&input, "msg");
+        assert!(result.is_array());
+        let arr = result.as_array().unwrap();
+        // The cap means index 200 won't be inserted (array len = MAX_INDEX + 1 = 101)
+        assert!(arr.len() <= MAX_INDEX + 1);
+    }
+
+    // --- build_object_from_keys: single-level key ---
+
+    #[test]
+    fn test_build_object_single_level_key() {
+        let mut input = HashMap::new();
+        input.insert("obj.flat_key".to_string(), json::json!(42));
+        let result = convert_key_path_to_nested_object(&input, "obj");
+        assert!(result.is_object());
+        assert_eq!(result["flat_key"], 42);
+    }
 }

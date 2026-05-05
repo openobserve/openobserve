@@ -290,4 +290,57 @@ mod tests {
             _ => panic!("Expected None result when k=0"),
         }
     }
+
+    #[test]
+    fn test_topk_value_none_input() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = topk(2, &None, Value::None, &eval_ctx).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_topk_invalid_input_type_returns_err() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = topk(2, &None, Value::Float(1.0), &eval_ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_select_topk_empty_series_indices() {
+        let timestamp = 1640995200;
+        let matrix = vec![RangeValue {
+            labels: vec![Arc::new(Label::new("k", "v"))],
+            samples: vec![Sample::new(timestamp, 1.0)],
+            exemplars: None,
+            time_window: None,
+        }];
+        let eval_timestamps = HashSet::from([timestamp]);
+        let result = select_topk_series(&matrix, &[], 2, &eval_timestamps, false);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_select_topk_all_fit_within_k() {
+        // len == k: all values should be included
+        let timestamp = 1640995200;
+        let matrix = vec![
+            RangeValue {
+                labels: vec![Arc::new(Label::new("i", "1"))],
+                samples: vec![Sample::new(timestamp, 5.0)],
+                exemplars: None,
+                time_window: None,
+            },
+            RangeValue {
+                labels: vec![Arc::new(Label::new("i", "2"))],
+                samples: vec![Sample::new(timestamp, 3.0)],
+                exemplars: None,
+                time_window: None,
+            },
+        ];
+        let eval_timestamps = HashSet::from([timestamp]);
+        let result = select_topk_series(&matrix, &[0, 1], 5, &eval_timestamps, false);
+        assert_eq!(result.len(), 2);
+    }
 }

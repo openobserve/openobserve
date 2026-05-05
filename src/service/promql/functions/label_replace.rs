@@ -79,6 +79,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_label_replace_value_none_input() {
+        let result = label_replace(Value::None, "dst", "$1", "src", ".*").unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_label_replace_invalid_input_returns_err() {
+        let result = label_replace(Value::Float(1.0), "dst", "$1", "src", ".*");
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_label_replace_function() {
         use config::meta::promql::value::{RangeValue, Sample};
 
@@ -120,5 +132,73 @@ mod tests {
             }
             _ => panic!("Expected Matrix result"),
         }
+    }
+
+    #[test]
+    fn test_label_replace_empty_replacement_removes_dest_label() {
+        use config::meta::promql::value::{RangeValue, Sample};
+
+        let labels = vec![
+            Arc::new(Label::new("dst", "old_value")),
+            Arc::new(Label::new("src", "source_val")),
+        ];
+        let range_value = RangeValue {
+            labels,
+            samples: vec![Sample::new(1000, 1.0)],
+            exemplars: None,
+            time_window: None,
+        };
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = label_replace(matrix, "dst", "", "src", ".*").unwrap();
+
+        match result {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                // Empty replacement removes dst label
+                assert!(m[0].labels.iter().all(|l| l.name != "dst"));
+            }
+            _ => panic!("Expected Matrix result"),
+        }
+    }
+
+    #[test]
+    fn test_label_replace_no_regex_match_leaves_labels_unchanged() {
+        use config::meta::promql::value::{RangeValue, Sample};
+
+        let labels = vec![Arc::new(Label::new("instance", "prod-server"))];
+        let range_value = RangeValue {
+            labels,
+            samples: vec![Sample::new(1000, 1.0)],
+            exemplars: None,
+            time_window: None,
+        };
+        let matrix = Value::Matrix(vec![range_value]);
+        // Regex won't match "prod-server"
+        let result = label_replace(matrix, "hostname", "$1", "instance", r"(\d+)").unwrap();
+
+        match result {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                // hostname label NOT added since regex didn't match
+                assert!(m[0].labels.iter().all(|l| l.name != "hostname"));
+                // instance label preserved
+                assert!(m[0].labels.iter().any(|l| l.name == "instance"));
+            }
+            _ => panic!("Expected Matrix result"),
+        }
+    }
+
+    #[test]
+    fn test_label_replace_invalid_dest_label_returns_err() {
+        let matrix = Value::Matrix(vec![]);
+        let result = label_replace(matrix, "123invalid", "$1", "src", ".*");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_label_replace_invalid_regex_returns_err() {
+        let matrix = Value::Matrix(vec![]);
+        let result = label_replace(matrix, "dst", "$1", "src", "[invalid");
+        assert!(result.is_err());
     }
 }

@@ -29,3 +29,34 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "script-1".to_string(),
+            name: "my_script".to_string(),
+            file_path: "/scripts".to_string(),
+            file_name: "run.sh".to_string(),
+            org_id: "org".to_string(),
+            created_by: "user1".to_string(),
+            origin_cluster_url: "http://cluster".to_string(),
+            env: serde_json::json!({}),
+            execution_details: "{}".to_string(),
+            cron_expr: None,
+            created_at: 1000,
+            last_modified_at: 2000,
+            last_executed_at: None,
+            last_successful_at: None,
+            description: None,
+            status: "active".to_string(),
+            service_account: "sa1".to_string(),
+        };
+        assert_eq!(m.org_id, "org");
+        assert_eq!(m.status, "active");
+        assert!(m.cron_expr.is_none());
+    }
+}

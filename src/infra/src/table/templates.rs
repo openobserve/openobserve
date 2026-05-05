@@ -157,3 +157,83 @@ async fn list_models(
         .all(db)
         .await
 }
+
+#[cfg(test)]
+mod tests {
+    use svix_ksuid::KsuidLike;
+
+    use super::*;
+
+    fn make_model(id: &str, title: Option<&str>, tmpl_type: &str) -> Model {
+        Model {
+            id: id.to_string(),
+            org: "myorg".to_string(),
+            name: "my-template".to_string(),
+            is_default: false,
+            r#type: tmpl_type.to_string(),
+            body: r#"{"text": "alert"}"#.to_string(),
+            title: title.map(|s| s.to_string()),
+        }
+    }
+
+    #[test]
+    fn test_try_from_model_email_template() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, Some("Alert Subject"), "email");
+        let tmpl = Template::try_from(model).unwrap();
+        assert_eq!(tmpl.org_id, "myorg");
+        assert_eq!(tmpl.name, "my-template");
+        assert!(!tmpl.is_default);
+        assert!(
+            matches!(tmpl.template_type, TemplateType::Email { title } if title == "Alert Subject")
+        );
+    }
+
+    #[test]
+    fn test_try_from_model_http_template() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "http");
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(matches!(tmpl.template_type, TemplateType::Http));
+    }
+
+    #[test]
+    fn test_try_from_model_sns_template() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "slack");
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(matches!(tmpl.template_type, TemplateType::Sns));
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_ksuid() {
+        let model = make_model("bad-id", None, "http");
+        let result = Template::try_from(model);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_http_type_case_insensitive() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "HTTP");
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(matches!(tmpl.template_type, TemplateType::Http));
+    }
+
+    #[test]
+    fn test_try_from_model_is_default_true() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id, None, "http");
+        model.is_default = true;
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(tmpl.is_default);
+    }
+
+    #[test]
+    fn test_try_from_model_body_preserved() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "http");
+        let tmpl = Template::try_from(model).unwrap();
+        assert_eq!(tmpl.body, r#"{"text": "alert"}"#);
+    }
+}

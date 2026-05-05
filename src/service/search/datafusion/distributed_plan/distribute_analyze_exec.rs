@@ -240,3 +240,42 @@ fn collect_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Metrics> {
     }
     metrics
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::physical_plan::empty::EmptyExec;
+
+    use super::*;
+
+    fn empty_input() -> Arc<dyn ExecutionPlan> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        Arc::new(EmptyExec::new(schema))
+    }
+
+    #[test]
+    fn test_distribute_analyze_exec_new_non_verbose() {
+        let input = empty_input();
+        let exec = DistributeAnalyzeExec::new(false, false, input);
+        assert_eq!(exec.name(), "DistributeAnalyzeExec");
+        assert_eq!(exec.children().len(), 1);
+    }
+
+    #[test]
+    fn test_distribute_analyze_exec_new_verbose() {
+        let input = empty_input();
+        let exec = DistributeAnalyzeExec::new(true, true, input);
+        assert_eq!(exec.name(), "DistributeAnalyzeExec");
+    }
+
+    #[test]
+    fn test_distribute_analyze_exec_schema_has_four_fields() {
+        let input = empty_input();
+        let exec = DistributeAnalyzeExec::new(false, false, input);
+        assert_eq!(exec.schema().fields().len(), 4);
+        assert_eq!(exec.schema().field(0).name(), "phase");
+        assert_eq!(exec.schema().field(1).name(), "node_address");
+    }
+}

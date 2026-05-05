@@ -109,6 +109,7 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::Array;
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -120,6 +121,37 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_arr_sort_impl_integers_direct() {
+        let input = StringArray::from(vec!["[3, 1, 4]"]);
+        let args = [ColumnarValue::Array(Arc::new(input))];
+        let result = arr_sort_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert_eq!(out.value(0), "[1,3,4]");
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_arr_sort_impl_wrong_arg_count_errors() {
+        assert!(arr_sort_impl(&[]).is_err());
+    }
+
+    #[test]
+    fn test_arr_sort_impl_invalid_json_returns_null() {
+        let input = StringArray::from(vec!["not-json"]);
+        let args = [ColumnarValue::Array(Arc::new(input))];
+        let result = arr_sort_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert!(out.is_null(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
 
     // Helper function to run a single test case
     async fn run_single_test(arr_field: &str, expected_output: Vec<&str>) {

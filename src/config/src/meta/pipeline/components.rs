@@ -748,4 +748,290 @@ mod tests {
         }
         assert!(result.is_ok(), "Failed to deserialize: {:?}", result.err());
     }
+
+    // ── PipelineSource methods ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_pipeline_source_is_scheduled() {
+        let scheduled = PipelineSource::Scheduled(DerivedStream::default());
+        assert!(scheduled.is_scheduled());
+        assert!(!scheduled.is_realtime());
+
+        let realtime =
+            PipelineSource::Realtime(StreamParams::new("org", "stream", StreamType::Logs));
+        assert!(realtime.is_realtime());
+        assert!(!realtime.is_scheduled());
+    }
+
+    // ── DerivedStream::get_scheduler_module_key ───────────────────────────────
+
+    #[test]
+    fn test_derived_stream_scheduler_module_key() {
+        let stream = DerivedStream {
+            org_id: "myorg".to_string(),
+            stream_type: StreamType::Logs,
+            ..Default::default()
+        };
+        let key = stream.get_scheduler_module_key("my_pipeline", "pipe-123");
+        assert_eq!(key, "logs/myorg/my_pipeline/pipe-123");
+    }
+
+    // ── Node methods ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_node_new_and_accessors() {
+        let stream_data = NodeData::Stream(StreamParams::new("org", "stream", StreamType::Logs));
+        let node = Node::new(
+            "node-1".to_string(),
+            stream_data.clone(),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        assert_eq!(node.get_node_id(), "node-1");
+        assert_eq!(node.get_node_data(), stream_data);
+        assert!(!node.is_function_node());
+    }
+
+    #[test]
+    fn test_node_is_function_node() {
+        let func_data = NodeData::Function(FunctionParams {
+            name: "my_func".to_string(),
+            after_flatten: false,
+            num_args: 0,
+        });
+        let node = Node::new(
+            "func-1".to_string(),
+            func_data,
+            10.0,
+            20.0,
+            "default".to_string(),
+        );
+        assert!(node.is_function_node());
+    }
+
+    // ── Edge::new ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_edge_new() {
+        let edge = Edge::new("source-1".to_string(), "target-2".to_string());
+        assert_eq!(edge.id, "esource-1-target-2");
+        assert_eq!(edge.source, "source-1");
+        assert_eq!(edge.target, "target-2");
+    }
+
+    #[test]
+    fn test_llm_evaluation_params_default() {
+        let p = LlmEvaluationParams::default();
+        assert_eq!(p.sampling_rate, 0.01);
+        assert!(p.enable_llm_judge);
+        assert_eq!(p.llm_span_identifier, "llm_input");
+        assert!(p.name.is_empty());
+        assert!(p.eval_template.is_none());
+    }
+
+    #[test]
+    fn test_llm_evaluation_params_sampling_rate_serde() {
+        // number format
+        let json = r#"{"sampling_rate": 0.5}"#;
+        let p: LlmEvaluationParams = serde_json::from_str(json).unwrap();
+        assert!((p.sampling_rate - 0.5).abs() < 1e-9);
+
+        // string format
+        let json_str = r#"{"sampling_rate": "0.25"}"#;
+        let p2: LlmEvaluationParams = serde_json::from_str(json_str).unwrap();
+        assert!((p2.sampling_rate - 0.25).abs() < 1e-9);
+
+        // out of range → error
+        let bad = r#"{"sampling_rate": 1.5}"#;
+        assert!(serde_json::from_str::<LlmEvaluationParams>(bad).is_err());
+
+        // negative → error
+        let neg = r#"{"sampling_rate": -0.1}"#;
+        assert!(serde_json::from_str::<LlmEvaluationParams>(neg).is_err());
+    }
+
+    #[test]
+    fn test_node_partial_eq() {
+        let node_a = Node::new(
+            "n1".to_string(),
+            NodeData::Stream(StreamParams {
+                org_id: "org".to_string().into(),
+                stream_name: "logs".to_string().into(),
+                stream_type: StreamType::Logs,
+            }),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let node_b = node_a.clone();
+        assert_eq!(node_a, node_b);
+
+        let node_c = Node::new(
+            "n2".to_string(), // different id
+            NodeData::Stream(StreamParams {
+                org_id: "org".to_string().into(),
+                stream_name: "logs".to_string().into(),
+                stream_type: StreamType::Logs,
+            }),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        assert_ne!(node_a, node_c);
+    }
+
+    #[test]
+    fn test_pipeline_source_mem_size_realtime() {
+        let src = PipelineSource::Realtime(StreamParams::new("org", "stream", StreamType::Logs));
+        assert!(src.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_pipeline_source_mem_size_scheduled() {
+        let src = PipelineSource::Scheduled(DerivedStream::default());
+        assert!(src.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_pipeline_source_default_is_realtime() {
+        let src = PipelineSource::default();
+        assert!(src.is_realtime());
+        assert!(!src.is_scheduled());
+        assert!(src.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_derived_stream_mem_size() {
+        let ds = DerivedStream {
+            org_id: "myorg".to_string(),
+            stream_type: StreamType::Logs,
+            ..Default::default()
+        };
+        assert!(ds.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_mem_size() {
+        let node = Node::new(
+            "n1".to_string(),
+            NodeData::Stream(StreamParams::new("org", "logs", StreamType::Logs)),
+            1.0,
+            2.0,
+            "input".to_string(),
+        );
+        assert!(node.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_data_mem_size_stream() {
+        let data = NodeData::Stream(StreamParams::new("org", "logs", StreamType::Logs));
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_data_mem_size_function() {
+        let data = NodeData::Function(FunctionParams {
+            name: "my_fn".to_string(),
+            after_flatten: false,
+            num_args: 0,
+        });
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_function_params_mem_size() {
+        let p = FunctionParams {
+            name: "fn".to_string(),
+            after_flatten: true,
+            num_args: 2,
+        };
+        assert!(p.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_edge_mem_size() {
+        let edge = Edge::new("src-1".to_string(), "dst-1".to_string());
+        assert!(edge.mem_size() > 0);
+        assert_eq!(edge.source, "src-1");
+        assert_eq!(edge.target, "dst-1");
+    }
+
+    #[test]
+    fn test_node_data_mem_size_remote_stream() {
+        let data = NodeData::RemoteStream(RemoteStreamParams {
+            org_id: "org".to_string().into(),
+            destination_name: "dest".to_string().into(),
+        });
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_data_mem_size_query() {
+        let data = NodeData::Query(DerivedStream::default());
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_data_mem_size_llm_evaluation() {
+        let data = NodeData::LlmEvaluation(LlmEvaluationParams::default());
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_derived_stream_with_optional_fields_serde() {
+        let ds = DerivedStream {
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            delay: Some(30),
+            start_at: Some(1_700_000_000_000_000),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&ds).unwrap();
+        assert!(json.contains("delay"));
+        assert!(json.contains("start_at"));
+        let back: DerivedStream = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.delay, Some(30));
+        assert_eq!(back.start_at, Some(1_700_000_000_000_000));
+    }
+
+    #[test]
+    fn test_derived_stream_optional_fields_absent_when_none() {
+        let ds = DerivedStream::default();
+        let json = serde_json::to_string(&ds).unwrap();
+        assert!(!json.contains("\"delay\""));
+        assert!(!json.contains("\"start_at\""));
+    }
+
+    #[test]
+    fn test_llm_evaluation_params_eval_template_absent_when_none() {
+        let params = LlmEvaluationParams::default();
+        let json = serde_json::to_value(&params).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("eval_template"));
+    }
+
+    #[test]
+    fn test_llm_evaluation_params_eval_template_present_when_some() {
+        let params = LlmEvaluationParams {
+            eval_template: Some("my_template".to_string()),
+            ..LlmEvaluationParams::default()
+        };
+        let json = serde_json::to_value(&params).unwrap();
+        assert!(json.as_object().unwrap().contains_key("eval_template"));
+    }
+
+    #[test]
+    fn test_default_sampling_rate() {
+        assert!((default_sampling_rate() - 0.01).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_default_enable_llm_judge() {
+        assert!(default_enable_llm_judge());
+    }
+
+    #[test]
+    fn test_default_llm_span_identifier() {
+        assert_eq!(default_llm_span_identifier(), "llm_input");
+    }
 }

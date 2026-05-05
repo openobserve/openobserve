@@ -209,4 +209,35 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_generate_result_path_format() {
+        let path = generate_result_path("trace-123");
+        assert!(
+            path.starts_with("join/"),
+            "path should start with 'join/': {path}"
+        );
+        assert!(
+            path.ends_with(".arrow"),
+            "path should end with '.arrow': {path}"
+        );
+        assert!(
+            path.contains("trace-123"),
+            "path should contain trace_id: {path}"
+        );
+    }
+
+    #[test]
+    fn test_generate_result_path_empty_trace_id() {
+        let path = generate_result_path("");
+        assert!(path.starts_with("join/"));
+        assert!(path.ends_with(".arrow"));
+    }
+
+    #[test]
+    fn test_generate_result_path_uniqueness() {
+        let path1 = generate_result_path("t1");
+        let path2 = generate_result_path("t1");
+        assert_ne!(path1, path2, "two calls should produce distinct paths");
+    }
 }

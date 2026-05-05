@@ -783,4 +783,78 @@ mod tests {
         );
         assert!(res.stack[2].source_info.is_some());
     }
+
+    #[test]
+    fn test_parse_line_valid() {
+        let line = "at myFn @ http://localhost:4173/assets/App-Dfx1Q7gE.js:1:42";
+        let result = parse_line(line);
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        assert_eq!(parsed.file, "App-Dfx1Q7gE.js");
+        assert_eq!(parsed.line, 1);
+        assert_eq!(parsed.col, 42);
+    }
+
+    #[test]
+    fn test_parse_line_no_at_symbol_returns_err() {
+        let line = "http://localhost:4173/assets/App.js:1:42";
+        assert!(parse_line(line).is_err());
+    }
+
+    #[test]
+    fn test_parse_line_no_colon_after_filename_returns_err() {
+        let line = "at fn @ http://localhost:4173/assets/App.js";
+        assert!(parse_line(line).is_err());
+    }
+
+    #[test]
+    fn test_parse_line_non_numeric_position_returns_err() {
+        let line = "at fn @ http://localhost:4173/assets/App.js:x:y";
+        assert!(parse_line(line).is_err());
+    }
+
+    #[test]
+    fn test_get_file_path() {
+        let path = get_file_path("myorg", "mysourcemap.js.map");
+        assert_eq!(path, "files/myorg/sourcemaps/mysourcemap.js.map");
+    }
+
+    #[test]
+    fn test_translated_stack_empty() {
+        let s = TranslatedStack::empty();
+        assert!(s.error.is_empty());
+        assert!(s.stack.is_empty());
+    }
+
+    #[test]
+    fn test_translated_stack_empty_with_message() {
+        let s = TranslatedStack::empty_with_message("something went wrong".to_string());
+        assert_eq!(s.error, "something went wrong");
+        assert!(s.stack.is_empty());
+    }
+
+    #[test]
+    fn test_translated_stack_add_line() {
+        let mut s = TranslatedStack::empty();
+        s.add_line(TranslatedStackLine {
+            line: "at fn @ file.js:1:2".to_string(),
+            source_info: None,
+        });
+        assert_eq!(s.stack.len(), 1);
+        assert_eq!(s.stack[0].line, "at fn @ file.js:1:2");
+    }
+
+    #[test]
+    fn test_parse_line_no_slash_in_path_uses_full_segment() {
+        // When no slash, origin_path (including leading space) is used as file_pos.
+        // The file field will retain any leading whitespace from the split.
+        let line = "at fn @ App.js:1:5";
+        let result = parse_line(line);
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        // origin_path is " App.js:1:5" (leading space), so file is " App.js"
+        assert!(parsed.file.contains("App.js"));
+        assert_eq!(parsed.line, 1);
+        assert_eq!(parsed.col, 5);
+    }
 }

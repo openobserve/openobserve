@@ -150,3 +150,18 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20250611_000003_populate_reports_scheduled_jobs"
+        );
+    }
+}
