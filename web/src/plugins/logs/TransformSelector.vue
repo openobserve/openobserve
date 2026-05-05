@@ -260,16 +260,38 @@ const transformsLabel = computed(() => {
 });
 
 const transformIcon = computed(() => {
+  const isDark = store.state.theme === "dark";
   if (!isActionsEnabled.value)
-    return "img:" + getImageURL("images/common/function.svg");
+    return (
+      "img:" +
+      getImageURL(
+        isDark
+          ? "images/common/function_dark.svg"
+          : "images/common/function.svg",
+      )
+    );
 
   if (searchObj.data.transformType === "function")
-    return "img:" + getImageURL("images/common/function.svg");
+    return (
+      "img:" +
+      getImageURL(
+        isDark
+          ? "images/common/function_dark.svg"
+          : "images/common/function.svg",
+      )
+    );
 
   if (searchObj.data.transformType === "action") return "code";
 
   if (!searchObj.data.transformType)
-    return "img:" + getImageURL("images/common/transform.svg");
+    return (
+      "img:" +
+      getImageURL(
+        isDark
+          ? "images/common/transform_dark.svg"
+          : "images/common/transform.svg",
+      )
+    );
 });
 
 const updateTransforms = () => {
