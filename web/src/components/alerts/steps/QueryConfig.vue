@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="tab in tabOptions"
             :key="tab.value"
             :value="tab.value"
+            :data-test="`query-mode-${tab.value}`"
             size="sm"
           >
             <template #icon-left>

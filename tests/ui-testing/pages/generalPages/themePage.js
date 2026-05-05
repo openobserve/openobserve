@@ -8,7 +8,7 @@ export class ThemePage {
         this.predefinedThemesMenuItem = '[data-test="menu-link-predefined-themes-item"]';
         this.predefinedThemesDialog = '.predefined-theme-card';
         this.resetThemeBtn = 'button:has-text("Reset")';
-        this.closeDialogBtn = '.predefined-theme-card button[data-o2-btn]';
+        this.closeDialogBtn = '[data-test="predefined-themes-close-btn"]';
 
         // Light/Dark Mode Tabs in Predefined Themes
         this.lightModeTab = '[role="tab"]:has-text("Light Mode")';

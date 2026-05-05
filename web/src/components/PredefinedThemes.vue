@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left><q-icon name="refresh" size="14px" /></template>
           Reset
         </OButton>
-        <OButton variant="ghost" size="icon" v-close-popup>
+        <OButton variant="ghost" size="icon" v-close-popup data-test="predefined-themes-close-btn">
           <q-icon name="close" size="14px" />
         </OButton>
       </q-card-section>
