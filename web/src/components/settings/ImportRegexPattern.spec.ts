@@ -137,7 +137,7 @@ describe("ImportRegexPattern", () => {
     });
 
     it("should initialize correct tabs structure", () => {
-      expect(wrapper.vm.allTabs).toEqual([
+      expect(wrapper.vm.allTabs).toMatchObject([
         {
           label: "Built-in Patterns",
           value: "import_built_in_patterns",

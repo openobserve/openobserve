@@ -174,12 +174,13 @@ describe("PanelSidebar", () => {
 
     it("should render collapse button in expanded state", () => {
       wrapper = createWrapper({ modelValue: true });
-      
+
       const collapseBtn = wrapper.find('[data-test="dashboard-sidebar-collapse-btn"]');
       expect(collapseBtn.exists()).toBe(true);
-      expect(collapseBtn.attributes("icon")).toBe("unfold_less");
-      expect(collapseBtn.classes()).toContain("collapse-button");
-      expect(collapseBtn.classes()).toContain("rotate-90");
+      // OButton uses icon-left slot instead of icon prop; icon is rendered inside as q-icon
+      expect(collapseBtn.html()).toContain("unfold_less");
+      // OButton applies tw:rotate-90 from the class attr; collapse-button is only a CSS definition
+      expect(collapseBtn.classes()).toContain("tw:rotate-90");
     });
 
     it("should display title in expanded state", () => {
@@ -444,10 +445,12 @@ describe("PanelSidebar", () => {
 
     it("should apply correct button classes", () => {
       wrapper = createWrapper({ modelValue: true });
-      
-      const button = wrapper.find(".q-btn");
-      expect(button.classes()).toContain("collapse-button");
-      expect(button.classes()).toContain("rotate-90");
+
+      // OButton renders as a native <button> element with Tailwind classes
+      const button = wrapper.find('[data-test="dashboard-sidebar-collapse-btn"]');
+      expect(button.exists()).toBe(true);
+      // OButton applies tw:rotate-90 from the class attr passed via $attrs
+      expect(button.classes()).toContain("tw:rotate-90");
     });
 
     it("should apply scroll class to content", () => {

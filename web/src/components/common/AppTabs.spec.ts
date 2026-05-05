@@ -36,8 +36,8 @@ describe("AppTabs", () => {
   });
 
   it("should render all non-hidden tabs", () => {
-    const tabs = wrapper.findAll('.o2-tab');
-    expect(tabs).toHaveLength(5);
+    const tabs = wrapper.findAll('[data-test^="tab-"]');
+    expect(tabs).toHaveLength(4); // tab4 has hide: true, filtered by visibleTabs
   });
 
   it("should display tab labels correctly", () => {
@@ -48,14 +48,13 @@ describe("AppTabs", () => {
 
   it("should highlight active tab", () => {
     const activeTab = wrapper.find('[data-test="tab-tab1"]');
-    expect(activeTab.classes()).toContain("active");
-    expect(activeTab.classes()).toContain("text-primary");
+    expect(activeTab.attributes("data-state")).toBe("on");
   });
 
   it("should emit update:activeTab when non-disabled tab is clicked", async () => {
     const tab2 = wrapper.find('[data-test="tab-tab2"]');
     await tab2.trigger("click");
-    
+
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1);
     expect(wrapper.emitted("update:activeTab")[0]).toEqual(["tab2"]);
   });
@@ -63,25 +62,26 @@ describe("AppTabs", () => {
   it("should not emit when disabled tab is clicked", async () => {
     const disabledTab = wrapper.find('[data-test="tab-tab3"]');
     await disabledTab.trigger("click");
-    
+
     expect(wrapper.emitted("update:activeTab")).toBeFalsy();
   });
 
   it("should not emit when hidden tab is clicked", async () => {
+    // Hidden tab is not rendered (filtered by visibleTabs computed)
     const hiddenTab = wrapper.find('[data-test="tab-tab4"]');
-    await hiddenTab.trigger("click");
-    
+    expect(hiddenTab.exists()).toBe(false);
     expect(wrapper.emitted("update:activeTab")).toBeFalsy();
   });
 
   it("should apply disabled class to disabled tabs", () => {
     const disabledTab = wrapper.find('[data-test="tab-tab3"]');
-    expect(disabledTab.classes()).toContain("disabled");
+    expect(disabledTab.attributes("data-disabled")).toBeDefined();
   });
 
   it("should apply hidden class to hidden tabs", () => {
+    // Hidden tab is not rendered in DOM (filtered by visibleTabs computed)
     const hiddenTab = wrapper.find('[data-test="tab-tab4"]');
-    expect(hiddenTab.classes()).toContain("hidden");
+    expect(hiddenTab.exists()).toBe(false);
   });
 
   it("should apply custom styles when provided", () => {
@@ -92,7 +92,7 @@ describe("AppTabs", () => {
   it("should use custom title or fallback to label", () => {
     const styledTab = wrapper.find('[data-test="tab-tab5"]');
     expect(styledTab.attributes("title")).toBe("Custom Title");
-    
+
     const normalTab = wrapper.find('[data-test="tab-tab1"]');
     expect(normalTab.attributes("title")).toBe("Tab 1");
   });
@@ -105,28 +105,27 @@ describe("AppTabs", () => {
         show: false
       }
     });
-    
-    expect(hiddenWrapper.find('.o2-tabs').exists()).toBe(false);
+
+    expect(hiddenWrapper.find('[data-test^="tab-"]').exists()).toBe(false);
     hiddenWrapper.unmount();
   });
 
   it("should render when show prop is true (default)", () => {
-    expect(wrapper.find('.o2-tabs').exists()).toBe(true);
+    expect(wrapper.find('[data-test^="tab-"]').exists()).toBe(true);
   });
 
-  it("should handle changeTab function correctly", () => {
-    const vm = wrapper.vm as any;
-    
-    // Test normal tab
-    vm.changeTab({ label: "Test", value: "test" });
+  it("should handle changeTab function correctly", async () => {
+    // onSelect is internal and not exposed; test tab selection via clicks
+    const tab2 = wrapper.find('[data-test="tab-tab2"]');
+    await tab2.trigger("click");
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1);
-    
-    // Test disabled tab (should not emit)
-    vm.changeTab({ label: "Test", value: "test", disabled: true });
+
+    // Disabled tab click should not add more emits
+    const disabledTab = wrapper.find('[data-test="tab-tab3"]');
+    await disabledTab.trigger("click");
     expect(wrapper.emitted("update:activeTab")).toHaveLength(1); // Still 1
-    
-    // Test hidden tab (should not emit)
-    vm.changeTab({ label: "Test", value: "test", hide: true });
-    expect(wrapper.emitted("update:activeTab")).toHaveLength(1); // Still 1
+
+    // Hidden tab is not in DOM
+    expect(wrapper.find('[data-test="tab-tab4"]').exists()).toBe(false);
   });
 });

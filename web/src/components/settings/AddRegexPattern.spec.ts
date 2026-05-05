@@ -242,7 +242,7 @@ describe("AddRegexPattern", () => {
       const wrapper = createWrapper();
       const saveBtn = wrapper.find('[data-test="add-regex-pattern-save-btn"]');
       if (saveBtn.exists()) {
-        expect(saveBtn.attributes("disable")).toBeDefined();
+        expect(saveBtn.attributes("disabled")).toBeDefined();
       } else {
         // If button doesn't exist, check the component's computed property instead
         expect(wrapper.vm.isFormEmpty).toBe(true);
@@ -509,12 +509,10 @@ describe("AddRegexPattern", () => {
       expect(wrapper.vm.store.state.zoConfig.ai_enabled).toBe(true);
       
       // Look for button that should have the AI attributes
-      const allBtns = wrapper.findAll('[data-test-stub="q-btn"]');
-      const aiBtn = allBtns.find(btn => {
-        return btn.attributes('data-test') === 'add-regex-pattern-open-close-ai-btn';
-      });
-      
-      if (aiBtn) {
+      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
+      const allBtns = wrapper.findAll('button[data-o2-btn]');
+
+      if (aiBtn.exists()) {
         expect(aiBtn.exists()).toBe(true);
       } else {
         // Since all conditions are met, the AI functionality is properly configured
