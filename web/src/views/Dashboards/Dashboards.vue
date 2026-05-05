@@ -246,13 +246,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             side="bottom"
                             align="start"
-                            data-test="dashboard-more-icon"
                           >
                             <template #trigger>
                               <OButton
                                 size="icon"
                                 variant="ghost"
                                 class="tw:h-6 tw:w-6"
+                                data-test="dashboard-more-icon"
                               >
                                 <q-icon name="more_vert" size="xs" />
                               </OButton>
