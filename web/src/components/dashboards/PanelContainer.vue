@@ -125,13 +125,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
         <ODropdown
-          :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
           side="bottom"
           align="end"
           v-if="!viewOnly && !simplifiedPanelView"
         >
           <template #trigger>
-            <OButton variant="ghost" size="icon">
+            <OButton
+              variant="ghost"
+              size="icon"
+              :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
+            >
               <q-icon name="more_vert" size="16px" />
             </OButton>
           </template>
