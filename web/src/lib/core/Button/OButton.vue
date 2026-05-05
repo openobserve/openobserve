@@ -92,6 +92,14 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-[color:var(--q-warning)]/50",
     "tw:disabled:opacity-60",
   ].join(" "),
+  // Outline warning: yellow bg + black text + yellow border — for pending-action indicators (e.g. refresh when variables changed)
+  "outline-warning": [
+    "tw:bg-[var(--q-warning)] tw:text-gray-900 tw:border tw:border-[color:var(--q-warning)]",
+    "tw:enabled:hover:bg-[color:var(--q-warning)]/90",
+    "tw:enabled:active:bg-[color:var(--q-warning)]/80",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-[color:var(--q-warning)]/50",
+    "tw:disabled:opacity-60",
+  ].join(" "),
   // Solid warning: filled yellow background + dark text — for buttons requiring user attention
   warning: [
     "tw:bg-[var(--q-warning)] tw:text-gray-900 tw:border tw:border-[color:var(--q-warning)]",
@@ -213,7 +221,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   xs: "tw:h-7 tw:ps-2.5 tw:pe-2.5 tw:text-xs tw:gap-1.5 tw:rounded",
   sm: "tw:h-9 tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-md",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
-  "sm-toolbar": "tw:h-[1.875rem] tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1.5 tw:rounded-md",
+  "sm-toolbar":
+    "tw:h-[1.875rem] tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1.5 tw:rounded-md",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches Quasar dense button
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "tw:h-6 tw:ps-2 tw:pe-1.5 tw:text-xs tw:gap-1 tw:rounded tw:leading-none",
@@ -239,7 +248,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 26px rounded-lg — compact modern icon button for panel header collapse/expand
   "icon-panel": "tw:size-[1.625rem] tw:p-0 tw:rounded-lg tw:gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
-  "sidebar-button": "tw:h-8 tw:w-3 tw:p-0 tw:rounded-sm tw:overflow-hidden tw:gap-x-0",
+  "sidebar-button":
+    "tw:h-8 tw:w-3 tw:p-0 tw:rounded-sm tw:overflow-hidden tw:gap-x-0",
 };
 
 const activeClasses = [
