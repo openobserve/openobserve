@@ -379,8 +379,24 @@ where
         ) {
             Some(r) => r,
             None => {
-                // TODO: migrate this route to the ROUTE_PERMISSIONS table
-                return Err(AuthExtractorRejection::forbidden("Forbidden"));
+                // Route not yet in ROUTE_PERMISSIONS table.
+                // Let the validator handle it - root users will bypass
+                // in check_permissions, non-root users will be rejected there.
+                let auth_str = extract_auth_str_from_headers(&parts.headers).await;
+                if auth_str.is_empty() {
+                    return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
+                }
+                return Ok(AuthExtractor {
+                    auth: auth_str,
+                    method: String::new(),
+                    o2_type: String::new(),
+                    org_id: String::new(),
+                    bypass_check: false,
+                    parent_id: String::new(),
+                    use_all_org: false,
+                    use_self_context: false,
+                    use_self_parent: false,
+                });
             }
         };
 
