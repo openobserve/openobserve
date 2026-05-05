@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { queryIndexSplit } from "@/utils/zincutils";
 
 const quoteSqlIdentifierForTest = (field: string) =>
   field === "user" ? `"${field}"` : field;
