@@ -207,11 +207,11 @@ export class AlertsPage {
             relatedAlertCountText: '[style*="width: 120px"]',
             severityBadge: '.q-badge',
 
-            // Incident detail — tab selectors (Reka TabsTrigger)
-            serviceGraphTab: '[role="tab"]:has-text("Alert Graph")',
-            logsTab: '[role="tab"]:has-text("Logs")',
-            metricsTab: '[role="tab"]:has-text("Metrics")',
-            tracesTab: '[role="tab"]:has-text("Traces")',
+            // Incident detail — tab selectors (data-test on OTab in IncidentDetailDrawer.vue)
+            serviceGraphTab: '[data-test="incident-alert-graph-tab"]',
+            logsTab: '[data-test="incident-logs-tab"]',
+            metricsTab: '[data-test="incident-metrics-tab"]',
+            tracesTab: '[data-test="incident-traces-tab"]',
 
             // Incident detail — Service Graph content
             serviceGraphContainer: '.incident-service-graph',
@@ -1508,7 +1508,7 @@ export class AlertsPage {
      */
     async clickAlertTriggersTab() {
         testLogger.info('Clicking Alert Triggers tab');
-        await this.page.locator('[role="tab"]:has-text("Alert Triggers")').first().click();
+        await this.page.locator('[data-test="incident-alert-triggers-tab"]').first().click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked Alert Triggers tab');
     }
@@ -1674,28 +1674,28 @@ export class AlertsPage {
     // ==================== INCIDENT DETAIL — TAB NAVIGATION ====================
 
     /**
-     * Tab name → visible label map for Quasar q-tab text-based fallback.
-     * Quasar may or may not render name= as an HTML attribute.
+     * Tab name → data-test attribute map (IncidentDetailDrawer.vue).
      */
-    static TAB_LABELS = {
-        overview: 'Overview',
-        incidentAnalysis: 'Incident Analysis',
-        serviceGraph: 'Alert Graph',
-        alertTriggers: 'Alert Triggers',
-        logs: 'Logs',
-        metrics: 'Metrics',
-        traces: 'Traces',
+    static TAB_DATA_TESTS = {
+        overview:         'incident-overview-tab',
+        activity:         'incident-activity-tab',
+        incidentAnalysis: 'incident-analysis-tab',
+        serviceGraph:     'incident-alert-graph-tab',
+        alertTriggers:    'incident-alert-triggers-tab',
+        logs:             'incident-logs-tab',
+        metrics:          'incident-metrics-tab',
+        traces:           'incident-traces-tab',
     };
 
     /**
-     * Click a tab on the incident detail page by its Reka tab label.
-     * Uses role="tab" with has-text for label-based matching.
-     * @param {string} tabName - One of: overview, incidentAnalysis, serviceGraph, alertTriggers, logs, metrics, traces
+     * Click a tab on the incident detail page by its data-test attribute.
+     * @param {string} tabName - One of: overview, activity, incidentAnalysis, serviceGraph, alertTriggers, logs, metrics, traces
      */
     async clickIncidentDetailTab(tabName) {
         testLogger.info(`Clicking incident detail tab: ${tabName}`);
-        const label = AlertsPage.TAB_LABELS[tabName] || tabName;
-        const tab = this.page.locator(`[role="tab"]:has-text("${label}")`);
+        const dataTest = AlertsPage.TAB_DATA_TESTS[tabName];
+        const selector = dataTest ? `[data-test="${dataTest}"]` : `[role="tab"]:has-text("${tabName}")`;
+        const tab = this.page.locator(selector);
         await tab.first().waitFor({ state: 'visible', timeout: 10000 });
         await tab.first().click();
         await this.page.waitForTimeout(1500);

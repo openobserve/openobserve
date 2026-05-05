@@ -188,21 +188,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTab
             name="overview"
             label="Overview"
+            data-test="incident-overview-tab"
           />
           <OTab
             name="activity"
             label="Activity"
+            data-test="incident-activity-tab"
           />
           <OTab
             name="incidentAnalysis"
             :label="t('alerts.incidents.incidentAnalysis')"
+            data-test="incident-analysis-tab"
           />
           <OTab
             name="serviceGraph"
             label="Alert Graph"
+            data-test="incident-alert-graph-tab"
           />
           <OTab
             name="alertTriggers"
+            data-test="incident-alert-triggers-tab"
           >
             <template #default>
               <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -216,14 +221,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTab
             name="logs"
             :label="t('common.logs')"
+            data-test="incident-logs-tab"
           />
           <OTab
             name="metrics"
             :label="t('search.metrics')"
+            data-test="incident-metrics-tab"
           />
           <OTab
             name="traces"
             :label="t('menu.traces')"
+            data-test="incident-traces-tab"
           />
         </OTabs>
       </div>

@@ -51,10 +51,9 @@ export class MetricsQueryEditorPage {
 
         // Look for the "Custom" button - try multiple selector strategies
         const customButtonSelectors = [
+            '[data-test="query-mode-custom"]',
             'button:has-text("Custom")',
             'button[data-o2-btn]:has-text("Custom")',
-            '[data-test*="custom"]',
-            'button[class*="custom"]'
         ];
 
         for (const selector of customButtonSelectors) {
