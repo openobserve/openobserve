@@ -50,7 +50,9 @@ def get_field_for_fts(settings):
     """Return a field safe for FTS (text type, not in FTS already)."""
     current = set(settings.get("full_text_search_keys", []))
     available = [f for f in FTS_SAFE_FIELDS if f not in current]
-    return random.choice(available) if available else random.choice(FTS_SAFE_FIELDS)
+    if not available:
+        pytest.skip("No FTS-safe fields available outside current settings")
+    return random.choice(available)
 
 
 def get_field_for_index(settings):
@@ -387,7 +389,7 @@ class TestStreamSettingsDedupEdgeCases:
             for i in range(4):
                 resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
                 assert resp.status_code == 200, f"Attempt {i+1} failed: {resp.text[:200]}"
-            time.sleep(1)
+                time.sleep(1)
 
             # Verify exactly once
             settings = get_stream_settings(session, base_url, ORG_ID, STREAM_NAME)
