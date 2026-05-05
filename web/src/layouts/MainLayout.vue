@@ -17,18 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-layout
     view="hHh Lpr lff"
-    :class="[store.state.printMode === true ? 'printMode' : '']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'oo_app']"
   >
-    <div class="oo_app">
-      <header class="oo_header">
-        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-        <div class="oo_banner">
-          <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
-        </div>
+    <q-header class="oo_header">
+      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+      <div class="oo_banner">
+        <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+      </div>
 
-        <!-- Header component containing logo, navigation, and user controls -->
-        <div class="oo_topbar">
-          <Header
+      <!-- Header component containing logo, navigation, and user controls -->
+      <div class="oo_topbar">
+        <Header
           :store="store"
           :router="router"
           :config="config"
@@ -58,39 +57,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open-predefined-themes="openPredefinedThemes"
           @signout="signout"
         />
-        </div>
-      </header>
+      </div>
+    </q-header>
 
-      <div class="oo_body">
-        <aside class="oo_sidebar oo_left card-container">
-          <!-- Left sidebar Menu navigation can go here -->
-          
-              <q-list class="leftNavList">
-                <menu-link
-                  v-for="(nav, index) in linksList"
-                  :key="nav.title"
-                  :link-name="nav.name"
-                  :animation-index="index"
-                  v-bind="{ ...nav, mini: miniMode }"
-                  @mouseenter="handleMenuHover(nav.link)"
-                />
-              </q-list>
-          
-        </aside>
+    <q-drawer
+      v-model="leftDrawerOpen"
+      show-if-above
+      side="left"
+      :width="84"
+      :breakpoint="500"
+      role="navigation"
+      aria-label="Main navigation"
+      class="oo_sidebar oo_left"
+    >
+      <q-list class="leftNavList">
+        <menu-link
+          v-for="(nav, index) in linksList"
+          :key="nav.title"
+          :link-name="nav.name"
+          :animation-index="index"
+          v-bind="{ ...nav, mini: miniMode }"
+          @mouseenter="handleMenuHover(nav.link)"
+        />
+      </q-list>
+    </q-drawer>
 
+    <q-page-container>
+      <div class="oo_body" :style="ooBodyGridStyle">
         <!-- Main Panel -->
         <main class="oo_main">
           <div class="oo_content-scroll">
             <div
               v-show="isLoading"
-              :style="{ width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%' }"
               :key="store.state.selectedOrganization?.identifier"
             >
-              <q-page-container v-if="isLoading" style="padding: 0px;">
-                <router-view v-slot="{ Component }">
-                  <component :is="Component" @sendToAiChat="sendToAiChat" />
-                </router-view>
-              </q-page-container>
+              <router-view v-slot="{ Component }">
+                <component :is="Component" @sendToAiChat="sendToAiChat" />
+              </router-view>
             </div>
           </div>
         </main>
@@ -99,7 +102,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
           class="oo_sidebar oo_right"
-          :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
+          :class="[
+            store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container',
+            { 'oo_sidebar--expanded': store.state.isAiChatExpanded }
+          ]"
+          :style="store.state.isAiChatExpanded
+            ? { position: 'fixed', top: 0, right: 0, width: '50%', maxWidth: '100%', minWidth: '300px', height: '100vh', zIndex: 200 }
+            : {}"
         >
           <O2AIChat
             :header-height="42.5"
@@ -111,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </aside>
       </div>
-    </div>
+    </q-page-container>
 
     <q-dialog v-model="showGetStarted"
 maximized full-height>
@@ -1091,6 +1100,14 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    const ooBodyGridStyle = computed(() => {
+      const aiChatVisible = store.state.isAiChatEnabled && !store.state.isAiChatExpanded;
+      if (!aiChatVisible) {
+        return { gridTemplateColumns: '1fr' };
+      }
+      return { gridTemplateColumns: '1fr 25%' };
+    });
+
     const getBtnLogo = computed(() => {
       if (isHovered.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
@@ -1188,6 +1205,7 @@ export default defineComponent({
       splitterModel,
       toggleAIChat,
       closeChat,
+      ooBodyGridStyle,
       getBtnLogo,
       isHovered,
       showGetStarted,
