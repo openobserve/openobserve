@@ -15,77 +15,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OLayout
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen']"
+  <q-layout
+    view="hHh Lpr lff"
+    :class="[store.state.printMode === true ? 'printMode' : '']"
   >
-    <header class="o2-app-header tw:shrink-0">
-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <div
-        class="tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
-      >
-        <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
-      </div>
+    <div class="oo_app">
+      <header class="oo_header">
+        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <div class="oo_banner">
+          <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+        </div>
 
-      <!-- Header component containing logo, navigation, and user controls -->
-      <Header
-        :store="store"
-        :router="router"
-        :config="config"
-        :user="user"
-        :slack-icon="slackIcon"
-        :zo-backend-url="zoBackendUrl"
-        :lang-list="langList"
-        :selected-language="selectedLanguage"
-        :selected-org="selectedOrg"
-        :user-clicked-org="userClickedOrg"
-        :filtered-organizations="filteredOrganizations"
-        :search-query="searchQuery"
-        :rows-per-page="rowsPerPage"
-        :is-hovered="isHovered"
-        :get-btn-logo="getBtnLogo"
-        @update:selected-org="selectedOrg = $event"
-        @update:search-query="searchQuery = $event"
-        @update:is-hovered="isHovered = $event"
-        @update-organization="updateOrganization"
-        @go-to-home="goToHome"
-        @go-to-about="goToAbout"
-        @toggleAIChat="toggleAIChat"
-        @open-slack="openSlack"
-        @navigateToOpenAPI="navigateToOpenAPI"
-        @navigate-to-docs="navigateToDocs"
-        @change-language="changeLanguage"
-        @open-predefined-themes="openPredefinedThemes"
-        @signout="signout"
-      />
-    </header>
+        <!-- Header component containing logo, navigation, and user controls -->
+        <div class="oo_topbar">
+          <Header
+          :store="store"
+          :router="router"
+          :config="config"
+          :user="user"
+          :slack-icon="slackIcon"
+          :zo-backend-url="zoBackendUrl"
+          :lang-list="langList"
+          :selected-language="selectedLanguage"
+          :selected-org="selectedOrg"
+          :user-clicked-org="userClickedOrg"
+          :filtered-organizations="filteredOrganizations"
+          :search-query="searchQuery"
+          :rows-per-page="rowsPerPage"
+          :is-hovered="isHovered"
+          :get-btn-logo="getBtnLogo"
+          @update:selected-org="selectedOrg = $event"
+          @update:search-query="searchQuery = $event"
+          @update:is-hovered="isHovered = $event"
+          @update-organization="updateOrganization"
+          @go-to-home="goToHome"
+          @go-to-about="goToAbout"
+          @toggleAIChat="toggleAIChat"
+          @open-slack="openSlack"
+          @navigateToOpenAPI="navigateToOpenAPI"
+          @navigate-to-docs="navigateToDocs"
+          @change-language="changeLanguage"
+          @open-predefined-themes="openPredefinedThemes"
+          @signout="signout"
+        />
+        </div>
+      </header>
 
-    <div class="o2-app-body tw:flex-1 tw:flex tw:min-h-0">
-      <ONavbar
-        :links-list="linksList"
-        :mini-mode="miniMode"
-        :visible="leftDrawerOpen"
-        @menu-hover="handleMenuHover"
-      />
+      <div class="oo_body">
+        <aside class="oo_sidebar oo_left card-container">
+          <!-- Left sidebar Menu navigation can go here -->
+          
+              <q-list class="leftNavList">
+                <menu-link
+                  v-for="(nav, index) in linksList"
+                  :key="nav.title"
+                  :link-name="nav.name"
+                  :animation-index="index"
+                  v-bind="{ ...nav, mini: miniMode }"
+                  @mouseenter="handleMenuHover(nav.link)"
+                />
+              </q-list>
+          
+        </aside>
 
-      <OPageContainer class="tw:flex-1 tw:min-w-0 tw:flex">
         <!-- Main Panel -->
-        <main
-          class="tw:flex tw:flex-col tw:min-h-0"
-          :style="{
-            width:
-              store.state.isAiChatEnabled && !store.state.isAiChatExpanded
-                ? '75%'
-                : '100%',
-          }"
-        >
-          <div class="o2-content-scroll tw:flex-1 tw:overflow-y-auto">
+        <main class="oo_main">
+          <div class="oo_content-scroll">
             <div
               v-show="isLoading"
+              :style="{ width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%' }"
               :key="store.state.selectedOrganization?.identifier"
             >
-              <router-view v-slot="{ Component }">
-                <component :is="Component" @sendToAiChat="sendToAiChat" />
-              </router-view>
+              <q-page-container v-if="isLoading" style="padding: 0px;">
+                <router-view v-slot="{ Component }">
+                  <component :is="Component" @sendToAiChat="sendToAiChat" />
+                </router-view>
+              </q-page-container>
             </div>
           </div>
         </main>
@@ -93,34 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,2.25rem)] tw:self-start tw:shrink-0"
-          :class="[
-            store.state.theme == 'dark'
-              ? 'dark-mode-chat-container'
-              : 'light-mode-chat-container',
-            { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
-          ]"
-          :style="[
-            {
-              height: 'calc(100vh - var(--navbar-height, 2.25rem))',
-            },
-            store.state.isAiChatExpanded
-              ? {
-                  position: 'fixed',
-                  top: 0,
-                  right: 0,
-                  width: '50%',
-                  maxWidth: '100%',
-                  minWidth: '18.75rem',
-                  height: '100vh',
-                  zIndex: 200,
-                }
-              : {
-                  width: '25%',
-                  maxWidth: '100%',
-                  minWidth: '4.688rem',
-                },
-          ]"
+          class="oo_sidebar oo_right"
+          :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
         >
           <O2AIChat
             :header-height="42.5"
@@ -131,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aiChatPayload="aiChatPayload"
           />
         </aside>
-    </OPageContainer>
+      </div>
     </div>
 
     <q-dialog v-model="showGetStarted"
@@ -139,26 +118,30 @@ maximized full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
     <PredefinedThemes />
-  </OLayout>
+  </q-layout>
 </template>
 
 <script lang="ts">
 import {
+  QPage,
+  QPageContainer,
+  QLayout,
+  QDrawer,
+  QList,
   QItem,
   QItemLabel,
   QItemSection,
   QBtn,
   QBtnDropdown,
   QToolbarTitle,
+  QHeader,
   QToolbar,
   QAvatar,
   QIcon,
   QSelect,
   useQuasar,
 } from "quasar";
-import OLayout from "@/lib/core/Layout/OLayout.vue";
-import OPageContainer from "@/lib/core/PageContainer/OPageContainer.vue";
-import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
+import MenuLink from "../components/MenuLink.vue";
 import Header from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -193,6 +176,8 @@ import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
+import streamService from "@/services/stream";
+import billings from "@/services/billings";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
@@ -206,7 +191,8 @@ import {
   outlinedWindow,
   outlinedReportProblem,
   outlinedFilterAlt,
-
+  outlinedPerson,
+  outlinedFormatListBulleted,
   outlinedSettings,
   outlinedManageAccounts,
   outlinedDescription,
@@ -235,18 +221,22 @@ export default defineComponent({
   name: "MainLayout",
   mixins: [mainLayoutMixin],
   components: {
+    "menu-link": MenuLink,
     Header,
     WebinarBanner,
     "keep-alive": KeepAlive,
-    OLayout,
-    OPageContainer,
-    ONavbar,
+    "q-page": QPage,
+    "q-page-container": QPageContainer,
+    "q-layout": QLayout,
+    "q-drawer": QDrawer,
+    "q-list": QList,
     "q-item": QItem,
     "q-item-label": QItemLabel,
     "q-item-section": QItemSection,
     "q-btn": QBtn,
     "q-btn-dropdown": QBtnDropdown,
     "q-toolbar-title": QToolbarTitle,
+    "q-header": QHeader,
     "q-toolbar": QToolbar,
     "router-view": RouterView,
     "q-avatar": QAvatar,
@@ -336,11 +326,8 @@ export default defineComponent({
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
-    const aiChatPayload = ref<{
-      text: string;
-      autoSend: boolean;
-      id: number;
-    } | null>(null);
+    const aiChatAutoSend = ref(false);
+    const aiChatPayload = ref<{ text: string; autoSend: boolean; id: number } | null>(null);
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
 
@@ -366,6 +353,17 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
+    const excludeParentRedirect = [
+      "pipeline",
+      "functionList",
+      "streamFunctions",
+      "enrichmentTables",
+      "alertList",
+      "alertDestinations",
+      "alertTemplates",
+      "/ingestion/",
+    ];
+
     const isActionsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -539,11 +537,10 @@ export default defineComponent({
     watch(
       () => store.state.isWebinarBannerVisible,
       (visible) => {
-        const navbarHeight = visible ? "calc(2.25rem + 1.688rem)" : "2.25rem";
-        document.documentElement.style.setProperty(
-          "--navbar-height",
-          navbarHeight,
-        );
+        const navbarHeight = visible
+          ? "calc(36px + 27px)"
+          : "36px";
+        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
       },
       { immediate: true },
     );
@@ -660,6 +657,34 @@ export default defineComponent({
       ) {
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
+      }
+    }
+
+    const triggerRefreshToken = () => {
+      const expirationTimeUnix = store.state.userInfo.exp;
+
+      // Convert the expiration time to milliseconds
+      const expirationTimeMilliseconds = expirationTimeUnix * 1000;
+
+      // Get the current time in milliseconds
+      const currentTimeMilliseconds = Date.now();
+
+      // Calculate the time difference
+      const timeUntilNextAPICall =
+        expirationTimeMilliseconds - currentTimeMilliseconds - 100;
+
+      // Convert the time difference from milliseconds to seconds
+      const timeUntilNextAPICallInSeconds = timeUntilNextAPICall / 1000;
+
+      // setTimeout(() => {
+      //   mainLayoutMixin.setup().getRefreshToken();
+      // }, timeUntilNextAPICallInSeconds);
+    };
+
+    //get refresh token for cloud environment
+    if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
+      if (config.isCloud == "true") {
+        triggerRefreshToken();
       }
     }
 
@@ -1052,23 +1077,11 @@ export default defineComponent({
     const toggleAIChat = () => {
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
-        window.dispatchEvent(
-          new CustomEvent("o2:home-switch-tab", { detail: "ai" }),
-        );
+        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
         return;
       }
-      if (!store.state.isAiChatEnabled) {
-        // Closed → Open inline sidebar
-        store.dispatch("setIsAiChatEnabled", true);
-        store.dispatch("setIsAiChatExpanded", false);
-      } else if (!store.state.isAiChatExpanded) {
-        // Inline sidebar → Close
-        store.dispatch("setIsAiChatEnabled", false);
-        store.dispatch("setIsAiChatExpanded", false);
-      } else {
-        // Expanded overlay → Back to inline sidebar
-        store.dispatch("setIsAiChatExpanded", false);
-      }
+      const isEnabled = !store.state.isAiChatEnabled;
+      store.dispatch("setIsAiChatEnabled", isEnabled);
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -1094,11 +1107,7 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (
-      value: any,
-      append: boolean = true,
-      autoSend: boolean = false,
-    ) => {
+    const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
@@ -1121,9 +1130,7 @@ export default defineComponent({
       aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = text;
-        nextTick(() => {
-          aiChatInputContext.value = "";
-        });
+        nextTick(() => { aiChatInputContext.value = ""; });
       });
     };
 
@@ -1161,7 +1168,7 @@ export default defineComponent({
       linksList,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen: true,
+      leftDrawerOpen: false,
       miniMode,
       user,
       zoBackendUrl,
@@ -1171,6 +1178,7 @@ export default defineComponent({
       setSelectedOrganization,
       getOrganizationSettings,
       resetStreams,
+      triggerRefreshToken,
       prefetch,
       expandMenu,
       slackIcon: markRaw(SlackIcon),
@@ -1249,47 +1257,565 @@ export default defineComponent({
         this.selectedOrg = matchingOrg;
       }
     },
+    changeUserInfo(newVal) {
+      if (JSON.stringify(newVal) != "{}") {
+        this.triggerRefreshToken();
+      }
+    },
   },
 });
 </script>
 
 <style lang="scss">
 @import "../styles/app.scss";
-</style>
+@import "../styles/menu-variables";
+@import "../styles/menu-animations";
 
-<style lang="scss" scoped>
-// Print mode — hide header + sidebar, show body overflow
+// Logo container
+.logo-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  min-width: 150px;
+}
+
+// OpenObserve logo styling
+.openobserve-logo {
+  height: 32px;
+  width: auto;
+  max-width: 150px;
+  display: block;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
 .printMode {
-  :global(body) {
+  body {
     overflow: auto !important;
   }
-
-  .o2-app-header {
+  .q-header {
     display: none;
   }
 
-  .left-drawer {
+  .q-drawer {
     display: none;
   }
 
-  .o2-app-body {
-    padding-left: 0;
+  .q-page-container {
+    padding-left: 0px !important;
   }
 }
 
-// Always show left drawer on screens above 500px
-@media (min-width: 501px) {
-  .left-drawer {
-    display: flex !important;
-    flex-direction: column;
+@media print {
+  .tw:h-full,
+  .tw:h-\[calc\(100vh-105px\)\],
+  .tw:overflow-y-auto {
+    overflow: visible !important;
   }
 }
 
-.o2-app-header {
+.q-drawer {
+  border-radius: 0.625rem;
+}
+
+.warning-msg {
+  background-color: var(--q-warning);
+  padding: 5px;
+  border-radius: 5px;
+}
+
+.alert-msg {
+  background-color: var(--q-alert);
+  padding: 5px;
+  border-radius: 5px;
+}
+
+.q-header .q-btn-dropdown__arrow {
+  margin-left: -4px;
+}
+
+.q-header {
   color: unset;
+
+  .beta-text {
+    font-size: 11px;
+    right: 1px;
+    bottom: -9px;
+  }
+
+  .appLogo {
+    width: 120px;
+    max-width: 150px;
+    max-height: 31px;
+    cursor: pointer;
+
+    &__mini {
+      margin-right: 0.25rem;
+      // margin-left: 0.25rem;
+      height: 30px;
+      width: 30px;
+    }
+  }
 }
 
-.left-drawer {
+.q-toolbar {
+  min-height: 40px;
+}
+
+.headerMenu {
+  margin-right: 1rem;
+
+  .block {
+    font-weight: 700;
+    color: #404040;
+  }
+}
+
+.q-item {
+  min-height: 30px;
+  padding: 3px 8px;
+}
+
+.o2-bg-color {
+  // background-color: rgba(89, 96, 178, 0.08);
+  background: transparent;
+}
+
+.q-list {
+  &.leftNavList {
+    padding: 4px 0px 0px 0px;
+
+    .q-item {
+      margin: 0px 5px;
+      display: list-item;
+      text-align: center;
+      list-style: none;
+      padding: 2px 2px;
+      border-radius: 5px;
+
+      .q-icon {
+        height: 1.3rem;
+        width: 1.3rem;
+      }
+
+      .q-item__label {
+        padding-bottom: 4px;
+      }
+
+      &.q-router-link--active {
+        .q-icon img {
+          filter: brightness(100);
+        }
+
+        .q-item__label {
+          color: var(--o2-menu-color);
+
+          // Light mode: make text blue for readability
+          body.body--light & {
+            color: #19191e !important;
+          }
+          // Dark mode: make text blue for readability
+          body.body--dark & {
+            color: #ffffff !important;
+          }
+        }
+        color: var(--o2-menu-color);
+
+        // Light mode: make item text blue
+        body.body--light & {
+          color: var(--o2-menu-color) !important;
+
+          .q-icon {
+            color: #19191e !important;
+          }
+        }
+
+        // Dark mode: make item text blue
+        body.body--dark & {
+          color: var(--o2-menu-color) !important;
+
+          .q-icon {
+            color: #ffffff !important;
+          }
+        }
+      }
+
+      &__label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--o2-text-secondary);
+      }
+    }
+  }
+
+  .flagIcon img {
+    border-radius: 3px;
+    object-fit: cover;
+    display: block;
+    height: 16px;
+    width: 24px;
+  }
+
+  .q-item {
+    &__section {
+      &--avatar {
+        padding-right: 0px !important;
+        min-width: 1.5rem;
+        display: list-item;
+        text-align: center;
+        list-style: none;
+      }
+    }
+
+    &__label {
+      font-weight: 400;
+    }
+
+    &.activeLang {
+      &__label {
+        font-weight: 600;
+        color: $primary;
+      }
+    }
+  }
+}
+
+.userInfo {
+  align-items: flex-start;
+  flex-direction: column;
+  margin-left: 0.875rem;
+  margin-right: 1rem;
+  display: flex;
+
+  .userName {
+    line-height: 1.25rem;
+    font-weight: 700;
+  }
+
+  .userRole {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: #565656;
+    font-weight: 600;
+  }
+}
+
+.headerMenu {
+  margin-right: 1rem;
+
+  .block {
+    font-weight: 700;
+    color: #404040;
+  }
+}
+.q-list {
+  // &.leftNavList {
+  //   .q-item {
+  //     .q-icon {
+  //       height: 1rem;
+  //       width: 1rem;
+  //     }
+
+  //     &.q-router-link--active {
+  //       .q-icon img {
+  //         filter: brightness(100);
+  //       }
+  //     }
+  //   }
+  // }
+
+  .flagIcon img {
+    border-radius: 3px;
+    object-fit: cover;
+    display: block;
+    height: 16px;
+    width: 24px;
+  }
+
+  .q-item {
+    &__section {
+      &--avatar {
+        padding-right: 0.875rem;
+        min-width: 1.5rem;
+      }
+    }
+
+    &__label {
+      font-weight: 400;
+    }
+
+    &.activeLang {
+      &__label {
+        font-weight: 600;
+        color: $primary;
+      }
+    }
+  }
+}
+
+.userInfo {
+  align-items: flex-start;
+  flex-direction: column;
+  margin-left: 0.875rem;
+  margin-right: 1rem;
+  display: flex;
+
+  .userName {
+    line-height: 1.25rem;
+    font-weight: 700;
+  }
+
+  .userRole {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: #565656;
+    font-weight: 600;
+  }
+}
+
+.dark-mode {
+  background-color: $dark-page;
+}
+
+.languagelist {
+  .q-item {
+    padding: 4px 8px;
+  }
+}
+
+.text-powered-by {
+  float: left;
+  display: inline-block;
+  position: absolute;
+  margin-top: 16px;
+  margin-left: 0px;
+}
+
+.custom-text-logo {
+  display: inline-block;
+  float: left;
+  position: absolute;
+  margin-left: 72px !important;
+  margin-top: 16px !important;
+  width: 80px !important;
+}
+
+.header-menu {
+  display: flex;
+  align-items: center;
+
+  .q-btn,
+  [data-o2-btn] {
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+    }
+
+    // Skip bounce effect for AI button and org selector
+    &.ai-hover-btn {
+      &:hover {
+        transform: none;
+      }
+    }
+  }
+
+  // Skip bounce for org selector (inside div)
+  [data-test="navbar-organizations-select"] .q-btn,
+  [data-test="navbar-organizations-select"] [data-o2-btn] {
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+.header-icon {
+  opacity: 0.7;
+}
+
+body.ai-chat-open {
+  .q-layout {
+    width: 75%;
+    transition: width 0.3s ease;
+  }
+}
+
+.q-layout {
+  width: 100%;
+  transition: width 0.3s ease;
+}
+
+.o2-button {
+  border-radius: 4px;
+  padding: 0px 8px;
+  color: white;
+}
+.dark-mode-chat-container {
+}
+.light-mode-chat-container {
+}
+
+
+.ai-btn-active {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+  }
+}
+.ai-btn-active:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+}
+.ai-hover-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.ai-hover-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+}
+
+.ai-icon {
+  transition: transform 0.6s ease;
+}
+
+.ai-hover-btn:hover .ai-icon {
+  transform: rotate(180deg);
+}
+
+.theme-btn-active {
+  background: color-mix(
+    in srgb,
+    var(--o2-theme-color) 15%,
+    transparent 85%
+  ) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+    color: var(--o2-theme-color) !important;
+  }
+}
+
+.organization-menu-o2 {
+  // Disable hover for organization menu dropdown
+  // Disable table row hover
+  .q-tr:hover,
+  tr:hover,
+  tbody tr:hover,
+  tbody .q-tr:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  td:hover,
+  .q-td:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  // Disable default q-item hover
+  .q-item:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: inherit !important;
+  }
+
+  .org-table {
+    // Disable global table row hover
+    tbody .q-tr:hover {
+      background: transparent !important;
+    }
+
+    td {
+      padding: 0 !important;
+      height: 32px !important;
+      min-height: 32px !important;
+    }
+
+    .q-table__top {
+      padding: 10px !important;
+
+      .q-field__control {
+        height: 40px;
+      }
+
+      input {
+        font-size: 14px;
+      }
+    }
+
+    .q-table__bottom {
+      padding: 8px 12px !important;
+      min-height: 40px;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+
+      .q-table__control {
+        display: flex !important;
+        align-items: center !important;
+      }
+
+      // Ensure pagination arrows are visible
+      .q-btn {
+        display: inline-flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+    }
+
+    // Table cell with no padding
+    .org-list-item-cell {
+      padding: 0 !important;
+      cursor: pointer;
+    }
+
+    // Individual org menu item
+    .org-menu-item {
+      padding: 6px 12px;
+      width: 100%;
+      display: block;
+      transition: background-color 0.2s ease;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+
+      // Enable hover only for individual org menu items
+      &:hover {
+        background-color: var(--o2-hover-accent) !important;
+        border-radius: 4px;
+      }
+
+      // Active/selected state
+      &--active {
+        color: var(--q-primary) !important;
+        font-weight: 500;
+        background: rgba(89, 96, 178, 0.08);
+
+        &:hover {
+          background: rgba(89, 96, 178, 0.12) !important;
+        }
+      }
+    }
+  }
+}
+.q-drawer {
   margin-bottom: 0.675rem;
 }
 </style>
