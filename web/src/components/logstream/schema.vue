@@ -256,6 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="crossLinking"
                     icon="link"
                     :label="t('crossLinks.header')"
+                    data-test="schema-cross-linking-tab"
                   />
                 </OTabs>
               </div>
