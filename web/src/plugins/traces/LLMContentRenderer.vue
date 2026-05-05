@@ -46,12 +46,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Regular content rendering -->
-    <div v-else class="content-wrapper tw:h-full">
+    <div
+      v-else
+      class="content-wrapper"
+      :class="
+        props.viewMode === 'formatted' &&
+        !shouldRenderAsMessages &&
+        !isPlainText &&
+        'tw:h-full'
+      "
+    >
       <!-- Truncated view -->
-      <div v-if="!isExpanded && contentStats.shouldTruncate" class="tw:h-full!">
+      <div
+        v-if="!isExpanded && contentStats.shouldTruncate"
+        :class="
+          props.viewMode === 'formatted' &&
+          !shouldRenderAsMessages &&
+          !isPlainText &&
+          'tw:h-full'
+        "
+      >
         <!-- Formatted mode -->
-        <div v-if="props.viewMode === 'formatted'" class="tw:h-full">
-          <div v-if="shouldRenderAsMessages" class="messages-view tw:h-full">
+        <div
+          v-if="props.viewMode === 'formatted'"
+          :class="!shouldRenderAsMessages && !isPlainText && 'tw:h-full'"
+        >
+          <div v-if="shouldRenderAsMessages" class="messages-view">
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
@@ -88,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="message-content markdown-body q-pa-sm"
+                class="message-content markdown-body q-pa-sm tw:overflow-x-auto"
                 style="background-color: var(--o2-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
@@ -112,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- JSON mode -->
-        <div v-else class="json-content">
+        <div v-else class="json-content tw:h-full!">
           <CodeQueryEditor
             :editor-id="`truncated-json-mode-viewer-${editorIdPrefix}`"
             :query="parsedContentJson"
@@ -139,10 +159,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Full content view -->
-      <div v-else class="tw:h-full">
+      <div
+        v-else
+        :class="
+          props.viewMode === 'formatted' &&
+          !shouldRenderAsMessages &&
+          !isPlainText &&
+          'tw:h-full'
+        "
+      >
         <!-- Formatted mode -->
-        <div v-if="props.viewMode === 'formatted'" class="tw:h-full">
-          <div v-if="shouldRenderAsMessages" class="messages-view tw:h-full">
+        <div
+          v-if="props.viewMode === 'formatted'"
+          :class="!shouldRenderAsMessages && !isPlainText && 'tw:h-full'"
+        >
+          <div v-if="shouldRenderAsMessages" class="messages-view">
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
@@ -179,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="message-content markdown-body q-pa-sm"
+                class="message-content markdown-body q-pa-sm tw:overflow-x-auto"
                 style="background-color: var(--o2-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
