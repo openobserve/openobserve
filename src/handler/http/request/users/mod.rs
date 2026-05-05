@@ -113,6 +113,9 @@ pub async fn list(
             "users",
             "GET",
             None,
+            false,
+            false,
+            false,
         )
         .await
     {
@@ -460,7 +463,19 @@ pub async fn delete_bulk(
 
     #[cfg(feature = "enterprise")]
     for email in &req.ids {
-        if !check_permissions(email, &org_id, &initiator_id, "users", "DELETE", None).await {
+        if !check_permissions(
+            email,
+            &org_id,
+            &initiator_id,
+            "users",
+            "DELETE",
+            None,
+            false,
+            false,
+            false,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }

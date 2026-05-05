@@ -72,6 +72,9 @@ pub async fn get_dimension_analytics(
             "service_streams",
             "GET",
             None,
+            false,
+            false,
+            false,
         )
         .await
         {
@@ -187,6 +190,9 @@ pub async fn correlate_streams(
             "service_streams",
             "GET",
             None,
+            false,
+            false,
+            false,
         )
         .await
         {
@@ -309,6 +315,9 @@ pub async fn get_identity_config(
         "service_streams",
         "GET",
         None,
+        false,
+        false,
+        false,
     )
     .await
     {
@@ -352,6 +361,9 @@ pub async fn save_identity_config(
         "service_streams",
         "PUT",
         None,
+        false,
+        false,
+        false,
     )
     .await
     {
@@ -457,6 +469,9 @@ pub async fn reset_services(
             "service_streams",
             "DELETE",
             None,
+            false,
+            false,
+            false,
         )
         .await
         {
