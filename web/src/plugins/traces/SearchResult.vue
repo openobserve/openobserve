@@ -48,16 +48,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
         />
         <!-- Insights Button -->
-          <OButton
+        <OButton
           variant="outline"
-          size="xs"
+          size="chip"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
           <template #icon-left>
-            <q-icon name="timeline" size="14px" />
+            <q-icon name="timeline" size="12px" />
           </template>
-          {{ t('volumeInsights.insightsButtonLabel') }}
+          {{ t("volumeInsights.insightsButtonLabel") }}
           <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
         </OButton>
         <ORefreshButton
@@ -165,7 +165,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineAsyncComponent, defineComponent, ref, watch } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  defineComponent,
+  ref,
+  watch,
+} from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
