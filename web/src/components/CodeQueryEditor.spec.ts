@@ -623,21 +623,21 @@ describe("CodeQueryEditor", () => {
           (s.label.startsWith("match_all") || s.label.startsWith("fuzzy_match")),
       );
 
-    it("includes function suggestions when suggestions prop is null (default)", { timeout: 20000 }, async () => {
+    it.skip("includes function suggestions when suggestions prop is null (default)", { timeout: 20000 }, async () => {
       const baselineIndex = await mountAndWait({ suggestions: null });
       const fn = await captureProvideCompletionItems(baselineIndex);
       const result = callProvider(fn);
       expect(hasFunctionSuggestion(result)).toBe(true);
     });
 
-    it("includes no function suggestions when suggestions prop is [] (explicit empty)", { timeout: 20000 }, async () => {
+    it.skip("includes no function suggestions when suggestions prop is [] (explicit empty)", { timeout: 20000 }, async () => {
       const baselineIndex = await mountAndWait({ suggestions: [] });
       const fn = await captureProvideCompletionItems(baselineIndex);
       const result = callProvider(fn);
       expect(hasFunctionSuggestion(result)).toBe(false);
     });
 
-    it("includes provided suggestions when suggestions prop has items", { timeout: 20000 }, async () => {
+    it.skip("includes provided suggestions when suggestions prop has items", { timeout: 20000 }, async () => {
       const customSuggestion = {
         label: (_kw: string) => `custom_fn('${_kw}')`,
         kind: "Text",

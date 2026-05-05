@@ -16,6 +16,7 @@
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import serviceStreamsApi from "@/services/service_streams";
+import settingsApi from "@/services/settings";
 import type {
   ServiceMetadata,
   FieldAlias,
@@ -45,6 +46,37 @@ interface SemanticGroupsCacheEntry {
 // Key: org_identifier, Value: cache entry with TTL
 const semanticGroupsGlobalCache = new Map<string, SemanticGroupsCacheEntry>();
 const pendingSemanticGroupsRequests = new Map<string, Promise<FieldAlias[]>>();
+
+// ---------------------------------------------------------------------------
+// Key fields config — per-stream-type pinned fields (fields + groups)
+// ---------------------------------------------------------------------------
+
+export interface KeyFieldsSpec {
+  fields: string[];
+  groups: string[];
+}
+export type KeyFieldsConfig = Record<string, KeyFieldsSpec>;
+
+export interface FieldGroupingConfig {
+  prefix_aliases: Record<string, string>;
+  group_labels: Record<string, string>;
+}
+
+interface KeyFieldsCacheEntry {
+  data: KeyFieldsConfig;
+  timestamp: number;
+}
+
+interface FieldGroupingCacheEntry {
+  data: FieldGroupingConfig;
+  timestamp: number;
+}
+
+const keyFieldsGlobalCache = new Map<string, KeyFieldsCacheEntry>();
+const pendingKeyFieldsRequests = new Map<string, Promise<KeyFieldsConfig>>();
+
+const fieldGroupingGlobalCache = new Map<string, FieldGroupingCacheEntry>();
+const pendingFieldGroupingRequests = new Map<string, Promise<FieldGroupingConfig>>();
 
 
 /**
@@ -262,6 +294,10 @@ export function useServiceCorrelation() {
     const org = orgIdentifier.value;
     semanticGroupsGlobalCache.delete(org);
     pendingSemanticGroupsRequests.delete(org);
+    keyFieldsGlobalCache.delete(org);
+    pendingKeyFieldsRequests.delete(org);
+    fieldGroupingGlobalCache.delete(org);
+    pendingFieldGroupingRequests.delete(org);
     clearIdentityConfigCache(org);
     console.log(`[useServiceCorrelation] Cleared caches for org '${org}'`);
   }
@@ -273,6 +309,10 @@ export function useServiceCorrelation() {
   function clearAllCaches() {
     semanticGroupsGlobalCache.clear();
     pendingSemanticGroupsRequests.clear();
+    keyFieldsGlobalCache.clear();
+    pendingKeyFieldsRequests.clear();
+    fieldGroupingGlobalCache.clear();
+    pendingFieldGroupingRequests.clear();
     clearAllIdentityConfigCache();
     console.log(`[useServiceCorrelation] Cleared all caches`);
   }
@@ -289,6 +329,71 @@ export function useServiceCorrelation() {
     }
   }
 
+  async function loadKeyFields(): Promise<KeyFieldsConfig> {
+    const org = orgIdentifier.value;
+
+    if (keyFieldsGlobalCache.has(org)) {
+      const cached = keyFieldsGlobalCache.get(org)!;
+      if (Date.now() - cached.timestamp < SEMANTIC_GROUPS_CACHE_TTL_MS) {
+        return cached.data;
+      }
+      keyFieldsGlobalCache.delete(org);
+    }
+
+    if (pendingKeyFieldsRequests.has(org)) {
+      return pendingKeyFieldsRequests.get(org)!;
+    }
+
+    const requestPromise = (async (): Promise<KeyFieldsConfig> => {
+      try {
+        const response = await settingsApi.getSetting(org, "key_fields");
+        const data: KeyFieldsConfig = response.data?.setting_value ?? {};
+        keyFieldsGlobalCache.set(org, { data, timestamp: Date.now() });
+        return data;
+      } catch {
+        return {};
+      } finally {
+        pendingKeyFieldsRequests.delete(org);
+      }
+    })();
+
+    pendingKeyFieldsRequests.set(org, requestPromise);
+    return requestPromise;
+  }
+
+  async function loadFieldGrouping(): Promise<FieldGroupingConfig> {
+    const org = orgIdentifier.value;
+    const empty: FieldGroupingConfig = { prefix_aliases: {}, group_labels: {} };
+
+    if (fieldGroupingGlobalCache.has(org)) {
+      const cached = fieldGroupingGlobalCache.get(org)!;
+      if (Date.now() - cached.timestamp < SEMANTIC_GROUPS_CACHE_TTL_MS) {
+        return cached.data;
+      }
+      fieldGroupingGlobalCache.delete(org);
+    }
+
+    if (pendingFieldGroupingRequests.has(org)) {
+      return pendingFieldGroupingRequests.get(org)!;
+    }
+
+    const requestPromise = (async (): Promise<FieldGroupingConfig> => {
+      try {
+        const response = await settingsApi.getSetting(org, "field_grouping");
+        const data: FieldGroupingConfig = response.data?.setting_value ?? empty;
+        fieldGroupingGlobalCache.set(org, { data, timestamp: Date.now() });
+        return data;
+      } catch {
+        return empty;
+      } finally {
+        pendingFieldGroupingRequests.delete(org);
+      }
+    })();
+
+    pendingFieldGroupingRequests.set(org, requestPromise);
+    return requestPromise;
+  }
+
   return {
     // State
     error,
@@ -300,6 +405,8 @@ export function useServiceCorrelation() {
     // Methods
     findRelatedTelemetry,
     loadSemanticGroups,
+    loadKeyFields,
+    loadFieldGrouping,
     loadIdentityConfig,
     clearCache,
     clearAllCaches,

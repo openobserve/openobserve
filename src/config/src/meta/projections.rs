@@ -24,3 +24,38 @@ pub struct ProjectionColumnMapping {
     /// Set of underlying column names that contribute to this projection
     pub source_columns: HashSet<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_projection_column_mapping_construction() {
+        let mut cols = HashSet::new();
+        cols.insert("col_a".to_string());
+        cols.insert("col_b".to_string());
+        let mapping = ProjectionColumnMapping {
+            output_field: "alias".to_string(),
+            projection_expr: "col_a + col_b".to_string(),
+            source_columns: cols,
+        };
+        assert_eq!(mapping.output_field, "alias");
+        assert_eq!(mapping.projection_expr, "col_a + col_b");
+        assert!(mapping.source_columns.contains("col_a"));
+        assert!(mapping.source_columns.contains("col_b"));
+    }
+
+    #[test]
+    fn test_projection_column_mapping_clone() {
+        let mut cols = HashSet::new();
+        cols.insert("x".to_string());
+        let original = ProjectionColumnMapping {
+            output_field: "out".to_string(),
+            projection_expr: "expr".to_string(),
+            source_columns: cols,
+        };
+        let cloned = original.clone();
+        assert_eq!(cloned.output_field, original.output_field);
+        assert_eq!(cloned.source_columns, original.source_columns);
+    }
+}

@@ -1475,4 +1475,192 @@ mod tests {
         );
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_sample_is_nan() {
+        let normal = Sample::new(1000, 42.0);
+        assert!(!normal.is_nan());
+
+        let nan_sample = Sample::new(1000, f64::NAN);
+        assert!(nan_sample.is_nan());
+
+        let inf_sample = Sample::new(1000, f64::INFINITY);
+        assert!(!inf_sample.is_nan());
+    }
+
+    #[test]
+    fn test_range_value_new() {
+        let labels: Labels = vec![
+            Arc::new(Label::new("__name__", "cpu")),
+            Arc::new(Label::new("job", "node")),
+        ];
+        let samples = vec![Sample::new(1000, 1.0), Sample::new(2000, 2.0)];
+        let rv = RangeValue::new(labels.clone(), samples);
+        assert_eq!(rv.samples.len(), 2);
+        assert_eq!(rv.samples[0].value, 1.0);
+        assert!(rv.exemplars.is_none());
+        assert!(rv.time_window.is_none());
+    }
+
+    #[test]
+    fn test_value_get_ref_matrix_values() {
+        let rv = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
+        let val = Value::Matrix(vec![rv]);
+        assert!(val.get_ref_matrix_values().is_some());
+        assert_eq!(val.get_ref_matrix_values().unwrap().len(), 1);
+
+        let val_none = Value::Float(1.0);
+        assert!(val_none.get_ref_matrix_values().is_none());
+    }
+
+    #[test]
+    fn test_value_get_range_values() {
+        let rv = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
+        let val = Value::Matrix(vec![rv]);
+        let result = val.get_range_values();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().len(), 1);
+
+        assert!(Value::Float(1.0).get_range_values().is_none());
+    }
+
+    #[test]
+    fn test_value_get_vector() {
+        let iv = InstantValue {
+            labels: vec![],
+            sample: Sample::new(1000, 5.0),
+        };
+        let val = Value::Vector(vec![iv]);
+        assert!(val.get_vector().is_some());
+        assert_eq!(val.get_vector().unwrap().len(), 1);
+
+        assert!(Value::Float(1.0).get_vector().is_none());
+    }
+
+    #[test]
+    fn test_value_get_string() {
+        let val = Value::String("hello".to_string());
+        assert_eq!(val.get_string(), Some("hello".to_string()));
+
+        assert!(Value::Float(1.0).get_string().is_none());
+        assert!(Value::None.get_string().is_none());
+    }
+
+    #[test]
+    fn test_value_get_float() {
+        let val = Value::Float(3.14);
+        assert_eq!(val.get_float(), Some(3.14));
+
+        assert!(Value::String("x".to_string()).get_float().is_none());
+        assert!(Value::None.get_float().is_none());
+    }
+
+    #[test]
+    fn test_labels_without_label() {
+        let labels: Labels = vec![
+            Arc::new(Label::new("__name__", "cpu")),
+            Arc::new(Label::new("job", "node")),
+            Arc::new(Label::new("instance", "host1")),
+        ];
+        let filtered = labels.without_label("job");
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|l| l.name != "job"));
+    }
+
+    #[test]
+    fn test_labels_without_metric_name() {
+        let labels: Labels = vec![
+            Arc::new(Label::new("__name__", "cpu")),
+            Arc::new(Label::new("job", "node")),
+        ];
+        let filtered = labels.without_metric_name();
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered.iter().all(|l| l.name != "__name__"));
+    }
+
+    #[test]
+    fn test_eval_context_is_instant_true() {
+        let ctx = EvalContext::new(1000, 1000, 0, "trace-1".to_string());
+        assert!(ctx.is_instant());
+        let ts = ctx.timestamps();
+        assert_eq!(ts, vec![1000]);
+    }
+
+    #[test]
+    fn test_eval_context_is_instant_false_timestamps() {
+        let ctx = EvalContext::new(0, 200, 100, "trace-2".to_string());
+        assert!(!ctx.is_instant());
+        let ts = ctx.timestamps();
+        assert_eq!(ts, vec![0, 100, 200]);
+    }
+
+    #[test]
+    fn test_contains_same_label_set_vector_three_unique() {
+        let label_a = vec![Arc::new(Label::new("n", "a"))];
+        let label_b = vec![Arc::new(Label::new("n", "b"))];
+        let label_c = vec![Arc::new(Label::new("n", "c"))];
+        let v = Value::Vector(vec![
+            InstantValue {
+                labels: label_a,
+                sample: Sample::new(1, 1.0),
+            },
+            InstantValue {
+                labels: label_b,
+                sample: Sample::new(2, 2.0),
+            },
+            InstantValue {
+                labels: label_c,
+                sample: Sample::new(3, 3.0),
+            },
+        ]);
+        assert!(!v.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_vector_three_with_duplicate() {
+        let label_a = vec![Arc::new(Label::new("n", "a"))];
+        let label_b = vec![Arc::new(Label::new("n", "b"))];
+        let label_a2 = vec![Arc::new(Label::new("n", "a"))]; // dup
+        let v = Value::Vector(vec![
+            InstantValue {
+                labels: label_a,
+                sample: Sample::new(1, 1.0),
+            },
+            InstantValue {
+                labels: label_b,
+                sample: Sample::new(2, 2.0),
+            },
+            InstantValue {
+                labels: label_a2,
+                sample: Sample::new(3, 3.0),
+            },
+        ]);
+        assert!(v.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_matrix_three_unique() {
+        let la = vec![Arc::new(Label::new("n", "a"))];
+        let lb = vec![Arc::new(Label::new("n", "b"))];
+        let lc = vec![Arc::new(Label::new("n", "c"))];
+        let m = Value::Matrix(vec![
+            RangeValue::new(la, vec![]),
+            RangeValue::new(lb, vec![]),
+            RangeValue::new(lc, vec![]),
+        ]);
+        assert!(!m.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_matrix_three_with_duplicate() {
+        let la = vec![Arc::new(Label::new("n", "a"))];
+        let lb = vec![Arc::new(Label::new("n", "b"))];
+        let la2 = vec![Arc::new(Label::new("n", "a"))]; // dup
+        let m = Value::Matrix(vec![
+            RangeValue::new(la, vec![]),
+            RangeValue::new(lb, vec![]),
+            RangeValue::new(la2, vec![]),
+        ]);
+        assert!(m.contains_same_label_set());
+    }
 }

@@ -1268,4 +1268,78 @@ mod tests {
                 .contains("After Flatten must be checked")
         );
     }
+
+    #[test]
+    fn test_default_status_is_true() {
+        assert!(default_status());
+    }
+
+    #[test]
+    fn test_pipeline_get_all_destination_streams() {
+        let pipeline = Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new("org", "src", StreamType::Logs)),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        let mut node_map = HashMap::new();
+        node_map.insert(
+            "1".to_string(),
+            NodeData::Stream(StreamParams::new("org", "source_stream", StreamType::Logs)),
+        );
+        node_map.insert(
+            "2".to_string(),
+            NodeData::Function(components::FunctionParams {
+                name: "fn1".to_string(),
+                after_flatten: false,
+                num_args: 0,
+            }),
+        );
+        node_map.insert(
+            "3".to_string(),
+            NodeData::Stream(StreamParams::new("org", "dest_stream", StreamType::Logs)),
+        );
+
+        // Graph: 1→2→3; node "3" is leaf (not in graph as source) = destination
+        let mut graph = HashMap::new();
+        graph.insert("1".to_string(), vec!["2".to_string()]);
+        graph.insert("2".to_string(), vec!["3".to_string()]);
+
+        let destinations = pipeline.get_all_destination_streams(&node_map, &graph);
+        assert_eq!(destinations.len(), 1);
+        assert_eq!(destinations[0].stream_name, "dest_stream");
+    }
+
+    #[test]
+    fn test_pipeline_get_all_destination_streams_empty_when_all_have_outgoing() {
+        let pipeline = Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new("org", "src", StreamType::Logs)),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        let mut node_map = HashMap::new();
+        node_map.insert(
+            "1".to_string(),
+            NodeData::Stream(StreamParams::new("org", "a", StreamType::Logs)),
+        );
+        // Both nodes have outgoing edges → no leaf streams
+        let mut graph = HashMap::new();
+        graph.insert("1".to_string(), vec!["other".to_string()]);
+
+        let destinations = pipeline.get_all_destination_streams(&node_map, &graph);
+        assert!(destinations.is_empty());
+    }
 }

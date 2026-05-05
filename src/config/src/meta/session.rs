@@ -48,3 +48,56 @@ pub struct AssumeServiceAccountResponse {
     /// Duration in seconds until expiration
     pub expires_in: u64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_assume_request_defaults_optional_fields() {
+        let json = r#"{"org_id":"default"}"#;
+        let req: AssumeServiceAccountRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.org_id, "default");
+        assert!(req.service_account.is_none());
+        assert!(req.duration_seconds.is_none());
+    }
+
+    #[test]
+    fn test_assume_request_all_fields() {
+        let json =
+            r#"{"org_id":"myorg","service_account":"svc@example.com","duration_seconds":3600}"#;
+        let req: AssumeServiceAccountRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.org_id, "myorg");
+        assert_eq!(req.service_account, Some("svc@example.com".to_string()));
+        assert_eq!(req.duration_seconds, Some(3600));
+    }
+
+    #[test]
+    fn test_assume_request_serialize_roundtrip() {
+        let req = AssumeServiceAccountRequest {
+            org_id: "org1".to_string(),
+            service_account: Some("bot@example.com".to_string()),
+            duration_seconds: Some(7200),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: AssumeServiceAccountRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.org_id, req.org_id);
+        assert_eq!(back.service_account, req.service_account);
+        assert_eq!(back.duration_seconds, req.duration_seconds);
+    }
+
+    #[test]
+    fn test_assume_response_serialize() {
+        let resp = AssumeServiceAccountResponse {
+            session_id: "sess-abc".to_string(),
+            org_id: "org1".to_string(),
+            role_name: "admin".to_string(),
+            expires_at: "2026-01-01T00:00:00Z".to_string(),
+            expires_in: 3600,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"session_id\":\"sess-abc\""));
+        assert!(json.contains("\"org_id\":\"org1\""));
+        assert!(json.contains("\"expires_in\":3600"));
+    }
+}

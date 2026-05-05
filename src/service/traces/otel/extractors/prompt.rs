@@ -39,3 +39,92 @@ impl PromptExtractor {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_extract_prompt_name_from_gen_ai_attribute() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.prompt.name".to_string(),
+            config::utils::json::json!("my_prompt"),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert_eq!(result, Some("my_prompt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_prompt_name_from_langfuse_attribute() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "langfuse.observation.prompt.name".to_string(),
+            config::utils::json::json!("langfuse_prompt"),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert_eq!(result, Some("langfuse_prompt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_prompt_name_gen_ai_takes_priority_over_langfuse() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.prompt.name".to_string(),
+            config::utils::json::json!("gen_ai_prompt"),
+        );
+        attrs.insert(
+            "langfuse.observation.prompt.name".to_string(),
+            config::utils::json::json!("langfuse_prompt"),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert_eq!(result, Some("gen_ai_prompt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_prompt_name_absent_returns_none() {
+        let result = PromptExtractor.extract_name(&HashMap::new());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_non_string_gen_ai_returns_none() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.prompt.name".to_string(),
+            config::utils::json::json!(42),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_non_string_gen_ai_blocks_langfuse_fallback() {
+        // When gen_ai key exists but is non-string, extract_name returns None
+        // without falling through to the langfuse key.
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.prompt.name".to_string(),
+            config::utils::json::json!(true),
+        );
+        attrs.insert(
+            "langfuse.observation.prompt.name".to_string(),
+            config::utils::json::json!("fallback_prompt"),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_non_string_langfuse_returns_none() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "langfuse.observation.prompt.name".to_string(),
+            config::utils::json::json!(null),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert!(result.is_none());
+    }
+}

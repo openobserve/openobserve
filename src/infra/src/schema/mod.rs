@@ -1314,4 +1314,32 @@ mod tests {
         assert_eq!(delta.len(), 2); // Two widening conversions
         assert_eq!(merged.len(), 4); // All four fields
     }
+
+    #[test]
+    fn test_schema_cache_new_from_arc() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int64, false),
+            Field::new("b", DataType::Utf8, true),
+        ]));
+        let cache = SchemaCache::new_from_arc(schema.clone());
+        assert_eq!(cache.schema().fields().len(), 2);
+        assert!(!cache.hash_key().is_empty());
+    }
+
+    #[test]
+    fn test_schema_cache_is_empty() {
+        let empty = SchemaCache::new(Schema::new(Vec::<Field>::new()));
+        assert!(empty.is_empty());
+
+        let non_empty =
+            SchemaCache::new(Schema::new(vec![Field::new("f", DataType::Boolean, false)]));
+        assert!(!non_empty.is_empty());
+    }
+
+    #[test]
+    fn test_schema_cache_schema_accessor() {
+        let schema = Schema::new(vec![Field::new("f1", DataType::Int32, false)]);
+        let cache = SchemaCache::new(schema);
+        assert_eq!(cache.schema().fields().len(), 1);
+    }
 }

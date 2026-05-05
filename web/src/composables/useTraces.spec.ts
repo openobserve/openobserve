@@ -87,6 +87,7 @@ vi.mock("@/utils/traces/traceColors", () => ({
   getSpanColorHex: vi.fn((index: number) => `#color-${index}`),
 }));
 
+import { getSpanColorHex } from "@/utils/traces/traceColors";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "./useTraces";
 
 // ---------------------------------------------------------------------------
@@ -130,6 +131,7 @@ describe("useTraces", () => {
       expect(inst).toHaveProperty("tracesShareURL");
       expect(inst).toHaveProperty("formatTracesMetaData");
       expect(inst).toHaveProperty("setServiceColors"); // [auto-generated]
+      expect(inst).toHaveProperty("getOrSetServiceColor");
     });
   });
 
@@ -1218,6 +1220,64 @@ describe("useTraces", () => {
       // getSpanColorHex is mocked as (index) => `#color-${index}`
       // colorIndex = Object.keys(serviceColors).length = 2 before insertion
       expect(searchObj.meta.serviceColors["svc-3"]).toBe("#color-2");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getOrSetServiceColor
+  // -------------------------------------------------------------------------
+  describe("getOrSetServiceColor", () => {
+    it("should return existing color when service already has one", () => {
+      const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = { "my-service": "#ff0000" };
+
+      const color = getOrSetServiceColor("my-service");
+
+      expect(color).toBe("#ff0000");
+      // Verify the existing color was not overwritten
+      expect(searchObj.meta.serviceColors["my-service"]).toBe("#ff0000");
+      // Verify no new keys were added
+      expect(Object.keys(searchObj.meta.serviceColors)).toHaveLength(1);
+    });
+
+    it("should create and return a new color when service is unknown", () => {
+      const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      // Override the mock to return a specific hex for this test
+      vi.mocked(getSpanColorHex).mockReturnValueOnce("#abcdef");
+
+      const color = getOrSetServiceColor("new-service");
+
+      expect(color).toBe("#abcdef");
+      expect(searchObj.meta.serviceColors["new-service"]).toBe("#abcdef");
+      // Should have been called with index 0 since serviceColors was empty
+      expect(getSpanColorHex).toHaveBeenCalledWith(0);
+    });
+
+    it("should return undefined for empty string input", () => {
+      const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      const color = getOrSetServiceColor("");
+
+      expect(color).toBeUndefined();
+      // Should not have added any color for empty string
+      expect(Object.keys(searchObj.meta.serviceColors)).toHaveLength(0);
+    });
+
+    it("should initialize and assign a color when serviceColors starts empty", () => {
+      const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      const color = getOrSetServiceColor("valid-service");
+
+      expect(color).toBe("#color-0");
+      expect(searchObj.meta.serviceColors["valid-service"]).toBe("#color-0");
     });
   });
 

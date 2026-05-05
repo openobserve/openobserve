@@ -2402,9 +2402,10 @@ import {
   buildDateTimeObject,
 } from "@/utils/zincutils";
 
+import { debounce } from "lodash-es";
 import savedviewsService from "@/services/saved_views";
+
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { cloneDeep, debounce } from "lodash-es";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
@@ -3250,33 +3251,15 @@ export default defineComponent({
       }
     };
 
-    // Debounced query trigger for absolute time when auto-run is enabled.
-    // Gives the user 1.5s to finish typing start/end time before firing.
-    const triggerAbsoluteQueryDebounced = debounce((value: object) => {
-      if (
-        searchObj.loading == false &&
-        store.state.zoConfig.query_on_stream_selection == false
-      ) {
-        searchObj.loading = true;
-        searchObj.runQuery = true;
-      }
-
-      if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
-          stream_name: searchObj.data.stream.selectedStream.join(","),
-          page: "Search Logs",
-        });
-      }
-
-      if (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode) {
-        emit("searchdata");
-      }
+    // Debounced auto-run for absolute time — gives the user 2.5s to finish
+    // typing start/end time before firing the query.
+    const debouncedAutoRunAbsolute = debounce(() => {
+      emit("searchdata");
     }, 2500);
 
+    let ignoreAutoTrigger = false;
     const updateDateTime = async (value: object) => {
+      ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
@@ -3333,15 +3316,6 @@ export default defineComponent({
       await nextTick();
 
       if (
-        value.valueType === "absolute" &&
-        store.state.zoConfig.auto_query_enabled
-      ) {
-        // Debounce query trigger so user can finish typing the full time value
-        triggerAbsoluteQueryDebounced(value);
-        return;
-      }
-
-      if (
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false
       ) {
@@ -3366,6 +3340,15 @@ export default defineComponent({
         store.state.zoConfig.query_on_stream_selection == false
       ) {
         emit("searchdata");
+        return;
+      }
+
+      if (searchObj.meta.liveMode && ignoreAutoTrigger == false) {
+        if (value.valueType === "absolute") {
+          debouncedAutoRunAbsolute();
+        } else {
+          emit("searchdata");
+        }
       }
     };
 

@@ -344,3 +344,34 @@ pub enum AnomalyDetectionConfig {
     CreatedAt,
     UpdatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_pull_idx_name() {
+        let sql = create_anomaly_config_pull_idx_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(ANOMALY_CONFIG_PULL_IDX));
+    }
+
+    #[test]
+    fn test_org_idx_name() {
+        let sql = create_anomaly_config_org_idx_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(ANOMALY_CONFIG_ORG_IDX));
+    }
+
+    #[test]
+    fn test_timeout_idx_name() {
+        let sql = create_anomaly_config_timeout_idx_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(ANOMALY_CONFIG_TIMEOUT_IDX));
+    }
+
+    #[test]
+    fn test_table_stmt_contains_table_name() {
+        let sql = create_anomaly_detection_config_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("anomaly_detection_config"));
+    }
+}

@@ -431,4 +431,61 @@ mod tests {
         assert_eq!(response.name, Some("name-1".into()));
         assert_eq!(response.trace_id, Some("trace-1".into()));
     }
+
+    #[test]
+    fn test_optional_fields_serialized_when_some() {
+        let response = HttpResponse {
+            code: 200,
+            message: "ok".to_string(),
+            id: Some("id-123".to_string()),
+            name: Some("my-name".to_string()),
+            error_detail: Some("detail".to_string()),
+            trace_id: Some("trace-abc".to_string()),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"id\""));
+        assert!(json.contains("\"name\""));
+        assert!(json.contains("error_detail"));
+        assert!(json.contains("trace_id"));
+    }
+
+    #[test]
+    fn test_into_response_unrecognized_code_defaults_to_ok() {
+        let http_response = HttpResponse {
+            code: 418, // teapot — not in match arms
+            message: "test".to_string(),
+            id: None,
+            name: None,
+            error_detail: None,
+            trace_id: None,
+        };
+        let response = http_response.into_response();
+        assert_eq!(response.status(), http::StatusCode::OK);
+    }
+
+    #[test]
+    fn test_http_response_payment_required() {
+        let response = HttpResponse::payment_required("pay up");
+        assert_eq!(response.status(), http::StatusCode::PAYMENT_REQUIRED);
+    }
+
+    #[test]
+    fn test_http_response_too_many_requests() {
+        let response = HttpResponse::too_many_requests("slow down");
+        assert_eq!(response.status(), http::StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[test]
+    fn test_into_response_503_service_unavailable() {
+        let http_response = HttpResponse {
+            code: 503,
+            message: "down".to_string(),
+            id: None,
+            name: None,
+            error_detail: None,
+            trace_id: None,
+        };
+        let response = http_response.into_response();
+        assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);
+    }
 }

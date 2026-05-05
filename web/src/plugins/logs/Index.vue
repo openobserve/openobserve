@@ -209,7 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-no-stream-selected-text"
                         class="text-center col-10 q-mx-none tw:mt-none! tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary" size="md" />
+                        <q-icon name="info" color="primary"
+size="md" />
                         {{ t("search.noStreamSelectedMessage") }}
                       </h6>
                     </div>
@@ -227,7 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary" size="md" />
+                        <q-icon name="info" color="primary"
+size="md" />
                         {{ t("search.noRecordFound") }}
                         <q-btn
                           v-if="
@@ -255,7 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary" size="md" />
+                        <q-icon name="info" color="primary"
+size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -272,7 +275,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary" size="md" />
+                        <q-icon name="info" color="primary"
+size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -381,7 +385,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon name="info" class="q-mr-xs" size="20px" />
+              <q-icon name="info" class="q-mr-xs"
+size="20px" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
@@ -2319,41 +2324,6 @@ export default defineComponent({
         }
       },
       { immediate: true },
-    );
-
-    // Debounced auto-run triggered by datetime changes in live mode.
-    // Only fires when query_on_stream_selection is true (i.e., the existing
-    // updateDateTime path is NOT already auto-running the query).
-    // Uses runQueryFn so the histogram is also refreshed.
-    const debouncedAutoRunOnDatetime = debounce(() => {
-      // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (1500ms).
-      // Only auto-run here for relative time to avoid double-triggering.
-      if (
-        searchObj.data.datetime.type === "relative" &&
-        searchObj.meta.liveMode &&
-        store.state.zoConfig?.auto_query_enabled &&
-        store.state.zoConfig?.query_on_stream_selection !== false &&
-        searchObj.meta.logsVisualizeToggle === "logs" &&
-        searchObj.data.stream.selectedStream.length > 0 &&
-        !searchObj.loading &&
-        !searchObj.loadingHistogram
-      ) {
-        runQueryFn();
-      }
-    }, 500);
-
-    watch(
-      () => [
-        searchObj.data.datetime.type,
-        searchObj.data.datetime.startTime,
-        searchObj.data.datetime.endTime,
-        searchObj.data.datetime.relativeTimePeriod,
-      ],
-      (_newVal, _oldVal) => {
-        if (searchObj.shouldIgnoreWatcher) return;
-        debouncedAutoRunOnDatetime();
-      },
-      { deep: true },
     );
 
     // Watch AI chat state and adjust splitter to give more space when chat is open

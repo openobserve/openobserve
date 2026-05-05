@@ -85,7 +85,7 @@ const summaryContainer = ref<HTMLElement | null>(null);
 const showScrollToBottom = ref(false);
 
 const summaryText = computed(() => {
-  return generateAlertSummary(props.formData, props.destinations, t, props.wizardStep, props.previewQuery, props.generatedSqlQuery);
+  return generateAlertSummary(props.formData, props.destinations, t, undefined, props.previewQuery, props.generatedSqlQuery);
 });
 
 const handleSummaryClick = (event: MouseEvent) => {

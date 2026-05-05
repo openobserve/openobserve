@@ -55,3 +55,24 @@ fn parse_key(key: &str) -> Result<String> {
     }
     Ok(key_columns[2].into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_key_valid() {
+        let id = parse_key("/short_urls/abc123").unwrap();
+        assert_eq!(id, "abc123");
+    }
+
+    #[test]
+    fn test_parse_key_too_short_returns_err() {
+        assert!(parse_key("/short_urls").is_err());
+    }
+
+    #[test]
+    fn test_parse_key_empty_id_returns_err() {
+        assert!(parse_key("/short_urls/").is_err());
+    }
+}

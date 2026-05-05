@@ -237,3 +237,156 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
         .filter(|entry| entry.org_id == org_id)
         .count() as i64
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_alert() -> Alert {
+        serde_json::from_value(serde_json::json!({})).unwrap()
+    }
+
+    #[test]
+    fn test_pending_batch_new_has_one_alert() {
+        let batch = PendingBatch::new(
+            "fp1".to_string(),
+            "myorg".to_string(),
+            make_alert(),
+            vec![],
+            30,
+            10,
+        );
+        assert_eq!(batch.alerts.len(), 1);
+        assert!(!batch.is_full());
+    }
+
+    #[test]
+    fn test_pending_batch_is_full_at_capacity() {
+        let mut batch = PendingBatch::new(
+            "fp2".to_string(),
+            "myorg".to_string(),
+            make_alert(),
+            vec![],
+            30,
+            2,
+        );
+        assert!(!batch.is_full());
+        let added = batch.add_alert(make_alert(), vec![]);
+        assert!(added);
+        assert!(batch.is_full());
+    }
+
+    #[test]
+    fn test_pending_batch_add_alert_returns_false_when_full() {
+        let mut batch = PendingBatch::new(
+            "fp3".to_string(),
+            "myorg".to_string(),
+            make_alert(),
+            vec![],
+            30,
+            1,
+        );
+        assert!(batch.is_full());
+        let added = batch.add_alert(make_alert(), vec![]);
+        assert!(!added);
+        assert_eq!(batch.alerts.len(), 1);
+    }
+
+    #[test]
+    fn test_pending_batch_not_expired_immediately() {
+        let batch = PendingBatch::new(
+            "fp4".to_string(),
+            "myorg".to_string(),
+            make_alert(),
+            vec![],
+            3600, // 1 hour wait
+            10,
+        );
+        assert!(!batch.is_expired());
+    }
+
+    #[test]
+    fn test_add_to_batch_creates_new_batch() {
+        let fp = "grouping_test_add_creates_new_batch_unique".to_string();
+        PENDING_BATCHES.remove(&fp);
+
+        let ready = add_to_batch(
+            fp.clone(),
+            "org-test-add".to_string(),
+            make_alert(),
+            vec![],
+            3600,
+            10,
+        );
+        assert!(!ready);
+        assert!(PENDING_BATCHES.contains_key(&fp));
+
+        PENDING_BATCHES.remove(&fp);
+    }
+
+    #[test]
+    fn test_add_to_batch_returns_true_when_full() {
+        let fp = "grouping_test_add_batch_full_unique".to_string();
+        PENDING_BATCHES.remove(&fp);
+
+        let ready1 = add_to_batch(
+            fp.clone(),
+            "org-test-full".to_string(),
+            make_alert(),
+            vec![],
+            3600,
+            2,
+        );
+        assert!(!ready1); // new batch, 1 alert, not full
+
+        let ready2 = add_to_batch(
+            fp.clone(),
+            "org-test-full".to_string(),
+            make_alert(),
+            vec![],
+            3600,
+            2,
+        );
+        assert!(ready2); // 2nd alert fills batch, ready=true
+
+        PENDING_BATCHES.remove(&fp);
+    }
+
+    #[test]
+    fn test_get_ready_batch_returns_none_when_not_expired() {
+        let fp = "grouping_test_get_ready_not_expired_unique".to_string();
+        PENDING_BATCHES.remove(&fp);
+
+        add_to_batch(
+            fp.clone(),
+            "org-test-get".to_string(),
+            make_alert(),
+            vec![],
+            3600,
+            10,
+        );
+
+        let batch = get_ready_batch(&fp);
+        assert!(batch.is_none()); // 3600s wait, not expired
+
+        PENDING_BATCHES.remove(&fp);
+    }
+
+    #[test]
+    fn test_get_pending_batch_count_counts_org_batches() {
+        let fp1 = "grouping_count_fp1_unique_org".to_string();
+        let fp2 = "grouping_count_fp2_unique_org".to_string();
+        let org = "org-count-unique-test";
+        PENDING_BATCHES.remove(&fp1);
+        PENDING_BATCHES.remove(&fp2);
+
+        add_to_batch(fp1.clone(), org.to_string(), make_alert(), vec![], 3600, 10);
+        add_to_batch(fp2.clone(), org.to_string(), make_alert(), vec![], 3600, 10);
+
+        let count = get_pending_batch_count(org);
+        assert!(count >= 2);
+
+        PENDING_BATCHES.remove(&fp1);
+        PENDING_BATCHES.remove(&fp2);
+    }
+}

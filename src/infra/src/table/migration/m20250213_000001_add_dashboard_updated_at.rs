@@ -58,3 +58,18 @@ enum Dashboards {
     Table,
     UpdatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20250213_000001_add_dashboard_updated_at"
+        );
+    }
+}

@@ -592,4 +592,18 @@ mod tests {
             assert_eq!(response.status().as_u16(), expected_status);
         }
     }
+
+    #[test]
+    fn test_folder_error_infra_error_is_500() {
+        let err = FolderError::InfraError(infra::errors::Error::Message("db down".to_string()));
+        let response: Response = err.into();
+        assert_eq!(response.status().as_u16(), 500);
+    }
+
+    #[test]
+    fn test_folder_error_table_reports_error_is_500() {
+        let err = FolderError::TableReportsError(infra::table::reports::Error::ReportNotFound);
+        let response: Response = err.into();
+        assert_eq!(response.status().as_u16(), 500);
+    }
 }
