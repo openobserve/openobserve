@@ -24,7 +24,7 @@ export class ThemePage {
         this.customColorPreview = '.theme-card-compact:has-text("Custom Color") .color-preview-small.clickable';
         this.colorPickerDialog = '.q-color-picker, .q-color';
         // The color picker Close button is the rectangle-styled button, not the round X button
-        this.colorPickerClose = '.q-dialog button:has-text("Close")';
+        this.colorPickerClose = '[data-test="color-picker-close-btn"]';
 
         // General Settings - Theme Management
         this.settingsMenuItem = '[data-test="menu-link-\\/settings-item"]';

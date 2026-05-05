@@ -420,6 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :ref="(node: any) => measureDashboardRow(node)"
               class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
+              data-test="dashboard-data-row"
               @click="handleDataRowClick(row.original, idx as number, $event)"
             >
               <td

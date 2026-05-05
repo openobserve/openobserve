@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-8 text-left q-pl-lg warning flex items-center">
+        <div v-else class="col-8 text-left q-pl-lg warning flex items-center" data-test="logs-search-result-title">
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText

@@ -21,8 +21,8 @@ export class IamPage {
 
         this.deleteButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td/button[@title='Delete Service Account']`;
 
-        this.confirmOkButton = "//div[@class='q-card']/div[2]/button/span[text()='OK']";
-        this.cancelButton = "//div[@class='q-card']/div[2]/button/span[text()='Cancel']";
+        this.confirmOkButton = '[data-test="confirm-button"]';
+        this.cancelButton = '[data-test="cancel-button"]';
 
         this.refreshButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td/button[@title='Refresh Service Token']`;
 

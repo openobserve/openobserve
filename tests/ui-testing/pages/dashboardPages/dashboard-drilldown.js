@@ -20,8 +20,8 @@ export default class DashboardDrilldownPage {
     this.confirmButton = page.locator('[data-test="confirm-button"]');
 
     // Dashboard view — drilldown trigger overlay
-    this.drilldownMenu = page.locator('.crosslink-drilldown-menu');
-    this.drilldownMenuFirstItem = page.locator('.crosslink-drilldown-menu-item').first();
+    this.drilldownMenu = page.locator('[data-test="drilldown-menu"]');
+    this.drilldownMenuFirstItem = page.locator('[data-test="drilldown-menu-item"]').first();
   }
 
   generateUniqueDrilldownName(prefix = "u") {
@@ -146,9 +146,9 @@ export default class DashboardDrilldownPage {
     await tablePanel.waitFor({ state: 'attached', timeout: 20000 });
     await tablePanel.scrollIntoViewIfNeeded();
 
-    // TanStack table (dashboard mode) renders rows directly in tbody with class dashboard-data-row.
+    // TanStack table (dashboard mode) renders rows directly in tbody with data-test="dashboard-data-row".
     // Click the first data row to trigger the @click:dataRow event (emitted as row-click).
-    const tableRow = tablePanel.locator('tbody tr.dashboard-data-row').first();
+    const tableRow = tablePanel.locator('[data-test="dashboard-data-row"]').first();
     await tableRow.waitFor({ state: 'visible', timeout: 30000 });
     await tableRow.click();
     await this.page.waitForTimeout(500);
