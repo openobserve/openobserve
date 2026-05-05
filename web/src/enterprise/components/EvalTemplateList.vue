@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="selectedItems.length > 0"
                   data-test="eval-template-list-bulk-delete-btn"
-                  variant="outline-destructive"
+                  variant="outline"
                   size="sm-action"
                   @click="openBulkDeleteDialog"
                 >

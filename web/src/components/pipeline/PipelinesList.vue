@@ -453,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     data-test="pipeline-list-delete-pipelines-btn"
-                    variant="outline-destructive"
+                    variant="outline"
                     size="sm-action"
                     @click="openBulkDeleteDialog"
                   >
