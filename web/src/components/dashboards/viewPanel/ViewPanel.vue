@@ -72,7 +72,7 @@
         </OButton>
         <OButton
           v-else
-          :variant="isVariablesChanged ? 'outline' : 'ghost-warning'"
+          :variant="isVariablesChanged ? 'outline' : 'outline-warning'"
           size="icon-xs"
           @click="refreshData"
           :disabled="disable"
@@ -86,7 +86,7 @@
           }}</q-tooltip>
         </OButton>
         <OButton
-          variant="ghost"
+          variant="outline"
           size="icon-xs"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
