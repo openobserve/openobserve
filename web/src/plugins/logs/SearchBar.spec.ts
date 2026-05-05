@@ -4216,20 +4216,20 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "status = 200",
         );
         expect(result).toBe(
-          'SELECT count(*) FROM "logs" where status = 200 GROUP BY level',
+          'SELECT count(*) FROM "logs" where status = 200 group by level',
         );
       });
 
       it("should insert WHERE before GROUP BY, not ORDER BY, when both are present (bug fix)", () => {
         // This is the exact bug: old code checked ORDER BY first and would
         // insert WHERE before ORDER BY instead of GROUP BY, producing
-        // invalid SQL like:  ...WHERE x GROUP BY y ORDER BY z
+        // invalid SQL like:  ...GROUP BY x where y ORDER BY z
         const result = insertFilterBeforeEarliestClause(
           'SELECT count(*) FROM "logs" GROUP BY level ORDER BY count(*) DESC',
           "status = 200",
         );
         expect(result).toBe(
-          'SELECT count(*) FROM "logs" where status = 200 GROUP BY level ORDER BY count(*) DESC',
+          'SELECT count(*) FROM "logs" where status = 200 group by level ORDER BY count(*) DESC',
         );
       });
 
@@ -4239,7 +4239,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "level = 'error'",
         );
         expect(result).toBe(
-          'SELECT * FROM "logs" where level = \'error\' ORDER BY timestamp DESC',
+          'SELECT * FROM "logs" where level = \'error\' order by timestamp DESC',
         );
       });
 
@@ -4249,7 +4249,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "status = 200",
         );
         expect(result).toBe(
-          'SELECT * FROM "logs" where status = 200 LIMIT 100',
+          'SELECT * FROM "logs" where status = 200 limit 100',
         );
       });
 
@@ -4259,7 +4259,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "status = 200",
         );
         expect(result).toBe(
-          'SELECT level, count(*) as cnt FROM "logs" where status = 200 GROUP BY level HAVING cnt > 5 ORDER BY cnt DESC LIMIT 10',
+          'SELECT level, count(*) as cnt FROM "logs" where status = 200 group by level HAVING cnt > 5 ORDER BY cnt DESC LIMIT 10',
         );
       });
 
@@ -4278,7 +4278,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "status = 200",
         );
         expect(result).toBe(
-          'SELECT level, count(*) as cnt FROM "logs" where status = 200 HAVING cnt > 5',
+          'SELECT level, count(*) as cnt FROM "logs" where status = 200 having cnt > 5',
         );
       });
 
@@ -4288,7 +4288,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "status = 200",
         );
         expect(result).toBe(
-          'SELECT * FROM "logs" where status = 200 Group By level Order By timestamp DESC',
+          'SELECT * FROM "logs" where status = 200 group by level Order By timestamp DESC',
         );
       });
     });
@@ -4303,7 +4303,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "AND",
         );
         expect(result).toBe(
-          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 GROUP BY status',
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 group by status',
         );
       });
 
@@ -4314,7 +4314,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "AND",
         );
         expect(result).toBe(
-          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 GROUP BY status ORDER BY count(*) DESC LIMIT 50',
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 group by status ORDER BY count(*) DESC LIMIT 50',
         );
       });
 
@@ -4334,18 +4334,16 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
 
     describe("edge cases", () => {
       it("should not be confused by column names containing clause keywords", () => {
-        // "order_count" contains "order" but is not "order by"
+        // "order_count" does NOT contain "order by" (with space), so it won't
+        // cause false matches. The algorithm looks for "group by", "order by",
+        // etc. with spaces, so column names like "group_name" or "order_count"
+        // are safe.
         const result = insertFilterBeforeEarliestClause(
           'SELECT order_count, group_name FROM "logs" GROUP BY group_name ORDER BY order_count DESC',
           "status = 200",
         );
-        // The algorithm uses .indexOf which might find "order" in "order_count"
-        // followed by "by" ... actually "order_count" doesn't contain "order by"
-        // so this test is fine. But let's check if "group" in "group_name" could
-        // falsely match "group by" — it does because "group_name" contains "group"
-        // but not "group by". The algorithm looks for "group by" not just "group".
         expect(result).toBe(
-          'SELECT order_count, group_name FROM "logs" where status = 200 GROUP BY group_name ORDER BY order_count DESC',
+          'SELECT order_count, group_name FROM "logs" where status = 200 group by group_name ORDER BY order_count DESC',
         );
       });
 
@@ -4363,7 +4361,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "message = 'error: 500 - internal'",
         );
         expect(result).toBe(
-          'SELECT * FROM "logs" where message = \'error: 500 - internal\' GROUP BY level',
+          'SELECT * FROM "logs" where message = \'error: 500 - internal\' group by level',
         );
       });
     });
