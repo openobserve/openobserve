@@ -653,6 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- end usage tab panel -->
+    </div>
   </q-page>
 </template>
 
