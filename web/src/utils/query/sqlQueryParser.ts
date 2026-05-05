@@ -288,13 +288,30 @@ export async function parseSQL(
     // Extract fields, filters, and joins
     const { fields, filters, streamName, joins } = await getFieldsFromQuery(query);
 
-    // If no fields extracted, use custom mode
+    // If no fields extracted (SELECT *), use auto mode with default histogram/count
     if (!fields || fields.length === 0) {
       return {
-        ...defaultResult,
         stream: stream || streamName || "",
+        streamType,
+        xFields: [
+          {
+            column: "_timestamp",
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+        ],
+        yFields: [
+          {
+            column: "_timestamp",
+            alias: "y_axis_1",
+            aggregationFunction: "count",
+          },
+        ],
+        breakdownFields: [],
         filters: filters as ParsedFilter,
         joins: joins || [],
+        customQuery: false,
+        rawQuery: query,
       };
     }
 

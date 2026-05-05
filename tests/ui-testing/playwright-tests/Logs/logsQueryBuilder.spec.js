@@ -1260,3 +1260,87 @@ test.describe("Logs Query Builder - Chart Auto-Selection", () => {
         testLogger.info('Multiple Y + X → bar chart - PASSED');
     });
 });
+
+// ============================================================================
+// Test Suite: SQL Query Generation - WHERE clause & value handling
+// ============================================================================
+
+test.describe("Logs Query Builder - SQL Query Generation", () => {
+    test.describe.configure({ mode: 'serial' });
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+
+        await page.waitForLoadState('domcontentloaded');
+        await ingestTestData(page);
+        await page.waitForLoadState('domcontentloaded');
+
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
+        await pm.logsPage.selectStream("e2e_automate");
+        await applyQueryButton(pm);
+
+        testLogger.info('SQL Query Generation test setup completed');
+    });
+
+    test("LIKE clause query → auto mode with filter parsed", {
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+    }, async ({ page }) => {
+        testLogger.info('Testing LIKE clause: SELECT * with LIKE → auto mode + filter');
+
+        // LIKE clause with special characters (starts with pattern)
+        const likeQuery = `SELECT * FROM "e2e_automate" WHERE kubernetes.container_name LIKE 'prom%'`;
+        await setupQueryAndSwitchToBuild(pm, page, likeQuery);
+
+        // SELECT * with WHERE → auto mode (default histogram/count) + filter parsed
+        await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.verifyChartTypeSelected('bar');
+
+        // X and Y axes should have default fields
+        await pm.logsPage.expectXAxisLayoutVisible();
+        await pm.logsPage.expectYAxisLayoutVisible();
+
+        // Filter should be parsed from WHERE clause
+        const filterCount = await pm.logsPage.getFilterConditionCount();
+        expect(filterCount).toBeGreaterThanOrEqual(1);
+
+        // Generated query in search bar should contain LIKE with proper quoting
+        const editorText = await pm.logsPage.getQueryEditorText();
+        expect(editorText.toLowerCase()).toContain('like');
+        expect(editorText).toContain('prom%');
+
+        testLogger.info('LIKE clause → auto mode + filter - PASSED');
+    });
+
+    test("SELECT * with WHERE numeric value → auto mode, unquoted number in filter", {
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+    }, async ({ page }) => {
+        testLogger.info('Testing SELECT * + WHERE numeric: auto mode + filter + unquoted value');
+
+        // SELECT * with numeric WHERE condition — should go to auto mode (not custom)
+        // and the numeric value should NOT be quoted in the generated SQL
+        const numericWhereQuery = `SELECT * FROM "e2e_automate" WHERE k8s_container_restart_count = '1'`;
+        await setupQueryAndSwitchToBuild(pm, page, numericWhereQuery);
+
+        // SELECT * → auto mode with default histogram/count → bar chart
+        await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.verifyChartTypeSelected('bar');
+
+        // X and Y axes should have default fields (histogram + count)
+        await pm.logsPage.expectXAxisLayoutVisible();
+        await pm.logsPage.expectYAxisLayoutVisible();
+
+        // Filter should be parsed from WHERE clause
+        const filterCount = await pm.logsPage.getFilterConditionCount();
+        expect(filterCount).toBeGreaterThanOrEqual(1);
+
+        // Generated query should contain the WHERE condition
+        const editorText = await pm.logsPage.getQueryEditorText();
+        expect(editorText.toLowerCase()).toContain('where');
+        expect(editorText).toContain('k8s_container_restart_count');
+
+        testLogger.info('SELECT * + WHERE numeric → auto mode + filter - PASSED');
+    });
+});

@@ -570,11 +570,14 @@ const formatValue = (
   }
   // escape any single quotes in the value
   tempValue = escapeSingleQuotes(tempValue);
-  // add double quotes around the value
-  tempValue =
-    columnType == "Utf8" || columnType === undefined
-      ? `'${tempValue}'`
-      : `${tempValue}`;
+  // Quote string values, leave numeric values unquoted
+  if (columnType === "Utf8") {
+    tempValue = `'${tempValue}'`;
+  } else if (columnType === undefined) {
+    // Schema not loaded — infer from value: quote unless it's purely numeric
+    const isNumeric = tempValue !== "" && !isNaN(Number(tempValue));
+    tempValue = isNumeric ? `${tempValue}` : `'${tempValue}'`;
+  }
 
   return tempValue;
 };
@@ -746,22 +749,13 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
           )}`;
           break;
         case "Not Contains":
-          selectFilter +=
-            columnType === "Utf8"
-              ? `NOT LIKE '%${condition.value}%'`
-              : `NOT LIKE %${condition.value}%`;
+          selectFilter += `NOT LIKE '%${escapeSingleQuotes(condition.value)}%'`;
           break;
         case "Starts With":
-          selectFilter +=
-            columnType === "Utf8"
-              ? `LIKE '${condition.value}%'`
-              : `LIKE ${condition.value}%`;
+          selectFilter += `LIKE '${escapeSingleQuotes(condition.value)}%'`;
           break;
         case "Ends With":
-          selectFilter +=
-            columnType === "Utf8"
-              ? `LIKE '%${condition.value}'`
-              : `LIKE %${condition.value}`;
+          selectFilter += `LIKE '%${escapeSingleQuotes(condition.value)}'`;
           break;
         default:
           selectFilter += `${condition.operator} ${formatValue(
