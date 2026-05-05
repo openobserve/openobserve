@@ -2230,10 +2230,27 @@ export default defineComponent({
       },
     );
 
-    // NOTE: Build mode URL sync is handled by runQuery (line ~2530).
-    // Reactive watchers that call router.push are intentionally avoided here
-    // because Quasar QMenu watches $route.fullPath and auto-closes on any
-    // route change, which breaks all popups in the builder.
+    // Watch for build page chart type changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.type,
+      () => {
+        // Sync build data to URL parameters when chart type changes
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+    );
+
+    // Watch for build page config changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.config,
+      () => {
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+      { deep: true },
+    );
 
     // Watch for SQL mode changes while in build mode.
     // When SQL mode is toggled, re-sync the search bar query:
