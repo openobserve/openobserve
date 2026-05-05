@@ -1038,41 +1038,35 @@ pub(crate) async fn check_permissions(
 
     let object_str = auth_info.o2_type;
     log::debug!("Role of user {user_id} is {role:#?}");
-    let obj_str = if object_str.contains("##user_id##") {
-        object_str.replace("##user_id##", user_id)
-    } else {
-        object_str
-    };
     let role = if role.eq(&UserRole::Root) {
         // root user should have access to everything , bypass check in openfga
         return true;
-    } else if auth_info.org_id.eq("organizations") && auth_info.method.eq("POST") {
-        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
-            Some(user) => format!("{}", user.role),
-            None => "".to_string(),
-        }
     } else {
         format!("{role}")
     };
-    let org_id = if auth_info.org_id.eq("organizations") {
-        if auth_info.method.eq("POST") {
-            // The user is trying to create a new organization
-            // Use the usage org to check for permission
-            config::META_ORG_ID
-        } else {
-            user_id
+
+    let org_id = &auth_info.org_id;
+
+    // When checking against META_ORG, look up the user's role there
+    let effective_role = if org_id == config::META_ORG_ID {
+        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
+            Some(user) => format!("{}", user.role),
+            None => role,
         }
     } else {
-        &auth_info.org_id
+        role
     };
 
     o2_openfga::authorizer::authz::is_allowed(
         org_id,
         user_id,
         &auth_info.method,
-        &obj_str,
+        &object_str,
         &auth_info.parent_id,
-        &role.to_string(),
+        &effective_role,
+        auth_info.use_all_org,
+        auth_info.use_self_context,
+        auth_info.use_self_parent,
     )
     .await
 }

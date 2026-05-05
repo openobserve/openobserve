@@ -743,6 +743,9 @@ pub async fn delete_alert_bulk(
             "alerts",
             "DELETE",
             Some(&_folder_id),
+            false,
+            false,
+            false,
         )
         .await
         {
@@ -1042,7 +1045,19 @@ pub async fn enable_alert_bulk(
         let user_id = &user_email.user_id;
 
         for id in &req.ids {
-            if !check_permissions(&id.to_string(), &org_id, user_id, "alerts", "PUT", None).await {
+            if !check_permissions(
+                &id.to_string(),
+                &org_id,
+                user_id,
+                "alerts",
+                "PUT",
+                None,
+                false,
+                false,
+                false,
+            )
+            .await
+            {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
