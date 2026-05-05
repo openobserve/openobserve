@@ -126,6 +126,7 @@ mod tests {
     };
     use o2_enterprise::enterprise::search::datafusion::optimizer::broadcast_join::should_use_broadcast_join;
 
+    use super::*;
     use crate::service::search::datafusion::{
         optimizer::physical_optimizer::join_reorder::JoinReorderRule,
         table_provider::empty_table::NewEmptyTable,
