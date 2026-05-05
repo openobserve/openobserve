@@ -26,8 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       height: 100%;
     "
   >
-    <div class="search-list full-height full-width" ref="searchListContainer">
-      <div class="row tw:min-h-[28px] tw:pt-[0.375rem]">
+    <div
+      class="search-list full-height full-width tw:flex tw:flex-col"
+      ref="searchListContainer"
+    >
+      <!-- Section header: static at top -->
+      <div class="row tw:min-h-[28px] tw:pt-[0.375rem] tw:shrink-0">
         <div
           class="col-8 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
@@ -207,166 +211,223 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
       </div>
-      <div
-        :class="[
-          'histogram-container',
-          searchObj.meta.showHistogram
-            ? 'histogram-container--visible'
-            : 'histogram-container--hidden',
-        ]"
-        v-if="
-          searchObj.meta.logsVisualizeToggle !== 'patterns' &&
-          searchObj.data?.histogram?.errorMsg == '' &&
-          searchObj.data.histogram.errorCode != -1
-        "
-      >
+
+      <!-- Combined scroll area: histogram + logs/patterns scroll together -->
+      <div class="tw:flex-1 tw:overflow-y-auto" ref="scrollContainerRef">
         <div
+          ref="histogramRef"
+          :class="[
+            'histogram-container',
+            searchObj.meta.showHistogram
+              ? 'histogram-container--visible'
+              : 'histogram-container--hidden',
+          ]"
           v-if="
-            searchObj.meta.showHistogram &&
-            (searchObj.data?.queryResults?.aggs?.length > 0 ||
-              (plotChart && Object.keys(plotChart)?.length > 0))
-          "
-          class="histogram-chart"
-          @click="onHistogramAreaClick"
-        >
-          <ChartRenderer
-            ref="histogramChart"
-            data-test="logs-search-result-bar-chart"
-            :data="plotChart"
-            style="width:100%;height:100%"
-            @updated:dataZoom="onChartUpdate"
-          />
-        </div>
-
-        <div
-          class="histogram-empty"
-          v-else-if="
-            searchObj.meta.showHistogram &&
-            !searchObj.loadingHistogram &&
-            !searchObj.loading
-          "
-        >
-          <h6 class="text-center">
-            <span class="histogram-empty__message">
-              <q-icon name="warning" color="warning" size="xs"></q-icon> No data
-              found for histogram.</span
-            >
-          </h6>
-        </div>
-
-        <div
-          class="histogram-empty"
-          v-else-if="
-            searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0
-          "
-        >
-          <h5 class="text-center">
-            <span class="histogram-empty__message" style="color: transparent"
-              >.</span
-            >
-          </h5>
-        </div>
-
-        <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
-          <q-spinner-hourglass
-            color="primary"
-            size="25px"
-            class="search-spinner"
-          />
-        </div>
-      </div>
-      <div
-        :class="[
-          'histogram-container',
-          searchObj.meta.showHistogram
-            ? 'histogram-container--visible'
-            : 'histogram-container--hidden',
-        ]"
-        v-else-if="
-          searchObj.meta.logsVisualizeToggle !== 'patterns' &&
-          searchObj.data.histogram?.errorMsg != '' &&
-          searchObj.meta.showHistogram &&
-          searchObj.data.histogram.errorCode != -1
-        "
-      >
-        <h6
-          class="text-center histogram-error"
-          v-if="
-            searchObj.data.histogram.errorCode != 0 &&
+            searchObj.meta.logsVisualizeToggle !== 'patterns' &&
+            searchObj.data?.histogram?.errorMsg == '' &&
             searchObj.data.histogram.errorCode != -1
           "
         >
-          <q-icon name="warning" color="warning" size="xs"></q-icon> Error while
-          fetching histogram data.
-          <q-btn
-            @click="toggleErrorDetails"
-            size="sm"
-            data-test="logs-page-histogram-error-details-btn"
-            class="o2-secondary-button"
-            >{{ t("search.histogramErrorBtnLabel") }}</q-btn
-          ><br />
-          <span v-if="disableMoreErrorDetails">
+          <div
+            v-if="
+              searchObj.meta.showHistogram &&
+              (searchObj.data?.queryResults?.aggs?.length > 0 ||
+                (plotChart && Object.keys(plotChart)?.length > 0))
+            "
+            class="histogram-chart"
+            @click="onHistogramAreaClick"
+          >
+            <ChartRenderer
+              ref="histogramChart"
+              data-test="logs-search-result-bar-chart"
+              :data="plotChart"
+              style="width: 100%; height: 100%"
+              @updated:dataZoom="onChartUpdate"
+            />
+          </div>
+
+          <div
+            class="histogram-empty"
+            v-else-if="
+              searchObj.meta.showHistogram &&
+              !searchObj.loadingHistogram &&
+              !searchObj.loading
+            "
+          >
+            <h6 class="text-center">
+              <span class="histogram-empty__message">
+                <q-icon name="warning" color="warning" size="xs"></q-icon> No
+                data found for histogram.</span
+              >
+            </h6>
+          </div>
+
+          <div
+            class="histogram-empty"
+            v-else-if="
+              searchObj.meta.showHistogram &&
+              Object.keys(plotChart)?.length === 0
+            "
+          >
+            <h5 class="text-center">
+              <span class="histogram-empty__message" style="color: transparent"
+                >.</span
+              >
+            </h5>
+          </div>
+
+          <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
+            <q-spinner-hourglass
+              color="primary"
+              size="25px"
+              class="search-spinner"
+            />
+          </div>
+        </div>
+        <div
+          :class="[
+            'histogram-container',
+            searchObj.meta.showHistogram
+              ? 'histogram-container--visible'
+              : 'histogram-container--hidden',
+          ]"
+          v-else-if="
+            searchObj.meta.logsVisualizeToggle !== 'patterns' &&
+            searchObj.data.histogram?.errorMsg != '' &&
+            searchObj.meta.showHistogram &&
+            searchObj.data.histogram.errorCode != -1
+          "
+        >
+          <h6
+            class="text-center histogram-error"
+            v-if="
+              searchObj.data.histogram.errorCode != 0 &&
+              searchObj.data.histogram.errorCode != -1
+            "
+          >
+            <q-icon name="warning" color="warning" size="xs"></q-icon> Error
+            while fetching histogram data.
+            <q-btn
+              @click="toggleErrorDetails"
+              size="sm"
+              data-test="logs-page-histogram-error-details-btn"
+              class="o2-secondary-button"
+              >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+            ><br />
+            <span v-if="disableMoreErrorDetails">
+              <SanitizedHtmlRenderer
+                data-test="logs-search-histogram-error-message"
+                :htmlContent="searchObj.data?.histogram?.errorMsg"
+              />
+            </span>
+          </h6>
+          <h6
+            class="text-center"
+            v-else-if="searchObj.data.histogram.errorCode != -1"
+          >
             <SanitizedHtmlRenderer
               data-test="logs-search-histogram-error-message"
               :htmlContent="searchObj.data?.histogram?.errorMsg"
             />
-          </span>
-        </h6>
-        <h6
-          class="text-center"
-          v-else-if="searchObj.data.histogram.errorCode != -1"
-        >
-          <SanitizedHtmlRenderer
-            data-test="logs-search-histogram-error-message"
-            :htmlContent="searchObj.data?.histogram?.errorMsg"
-          />
-        </h6>
-      </div>
-
-      <!-- Pinned breakdown tooltip — teleported to body to avoid stacking context issues -->
-      <Teleport to="body">
-        <div v-if="pinnedTooltip.visible" class="oo-pin-backdrop" @click="closePinnedTooltip" />
-        <div
-          v-if="pinnedTooltip.visible"
-          class="oo-pin-tooltip"
-          :style="{ top: pinnedTooltip.y + 'px', left: pinnedTooltip.x + 'px' }"
-          @keydown.esc="closePinnedTooltip"
-          tabindex="-1"
-        >
-          <div class="oo-pin-tooltip__time">{{ pinnedTooltip.timestamp }}</div>
-          <div
-            v-for="row in pinnedTooltip.rows"
-            :key="row.rawValue"
-            class="oo-pin-tooltip__row"
-          >
-            <span class="oo-pin-tooltip__dot" :style="{ background: row.color }" />
-            <span class="oo-pin-tooltip__name">{{ row.displayLabel }}</span>
-            <span class="oo-pin-tooltip__count">{{ formatCount(row.count) }}</span>
-            <span class="oo-pin-tooltip__row-actions">
-              <span class="oo-pin-tooltip__action oo-pin-tooltip__action--include" title="include" @click.stop="applyPinnedFilter(row.rawValue, 'include')">=</span>
-              <span class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude" title="exclude" @click.stop="applyPinnedFilter(row.rawValue, 'exclude')">≠</span>
-            </span>
-          </div>
+          </h6>
         </div>
-      </Teleport>
 
-      <!-- Logs View -->
-      <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
-        <tenstack-table
-          ref="searchTableRef"
-          :columns="getColumns || []"
-          :rows="searchObj.data.queryResults?.hits || []"
-          :wrap="searchObj.meta.toggleSourceWrap"
-          :width="getTableWidth"
-          :err-msg="searchObj.data.missingStreamMessage"
-          :loading="searchObj.loading"
-          :functionErrorMsg="searchObj?.data?.functionError"
-          :expandedRows="expandedLogs"
-          :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
-          :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
-          :highlight-query="searchObj.data.highlightQuery"
-          :default-columns="!searchObj.data.stream.selectedFields.length"
-          class="col-12 tw:mt-[0.375rem]"
+        <!-- Pinned breakdown tooltip — teleported to body to avoid stacking context issues -->
+        <Teleport to="body">
+          <div
+            v-if="pinnedTooltip.visible"
+            class="oo-pin-backdrop"
+            @click="closePinnedTooltip"
+          />
+          <div
+            v-if="pinnedTooltip.visible"
+            class="oo-pin-tooltip"
+            :style="{
+              top: pinnedTooltip.y + 'px',
+              left: pinnedTooltip.x + 'px',
+            }"
+            @keydown.esc="closePinnedTooltip"
+            tabindex="-1"
+          >
+            <div class="oo-pin-tooltip__time">
+              {{ pinnedTooltip.timestamp }}
+            </div>
+            <div
+              v-for="row in pinnedTooltip.rows"
+              :key="row.rawValue"
+              class="oo-pin-tooltip__row"
+            >
+              <span
+                class="oo-pin-tooltip__dot"
+                :style="{ background: row.color }"
+              />
+              <span class="oo-pin-tooltip__name">{{ row.displayLabel }}</span>
+              <span class="oo-pin-tooltip__count">{{
+                formatCount(row.count)
+              }}</span>
+              <span class="oo-pin-tooltip__row-actions">
+                <span
+                  class="oo-pin-tooltip__action oo-pin-tooltip__action--include"
+                  title="include"
+                  @click.stop="applyPinnedFilter(row.rawValue, 'include')"
+                  >=</span
+                >
+                <span
+                  class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude"
+                  title="exclude"
+                  @click.stop="applyPinnedFilter(row.rawValue, 'exclude')"
+                  >≠</span
+                >
+              </span>
+            </div>
+          </div>
+        </Teleport>
+
+        <!-- Logs View -->
+        <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
+          <tenstack-table
+            ref="searchTableRef"
+            :columns="getColumns || []"
+            :rows="searchObj.data.queryResults?.hits || []"
+            :wrap="searchObj.meta.toggleSourceWrap"
+            :width="getTableWidth"
+            :err-msg="searchObj.data.missingStreamMessage"
+            :loading="searchObj.loading"
+            :functionErrorMsg="searchObj?.data?.functionError"
+            :expandedRows="expandedLogs"
+            :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
+            :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
+            :highlight-query="searchObj.data.highlightQuery"
+            :default-columns="!searchObj.data.stream.selectedFields.length"
+            class="col-12"
+            :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
+            :scroll-el="scrollContainerRef"
+            :scroll-margin="0"
+            :class="[
+              !searchObj.meta.showHistogram ||
+              (searchObj.meta.showHistogram &&
+                searchObj.data.histogram.errorCode == -1)
+                ? 'table-container--without-histogram'
+                : 'table-container--with-histogram',
+            ]"
+            @update:columnSizes="handleColumnSizesUpdate"
+            @update:columnOrder="handleColumnOrderUpdate"
+            @copy="copyLogToClipboard"
+            @add-field-to-table="addFieldToTable"
+            @add-search-term="addSearchTerm"
+            @close-column="closeColumn"
+            @click:data-row="openLogDetails"
+            @expand-row="expandLog"
+            @send-to-ai-chat="sendToAiChat"
+            @view-trace="redirectToTraces"
+            @show-correlation="openLogDetailsWithCorrelation"
+          />
+        </template>
+
+        <!-- Patterns View -->
+        <div
+          v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
+          class="tw:flex tw:flex-col"
           :class="[
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram &&
@@ -374,46 +435,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'table-container--without-histogram'
               : 'table-container--with-histogram',
           ]"
-          :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
-          @update:columnSizes="handleColumnSizesUpdate"
-          @update:columnOrder="handleColumnOrderUpdate"
-          @copy="copyLogToClipboard"
-          @add-field-to-table="addFieldToTable"
-          @add-search-term="addSearchTerm"
-          @close-column="closeColumn"
-          @click:data-row="openLogDetails"
-          @expand-row="expandLog"
-          @send-to-ai-chat="sendToAiChat"
-          @view-trace="redirectToTraces"
-          @show-correlation="openLogDetailsWithCorrelation"
-        />
-      </template>
-
-      <!-- Patterns View -->
-      <div
-        v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
-        class="tw:flex tw:flex-col"
-        :class="[
-          !searchObj.meta.showHistogram ||
-          (searchObj.meta.showHistogram &&
-            searchObj.data.histogram.errorCode == -1)
-            ? 'table-container--without-histogram'
-            : 'table-container--with-histogram',
-        ]"
-      >
-        <!-- Patterns List -->
-        <PatternList
-          :patterns="patternsState?.patterns?.patterns || []"
-          :loading="searchObj.loading"
-          :totalLogsAnalyzed="
-            patternsState?.patterns?.statistics?.total_logs_analyzed
-          "
-          :wrap="searchObj.meta.toggleSourceWrap"
-          @open-details="openPatternDetails"
-          @add-to-search="addPatternToSearch"
-          @create-alert="createAlertFromPattern"
-        />
+        >
+          <!-- Patterns List -->
+          <PatternList
+            :patterns="patternsState?.patterns?.patterns || []"
+            :loading="searchObj.loading"
+            :totalLogsAnalyzed="
+              patternsState?.patterns?.statistics?.total_logs_analyzed
+            "
+            :wrap="searchObj.meta.toggleSourceWrap"
+            :scroll-target="scrollContainerRef"
+            @open-details="openPatternDetails"
+            @add-to-search="addPatternToSearch"
+            @create-alert="createAlertFromPattern"
+          />
+        </div>
       </div>
+      <!-- end combined scroll area -->
 
       <q-dialog
         data-test="logs-search-result-detail-dialog"
@@ -853,6 +891,8 @@ export default defineComponent({
     } | null>(null);
 
     const searchTableRef: any = ref(null);
+    const scrollContainerRef = ref(null);
+    const histogramRef = ref(null);
 
     // Correlation dashboard state
     const showCorrelation = ref(false);
@@ -965,7 +1005,12 @@ export default defineComponent({
       y: number;
       field: string;
       timestamp: string;
-      rows: { displayLabel: string; rawValue: string; count: number; color: string }[];
+      rows: {
+        displayLabel: string;
+        rawValue: string;
+        count: number;
+        color: string;
+      }[];
     }>({
       visible: false,
       x: 0,
@@ -980,11 +1025,15 @@ export default defineComponent({
     const closePinnedTooltip = () => {
       pinnedTooltip.value.visible = false;
       // Restore tooltip mouse tracking
-      histogramChart.value?.chart?.setOption({ tooltip: { triggerOn: "mousemove|click" } }, false);
+      histogramChart.value?.chart?.setOption(
+        { tooltip: { triggerOn: "mousemove|click" } },
+        false,
+      );
     };
 
     const onHistogramAreaClick = (event: MouseEvent) => {
-      const { breakdownField, breakdownSeries, xData } = searchObj.data.histogram;
+      const { breakdownField, breakdownSeries, xData } =
+        searchObj.data.histogram;
       if (!breakdownSeries?.size || !xData?.length) return;
 
       const eChart = histogramChart.value?.chart;
@@ -998,7 +1047,10 @@ export default defineComponent({
       // Ignore clicks outside the plot area (e.g. legend items)
       if (!eChart.containPixel("grid", [pixelX, pixelY])) return;
 
-      const dataPoint = eChart.convertFromPixel({ seriesIndex: 0 }, [pixelX, pixelY]);
+      const dataPoint = eChart.convertFromPixel({ seriesIndex: 0 }, [
+        pixelX,
+        pixelY,
+      ]);
       if (!dataPoint) return;
 
       const clickedTs: number = dataPoint[0];
@@ -1006,7 +1058,10 @@ export default defineComponent({
       let minDiff = Infinity;
       (xData as number[]).forEach((ts: number, i: number) => {
         const diff = Math.abs(ts - clickedTs);
-        if (diff < minDiff) { minDiff = diff; dataIndex = i; }
+        if (diff < minDiff) {
+          minDiff = diff;
+          dataIndex = i;
+        }
       });
 
       const timestamp = formatDate(new Date(xData[dataIndex]));
@@ -1015,7 +1070,10 @@ export default defineComponent({
         // Explicit check so numeric 0 is not treated as empty (0 is falsy in JS).
         // Case is preserved — we never re-capitalize or lowercase user data;
         // the tooltip label and the filter term must match the source exactly.
-        const label = (category === null || category === undefined || category === "") ? "(empty)" : String(category);
+        const label =
+          category === null || category === undefined || category === ""
+            ? "(empty)"
+            : String(category);
         const rawValue = label === "(empty)" ? "" : label;
         const matchedSeries = (plotChart.value?.options?.series ?? []).find(
           (s: any) => s.name === label,
@@ -1032,20 +1090,36 @@ export default defineComponent({
       const panelW = 250;
       // Cap panel height at the viewport so placement math stays valid even
       // for high-cardinality breakdowns. Actual scroll is handled in CSS.
-      const panelH = Math.min(rows.length * 28 + 60, window.innerHeight - 2 * margin);
-      const x = Math.min(event.clientX + margin, window.innerWidth - panelW - margin);
+      const panelH = Math.min(
+        rows.length * 28 + 60,
+        window.innerHeight - 2 * margin,
+      );
+      const x = Math.min(
+        event.clientX + margin,
+        window.innerWidth - panelW - margin,
+      );
       const y = Math.max(
         margin,
         Math.min(event.clientY + margin, window.innerHeight - panelH - margin),
       );
 
-      pinnedTooltip.value = { visible: true, x, y, field: breakdownField ?? "", timestamp, rows };
+      pinnedTooltip.value = {
+        visible: true,
+        x,
+        y,
+        field: breakdownField ?? "",
+        timestamp,
+        rows,
+      };
 
       eChart.dispatchAction({ type: "hideTip" });
       eChart.setOption({ tooltip: { triggerOn: "none" } }, false);
     };
 
-    const applyPinnedFilter = (rawValue: string, action: "include" | "exclude") => {
+    const applyPinnedFilter = (
+      rawValue: string,
+      action: "include" | "exclude",
+    ) => {
       const field = pinnedTooltip.value.field;
       if (!field) return;
       addSearchTerm(field, rawValue, action);
@@ -1404,7 +1478,7 @@ export default defineComponent({
     });
 
     const scrollTableToTop = (value: number) => {
-      searchTableRef.value?.parentRef?.scrollTo({ top: value });
+      scrollContainerRef.value?.scrollTo({ top: value });
     };
 
     const getColumns = computed(() => {
@@ -1599,6 +1673,8 @@ export default defineComponent({
       updatedLocalLogFilterField,
       byString,
       searchTableRef,
+      scrollContainerRef,
+      histogramRef,
       searchAroundData,
       addSearchTerm,
       removeSearchTerm,
