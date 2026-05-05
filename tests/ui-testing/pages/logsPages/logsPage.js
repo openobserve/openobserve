@@ -147,8 +147,8 @@ export class LogsPage {
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
 
         // Query type selector (Auto/Custom mode)
-        this.builderQueryType = '[data-test="dashboard-builder-query-type"]';
-        this.customQueryType = '[data-test="dashboard-custom-query-type"]';
+        this.builderQueryType = '[data-test="logs-build-mode-builder-btn"]';
+        this.customQueryType = '[data-test="logs-build-mode-custom-btn"]';
         this.sqlQueryType = '[data-test="dashboard-sql-query-type"]';
         this.promqlQueryType = '[data-test="dashboard-promql-query-type"]';
 
@@ -1761,7 +1761,7 @@ export class LogsPage {
     }
 
     async fillQueryEditor(query) {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
     }
 
     async clearQueryEditor() {
@@ -5835,7 +5835,8 @@ export class LogsPage {
      */
     async setQueryEditorContent(query) {
         // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        // Use .first() to avoid strict mode violations when multiple monaco instances exist
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea').first();
         await inputArea.click({ force: true });
         await inputArea.fill(query);
         // Wait for Monaco to render the new content in the view-line
@@ -6352,9 +6353,11 @@ export class LogsPage {
     /**
      * Expect Builder mode (Auto mode) to be active
      */
-    async expectBuilderModeActive() {
+    async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
-        await expect(builderTypeBtn).toBeVisible();
+        await expect(builderTypeBtn).toBeVisible({ timeout });
+        // Verify "Builder" button has "selected" class (active state)
+        await expect(builderTypeBtn).toHaveClass(/selected/, { timeout });
         testLogger.info('Builder mode is active');
     }
 
@@ -6372,7 +6375,18 @@ export class LogsPage {
      */
     async clickBuilderQueryType() {
         await this.page.locator(this.builderQueryType).click();
-        await this.page.waitForTimeout(500);
+        // Switching Custom → Builder shows a confirmation dialog
+        // ("Are you sure? X/Y/Filters will be wiped off.")
+        const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+        try {
+            await confirmBtn.waitFor({ state: 'visible', timeout: 3000 });
+            await confirmBtn.click();
+            testLogger.info('Confirmed Builder mode switch (dialog dismissed)');
+        } catch (e) {
+            // No dialog appeared — direct switch (e.g., first time or already in builder)
+            testLogger.info('No confirmation dialog appeared');
+        }
+        await this.page.waitForLoadState('domcontentloaded').catch(() => {});
         testLogger.info('Clicked Builder query type');
     }
 
@@ -6388,24 +6402,24 @@ export class LogsPage {
     /**
      * Expect X-axis layout section to be visible
      */
-    async expectXAxisLayoutVisible() {
-        await expect(this.page.locator(this.xAxisLayout)).toBeVisible();
+    async expectXAxisLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.xAxisLayout)).toBeVisible({ timeout });
         testLogger.info('X-axis layout is visible');
     }
 
     /**
      * Expect Y-axis layout section to be visible
      */
-    async expectYAxisLayoutVisible() {
-        await expect(this.page.locator(this.yAxisLayout)).toBeVisible();
+    async expectYAxisLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.yAxisLayout)).toBeVisible({ timeout });
         testLogger.info('Y-axis layout is visible');
     }
 
     /**
      * Expect Breakdown layout section to be visible
      */
-    async expectBreakdownLayoutVisible() {
-        await expect(this.page.locator(this.breakdownLayout)).toBeVisible();
+    async expectBreakdownLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.breakdownLayout)).toBeVisible({ timeout });
         testLogger.info('Breakdown layout is visible');
     }
 
@@ -6500,21 +6514,46 @@ export class LogsPage {
 
     /**
      * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
-     * Uses the parent element's background class to detect selection state.
+     * Uses waitForFunction for reliable DOM detection that survives reactive re-renders.
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
-    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
-        // Use visible() filter — there can be multiple PanelEditor instances in DOM
-        // (e.g., cached Visualize tab + active Build tab). Only check the visible one.
-        const selector = this.chartTypeItem(chartId);
-        const parentLocator = this.page.locator(selector).locator('visible=true').locator('..');
-
+    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 30000) {
         if (shouldBeSelected) {
-            await expect(parentLocator).toHaveClass(/bg-grey-[35]/, { timeout });
-            testLogger.info(`Chart type "${chartId}" is selected (verified via bg-grey class)`);
+            // Use waitForFunction to reliably detect the selected chart type in DOM
+            // This approach is immune to Playwright locator timing issues with reactive re-renders
+            try {
+                await this.page.waitForFunction((expectedChart) => {
+                    const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
+                    for (const item of items) {
+                        const classes = item.className || '';
+                        if (classes.includes('bg-grey-3') || classes.includes('bg-grey-5')) {
+                            const child = item.querySelector(`[data-test="selected-chart-${expectedChart}-item"]`);
+                            if (child) return true;
+                        }
+                    }
+                    return false;
+                }, chartId, { timeout });
+                testLogger.info(`Chart type "${chartId}" is selected (verified via waitForFunction)`);
+            } catch (error) {
+                // Fallback: check what IS selected for better error messages
+                const actual = await this.waitForChartTypeStabilized(5000);
+                throw new Error(`Expected chart type "${chartId}" to be selected, but found "${actual || 'none'}"`);
+            }
         } else {
-            await expect(parentLocator).not.toHaveClass(/bg-grey-[35]/, { timeout: 5000 });
+            // Verify chart is NOT selected
+            const result = await this.page.evaluate((expectedChart) => {
+                const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
+                for (const item of items) {
+                    const classes = item.className || '';
+                    if (classes.includes('bg-grey-3') || classes.includes('bg-grey-5')) {
+                        const child = item.querySelector(`[data-test="selected-chart-${expectedChart}-item"]`);
+                        if (child) return true;
+                    }
+                }
+                return false;
+            }, chartId);
+            expect(result).toBe(false);
             testLogger.info(`Chart type "${chartId}" is NOT selected (verified via bg-grey class)`);
         }
     }
@@ -6718,6 +6757,87 @@ export class LogsPage {
             testLogger.info(`Chart type detected via fallback: ${fallback}`);
         }
         return fallback;
+    }
+
+    // ============================================================================
+    // BUILD TAB IMPROVEMENT METHODS - PR #11586
+    // New behavior: SQL mode preserved, default histogram/count for empty/SELECT*
+    // ============================================================================
+
+    /**
+     * Verify SQL mode state is preserved (not forced ON) when switching to Build tab.
+     * NEW behavior in PR #11586 — replaces verifySqlModeAutoEnablesOnBuild().
+     * @param {boolean} expectedState - Expected SQL mode state after Build toggle
+     * @returns {Promise<boolean>} True if SQL mode matches expected state
+     */
+    async verifySqlModePreservedOnBuild(expectedState) {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        const actualState = isChecked === 'true';
+        if (actualState === expectedState) {
+            testLogger.info(`SQL mode preserved on Build tab: expected=${expectedState}, actual=${actualState}`);
+            return true;
+        } else {
+            testLogger.warn(`SQL mode NOT preserved: expected=${expectedState}, actual=${actualState}`);
+            return false;
+        }
+    }
+
+    /**
+     * Expect the builder has X-axis items populated (any items on X axis).
+     * Checks that at least one item exists inside the X-axis layout.
+     */
+    async expectXAxisHasItems() {
+        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
+        await expect(xItems.first()).toBeVisible({ timeout: 15000 });
+        const count = await xItems.count();
+        testLogger.info(`X-axis has ${count} item(s)`);
+        return count;
+    }
+
+    /**
+     * Expect the builder has Y-axis items populated (any items on Y axis).
+     * Checks that at least one item exists inside the Y-axis layout.
+     */
+    async expectYAxisHasItems() {
+        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        await expect(yItems.first()).toBeVisible({ timeout: 15000 });
+        const count = await yItems.count();
+        testLogger.info(`Y-axis has ${count} item(s)`);
+        return count;
+    }
+
+    /**
+     * Expect X-axis and Y-axis are empty (no items)
+     */
+    async expectAxesEmpty() {
+        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
+        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        await expect(xItems).toHaveCount(0, { timeout: 5000 });
+        await expect(yItems).toHaveCount(0, { timeout: 5000 });
+        testLogger.info('X and Y axes are empty');
+    }
+
+    /**
+     * Check if the filter section has any conditions populated.
+     * Looks for filter condition items inside the filter layout.
+     * Filter conditions use data-test="dashboard-add-condition-label-{index}-{label}" pattern.
+     * @returns {Promise<number>} Number of filter conditions found
+     */
+    async getFilterConditionCount() {
+        // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
+        const filterItems = this.page.locator('[data-test^="dashboard-add-condition-label-"]');
+        const count = await filterItems.count();
+        testLogger.info(`Filter has ${count} condition(s)`);
+        return count;
+    }
+
+    /**
+     * Expect the logs table to be visible (when on Logs tab)
+     */
+    async expectLogsTableVisible() {
+        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Logs table is visible');
     }
 
     // ============================================================================

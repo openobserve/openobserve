@@ -1489,6 +1489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="mode-label">Mode:</span>
                 <div class="mode-buttons">
                   <button
+                    data-test="logs-build-mode-builder-btn"
                     :class="[
                       'mode-btn',
                       { selected: searchObj.meta.buildModeQueryEditorDisabled },
@@ -1498,6 +1499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Builder
                   </button>
                   <button
+                    data-test="logs-build-mode-custom-btn"
                     :class="[
                       'mode-btn',
                       {
