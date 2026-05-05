@@ -56,11 +56,12 @@ def get_field_for_fts(settings):
 
 
 def get_field_for_index(settings):
-    """Return a field safe for index (not already in FTS to avoid conflicts)."""
+    """Return a field safe for index (not in FTS and not already indexed)."""
     current_fts = set(settings.get("full_text_search_keys", []))
-    safe = [f for f in INDEX_SAFE_FIELDS if f not in current_fts]
+    current_idx = set(settings.get("index_fields", []))
+    safe = [f for f in INDEX_SAFE_FIELDS if f not in current_fts and f not in current_idx]
     if not safe:
-        safe = INDEX_SAFE_FIELDS  # fallback: all may conflict, just use any
+        pytest.skip("No index-safe fields available outside current settings")
     return random.choice(safe)
 
 
@@ -68,7 +69,9 @@ def get_field_for_bloom(settings):
     """Return a field safe for bloom filter (not already in bloom_filter_fields)."""
     current = set(settings.get("bloom_filter_fields", []))
     available = [f for f in BLOOM_SAFE_FIELDS if f not in current]
-    return random.choice(available) if available else random.choice(BLOOM_SAFE_FIELDS)
+    if not available:
+        pytest.skip("No bloom-filter-safe fields available outside current settings")
+    return random.choice(available)
 
 
 def get_stream_settings(session, base_url, org_id, stream_name, stream_type=STREAM_TYPE):
@@ -345,6 +348,7 @@ class TestStreamSettingsDedupEdgeCases:
             payload = {"index_fields": {"add": [field_a], "remove": []}}
             resp = update_stream_settings(session, base_url, ORG_ID, STREAM_NAME, payload)
             assert resp.status_code == 200
+            time.sleep(1)
 
             # Add second field
             payload = {"index_fields": {"add": [field_b], "remove": []}}
