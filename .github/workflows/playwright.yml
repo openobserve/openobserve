@@ -74,7 +74,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-30
+      labels: ubicloud-standard-8
 
     steps:
       - name: Remove unused tools
