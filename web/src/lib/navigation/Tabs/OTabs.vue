@@ -193,7 +193,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
         class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:cursor-pointer tw:text-tabs-active-text tw:enabled:hover:text-tabs-indicator tw:disabled:opacity-30 tw:disabled:cursor-default tw:border-b-2 tw:border-transparent tw:bg-transparent tw:outline-none"
         @click="scrollTabs(-1)"
       >
-        <span class="material-icons" style="font-size: 25px; line-height: 1;">navigate_before</span>
+        <span class="material-icons tw:text-[25px] tw:leading-none">navigate_before</span>
       </button>
 
       <!-- Overflow-hidden scroll container -->
@@ -230,7 +230,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
         class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:cursor-pointer tw:text-tabs-active-text tw:enabled:hover:text-tabs-indicator tw:disabled:opacity-30 tw:disabled:cursor-default tw:border-b-2 tw:border-transparent tw:bg-transparent tw:outline-none"
         @click="scrollTabs(1)"
       >
-        <span class="material-icons" style="font-size: 25px; line-height: 1;">navigate_next</span>
+        <span class="material-icons tw:text-[25px] tw:leading-none">navigate_next</span>
       </button>
     </div>
   </TabsRoot>

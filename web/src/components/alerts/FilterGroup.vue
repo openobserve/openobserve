@@ -17,11 +17,12 @@
 
     <div :class="[`  tw:px-2 tw:mb-2 el-border el-border-radius `,
         'tw:mt-4',
-        store.state.isAiChatEnabled ? `tw:w-full tw:ml-[${depth * 10}px]` : `xl:tw:w-fit tw:ml-[${depth * 20}px]`
+        store.state.isAiChatEnabled ? 'tw:w-full' : 'xl:tw:w-fit'
     ]"
     :style="{
         opacity: computedOpacity,
-        backgroundColor: computedStyleMap
+        backgroundColor: computedStyleMap,
+        marginLeft: store.state.isAiChatEnabled ? (depth * 10 + 'px') : (depth * 20 + 'px')
     }"
     >
       <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
