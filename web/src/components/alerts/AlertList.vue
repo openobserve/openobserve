@@ -624,7 +624,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-move-across-folders-btn"
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
                       class="q-mr-sm"
                       @click="moveMultipleAlerts"
@@ -635,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
                       class="q-mr-sm"
                       @click="multipleExportAlert"
@@ -646,7 +646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
                       class="q-mr-sm"
                       @click="bulkToggleAlerts('pause')"
@@ -657,7 +657,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
                       class="q-mr-sm"
                       @click="bulkToggleAlerts('resume')"
@@ -668,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
                       class="q-mr-sm"
                       @click="openBulkDeleteDialog"

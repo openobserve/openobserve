@@ -396,6 +396,10 @@ export default defineComponent({
     .hover-actions {
       display: none;
       align-items: center;
+      // No background change on hover — the button appears inside a folder item
+      // which already has its own hover/active state. Any fill here looks like
+      // a white or grey artifact over the item background.
+      --color-button-ghost-hover-bg: transparent;
 
       .q-btn {
         margin-left: 0.5rem;

@@ -209,10 +209,10 @@
            <!-- o2 ai context add button in the test function -->
            <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
-            :size="'6px'"
-            :imageHeight="'16px'"
-            :imageWidth="'16px'"
+            imageHeight="24px"
+            imageWidth="24px"
             :class="'tw:px-2 tw:mr-4'"
+            style="width: 32px !important; height: 32px !important; min-width: 32px !important; min-height: 32px !important;"
            />
           </template>
       </FullViewContainer>
