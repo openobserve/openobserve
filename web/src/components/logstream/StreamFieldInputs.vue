@@ -6,7 +6,7 @@
     <template v-if="!fields.length">
       <OButton
         data-test="add-stream-add-field-btn"
-        variant="ghost"
+        variant="outline"
         size="sm-action"
         class="q-mt-sm"
         @click="addApiHeader"

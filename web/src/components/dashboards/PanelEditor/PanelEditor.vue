@@ -197,7 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Warning icons and last refreshed time -->
-                  <div class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center">
+                  <div
+                    class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2"
+                  >
                     <!-- Common error/warning buttons component -->
                     <PanelErrorButtons
                       :error="errorMessage"

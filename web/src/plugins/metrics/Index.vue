@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state?.zoConfig?.min_auto_refresh_interval || 5
             "
             @trigger="runQuery"
-            class="q-mr-xs q-px-none dashboards-icon dashboards-auto-refresh-interval"
+            class="q-px-none dashboards-icon dashboards-auto-refresh-interval"
             data-test="metrics-auto-refresh"
           />
           <div

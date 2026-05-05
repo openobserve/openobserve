@@ -35,7 +35,7 @@
   /* Button — outline */
   --color-button-outline-text: var(--color-text-primary);
   --color-button-outline-border: var(--color-primary-300);
-  --color-button-outline-hover-bg: var(--color-primary-50);
+  --color-button-outline-hover-bg: var(--o2-hover-accent);
   --color-button-outline-hover-border: var(--color-primary-400);
   --color-button-outline-active-bg: var(--color-primary-100);
   --color-button-outline-focus-ring: var(--color-primary-400);
