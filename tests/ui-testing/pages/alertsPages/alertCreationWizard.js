@@ -690,11 +690,15 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // Clean up any residual q-portal dialog overlays from the closed SQL Editor.
-        // The VRL Editor dialog portal often remains without aria-hidden and intercepts
-        // pointer events. Target only dialog portals (not menus/tooltips) and remove all.
+        // Clean up residual q-portal dialog overlays from the closed SQL Editor,
+        // scoped to already-hidden portals and the Monaco editor's portal specifically
+        // so we don't hide any other legitimately open dialog.
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => { el.style.display = 'none'; });
+            document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => {
+                const isHidden = el.getAttribute('aria-hidden') === 'true';
+                const hasMonaco = el.querySelector('.monaco-editor');
+                if (isHidden || hasMonaco) el.style.display = 'none';
+            });
         }).catch(e => testLogger.warn('Failed to remove dialog portals', { error: e.message }));
         await this.page.waitForTimeout(300);
 
@@ -713,12 +717,20 @@ export class AlertCreationWizard {
             testLogger.info('q-field click failed, clicking main element with force');
             await thresholdOperator.click({ force: true });
         });
-        await this.page.waitForTimeout(1000);
+        // Wait for the dropdown menu to actually appear before selecting an option
+        await this.page.locator('[role="listbox"]:visible, .q-menu:visible').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         // Use role-based option selection (bypasses q-portal visibility issues)
-        await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 }).catch(async () => {
+        // Use a flag to track success so the fallback error isn't silently swallowed
+        let operatorSelected = false;
+        try {
+            await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 });
+            operatorSelected = true;
+        } catch {
             testLogger.warn('Role option not found, trying q-menu fallback');
+        }
+        if (!operatorSelected) {
             await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click({ timeout: 3000 });
-        });
+        }
         testLogger.info('Set threshold operator: >=');
 
         const thresholdInput = thresholdSection.locator('input[type="number"]').first();
