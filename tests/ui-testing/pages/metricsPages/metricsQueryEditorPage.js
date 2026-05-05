@@ -52,7 +52,7 @@ export class MetricsQueryEditorPage {
         // Look for the "Custom" button - try multiple selector strategies
         const customButtonSelectors = [
             'button:has-text("Custom")',
-            '.q-btn:has-text("Custom")',
+            'button[data-o2-btn]:has-text("Custom")',
             '[data-test*="custom"]',
             'button[class*="custom"]'
         ];
@@ -302,8 +302,7 @@ export class MetricsQueryEditorPage {
 
             // Verify we're on the right tab by checking active state
             const isActive = await tabSelector.evaluate(el => {
-                return el.classList.contains('q-tab--active') ||
-                       el.getAttribute('aria-selected') === 'true';
+                return el.getAttribute('data-state') === 'active' || el.getAttribute('aria-selected') === 'true';
             });
 
             if (isActive) {
@@ -331,8 +330,7 @@ export class MetricsQueryEditorPage {
 
             // Verify active
             const isActive = await nthTab.evaluate(el => {
-                return el.classList.contains('q-tab--active') ||
-                       el.getAttribute('aria-selected') === 'true';
+                return el.getAttribute('data-state') === 'active' || el.getAttribute('aria-selected') === 'true';
             });
 
             if (isActive) {
@@ -364,10 +362,10 @@ export class MetricsQueryEditorPage {
             '[data-test*="dashboard-panel-query-tab-add"]',   // Contains match (handles backtick variant)
             '[data-test="dashboard-panel-query-tab-add"]',    // Exact data-test attribute
             'button[data-test*="panel-query-tab-add"]',       // Partial match
-            'button.q-btn[icon="add"]',                        // Button with add icon
-            'button.q-btn.q-btn--round.q-btn--flat',          // Round flat button (likely the add button)
-            '.q-tab__content + button[icon="add"]',           // Add button next to tabs
-            'button.q-btn:has(.q-icon[name="add"])',          // Button containing add icon
+            'button[data-o2-btn][aria-label="add"]',          // O2 button with add aria-label
+            '[role="tablist"] ~ button[data-o2-btn]',         // O2 add button after tablist
+            '[role="tablist"] + button[data-o2-btn]',         // O2 add button immediately after tablist
+            'button[data-o2-btn]:has-text("")',               // O2 add button (icon-only, empty text)
         ];
 
         for (const selector of selectors) {
@@ -389,15 +387,17 @@ export class MetricsQueryEditorPage {
             }
         }
 
-        // If specific selectors don't work, try finding any round button with add icon
-        const roundButtons = this.page.locator('button.q-btn--round');
-        const buttonCount = await roundButtons.count();
-        this.testLogger.info(`Found ${buttonCount} round buttons`);
+        // If specific selectors don't work, try finding any O2 button with add icon near the tab list
+        const o2Buttons = this.page.locator('button[data-o2-btn]');
+        const buttonCount = await o2Buttons.count();
+        this.testLogger.info(`Found ${buttonCount} O2 buttons`);
 
         for (let i = 0; i < buttonCount; i++) {
-            const btn = roundButtons.nth(i);
-            const hasAddIcon = await btn.locator('.q-icon').first().evaluate(icon => {
-                return icon.textContent === 'add' || icon.getAttribute('aria-label')?.includes('add');
+            const btn = o2Buttons.nth(i);
+            const hasAddIcon = await btn.evaluate(el => {
+                const ariaLabel = el.getAttribute('aria-label') || '';
+                const textContent = el.textContent || '';
+                return ariaLabel.toLowerCase().includes('add') || textContent.trim() === 'add' || textContent.trim() === '';
             }).catch(() => false);
 
             if (hasAddIcon && await btn.isVisible()) {

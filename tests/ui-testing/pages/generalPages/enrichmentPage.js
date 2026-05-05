@@ -1969,7 +1969,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Closing URL Jobs dialog');
 
         // Try clicking X button, fallback to pressing Escape
-        const closeBtn = this.page.locator('.q-dialog [aria-label="Close"], .q-dialog .q-btn--flat').first();
+        const closeBtn = this.page.locator('.q-dialog [aria-label="Close"], .q-dialog button[data-o2-btn]').first();
         if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await closeBtn.click();
         } else {

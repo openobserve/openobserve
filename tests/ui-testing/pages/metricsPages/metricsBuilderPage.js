@@ -41,8 +41,8 @@ export class MetricsBuilderPage {
         this.dashboardAddButton = '[data-test="metrics-schema-update-settings-button"]';
 
         // Confirm dialog for mode switching
-        this.confirmDialogOk = '.q-dialog .q-btn:has-text("OK"), .q-dialog .q-btn:has-text("Confirm")';
-        this.confirmDialogCancel = '.q-dialog .q-btn:has-text("Cancel")';
+        this.confirmDialogOk = '.q-dialog button:has-text("OK"), .q-dialog button:has-text("Confirm")';
+        this.confirmDialogCancel = '.q-dialog button:has-text("Cancel")';
     }
 
     // ===== Query Mode Switching =====

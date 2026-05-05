@@ -27,7 +27,7 @@ class LanguagePage {
   textSelectors = [
     'button', 'a', 'label', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'input[placeholder]', 'textarea[placeholder]',
-    '.q-item__label', '.q-tab__label', '.q-btn__content',
+    '.q-item__label', '.o-tab__label',
     '.q-field__label', '.q-card__section', '.q-toolbar__title',
     '[class*="menu"]', '[class*="nav"]', '[class*="sidebar"]',
     '[data-test]', '.q-dialog', '.q-modal', '.q-drawer',

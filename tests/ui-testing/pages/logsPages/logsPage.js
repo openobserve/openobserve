@@ -42,10 +42,10 @@ export class LogsPage {
         this.matchingFieldsSelector = '[data-test*="log-search-expand-"]';
         this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
-        this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"] > .q-btn__content';
-        this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block';
-        this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"] > .q-btn__content';
-        this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"] > .q-btn__content > .block';
+        this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"]';
+        this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
+        this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"]';
+        this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"]';
         this.relative1HourButton = '[data-test="date-time-relative-1-h-btn"]';
         this.absoluteTab = '[data-test="date-time-absolute-tab"]';
         this.scheduleText = '[data-test="date-time-btn"]';
@@ -74,10 +74,10 @@ export class LogsPage {
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
-        this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
+        this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
-        this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
-        this.savedViewDialogSaveContent = '[data-test="saved-view-dialog-save-btn"] > .q-btn__content';
+        this.closeDialog = '[data-test="close-dialog"]';
+        this.savedViewDialogSaveContent = '[data-test="saved-view-dialog-save-btn"]';
         this.savedViewByLabel = '.q-item__label';
         this.notificationMessage = '.q-notification__message';
         this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
@@ -98,7 +98,7 @@ export class LogsPage {
         this.schemaStreamIndexSelect = ':nth-child(2) > [data-test="schema-stream-index-select"]';
         this.fullTextSearch = '.q-virtual-scroll__content';
         this.schemaUpdateSettingsButton = '[data-test="schema-update-settings-button"]';
-        this.colAutoButton = '.col-auto > .q-btn > .q-btn__content';
+        this.colAutoButton = '.col-auto button';
         this.exploreTitle = '[title="Explore"]';
         this.streamsSearchStreamInput = '[data-test="streams-search-stream-input"]';
         this.logSearchIndexListFieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
@@ -115,7 +115,7 @@ export class LogsPage {
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
-        this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"] > .q-btn__content';
+        this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
         this.menuLink = link => `[data-test="menu-link-${link}"]`;
         this.searchAroundBtn = '[data-test="logs-search-bar-search-around-btn"]';
         this.pagination = '[data-test="logs-search-pagination"]';
@@ -223,9 +223,9 @@ export class LogsPage {
         this.applyDimensionFiltersEmbedded = '[data-test="apply-dimension-filters-embedded"]';
         this.metricSelectorButton = '[data-test="metric-selector-button"]';
         // Correlation tabs in detail drawer (tab names, not data-test)
-        this.correlatedLogsTab = '.q-tab[name="correlated-logs"], .q-tabs .q-tab:has-text("Logs"):not([data-test="log-detail-json-tab"])';
-        this.correlatedMetricsTab = '.q-tab[name="correlated-metrics"], .q-tabs .q-tab:has-text("Metrics")';
-        this.correlatedTracesTab = '.q-tab[name="correlated-traces"], .q-tabs .q-tab:has-text("Traces")';
+        this.correlatedLogsTab = '[role="tablist"] [role="tab"]:has-text("Logs"):not([data-test="log-detail-json-tab"]):not([data-test="log-detail-table-tab"])';
+        this.correlatedMetricsTab = '[role="tab"]:has-text("Metrics")';
+        this.correlatedTracesTab = '[role="tab"]:has-text("Traces")';
         // Correlation loading and error states
         this.correlationLoadingSpinner = '.q-spinner-hourglass';
         this.correlationErrorMessage = '.tw\\:text-red-500';
@@ -1068,7 +1068,7 @@ export class LogsPage {
 
     async setDateTimeTo15Minutes() {
         await this.page.locator(this.dateTimeButton).click();
-        await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click();
+        await this.page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     }
 
     async setAbsoluteDate(year, month, day, currentMonth, currentYear) {
@@ -1794,7 +1794,7 @@ export class LogsPage {
             (selector) => {
                 const btn = document.querySelector(selector);
                 if (!btn) return false;
-                return btn.hasAttribute('disabled') || btn.classList.contains('q-btn--loading') || btn.textContent?.trim()?.includes('Cancel');
+                return btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true' || btn.textContent?.trim()?.includes('Cancel');
             },
             this.queryButton,
             { timeout: 5000 }
@@ -1808,7 +1808,7 @@ export class LogsPage {
                 const btn = document.querySelector(selector);
                 if (!btn) return false;
                 const isDisabled = btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true';
-                const isLoading = btn.classList.contains('q-btn--loading');
+                const isLoading = btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true';
                 const text = btn.textContent?.trim() || '';
                 return !isDisabled && !isLoading && !text.includes('Cancel');
             },
@@ -2186,8 +2186,8 @@ export class LogsPage {
         const jsonTab = this.page.locator(this.logDetailJsonTab);
         await expect(jsonTab).toBeVisible();
 
-        // Check if JSON tab is selected (has 'q-tab--active' class)
-        const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
+        // Check if JSON tab is selected (has data-state="active" for Reka OTab)
+        const isJsonTabActive = await jsonTab.evaluate(el => el.getAttribute('data-state') === 'active');
         expect(isJsonTabActive, 'JSON tab should be selected by default (Bug #9724)').toBe(true);
 
         // Verify JSON content is visible
@@ -2233,7 +2233,7 @@ export class LogsPage {
      */
     async verifyTableTabSelected() {
         const tableTab = this.page.locator(this.logDetailTableTab);
-        const isTableTabActive = await tableTab.evaluate(el => el.classList.contains('q-tab--active'));
+        const isTableTabActive = await tableTab.evaluate(el => el.getAttribute('data-state') === 'active');
         expect(isTableTabActive, 'Table tab should be selected').toBe(true);
         await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
         testLogger.info('✓ Table tab is selected and content is visible');
@@ -2245,7 +2245,7 @@ export class LogsPage {
      */
     async verifyJsonTabSelected() {
         const jsonTab = this.page.locator(this.logDetailJsonTab);
-        const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
+        const isJsonTabActive = await jsonTab.evaluate(el => el.getAttribute('data-state') === 'active');
         expect(isJsonTabActive, 'JSON tab should be selected').toBe(true);
         await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
         testLogger.info('✓ JSON tab is selected and content is visible');
@@ -2365,9 +2365,9 @@ export class LogsPage {
         await this.page.waitForTimeout(2000);
 
         // Check for correlation tabs by looking for tabs with specific text
-        const logsTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Logs' });
-        const metricsTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Metrics' });
-        const tracesTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Traces' });
+        const logsTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Logs' });
+        const metricsTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Metrics' });
+        const tracesTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Traces' });
 
         // At least one correlation tab should be visible
         const anyCorrelationTabVisible = await logsTab.or(metricsTab).or(tracesTab).first().isVisible().catch(() => false);
@@ -2380,7 +2380,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedLogsTab() {
-        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Logs' }).last();
+        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Logs' }).last();
         await tab.click();
         testLogger.info('Clicked Correlated Logs tab');
         await this.page.waitForTimeout(1000);
@@ -2391,7 +2391,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedMetricsTab() {
-        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Metrics' });
+        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Metrics' });
         await tab.click();
         testLogger.info('Clicked Correlated Metrics tab');
         await this.page.waitForTimeout(1000);
@@ -2402,7 +2402,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedTracesTab() {
-        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Traces' });
+        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Traces' });
         await tab.click();
         testLogger.info('Clicked Correlated Traces tab');
         await this.page.waitForTimeout(1000);
@@ -2859,16 +2859,16 @@ export class LogsPage {
     }
 
     async clickPaginationPage(pageNumber) {
-        return await this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first().click();
+        return await this.page.locator(`${this.resultPagination} button`).filter({ hasText: pageNumber.toString() }).first().click();
     }
 
     async getPaginationPageCount() {
-        const pageButtons = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: /^\d+$/ });
+        const pageButtons = this.page.locator(`${this.resultPagination} button`).filter({ hasText: /^\d+$/ });
         return await pageButtons.count();
     }
 
     async getPaginationPageClasses(pageNumber) {
-        const pageButton = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first();
+        const pageButton = this.page.locator(`${this.resultPagination} button`).filter({ hasText: pageNumber.toString() }).first();
         return await pageButton.getAttribute('class');
     }
 
@@ -2878,7 +2878,7 @@ export class LogsPage {
     }
 
     async getActivePaginationPageText() {
-        return await this.page.locator(`${this.resultPagination} .q-btn--unelevated`).first().textContent({ timeout: 5000 }).catch(() => 'unknown');
+        return await this.page.locator(`${this.resultPagination} button[aria-current='true'], ${this.resultPagination} button[aria-pressed='true'], ${this.resultPagination} button[data-state='active']`).first().textContent({ timeout: 5000 }).catch(() => 'unknown');
     }
 
     async expectSQLPaginationNotVisible() {

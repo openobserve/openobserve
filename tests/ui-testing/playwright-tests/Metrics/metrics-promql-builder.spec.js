@@ -1390,7 +1390,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       await discardBtn.click();
       await page.waitForTimeout(1000);
       // Handle confirmation dialog if appears
-      const confirmBtn = page.locator('.q-dialog .q-btn:has-text("OK"), .q-dialog .q-btn:has-text("Confirm"), [data-test="confirm-button"]').first();
+      const confirmBtn = page.locator('button:has-text("OK"), button:has-text("Confirm"), [data-test="confirm-button"]').first();
       if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await confirmBtn.click();
         await page.waitForTimeout(1000);

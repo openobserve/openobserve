@@ -661,7 +661,7 @@ export class AlertDestinationsPage {
             '[data-test*="destination-import"]',
             'button:has-text("Import")',
             '.q-table__control button:has-text("Import")',
-            'button.q-btn:not(.q-btn--flat)'
+            'button[data-o2-btn]:has-text("Import")'
         ];
 
         let importBtnClicked = false;
