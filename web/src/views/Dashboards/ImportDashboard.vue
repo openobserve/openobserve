@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="!!isLoading"
             type="submit"
+            data-test="dashboard-import-submit-btn"
             @click="importDashboard"
             >{{ t("dashboard.import") }}</OButton
           >
