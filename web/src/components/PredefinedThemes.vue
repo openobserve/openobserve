@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-card-section>
         <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
+          <OButton variant="outline" size="sm-action" v-close-popup data-test="color-picker-close-btn">
             Close
           </OButton>
         </q-card-actions>

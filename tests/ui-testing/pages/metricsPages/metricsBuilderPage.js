@@ -922,8 +922,8 @@ export class MetricsBuilderPage {
             if (text.trim()) headers.push(text.trim());
         }
 
-        // Count data rows (TanStack dashboard mode uses dashboard-data-row class)
-        const rows = table.locator('tbody tr.dashboard-data-row, tbody tr');
+        // Count data rows (TanStack dashboard mode uses data-test="dashboard-data-row")
+        const rows = table.locator('[data-test="dashboard-data-row"], tbody tr');
         const rowCount = await rows.count().catch(() => 0);
 
         return { visible, rowCount, headers };

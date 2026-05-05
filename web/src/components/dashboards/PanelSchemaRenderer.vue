@@ -249,6 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{
           'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
         }"
+        data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
@@ -265,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             class="crosslink-drilldown-menu-item"
+            data-test="drilldown-menu-item"
             @click="openDrilldown(index)"
           >
             <q-icon
