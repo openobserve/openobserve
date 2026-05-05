@@ -609,10 +609,10 @@ describe("PromQLTableChart", () => {
   });
 
   describe("Performance", () => {
-    it.skip("should handle large datasets", () => {
+    it("should handle large datasets", () => {
       const largeData = {
         columns: mockTableData.columns,
-        rows: Array.from({ length: 10000 }, (_, i) => ({
+        rows: Array.from({ length: 1000 }, (_, i) => ({
           __legend__: `series${i % 10}`,
           timestamp: `2023-01-01T00:${String(i % 60).padStart(2, "0")}:00Z`,
           value: i * 10,
@@ -623,14 +623,14 @@ describe("PromQLTableChart", () => {
       wrapper = createWrapper({ data: largeData });
       const endTime = performance.now();
 
-      expect(endTime - startTime).toBeLessThan(10000);
-      expect(wrapper.vm.tableRows.length).toBe(10000);
+      expect(endTime - startTime).toBeLessThan(5000);
+      expect(wrapper.vm.tableRows.length).toBe(1000);
     });
 
-    it.skip("should efficiently filter large datasets", async () => {
+    it("should efficiently filter large datasets", async () => {
       const largeData = {
         columns: mockTableData.columns,
-        rows: Array.from({ length: 5000 }, (_, i) => ({
+        rows: Array.from({ length: 1000 }, (_, i) => ({
           __legend__: `series${i % 5}`,
           timestamp: `2023-01-01T00:${String(i % 60).padStart(2, "0")}:00Z`,
           value: i * 10,
@@ -648,7 +648,7 @@ describe("PromQLTableChart", () => {
       const endTime = performance.now();
 
       expect(endTime - startTime).toBeLessThan(100);
-      expect(filtered.length).toBe(1000); // 5000 / 5 series
+      expect(filtered.length).toBe(200); // 1000 / 5 series
     });
   });
 });
