@@ -86,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </div>
           <!-- import dashboard button with dropdown -->
-          <ODropdown side="bottom" align="end" data-test="dashboard-import">
+          <ODropdown side="bottom" align="end">
             <template #trigger>
-              <OButton variant="outline" size="sm" class="q-ml-sm">
+              <OButton variant="outline" size="sm" class="q-ml-sm" data-test="dashboard-import">
                 {{ t(`dashboard.import`) }}
                 <template #icon-right>
                   <q-icon name="expand_more" size="xs" />
