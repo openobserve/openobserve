@@ -532,6 +532,7 @@ impl Search for Searcher {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(feature = "enterprise"))]
     use super::*;
 
     #[test]
