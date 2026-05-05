@@ -345,7 +345,7 @@ const initializeFromQuery = async () => {
   const trimmedQuery = props.searchQuery?.trim() || "";
   const isEmptyOrSelectAll =
     !trimmedQuery ||
-    /^\s*select\s+\*\s+from\s+["'`]?\w+["'`]?\s*$/i.test(trimmedQuery);
+    /^\s*select\s+\*\s+from\s+["'`]?[\w.:-]+["'`]?\s*$/i.test(trimmedQuery);
   if (isEmptyOrSelectAll) {
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
