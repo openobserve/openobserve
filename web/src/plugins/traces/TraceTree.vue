@@ -127,6 +127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ]"
                 :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
                 @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
+                @mouseover="
+                  selectedSpanId &&
+                  selectSpan((spans as any[])[virtualRow.index].spanId)
+                "
               >
                 <div
                   class="absolute view-logs-container"
