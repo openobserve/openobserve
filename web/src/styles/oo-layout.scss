@@ -1,0 +1,71 @@
+// Copyright 2026 OpenObserve Inc.
+
+/* ============================================================================
+   oo_ LAYOUT SYSTEM
+   Responsive CSS grid layout classes prefixed with oo_ to avoid conflicts.
+   Adapted from responsive_html_v1.html.
+   ============================================================================ */
+
+/* ---- root app ---- */
+.oo_app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- header area ---- */
+.oo_header {
+  flex-shrink: 0;
+  background: var(--o2-card-bg);
+  border-bottom: 1px solid var(--o2-border-color);
+  margin-bottom: 0.5rem;
+}
+
+.oo_banner {
+  background: var(--o2-primary-btn-bg);
+  color: var(--o2-primary-btn-text);
+  text-align: center;
+}
+
+/* ---- body area (grid: left sidebar | main | right sidebar) ---- */
+.oo_body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 84px 1fr 25%;
+  min-height: 0;
+}
+
+/* ---- sidebars ---- */
+.oo_sidebar {
+  overflow-y: auto;
+  border-right: 1px solid var(--o2-border-color);
+
+  &.oo_right {
+    border-left: 1px solid var(--o2-border-color);
+    border-right: none;
+  }
+}
+
+/* ---- main content area ---- */
+.oo_main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.oo_content-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ---- sticky bottom bar ---- */
+.oo_bottom-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--o2-card-bg-solid);
+  border-top: 1px solid var(--o2-border-color);
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.625rem;
+}

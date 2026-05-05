@@ -19,95 +19,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     view="hHh Lpr lff"
     :class="[store.state.printMode === true ? 'printMode' : '']"
   >
-    <q-header>
-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+    <div class="oo_app">
+      <header class="oo_header">
+        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <div class="oo_banner">
+          <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+        </div>
 
-      <!-- Header component containing logo, navigation, and user controls -->
-      <Header
-        :store="store"
-        :router="router"
-        :config="config"
-        :user="user"
-        :slack-icon="slackIcon"
-        :zo-backend-url="zoBackendUrl"
-        :lang-list="langList"
-        :selected-language="selectedLanguage"
-        :selected-org="selectedOrg"
-        :user-clicked-org="userClickedOrg"
-        :filtered-organizations="filteredOrganizations"
-        :search-query="searchQuery"
-        :rows-per-page="rowsPerPage"
-        :is-hovered="isHovered"
-        :get-btn-logo="getBtnLogo"
-        @update:selected-org="selectedOrg = $event"
-        @update:search-query="searchQuery = $event"
-        @update:is-hovered="isHovered = $event"
-        @update-organization="updateOrganization"
-        @go-to-home="goToHome"
-        @go-to-about="goToAbout"
-        @toggleAIChat="toggleAIChat"
-        @open-slack="openSlack"
-        @navigateToOpenAPI="navigateToOpenAPI"
-        @navigate-to-docs="navigateToDocs"
-        @change-language="changeLanguage"
-        @open-predefined-themes="openPredefinedThemes"
-        @signout="signout"
-      />
-    </q-header>
-
-    <q-drawer
-      v-model="drawer"
-      show-if-above
-      :width="84"
-      :breakpoint="500"
-      role="navigation"
-      aria-label="Main navigation"
-      class="card-container q-mt-xs tw:mb-[0.675rem]"
-    >
-      <q-list class="leftNavList">
-        <menu-link
-          v-for="(nav, index) in linksList"
-          :key="nav.title"
-          :link-name="nav.name"
-          :animation-index="index"
-          v-bind="{ ...nav, mini: miniMode }"
-          @mouseenter="handleMenuHover(nav.link)"
+        <!-- Header component containing logo, navigation, and user controls -->
+        <div class="oo_topbar">
+          <Header
+          :store="store"
+          :router="router"
+          :config="config"
+          :user="user"
+          :slack-icon="slackIcon"
+          :zo-backend-url="zoBackendUrl"
+          :lang-list="langList"
+          :selected-language="selectedLanguage"
+          :selected-org="selectedOrg"
+          :user-clicked-org="userClickedOrg"
+          :filtered-organizations="filteredOrganizations"
+          :search-query="searchQuery"
+          :rows-per-page="rowsPerPage"
+          :is-hovered="isHovered"
+          :get-btn-logo="getBtnLogo"
+          @update:selected-org="selectedOrg = $event"
+          @update:search-query="searchQuery = $event"
+          @update:is-hovered="isHovered = $event"
+          @update-organization="updateOrganization"
+          @go-to-home="goToHome"
+          @go-to-about="goToAbout"
+          @toggleAIChat="toggleAIChat"
+          @open-slack="openSlack"
+          @navigateToOpenAPI="navigateToOpenAPI"
+          @navigate-to-docs="navigateToDocs"
+          @change-language="changeLanguage"
+          @open-predefined-themes="openPredefinedThemes"
+          @signout="signout"
         />
-      </q-list>
-    </q-drawer>
-    <div class="row full-height no-wrap">
-      <!-- Left Panel -->
-      <div
-        class="col"
-        v-show="isLoading"
-        :style="{ width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%' }"
-        :key="store.state.selectedOrganization?.identifier"
-      >
-        <q-page-container v-if="isLoading">
-          <router-view v-slot="{ Component }">
-            <component :is="Component" @sendToAiChat="sendToAiChat" />
-          </router-view>
-        </q-page-container>
-      </div>
+        </div>
+      </header>
 
-      <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
-      <div
-        v-show="store.state.isAiChatEnabled && isLoading"
-        class="col-auto"
-        :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
-        :style="store.state.isAiChatExpanded
-          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: calc(var(--navbar-height) + 8px);'
-          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: calc(var(--navbar-height) + 8px); padding-right: 0.625rem;'"
-      >
-        <O2AIChat
-          :header-height="42.5"
-          :is-open="store.state.isAiChatEnabled"
-          @close="closeChat"
-          :aiChatInputContext="aiChatInputContext"
-          :appendMode="aiChatAppendMode"
-          :aiChatPayload="aiChatPayload"
-        />
+      <div class="oo_body">
+        <aside class="oo_sidebar oo_left card-container">
+          <!-- Left sidebar Menu navigation can go here -->
+          
+              <q-list class="leftNavList">
+                <menu-link
+                  v-for="(nav, index) in linksList"
+                  :key="nav.title"
+                  :link-name="nav.name"
+                  :animation-index="index"
+                  v-bind="{ ...nav, mini: miniMode }"
+                  @mouseenter="handleMenuHover(nav.link)"
+                />
+              </q-list>
+          
+        </aside>
+
+        <!-- Main Panel -->
+        <main class="oo_main">
+          <div class="oo_content-scroll">
+            <div
+              v-show="isLoading"
+              :style="{ width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%' }"
+              :key="store.state.selectedOrganization?.identifier"
+            >
+              <q-page-container v-if="isLoading" style="padding: 0px;">
+                <router-view v-slot="{ Component }">
+                  <component :is="Component" @sendToAiChat="sendToAiChat" />
+                </router-view>
+              </q-page-container>
+            </div>
+          </div>
+        </main>
+
+        <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
+        <aside
+          v-show="store.state.isAiChatEnabled && isLoading"
+          class="oo_sidebar oo_right"
+          :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
+        >
+          <O2AIChat
+            :header-height="42.5"
+            :is-open="store.state.isAiChatEnabled"
+            @close="closeChat"
+            :aiChatInputContext="aiChatInputContext"
+            :appendMode="aiChatAppendMode"
+            :aiChatPayload="aiChatPayload"
+          />
+        </aside>
       </div>
     </div>
 
