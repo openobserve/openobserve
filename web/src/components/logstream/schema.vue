@@ -988,7 +988,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
                     :disabled="!selectedFields.length && !selectedDateFields.length"
                     data-test="schema-delete-button"
-                    variant="ghost-destructive"
+                    variant="outline"
                     size="sm-action"
                     @click="activeMainTab == 'schemaSettings' ? (confirmQueryModeChangeDialog = true) : (confirmDeleteDatesDialog = true)"
                   >

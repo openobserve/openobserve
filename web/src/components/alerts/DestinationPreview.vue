@@ -69,7 +69,7 @@ limitations under the License.
                   <strong>Threshold Exceeded:</strong> greater than 80%
                 </div>
                 <div class="slack-actions">
-                  <button class="slack-button">View in OpenObserve</button>
+                  <OButton variant="preview-slack">View in OpenObserve</OButton>
                 </div>
               </div>
             </div>
@@ -110,7 +110,7 @@ limitations under the License.
               </div>
             </div>
             <div class="teams-actions">
-              <button class="teams-button">View in OpenObserve</button>
+              <OButton variant="preview-teams">View in OpenObserve</OButton>
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@ limitations under the License.
                 <span class="detail-value">{{ getCurrentTime() }}</span>
               </div>
             </div>
-            <button class="email-button">View in OpenObserve</button>
+            <OButton variant="preview-email">View in OpenObserve</OButton>
           </div>
         </div>
 
@@ -248,7 +248,7 @@ limitations under the License.
               </div>
             </div>
             <div class="opsgenie-actions">
-              <button>View in OpenObserve</button>
+              <OButton variant="preview-action">View in OpenObserve</OButton>
             </div>
           </div>
         </div>

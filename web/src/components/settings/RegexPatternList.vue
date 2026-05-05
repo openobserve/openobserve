@@ -143,7 +143,7 @@
             <OButton
               v-if="selectedPatterns.length > 0"
               data-test="regex-pattern-list-delete-patterns-btn"
-              variant="outline-destructive"
+              variant="outline"
               size="sm-action"
               @click="openBulkDeleteDialog"
             >

@@ -31,7 +31,17 @@ export type ButtonVariant =
   // Use on dark gradient backgrounds — transparent with white border/text
   | "on-dark-ghost"
   // Solid warning (yellow) background — use to draw attention to a required action
-  | "warning";
+  | "warning"
+  // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
+  | "preview-slack"
+  | "preview-teams"
+  | "preview-email"
+  // Generic preview action button — for destination previews with no specific brand color
+  | "preview-action"
+  // Webinar banner dismiss — inline text-link style button for the top bar banner
+  | "webinar-dismiss"
+  // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
+  | "pricing-chip";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =

@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="selectedAccounts.length > 0"
                   data-test="service-accounts-list-delete-accounts-btn"
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   class="tw:mr-2"
                   @click="openBulkDeleteDialog"

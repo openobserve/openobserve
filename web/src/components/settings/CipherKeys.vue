@@ -97,12 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="selectedKeys.length > 0"
               data-test="cipher-keys-list-delete-keys-btn"
-              variant="outline-destructive"
+              variant="outline"
               size="sm-action"
               class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
-              <Trash2 class="tw:size-4 tw:mr-1" />
+              <template #icon-left><Trash2 class="tw:size-4 tw:shrink-0" /></template>
               Delete
             </OButton>
             <QTablePagination
