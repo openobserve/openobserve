@@ -93,3 +93,35 @@ enum Folders {
     FolderId,
     Type,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_new_idx_contains_name() {
+        let sql = create_new_folders_org_type_folder_id_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(NEW_FOLDERS_ORG_TYPE_FOLDER_ID_IDX));
+    }
+
+    #[test]
+    fn test_old_idx_contains_name() {
+        let sql = create_old_folders_org_folder_id_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(OLD_FOLDERS_ORG_FOLDER_ID_IDX));
+    }
+
+    #[test]
+    fn test_old_idx_constant_value() {
+        assert_eq!(OLD_FOLDERS_ORG_FOLDER_ID_IDX, "folders_org_folder_id_idx");
+    }
+
+    #[test]
+    fn test_new_idx_constant_value() {
+        assert_eq!(
+            NEW_FOLDERS_ORG_TYPE_FOLDER_ID_IDX,
+            "folders_org_type_folder_id_idx"
+        );
+    }
+}

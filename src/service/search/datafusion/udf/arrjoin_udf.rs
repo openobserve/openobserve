@@ -92,6 +92,7 @@ pub fn arr_join_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::Array;
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -103,6 +104,47 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_arr_join_impl_direct_valid() {
+        let arr = StringArray::from(vec![r#"["a","b","c"]"#]);
+        let delim = StringArray::from(vec![","]);
+        let args = [
+            ColumnarValue::Array(Arc::new(arr)),
+            ColumnarValue::Array(Arc::new(delim)),
+        ];
+        let result = arr_join_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert_eq!(out.value(0), "a,b,c");
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_arr_join_impl_direct_non_array_json_returns_null() {
+        let arr = StringArray::from(vec!["not-json"]);
+        let delim = StringArray::from(vec![","]);
+        let args = [
+            ColumnarValue::Array(Arc::new(arr)),
+            ColumnarValue::Array(Arc::new(delim)),
+        ];
+        let result = arr_join_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert!(out.is_null(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_arr_join_impl_wrong_arg_count_errors() {
+        let arr = StringArray::from(vec!["[1]"]);
+        let args = [ColumnarValue::Array(Arc::new(arr))];
+        assert!(arr_join_impl(&args).is_err());
+    }
 
     // Helper function to run a single test case
     async fn run_single_test(arr_field: &str, delimiter: &str, expected_output: Vec<&str>) {

@@ -63,3 +63,18 @@ enum ServiceStreams {
     Table,
     FieldNameMapping,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20260326_000001_add_field_name_mapping_to_service_streams"
+        );
+    }
+}

@@ -141,3 +141,86 @@ impl TableProvider for EnrichTable {
         Ok(vec![TableProviderFilterPushDown::Inexact; filters.len()])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        datasource::{TableProvider, TableType},
+        logical_expr::TableProviderFilterPushDown,
+        prelude::Expr,
+        scalar::ScalarValue,
+        sql::TableReference,
+    };
+
+    use super::*;
+
+    fn test_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]))
+    }
+
+    #[test]
+    fn test_new_bare_table_has_timestamp_filter() {
+        let stream = TableReference::bare("my_stream");
+        let table = EnrichTable::new("myorg", &stream, test_schema(), (100, 200));
+        assert_eq!(table.timestamp_filter, Some((100, 200)));
+    }
+
+    #[test]
+    fn test_new_enrich_schema_no_timestamp_filter() {
+        let stream = TableReference::partial("enrich", "my_table");
+        let table = EnrichTable::new("myorg", &stream, test_schema(), (100, 200));
+        assert_eq!(table.timestamp_filter, None);
+    }
+
+    #[test]
+    fn test_new_enrichment_tables_schema_no_timestamp_filter() {
+        let stream = TableReference::partial("enrichment_tables", "my_table");
+        let table = EnrichTable::new("myorg", &stream, test_schema(), (100, 200));
+        assert_eq!(table.timestamp_filter, None);
+    }
+
+    #[test]
+    fn test_new_other_schema_has_timestamp_filter() {
+        let stream = TableReference::partial("logs", "my_table");
+        let table = EnrichTable::new("myorg", &stream, test_schema(), (0, 999));
+        assert_eq!(table.timestamp_filter, Some((0, 999)));
+    }
+
+    #[test]
+    fn test_schema_returns_correct() {
+        let stream = TableReference::bare("t");
+        let schema = test_schema();
+        let table = EnrichTable::new("org", &stream, schema.clone(), (0, 1));
+        assert_eq!(table.schema().fields().len(), 1);
+        assert_eq!(table.schema().field(0).name(), "id");
+    }
+
+    #[test]
+    fn test_table_type_is_base() {
+        let stream = TableReference::bare("t");
+        let table = EnrichTable::new("org", &stream, test_schema(), (0, 1));
+        assert_eq!(table.table_type(), TableType::Base);
+    }
+
+    #[test]
+    fn test_supports_filters_pushdown_empty() {
+        let stream = TableReference::bare("t");
+        let table = EnrichTable::new("org", &stream, test_schema(), (0, 1));
+        let result = table.supports_filters_pushdown(&[]).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_supports_filters_pushdown_inexact() {
+        let stream = TableReference::bare("t");
+        let table = EnrichTable::new("org", &stream, test_schema(), (0, 1));
+        let dummy = Expr::Literal(ScalarValue::Boolean(Some(true)), None);
+        let filters = vec![&dummy];
+        let result = table.supports_filters_pushdown(&filters).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], TableProviderFilterPushDown::Inexact);
+    }
+}

@@ -683,6 +683,63 @@ mod tests {
     }
 
     #[test]
+    fn test_build_request_headers_skips_hop_by_hop() {
+        let mut headers = HeaderMap::new();
+        headers.insert("connection", "keep-alive".parse().unwrap());
+        headers.insert("host", "example.com".parse().unwrap());
+        headers.insert("content-length", "100".parse().unwrap());
+        headers.insert("transfer-encoding", "chunked".parse().unwrap());
+        headers.insert("authorization", "Bearer token123".parse().unwrap());
+
+        let result = build_request_headers(&headers, false);
+
+        assert!(!result.contains_key("connection"));
+        assert!(!result.contains_key("host"));
+        assert!(!result.contains_key("content-length"));
+        assert!(!result.contains_key("transfer-encoding"));
+        assert!(result.contains_key("authorization"));
+    }
+
+    #[test]
+    fn test_build_request_headers_streaming_replaces_accept_encoding() {
+        let mut headers = HeaderMap::new();
+        headers.insert("accept-encoding", "gzip, deflate".parse().unwrap());
+        headers.insert("authorization", "Bearer token".parse().unwrap());
+
+        let result = build_request_headers(&headers, true);
+
+        let accept_encoding = result.get("accept-encoding").unwrap();
+        assert_eq!(accept_encoding, "identity");
+        assert!(result.contains_key("authorization"));
+    }
+
+    #[test]
+    fn test_build_request_headers_non_streaming_keeps_accept_encoding() {
+        let mut headers = HeaderMap::new();
+        headers.insert("accept-encoding", "gzip".parse().unwrap());
+
+        let result = build_request_headers(&headers, false);
+
+        let accept_encoding = result.get("accept-encoding").unwrap();
+        assert_eq!(accept_encoding, "gzip");
+    }
+
+    #[test]
+    fn test_build_request_headers_empty_input() {
+        let headers = HeaderMap::new();
+        let result = build_request_headers(&headers, false);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_build_request_headers_streaming_adds_identity_even_without_accept_encoding() {
+        let headers = HeaderMap::new();
+        let result = build_request_headers(&headers, true);
+        let accept_encoding = result.get("accept-encoding").unwrap();
+        assert_eq!(accept_encoding, "identity");
+    }
+
+    #[test]
     fn test_is_streaming_endpoint() {
         assert!(is_streaming_endpoint("/api/org/_search_stream"));
         assert!(is_streaming_endpoint("/api/org/_values_stream"));

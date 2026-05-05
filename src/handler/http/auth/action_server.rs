@@ -46,6 +46,39 @@ fn validate_action_server_token(auth_header: Option<&str>) -> bool {
     decoded_str == expected_token
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_no_header_returns_false() {
+        assert!(!validate_action_server_token(None));
+    }
+
+    #[test]
+    fn test_validate_no_basic_prefix_returns_false() {
+        assert!(!validate_action_server_token(Some("Bearer sometoken")));
+        assert!(!validate_action_server_token(Some("token")));
+        assert!(!validate_action_server_token(Some("")));
+    }
+
+    #[test]
+    fn test_validate_invalid_base64_returns_false() {
+        // "Basic " prefix but garbage base64
+        assert!(!validate_action_server_token(Some("Basic !!invalid!!")));
+    }
+
+    #[test]
+    fn test_validate_valid_base64_non_utf8_returns_false() {
+        // base64 of non-UTF8 bytes: 0xFF 0xFE
+        let encoded =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &[0xFF, 0xFE]);
+        let header = format!("Basic {encoded}");
+        // non-UTF8 decoded string → returns false
+        assert!(!validate_action_server_token(Some(&header)));
+    }
+}
+
 /// Authentication middleware for action server routes.
 /// Validates requests using O2_ACTION_SERVER_TOKEN.
 pub async fn auth_middleware(request: Request, next: Next) -> Response {

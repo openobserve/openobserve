@@ -27,8 +27,8 @@ use config::{
     meta::{
         promql,
         stream::{
-            DistinctField, PartitionTimeLevel, StreamField, StreamParams, StreamSettings,
-            StreamStats, StreamType, TimeRange, UpdateStreamSettings,
+            DistinctField, PartitionTimeLevel, StreamField, StreamParams, StreamPartition,
+            StreamSettings, StreamStats, StreamType, TimeRange, UpdateStreamSettings,
         },
     },
     utils::{flatten::format_label_name, json, time::now_micros, util::get_distinct_stream_name},
@@ -657,9 +657,13 @@ pub async fn update_stream_settings(
                 "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
             ));
         }
-        settings
+        let new_defined: Vec<_> = new_settings
             .defined_schema_fields
-            .extend(new_settings.defined_schema_fields.add);
+            .add
+            .into_iter()
+            .filter(|f| !settings.defined_schema_fields.contains(f))
+            .collect();
+        settings.defined_schema_fields.extend(new_defined);
     }
     if !new_settings.defined_schema_fields.remove.is_empty() {
         settings
@@ -690,6 +694,7 @@ pub async fn update_stream_settings(
             .collect::<HashSet<_>>();
         let mut fields: Vec<_> = fields.into_iter().collect();
         fields.sort();
+        fields.dedup();
         fields.retain(|field| schema_fields.contains(field));
         settings.defined_schema_fields = fields;
     }
@@ -702,9 +707,14 @@ pub async fn update_stream_settings(
 
     // check for bloom filter fields
     if !new_settings.bloom_filter_fields.add.is_empty() {
-        settings
-            .bloom_filter_fields
-            .extend(new_settings.bloom_filter_fields.add);
+        let mut add = new_settings.bloom_filter_fields.add;
+        add.sort();
+        add.dedup();
+        let new_bloom: Vec<_> = add
+            .into_iter()
+            .filter(|f| !settings.bloom_filter_fields.contains(f))
+            .collect();
+        settings.bloom_filter_fields.extend(new_bloom);
     }
     if !new_settings.bloom_filter_fields.remove.is_empty() {
         settings
@@ -714,7 +724,14 @@ pub async fn update_stream_settings(
 
     // check for index fields
     if !new_settings.index_fields.add.is_empty() {
-        settings.index_fields.extend(new_settings.index_fields.add);
+        let mut add = new_settings.index_fields.add;
+        add.sort();
+        add.dedup();
+        let new_index: Vec<_> = add
+            .into_iter()
+            .filter(|f| !settings.index_fields.contains(f))
+            .collect();
+        settings.index_fields.extend(new_index);
         settings.index_updated_at = now_micros();
     }
     if !new_settings.index_fields.remove.is_empty() {
@@ -724,9 +741,21 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.extended_retention_days.add.is_empty() {
-        settings
+        let mut seen = std::collections::HashSet::new();
+        let new_retention: Vec<_> = new_settings
             .extended_retention_days
-            .extend(new_settings.extended_retention_days.add);
+            .add
+            .into_iter()
+            .filter(|r| {
+                if seen.contains(r) || settings.extended_retention_days.contains(r) {
+                    false
+                } else {
+                    seen.insert(r.clone());
+                    true
+                }
+            })
+            .collect();
+        settings.extended_retention_days.extend(new_retention);
     }
 
     if !new_settings.extended_retention_days.remove.is_empty() {
@@ -856,10 +885,19 @@ pub async fn update_stream_settings(
         settings.storage_type = storage_type;
     }
 
+    if let Some(is_llm_stream) = new_settings.is_llm_stream {
+        settings.is_llm_stream = is_llm_stream;
+    }
+
     if !new_settings.full_text_search_keys.add.is_empty() {
-        settings
-            .full_text_search_keys
-            .extend(new_settings.full_text_search_keys.add);
+        let mut add = new_settings.full_text_search_keys.add;
+        add.sort();
+        add.dedup();
+        let new_fts: Vec<_> = add
+            .into_iter()
+            .filter(|f| !settings.full_text_search_keys.contains(f))
+            .collect();
+        settings.full_text_search_keys.extend(new_fts);
         settings.index_updated_at = now_micros();
     }
 
@@ -870,15 +908,26 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.partition_keys.add.is_empty() {
-        settings
-            .partition_keys
-            .extend(new_settings.partition_keys.add);
+        let mut seen: Vec<StreamPartition> = Vec::new();
+        for k in new_settings.partition_keys.add {
+            if seen.iter().any(|s| s.field == k.field)
+                || settings.partition_keys.iter().any(|s| s.field == k.field)
+            {
+                continue;
+            }
+            seen.push(k.clone());
+            settings.partition_keys.push(k);
+        }
     }
 
     if !new_settings.partition_keys.remove.is_empty() {
-        settings
-            .partition_keys
-            .retain(|field| !new_settings.partition_keys.remove.contains(field));
+        settings.partition_keys.retain(|field| {
+            !new_settings
+                .partition_keys
+                .remove
+                .iter()
+                .any(|r| r.field == field.field)
+        });
     }
 
     // Handle cross_links updates
@@ -902,7 +951,13 @@ pub async fn update_stream_settings(
                     "Cross-link name must be 256 characters or less",
                 ));
             }
-            settings.cross_links.push(link_to_add);
+            if !settings
+                .cross_links
+                .iter()
+                .any(|l| l.name == link_to_add.name)
+            {
+                settings.cross_links.push(link_to_add);
+            }
         }
 
         // Enforce max limit
@@ -1749,5 +1804,26 @@ mod tests {
             assert_eq!(meta.metric_family_name, "normal_metric");
             assert_eq!(meta.help, "normal_metric");
         }
+    }
+
+    #[test]
+    fn test_parse_data_type_all_variants() {
+        assert_eq!(parse_data_type("utf8"), Some(DataType::Utf8));
+        assert_eq!(parse_data_type("UTF8"), Some(DataType::Utf8));
+        assert_eq!(parse_data_type("largeutf8"), Some(DataType::LargeUtf8));
+        assert_eq!(parse_data_type("large_utf8"), Some(DataType::LargeUtf8));
+        assert_eq!(parse_data_type("LARGE_UTF8"), Some(DataType::LargeUtf8));
+        assert_eq!(parse_data_type("bool"), Some(DataType::Boolean));
+        assert_eq!(parse_data_type("boolean"), Some(DataType::Boolean));
+        assert_eq!(parse_data_type("BOOLEAN"), Some(DataType::Boolean));
+        assert_eq!(parse_data_type("int64"), Some(DataType::Int64));
+        assert_eq!(parse_data_type("INT64"), Some(DataType::Int64));
+        assert_eq!(parse_data_type("uint64"), Some(DataType::UInt64));
+        assert_eq!(parse_data_type("float64"), Some(DataType::Float64));
+        assert_eq!(parse_data_type("FLOAT64"), Some(DataType::Float64));
+        // unknown → None
+        assert_eq!(parse_data_type("text"), None);
+        assert_eq!(parse_data_type(""), None);
+        assert_eq!(parse_data_type("int32"), None);
     }
 }

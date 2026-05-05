@@ -626,3 +626,47 @@ pub async fn get_built_in_patterns(
 
     MetaHttpResponse::json(response)
 }
+
+#[cfg(test)]
+mod tests {
+    use infra::table::re_pattern::PatternEntry;
+
+    use super::*;
+
+    fn make_entry() -> PatternEntry {
+        PatternEntry {
+            id: "id-1".to_string(),
+            org: "myorg".to_string(),
+            name: "test-pattern".to_string(),
+            description: "a description".to_string(),
+            created_by: "alice".to_string(),
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+            pattern: r"\d+".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_pattern_get_response_from_entry() {
+        let entry = make_entry();
+        let resp = PatternGetResponse::from(entry);
+        assert_eq!(resp.id, "id-1");
+        assert_eq!(resp.name, "test-pattern");
+        assert_eq!(resp.description, "a description");
+        assert_eq!(resp.pattern, r"\d+");
+        assert_eq!(resp.created_at, 1_000_000);
+        assert_eq!(resp.updated_at, 2_000_000);
+    }
+
+    #[test]
+    fn test_pattern_info_from_entry() {
+        let entry = make_entry();
+        let info = PatternInfo::from(entry);
+        assert_eq!(info.id, "id-1");
+        assert_eq!(info.name, "test-pattern");
+        assert_eq!(info.description, "a description");
+        assert_eq!(info.pattern, r"\d+");
+        assert_eq!(info.created_at, 1_000_000);
+        assert_eq!(info.updated_at, 2_000_000);
+    }
+}

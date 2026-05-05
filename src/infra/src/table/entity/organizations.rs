@@ -28,3 +28,38 @@ impl Related<super::org_users::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(not(feature = "cloud"))]
+    fn test_model_construction() {
+        let m = Model {
+            identifier: "myorg".to_string(),
+            org_name: "My Organization".to_string(),
+            org_type: 1,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        assert_eq!(m.identifier, "myorg");
+        assert_eq!(m.org_name, "My Organization");
+        assert_eq!(m.org_type, 1);
+    }
+
+    #[test]
+    #[cfg(feature = "cloud")]
+    fn test_model_construction_cloud() {
+        let m = Model {
+            identifier: "myorg".to_string(),
+            org_name: "My Organization".to_string(),
+            org_type: 1,
+            created_at: 1000,
+            updated_at: 2000,
+            trial_ends_at: 3000,
+        };
+        assert_eq!(m.identifier, "myorg");
+        assert_eq!(m.trial_ends_at, 3000);
+    }
+}

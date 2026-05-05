@@ -387,7 +387,10 @@
     "liveModeTooltip": "Interrogazione automatica sulle modifiche al filtro/orario",
     "turnOnLiveMode": "Attiva la modalità Live",
     "turnOffLiveMode": "Disattiva la modalità Live",
-    "autoRunEnabled": "Esecuzione automatica abilitata"
+    "autoRunEnabled": "Esecuzione automatica abilitata",
+    "selectStreamFirst": "Seleziona prima uno stream",
+    "traces": "Tracce",
+    "switchToLogs": "clicca per tornare a Logs"
   },
   "menu": {
     "home": "Home",
@@ -976,7 +979,8 @@
     "fieldName": "Nome campo",
     "fieldRequired": "Il campo è obbligatorio!",
     "dataType": "Tipo di dati",
-    "dataTypeRequired": "Il tipo di dati è obbligatorio!"
+    "dataTypeRequired": "Il tipo di dati è obbligatorio!",
+    "udsFieldAlreadyInSchema": "Uno o più campi selezionati fanno già parte dello schema definito"
   },
   "function": {
     "header": "Funzioni",
@@ -1121,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Registri Pub/Sub"
+    "pubsub": "Registri Pub/Sub",
+    "aiLabel": "Integrazioni AI"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2885,7 +2890,38 @@
       "multiStepAgent": "Agente in più fasi"
     },
     "noLogsAvailableForService": "Nessun registro disponibile per questo servizio",
-    "spansTruncatedWarning": "Mostra {count} di {total} intervalli: la traccia potrebbe essere incompleta. Restringi l'intervallo di tempo o contatta l'amministratore per aumentare il limite di intervallo."
+    "spansTruncatedWarning": "Mostra {count} di {total} intervalli: la traccia potrebbe essere incompleta. Restringi l'intervallo di tempo o contatta l'amministratore per aumentare il limite di intervallo.",
+    "servicesCatalog": {
+      "tabLabel": "Catalogo dei servizi",
+      "title": "Catalogo dei servizi",
+      "filterPlaceholder": "Filtra per nome del servizio...",
+      "noServicesFound": "Nessun servizio trovato nell'intervallo di tempo selezionato.",
+      "loading": "Caricamento dei servizi...",
+      "columns": {
+        "serviceName": "Servizio",
+        "status": "Status",
+        "requests": "Richieste",
+        "errorRate": "Tasso di errore",
+        "errors": "Errori",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Latenza media",
+        "lastSeen": "Visto l'ultima volta",
+        "operations": "Operazioni"
+      },
+      "status": {
+        "healthy": "Salutare",
+        "warning": "Avvertenza",
+        "degraded": "Degradato"
+      },
+      "viewTraces": "Visualizza tracce",
+      "exportCsv": "Esporta CSV",
+      "justNow": "Proprio ora",
+      "minutesAgo": "{n} m fa",
+      "hoursAgo": "{n} h fa",
+      "daysAgo": "{n} d fa"
+    }
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

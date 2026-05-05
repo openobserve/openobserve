@@ -581,4 +581,47 @@ mod tests {
         assert!(t2 > t1);
         assert!(t2 - t1 >= 10000); // At least 10ms difference
     }
+
+    #[test]
+    fn test_parse_interval_to_minutes() {
+        assert_eq!(parse_interval_to_minutes("30m"), 30);
+        assert_eq!(parse_interval_to_minutes("2h"), 120);
+        assert_eq!(parse_interval_to_minutes("90s"), 1);
+        assert_eq!(parse_interval_to_minutes("1d"), 1440);
+        assert_eq!(parse_interval_to_minutes("60"), 60);
+        assert_eq!(parse_interval_to_minutes("invalid"), 0);
+    }
+
+    #[test]
+    fn test_parse_timestamp_micro_from_value_f64() {
+        // f64 number → is_f64() branch (line 166)
+        let v = json::json!(1609459200.0f64);
+        let result = parse_timestamp_micro_from_value(&v);
+        assert!(result.is_ok());
+        let (ts, is_valid) = result.unwrap();
+        assert!(ts > 0);
+        assert!(!is_valid); // f64 sets is_i64=false → is_valid=false
+    }
+
+    #[test]
+    fn test_parse_timestamp_micro_from_value_invalid_type_returns_error() {
+        // bool/null → `_` arm → Err("Invalid time format [type]")
+        let v = json::json!(true);
+        assert!(parse_timestamp_micro_from_value(&v).is_err());
+        let v = json::json!(null);
+        assert!(parse_timestamp_micro_from_value(&v).is_err());
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros_invalid_returns_error() {
+        // Both i64 parse and str parse fail → Err("invalid time format [string]")
+        let result = parse_str_to_timestamp_micros("not_a_time_string!!!$$$");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid time zone offset")]
+    fn test_parse_timezone_to_offset_invalid_panics() {
+        parse_timezone_to_offset("America/New_York");
+    }
 }

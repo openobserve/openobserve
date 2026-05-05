@@ -1068,14 +1068,12 @@ describe("Index List", async () => {
   });
 
   describe("Additional field filtering tests", () => {
-    it("should return empty array when no search terms provided", async () => {
+    it("should return all rows when no search terms provided", async () => {
       const rows = [{ name: "field1" }, { name: "field2" }];
 
       const result = wrapper.vm.filterFieldFn(rows, "");
 
-      expect(result).toEqual([
-        { name: "no-fields-found", label: "No matching fields found" },
-      ]);
+      expect(result).toEqual(rows);
     });
 
     it("should filter fields case-insensitively", async () => {
@@ -2185,14 +2183,12 @@ describe("Index List", async () => {
   });
 
   describe("Additional field filtering tests", () => {
-    it("should return empty array when no search terms provided", async () => {
+    it("should return all rows when no search terms provided", async () => {
       const rows = [{ name: "field1" }, { name: "field2" }];
 
       const result = wrapper.vm.filterFieldFn(rows, "");
 
-      expect(result).toEqual([
-        { name: "no-fields-found", label: "No matching fields found" },
-      ]);
+      expect(result).toEqual(rows);
     });
 
     it("should filter fields case-insensitively", async () => {

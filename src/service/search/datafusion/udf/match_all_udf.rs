@@ -112,3 +112,46 @@ impl ScalarUDFImpl for FuzzyMatchAllUdf {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use datafusion::logical_expr::ScalarUDFImpl as _;
+
+    use super::*;
+
+    #[test]
+    fn test_match_all_udf_name() {
+        let udf = MatchAllUdf::new();
+        assert_eq!(udf.name(), MATCH_ALL_UDF_NAME);
+        assert_eq!(MATCH_ALL_UDF_NAME, "match_all");
+    }
+
+    #[test]
+    fn test_match_all_udf_return_type_is_boolean() {
+        let udf = MatchAllUdf::new();
+        assert_eq!(udf.return_type(&[]).unwrap(), DataType::Boolean);
+    }
+
+    #[test]
+    fn test_match_all_static_udf_name() {
+        assert_eq!(MATCH_ALL_UDF.name(), MATCH_ALL_UDF_NAME);
+    }
+
+    #[test]
+    fn test_fuzzy_match_all_udf_name() {
+        let udf = FuzzyMatchAllUdf::new();
+        assert_eq!(udf.name(), FUZZY_MATCH_ALL_UDF_NAME);
+        assert_eq!(FUZZY_MATCH_ALL_UDF_NAME, "fuzzy_match_all");
+    }
+
+    #[test]
+    fn test_fuzzy_match_all_udf_return_type_is_boolean() {
+        let udf = FuzzyMatchAllUdf::new();
+        assert_eq!(udf.return_type(&[]).unwrap(), DataType::Boolean);
+    }
+
+    #[test]
+    fn test_fuzzy_match_all_static_udf_name() {
+        assert_eq!(FUZZY_MATCH_ALL_UDF.name(), FUZZY_MATCH_ALL_UDF_NAME);
+    }
+}

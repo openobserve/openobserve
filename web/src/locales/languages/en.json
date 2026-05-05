@@ -135,6 +135,7 @@
     "resetFields": "Reset selected table fields",
     "metrics": "Metrics",
     "selectIndex": "Select Stream First",
+    "selectStreamFirst": "Select a stream first",
     "typeSearch": "Type your search query here.",
     "searchField": "Search for a field",
     "searchDimension": "Search Dimensions",
@@ -239,7 +240,10 @@
     "syntaxGuideLabel": "Syntax Guide",
     "legendLabel": "Legend",
     "logs": "Logs",
+    "traces": "Traces",
+    "metrics": "Metrics",
     "enrichmentTables": "Enrichment Tables",
+    "switchToLogs": "click to switch back to Logs",
     "savedViewsLabel": "Saved View",
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
@@ -536,7 +540,6 @@
     "feature_query_management": "Query management",
     "feature_workload_management": "Workload management (QoS)",
     "feature_audit_trail": "Audit trail",
-    "feature_action_scripts": "Action Scripts",
     "feature_sensitive_data_redaction": "Sensitive data redaction",
     "feature_influence_roadmap": "Ability to influence roadmap",
     "feature_license": "License",
@@ -715,10 +718,6 @@
         "audit_trail": {
           "name": "Audit Trail",
           "note": "Complete activity logging for compliance"
-        },
-        "action_scripts": {
-          "name": "Action Scripts",
-          "note": "Automate responses to events and alerts"
         },
         "sensitive_data_redaction": {
           "name": "Sensitive Data Redaction",
@@ -1035,6 +1034,7 @@
     "addField": "Add Field",
     "addSchemaField": "Add to Defined Schema",
     "removeSchemaField": "Remove Defined Schema",
+    "udsFieldAlreadyInSchema": "One or more selected fields are already part of the defined schema",
     "storeOriginalData": "Store Original Data",
     "flattenLevel": "Flatten Level",
     "approxPartition": "Use Stream Stats for Partitioning",
@@ -1403,7 +1403,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub Logs"
+    "pubsub": "Pub/Sub Logs",
+    "aiLabel": "AI Integrations"
   },
   "dashboard": {
     "selectField": "Field",
@@ -1963,7 +1964,7 @@
     "dashboardTitle": "Dashboards",
     "streamTotal": "Streams",
     "totalDashboard": "Dashboards",
-    "tabAiAssistant": "O2 AI Assistant",
+    "tabAiAssistant": "O2 Assistant",
     "tabOverview": "Overview",
     "tabUsage": "Usage"
   },
@@ -3179,6 +3180,39 @@
       "status": "Status",
       "type": "Type",
       "multiStepAgent": "Multi-step Agent"
+    },
+    "servicesCatalog": {
+      "tabLabel": "Service Catalog",
+      "title": "Service Catalog",
+      "filterPlaceholder": "Filter by service name...",
+      "noServicesFound": "No services found in the selected time range.",
+      "loading": "Loading services...",
+      "columns": {
+        "serviceName": "Service",
+        "status": "Status",
+        "requests": "Requests",
+        "errorRate": "Error Rate",
+        "errors": "Errors",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgDuration": "Avg Duration",
+        "maxDuration": "Max Duration",
+        "operations": "Operations"
+      },
+      "status": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "warning": "Warning",
+        "critical": "Critical"
+      },
+      "serviceLabel": "service",
+      "servicesLabel": "services",
+      "viewTraces": "View Traces",
+      "exportCsv": "Export CSV",
+      "legend": {
+        "title": "Error Rate"
+      }
     }
   },
   "actions": {

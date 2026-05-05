@@ -16,444 +16,445 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="tw:px-[0.625rem] q-pt-xs home-page" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
 
-    <!-- Tab bar (drag to reorder) — hidden for OSS (single tab) -->
-    <div
-      v-if="isEnterpriseOrCloud"
-      class="home-tab-bar"
-      @dragover.prevent
-      @drop="onTabDrop($event)"
-    >
-      <button
-        v-for="tab in tabOrder"
-        :key="tab.id"
-        class="home-tab-btn"
-        :class="{ 'home-tab-active': activeHomeTab === tab.id, 'home-tab-dragging': draggingTab === tab.id }"
-        draggable="true"
-        @click="activeHomeTab = tab.id"
-        @dragstart="onTabDragStart($event, tab.id)"
-        @dragend="onTabDragEnd"
-        @dragenter.prevent="onTabDragEnter(tab.id)"
+    <div class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-auto" style="max-height: calc(100vh - var(--navbar-height) - 18px)">
+      <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
+      <div
+        v-if="tabOrder.length > 1"
+        class="home-tab-bar"
+        @dragover.prevent
+        @drop="onTabDrop($event)"
       >
-        <q-icon name="drag_indicator" class="home-tab-drag-handle" size="0.875em" />
-        {{ tab.label }}
-      </button>
-    </div>
+        <button
+          v-for="tab in tabOrder"
+          :key="tab.id"
+          class="home-tab-btn"
+          :class="{ 'home-tab-active': activeHomeTab === tab.id, 'home-tab-dragging': draggingTab === tab.id }"
+          draggable="true"
+          @click="activeHomeTab = tab.id"
+          @dragstart="onTabDragStart($event, tab.id)"
+          @dragend="onTabDragEnd"
+          @dragenter.prevent="onTabDragEnter(tab.id)"
+        >
+          <q-icon name="drag_indicator" class="home-tab-drag-handle" size="0.875em" />
+          {{ tab.label }}
+        </button>
+      </div>
 
-    <!-- O2 AI Assistant tab -->
-    <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
-      <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
-      <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
-    </div>
+      <!-- O2 AI Assistant tab -->
+      <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
+        <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
+        <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
+      </div>
 
-    <!-- Overview tab -->
-    <div v-if="activeHomeTab === 'overview'" class="home-tab-panel">
-      <OverviewTab />
-    </div>
+      <!-- Overview tab -->
+      <div v-if="activeHomeTab === 'overview'" class="card-container home-tab-panel">
+        <OverviewTab />
+      </div>
 
-    <!-- Usage tab (existing content) -->
-    <div v-if="activeHomeTab === 'usage'" class="tw:h-full tw:overflow-y-auto">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container card-container--col" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'">
-        <!-- 1st section -->
-         <div class="banners-wrapper">
-            <div>
-            <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
-            <TrialPeriod></TrialPeriod>
-          </div>
-            <LicensePeriod v-if="!showUsageReportBanner" @update-license="goToLicensePage"></LicensePeriod>
-            <UsageReportBanner></UsageReportBanner>
-            <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
-          </div>
-        <div class="feature-card"
-        :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
-        role="region"
-        aria-label="Streams overview section"
-         >
-          <div class="row justify-between items-center streams-header">
-            <div class="row tw:items-center tw:gap-2">
-              <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                <q-icon :name="outlinedWindow" size="1.5rem" />
-              </div>
-              <div class="section-header">{{ t("home.streams") }}</div>
+      <!-- Usage tab (existing content) -->
+      <div v-if="activeHomeTab === 'usage'" >
+      <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container card-container--col" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'">
+          <!-- 1st section -->
+          <div class="banners-wrapper">
+              <div>
+              <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
+              <TrialPeriod></TrialPeriod>
             </div>
-              <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-               aria-label="View all streams"
-               >
-                <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                <q-icon name="arrow_forward" class="view-arrow-icon" />
-                <router-link
-                  exact
-                  :to="{
-                    name: 'logstreams',
-                    query: { org_identifier: store.state.selectedOrganization?.identifier }
-                  }"
-                  class="absolute full-width full-height"
-                  aria-label="Navigate to streams page"
-                ></router-link>
-            </q-btn>
-          </div>
+              <LicensePeriod v-if="!showUsageReportBanner" @update-license="goToLicensePage"></LicensePeriod>
+              <UsageReportBanner></UsageReportBanner>
+              <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
+            </div>
+          <div class="feature-card"
+          :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
+          role="region"
+          aria-label="Streams overview section"
+          >
+            <div class="row justify-between items-center streams-header">
+              <div class="row tw:items-center tw:gap-2">
+                <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                  <q-icon :name="outlinedWindow" size="1.5rem" />
+                </div>
+                <div class="section-header">{{ t("home.streams") }}</div>
+              </div>
+                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                aria-label="View all streams"
+                >
+                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                  <q-icon name="arrow_forward" class="view-arrow-icon" />
+                  <router-link
+                    exact
+                    :to="{
+                      name: 'logstreams',
+                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                    }"
+                    class="absolute full-width full-height"
+                    aria-label="Navigate to streams page"
+                  ></router-link>
+              </q-btn>
+            </div>
 
 
-          <!-- Tiles -->
-          <div class="tiles-grid">
-            <div class="tile">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Streams count statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.streams") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="streamsIcon" alt="" />
+            <!-- Tiles -->
+            <div class="tiles-grid">
+              <div class="tile">
+                <div class="tile-content rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                role="article"
+                aria-label="Streams count statistics">
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.streams") }}</div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="streamsIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div v-if="false" class="performance-text"
+                  :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                  >
+                    <q-icon name="arrow_upward" size="14px"  /> 2.89% from last week
                   </div>
                 </div>
 
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text"
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px"  /> 2.89% from last week
-                </div>
+              <!-- Bottom Section (40%) -->
+              <div class="data-to-display row items-end " aria-live="polite">
+                {{ animatedStreamsCount || summary.streams_count }}
+              </div>
+              </div>
               </div>
 
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ animatedStreamsCount || summary.streams_count }}
-            </div>
-            </div>
-            </div>
-
-            <div class="tile">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Events count statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between" >
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="recordsIcon" alt="" />
-                  </div>
-                </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
-                </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ formattedAnimatedEventsCount }}
-            </div>
-            </div>
-            </div>
-
-            <div class="tile">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Ingested data size statistics">
-              <!-- Top Section (60%) -->
+              <div class="tile">
+                <div class="tile-content rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                role="article"
+                aria-label="Events count statistics">
+                <!-- Top Section (60%) -->
                 <div class="column justify-between" >
                   <!-- Title row -->
                   <div class="row justify-between">
-                    <div class="tile-title">{{ t("home.totalDataIngested") }}</div>
+                    <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
                     <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                      <img :src="ingestedSizeIcon" alt="" />
+                      <img :src="recordsIcon" alt="" />
                     </div>
                   </div>
 
                   <!-- Performance text -->
                   <div v-if="false" class="performance-text "
-                  :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
+                  :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
                   >
-                    <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
+                    <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
                   </div>
                 </div>
 
-                <!-- Bottom Section (40%) -->
-                <div class="data-to-display row items-end " aria-live="polite">
-                  {{ formattedAnimatedIngestedSize }}
+              <!-- Bottom Section (40%) -->
+              <div class="data-to-display row items-end " aria-live="polite">
+                {{ formattedAnimatedEventsCount }}
+              </div>
+              </div>
+              </div>
+
+              <div class="tile">
+                <div class="tile-content rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                role="article"
+                aria-label="Ingested data size statistics">
+                <!-- Top Section (60%) -->
+                  <div class="column justify-between" >
+                    <!-- Title row -->
+                    <div class="row justify-between">
+                      <div class="tile-title">{{ t("home.totalDataIngested") }}</div>
+                      <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                        <img :src="ingestedSizeIcon" alt="" />
+                      </div>
+                    </div>
+
+                    <!-- Performance text -->
+                    <div v-if="false" class="performance-text "
+                    :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
+                    >
+                      <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
+                    </div>
+                  </div>
+
+                  <!-- Bottom Section (40%) -->
+                  <div class="data-to-display row items-end " aria-live="polite">
+                    {{ formattedAnimatedIngestedSize }}
+                  </div>
+                </div>
+              </div>
+
+              
+              <div class="tile" v-if="config.isCloud == 'false'">
+                <div class="tile-content rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                role="article"
+                aria-label="Compressed data size statistics">
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.totalDataCompressed") }}</div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="compressedSizeIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div v-if="false" class="performance-text "
+                  :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                  >
+                    <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
+                  </div>
+                </div>
+
+              <!-- Bottom Section (40%) -->
+              <div class="data-to-display row items-end " aria-live="polite">
+                {{ formattedAnimatedCompressedSize }}
+              </div>
+              </div>
+              </div>
+
+              <div class="tile" v-if="config.isCloud == 'false'">
+                <div class="tile-content rounded-borders text-center column justify-between "
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                role="article"
+                aria-label="Index size statistics">
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="indexSizeIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div v-if="false" class="performance-text "
+                  :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
+                  >
+                    <q-icon name="arrow_upward" size="14px" /> 0.00% from last week
+                  </div>
+                </div>
+
+              <!-- Bottom Section (40%) -->
+              <div class="data-to-display row items-end " aria-live="polite">
+                {{ formattedAnimatedIndexSize }}
+              </div>
+              </div>
+              </div>
+
+          </div>
+
+          </div>
+        <!-- 2nd section -->
+          <div class="charts-main-container">
+            <!-- functions and dashboards tiles + 2 charts -->
+          <div class="functions-dashboards-column">
+
+            <div class="tile-wrapper">
+              <div class="feature-card rounded-borders text-center column justify-between"
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                role="article"
+                aria-label="Functions count statistics">
+                <div class="column justify-between">
+                  <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
+                    <div class="tile-icon icon-bg-orange tw:flex-shrink-0" aria-hidden="true">
+                      <img :src="functionsIcon" alt="" />
+                    </div>
+                    <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.functionTitle") }}</div>
+                    <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                    aria-label="View all functions"
+                    class="tw:flex-shrink-0"
+                    >
+                        <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                        <q-icon name="arrow_forward" class="view-arrow-icon" />
+                      <router-link
+                        exact
+                        :to="{
+                          name: 'functionList',
+                          query: { org_identifier: store.state.selectedOrganization?.identifier }
+                        }"
+                        class="absolute full-width full-height"
+                        aria-label="Navigate to functions page"
+                      ></router-link>
+                  </q-btn>
+                  </div>
+                </div>
+                <div class="data-to-display row items-end" aria-live="polite">
+                  {{ animatedFunctionCount || summary.function_count }}
                 </div>
               </div>
             </div>
 
-            
-            <div class="tile" v-if="config.isCloud == 'false'">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Compressed data size statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.totalDataCompressed") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="compressedSizeIcon" alt="" />
+            <!-- Tile 2 -->
+            <div class="tile-wrapper">
+              <div class="feature-card rounded-borders text-center column justify-between"
+                :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+                role="article"
+                aria-label="Dashboards count statistics">
+                <div class="column justify-between">
+                  <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
+                    <div class="tile-icon icon-bg-orange tw:flex-shrink-0" aria-hidden="true">
+                      <img :src="dashboardsIcon" alt="" />
+                    </div>
+                    <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.dashboardTitle") }}</div>
+                    <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
+                    aria-label="View all dashboards"
+                    class="tw:flex-shrink-0"
+                    >
+                    <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                    <q-icon name="arrow_forward" class="view-arrow-icon" />
+                      <router-link
+                        exact
+                        :to="{
+                          name: 'dashboards',
+                          query: { org_identifier: store.state.selectedOrganization?.identifier }
+                        }"
+                        class="absolute full-width full-height"
+                        aria-label="Navigate to dashboards page"
+                      ></router-link>
+                  </q-btn>
                   </div>
                 </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
+                <div class="data-to-display row items-end" aria-live="polite">
+                  {{ animatedDashboardCount || summary.dashboard_count }}
                 </div>
               </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ formattedAnimatedCompressedSize }}
             </div>
-            </div>
-            </div>
-
-            <div class="tile" v-if="config.isCloud == 'false'">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Index size statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="indexSizeIcon" alt="" />
-                  </div>
-                </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px" /> 0.00% from last week
-                </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ formattedAnimatedIndexSize }}
-            </div>
-            </div>
-            </div>
-
-        </div>
-
-        </div>
-      <!-- 2nd section -->
-        <div class="charts-main-container">
-          <!-- functions and dashboards tiles + 2 charts -->
-        <div class="functions-dashboards-column">
-
-          <div class="tile-wrapper">
-            <div class="feature-card rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              role="article"
-              aria-label="Functions count statistics">
-              <div class="column justify-between">
-                <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
-                  <div class="tile-icon icon-bg-orange tw:flex-shrink-0" aria-hidden="true">
-                    <img :src="functionsIcon" alt="" />
-                  </div>
-                  <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.functionTitle") }}</div>
+          </div>
+                    <!-- Chart 1 -->
+            <div class="feature-card first-chart-container rounded-borders tw:p-4"
+            :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+            role="region"
+            aria-label="Alerts overview section"
+            >
+              <div class="details-container">
+                <div class="row justify-between items-center">
+                  <span class="text-title tw:flex tw:items-center tw:gap-2">
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                        <img :src="alertsIcon" alt="" />
+                    </div>
+                    {{ t("home.alertTitle") }}
+                  </span>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                  aria-label="View all functions"
-                  class="tw:flex-shrink-0"
-                  >
-                      <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                      <q-icon name="arrow_forward" class="view-arrow-icon" />
+                  aria-label="View all alerts">
+                    <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                    <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
                       :to="{
-                        name: 'functionList',
+                        name: 'alertList',
                         query: { org_identifier: store.state.selectedOrganization?.identifier }
                       }"
                       class="absolute full-width full-height"
-                      aria-label="Navigate to functions page"
+                      aria-label="Navigate to alerts page"
                     ></router-link>
                 </q-btn>
                 </div>
+                <div class="row q-pt-sm home-stat-row">
+                  <div class="column">
+                    <span class="text-subtitle">{{ t("home.scheduledAlert") }}</span>
+                    <span class="results-count" aria-live="polite">{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span>
+                  </div>
+                  <q-separator vertical />
+                  <div class="column">
+                    <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
+                    <span class="results-count" aria-live="polite">{{ animatedRtAlerts || summary.rt_alerts }}</span>
+                  </div>
+                </div>
               </div>
-              <div class="data-to-display row items-end" aria-live="polite">
-                {{ animatedFunctionCount || summary.function_count }}
+              <div class="custom-first-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)]  md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)] tw:w-full"  >
+                <CustomChartRenderer
+                  :key="alertsPanelDataKey"
+                  :data="alertsPanelData"
+                  class="tw:w-full tw:h-full md:tw:h-[calc(100vh-400px)] "
+                />
               </div>
             </div>
-          </div>
-
-          <!-- Tile 2 -->
-          <div class="tile-wrapper">
-            <div class="feature-card rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              role="article"
-              aria-label="Dashboards count statistics">
-              <div class="column justify-between">
-                <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
-                  <div class="tile-icon icon-bg-orange tw:flex-shrink-0" aria-hidden="true">
-                    <img :src="dashboardsIcon" alt="" />
-                  </div>
-                  <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.dashboardTitle") }}</div>
+            <div class="feature-card second-chart-container rounded-borders tw:p-4"
+            :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
+            role="region"
+            aria-label="Pipelines overview section"
+            >
+              <div class="details-container">
+                <div class="row justify-between items-center">
+                  <span class="text-title tw:flex tw:items-center tw:gap-2">
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                        <img :src="pipelinesIcon" alt="" />
+                    </div>
+                    {{ t("home.pipelineTitle") }}
+                  </span>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                  aria-label="View all dashboards"
-                  class="tw:flex-shrink-0"
-                  >
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                  <q-icon name="arrow_forward" class="view-arrow-icon" />
+                  aria-label="View all pipelines">
+                    <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                    <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
                       :to="{
-                        name: 'dashboards',
+                        name: 'pipelines',
                         query: { org_identifier: store.state.selectedOrganization?.identifier }
                       }"
                       class="absolute full-width full-height"
-                      aria-label="Navigate to dashboards page"
+                      aria-label="Navigate to pipelines page"
                     ></router-link>
                 </q-btn>
                 </div>
+                <div class="row q-pt-sm home-stat-row">
+                  <div class="column">
+                    <span class="text-subtitle"> {{ t("home.schedulePipelineTitle") }}</span>
+                    <span class="results-count" aria-live="polite">{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span>
+                  </div>
+                  <q-separator vertical />
+                  <div class="column">
+                    <span class="text-subtitle">{{ t("home.rtPipelineTitle") }}</span>
+                    <span class="results-count" aria-live="polite">{{ animatedRtPipelines || summary.rt_pipelines }}</span>
+                  </div>
+                </div>
               </div>
-              <div class="data-to-display row items-end" aria-live="polite">
-                {{ animatedDashboardCount || summary.dashboard_count }}
+              <div class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)]  md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"  >
+                <CustomChartRenderer
+                  :key="pipelinesPanelDataKey"
+                  :data="pipelinesPanelData"
+                  class="tw:w-full tw:h-full "
+                />
               </div>
             </div>
           </div>
         </div>
-                  <!-- Chart 1 -->
-          <div class="feature-card first-chart-container rounded-borders tw:p-4"
-          :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
-          role="region"
-          aria-label="Alerts overview section"
-          >
-            <div class="details-container">
-              <div class="row justify-between items-center">
-                <span class="text-title tw:flex tw:items-center tw:gap-2">
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                      <img :src="alertsIcon" alt="" />
-                  </div>
-                  {{ t("home.alertTitle") }}
-                </span>
-                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                aria-label="View all alerts">
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                  <q-icon name="arrow_forward" class="view-arrow-icon" />
-                  <router-link
-                    exact
-                    :to="{
-                      name: 'alertList',
-                      query: { org_identifier: store.state.selectedOrganization?.identifier }
-                    }"
-                    class="absolute full-width full-height"
-                    aria-label="Navigate to alerts page"
-                  ></router-link>
-              </q-btn>
-              </div>
-              <div class="row q-pt-sm home-stat-row">
-                <div class="column">
-                  <span class="text-subtitle">{{ t("home.scheduledAlert") }}</span>
-                  <span class="results-count" aria-live="polite">{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span>
-                </div>
-                <q-separator vertical />
-                <div class="column">
-                  <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
-                  <span class="results-count" aria-live="polite">{{ animatedRtAlerts || summary.rt_alerts }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="custom-first-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)]  md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)] tw:w-full"  >
-              <CustomChartRenderer
-                :key="alertsPanelDataKey"
-                :data="alertsPanelData"
-                class="tw:w-full tw:h-full md:tw:h-[calc(100vh-400px)] "
-              />
-            </div>
+        <div
+        v-if="no_data_ingest && !isLoadingSummary"
+        class="q-pa-md row items-start q-gutter-md home-no-data-panel"
+      >
+      <TrialPeriod></TrialPeriod>
+        <div class="my-card">
+          <div align="center" flat
+  bordered class="my-card q-py-md">
+            <div class="text-h6">{{ t("home.noData") }}</div>
+            <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
           </div>
-          <div class="feature-card second-chart-container rounded-borders tw:p-4"
-          :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
-          role="region"
-          aria-label="Pipelines overview section"
-          >
-            <div class="details-container">
-              <div class="row justify-between items-center">
-                <span class="text-title tw:flex tw:items-center tw:gap-2">
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                      <img :src="pipelinesIcon" alt="" />
-                  </div>
-                  {{ t("home.pipelineTitle") }}
-                </span>
-                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                aria-label="View all pipelines">
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                  <q-icon name="arrow_forward" class="view-arrow-icon" />
-                  <router-link
-                    exact
-                    :to="{
-                      name: 'pipelines',
-                      query: { org_identifier: store.state.selectedOrganization?.identifier }
-                    }"
-                    class="absolute full-width full-height"
-                    aria-label="Navigate to pipelines page"
-                  ></router-link>
-              </q-btn>
-              </div>
-              <div class="row q-pt-sm home-stat-row">
-                <div class="column">
-                  <span class="text-subtitle"> {{ t("home.schedulePipelineTitle") }}</span>
-                  <span class="results-count" aria-live="polite">{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span>
-                </div>
-                <q-separator vertical />
-                <div class="column">
-                  <span class="text-subtitle">{{ t("home.rtPipelineTitle") }}</span>
-                  <span class="results-count" aria-live="polite">{{ animatedRtPipelines || summary.rt_pipelines }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)]  md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"  >
-              <CustomChartRenderer
-                :key="pipelinesPanelDataKey"
-                :data="pipelinesPanelData"
-                class="tw:w-full tw:h-full "
-              />
-            </div>
+
+          <q-separator />
+
+          <div align="center" class="q-py-sm">
+            <q-btn
+              no-caps
+              color="primary"
+              @click="() => $router.push({ name: 'ingestion' })"
+              flat
+              >{{ t("home.findIngestion") }}
+            </q-btn>
           </div>
         </div>
       </div>
-      <div
-      v-if="no_data_ingest && !isLoadingSummary"
-      class="q-pa-md row items-start q-gutter-md home-no-data-panel"
-    >
-    <TrialPeriod></TrialPeriod>
-      <div class="my-card">
-        <div align="center" flat
-bordered class="my-card q-py-md">
-          <div class="text-h6">{{ t("home.noData") }}</div>
-          <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
-        </div>
-
-        <q-separator />
-
-        <div align="center" class="q-py-sm">
-          <q-btn
-            no-caps
-            color="primary"
-            @click="() => $router.push({ name: 'ingestion' })"
-            flat
-            >{{ t("home.findIngestion") }}
-          </q-btn>
-        </div>
+      <div v-if="isLoadingSummary">
+        <HomeViewSkeleton />
       </div>
+      </div> <!-- end usage tab panel -->
     </div>
-    <div v-if="isLoadingSummary">
-      <HomeViewSkeleton />
-    </div>
-    </div> <!-- end usage tab panel -->
-
   </q-page>
 
 
@@ -503,15 +504,17 @@ export default defineComponent({
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
-    const DEFAULT_TABS = isEnterpriseOrCloud
-      ? [
-          { id: "ai",       label: t("home.tabAiAssistant") },
-          { id: "overview", label: t("home.tabOverview")    },
-          { id: "usage",    label: t("home.tabUsage")       },
-        ]
-      : [
-          { id: "usage",    label: t("home.tabUsage")       },
-        ];
+    const DEFAULT_TABS = computed(() => {
+      const tabs: { id: string; label: string }[] = [];
+      if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
+        tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
+      }
+      if (isEnterpriseOrCloud) {
+        tabs.push({ id: "overview", label: t("home.tabOverview") });
+      }
+      tabs.push({ id: "usage", label: t("home.tabUsage") });
+      return tabs;
+    });
 
     function loadTabOrder() {
       try {
@@ -519,20 +522,20 @@ export default defineComponent({
         if (saved) {
           const ids: string[] = JSON.parse(saved);
           const ordered = ids
-            .map(id => DEFAULT_TABS.find(t => t.id === id))
-            .filter(Boolean) as typeof DEFAULT_TABS;
+            .map(id => DEFAULT_TABS.value.find(t => t.id === id))
+            .filter(Boolean) as { id: string; label: string }[];
           // append any new tabs not yet in saved order
-          DEFAULT_TABS.forEach(t => { if (!ordered.find(o => o.id === t.id)) ordered.push(t); });
+          DEFAULT_TABS.value.forEach(t => { if (!ordered.find(o => o.id === t.id)) ordered.push(t); });
           return ordered;
         }
       } catch {}
-      return [...DEFAULT_TABS];
+      return [...DEFAULT_TABS.value];
     }
 
     const tabOrder = ref(loadTabOrder());
 
     const savedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
-    const activeHomeTab = ref(savedActiveTab && DEFAULT_TABS.find(t => t.id === savedActiveTab) ? savedActiveTab : tabOrder.value[0].id);
+    const activeHomeTab = ref(savedActiveTab && DEFAULT_TABS.value.find(t => t.id === savedActiveTab) ? savedActiveTab : tabOrder.value[0].id);
 
     watch(activeHomeTab, val => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
@@ -998,7 +1001,7 @@ export default defineComponent({
 
     function onSwitchTab(e: Event) {
       const tab = (e as CustomEvent).detail;
-      if (DEFAULT_TABS.find(t => t.id === tab)) {
+      if (DEFAULT_TABS.value.find(t => t.id === tab)) {
         activeHomeTab.value = tab;
       }
     }

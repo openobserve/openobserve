@@ -614,3 +614,84 @@ pub async fn enable_pipeline_bulk(
         err,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{http::StatusCode, response::Response};
+
+    use crate::service::db::pipeline::PipelineError;
+
+    fn status(err: PipelineError) -> StatusCode {
+        Response::from(err).status()
+    }
+
+    // 404 Not Found
+    #[test]
+    fn test_not_found_is_not_found() {
+        assert_eq!(
+            status(PipelineError::NotFound("abc".to_string())),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    // 409 Conflict
+    #[test]
+    fn test_modified_is_conflict() {
+        assert_eq!(
+            status(PipelineError::Modified("abc".to_string())),
+            StatusCode::CONFLICT
+        );
+    }
+
+    // 400 Bad Request
+    #[test]
+    fn test_stream_in_use_is_bad_request() {
+        assert_eq!(status(PipelineError::StreamInUse), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_pipeline_does_not_apply_is_bad_request() {
+        assert_eq!(
+            status(PipelineError::PipelineDoesNotApply),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_pipeline_is_bad_request() {
+        assert_eq!(
+            status(PipelineError::InvalidPipeline("bad config".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_derived_stream_is_bad_request() {
+        assert_eq!(
+            status(PipelineError::InvalidDerivedStream(
+                "missing field".to_string()
+            )),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_delete_derived_stream_is_bad_request() {
+        assert_eq!(
+            status(PipelineError::DeleteDerivedStream("failed".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    // 500 Internal Server Error
+    #[test]
+    fn test_infra_error_is_internal_server_error() {
+        let err = infra::errors::Error::DbError(infra::errors::DbError::SeaORMError(
+            "db down".to_string(),
+        ));
+        assert_eq!(
+            status(PipelineError::InfraError(err)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+}

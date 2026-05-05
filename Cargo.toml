@@ -48,6 +48,7 @@ inherits = "release"
 opt-level = 1
 codegen-units = 16
 debug = false
+debug-assertions = true
 strip = true
 lto = false
 incremental = false

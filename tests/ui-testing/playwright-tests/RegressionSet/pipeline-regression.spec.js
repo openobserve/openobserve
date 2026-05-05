@@ -3,6 +3,7 @@ const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const logsdata = require('../../../test-data/logs_data.json');
 
 test.describe.configure({ mode: "serial" });
 
@@ -426,6 +427,85 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await pageManager.pipelinesPage.cleanupPipelineCreation();
 
     testLogger.info('Test passed: Cancel button click handled correctly');
+  });
+
+  // ======================================================================
+  // Bug #11498: Run Query enabled without selecting stream
+  // Fix: PR #11502 added :disable="!selectedStreamName" to Run Query button
+  // ======================================================================
+
+  /**
+   * Shared setup for Bug #11498 tests: ingest logs data, navigate to pipelines,
+   * add a new pipeline, drag the Query button, and wait for the dialog.
+   */
+  async function setupBug11498Test(page) {
+    const streamNames = ["e2e_automate", "k8s_json"];
+    await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
+    await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+    await pageManager.pipelinesPage.addPipeline();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
+    await page.waitForTimeout(500);
+    await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
+    await page.waitForTimeout(1000);
+  }
+
+  test("Bug #11498: should disable Run Query button when no stream is selected", {
+    tag: ['@smoke', '@P0', '@bug11498', '@pipelineRegression']
+  }, async ({ page }) => {
+    testLogger.info("Testing Run Query button is disabled without stream selection");
+    await setupBug11498Test(page);
+
+    // Verify Run Query button is visible but disabled (no stream selected yet)
+    await pageManager.pipelinesPage.expectRunQueryDisabled();
+
+    // Expand Build Query section to select a stream
+    await pageManager.pipelinesPage.expandBuildQuerySection();
+    await page.waitForTimeout(500);
+
+    // Select stream type (logs)
+    await pageManager.pipelinesPage.selectStreamType("logs");
+    await page.waitForTimeout(1000);
+
+    // Run Query should still be disabled (no stream NAME selected yet,
+    // only stream TYPE)
+    await pageManager.pipelinesPage.expectRunQueryDisabled();
+
+    testLogger.info("Test passed: Run Query is disabled when no stream is selected");
+
+    // Teardown: close the scheduled pipeline dialog to avoid state carry-over
+    await pageManager.pipelinesPage.clickCancelAndConfirm();
+  });
+
+  test("Bug #11498: should enable Run Query button after stream is selected", {
+    tag: ['@smoke', '@P0', '@bug11498', '@pipelineRegression']
+  }, async ({ page }) => {
+    testLogger.info("Testing Run Query button enables after stream selection");
+    await setupBug11498Test(page);
+
+    // Expand Build Query section
+    await pageManager.pipelinesPage.expandBuildQuerySection();
+    await page.waitForTimeout(500);
+
+    // Select stream type (logs)
+    await pageManager.pipelinesPage.selectStreamType("logs");
+    await page.waitForTimeout(1000);
+
+    // Select stream name (e2e_automate)
+    await pageManager.pipelinesPage.selectStreamName("e2e_automate");
+    await page.waitForTimeout(1000);
+
+    // Verify SQL editor is visible (query auto-generated)
+    await pageManager.pipelinesPage.expectSqlEditorVisible();
+    await pageManager.pipelinesPage.expectQueryToContain("e2e_automate");
+
+    // Verify Run Query button is now enabled
+    await pageManager.pipelinesPage.expectRunQueryEnabled();
+
+    testLogger.info("Test passed: Run Query is enabled after stream selection");
+
+    // Teardown: close the scheduled pipeline dialog to avoid state carry-over
+    await pageManager.pipelinesPage.clickCancelAndConfirm();
   });
 
 });

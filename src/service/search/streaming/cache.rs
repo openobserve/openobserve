@@ -696,4 +696,49 @@ mod tests {
         assert!(new_cache_duration > 0, "Fix produces positive duration");
         assert_eq!(new_cache_duration, 6875303800);
     }
+
+    #[test]
+    fn test_create_mock_cached_response_fields() {
+        let resp = create_mock_cached_response(100, 200);
+        assert_eq!(resp.response_start_time, 100);
+        assert_eq!(resp.response_end_time, 200);
+        assert!(resp.has_cached_data);
+        assert!(resp.cache_query_response);
+        assert_eq!(resp.ts_column, "_timestamp");
+        assert!(!resp.is_descending);
+        assert_eq!(resp.limit, 100);
+    }
+
+    #[test]
+    fn test_cache_duration_single_entry() {
+        let cached_resp = vec![create_mock_cached_response(1000, 2000)];
+        let mut all_timestamps = Vec::new();
+        for cached in &cached_resp {
+            all_timestamps.push(cached.response_start_time);
+            all_timestamps.push(cached.response_end_time);
+        }
+        let start = all_timestamps.iter().min().copied().unwrap_or_default();
+        let end = all_timestamps.iter().max().copied().unwrap_or_default();
+        assert_eq!(start, 1000);
+        assert_eq!(end, 2000);
+        assert_eq!(end - start, 1000);
+    }
+
+    #[test]
+    fn test_cache_duration_ascending_order() {
+        let cached_resp = vec![
+            create_mock_cached_response(100, 200),
+            create_mock_cached_response(300, 400),
+            create_mock_cached_response(500, 600),
+        ];
+        let mut all_timestamps = Vec::new();
+        for cached in &cached_resp {
+            all_timestamps.push(cached.response_start_time);
+            all_timestamps.push(cached.response_end_time);
+        }
+        let start = all_timestamps.iter().min().copied().unwrap_or_default();
+        let end = all_timestamps.iter().max().copied().unwrap_or_default();
+        assert_eq!(start, 100);
+        assert_eq!(end, 600);
+    }
 }

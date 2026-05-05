@@ -243,7 +243,7 @@ impl WriteUtf8 for StringBuf<'_> {
 
 #[cfg(test)]
 mod tests {
-    use prometheus::{Counter, Gauge, Histogram, HistogramOpts, core::Collector};
+    use prometheus::{Counter, CounterVec, Gauge, Histogram, HistogramOpts, Opts, core::Collector};
 
     use super::*;
 
@@ -364,5 +364,88 @@ mod tests {
         let metrics = json.as_array().unwrap();
         assert!(!metrics.is_empty());
         assert_eq!(metrics[0]["__name__"], "test_counter");
+    }
+
+    #[test]
+    fn test_format_type_returns_text_format() {
+        let encoder = JsonEncoder::new();
+        assert_eq!(encoder.format_type(), TEXT_FORMAT);
+    }
+
+    #[test]
+    fn test_encode_histogram_with_explicit_inf_bucket() {
+        // +Inf bucket in opts → inf_seen=true → no synthetic +Inf added
+        let histogram = Histogram::with_opts(
+            HistogramOpts::new("test_hist_inf", "help").buckets(vec![1.0, f64::INFINITY]),
+        )
+        .unwrap();
+        histogram.observe(0.5);
+
+        let encoder = JsonEncoder::new();
+        let result = encoder.encode_to_json(&histogram.collect());
+        // Should have bucket rows but no duplicate synthetic +Inf
+        let bucket_rows: Vec<_> = result
+            .iter()
+            .filter(|r| r["__name__"] == "test_hist_inf_bucket")
+            .collect();
+        // Exactly 2 explicit buckets (1.0 and +Inf), no extra synthetic +Inf
+        assert_eq!(bucket_rows.len(), 2);
+    }
+
+    #[test]
+    fn test_encode_with_labels_populates_extra_info() {
+        // CounterVec adds labels → extra_info labels branch covered
+        let counter = CounterVec::new(
+            Opts::new("test_labeled_counter", "labeled counter help"),
+            &["code"],
+        )
+        .unwrap();
+        counter.with_label_values(&["200"]).inc_by(5.0);
+
+        let encoder = JsonEncoder::new();
+        let result = encoder.encode_to_json(&counter.collect());
+        assert!(!result.is_empty());
+        // Label "code" = "200" should appear in the metric row
+        assert_eq!(result[0]["code"], "200");
+    }
+
+    #[test]
+    fn test_encode_untyped_metric_produces_header_only() {
+        use prometheus::proto::MetricType;
+        // Build MetricFamily proto directly with UNTYPED type
+        let mut mf = MetricFamily::new();
+        mf.set_name("test_untyped".to_string());
+        mf.set_help("untyped help".to_string());
+        mf.set_field_type(MetricType::UNTYPED);
+        mf.mut_metric().push(prometheus::proto::Metric::new());
+
+        let encoder = JsonEncoder::new();
+        let result = encoder.encode_to_json(&[mf]);
+        // UNTYPED → `continue` in inner loop → mf_map pushed after loop without value
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0]["__name__"], "test_untyped");
+        assert!(result[0].get("value").is_none());
+    }
+
+    #[test]
+    fn test_encode_summary_produces_sum_and_count_rows() {
+        use prometheus::proto::{Metric, MetricType, Summary as ProtoSummary};
+        let mut mf = MetricFamily::new();
+        mf.set_name("test_summary".to_string());
+        mf.set_help("summary help".to_string());
+        mf.set_field_type(MetricType::SUMMARY);
+
+        let mut s = ProtoSummary::new();
+        s.set_sample_count(3);
+        s.set_sample_sum(6.0);
+
+        let mut m = Metric::new();
+        m.set_summary(s);
+        mf.mut_metric().push(m);
+
+        let encoder = JsonEncoder::new();
+        let result = encoder.encode_to_json(&[mf]);
+        assert!(result.iter().any(|r| r["__name__"] == "test_summary_sum"));
+        assert!(result.iter().any(|r| r["__name__"] == "test_summary_count"));
     }
 }

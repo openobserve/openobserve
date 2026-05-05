@@ -45,3 +45,18 @@ pub use o2_enterprise::enterprise::service_graph::{
 };
 // Re-export processor for compactor
 pub use processor::process_service_graph;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_query_window_minutes_value() {
+        assert_eq!(DEFAULT_QUERY_WINDOW_MINUTES, 60);
+    }
+
+    #[test]
+    fn test_default_query_window_minutes_positive() {
+        assert!(DEFAULT_QUERY_WINDOW_MINUTES > 0);
+    }
+}

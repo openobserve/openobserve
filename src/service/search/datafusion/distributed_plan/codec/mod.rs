@@ -97,3 +97,21 @@ impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {
         Err(last_err.unwrap())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_physical_extension_codec_has_one_codec() {
+        let codec = get_physical_extension_codec();
+        assert_eq!(codec.codecs.len(), 1);
+    }
+
+    #[test]
+    fn test_composed_codec_debug() {
+        let codec = get_physical_extension_codec();
+        let s = format!("{codec:?}");
+        assert!(s.contains("ComposedPhysicalExtensionCodec"));
+    }
+}

@@ -133,3 +133,27 @@ impl MemorySize for MemTable {
         std::mem::size_of::<MemTable>() + self.streams.mem_size()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memtable_new_has_unique_id() {
+        let m1 = MemTable::new();
+        let m2 = MemTable::new();
+        assert_ne!(m1.id(), m2.id());
+    }
+
+    #[test]
+    fn test_memtable_new_empty_streams() {
+        let m = MemTable::new();
+        assert!(m.streams.is_empty());
+    }
+
+    #[test]
+    fn test_memtable_mem_size_at_least_struct_size() {
+        let m = MemTable::new();
+        assert!(m.mem_size() >= std::mem::size_of::<MemTable>());
+    }
+}

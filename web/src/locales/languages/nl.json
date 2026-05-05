@@ -387,7 +387,10 @@
     "liveModeTooltip": "Query automatisch uitvoeren bij wijzigingen in filter/tijd",
     "turnOnLiveMode": "Live-modus inschakelen",
     "turnOffLiveMode": "Live-modus uitschakelen",
-    "autoRunEnabled": "Automatisch uitvoeren ingeschakeld"
+    "autoRunEnabled": "Automatisch uitvoeren ingeschakeld",
+    "selectStreamFirst": "Selecteer eerst een stream",
+    "traces": "Sporen",
+    "switchToLogs": "klik om terug te schakelen naar de logboeken"
   },
   "menu": {
     "home": "Home",
@@ -976,7 +979,8 @@
     "fieldName": "Veldnaam",
     "fieldRequired": "Veld is verplicht!",
     "dataType": "Gegevenstype",
-    "dataTypeRequired": "Gegevenstype is vereist!"
+    "dataTypeRequired": "Gegevenstype is vereist!",
+    "udsFieldAlreadyInSchema": "Een of meer geselecteerde velden maken al deel uit van het gedefinieerde schema"
   },
   "function": {
     "header": "Functies",
@@ -1121,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub-logboeken"
+    "pubsub": "Pub/Sub-logboeken",
+    "aiLabel": "AI-integraties"
   },
   "dashboard": {
     "selectField": "Veld",
@@ -2887,7 +2892,38 @@
       "multiStepAgent": "Agent met meerdere stappen"
     },
     "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service",
-    "spansTruncatedWarning": "Toont {count} van {total} overspanningen — de tracering is mogelijk onvolledig. Beperk de tijdspanne of neem contact op met uw beheerder om de limiet voor het bereik te verhogen."
+    "spansTruncatedWarning": "Toont {count} van {total} overspanningen — de tracering is mogelijk onvolledig. Beperk de tijdspanne of neem contact op met uw beheerder om de limiet voor het bereik te verhogen.",
+    "servicesCatalog": {
+      "tabLabel": "Servicecatalogus",
+      "title": "Servicecatalogus",
+      "filterPlaceholder": "Filteren op servicenaam...",
+      "noServicesFound": "Er zijn geen services gevonden in de geselecteerde periode.",
+      "loading": "Diensten aan het laden...",
+      "columns": {
+        "serviceName": "Service",
+        "status": "Status",
+        "requests": "Verzoeken",
+        "errorRate": "Foutpercentage",
+        "errors": "Fouten",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Gemiddelde latentie",
+        "lastSeen": "Laatst gezien",
+        "operations": "Operaties"
+      },
+      "status": {
+        "healthy": "Gezond",
+        "warning": "Waarschuwing",
+        "degraded": "Gedegradeerd"
+      },
+      "viewTraces": "Bekijk de sporen",
+      "exportCsv": "CSV exporteren",
+      "justNow": "Zojuist",
+      "minutesAgo": "{n} m geleden",
+      "hoursAgo": "{n} h geleden",
+      "daysAgo": "{n} geleden"
+    }
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
