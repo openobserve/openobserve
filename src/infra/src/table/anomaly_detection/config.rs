@@ -27,7 +27,7 @@ use sea_orm::{
 
 use crate::{
     errors::{self, Error},
-    table::entity::anomaly_detection_config,
+    table::entity::{anomaly_detection_config, folders},
 };
 
 type Model = anomaly_detection_config::Model;
@@ -74,16 +74,36 @@ pub async fn list_all_enabled<C: ConnectionTrait>(conn: &C) -> Result<Vec<Model>
 
 /// Inserts a new config row.
 ///
-/// Returns an error if a row with the same primary key already exists.
-/// Use `create_if_not_exists` for idempotent inserts.
-pub async fn create<C: ConnectionTrait>(conn: &C, config: Model) -> Result<Model> {
+/// Verifies the referenced folder exists inside the same transaction, matching
+/// the pattern used by `alerts::create` and `dashboards::create`.
+///
+/// Returns an error if the folder does not exist or if a row with the same
+/// primary key already exists. Use `create_if_not_exists` for idempotent inserts.
+pub async fn create<C: TransactionTrait + ConnectionTrait>(
+    conn: &C,
+    config: Model,
+) -> Result<Model> {
     let _lock = super::super::get_lock().await;
+    let txn = conn.begin().await?;
+
+    let folder_exists = folders::Entity::find_by_id(&config.folder_id)
+        .one(&txn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?
+        .is_some();
+    if !folder_exists {
+        return Err(Error::DbError(errors::DbError::PutAnomalyConfig(
+            errors::PutAnomalyConfigError::FolderDoesNotExist,
+        )));
+    }
+
     let anomaly_id = config.anomaly_id.clone();
     log::info!("[anomaly_detection_config] create: inserting id={anomaly_id}");
     let result = anomaly_detection_config::Entity::insert(into_active_model(config))
-        .exec_with_returning(conn)
+        .exec_with_returning(&txn)
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    txn.commit().await?;
     log::info!("[anomaly_detection_config] create: inserted id={anomaly_id}");
     Ok(result)
 }
@@ -143,6 +163,20 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
                 incoming.anomaly_id
             )))
         })?;
+
+    // If folder is changing, verify the new folder exists — matches alerts::update behaviour.
+    if existing.folder_id != incoming.folder_id {
+        let folder_exists = folders::Entity::find_by_id(&incoming.folder_id)
+            .one(&txn)
+            .await
+            .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?
+            .is_some();
+        if !folder_exists {
+            return Err(Error::DbError(errors::DbError::PutAnomalyConfig(
+                errors::PutAnomalyConfigError::FolderDoesNotExist,
+            )));
+        }
+    }
 
     let mut active = existing.into_active_model();
     patch_all_fields(&mut active, incoming);
