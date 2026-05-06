@@ -29,7 +29,7 @@
               class="tw:w-full"
               :streams="getAllSelectedStreams()"
               v-model="condition.column"
-              :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
+              :data-test="`dashboard-add-condition-column-${conditionIndex}`"
             />
             <OButton
               variant="ghost"
