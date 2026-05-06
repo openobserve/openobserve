@@ -447,12 +447,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   </div>
 
-  <q-dialog
-    v-model="showJsonEditorDialog"
-    position="right"
-    full-height
-    maximized
-    :persistent="true"
+  <ODrawer
+    v-model:open="showJsonEditorDialog"
+    size="lg"
+    persistent
   >
     <JsonEditor
       :data="formData"
@@ -463,7 +461,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @saveJson="saveAlertJson"
       :isEditing="beingUpdated"
     />
-  </q-dialog>
+  </ODrawer>
+</div>
 </template>
 
 <script lang="ts">
