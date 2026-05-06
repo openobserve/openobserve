@@ -390,8 +390,9 @@ where
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
             let key = if path_columns[1].eq("invites") {
                 "users"
-            } else if (path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
-                && method.eq("PUT")
+            } else if ((path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
+                && method.eq("PUT"))
+                || path_columns[1].eq("external_contract")
             {
                 "organizations"
             } else {
@@ -401,6 +402,7 @@ where
             // for organization api changes we need perms on _all_{org}
             let entity = match (key, path_columns[1]) {
                 ("organizations", "extend_trial_period") => "_all__meta".to_string(),
+                ("organizations", "external_contract") => "_all__meta".to_string(),
                 ("organizations", "organizations") => {
                     // Special case: assume_service_account endpoint should check org:_all__meta
                     if url_len == 3 && path_columns[2] == "assume_service_account" {
@@ -418,6 +420,30 @@ where
                 OFGA_MODELS.get(key).map_or(key, |model| model.key),
                 entity
             )
+        } else if path_columns[1].eq("llm") {
+            // LLM model pricing routes — uses dedicated "model_pricing" resource.
+            // url_len==3: /{org_id}/llm/models  (list / create)
+            // url_len==4: /{org_id}/llm/models/built-in  (read-only catalog)
+            // url_len==4: /{org_id}/llm/models/{model_id}  (get / update / delete)
+            let resource_key = OFGA_MODELS
+                .get("model_pricing")
+                .map_or("model_pricing", |m| m.key);
+            if url_len == 3 {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                } else if method.eq("POST") {
+                    method = "PUT".to_string();
+                }
+                format!("{resource_key}:{}", path_columns[0])
+            } else if path_columns.get(3) == Some(&"built-in") {
+                method = "LIST".to_string();
+                format!("{resource_key}:{}", path_columns[0])
+            } else if path_columns.get(3) == Some(&"refresh-built-in") {
+                method = "PUT".to_string();
+                format!("{resource_key}:{}", path_columns[0])
+            } else {
+                format!("{resource_key}:{}", path_columns[0])
+            }
         } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
             // to check permission on role:org/id for permissions on that specific role
@@ -1855,5 +1881,35 @@ mod tests {
         // Too short a path should not match
         let path: Vec<&str> = "v2/default/trigger".split('/').collect();
         assert_eq!(resolve_write_method("PATCH", &path), "PUT");
+    }
+
+    #[test]
+    fn test_build_basic_auth_header_format() {
+        use base64::Engine as _;
+        let header = build_basic_auth_header("user@example.com", "mytoken");
+        assert!(header.starts_with("Basic "));
+        let encoded = header.strip_prefix("Basic ").unwrap();
+        let decoded = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, "user@example.com:mytoken");
+    }
+
+    #[test]
+    fn test_build_basic_auth_header_empty_fields() {
+        use base64::Engine as _;
+        let header = build_basic_auth_header("", "");
+        assert!(header.starts_with("Basic "));
+        let encoded = header.strip_prefix("Basic ").unwrap();
+        let decoded = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, ":");
     }
 }

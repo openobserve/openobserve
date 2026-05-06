@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod action_scripts;
-mod ai_prompt;
 mod alerts;
+mod anomaly_detection;
 mod cipher_keys;
 mod compactor_manual_jobs;
 mod dashboards;
@@ -45,9 +45,9 @@ mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    ActionScriptsQueue, AiSystemPromptQueue, AlertsQueue, DashboardsQueue, DestinationsQueue,
-    EvalTemplatesQueue, FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue,
-    SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
+    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalTemplatesQueue,
+    FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
+    SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -80,6 +80,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_scheduler_msg: scheduler::process,
         on_semantic_groups_msg: semantic_groups::process,
         on_incident_msg: incidents::process,
+        on_anomaly_detection_msg: anomaly_detection::process,
     };
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,
@@ -112,9 +113,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_meta_msg: meta::process,
         on_orgs_msg: organization::process,
     };
-    let ai_prompt_queue = AiSystemPromptQueue {
-        on_prompt_update_msg: ai_prompt::process,
-    };
     let eval_templates_queue = EvalTemplatesQueue {
         on_eval_template_msg: eval_templates::process,
     };
@@ -132,7 +130,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(action_scripts_queue),
         Box::new(scheduler_queue),
         Box::new(org_users_queue),
-        Box::new(ai_prompt_queue),
         Box::new(eval_templates_queue),
     ];
 

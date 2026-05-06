@@ -2511,4 +2511,34 @@ mod tests {
             assert!(metric_names.contains(&"latency_sum"));
         }
     }
+
+    #[test]
+    fn test_batch_min_timestamp_empty_uses_default() {
+        assert_eq!(batch_min_timestamp(&[], 42), 42);
+    }
+
+    #[test]
+    fn test_batch_min_timestamp_single_entry() {
+        let mut row = serde_json::Map::new();
+        row.insert(TIMESTAMP_COL_NAME.to_string(), serde_json::json!(1000i64));
+        assert_eq!(batch_min_timestamp(&[row], 0), 1000);
+    }
+
+    #[test]
+    fn test_batch_min_timestamp_returns_min_of_first_and_last() {
+        let mut first = serde_json::Map::new();
+        first.insert(TIMESTAMP_COL_NAME.to_string(), serde_json::json!(500i64));
+        let mut middle = serde_json::Map::new();
+        middle.insert(TIMESTAMP_COL_NAME.to_string(), serde_json::json!(100i64));
+        let mut last = serde_json::Map::new();
+        last.insert(TIMESTAMP_COL_NAME.to_string(), serde_json::json!(200i64));
+        // min(first=500, last=200) = 200
+        assert_eq!(batch_min_timestamp(&[first, middle, last], 0), 200);
+    }
+
+    #[test]
+    fn test_batch_min_timestamp_no_timestamp_field_uses_default() {
+        let row = serde_json::Map::new(); // no _timestamp field
+        assert_eq!(batch_min_timestamp(&[row], 99), 99);
+    }
 }

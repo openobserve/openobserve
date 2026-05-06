@@ -80,6 +80,57 @@ impl From<i32> for FileType {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_type_to_i32() {
+        assert_eq!(i32::from(FileType::SourceMap), 0);
+    }
+
+    #[test]
+    fn test_i32_to_file_type_zero() {
+        assert!(matches!(FileType::from(0), FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_i32_to_file_type_unknown_defaults_to_source_map() {
+        assert!(matches!(FileType::from(99), FileType::SourceMap));
+        assert!(matches!(FileType::from(-1), FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_from_model_to_source_map() {
+        use super::super::entity::source_maps::Model;
+        let model = Model {
+            id: 42,
+            org: "myorg".to_string(),
+            service: Some("api".to_string()),
+            env: Some("prod".to_string()),
+            version: Some("1.0.0".to_string()),
+            source_file_name: "app.js".to_string(),
+            source_map_file_name: "app.js.map".to_string(),
+            file_store_id: "store-1".to_string(),
+            file_type: 0,
+            created_at: 1_000_000,
+            cluster: "us-east".to_string(),
+        };
+        let sm = SourceMap::from(model);
+        assert_eq!(sm.id, 42);
+        assert_eq!(sm.org, "myorg");
+        assert_eq!(sm.service.as_deref(), Some("api"));
+        assert_eq!(sm.env.as_deref(), Some("prod"));
+        assert_eq!(sm.version.as_deref(), Some("1.0.0"));
+        assert_eq!(sm.source_file_name, "app.js");
+        assert_eq!(sm.source_map_file_name, "app.js.map");
+        assert_eq!(sm.file_store_id, "store-1");
+        assert_eq!(sm.created_at, 1_000_000);
+        assert_eq!(sm.cluster, "us-east");
+        assert!(matches!(sm.file_type, FileType::SourceMap));
+    }
+}
+
 #[derive(FromQueryResult)]
 struct Value {
     value: Option<String>,

@@ -69,3 +69,57 @@ fn get_exclude_labels() -> Vec<&'static str> {
     // vec.push(column_timestamp);
     vec
 }
+
+#[cfg(test)]
+mod tests {
+    use config::utils::json;
+
+    use super::*;
+
+    #[test]
+    fn test_signature_without_labels_same_labels_same_hash() {
+        let mut m1 = json::Map::new();
+        m1.insert("env".to_string(), json::Value::String("prod".to_string()));
+        let mut m2 = json::Map::new();
+        m2.insert("env".to_string(), json::Value::String("prod".to_string()));
+        assert_eq!(
+            signature_without_labels(&m1, &[]),
+            signature_without_labels(&m2, &[])
+        );
+    }
+
+    #[test]
+    fn test_signature_without_labels_excludes_key() {
+        let mut with_extra = json::Map::new();
+        with_extra.insert("env".to_string(), json::Value::String("prod".to_string()));
+        with_extra.insert("noise".to_string(), json::Value::String("x".to_string()));
+        let mut without_extra = json::Map::new();
+        without_extra.insert("env".to_string(), json::Value::String("prod".to_string()));
+        assert_eq!(
+            signature_without_labels(&with_extra, &["noise"]),
+            signature_without_labels(&without_extra, &[])
+        );
+    }
+
+    #[test]
+    fn test_signature_without_labels_different_values_differ() {
+        let mut m1 = json::Map::new();
+        m1.insert("env".to_string(), json::Value::String("prod".to_string()));
+        let mut m2 = json::Map::new();
+        m2.insert(
+            "env".to_string(),
+            json::Value::String("staging".to_string()),
+        );
+        assert_ne!(
+            signature_without_labels(&m1, &[]),
+            signature_without_labels(&m2, &[])
+        );
+    }
+
+    #[test]
+    fn test_get_exclude_labels_contains_known_labels() {
+        let labels = get_exclude_labels();
+        assert!(labels.contains(&"_timestamp"));
+        assert!(labels.contains(&"_all"));
+    }
+}

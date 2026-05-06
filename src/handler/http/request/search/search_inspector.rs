@@ -555,3 +555,75 @@ fn format_trace_id(trace_id: Option<String>) -> String {
     }
     cols.join("-")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::search::inspector::SearchInspectorFields;
+
+    #[test]
+    fn test_format_trace_id_none_returns_empty() {
+        assert_eq!(format_trace_id(None), "");
+    }
+
+    #[test]
+    fn test_format_trace_id_single_part_unchanged() {
+        assert_eq!(format_trace_id(Some("abcdef".to_string())), "abcdef");
+    }
+
+    #[test]
+    fn test_format_trace_id_three_parts_second_numeric_keeps_two() {
+        assert_eq!(
+            format_trace_id(Some(
+                "019cae07a3f0740ab34831ba04563200-1-13jPR6A".to_string()
+            )),
+            "019cae07a3f0740ab34831ba04563200-1"
+        );
+    }
+
+    #[test]
+    fn test_format_trace_id_two_parts_second_non_numeric_keeps_first() {
+        assert_eq!(
+            format_trace_id(Some("21aae3eed2c6fd63aabba9feed664331-Evlj599".to_string())),
+            "21aae3eed2c6fd63aabba9feed664331"
+        );
+    }
+
+    #[test]
+    fn test_sort_events_by_timestamp_empty_returns_empty() {
+        let events: Vec<SearchInspectorFields> = vec![];
+        let result = sort_events_by_timestamp(events);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_sort_events_by_timestamp_clears_identifying_fields() {
+        let mut event = SearchInspectorFields::default();
+        event.trace_id = Some("trace-123".to_string());
+        event.search_role = Some("follower".to_string());
+        event.cluster = Some("cluster-a".to_string());
+        event.region = Some("us-east-1".to_string());
+        event.node_name = Some("node-1".to_string());
+        event.timestamp = Some("1000".to_string());
+
+        let result = sort_events_by_timestamp(vec![event]);
+        let e = &result[0];
+        assert!(e.trace_id.is_none());
+        assert!(e.search_role.is_none());
+        assert!(e.cluster.is_none());
+        assert!(e.region.is_none());
+        assert!(e.node_name.is_none());
+    }
+
+    #[test]
+    fn test_sort_events_by_timestamp_orders_ascending() {
+        let mut e1 = SearchInspectorFields::default();
+        e1.timestamp = Some("2000".to_string());
+        let mut e2 = SearchInspectorFields::default();
+        e2.timestamp = Some("1000".to_string());
+
+        let result = sort_events_by_timestamp(vec![e1, e2]);
+        assert_eq!(result[0].timestamp, Some("1000".to_string()));
+        assert_eq!(result[1].timestamp, Some("2000".to_string()));
+    }
+}

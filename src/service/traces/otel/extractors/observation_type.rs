@@ -530,4 +530,234 @@ mod tests {
 
         assert!(!is_llm_trace(&attrs, None));
     }
+
+    #[test]
+    fn test_observation_type_as_str_task_and_workflow() {
+        assert_eq!(ObservationType::Task.as_str(), "TASK");
+        assert_eq!(ObservationType::Workflow.as_str(), "WORKFLOW");
+    }
+
+    #[test]
+    fn test_traceloop_span_kind_workflow() {
+        let attrs = make_attributes(vec![("traceloop.span.kind", "workflow")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Workflow);
+    }
+
+    #[test]
+    fn test_traceloop_span_kind_task() {
+        let attrs = make_attributes(vec![("traceloop.span.kind", "task")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Task);
+    }
+
+    #[test]
+    fn test_traceloop_span_kind_agent() {
+        let attrs = make_attributes(vec![("traceloop.span.kind", "agent")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Agent);
+    }
+
+    #[test]
+    fn test_traceloop_span_kind_tool() {
+        let attrs = make_attributes(vec![("traceloop.span.kind", "tool")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Tool);
+    }
+
+    #[test]
+    fn test_langfuse_type_generation() {
+        let attrs = make_attributes(vec![("langfuse.observation.type", "GENERATION")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_langfuse_type_span() {
+        let attrs = make_attributes(vec![("langfuse.observation.type", "SPAN")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Span);
+    }
+
+    #[test]
+    fn test_langfuse_type_chain() {
+        let attrs = make_attributes(vec![("langfuse.observation.type", "CHAIN")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Chain);
+    }
+
+    #[test]
+    fn test_langfuse_type_retriever() {
+        let attrs = make_attributes(vec![("langfuse.observation.type", "RETRIEVER")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Retriever);
+    }
+
+    #[test]
+    fn test_gen_ai_operation_unknown_falls_through() {
+        // Unrecognized operation name falls through to next priority
+        let mut attrs = make_attributes(vec![("gen_ai.operation.name", "unknown_op")]);
+        attrs.insert("gen_ai.tool.name".to_string(), json::json!("my_tool"));
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Tool);
+    }
+
+    #[test]
+    fn test_llm_request_type_unknown_falls_through() {
+        let mut attrs = make_attributes(vec![("llm.request.type", "unknown")]);
+        attrs.insert("gen_ai.tool.name".to_string(), json::json!("my_tool"));
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Tool);
+    }
+
+    #[test]
+    fn test_gen_ai_tool_call_id_detection() {
+        let attrs = make_attributes(vec![("gen_ai.tool.call.id", "call_abc")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Tool);
+    }
+
+    #[test]
+    fn test_vercel_scope_no_model_returns_span() {
+        let attrs = HashMap::new();
+        let scope = Some(ScopeInfo {
+            name: Some("ai".to_string()),
+        });
+        let result = map_to_observation_type(&attrs, &HashMap::new(), scope.as_ref());
+        assert_eq!(result, ObservationType::Span);
+    }
+
+    #[test]
+    fn test_model_key_fallback_response_model() {
+        let attrs = make_attributes(vec![("gen_ai.response.model", "gpt-4")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_model_key_fallback_openinference_llm_model_name() {
+        let attrs = make_attributes(vec![("llm.model_name", "llama3")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_is_llm_trace_scope_ai_no_attrs() {
+        let attrs = HashMap::new();
+        assert!(is_llm_trace(&attrs, Some("ai")));
+    }
+
+    #[test]
+    fn test_is_llm_trace_langfuse_type() {
+        let attrs = make_attributes(vec![("langfuse.observation.type", "GENERATION")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_traceloop_span_kind() {
+        let attrs = make_attributes(vec![("traceloop.span.kind", "llm")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_vercel_ai_model_id_no_scope() {
+        let attrs = make_attributes(vec![("ai.model.id", "gpt-4")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_observation_type_event_as_str() {
+        assert_eq!(ObservationType::Event.as_str(), "EVENT");
+    }
+
+    #[test]
+    fn test_langfuse_type_embedding() {
+        let attrs = make_attributes(vec![("langfuse.observation.type", "EMBEDDING")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Embedding);
+    }
+
+    #[test]
+    fn test_langfuse_type_tool() {
+        let attrs = make_attributes(vec![("langfuse.observation.type", "TOOL")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Tool);
+    }
+
+    #[test]
+    fn test_langfuse_type_agent() {
+        let attrs = make_attributes(vec![("langfuse.observation.type", "AGENT")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Agent);
+    }
+
+    #[test]
+    fn test_model_key_fallback_vercel_model_id_no_scope() {
+        // "ai.model.id" without scope "ai" falls through to model_keys loop
+        let attrs = make_attributes(vec![("ai.model.id", "claude-3")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_model_key_fallback_openinference_llm_response_model() {
+        let attrs = make_attributes(vec![("llm.response.model", "llama2")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_model_key_fallback_plain_model() {
+        let attrs = make_attributes(vec![("model", "gpt-3.5")]);
+        let result = map_to_observation_type(&attrs, &HashMap::new(), None);
+        assert_eq!(result, ObservationType::Generation);
+    }
+
+    #[test]
+    fn test_is_llm_trace_vercel_prompt() {
+        let attrs = make_attributes(vec![("ai.prompt", "hello world")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_vercel_prompt_messages() {
+        let attrs = make_attributes(vec![("ai.prompt.messages", "[{\"role\":\"user\"}]")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_openinference_llm_model_name() {
+        let attrs = make_attributes(vec![("llm.model_name", "llama3")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_gcp_vertex() {
+        let attrs = make_attributes(vec![("gcp.vertex.agent.llm_request", "{}")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_logfire_prompt() {
+        let attrs = make_attributes(vec![("prompt", "some prompt text")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_mlflow_span_inputs() {
+        let attrs = make_attributes(vec![("mlflow.spanInputs", "{\"question\": \"test\"}")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_framework_input() {
+        let attrs = make_attributes(vec![("input", "some text")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_framework_input_value() {
+        let attrs = make_attributes(vec![("input.value", "some text")]);
+        assert!(is_llm_trace(&attrs, None));
+    }
 }

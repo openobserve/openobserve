@@ -31,33 +31,34 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Determine base ref
+        id: base_ref
+        run: |
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "base=${{ github.event.merge_group.base_sha }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.before }}" ]; then
+            echo "base=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          else
+            echo "base=origin/${{ github.base_ref || 'main' }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check if UI code has changes
         id: check_changes
         run: |
-          if [ -n "${{ github.event.before }}" ]; then
-            if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
-              echo "has_changes=true" >> $GITHUB_OUTPUT
-            else
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-            fi
+          if git diff --name-only ${{ steps.base_ref.outputs.base }} ${{ github.sha }} | grep -q "^web/"; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
           else
-            # For new branches or when before is unavailable, check against base branch
-            if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -q "^web/"; then
-              echo "has_changes=true" >> $GITHUB_OUTPUT
-            else
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-            fi
+            echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Check if package files changed
         id: check_package_changes
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          results=$(git show --name-only HEAD | grep "package.*.json" || true)
-          if [ -z "$results" ]; then
-            echo "has_package_changes=false" >> $GITHUB_OUTPUT
-          else
+          if git diff --name-only ${{ steps.base_ref.outputs.base }} ${{ github.sha }} | grep -q "package.*.json"; then
             echo "has_package_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_package_changes=false" >> $GITHUB_OUTPUT
           fi
 
       - uses: actions/setup-node@v5
@@ -73,4 +74,4 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true' && steps.check_package_changes.outputs.has_package_changes == 'true'
         run: |
           npm install -g license-checker
-          cd web && license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC-BY-4.0;Artistic-2.0;UNLICENSED;Python-2.0"
+          cd web && license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC0-1.0;CC-BY-4.0;Artistic-2.0;UNLICENSED;Python-2.0;BlueOak-1.0.0"

@@ -61,6 +61,9 @@ export const useSearchConnection = () => {
     if (type === "search") {
       searchObj.data.lastSearchTraceId = traceId;
     }
+    if (type === "histogram") {
+      searchObj.data.lastHistogramTraceId = traceId;
+    }
 
     const payload: {
       queryReq: SearchRequestPayload;
@@ -183,6 +186,8 @@ export const useSearchConnection = () => {
         searchObj.data.histogram = {
           xData: [],
           yData: [],
+          breakdownField: null,
+          breakdownSeries: null,
           chartParams: {
             title: "",
             unparsed_x_data: [],

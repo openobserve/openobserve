@@ -21,7 +21,7 @@ use {
     },
     config::meta::user::{UserOrg, UserRole},
     o2_dex::config::get_config as get_dex_config,
-    o2_openfga::authorizer::authz::get_add_user_to_org_tuples,
+    o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, get_user_role_deletion_tuple},
     o2_openfga::authorizer::roles::{
         check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
     },
@@ -77,7 +77,6 @@ pub async fn process_token(
     #[cfg(not(feature = "cloud"))]
     {
         use config::get_config;
-        use o2_openfga::authorizer::authz::get_user_role_deletion_tuple;
 
         use crate::common::meta::user::UserOrgRole;
 
@@ -158,7 +157,7 @@ pub async fn process_token(
             source_orgs.len()
         );
 
-        if openfga_cfg.map_group_to_role && !custom_roles.is_empty() {
+        if openfga_cfg.map_group_to_role {
             log::info!("Calling map_group_to_custom_role");
             map_group_to_custom_role(&user_email, &name, custom_roles, res.0.user_role).await;
             return Ok(None);
@@ -527,17 +526,24 @@ async fn map_group_to_custom_role(
             }
         }
 
-        // Build organizations list for DB
-        // - If custom claim parsing enabled and custom orgs exist: add to those orgs
-        // - Otherwise: add to default org only
         let mut organizations = Vec::new();
 
-        // Custom claim parsing: add user to custom orgs
         for org_name in custom_orgs.keys() {
             organizations.push(UserOrg {
                 role: role.clone(),
                 name: org_name.clone(),
                 org_name: org_name.clone(),
+                token: Default::default(),
+                rum_token: Default::default(),
+            });
+        }
+
+        // If the organizations is empty, add the user to the default org
+        if organizations.is_empty() {
+            organizations.push(UserOrg {
+                role: role.clone(),
+                name: dex_cfg.default_org.clone(),
+                org_name: dex_cfg.default_org.clone(),
                 token: Default::default(),
                 rum_token: Default::default(),
             });
@@ -635,6 +641,42 @@ async fn map_group_to_custom_role(
                 }
             }
         }
+
+        // Remove orgs no longer assigned via group membership (default org is never removed)
+        for existing_org in existing_user.organizations.iter() {
+            if existing_org.name != dex_cfg.default_org
+                && !custom_orgs.contains_key(&existing_org.name)
+            {
+                match users::remove_user_from_org(
+                    &existing_org.name,
+                    user_email,
+                    &config::get_config().auth.root_user_email,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        log::info!(
+                            "group_to_custom_role: User removed from org {} (group no longer assigned)",
+                            existing_org.name
+                        );
+                        if openfga_cfg.enabled {
+                            remove_tuples.push(get_user_role_deletion_tuple(
+                                &existing_org.role.to_string(),
+                                user_email,
+                                &existing_org.name,
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "group_to_custom_role: Error removing user from org {}: {e}",
+                            existing_org.name
+                        );
+                    }
+                }
+            }
+        }
+
         let existing_roles = get_roles_for_user(user_email).await;
 
         // Find roles to delete: present in existing_role but not in custom_role

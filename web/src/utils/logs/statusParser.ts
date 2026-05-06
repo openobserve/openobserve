@@ -30,10 +30,10 @@
  * 5: notice, 6: info, 7: debug, 8: ok/success
  *
  * Examples:
- * - extractStatusFromLog({ "severity": 0 }) → { level: "info", color: "#84a8f6ff", priority: 6 }
- * - extractStatusFromLog({ "level": "ERROR" }) → { level: "error", color: "#dc2626", priority: 3 }
- * - extractStatusFromLog({ "syslog.severity": 4 }) → { level: "warning", color: "#eab308", priority: 4 }
- * - extractStatusFromLog({ "status": "ok" }) → { level: "ok", color: "#059669", priority: 8 }
+ * - extractStatusFromLog({ "severity": 0 }) → { level: "info", color: "#1E88E5", priority: 6 }
+ * - extractStatusFromLog({ "level": "ERROR" }) → { level: "error", color: "#EF5350", priority: 3 }
+ * - extractStatusFromLog({ "syslog.severity": 4 }) → { level: "warning", color: "#FB8C00", priority: 4 }
+ * - extractStatusFromLog({ "status": "ok" }) → { level: "ok", color: "#43A047", priority: 8 }
  */
 
 export interface StatusInfo {
@@ -44,25 +44,39 @@ export interface StatusInfo {
 
 /**
  * Color mapping for different log levels
- * Uses Tailwind CSS color palette for consistent theming
+ * Keys must stay aligned with SEMANTIC_COLORS_LIGHT / SEMANTIC_COLORS_DARK in convertLogData.ts.
  */
 export const STATUS_COLORS = {
-  emergency: '#dc2626', // red-600
-  alert: '#ea580c', // orange-600
-  critical: '#d97706', // amber-600
-  error: '#dc2626', // red-600
-  warning: '#eab308', // yellow-500
-  notice: '#16a34a', // green-600
-  info: '#84a8f6ff', // blue-600
-  debug: '#6b7280', // gray-500
-  ok: '#059669', // emerald-600
+  emergency: '#E53935', // aligned with convertLogData fatal/emergency
+  alert:     '#ea580c',
+  critical:  '#F4511E', // aligned with convertLogData critical
+  error:     '#EF5350', // aligned with convertLogData error
+  warning:   '#FB8C00', // aligned with convertLogData warn/warning
+  notice:    '#16a34a',
+  info:      '#1E88E5', // aligned with convertLogData info
+  debug:     '#00ACC1', // aligned with convertLogData debug
+  ok:        '#43A047', // aligned with convertLogData success/ok
 } as const;
+
+/**
+ * Dark-mode color overrides sourced from convertLogData.ts SEMANTIC_COLORS_DARK.
+ * Categories without a convertLogData dark equivalent (alert, notice) fall back to STATUS_COLORS.
+ */
+export const STATUS_COLORS_DARK: Partial<Record<keyof typeof STATUS_COLORS, string>> = {
+  emergency: '#E07070',
+  critical:  '#DC6030',
+  error:     '#D95C5C',
+  warning:   '#D4944A',
+  info:      '#4D8FD4',
+  debug:     '#3DAAB8',
+  ok:        '#4DAD55',
+};
 
 /**
  * Standard field names to search for status information
  * Ordered by preference - first match will be used
  */
-const STATUS_FIELDS = ['status', 'severity', 'level', 'syslog.severity'] as const;
+const STATUS_FIELDS = ['severity', 'level', 'log_level', 'syslog.severity', 'status'] as const;
 
 /**
  * Extracts status information from a log entry object
@@ -71,13 +85,13 @@ const STATUS_FIELDS = ['status', 'severity', 'level', 'syslog.severity'] as cons
  * @param logEntry - The log entry object to analyze
  * @returns StatusInfo with level, color, and priority
  */
-export function extractStatusFromLog(logEntry: any): StatusInfo {
+export function extractStatusFromLog(logEntry: any, isDark = false): StatusInfo {
   // Handle null, undefined, or non-object inputs
-  //this is a fallback for when the log entry is not an object 
+  //this is a fallback for when the log entry is not an object
   //we simply return info level and info color
   // Example: extractStatusFromLog(null) → { level: 'info', color: '#84a8f6ff', priority: 6 }
   if (!logEntry || typeof logEntry !== 'object') {
-    return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+    return { level: 'info', color: isDark ? (STATUS_COLORS_DARK.info ?? STATUS_COLORS.info) : STATUS_COLORS.info, priority: 6 };
   }
 
   // Search through predefined status fields in order of preference
@@ -85,7 +99,7 @@ export function extractStatusFromLog(logEntry: any): StatusInfo {
   //if we dont find a status field, we return info level and info color
   for (const field of STATUS_FIELDS) {
     let statusValue = logEntry[field];
-    
+
     // Found a valid status value - parse and return it
     // Example: logEntry["level"] = "WARNING" → parseStatusValue("WARNING")
     // Also handles numeric strings: "200", "404", "500"
@@ -99,19 +113,25 @@ export function extractStatusFromLog(logEntry: any): StatusInfo {
       // Convert numeric strings to numbers before parsing
       // Example: "0" → 0, "1" → 1, "error" → "error"
       statusValue = isNaN(Number(statusValue)) ? statusValue : Number(statusValue);
-      return parseStatusValue(statusValue);
+      return applyDarkColor(parseStatusValue(statusValue), isDark);
     }
   }
 
   // No status field found - default to info level
   // Example: { "message": "Hello world" } → { level: 'info', color: '#84a8f6ff', priority: 6 }
-  return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+  return applyDarkColor({ level: 'info', color: STATUS_COLORS.info, priority: 6 }, isDark);
+}
+
+function applyDarkColor(info: StatusInfo, isDark: boolean): StatusInfo {
+  if (!isDark) return info;
+  const darkColor = STATUS_COLORS_DARK[info.level as keyof typeof STATUS_COLORS_DARK];
+  return darkColor ? { ...info, color: darkColor } : info;
 }
 
 /**
  * Routes status value parsing based on data type
  * Handles both numeric (syslog) and string formats
- * 
+ *
  * @param value - The status value to parse (number or string)
  * @returns StatusInfo object
  */

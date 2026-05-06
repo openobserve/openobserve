@@ -46,3 +46,40 @@ impl FromStr for MemoryPoolType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_pool_type_from_str_greedy() {
+        assert_eq!(
+            "greedy".parse::<MemoryPoolType>(),
+            Ok(MemoryPoolType::Greedy)
+        );
+        assert_eq!(
+            "GREEDY".parse::<MemoryPoolType>(),
+            Ok(MemoryPoolType::Greedy)
+        );
+        assert_eq!("".parse::<MemoryPoolType>(), Ok(MemoryPoolType::Greedy));
+    }
+
+    #[test]
+    fn test_memory_pool_type_from_str_fair() {
+        assert_eq!("fair".parse::<MemoryPoolType>(), Ok(MemoryPoolType::Fair));
+        assert_eq!("FAIR".parse::<MemoryPoolType>(), Ok(MemoryPoolType::Fair));
+    }
+
+    #[test]
+    fn test_memory_pool_type_from_str_none() {
+        assert_eq!("none".parse::<MemoryPoolType>(), Ok(MemoryPoolType::None));
+        assert_eq!("off".parse::<MemoryPoolType>(), Ok(MemoryPoolType::None));
+        assert_eq!("OFF".parse::<MemoryPoolType>(), Ok(MemoryPoolType::None));
+    }
+
+    #[test]
+    fn test_memory_pool_type_from_str_invalid() {
+        assert!("unknown".parse::<MemoryPoolType>().is_err());
+        assert!("pool".parse::<MemoryPoolType>().is_err());
+    }
+}

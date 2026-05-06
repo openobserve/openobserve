@@ -393,13 +393,6 @@ pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>)
     }
 }
 
-pub fn get_stream_setting_log_patterns_enabled(settings: &Option<StreamSettings>) -> bool {
-    settings
-        .as_ref()
-        .map(|s| s.enable_log_patterns_extraction)
-        .unwrap_or(false)
-}
-
 pub fn get_stream_setting_index_updated_at(
     settings: &Option<StreamSettings>,
     created_at: Option<i64>,
@@ -1098,22 +1091,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_stream_setting_log_patterns_enabled() {
-        // Test with None
-        assert!(!get_stream_setting_log_patterns_enabled(&None));
-
-        // Test with disabled
-        let mut settings = StreamSettings::default();
-        settings.enable_log_patterns_extraction = false;
-        assert!(!get_stream_setting_log_patterns_enabled(&Some(settings)));
-
-        // Test with enabled
-        let mut settings = StreamSettings::default();
-        settings.enable_log_patterns_extraction = true;
-        assert!(get_stream_setting_log_patterns_enabled(&Some(settings)));
-    }
-
-    #[test]
     fn test_get_stream_setting_index_updated_at() {
         // Test with None settings and created_at
         let created_at = 1234567890;
@@ -1336,5 +1313,33 @@ mod tests {
         assert!(is_changed);
         assert_eq!(delta.len(), 2); // Two widening conversions
         assert_eq!(merged.len(), 4); // All four fields
+    }
+
+    #[test]
+    fn test_schema_cache_new_from_arc() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int64, false),
+            Field::new("b", DataType::Utf8, true),
+        ]));
+        let cache = SchemaCache::new_from_arc(schema.clone());
+        assert_eq!(cache.schema().fields().len(), 2);
+        assert!(!cache.hash_key().is_empty());
+    }
+
+    #[test]
+    fn test_schema_cache_is_empty() {
+        let empty = SchemaCache::new(Schema::new(Vec::<Field>::new()));
+        assert!(empty.is_empty());
+
+        let non_empty =
+            SchemaCache::new(Schema::new(vec![Field::new("f", DataType::Boolean, false)]));
+        assert!(!non_empty.is_empty());
+    }
+
+    #[test]
+    fn test_schema_cache_schema_accessor() {
+        let schema = Schema::new(vec![Field::new("f1", DataType::Int32, false)]);
+        let cache = SchemaCache::new(schema);
+        assert_eq!(cache.schema().fields().len(), 1);
     }
 }

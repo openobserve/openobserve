@@ -112,6 +112,9 @@ mod m20260331_000001_create_sys_rca_agent_service_accounts;
 mod m20260402_000001_reports_add_image_fields;
 mod m20260414_000001_add_is_system_to_cipher_keys;
 mod m20260414_000002_create_org_ai_toolsets;
+mod m20260415_000001_create_model_pricing_table;
+mod m20260415_000002_add_source_to_model_pricing;
+mod m20260504_000001_add_anomaly_detection_config_folder_fk;
 
 pub struct Migrator;
 
@@ -213,6 +216,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260402_000001_reports_add_image_fields::Migration),
             Box::new(m20260414_000001_add_is_system_to_cipher_keys::Migration),
             Box::new(m20260414_000002_create_org_ai_toolsets::Migration),
+            Box::new(m20260415_000001_create_model_pricing_table::Migration),
+            Box::new(m20260415_000002_add_source_to_model_pricing::Migration),
+            Box::new(m20260504_000001_add_anomaly_detection_config_folder_fk::Migration),
         ]
     }
 }
@@ -226,5 +232,15 @@ pub fn get_binary_type() -> &'static str {
     match db_type {
         MetaStore::Sqlite => "blob",
         _ => "bytea",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_text_type_returns_text() {
+        assert_eq!(get_text_type(), "text");
     }
 }

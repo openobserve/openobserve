@@ -289,4 +289,111 @@ mod tests {
         assert_eq!(config_node.role_group, RoleGroup::Background);
         assert_eq!(config_node.status, NodeStatus::Offline);
     }
+
+    #[test]
+    fn test_config_node_to_proto_all_roles() {
+        let roles = vec![
+            Role::All,
+            Role::Compactor,
+            Role::AlertManager,
+            Role::FlattenCompactor,
+            Role::ActionServer,
+        ];
+        let node = ConfigNode {
+            id: 2,
+            uuid: "u2".to_string(),
+            name: "n2".to_string(),
+            http_addr: "".to_string(),
+            grpc_addr: "".to_string(),
+            role: roles,
+            role_group: RoleGroup::None,
+            cpu_num: 1,
+            status: NodeStatus::Prepare,
+            scheduled: false,
+            broadcasted: false,
+            version: "".to_string(),
+            metrics: NodeMetrics::default(),
+        };
+        let proto = config_node_to_proto(node);
+        assert_eq!(proto.roles.len(), 5);
+        assert_eq!(proto.role_group, ProtoRoleGroup::None as i32);
+        assert_eq!(proto.status, ProtoNodeStatus::Prepare as i32);
+    }
+
+    #[test]
+    fn test_config_node_to_proto_background_group_offline() {
+        let node = ConfigNode {
+            id: 3,
+            uuid: "u3".to_string(),
+            name: "n3".to_string(),
+            http_addr: "".to_string(),
+            grpc_addr: "".to_string(),
+            role: vec![Role::Router],
+            role_group: RoleGroup::Background,
+            cpu_num: 1,
+            status: NodeStatus::Offline,
+            scheduled: false,
+            broadcasted: false,
+            version: "".to_string(),
+            metrics: NodeMetrics::default(),
+        };
+        let proto = config_node_to_proto(node);
+        assert_eq!(proto.role_group, ProtoRoleGroup::Background as i32);
+        assert_eq!(proto.status, ProtoNodeStatus::Offline as i32);
+    }
+
+    #[test]
+    fn test_proto_node_to_config_all_roles_and_no_metrics() {
+        let proto_node = NodeDetails {
+            id: 4,
+            uuid: "u4".to_string(),
+            name: "n4".to_string(),
+            http_addr: "".to_string(),
+            grpc_addr: "".to_string(),
+            roles: vec![
+                ProtoRole::All as i32,
+                ProtoRole::Ingester as i32,
+                ProtoRole::Querier as i32,
+                ProtoRole::AlertManager as i32,
+                ProtoRole::FlattenCompactor as i32,
+                ProtoRole::ScriptServer as i32,
+                999, // unknown role — filtered out
+            ],
+            role_group: ProtoRoleGroup::None as i32,
+            cpu_num: 1,
+            status: ProtoNodeStatus::Prepare as i32,
+            scheduled: false,
+            broadcasted: false,
+            version: "".to_string(),
+            metrics: None, // exercises map_or_else default branch
+        };
+        let config_node = proto_node_to_config(proto_node);
+        assert_eq!(config_node.role.len(), 6);
+        assert_eq!(config_node.role_group, RoleGroup::None);
+        assert_eq!(config_node.status, NodeStatus::Prepare);
+        // metrics should be default when None
+        assert_eq!(config_node.metrics.cpu_total, 0);
+    }
+
+    #[test]
+    fn test_proto_node_to_config_unknown_role_group_and_status() {
+        let proto_node = NodeDetails {
+            id: 5,
+            uuid: "u5".to_string(),
+            name: "n5".to_string(),
+            http_addr: "".to_string(),
+            grpc_addr: "".to_string(),
+            roles: vec![],
+            role_group: 999, // unknown → None
+            cpu_num: 1,
+            status: 999, // unknown → Prepare
+            scheduled: false,
+            broadcasted: false,
+            version: "".to_string(),
+            metrics: None,
+        };
+        let config_node = proto_node_to_config(proto_node);
+        assert_eq!(config_node.role_group, RoleGroup::None);
+        assert_eq!(config_node.status, NodeStatus::Prepare);
+    }
 }

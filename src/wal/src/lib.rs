@@ -58,3 +58,42 @@ pub fn build_file_path(
     path.set_extension(FILE_EXTENSION);
     path
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_file_path_basic() {
+        let path = build_file_path("/data", "myorg", "logs", "123".to_string());
+        assert_eq!(path, PathBuf::from("/data/myorg/logs/123.wal"));
+    }
+
+    #[test]
+    fn test_build_file_path_extension_is_wal() {
+        let path = build_file_path("/tmp", "org", "metrics", "xyz".to_string());
+        assert_eq!(path.extension().unwrap(), "wal");
+    }
+
+    #[test]
+    fn test_build_file_path_contains_org_and_stream() {
+        let path = build_file_path("/root", "tenant1", "traces", "abc-123".to_string());
+        let s = path.to_str().unwrap();
+        assert!(s.contains("tenant1"));
+        assert!(s.contains("traces"));
+        assert!(s.ends_with(".wal"));
+    }
+
+    #[test]
+    fn test_read_from_default_is_beginning() {
+        let r: ReadFrom = Default::default();
+        assert_eq!(r, ReadFrom::Beginning);
+    }
+
+    #[test]
+    fn test_read_from_checkpoint_stores_position() {
+        let pos: FilePosition = 42;
+        let r = ReadFrom::Checkpoint(pos);
+        assert_eq!(r, ReadFrom::Checkpoint(42));
+    }
+}

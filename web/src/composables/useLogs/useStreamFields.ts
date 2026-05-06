@@ -18,6 +18,7 @@ import { byString } from "@/utils/json";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import config from "@/aws-exports";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
@@ -31,12 +32,28 @@ import {
   convertToCamelCase,
   deepCopy,
 } from "@/utils/zincutils";
+import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  resolveFieldGroup,
+  getGroupLabel,
+  groupSortOrder,
+  buildSemanticIndex,
+  discoverPrefixes,
+  applyFieldGrouping,
+  shouldApplyFieldGrouping,
+  CATEGORY,
+  type SemanticIndex,
+  type FieldObj,
+} from "@/utils/fieldCategories";
+import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServiceCorrelation";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 export const useStreamFields = () => {
   const { getStreams, getStream } = useStreams();
   const { updateFieldKeywords } = useSqlSuggestions();
+  const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 
   const store = useStore();
   const router = useRouter();
@@ -48,9 +65,25 @@ export const useStreamFields = () => {
     fieldValues,
     notificationMsg,
     streamSchemaFieldsIndexMapping,
+    schemaRequestToken,
   } = searchState();
 
   const { fnParsedSQL, getColumnWidth } = logsUtils();
+
+  const correlationFilters = useCorrelationFilters({
+    orgId: () => store.state.selectedOrganization.identifier,
+    streamType: () => searchObj.data.stream.streamType,
+    streamName: () => searchObj.data.stream.selectedStream[0],
+    streamSchemaFields: () => searchObj.data.stream.selectedStreamFields,
+    getQuery: () => searchObj.data.query || searchObj.data.editorValue,
+    setQuery: (whereClause: string) => {
+      searchObj.data.query = whereClause;
+      searchObj.data.editorValue = whereClause;
+      searchObj.meta.sqlMode = false;
+    },
+    querySource: () => searchObj.data.query,
+  });
+  correlationFilters.watchQuery();
 
   const updateFieldValues = () => {
     try {
@@ -108,6 +141,8 @@ export const useStreamFields = () => {
   };
 
   const extractFields = async () => {
+    schemaRequestToken.value++;
+    const capturedToken = schemaRequestToken.value;
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
@@ -139,8 +174,19 @@ export const useStreamFields = () => {
           .join(",")
           .split(",");
 
+        // Seed expand state for both legacy stream groups and semantic groups.
+        // Semantic groups are expanded by default when there is a single stream.
+        const semanticGroupKeys = Object.values(CATEGORY);
+        const semanticExpandDefaults = Object.fromEntries(
+          semanticGroupKeys.map((key) => [key, true]),
+        );
+        const semanticCountDefaults = Object.fromEntries(
+          semanticGroupKeys.map((key) => [key, 0]),
+        );
+
         searchObj.data.stream.expandGroupRows = {
           common: true,
+          ...semanticExpandDefaults,
           ...Object.fromEntries(
             selectedStreamValues
               .sort()
@@ -157,6 +203,7 @@ export const useStreamFields = () => {
         };
         searchObj.data.stream.expandGroupRowsFieldCount = {
           common: 0,
+          ...semanticCountDefaults,
           ...Object.fromEntries(
             selectedStreamValues.sort().map((stream: any) => [stream, 0]),
           ),
@@ -169,14 +216,36 @@ export const useStreamFields = () => {
           searchObj.data.stream.expandGroupRowsFieldCount,
         );
 
+        const streamType = searchObj.data.stream.streamType || "logs";
+
+        // Load org semantic groups + key fields config + field grouping in parallel (all cached after first call)
+        const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
+        const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
+          isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
+          loadKeyFields(),
+          loadFieldGrouping(),
+        ]);
+        const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases ? (fieldGrouping as FieldGroupingConfig) : null;
+        const semanticIndex = semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
+        const keySpec = (keyFieldsConfig as KeyFieldsConfig)[streamType] ?? { fields: [], groups: [] };
+        const keyFieldSet = new Set(keySpec.fields.map((f) => f.toLowerCase()));
+        const keyGroupSet = new Set(keySpec.groups.map((g) => g.toLowerCase()));
+
+        // Pre-build dynamic prefixes from all stream schemas so the field loop
+        // resolves groups in a single pass.
+        const allSchemaFieldNames: string[] = [];
+        for (const stream of searchObj.data.streamResults.list) {
+          if (stream.schema) {
+            for (const f of stream.schema) allSchemaFieldNames.push(f.name);
+          }
+        }
+        const dynamicPrefixes = discoverPrefixes(allSchemaFieldNames, grouping);
+
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
 
         const interestingFieldsMapping: { [key: string]: string[] } = {
           common: [],
-          ...Object.fromEntries(
-            selectedStreamValues.sort().map((stream: any) => [stream, []]),
-          ),
         };
 
         const interestingFieldsMap: { [key: string]: boolean } = {};
@@ -205,6 +274,7 @@ export const useStreamFields = () => {
             // check for schema exist in the object or not
             // if not pull the schema from server.
             const streamData = await loadStreamFields(stream.name);
+            if (capturedToken !== schemaRequestToken.value) return;
             if (streamData.schema === undefined) {
               searchObj.loadingStream = false;
               searchObj.data.errorMsg = t("search.noFieldFound");
@@ -368,13 +438,16 @@ export const useStreamFields = () => {
             let UDSFieldCount = 0;
             // Build type map in a single pass over the schema array
             const schemaTypeMap: Record<string, string> = {};
+            const definedFields = stream.settings?.defined_schema_fields || [];
+            const tsCol = store.state.zoConfig?.timestamp_column;
+            const allCol = store.state.zoConfig?.all_fields_name;
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
               searchObj.meta.useUserDefinedSchemas === "user_defined_schema"
                 ? [
-                    store.state.zoConfig?.timestamp_column,
-                    ...stream.settings?.defined_schema_fields,
-                    store.state.zoConfig?.all_fields_name,
+                    ...(definedFields.includes(tsCol) ? [] : [tsCol]),
+                    ...definedFields,
+                    ...(definedFields.includes(allCol) ? [] : [allCol]),
                   ]
                 : stream.schema.map((obj: any) => {
                     schemaTypeMap[obj.name] = obj.type;
@@ -389,22 +462,21 @@ export const useStreamFields = () => {
                 (obj: any) => (schemaTypeMap[obj.name] = obj.type),
               );
             }
+            // O(1) sets for hot-path lookups inside the field loop
+            const ftsKeySet = new Set<string>(stream.settings.full_text_search_keys || []);
+            const interestingFieldSet = new Set<string>((searchObj.data.stream as any).interestingFieldList || []);
             for (const field of fields) {
+              const fieldDataType = schemaTypeMap[field] || "";
+              const semanticGroup = resolveFieldGroup(field, fieldDataType, semanticIndex, dynamicPrefixes);
               fieldObj = {
                 name: field,
-                ftsKey:
-                  stream.settings.full_text_search_keys.indexOf(field) > -1
-                    ? true
-                    : false,
+                ftsKey: ftsKeySet.has(field),
                 isSchemaField: true,
-                group: stream.name,
+                group: semanticGroup,
                 streams: [stream.name],
                 showValues: field !== timestampField && field !== allField,
-                isInterestingField:
-                  searchObj.data.stream.interestingFieldList.includes(field)
-                    ? true
-                    : false,
-                dataType: schemaTypeMap[field] || "",
+                isInterestingField: interestingFieldSet.has(field),
+                dataType: fieldDataType,
               };
 
               if (
@@ -490,24 +562,30 @@ export const useStreamFields = () => {
                     //   ] + 1;
                   } else {
                     schemaMaps.push(fieldObj);
+
+                    if (!(fieldObj.group in searchObj.data.stream.expandGroupRows)) {
+                      searchObj.data.stream.expandGroupRows[fieldObj.group] = true;
+                      searchObj.data.stream.expandGroupRowsFieldCount[fieldObj.group] = 0;
+                      searchObj.data.stream.interestingExpandedGroupRows[fieldObj.group] = true;
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[fieldObj.group] = 0;
+                      if (!(fieldObj.group in interestingFieldsMapping)) {
+                        interestingFieldsMapping[fieldObj.group] = [];
+                      }
+                    }
+
                     if (fieldObj.isInterestingField) {
                       interestingSchemaMaps.push(fieldObj);
-                      interestingFieldsMapping[stream.name].push(fieldObj.name);
+                      interestingFieldsMapping[fieldObj.group] = interestingFieldsMapping[fieldObj.group] || [];
+                      interestingFieldsMapping[fieldObj.group].push(fieldObj.name);
                       interestingFieldsMap[fieldObj.name] = true;
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                        stream.name
+                        fieldObj.group
                       ] =
-                        searchObj.data.stream
-                          .interestingExpandedGroupRowsFieldCount[stream.name] +
-                        1;
+                        (searchObj.data.stream.interestingExpandedGroupRowsFieldCount[fieldObj.group] ?? 0) + 1;
                     }
                     schemaFields.push(field);
-                    searchObj.data.stream.expandGroupRowsFieldCount[
-                      stream.name
-                    ] =
-                      searchObj.data.stream.expandGroupRowsFieldCount[
-                        stream.name
-                      ] + 1;
+                    searchObj.data.stream.expandGroupRowsFieldCount[fieldObj.group] =
+                      (searchObj.data.stream.expandGroupRowsFieldCount[fieldObj.group] ?? 0) + 1;
                   }
 
                   if (UDSFieldCount < userDefineSchemaSettings.length) {
@@ -597,22 +675,30 @@ export const useStreamFields = () => {
                 } else {
                   schemaMaps.push(fieldObj);
 
+                  // Seed expand state for dynamic dot-namespace groups on first encounter
+                  if (!(fieldObj.group in searchObj.data.stream.expandGroupRows)) {
+                    searchObj.data.stream.expandGroupRows[fieldObj.group] = true;
+                    searchObj.data.stream.expandGroupRowsFieldCount[fieldObj.group] = 0;
+                    searchObj.data.stream.interestingExpandedGroupRows[fieldObj.group] = true;
+                    searchObj.data.stream.interestingExpandedGroupRowsFieldCount[fieldObj.group] = 0;
+                    if (!(fieldObj.group in interestingFieldsMapping)) {
+                      interestingFieldsMapping[fieldObj.group] = [];
+                    }
+                  }
+
                   if (fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping[stream.name].push(fieldObj.name);
+                    interestingFieldsMapping[fieldObj.group] = interestingFieldsMapping[fieldObj.group] || [];
+                    interestingFieldsMapping[fieldObj.group].push(fieldObj.name);
                     interestingFieldsMap[fieldObj.name] = true;
                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                      stream.name
+                      fieldObj.group
                     ] =
-                      searchObj.data.stream
-                        .interestingExpandedGroupRowsFieldCount[stream.name] +
-                      1;
+                      (searchObj.data.stream.interestingExpandedGroupRowsFieldCount[fieldObj.group] ?? 0) + 1;
                   }
                   schemaFields.push(field);
-                  searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
-                    searchObj.data.stream.expandGroupRowsFieldCount[
-                      stream.name
-                    ] + 1;
+                  searchObj.data.stream.expandGroupRowsFieldCount[fieldObj.group] =
+                    (searchObj.data.stream.expandGroupRowsFieldCount[fieldObj.group] ?? 0) + 1;
                 }
               }
             }
@@ -703,7 +789,7 @@ export const useStreamFields = () => {
                     name: key,
                     type: "Utf8",
                     ftsKey: false,
-                    group: stream.name,
+                    group: resolveFieldGroup(key, "Utf8", semanticIndex, dynamicPrefixes),
                     isSchemaField: false,
                     showValues: false,
                     isInterestingField:
@@ -716,6 +802,7 @@ export const useStreamFields = () => {
 
                   if (fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
+                    if (!interestingFieldsMapping[stream.name]) interestingFieldsMapping[stream.name] = [];
                     interestingFieldsMapping[stream.name].push(fieldObj);
                     interestingFieldsMap[fieldObj.name] = true;
                   }
@@ -731,16 +818,78 @@ export const useStreamFields = () => {
           interestingFieldsMap,
         ).filter((field: any) => interestingFieldsMap[field]);
 
-        // searchObj.data.stream.selectedStreamFields = schemaMaps;
-        searchObj.data.stream.selectedStreamFields = [
-          ...commonSchemaMaps,
-          ...schemaMaps,
-        ];
+        if (capturedToken !== schemaRequestToken.value) return;
 
-        searchObj.data.stream.selectedInterestingStreamFields = [
-          ...interestingCommonSchemaMaps,
-          ...interestingSchemaMaps,
-        ];
+        const udsActive =
+          store.state.zoConfig.user_defined_schemas_enabled &&
+          searchObj.meta.useUserDefinedSchemas === "user_defined_schema" &&
+          userDefineSchemaSettings.length > 0;
+        const totalSchemaFieldCount = commonSchemaFields.length + schemaFields.length;
+        // Group when:
+        //   - UDS active: group the UDS fields (already constrained, always safe)
+        //   - No UDS: group all fields only when count <= UDS field limit (perf guard);
+        //     if no UDS is defined at all (udsFieldLimit=0), fall back to a reasonable
+        //     default threshold so grouping still works for normal streams.
+        const udsFieldLimit = userDefineSchemaSettings.length;
+        const shouldGroup = shouldApplyFieldGrouping({
+          semanticIndex,
+          streamCount: searchObj.data.stream.selectedStream.length,
+          udsActive,
+          udsFieldLimit,
+          totalSchemaFieldCount,
+        });
+
+        if (!shouldGroup) {
+          searchObj.data.stream.selectedStreamFields = [
+            ...commonSchemaMaps,
+            ...schemaMaps,
+          ];
+          searchObj.data.stream.selectedInterestingStreamFields = [
+            ...interestingCommonSchemaMaps,
+            ...interestingSchemaMaps,
+          ];
+        } else {
+          const streamState = searchObj.data.stream as any;
+          const allFields = [...commonSchemaMaps, ...schemaMaps] as FieldObj[];
+          const orderedFields = applyFieldGrouping(allFields, semanticIndex, keyFieldSet, keyGroupSet);
+          const orderedInterestingFields = applyFieldGrouping(
+            allFields.filter((f) => f.isInterestingField),
+            semanticIndex,
+            keyFieldSet,
+            keyGroupSet,
+          );
+
+          // Precompute per-group field counts in a single pass
+          const groupFieldCountMap = new Map<string, number>();
+          for (const r of orderedFields) {
+            if (!r.label && r.group) {
+              groupFieldCountMap.set(r.group, (groupFieldCountMap.get(r.group) ?? 0) + 1);
+            }
+          }
+          const interestingGroupFieldCountMap = new Map<string, number>();
+          for (const r of orderedInterestingFields) {
+            if (!r.label && r.group) {
+              interestingGroupFieldCountMap.set(r.group, (interestingGroupFieldCountMap.get(r.group) ?? 0) + 1);
+            }
+          }
+
+          // Sync expand-state counts from final buckets
+          for (const row of orderedFields) {
+            if (!row.label) continue;
+            const groupKey = row.group;
+            streamState.expandGroupRows[groupKey] = streamState.expandGroupRows[groupKey] ?? true;
+            streamState.expandGroupRowsFieldCount[groupKey] = groupFieldCountMap.get(groupKey) ?? 0;
+          }
+          for (const row of orderedInterestingFields) {
+            if (!row.label) continue;
+            const groupKey = row.group;
+            streamState.interestingExpandedGroupRows[groupKey] = streamState.interestingExpandedGroupRows[groupKey] ?? true;
+            streamState.interestingExpandedGroupRowsFieldCount[groupKey] = interestingGroupFieldCountMap.get(groupKey) ?? 0;
+          }
+
+          searchObj.data.stream.selectedStreamFields = orderedFields;
+          searchObj.data.stream.selectedInterestingStreamFields = orderedInterestingFields;
+        }
 
         if (
           searchObj.data.stream.selectedStreamFields != undefined &&
@@ -750,6 +899,9 @@ export const useStreamFields = () => {
 
         createFieldIndexMapping();
       }
+
+      correlationFilters.restore();
+
       searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loadingStream = false;
@@ -801,8 +953,18 @@ export const useStreamFields = () => {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
+        let latestStream = "";
 
         let selectedStream: any[] = [];
+        let existingValidStreams: any[] = [];
+
+        // Capture current selection (from localStorage restore or in-session state)
+        // to use as a fallback when no URL param is present.
+        const currentSelection: string[] = Array.isArray(
+          searchObj.data.stream.selectedStream,
+        )
+          ? searchObj.data.stream.selectedStream
+          : [];
 
         searchObj.data.stream.streamLists = [];
         let itemObj: {
@@ -824,13 +986,26 @@ export const useStreamFields = () => {
           }
           if (
             !router.currentRoute.value?.query?.stream &&
+            currentSelection.includes(item.name)
+          ) {
+            existingValidStreams.push(itemObj.value);
+          }
+          if (
+            !router.currentRoute.value?.query?.stream &&
             item.stats.doc_time_max >= lastUpdatedStreamTime
           ) {
-            selectedStream = [];
             lastUpdatedStreamTime = item.stats.doc_time_max;
-            selectedStream.push(itemObj.value);
+            latestStream = item.name;
           }
         }
+
+        // Priority: URL param > existing valid selection > latest by doc_time_max
+        if (!selectedStream.length && existingValidStreams.length) {
+          selectedStream = existingValidStreams;
+        } else if (!selectedStream.length && latestStream) {
+          selectedStream = [latestStream];
+        }
+
         if (
           (store.state.zoConfig.query_on_stream_selection == false ||
             router.currentRoute.value.query?.type == "stream_explorer") &&
@@ -1109,7 +1284,7 @@ export const useStreamFields = () => {
     }
   };
 
-  const filterHitsColumns = () => {
+  const filterHitsColumns = async () => {
     searchObj.data.queryResults.filteredHit = [];
     let itemHits: any = {};
     if (searchObj.data.stream.selectedFields.length > 0) {
@@ -1129,7 +1304,10 @@ export const useStreamFields = () => {
       searchObj.data.queryResults.filteredHit =
         searchObj.data.queryResults.hits;
     }
+
+    await correlationFilters.save();
   };
+
 
   return {
     updateFieldValues,

@@ -27,6 +27,8 @@ import {
 interface HistogramData {
   xData: any[];
   yData: any[];
+  breakdownField: string | null;
+  breakdownSeries: Map<string, number[]> | null;
   chartParams: {
     title: string;
     unparsed_x_data: any[];
@@ -116,6 +118,9 @@ const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
 // Field schema index mapping
 const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
 
+// Incremented each time extractFields() starts; guards against applying stale schema responses
+const schemaRequestToken = ref(0);
+
 /**
  * Reactive state management for logs functionality
  * Contains all reactive state variables used across logs components
@@ -188,6 +193,8 @@ export const searchState = () => {
           histogram: {
             xData: [],
             yData: [],
+            breakdownField: null,
+            breakdownSeries: null,
             chartParams: {
               title: "",
               unparsed_x_data: [],
@@ -209,9 +216,17 @@ export const searchState = () => {
       searchObj.data.sortedQueryResults = JSON.parse(
         JSON.stringify(state.data.sortedQueryResults),
       );
-      searchObj.data.histogram = JSON.parse(
-        JSON.stringify(state.data.histogram),
-      );
+      // Restore histogram — breakdownSeries was serialized as an entries array
+      // (Map is not JSON-serializable), so reconstruct the Map here.
+      const savedBreakdown = state.data.histogram.breakdownSeries;
+      searchObj.data.histogram = {
+        ...JSON.parse(
+          JSON.stringify({ ...state.data.histogram, breakdownSeries: null }),
+        ),
+        breakdownSeries: Array.isArray(savedBreakdown)
+          ? new Map(savedBreakdown)
+          : null,
+      };
 
       await nextTick();
       return true;
@@ -260,6 +275,8 @@ export const searchState = () => {
     searchObj.data.histogram = {
       xData: [],
       yData: [],
+      breakdownField: null,
+      breakdownSeries: null,
       chartParams: {
         title: "",
         unparsed_x_data: [],
@@ -436,6 +453,7 @@ export const searchState = () => {
     histogramResults,
     searchPartitionMap,
     resetSearchError,
+    schemaRequestToken,
   };
 };
 

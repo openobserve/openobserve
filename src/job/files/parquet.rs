@@ -707,9 +707,6 @@ async fn merge_files(
 
     // get latest version of schema
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    #[cfg(feature = "enterprise")]
-    let log_patterns_enabled =
-        infra::schema::get_stream_setting_log_patterns_enabled(&stream_settings);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
@@ -812,37 +809,6 @@ async fn merge_files(
         new_file_meta.compressed_size,
         start.elapsed().as_millis(),
     );
-
-    // Enterprise: Extract patterns from merged parquet (ingester nodes only)
-    #[cfg(feature = "enterprise")]
-    {
-        use config::cluster::LOCAL_NODE;
-        if LOCAL_NODE.is_ingester() && stream_type == StreamType::Logs && log_patterns_enabled {
-            let buf_clone = buf.clone();
-            let org_id_clone = org_id.clone();
-            let stream_name_clone = stream_name.clone();
-            let fts_fields = full_text_search_fields.clone();
-
-            // Spawn pattern extraction task (don't block file movement)
-            tokio::spawn(async move {
-                if let Err(e) = extract_patterns_from_parquet(
-                    &org_id_clone,
-                    &stream_name_clone,
-                    &buf_clone,
-                    &fts_fields,
-                )
-                .await
-                {
-                    log::error!(
-                        "[PatternExtraction] Failed to extract patterns for {}/{}: {}",
-                        org_id_clone,
-                        stream_name_clone,
-                        e
-                    );
-                }
-            });
-        }
-    }
 
     // upload file
     let buf = Bytes::from(buf);
@@ -981,154 +947,6 @@ fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
     let stream_name = columns[3].to_string();
     let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
     (org_id, stream_type, stream_name, prefix_date)
-}
-
-#[cfg(feature = "enterprise")]
-async fn extract_patterns_from_parquet(
-    org_id: &str,
-    stream_name: &str,
-    parquet_data: &[u8],
-    fts_fields: &[String],
-) -> Result<(), anyhow::Error> {
-    use config::utils::json;
-
-    let start = std::time::Instant::now();
-
-    // Read parquet data and extract log messages
-    let parquet_bytes = Bytes::from(parquet_data.to_vec());
-    let file_format = config::get_config().common.file_format;
-    let (_schema, mut reader) =
-        get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await?;
-    let mut log_messages = Vec::new();
-    let read_start = std::time::Instant::now();
-
-    // ParquetRecordBatchStream is a Stream, use .next().await
-    use futures::StreamExt;
-
-    use crate::common::meta::ingestion::{IngestUser, SystemJobType};
-    while let Some(batch_result) = reader.next().await {
-        let batch = batch_result?;
-
-        // Try to find FTS fields in the batch
-        for fts_field in fts_fields {
-            if let Some(column) = batch.column_by_name(fts_field) {
-                // Extract string values from the column
-                use arrow::array::Array;
-                if let Some(string_array) =
-                    column.as_any().downcast_ref::<arrow::array::StringArray>()
-                {
-                    for i in 0..string_array.len() {
-                        if !string_array.is_null(i) {
-                            log_messages.push((
-                                0i64, // timestamp not needed for pattern extraction
-                                {
-                                    let mut map = json::Map::new();
-                                    map.insert(
-                                        fts_field.clone(),
-                                        json::Value::String(string_array.value(i).to_string()),
-                                    );
-                                    map
-                                },
-                            ));
-                        }
-                    }
-                    break; // Found FTS field, no need to check others
-                }
-            }
-        }
-    }
-
-    let read_duration = read_start.elapsed();
-
-    if log_messages.is_empty() {
-        log::debug!(
-            "[PatternExtraction] No log messages found in parquet for {}/{}",
-            org_id,
-            stream_name
-        );
-        return Ok(());
-    }
-
-    log::info!(
-        "[PatternExtraction] Read {} log messages from parquet in {:?} for {}/{}",
-        log_messages.len(),
-        read_duration,
-        org_id,
-        stream_name
-    );
-
-    // Record parquet read time metric
-    metrics::PATTERN_EXTRACTION_TIME
-        .with_label_values(&[org_id, "read_parquet"])
-        .observe(read_duration.as_secs_f64());
-
-    // Extract patterns directly using XDrain (no in-memory accumulation needed)
-    let extraction_start = std::time::Instant::now();
-    let patterns = o2_enterprise::enterprise::log_patterns::extract_patterns_from_logs(
-        &log_messages,
-        fts_fields,
-    )
-    .map_err(|e| anyhow::anyhow!("Pattern extraction failed: {}", e))?;
-    let extraction_duration = extraction_start.elapsed();
-
-    if patterns.is_empty() {
-        log::debug!(
-            "[PatternExtraction] No patterns found for {}/{}",
-            org_id,
-            stream_name
-        );
-        return Ok(());
-    }
-
-    log::info!(
-        "[PatternExtraction] Extracted {} patterns from {} logs in {:?} for {}/{}",
-        patterns.len(),
-        log_messages.len(),
-        extraction_duration,
-        org_id,
-        stream_name
-    );
-
-    // Record pattern extraction time metric
-    metrics::PATTERN_EXTRACTION_TIME
-        .with_label_values(&[org_id, "extraction"])
-        .observe(extraction_duration.as_secs_f64());
-
-    // Ingest patterns immediately
-    let ingest_start = std::time::Instant::now();
-    crate::service::logs::patterns::ingest_patterns(
-        org_id,
-        stream_name,
-        patterns,
-        IngestUser::SystemJob(SystemJobType::LogPatterns),
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
-    let ingest_duration = ingest_start.elapsed();
-
-    let total_duration = start.elapsed();
-
-    log::info!(
-        "[PatternExtraction] Completed in {:?} (read: {:?}, extract: {:?}, ingest: {:?}) for {}/{}",
-        total_duration,
-        read_duration,
-        extraction_duration,
-        ingest_duration,
-        org_id,
-        stream_name
-    );
-
-    // Record ingestion time metric
-    metrics::PATTERN_EXTRACTION_TIME
-        .with_label_values(&[org_id, "ingestion"])
-        .observe(ingest_duration.as_secs_f64());
-
-    // Record total pattern extraction time metric
-    metrics::PATTERN_EXTRACTION_TIME
-        .with_label_values(&[org_id, "total"])
-        .observe(total_duration.as_secs_f64());
-
-    Ok(())
 }
 
 #[cfg(feature = "enterprise")]
@@ -1309,4 +1127,41 @@ async fn queue_services_from_parquet(
     .await;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+
+    use super::*;
+
+    #[test]
+    fn test_split_perfix_logs() {
+        let prefix = "files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/";
+        let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
+        assert_eq!(org_id, "default");
+        assert_eq!(stream_type, StreamType::Logs);
+        assert_eq!(stream_name, "olympics");
+        assert_eq!(prefix_date, "2023-08-21");
+    }
+
+    #[test]
+    fn test_split_perfix_traces() {
+        let prefix = "files/myorg/traces/default/2023/09/04/05/default/";
+        let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
+        assert_eq!(org_id, "myorg");
+        assert_eq!(stream_type, StreamType::Traces);
+        assert_eq!(stream_name, "default");
+        assert_eq!(prefix_date, "2023-09-04");
+    }
+
+    #[test]
+    fn test_split_perfix_metrics() {
+        let prefix = "files/acme/metrics/cpu_usage/2024/01/15/12/some-id/";
+        let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
+        assert_eq!(org_id, "acme");
+        assert_eq!(stream_type, StreamType::Metrics);
+        assert_eq!(stream_name, "cpu_usage");
+        assert_eq!(prefix_date, "2024-01-15");
+    }
 }

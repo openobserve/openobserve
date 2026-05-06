@@ -349,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-type="input"
                   :span="span"
                   view-mode="formatted"
+                  :instance-id="`${span.span_id}-input`"
                 />
               </div>
             </div>
@@ -396,6 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-type="output"
                   :span="span"
                   view-mode="formatted"
+                  :instance-id="`${span.span_id}-output`"
                 />
               </div>
             </div>
@@ -466,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="
                   $emit('apply-filter-immediately', {
                     field,
-                    value: fieldValue,
+                    value: getFilterValue(field, fieldValue),
                     operator: action.operator,
                   })
                 "
@@ -527,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
-                        value: fieldValue,
+                        value: getFilterValue(field, fieldValue),
                         operator: action.operator,
                       })
                     "
@@ -883,7 +885,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-red-500"
+              class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
             >
               {{ correlationError }}
             </div>
@@ -915,6 +917,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           :hide-dimension-filters="true"
+          :metric-group-definitions="metricGroupResources"
+          :panelHeight="12"
+          :panelWidth="96"
           @close="activeTab = 'attributes'"
         />
         <!-- Loading/Empty state when no data -->
@@ -936,7 +941,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-red-500"
+              class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
             >
               {{ correlationError }}
             </div>
@@ -972,6 +977,11 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import {
+  type MetricGroupDefinition,
+  K8S_METRIC_GROUP_DEFINITIONS,
+} from "@/utils/metrics/metricGrouping";
+import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
@@ -1028,6 +1038,7 @@ export default defineComponent({
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
+    DeployedCode,
   },
   emits: [
     "close",
@@ -1133,10 +1144,33 @@ export default defineComponent({
       return lines.join("\n");
     };
 
+    const store = useStore();
+
+    const RAW_VALUE_FILTER_FIELDS = new Set([
+      store.state?.zoConfig?.timestamp_column || "_timestamp",
+    ]);
+
     const filterActions = [
       { operator: "=" as const, iconComponent: EqualIcon },
       { operator: "!=" as const, iconComponent: NotEqualIcon },
     ];
+
+    const getFilterValue = (field: string, displayValue: unknown): unknown => {
+      const span = props.span as Record<string, unknown>;
+      if (field === "start_time") {
+        return span._start_time_ns ?? span.start_time ?? displayValue;
+      }
+      if (field === "end_time") {
+        return span._end_time_ns ?? span.end_time ?? displayValue;
+      }
+      const timestampField =
+        store.state?.zoConfig?.timestamp_column || "_timestamp";
+      if (field === timestampField) {
+        return span[timestampField] ?? displayValue;
+      }
+
+      return displayValue;
+    };
 
     const attributesForDisplay = computed(() => {
       const attrs = { ...spanDetails.value.attrs };
@@ -1235,8 +1269,6 @@ export default defineComponent({
     onBeforeMount(() => {
       spanDetails.value = getFormattedSpanDetails();
     });
-
-    const store = useStore();
 
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");
@@ -1433,6 +1465,10 @@ export default defineComponent({
 
       if (spanDetails.attrs.events) delete spanDetails.attrs.events;
 
+      // These are custom meta fields for start_time and end_time so removing it from spanDetails
+      delete spanDetails.attrs._start_time_ns;
+      delete spanDetails.attrs._end_time_ns;
+
       spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
@@ -1473,6 +1509,8 @@ export default defineComponent({
       store.state.zoConfig.timestamp_column,
       "start_time",
       "end_time",
+      "_start_time_ns",
+      "_end_time_ns",
       "duration",
       "busy_ns",
       "idle_ns",
@@ -1698,6 +1736,15 @@ export default defineComponent({
       }
     });
 
+    // Metric group definitions — controls which category tabs and default selections
+    // appear in the metrics dashboard. Uses K8S_METRIC_GROUP_DEFINITIONS for OTel
+    // semantic defaults; overrides the pods icon with the project-specific component.
+    const metricGroupResources = ref<MetricGroupDefinition[]>(
+      K8S_METRIC_GROUP_DEFINITIONS.map((g) =>
+        g.id === "pods" ? { ...g, icon: DeployedCode } : g,
+      ),
+    );
+
     // Correlation state
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
@@ -1888,7 +1935,7 @@ export default defineComponent({
             },
           };
         } else {
-          correlationError.value = t("correlation.noLogsFound");
+          correlationError.value = t("correlation.noDataFound");
         }
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
@@ -2123,6 +2170,7 @@ export default defineComponent({
       linkColumns,
       getTagRows,
       tagColumns,
+      getFilterValue,
       attributesForDisplay,
       attributesViewMode,
       attributesTableColumns,
@@ -2133,6 +2181,7 @@ export default defineComponent({
       correlationLoading,
       correlationError,
       correlationProps,
+      metricGroupResources,
       config,
       // LLM
       isLLMSpan,
@@ -2164,6 +2213,23 @@ export default defineComponent({
 :deep(.traces-correlated-metrics-container) {
   .q-splitter--vertical .q-splitter__separator {
     height: 100% !important;
+  }
+
+  .q-card {
+    box-shadow: none !important;
+    border: 1px solid var(--o2-border) !important;
+  }
+
+  .card-container {
+    box-shadow: none !important;
+  }
+
+  .dimension-sidebar {
+    padding-left: 0.25rem;
+  }
+
+  .dimension-sidebar-search-container {
+    padding: 0.375rem 0.2rem !important;
   }
 }
 
@@ -2759,20 +2825,11 @@ body.body--dark {
     overflow-x: hidden;
     background-color: var(--o2-code-bg);
 
-    // Enhance hover visibility for code/text content (exclude VueJsonPretty)
+    // Enhance hover visibility for code/text content
     ::v-deep {
       .plain-text-content {
         &:hover {
           background-color: rgba(0, 0, 0, 0.04) !important;
-        }
-      }
-
-      // Don't apply hover to VueJsonPretty elements
-      .vjs-tree {
-        * {
-          &:hover {
-            background-color: transparent !important;
-          }
         }
       }
     }
@@ -2831,15 +2888,6 @@ body.body--dark {
       .plain-text-content {
         &:hover {
           background-color: rgba(255, 255, 255, 0.05) !important;
-        }
-      }
-
-      // Don't apply hover to VueJsonPretty elements in dark mode
-      .vjs-tree {
-        * {
-          &:hover {
-            background-color: transparent !important;
-          }
         }
       }
     }

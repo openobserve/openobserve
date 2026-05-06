@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed } from "vue";
+import { reactive, computed, nextTick } from "vue";
 import {
   b64EncodeStandard,
   b64EncodeUnicode,
@@ -89,6 +89,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
+    liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
     searchMode: "spans" as TraceSearchMode,
     serviceGraphVisualizationType:
       (localStorage.getItem("serviceGraph_visualizationType") as
@@ -157,8 +158,6 @@ const defaultObject = {
       } | null,
       traceId: "",
       spanList: [],
-      spansTruncated: false,
-      totalSpanCount: 0,
       isLoadingTraceMeta: false,
       isLoadingTraceDetails: false,
       selectedSpanId: "" as String | null,
@@ -173,14 +172,7 @@ const searchObj = reactive(Object.assign({}, defaultObject));
 
 /** Default ordered column ID lists used when no localStorage entry exists. */
 export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
-  spans: [
-    "service_name",
-    "operation_name",
-    "duration",
-    "span_status",
-    "status_code",
-    "method",
-  ],
+  spans: ["service_name", "operation_name", "duration", "span_status"],
   traces: [
     "service_name",
     "operation_name",
@@ -351,8 +343,8 @@ const useTraces = () => {
 
     return {
       stream: searchObj.data.traceDetails.selectedLogStreams.join(","),
-      from: span.startTimeMs * 1000 - 60000000,
-      to: span.endTimeMs * 1000 + 60000000,
+      from: Math.floor(span.start_time / 1000) - 60000000,
+      to: Math.ceil(span.end_time / 1000) + 60000000,
       refresh: 0,
       query,
       orgIdentifier: store.state.selectedOrganization.identifier,
@@ -360,7 +352,9 @@ const useTraces = () => {
   };
 
   // Function to navigate to logs with the provided query details
-  const navigateToLogs = (queryDetails: any) => {
+  const navigateToLogs = async (queryDetails: any) => {
+    store.dispatch("logs/setIsInitialized", false);
+    await nextTick();
     router.push({
       path: "/logs",
       query: {
@@ -426,6 +420,14 @@ const useTraces = () => {
     });
   };
 
+  const getOrSetServiceColor = (serviceName: string): string => {
+    if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
+      const colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+      searchObj.meta.serviceColors[serviceName] = getSpanColorHex(colorIndex);
+    }
+    return searchObj.meta.serviceColors[serviceName];
+  };
+
   const formatTracesMetaData = (traces: any[]): any[] => {
     if (!traces.length) return [];
 
@@ -482,6 +484,7 @@ const useTraces = () => {
     tracesShareURL,
     formatTracesMetaData,
     setServiceColors,
+    getOrSetServiceColor,
   };
 };
 

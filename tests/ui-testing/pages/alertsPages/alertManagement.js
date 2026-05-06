@@ -27,16 +27,9 @@ export class AlertManagement {
     async updateAlert(alertName) {
         await this.page.locator(this.locators.alertUpdateButton.replace('{alertName}', alertName)).first().click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        testLogger.info('Opened alert for editing', { alertName });
+        testLogger.info('Opened alert for editing (v3)', { alertName });
 
-        await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
-        await this.page.waitForTimeout(1000);
-
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Navigated to Step 2: Conditions');
-
+        // All fields are in a flat tab-based layout (v3 UI), no step navigation needed
         // Change operator from Contains to = to verify update functionality
         const operatorDropdown = this.page.locator(this.locators.operatorSelect).first();
         await expect(operatorDropdown).toBeVisible({ timeout: 5000 });
@@ -45,17 +38,6 @@ export class AlertManagement {
         await this.page.getByText('=', { exact: true }).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Changed operator from Contains to =');
-
-        // Real-time alerts wizard: Step 2 -> Step 4 -> Step 6 (last)
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-        testLogger.info('Navigated to Step 4: Alert Settings');
-
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-        testLogger.info('Navigated to Step 6: Advanced (last step)');
 
         await this.page.locator(this.locators.alertSubmitButton).click();
         await expect(this.page.getByText(this.locators.alertUpdatedMessage)).toBeVisible({ timeout: 30000 });
@@ -466,11 +448,27 @@ export class AlertManagement {
     async openAlertDetailsDialog(alertName) {
         testLogger.info('Opening alert details dialog', { alertName });
 
+        // Try folder-specific search first
         await this.searchAlert(alertName);
         await this.page.waitForTimeout(1000);
 
-        const alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
-        await alertRow.waitFor({ state: 'visible', timeout: 10000 });
+        let alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
+        const rowVisible = await alertRow.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (!rowVisible) {
+            // Fallback: enable "search across folders" and retry
+            testLogger.info('Alert not found in current folder, retrying across all folders', { alertName });
+            const toggle = this.page.locator(this.locators.searchAcrossFoldersToggle);
+            if (await toggle.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await toggle.locator('div').nth(1).click({ force: true });
+                await this.page.waitForTimeout(500);
+            }
+            await this.searchAlert(alertName);
+            await this.page.waitForTimeout(1000);
+            alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
+        }
+
+        await alertRow.waitFor({ state: 'visible', timeout: 15000 });
 
         // Click the alert name cell (2nd column) to open details dialog
         const alertNameCell = alertRow.locator('td').nth(1);

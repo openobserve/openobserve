@@ -501,6 +501,25 @@ mod tests {
         table_provider::empty_table::NewEmptyTable, udf::match_all_udf,
     };
 
+    #[test]
+    fn test_rewrite_match_physical_new_name() {
+        let rule = RewriteMatchPhysical::new(vec![]);
+        assert_eq!(rule.name(), "RewriteMatchAllRule");
+    }
+
+    #[test]
+    fn test_rewrite_match_physical_schema_check() {
+        let rule = RewriteMatchPhysical::new(vec![]);
+        assert!(rule.schema_check());
+    }
+
+    #[test]
+    fn test_rewrite_match_physical_new_with_fields() {
+        let fields = vec![("col1".to_string(), DataType::Utf8)];
+        let rule = RewriteMatchPhysical::new(fields);
+        assert_eq!(rule.name(), "RewriteMatchAllRule");
+    }
+
     #[tokio::test]
     async fn test_rewrite_match_physical() {
         let sqls = [(

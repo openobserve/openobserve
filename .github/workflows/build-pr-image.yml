@@ -16,8 +16,38 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
+  build_frontend:
+    name: build_frontend
+    runs-on: ubicloud-standard-4
+    permissions:
+      contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend code
+        run: cd web && npm ci && npm run build
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 1
+          if-no-files-found: error
+
   build_pr_image_amd64:
     name: build_pr_image_amd64
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -46,19 +76,18 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          prefix-key: amd64
+          shared-key: openobserve-amd64
+          save-if: ${{ inputs.branch == 'main' }}
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm ci && npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -83,7 +112,7 @@ jobs:
           registry-type: public
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -112,6 +141,7 @@ jobs:
 
   build_pr_image_arm64:
     name: build_pr_image_arm64
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -140,19 +170,18 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          prefix-key: arm64
+          shared-key: openobserve-arm64
+          save-if: ${{ inputs.branch == 'main' }}
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm ci && npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -177,7 +206,7 @@ jobs:
           registry-type: public
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -238,7 +267,7 @@ jobs:
           registry-type: public
 
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -263,11 +292,18 @@ jobs:
   build_pr_image_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [build_pr_image_amd64, build_pr_image_arm64, build]
+    needs: [build_frontend, build_pr_image_amd64, build_pr_image_arm64, build]
     if: always()
     steps:
       - name: Check build results
         run: |
+          if [ "${{ needs.build_frontend.result }}" == "success" ]; then
+            echo "Frontend build passed"
+          else
+            echo "Frontend build failed"
+            exit 1
+          fi
+
           if [ "${{ needs.build_pr_image_amd64.result }}" == "success" ] || [ "${{ needs.build_pr_image_amd64.result }}" == "skipped" ]; then
             echo "AMD64 build passed or skipped"
           else

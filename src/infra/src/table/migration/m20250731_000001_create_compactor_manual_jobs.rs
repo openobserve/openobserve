@@ -85,3 +85,30 @@ enum CompactorManualJobs {
     EndedAt,
     Status,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_table_name() {
+        let sql = create_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("compactor_manual_jobs"));
+    }
+
+    #[test]
+    fn test_key_idx_contains_name() {
+        let sql = create_compactor_manual_jobs_key_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(COMPACTOR_MANUAL_JOBS_KEY_IDX));
+    }
+
+    #[test]
+    fn test_key_idx_constant_value() {
+        assert_eq!(
+            COMPACTOR_MANUAL_JOBS_KEY_IDX,
+            "compactor_manual_jobs_key_idx"
+        );
+    }
+}

@@ -4000,5 +4000,248 @@ describe("Convert PromQL Data Utils", () => {
         expect(typeof tooltipResult).toBe("string");
       });
     });
+
+    describe("timestamp filling and x-axis pinning", () => {
+      it("should fill missing timestamps using PromQL step on final render", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: { show_legends: true },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+
+        // Data has a gap: ts 100, 200, (missing 300), 400
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test" },
+                values: [
+                  [100, "1"],
+                  [200, "2"],
+                  [400, "4"],
+                ],
+              },
+            ],
+          },
+        ];
+
+        const metadata = {
+          queries: [
+            {
+              startTime: String(50 * 1_000_000),  // 50s in µs
+              endTime: String(450 * 1_000_000),    // 450s in µs
+            },
+          ],
+        };
+
+        const resultMetaData = [[{ step: 100_000_000 }]]; // 100s step in µs
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+          metadata,
+          resultMetaData,
+          false, // loading=false → fill timestamps
+        );
+
+        expect(result.options).toBeDefined();
+        // PromQL uses xAxis type "time" — data is in each series' .data array.
+        // The first series (non-annotation) should have more than 3 data points
+        // because gap filling inserts null values at missing timestamps.
+        const dataSeries = result.options.series.find(
+          (s: any) => s.name != null,
+        );
+        expect(dataSeries).toBeDefined();
+        expect(dataSeries.data.length).toBeGreaterThan(3);
+      });
+
+      it("should NOT fill missing timestamps during streaming (loading=true)", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: { show_legends: true },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test" },
+                values: [
+                  [100, "1"],
+                  [200, "2"],
+                  [400, "4"],
+                ],
+              },
+            ],
+          },
+        ];
+
+        const metadata = {
+          queries: [
+            {
+              startTime: String(50 * 1_000_000),
+              endTime: String(450 * 1_000_000),
+            },
+          ],
+        };
+
+        const resultMetaData = [[{ step: 100_000_000 }]];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+          metadata,
+          resultMetaData,
+          true, // loading=true → do NOT fill timestamps
+        );
+
+        expect(result.options).toBeDefined();
+        // During streaming, gap filling is skipped — series has only original 3 points
+        const dataSeries = result.options.series.find(
+          (s: any) => s.name != null,
+        );
+        expect(dataSeries).toBeDefined();
+        expect(dataSeries.data.length).toBe(3);
+      });
+
+      it("should pin x-axis min/max to query range during streaming (loading=true)", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: { show_legends: true },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test" },
+                values: [[1640435200, "10"]],
+              },
+            ],
+          },
+        ];
+
+        // µs timestamps
+        const startTimeUs = String(1640435000 * 1_000_000);
+        const endTimeUs = String(1640435500 * 1_000_000);
+        const metadata = {
+          queries: [{ startTime: startTimeUs, endTime: endTimeUs }],
+        };
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+          metadata,
+          undefined, // resultMetaData
+          true,      // loading — enables x-axis pinning during streaming
+        );
+
+        expect(result.options).toBeDefined();
+        // xAxis should have min and max set during streaming
+        expect(result.options.xAxis.min).toBeDefined();
+        expect(result.options.xAxis.max).toBeDefined();
+      });
+
+      it("should NOT pin x-axis on final render (loading=false) even with metadata", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: { show_legends: true },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test" },
+                values: [[1640435200, "10"]],
+              },
+            ],
+          },
+        ];
+
+        // µs timestamps
+        const startTimeUs = String(1640435000 * 1_000_000);
+        const endTimeUs = String(1640435500 * 1_000_000);
+        const metadata = {
+          queries: [{ startTime: startTimeUs, endTime: endTimeUs }],
+        };
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+          metadata,
+          undefined, // resultMetaData
+          false,     // loading=false — final render, no x-axis pinning
+        );
+
+        expect(result.options).toBeDefined();
+        // xAxis should NOT have min/max on final render
+        expect(result.options.xAxis.min).toBeUndefined();
+        expect(result.options.xAxis.max).toBeUndefined();
+      });
+
+      it("should NOT pin x-axis when metadata has no query times", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: { show_legends: true },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test" },
+                values: [[1640435200, "10"]],
+              },
+            ],
+          },
+        ];
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+          null,  // no metadata
+        );
+
+        expect(result.options).toBeDefined();
+        // xAxis should NOT have min/max set
+        expect(result.options.xAxis.min).toBeUndefined();
+        expect(result.options.xAxis.max).toBeUndefined();
+      });
+    });
   });
 });

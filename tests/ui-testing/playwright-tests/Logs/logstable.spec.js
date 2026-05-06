@@ -390,7 +390,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('✓ Field added to table successfully');
     
     // Enable SQL mode
-    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
     
     // Execute blank query with keyboard shortcut
@@ -439,7 +439,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('Testing that cmd+enter makes exactly 1 search + 1 histogram API call when histogram is enabled');
     
     // Enable SQL mode
-    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
     
     // Ensure histogram is enabled (it should be by default, but let's verify)
@@ -466,7 +466,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('Testing that cmd+enter does not add unwanted characters or move cursor position in SQL editor');
 
     // Enable SQL mode
-    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
 
     // Setup editor for cursor test
@@ -569,16 +569,17 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
   }, async ({ page }) => {
     testLogger.info('Testing severity color mapping for all severity levels');
 
-    // Expected color mapping based on mapNumericStatus function
+    // Expected color mapping based on STATUS_COLORS in statusParser.ts.
+    // Colors are aligned with convertLogData.ts SEMANTIC_COLORS_LIGHT.
     const expectedColors = {
-      0: '#84a8f6', // OTEL UNSPECIFIED - mapped to info - blue
-      1: '#ea580c', // alert - dark orange
-      2: '#d97706', // critical - orange
-      3: '#dc2626', // error - red
-      4: '#eab308', // warning - yellow
-      5: '#16a34a', // notice - green
-      6: '#84a8f6', // info - blue
-      7: '#6b7280'  // debug - gray
+      0: '#1e88e5', // OTEL UNSPECIFIED - mapped to info
+      1: '#ea580c', // alert - unchanged (no convertLogData equivalent)
+      2: '#f4511e', // critical
+      3: '#ef5350', // error
+      4: '#fb8c00', // warning
+      5: '#16a34a', // notice - unchanged (no convertLogData equivalent)
+      6: '#1e88e5', // info
+      7: '#00acc1'  // debug
     };
 
     // Get severity colors using POM method

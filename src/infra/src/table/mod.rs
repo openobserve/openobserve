@@ -25,6 +25,7 @@ use crate::{
 pub mod action_scripts;
 pub mod alert_incidents;
 pub mod alerts;
+pub mod anomaly_detection;
 pub mod backfill_jobs;
 pub mod cipher;
 pub mod compactor_manual_jobs;
@@ -39,6 +40,7 @@ pub mod folders;
 pub mod incident_events;
 pub mod kv_store;
 mod migration;
+pub mod model_pricing;
 pub mod org_ai_toolsets;
 pub mod org_users;
 pub mod organizations;

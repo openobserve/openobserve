@@ -125,37 +125,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:ml-[0rem] tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
               >
                 <span data-test="span-count-text">
-                  <template v-if="searchObj.data.traceDetails.spansTruncated">
-                    <span
-                      v-if="
-                        searchObj.data.traceDetails.totalSpanCount >
-                        traceSpanLimit
-                      "
-                      >Showing {{ traceSpanLimit }} out of
-                    </span>
-                    <span class="tw:pl-[0.25rem]">{{
-                      formatLargeNumber(
-                        searchObj.data.traceDetails.totalSpanCount,
-                      )
-                    }}</span>
-                  </template>
-                  <template v-else>{{
-                    formatLargeNumber(effectiveSpanList.length)
-                  }}</template>
+                  {{ formatLargeNumber(effectiveSpanList.length) }}
                   {{ t("traces.spansLabel") }}
+                  <q-tooltip
+                    >{{ effectiveSpanList.length }}
+                    {{ t("traces.spansLabel") }}</q-tooltip
+                  >
                 </span>
-                <q-tooltip
-                  v-if="searchObj.data.traceDetails.spansTruncated"
-                  anchor="bottom middle"
-                  self="top middle"
-                >
-                  {{
-                    t("traces.spansTruncatedWarning", {
-                      count: effectiveSpanList.length,
-                      total: searchObj.data.traceDetails.totalSpanCount,
-                    })
-                  }}
-                </q-tooltip>
               </div>
 
               <div
@@ -170,6 +146,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   >{{ formatLargeNumber(errorSpansCount) }}
                   {{ t("traces.errorsLabel") }}</span
+                >
+                <q-tooltip
+                  >{{ errorSpansCount }}
+                  {{ t("traces.errorsLabel") }}</q-tooltip
                 >
               </div>
             </div>
@@ -604,8 +584,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :spans="flatSpans"
                 :selected-span-id="selectedSpanId"
                 :trace-duration="traceMetadata?.duration_ms || 0"
-                :is-truncated="searchObj.data.traceDetails.spansTruncated"
-                :total-span-count="searchObj.data.traceDetails.totalSpanCount"
                 @span-selected="updateSelectedSpan"
               />
             </div>
@@ -1070,11 +1048,6 @@ export default defineComponent({
       const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
       return `${sidebarWidthPx}px`;
     });
-
-    /** Maximum number of spans fetched per trace. Truncation warning is shown when this limit is hit. */
-    const MAX_SPANS_PER_TRACE = 20000;
-
-    const traceSpanLimit = ref(MAX_SPANS_PER_TRACE);
 
     const serviceColorIndex = ref(0);
     const colors = ref(getAllSpanColors());
@@ -1615,26 +1588,11 @@ export default defineComponent({
     const sanitizeTraceId = (id: string): string =>
       String(id).replace(/['"\\]/g, "");
 
-    const buildTraceCountQuery = (trace: any) => {
-      const req = getDefaultRequest();
-      req.query.from = 0;
-      req.query.size = 1;
-      req.query.start_time = trace.from;
-      req.query.end_time = trace.to;
-      req.query.sql = b64EncodeUnicode(
-        `SELECT COUNT(*) as total FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}'`,
-      ) as string;
-      return req;
-    };
-
     const buildTraceSearchQuery = (trace: any) => {
       const req = getDefaultRequest();
       req.query.from = 0;
-      // Prefer operator-configured limit from backend config; fall back to the
-      // frontend default. When the backend exposes max_spans_per_trace via /config
-      // it is picked up automatically without any code changes.
-      req.query.size =
-        store.state.zoConfig.max_spans_per_trace ?? MAX_SPANS_PER_TRACE;
+      // TODO : Handle this with _search_stream instead of adding size
+      req.query.size = 50000;
       req.query.start_time = trace.from;
       req.query.end_time = trace.to;
 
@@ -1788,12 +1746,8 @@ export default defineComponent({
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
-        searchObj.data.traceDetails.spansTruncated = false;
-        searchObj.data.traceDetails.totalSpanCount = 0;
         const req = buildTraceSearchQuery(data);
-        const countReq = buildTraceCountQuery(data);
 
-        // Fetch trace spans, total span count, and RUM events in parallel
         const tracePromise = searchService.search(
           {
             org_identifier: router.currentRoute.value.query
@@ -1804,53 +1758,21 @@ export default defineComponent({
           "ui",
         );
 
-        const countPromise = searchService.search(
-          {
-            org_identifier: router.currentRoute.value.query
-              ?.org_identifier as string,
-            query: countReq,
-            page_type: "traces",
-          },
-          "ui",
-        );
-
-        // Fetch RUM events with matching trace_id
         const rumPromise = fetchRumEventsForTrace(
           data.trace_id,
           req.query.start_time,
           req.query.end_time,
         );
 
-        // Wait for all requests to complete
-        Promise.all([tracePromise, countPromise, rumPromise])
-          .then(([traceRes, countRes, rumEvents]) => {
+        Promise.all([tracePromise, rumPromise])
+          .then(([traceRes, rumEvents]) => {
             if (!traceRes.data?.hits?.length) {
               showTraceDetailsError();
               return;
             }
 
-            // Combine trace spans and RUM events
             const traceSpans = traceRes.data?.hits || [];
             const rumSpans = formatRumEventsAsSpans(rumEvents);
-            const limit =
-              store.state.zoConfig.max_spans_per_trace ?? MAX_SPANS_PER_TRACE;
-            traceSpanLimit.value = limit;
-            const totalFromCount: number =
-              countRes.data?.hits?.[0]?.total ?? traceSpans.length;
-            searchObj.data.traceDetails.totalSpanCount = totalFromCount;
-            searchObj.data.traceDetails.spansTruncated =
-              totalFromCount > traceSpans.length;
-            if (searchObj.data.traceDetails.spansTruncated) {
-              $q.notify({
-                type: "warning",
-                message: t("traces.spansTruncatedWarning", {
-                  count: traceSpans.length,
-                  total: totalFromCount,
-                }),
-                timeout: 0,
-                actions: [{ icon: "close", color: "black", round: false }],
-              });
-            }
             searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
             updateServiceColors();
             buildTracesTree();
@@ -2054,7 +1976,15 @@ export default defineComponent({
       // After the tree is built, scroll the pre-selected span into view (e.g.
       // when arriving from spans search mode with a span_id in the URL).
       if (selectedSpanId.value) {
-        scrollSpanIntoView(selectedSpanId.value);
+        if (!spanMap.value[selectedSpanId.value]) {
+          showErrorNotification(
+            `Span ${selectedSpanId.value} not found in trace`,
+          );
+          searchObj.data.traceDetails.selectedSpanId = "";
+          searchObj.data.traceDetails.showSpanDetails = false;
+        } else {
+          scrollSpanIntoView(selectedSpanId.value);
+        }
       }
     }
 
@@ -2848,7 +2778,6 @@ export default defineComponent({
       fetchEvalPipeline,
       fetchEvalData,
       formatLargeNumber,
-      traceSpanLimit,
     };
   },
 });

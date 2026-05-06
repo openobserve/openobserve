@@ -48,6 +48,7 @@ inherits = "release"
 opt-level = 1
 codegen-units = 16
 debug = false
+debug-assertions = true
 strip = true
 lto = false
 incremental = false
@@ -68,6 +69,7 @@ split-debuginfo = "packed"
 axum.workspace = true
 axum-extra.workspace = true
 axum-server.workspace = true
+axum-client-ip.workspace = true
 tower.workspace = true
 tower-http.workspace = true
 http.workspace = true
@@ -270,6 +272,7 @@ axum-extra = { version = "0.12", features = [
     "cookie",
 ] }
 axum-server = { version = "0.8", features = ["tls-rustls"] }
+axum-client-ip = "1.3"
 async-fs = "2.2"
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = [

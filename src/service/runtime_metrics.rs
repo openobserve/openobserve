@@ -228,6 +228,50 @@ async fn update_basic_runtime_info(runtime_name: &str) {
     );
 }
 
+#[cfg(test)]
+mod tests {
+    use tokio::runtime::Handle;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_register_runtime_accumulates_handles() {
+        let before = RUNTIME_HANDLES.lock().unwrap().len();
+        let handle = Handle::current();
+        register_runtime("reg_test_unique".to_string(), handle);
+        let after = RUNTIME_HANDLES.lock().unwrap().len();
+        // One new entry must have been appended.
+        assert_eq!(after, before + 1);
+        assert!(
+            RUNTIME_HANDLES
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(name, _)| name == "reg_test_unique")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_collect_runtime_metrics_does_not_panic() {
+        // Register a fresh handle so the loop body definitely executes at least once,
+        // exercising the stable-tokio branch (update_basic_runtime_info).
+        let handle = Handle::current();
+        register_runtime("collect_test_unique".to_string(), handle);
+        collect_runtime_metrics().await;
+    }
+
+    #[cfg(not(tokio_unstable))]
+    #[tokio::test]
+    async fn test_update_basic_runtime_info_sets_workers_to_minus_one() {
+        // Use a label name unique to this test to avoid interference from other tests.
+        update_basic_runtime_info("basic_test_unique").await;
+        let gauge = config::metrics::TOKIO_RUNTIME_TASKS
+            .with_label_values(&["basic_test_unique", "workers"])
+            .get();
+        assert_eq!(gauge, -1);
+    }
+}
+
 pub async fn start_metrics_collector() {
     #[cfg(tokio_unstable)]
     log::info!("Starting runtime metrics collector with full tokio_unstable metrics support");

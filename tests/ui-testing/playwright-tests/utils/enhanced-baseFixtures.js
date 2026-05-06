@@ -78,15 +78,28 @@ const test = baseTest.extend({
   },
 
   // Enhanced page fixture
-  page: async ({ context }, use) => {
+  page: async ({ context }, use, testInfo) => {
     const page = await context.newPage();
-    
+
     // Add wait helpers to page
     page.waitHelpers = waitUtils.create(page);
-    
+
     testLogger.debug('New page created with global session and wait helpers');
-    
+
     await use(page);
+
+    // On failure, click "Click for error details" before the framework takes its auto-screenshot.
+    // This ensures the expanded error dialog is visible in the failure screenshot.
+    if (testInfo.status === 'failed' || testInfo.status === 'timedOut') {
+      try {
+        const errorBtn = page.getByRole('button', { name: /click for error details/i });
+        const isVisible = await errorBtn.isVisible({ timeout: 2000 }).catch(() => false);
+        if (isVisible) {
+          await errorBtn.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(800);
+        }
+      } catch (_) {}
+    }
   }
 });
 

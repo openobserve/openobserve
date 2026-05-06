@@ -293,7 +293,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column Order popup has title section');
 
     // Verify description text is present
-    const descriptionText = columnOrderPopup.locator('.text-caption');
+    const descriptionText = columnOrderPopup.locator('.text-caption').first();
     await expect(descriptionText).toBeVisible();
     testLogger.info('Column Order popup has description text');
 

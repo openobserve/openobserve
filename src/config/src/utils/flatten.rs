@@ -627,4 +627,13 @@ mod tests {
             assert_eq!(key, expected);
         }
     }
+
+    #[test]
+    fn test_format_label_name() {
+        assert_eq!(format_label_name("HelloWorld"), "helloworld");
+        assert_eq!(format_label_name("already_fine"), "already_fine");
+        assert_eq!(format_label_name("test.key"), "test_key");
+        assert_eq!(format_label_name("UPPER_CASE"), "upper_case");
+        assert_eq!(format_label_name(""), "");
+    }
 }

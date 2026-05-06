@@ -89,6 +89,8 @@ export const convertPromQLData = async (
   hoveredSeriesState: any,
   annotations: any,
   metadata: any = null,
+  resultMetaData?: any,
+  loading?: any,
 ) => {
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
@@ -231,12 +233,42 @@ export const convertPromQLData = async (
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
 
-  // Add end time from metadata to reserve full time range and prevent chart shifting during chunked data loading
-  if (metadata?.queries?.[0]?.endTime) {
-    const endTimeInSeconds = Math.floor(metadata.queries[0].endTime / 1000000); // Convert from microseconds to seconds
-    // Only add if end time is not already in the data
-    if (!xAxisData.includes(endTimeInSeconds)) {
-      xAxisData.push(endTimeInSeconds);
+  // Fill missing timestamps from queryStart to queryEnd using PromQL step.
+  // Only on final render (loading=false) — during streaming, overlay handles gaps.
+  // This ensures cancelled queries show the full time range with nulls.
+  if (
+    !loading &&
+    xAxisData.length >= 2 &&
+    metadata?.queries?.[0]?.startTime &&
+    metadata?.queries?.[0]?.endTime
+  ) {
+    const metaStep = resultMetaData?.[0]?.[0]?.step;
+    const stepSeconds = metaStep
+      ? metaStep / 1_000_000
+      : (xAxisData[1] as number) - (xAxisData[0] as number);
+
+    if (stepSeconds > 0) {
+      const queryStartSec =
+        parseInt(metadata.queries[0].startTime) / 1_000_000;
+      const queryEndSec = parseInt(metadata.queries[0].endTime) / 1_000_000;
+
+      // Anchor to actual data grid — query range has fractional seconds
+      // but PromQL data uses integer timestamps. Snap to the data's grid.
+      const anchor = xAxisData[0] as number;
+      const gridStart =
+        anchor -
+        Math.ceil((anchor - queryStartSec) / stepSeconds) * stepSeconds;
+      const gridEnd =
+        anchor +
+        Math.ceil((queryEndSec - anchor) / stepSeconds) * stepSeconds;
+
+      const existingTimestamps = new Set(xAxisData);
+      for (let t = gridStart; t <= gridEnd; t += stepSeconds) {
+        if (!existingTimestamps.has(t)) {
+          xAxisData.push(t);
+        }
+      }
+      xAxisData.sort((a: number, b: number) => a - b);
     }
   }
 
@@ -537,6 +569,31 @@ export const convertPromQLData = async (
     },
     series: [],
   };
+  // Pin x-axis range during streaming to prevent chart shifting as
+  // chunks arrive. On final render the data is complete so ECharts
+  // can auto-range with its natural padding (avoids bar clipping at
+  // the y-axis edge where gap-filled data can extend beyond the query
+  // start).
+  if (loading && metadata?.queries?.[0]?.startTime && metadata?.queries?.[0]?.endTime) {
+    const queryStartMs = metadata.queries[0].startTime / 1000; // µs to ms
+    const queryEndMs = metadata.queries[0].endTime / 1000;
+
+    // Add half-step padding so edge bars aren't clipped during streaming.
+    // ECharts centers bars on their timestamp, so without padding the
+    // leftmost bar's left half extends beyond the plot boundary.
+    const metaStep = resultMetaData?.[0]?.[0]?.step; // µs
+    const halfStepMs = metaStep ? metaStep / 2000 : 0; // half step in ms
+
+    options.xAxis.min =
+      store.state.timezone !== "UTC"
+        ? toZonedTime(queryStartMs - halfStepMs, store.state.timezone)
+        : new Date(queryStartMs - halfStepMs).toISOString().slice(0, -1);
+    options.xAxis.max =
+      store.state.timezone !== "UTC"
+        ? toZonedTime(queryEndMs + halfStepMs, store.state.timezone)
+        : new Date(queryEndMs + halfStepMs).toISOString().slice(0, -1);
+  }
+
   // to pass grid index in gauge chart
   let gaugeIndex = 0;
 

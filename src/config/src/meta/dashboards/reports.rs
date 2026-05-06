@@ -290,6 +290,9 @@ pub struct ListReportsParams {
     /// When set to `true` the list will only include reports that have destinations. When set to
     /// `false` the list will only include reports that do not have destinations.
     pub has_destinations: Option<bool>,
+
+    /// When set, only reports whose names contain this substring (case-insensitive) are returned.
+    pub name_substring: Option<String>,
 }
 
 impl ListReportsParams {
@@ -301,6 +304,7 @@ impl ListReportsParams {
             dashboard_snowflake_id: None,
             page_size_and_idx: None,
             has_destinations: None,
+            name_substring: None,
         }
     }
 
@@ -327,6 +331,12 @@ impl ListReportsParams {
         self.page_size_and_idx = Some((page_size, page_idx));
         self
     }
+
+    /// Filter reports by name substring (case-insensitive).
+    pub fn with_name_substring(mut self, name_substring: &str) -> Self {
+        self.name_substring = Some(name_substring.to_string());
+        self
+    }
 }
 
 /// An item in a list of reports which only includes a subset of all the report fields.
@@ -345,6 +355,7 @@ pub struct ReportListFilters {
     pub dashboard: Option<String>,
     pub folder: Option<String>,
     pub destination_less: Option<bool>,
+    pub name_substring: Option<String>,
 }
 
 impl ReportListFilters {
@@ -355,6 +366,7 @@ impl ReportListFilters {
             dashboard_snowflake_id: self.dashboard,
             has_destinations: self.destination_less.map(|v| !v),
             page_size_and_idx: None,
+            name_substring: self.name_substring,
         }
     }
 }
@@ -679,6 +691,7 @@ mod tests {
             dashboard: Some("dashboard_123".to_string()),
             folder: Some("folder_456".to_string()),
             destination_less: Some(true),
+            name_substring: None,
         };
 
         let params = filters.into_params("test_org");
@@ -772,5 +785,50 @@ mod tests {
         assert_eq!(once_json, r#""once""#);
         assert_eq!(weeks_json, r#""weeks""#);
         assert_eq!(cron_json, r#""cron""#);
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_id_none_absent_from_json() {
+        let v = ReportDashboardVariable {
+            key: "k".to_string(),
+            value: "v".to_string(),
+            id: None,
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("id"));
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_id_some_present_in_json() {
+        let v = ReportDashboardVariable {
+            key: "k".to_string(),
+            value: "v".to_string(),
+            id: Some("var_id_1".to_string()),
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("id"));
+        assert_eq!(obj["id"], serde_json::json!("var_id_1"));
+    }
+
+    #[test]
+    fn test_report_dashboard_attachment_dimensions_none_absent() {
+        let d = ReportDashboard {
+            dashboard: "dash1".to_string(),
+            folder: "default".to_string(),
+            tabs: vec!["tab1".to_string()],
+            variables: vec![],
+            timerange: ReportTimerange::default(),
+            report_type: ReportMediaType::default(),
+            email_attachment_type: ReportEmailAttachmentType::default(),
+            attachment_dimensions: None,
+        };
+        let json = serde_json::to_value(&d).unwrap();
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("attachment_dimensions")
+        );
     }
 }

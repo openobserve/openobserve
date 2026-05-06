@@ -576,9 +576,9 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3, apiWaitMs = null) {
+    async selectStream(stream, maxRetries = 5, apiWaitMs = null) {
         // Cloud environments need longer for streams to be indexed after ingestion
-        const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 90000 : 30000);
+        const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 120000 : 30000);
         testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms)`);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
@@ -689,8 +689,8 @@ export class LogsPage {
                 await this.page.waitForTimeout(500);
 
                 if (attempt < maxRetries) {
-                    testLogger.debug(`selectStream: Waiting 5s before retry...`);
-                    await this.page.waitForTimeout(5000); // Wait before retry for stream to be indexed
+                    testLogger.debug(`selectStream: Waiting 10s before retry...`);
+                    await this.page.waitForTimeout(10000); // Wait before retry for stream to be indexed
 
                     // Navigate to logs page again to refresh stream list
                     await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
@@ -3485,8 +3485,8 @@ export class LogsPage {
     }
 
     async openFirstLogDetails() {
-        // Click on the first log entry to open details (expand the _timestamp column)
-        await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        // Click on the first log entry to open details (expand the first column)
+        await this.page.locator('[data-index="0"] [data-test="table-row-expand-menu"]').click();
         await this.page.waitForTimeout(1000);
     }
 
@@ -6500,22 +6500,44 @@ export class LogsPage {
 
     /**
      * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
-     * Uses the parent element's background class to detect selection state.
+     * Uses page.waitForFunction to poll the DOM directly, which is more reliable than
+     * locator-based polling during Vue reactive re-renders.
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
     async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
-        // Use visible() filter — there can be multiple PanelEditor instances in DOM
-        // (e.g., cached Visualize tab + active Build tab). Only check the visible one.
-        const selector = this.chartTypeItem(chartId);
-        const parentLocator = this.page.locator(selector).locator('visible=true').locator('..');
-
-        if (shouldBeSelected) {
-            await expect(parentLocator).toHaveClass(/bg-grey-[35]/, { timeout });
-            testLogger.info(`Chart type "${chartId}" is selected (verified via bg-grey class)`);
-        } else {
-            await expect(parentLocator).not.toHaveClass(/bg-grey-[35]/, { timeout: 5000 });
-            testLogger.info(`Chart type "${chartId}" is NOT selected (verified via bg-grey class)`);
+        // Use waitForFunction to directly check the DOM for the bg-grey class
+        // on the chart selection item. This survives Vue reactive re-renders better
+        // than Playwright's locator.toHaveClass polling.
+        try {
+            await this.page.waitForFunction(
+                ({ chartId, shouldBeSelected }) => {
+                    // Find all visible chart selection sections for this chart type
+                    const sections = document.querySelectorAll(
+                        `[data-test="selected-chart-${chartId}-item"]`
+                    );
+                    for (const section of sections) {
+                        // Skip sections inside display:none containers (e.g. cached Visualize tab)
+                        if (!/** @type {HTMLElement} */ (section).offsetParent) continue;
+                        // Check the parent q-item for the bg-grey selection class
+                        const parent = section.parentElement;
+                        if (!parent) continue;
+                        const hasBgGrey = /\bbg-grey-[35]\b/.test(parent.className);
+                        if (hasBgGrey === shouldBeSelected) return true;
+                    }
+                    return false;
+                },
+                { chartId, shouldBeSelected },
+                { timeout, polling: 'raf' }
+            );
+            testLogger.info(
+                `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
+            );
+        } catch (error) {
+            throw new Error(
+                `Chart type "${chartId}" was expected to be ${shouldBeSelected ? 'selected' : 'not selected'} ` +
+                `but was ${shouldBeSelected ? 'not selected' : 'selected'} within ${timeout}ms`
+            );
         }
     }
 
@@ -6638,9 +6660,10 @@ export class LogsPage {
         // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
         // Use visible filter to avoid hidden cached PanelEditor instances.
         try {
-            const initIndicator = this.page.locator(
-                `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`
-            ).locator('visible=true').first();
+            const initIndicator = this.page
+                .locator(`${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`)
+                .filter({ visible: true })
+                .first();
             await initIndicator.waitFor({ state: 'visible', timeout });
             testLogger.info('Build tab initialization complete (chart/table/no-data visible)');
         } catch (error) {
@@ -6907,4 +6930,139 @@ export class LogsPage {
     getQueryEditorLocator() {
         return this.page.locator(this.logsSearchBarQueryEditor);
     }
+
+    // ============================================================================
+    // MONACO SUGGESTION WIDGET METHODS - Bug #11400 auto-suggestions tests
+    // ============================================================================
+
+    /**
+     * Trigger Monaco's suggestion popup (Ctrl+Space) in the query editor.
+     * The editor must be focused first, and content should be set so cursor
+     * is positioned at a location where suggestions can be provided.
+     */
+    async triggerEditorSuggestions() {
+        // Focus the editor's input area (click auto-waits for actionability)
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        await inputArea.click({ force: true });
+        // Trigger suggestion widget and wait for it to appear
+        await this.page.keyboard.press('Control+Space');
+        await this.waitForSuggestionWidgetVisible();
+        testLogger.info('Triggered editor suggestions via Ctrl+Space');
+    }
+
+    /**
+     * Check if the Monaco suggestion widget is currently visible.
+     * @returns {Promise<boolean>} True if the suggest-widget has the 'visible' class
+     */
+    async isSuggestionWidgetVisible() {
+        const isVisible = await this.page.evaluate(() => {
+            const widget = document.querySelector('.monaco-editor .suggest-widget');
+            if (!widget) return false;
+            return widget.classList.contains('visible') || widget.classList.contains('focused');
+        });
+        testLogger.info(`Suggestion widget visible: ${isVisible}`);
+        return isVisible;
+    }
+
+    /**
+     * Wait for the suggestion widget to become visible.
+     * @param {number} timeout - Timeout in ms (default: 5000)
+     */
+    async waitForSuggestionWidgetVisible(timeout = 5000) {
+        await this.page.waitForFunction(() => {
+            const widget = document.querySelector('.monaco-editor .suggest-widget');
+            if (!widget) return false;
+            return widget.classList.contains('visible') || widget.classList.contains('focused');
+        }, { timeout });
+        testLogger.info('Suggestion widget became visible');
+    }
+
+    /**
+     * Get all suggestion label texts from the suggestion widget.
+     * @returns {Promise<string[]>} Array of label text content
+     */
+    async getSuggestionLabels() {
+        const labels = await this.page.evaluate(() => {
+            const rows = document.querySelectorAll('.suggest-widget.visible .monaco-list-row');
+            return Array.from(rows).map(row => {
+                // Monaco renders labels inside .contents .main .label-name or directly in the row
+                const labelEl = row.querySelector('.contents .main .label-name');
+                if (labelEl) return labelEl.textContent || '';
+                // Fallback: get full row text content
+                return row.textContent || '';
+            });
+        });
+        testLogger.info(`Suggestion labels: [${labels.join(', ')}]`);
+        return labels;
+    }
+
+    /**
+     * Check if the suggestion widget contains any function names that should NOT
+     * appear in value context (e.g., match_all, fuzzy_match, match_all_raw_ignore_case).
+     * @returns {Promise<{hasFunctions: boolean, foundFunctions: string[]}>}
+     */
+    async checkSuggestionForFunctions() {
+        const functionNames = ['match_all', 'fuzzy_match', 'match_all_raw_ignore_case'];
+        const result = await this.page.evaluate((fns) => {
+            const rows = document.querySelectorAll('.suggest-widget.visible .monaco-list-row');
+            const rowTexts = Array.from(rows).map(row => row.textContent || '');
+            const foundFunctions = fns.filter(fn =>
+                rowTexts.some(text => text.includes(fn))
+            );
+            return {
+                hasFunctions: foundFunctions.length > 0,
+                foundFunctions,
+                rowCount: rowTexts.length,
+                firstFew: rowTexts.slice(0, 5),
+            };
+        }, functionNames);
+        testLogger.info('Suggestion function check', result);
+        return result;
+    }
+
+    /**
+     * Check if the Monaco query editor has warning-level decorations (squiggly
+     * underlines) in the DOM. Used to verify validateDoubleQuotes() markers.
+     * @returns {Promise<boolean>} True if .squiggly-warning elements found
+     */
+    async hasEditorWarningMarkers() {
+        try {
+            return await this.page.evaluate(() => {
+                const editorContainer =
+                    document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!editorContainer) return false;
+                const warningSquiggles =
+                    editorContainer.querySelectorAll('.squiggly-warning');
+                return warningSquiggles.length > 0;
+            });
+        } catch (e) {
+            testLogger.warn('Error checking editor warning markers', { error: e.message });
+            return false;
+        }
+    }
+
+    /**
+     * Get the error state of the Monaco query editor DOM (not the Monaco API).
+     * Checks for red squiggly underlines and error overlay messages.
+     * @returns {Promise<string>} One of: 'no-error', 'has-error', 'has-error-widget', 'editor-not-found'
+     */
+    async getEditorErrorState() {
+        try {
+            return await this.page.evaluate(() => {
+                const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!editor) return 'editor-not-found';
+                // Check for Monaco error squiggles (red underlines)
+                const squigglyError = editor.querySelector('.squiggly-error');
+                if (squigglyError) return 'has-error';
+                // Check for visible error messages in the editor area
+                const errorWidget = editor.querySelector('.contentWidgets .monaco-editor-overlaymessage');
+                if (errorWidget) return 'has-error-widget';
+                return 'no-error';
+            });
+        } catch (e) {
+            testLogger.warn('Error checking editor error state', { error: e.message });
+            return 'editor-not-found';
+        }
+    }
+
 }

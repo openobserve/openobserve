@@ -105,7 +105,7 @@
             </q-btn>
           </div>
 
-          <div>
+          <div class="tw:flex tw:items-center tw:gap-1 chat-header-actions">
             <!-- Edit title button -->
             <q-btn
               v-if="currentChatId"
@@ -119,6 +119,17 @@
               <q-tooltip :delay="500">Edit title</q-tooltip>
             </q-btn>
             <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
+            <q-btn
+              flat
+              round
+              dense
+              size="md"
+              :icon="store.state.isAiChatExpanded ? 'close_fullscreen' : 'open_in_full'"
+              data-test="ai-chat-expand-btn"
+              @click="toggleExpand"
+            >
+              <q-tooltip :delay="500">{{ store.state.isAiChatExpanded ? 'Collapse' : 'Expand' }} ({{ isMac ? '⌘' : 'Ctrl+' }}B)</q-tooltip>
+            </q-btn>
             <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
           </div>
         </div>
@@ -307,16 +318,58 @@
 
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
-          <div v-if="chatMessages.length === 0" class="welcome-section ">
-            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full ">
-              <img :src="o2AiTitleLogo" />
-              <div class="tw:relative tw:inline-block">
-                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
-                <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+          <div v-if="chatMessages.length === 0" class="welcome-section" :class="{ 'welcome-section--centered': centeredStart }">
+            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full" :class="{ 'tw:relative': centeredStart }">
+              <div
+                class="tw:flex tw:flex-col tw:items-center"
+                :class="{ 'tw:absolute tw:left-1/2 tw:-translate-x-1/2': centeredStart }"
+                :style="centeredStart ? { top: 'calc(50% - 150px)' } : {}"
+              >
+                <img :src="o2AiTitleLogo" />
+                <div class="tw:relative tw:inline-block">
+                  <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
+                  <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+                </div>
+              </div>
+              <!-- Input rendered here when centeredStart so it appears mid-screen -->
+              <div v-if="centeredStart" class="centered-input-wrap">
+                  <div
+                    class="unified-input-box"
+                  :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                  @dragover="handleDragOver"
+                  @drop="handleDrop"
+                  @paste="handlePaste"
+                >
+                  <RichTextInput
+                    ref="chatInput"
+                    v-model="inputMessage"
+                    :placeholder="'Write your prompt'"
+                    :disabled="isLoading"
+                    :theme="store.state.theme"
+                    :references="contextReferences"
+                    :borderless="true"
+                    @keydown="handleKeyDown"
+                    @submit="sendMessage"
+                    @update:references="handleReferencesUpdate"
+                  />
+                  <div class="input-bottom-bar">
+                    <div class="tw:flex tw:items-center tw:gap-2"></div>
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <q-btn
+                        v-if="inputMessage.trim() || pendingImages.length > 0"
+                        @click="sendMessage"
+                        round dense flat size="sm"
+                        class="send-button"
+                      >
+                        <q-icon name="send" size="16px" color="white" />
+                      </q-btn>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div v-for="(message, index) in processedMessages" 
+          <div v-for="(message, index) in processedMessages"
             :key="index" 
             class="message" 
             :class="[
@@ -402,6 +455,23 @@
                           <span class="detail-label">Duration</span>
                           <span class="detail-value">{{ block.summary.took }}ms</span>
                         </div>
+                        <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
+                        <div v-if="block.summary.return_code !== undefined" class="detail-item">
+                          <span class="detail-label">Exit code</span>
+                          <code class="detail-value">{{ block.summary.return_code }}</code>
+                        </div>
+                        <div v-if="block.summary.stdout_lines !== undefined" class="detail-item">
+                          <span class="detail-label">Stdout</span>
+                          <span class="detail-value">{{ block.summary.stdout_lines }} lines</span>
+                        </div>
+                        <div v-if="block.summary.stderr_lines" class="detail-item">
+                          <span class="detail-label">Stderr</span>
+                          <span class="detail-value">{{ block.summary.stderr_lines }} lines</span>
+                        </div>
+                        <div v-if="block.summary.truncated" class="detail-item">
+                          <span class="detail-label">Output</span>
+                          <span class="detail-value">truncated</span>
+                        </div>
                       </template>
                       <!-- Existing context details -->
                       <div v-if="getToolCallDisplayData(block.context)?.query" class="detail-item">
@@ -463,6 +533,22 @@
                           </q-btn>
                         </div>
                         <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.vrl }}</code>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.command" class="detail-item">
+                        <div class="detail-header">
+                          <span class="detail-label">Command</span>
+                          <q-btn
+                            flat
+                            dense
+                            size="xs"
+                            icon="content_copy"
+                            class="copy-btn"
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.command)"
+                          >
+                            <q-tooltip>Copy command</q-tooltip>
+                          </q-btn>
+                        </div>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.command }}</code>
                       </div>
                       <!-- Tool response: SearchSQL hits -->
                       <template v-if="block.response && block.response.hits">
@@ -833,7 +919,7 @@
         </div>
       </div>
 
-      <div class="chat-input-container q-ma-md">
+      <div v-if="!(centeredStart && chatMessages.length === 0)" class="chat-input-container q-ma-md">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -997,6 +1083,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
+import useKeyboardShortcuts from '@/composables/useKeyboardShortcuts';
 import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -1055,6 +1142,14 @@ export default defineComponent({
     appendMode: {
       type: Boolean,
       default: true
+    },
+    aiChatPayload: {
+      type: Object as () => { text: string; autoSend: boolean; id: number } | null,
+      default: null
+    },
+    centeredStart: {
+      type: Boolean,
+      default: false
     }
   },
   setup(props) {
@@ -1074,6 +1169,7 @@ export default defineComponent({
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore ();
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
     // Chat history composable
@@ -1612,6 +1708,7 @@ export default defineComponent({
 
     watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
       if(newAiChatInputContext) {
+
         // Create a reference chip from the context
         const contextChip: ReferenceChip = {
           id: `context-${Date.now()}`,
@@ -1636,6 +1733,19 @@ export default defineComponent({
         }
         // If component not ready, chips will be processed when componentReady becomes true
         // No fallback text needed - avoids flickering when chat opens
+      }
+    });
+
+    // Atomic payload watcher — text + autoSend arrive together, no timing race
+    watch(() => props.aiChatPayload, (payload) => {
+      if (!payload?.text) return;
+      if (payload.autoSend) {
+        inputMessage.value = payload.text;
+        nextTick(() => {
+          setTimeout(() => {
+            sendMessage();
+          }, 50);
+        });
       }
     });
 
@@ -2760,6 +2870,28 @@ export default defineComponent({
       currentTextSegment.value = '';
       displayedStreamingContent.value = '';
     };
+
+    const toggleExpand = () => {
+      store.dispatch('setIsAiChatExpanded', !store.state.isAiChatExpanded);
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    useKeyboardShortcuts([
+      {
+        key: 'Escape',
+        handler: () => {
+          if (store.state.isAiChatExpanded) {
+            store.dispatch('setIsAiChatExpanded', false);
+            window.dispatchEvent(new Event('resize'));
+          }
+        },
+      },
+      {
+        key: 'b',
+        ctrlOrMeta: true,
+        handler: () => toggleExpand(),
+      },
+    ]);
 
     const addNewChat = () => {
       detachCurrentStream();
@@ -4051,10 +4183,25 @@ export default defineComponent({
           setTimeout(() => {
             componentReady.value = true;
             processPendingChips();
+            focusInput();
           }, 100);
         });
       }
     });
+
+    // Auto-focus input when chat is expanded
+    watch(
+      () => store.state.isAiChatExpanded,
+      (isExpanded) => {
+        if (isExpanded) {
+          nextTick(() => {
+            setTimeout(() => {
+              focusInput();
+            }, 150);
+          });
+        }
+      },
+    );
 
     // Watch for organization switches — reset current chat and reload history
     // scoped to the new org so users never see cross-org chat history.
@@ -4131,6 +4278,7 @@ export default defineComponent({
       if(!store.state.currentChatTimestamp) {
         addNewChat();
       }
+
     })
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
@@ -4532,6 +4680,9 @@ export default defineComponent({
       if (context.stream_name) data.stream = context.stream_name;
       if (context.type) data.type = context.type;
 
+      // CLI tools: surface the command string
+      if (context.command) data.command = context.command;
+
       return Object.keys(data).length > 0 ? data : null;
     };
 
@@ -4675,6 +4826,7 @@ export default defineComponent({
       chatHistory,
       currentChatId,
       addNewChat,
+      toggleExpand,
       openHistory,
       loadChat,
       showEditTitleDialog,
@@ -4706,6 +4858,7 @@ export default defineComponent({
       formatTime,
       loadHistory,
       store,
+      isMac,
       outlinedThumbUpOffAlt,
       outlinedThumbDownOffAlt,
       matThumbUpAlt,
@@ -4769,12 +4922,12 @@ export default defineComponent({
 <style lang="scss" scoped>
 .chat-container {
   width: 100%;
-  height: calc(100vh - 50px);
+  height: calc(100vh - var(--navbar-height) - 10px);
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: var(--o2-card-bg);
+  background-color: var(--o2-card-bg-solid);
   border-radius: 0.375rem;
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
 
@@ -4892,10 +5045,27 @@ export default defineComponent({
     background: linear-gradient(to right, rgba(var(--q-primary-rgb), 0.05), rgba(var(--q-primary-rgb), 0.1));
     border-radius: 8px;
     margin-bottom: 24px;
-    height: 100%;
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+
+    &.welcome-section--centered {
+      background: transparent;
+      padding: 0;
+      margin-bottom: 0;
+    }
+  }
+
+  .centered-input-wrap {
+    max-width: 900px;
+    width: calc(100% - 16px);
+    margin-top: 1.25em;
+    font-size: 1rem;
+
+    :deep(.rich-text-input) {
+      font-size: 1rem;
+    }
   }
 
   // Fixed analyzing indicator above input

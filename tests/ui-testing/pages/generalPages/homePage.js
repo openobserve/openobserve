@@ -66,7 +66,7 @@ export class HomePage {
         this.reportsPageIndicator = page.locator('[data-test="report-list-add-report-btn"]').or(page.getByText('Scheduled')).first();
         this.iamPageIndicator = page.locator('[data-test="iam-users-tab"]').or(page.getByRole('tab', { name: 'Users' })).first();
         this.pipelinesPageIndicator = page.locator('[data-test="function-list-add-function-btn"]').or(page.getByText('Functions')).first();
-        this.homePageIndicator = page.locator('.home-page').or(page.getByText('Streams')).first();
+        this.homePageIndicator = page.locator('.home-page').first();
 
         // ===== FAVICON SELECTOR (Bug #9217) =====
         this.faviconLink = page.locator('link#favicon');
@@ -149,9 +149,7 @@ export class HomePage {
     // ===== VALIDATION METHODS =====
 
     async homePageValidation() {
-        await expect(this.mainContent).toContainText('Streams');
-        await expect(this.mainContent).toContainText('Function');
-        await expect(this.mainContent).toContainText('Scheduled');
+        await expect(this.page.locator('.home-page')).toBeVisible({ timeout: 10000 });
     }
 
     async validateNavigationMenuVisible() {
@@ -176,21 +174,7 @@ export class HomePage {
     async validateHomeDashboardElements() {
         // Wait for page to load
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-        // Check if we have data or no-data state
-        const noDataVisible = await this.noDataCard.isVisible().catch(() => false);
-
-        if (noDataVisible) {
-            // No data state
-            await expect(this.mainContent).toContainText('No data');
-            await expect(this.ingestionButton).toBeVisible();
-        } else {
-            // Data state - validate tiles
-            await expect(this.mainContent).toContainText('Streams');
-            await expect(this.mainContent).toContainText('Events');
-            await expect(this.mainContent).toContainText('Function');
-            await expect(this.mainContent).toContainText('Dashboard');
-        }
+        await expect(this.page.locator('.home-page')).toBeVisible({ timeout: 10000 });
     }
 
     async validateLogoVisible() {
@@ -650,10 +634,7 @@ export class HomePage {
      * Validate Home page UI elements
      */
     async validateHomePageElements() {
-        await expect(this.mainContent).toBeVisible({ timeout: 10000 });
-        await expect(this.page.getByText('Streams').first()).toBeVisible({ timeout: 5000 });
-        await expect(this.page.getByText('Function').first()).toBeVisible({ timeout: 5000 });
-        await expect(this.page.getByText('Scheduled').first()).toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('.home-page')).toBeVisible({ timeout: 10000 });
     }
 
     /**

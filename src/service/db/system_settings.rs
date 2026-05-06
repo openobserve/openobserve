@@ -89,6 +89,30 @@ pub async fn get_resolved(
         return Ok(Some(setting));
     }
 
+    // For UI display config keys: serve embedded defaults directly, bypassing the system-level
+    // DB/cache lookup. This avoids stale empty rows written by older builds, and means no
+    // DB seeding is ever needed. Org-level overrides (checked above) still take precedence.
+    #[cfg(feature = "enterprise")]
+    {
+        use config::meta::system_settings::SystemSetting;
+        use o2_enterprise::enterprise::common::{
+            config::{O2_FIELD_GROUPING_SETTING_KEY, O2_KEY_FIELDS_SETTING_KEY},
+            semantic_config::{load_field_grouping, load_key_fields},
+        };
+
+        let value = if key == O2_KEY_FIELDS_SETTING_KEY {
+            Some(serde_json::to_value(load_key_fields())?)
+        } else if key == O2_FIELD_GROUPING_SETTING_KEY {
+            Some(serde_json::to_value(load_field_grouping())?)
+        } else {
+            None
+        };
+
+        if let Some(v) = value {
+            return Ok(Some(SystemSetting::new_system(key, v)));
+        }
+    }
+
     // Check system level
     get(&SettingScope::System, None, None, key).await
 }
@@ -390,7 +414,7 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
 pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::FieldAlias> {
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()
+        o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file()
     }
     #[cfg(not(feature = "enterprise"))]
     {

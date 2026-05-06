@@ -158,6 +158,10 @@ pub struct AllOrgListDetails {
     #[serde(default)]
     pub plan: i32,
     pub trial_expires_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract_end_date: Option<i64>,
+    #[serde(default)]
+    pub billing_provider: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -173,6 +177,20 @@ pub struct AllOrganizationResponse {
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ExtendTrialPeriodRequest {
+    pub org_id: String,
+    pub new_end_date: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateExternalContractRequest {
+    pub org_id: String,
+    pub end_date: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ExtendExternalContractRequest {
     pub org_id: String,
     pub new_end_date: i64,
 }
@@ -683,6 +701,8 @@ mod tests {
             org_type: "standard".to_string(),
             plan: Default::default(),
             trial_expires_at: None,
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         assert_eq!(details.plan, 0);
@@ -729,6 +749,8 @@ mod tests {
             org_type: "basic".to_string(),
             plan: 0,
             trial_expires_at: None,
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         let details2 = AllOrgListDetails {
@@ -740,6 +762,8 @@ mod tests {
             org_type: "premium".to_string(),
             plan: 1,
             trial_expires_at: Some(1641081600),
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         let response = AllOrganizationResponse {
@@ -761,6 +785,79 @@ mod tests {
 
         assert_eq!(request.org_id, "org-trial");
         assert_eq!(request.new_end_date, 1641081600);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_create_external_contract_request_roundtrip() {
+        let json = r#"{"org_id":"org-ext","end_date":1893456000000000}"#;
+        let req: CreateExternalContractRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.org_id, "org-ext");
+        assert_eq!(req.end_date, 1893456000000000);
+
+        // Round-trip through serialize to ensure both directions agree on the
+        // wire format used by the /external_contract endpoint.
+        let serialized = serde_json::to_string(&req).unwrap();
+        let req2: CreateExternalContractRequest = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req2.org_id, req.org_id);
+        assert_eq!(req2.end_date, req.end_date);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_extend_external_contract_request_roundtrip() {
+        let json = r#"{"org_id":"org-ext","new_end_date":1893456000000000}"#;
+        let req: ExtendExternalContractRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.org_id, "org-ext");
+        assert_eq!(req.new_end_date, 1893456000000000);
+
+        let serialized = serde_json::to_string(&req).unwrap();
+        let req2: ExtendExternalContractRequest = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req2.org_id, req.org_id);
+        assert_eq!(req2.new_end_date, req.new_end_date);
+    }
+
+    #[test]
+    fn test_all_org_list_details_with_contract_fields_serialization() {
+        // External-contract orgs surface contract_end_date + billing_provider,
+        // and contract_end_date must be omitted when null.
+        let with_contract = AllOrgListDetails {
+            id: 7,
+            identifier: "org-ext".to_string(),
+            name: "External Org".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "custom".to_string(),
+            plan: 3, // ExternalContract
+            trial_expires_at: Some(1641081600),
+            contract_end_date: Some(1893456000000000),
+            billing_provider: "no_op".to_string(),
+        };
+
+        let v = serde_json::to_value(&with_contract).unwrap();
+        assert_eq!(v["contract_end_date"], 1893456000000000_i64);
+        assert_eq!(v["billing_provider"], "no_op");
+        assert_eq!(v["plan"], 3);
+
+        let without_contract = AllOrgListDetails {
+            id: 8,
+            identifier: "org-free".to_string(),
+            name: "Free Org".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "custom".to_string(),
+            plan: 0,
+            trial_expires_at: Some(1641081600),
+            contract_end_date: None,
+            billing_provider: String::new(),
+        };
+
+        let v = serde_json::to_value(&without_contract).unwrap();
+        assert!(
+            v.get("contract_end_date").is_none(),
+            "contract_end_date should be omitted when None: {v}"
+        );
+        assert_eq!(v["billing_provider"], "");
     }
 
     #[test]
@@ -1082,5 +1179,133 @@ mod tests {
         assert_eq!(status.healthy, 0);
         assert_eq!(status.failed, 0);
         assert_eq!(status.warning, 2);
+    }
+
+    #[test]
+    fn test_org_setting_payload_all_none_absent() {
+        let payload = OrganizationSettingPayload {
+            scrape_interval: None,
+            trace_id_field_name: None,
+            span_id_field_name: None,
+            toggle_ingestion_logs: None,
+            streaming_aggregation_enabled: None,
+            enable_streaming_search: None,
+            min_auto_refresh_interval: None,
+            light_mode_theme_color: None,
+            dark_mode_theme_color: None,
+            max_series_per_query: None,
+            usage_stream_enabled: None,
+            #[cfg(feature = "enterprise")]
+            claim_parser_function: None,
+            cross_links: None,
+        };
+        let json = serde_json::to_value(&payload).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("scrape_interval"));
+        assert!(!obj.contains_key("trace_id_field_name"));
+        assert!(!obj.contains_key("span_id_field_name"));
+        assert!(!obj.contains_key("toggle_ingestion_logs"));
+        assert!(!obj.contains_key("streaming_aggregation_enabled"));
+        assert!(!obj.contains_key("enable_streaming_search"));
+        assert!(!obj.contains_key("min_auto_refresh_interval"));
+        assert!(!obj.contains_key("light_mode_theme_color"));
+        assert!(!obj.contains_key("dark_mode_theme_color"));
+        assert!(!obj.contains_key("max_series_per_query"));
+        assert!(!obj.contains_key("usage_stream_enabled"));
+        assert!(!obj.contains_key("cross_links"));
+    }
+
+    #[test]
+    fn test_org_creation_response_service_account_absent_when_none() {
+        let resp = OrganizationCreationResponse {
+            organization: Organization {
+                identifier: "id".to_string(),
+                name: "org".to_string(),
+                org_type: "custom".to_string(),
+                service_account: None,
+            },
+            service_account: None,
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        let obj = json.as_object().unwrap();
+        // Organization.service_account=None flattens in as null;
+        // OrganizationCreationResponse.service_account=None is skipped via skip_serializing_if.
+        // The key exists (null from Organization), but it is not a ServiceAccountTokenInfo object.
+        let sa_val = obj.get("service_account");
+        assert!(sa_val.map(|v| v.is_null()).unwrap_or(true));
+    }
+
+    #[test]
+    fn test_org_creation_response_service_account_present_when_some() {
+        let resp = OrganizationCreationResponse {
+            organization: Organization {
+                identifier: "id".to_string(),
+                name: "org".to_string(),
+                org_type: "custom".to_string(),
+                service_account: None,
+            },
+            service_account: Some(ServiceAccountTokenInfo {
+                email: "sa@test.com".to_string(),
+                token: "tok".to_string(),
+                role: "admin".to_string(),
+                message: "msg".to_string(),
+            }),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert!(json.as_object().unwrap().contains_key("service_account"));
+    }
+
+    #[test]
+    fn test_org_setting_optional_fields_absent_when_none() {
+        let setting = OrganizationSetting {
+            scrape_interval: 15,
+            trace_id_field_name: "traceid".to_string(),
+            span_id_field_name: "spanid".to_string(),
+            toggle_ingestion_logs: false,
+            streaming_aggregation_enabled: false,
+            enable_streaming_search: false,
+            min_auto_refresh_interval: 0,
+            free_trial_expiry: None,
+            light_mode_theme_color: None,
+            dark_mode_theme_color: None,
+            max_series_per_query: None,
+            usage_stream_enabled: false,
+            #[cfg(feature = "enterprise")]
+            claim_parser_function: String::new(),
+            cross_links: vec![],
+        };
+        let json = serde_json::to_value(&setting).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("free_trial_expiry"));
+        assert!(!obj.contains_key("light_mode_theme_color"));
+        assert!(!obj.contains_key("dark_mode_theme_color"));
+        assert!(!obj.contains_key("max_series_per_query"));
+    }
+
+    #[test]
+    fn test_org_setting_optional_fields_present_when_some() {
+        let setting = OrganizationSetting {
+            scrape_interval: 15,
+            trace_id_field_name: "traceid".to_string(),
+            span_id_field_name: "spanid".to_string(),
+            toggle_ingestion_logs: false,
+            streaming_aggregation_enabled: false,
+            enable_streaming_search: false,
+            min_auto_refresh_interval: 0,
+            free_trial_expiry: Some(9999999),
+            light_mode_theme_color: Some("#fff".to_string()),
+            dark_mode_theme_color: Some("#000".to_string()),
+            max_series_per_query: Some(1000),
+            usage_stream_enabled: false,
+            #[cfg(feature = "enterprise")]
+            claim_parser_function: String::new(),
+            cross_links: vec![],
+        };
+        let json = serde_json::to_value(&setting).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("free_trial_expiry"));
+        assert!(obj.contains_key("light_mode_theme_color"));
+        assert!(obj.contains_key("dark_mode_theme_color"));
+        assert!(obj.contains_key("max_series_per_query"));
     }
 }

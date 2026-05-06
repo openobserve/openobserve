@@ -98,11 +98,13 @@ const reports = {
     folder_id?: string,
     dashboard_id?: string,
     cache?: boolean,
+    name_substring?: string,
   ) => {
     const params: string[] = [];
     if (folder_id) params.push(`folder=${folder_id}`);
     if (dashboard_id) params.push(`dashboard_id=${dashboard_id}`);
     if (cache) params.push(`cache=${cache}`);
+    if (name_substring) params.push(`report_name_substring=${encodeURIComponent(name_substring)}`);
     const query = params.length ? `?${params.join("&")}` : "";
     return http().get(`/api/v2/${org_identifier}/reports${query}`);
   },

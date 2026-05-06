@@ -842,3 +842,150 @@ pub async fn init_from_db() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- pending_checkpoint_from ---
+    // QUOTA_CHECKPOINTS = [80, 90, 95, 100]
+
+    #[test]
+    fn test_pending_checkpoint_below_all() {
+        assert_eq!(pending_checkpoint_from(0, 0), None);
+        assert_eq!(pending_checkpoint_from(79, 0), None);
+    }
+
+    #[test]
+    fn test_pending_checkpoint_exactly_80() {
+        assert_eq!(pending_checkpoint_from(80, 0), Some(80));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_90_returns_highest_reached() {
+        assert_eq!(pending_checkpoint_from(90, 0), Some(90));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_100_returns_100() {
+        assert_eq!(pending_checkpoint_from(100, 0), Some(100));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_already_notified_at_80() {
+        // pct=90 reached, 80 already notified → highest unrenotified is 90
+        assert_eq!(pending_checkpoint_from(90, 80), Some(90));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_all_notified() {
+        assert_eq!(pending_checkpoint_from(100, 100), None);
+    }
+
+    #[test]
+    fn test_pending_checkpoint_between_checkpoints() {
+        // pct=85 → reached 80 but not 90; 80 already notified → None
+        assert_eq!(pending_checkpoint_from(85, 80), None);
+        // pct=85 → reached 80, not yet notified → Some(80)
+        assert_eq!(pending_checkpoint_from(85, 0), Some(80));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_95_skip_lower_notified() {
+        assert_eq!(pending_checkpoint_from(95, 90), Some(95));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_100_skip_notified_95() {
+        assert_eq!(pending_checkpoint_from(100, 95), Some(100));
+    }
+
+    // --- build_quota_email_message ---
+
+    #[test]
+    fn test_email_subject_contains_percentage_and_org_name() {
+        let (subject, _) = build_quota_email_message("org1", "My Org", 80, false, 80, 100);
+        assert!(subject.contains("80%"), "subject: {subject}");
+        assert!(subject.contains("My Org"), "subject: {subject}");
+    }
+
+    #[test]
+    fn test_email_subject_uses_org_id_when_name_empty() {
+        let (subject, _) = build_quota_email_message("org1", "", 80, false, 80, 100);
+        assert!(subject.contains("org1"), "subject: {subject}");
+    }
+
+    #[test]
+    fn test_email_body_contains_org_and_credits() {
+        let (_, body) = build_quota_email_message("org1", "My Org", 90, true, 90, 100);
+        assert!(body.contains("My Org"), "body missing org name");
+        assert!(body.contains("90"), "body missing used credits");
+        assert!(body.contains("100"), "body missing limit");
+    }
+
+    #[test]
+    fn test_email_80_free_mentions_subscribe() {
+        let (_, body) = build_quota_email_message("o", "o", 80, false, 80, 100);
+        assert!(
+            body.to_lowercase().contains("subscribe"),
+            "free 80% should mention subscribe"
+        );
+    }
+
+    #[test]
+    fn test_email_80_paid_mentions_billing() {
+        let (_, body) = build_quota_email_message("o", "o", 80, true, 80, 100);
+        assert!(
+            body.to_lowercase().contains("billed") || body.to_lowercase().contains("billing"),
+            "paid 80% should mention billing"
+        );
+    }
+
+    #[test]
+    fn test_email_100_free_credits_exhausted() {
+        let (_, body) = build_quota_email_message("o", "o", 100, false, 100, 100);
+        assert!(
+            body.to_lowercase().contains("exhaust"),
+            "100% free should mention exhausted"
+        );
+    }
+
+    #[test]
+    fn test_email_100_paid_pay_as_you_go() {
+        let (_, body) = build_quota_email_message("o", "o", 100, true, 100, 100);
+        assert!(
+            body.to_lowercase().contains("pay-as-you-go") || body.to_lowercase().contains("billed"),
+            "100% paid should mention pay-as-you-go"
+        );
+    }
+
+    #[test]
+    fn test_email_unknown_checkpoint_fallback() {
+        let (_, body) = build_quota_email_message("o", "o", 50, false, 50, 100);
+        assert!(body.contains("50%"), "fallback should include percentage");
+    }
+
+    #[test]
+    fn test_ai_usage_request_body_optional_fields_absent_when_none() {
+        let body = AiUsageRequestBody {
+            feature: "chat",
+            session_id: None,
+            incident_id: None,
+        };
+        let json = serde_json::to_string(&body).unwrap();
+        assert!(!json.contains("session_id"));
+        assert!(!json.contains("incident_id"));
+    }
+
+    #[test]
+    fn test_ai_usage_request_body_optional_fields_present_when_some() {
+        let body = AiUsageRequestBody {
+            feature: "chat",
+            session_id: Some("sess-123"),
+            incident_id: Some("inc-456"),
+        };
+        let json = serde_json::to_string(&body).unwrap();
+        assert!(json.contains("session_id"));
+        assert!(json.contains("incident_id"));
+    }
+}
