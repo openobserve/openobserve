@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'latitude', null)"
         data-test="dashboard-latitude-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -66,17 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              color="primary"
-              dense
-              size="sm"
-              :label="latitudeLabel"
-              class="q-pl-sm"
+            <OButton
+              variant="primary"
+              size="chip"
               :data-test="`dashboard-latitude-item-${latitudeLabel}`"
             >
+              {{ latitudeLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
@@ -111,17 +107,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-chip"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
               @click="removeLatitude()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -160,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'longitude', null)"
         data-test="dashboard-longitude-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -185,17 +181,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="longitudeLabel"
+            <OButton
+              variant="primary"
+              size="chip"
               :data-test="`dashboard-longitude-item-${longitudeLabel}`"
-              class="q-pl-sm"
             >
+              {{ longitudeLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
@@ -230,17 +222,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-chip"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
               @click="removeLongitude()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -279,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'weight', null)"
         data-test="dashboard-weight-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -304,17 +296,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="weightLabel"
+            <OButton
+              variant="primary"
+              size="chip"
               :data-test="`dashboard-weight-item-${weightLabel}`"
-              class="q-pl-sm"
             >
+              {{ weightLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-weight-item-${weightLabel}-menu`"
@@ -349,17 +337,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-chip"
               :data-test="`dashboard-weight-item-${weightLabel}-remove`"
               @click="removeWeight()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -384,6 +372,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, reactive, watch, computed, nextTick } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -398,6 +388,8 @@ import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
+    OButtonGroup,
+    OButton,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,

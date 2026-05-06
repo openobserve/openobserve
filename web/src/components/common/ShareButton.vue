@@ -15,23 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
+  <OButton
     :data-test="dataTest"
     :class="buttonClass"
-    :size="buttonSize"
+    :variant="variant"
+    :size="size"
     :loading="isLoading"
-    :disable="disabled || !url || isWebUrlNotConfigured"
-    icon="share"
+    :disabled="disabled || !url || isWebUrlNotConfigured"
     @click="handleShareClick"
   >
-    <span v-if="showLabel" class="q-ml-xs">{{ t("search.shareLink") }}</span>
+    <template #icon-left><q-icon name="share" /></template>
+    <span v-if="showLabel" class="tw:ml-1">{{ t("search.shareLink") }}</span>
     <q-tooltip v-if="isWebUrlNotConfigured">
-     <q-icon color="warning" name="warning" class="q-mr-xs" /> {{ t("search.webUrlNotConfigured") }}
+      <q-icon color="warning" name="warning" class="q-mr-xs" />
+      {{ t("search.webUrlNotConfigured") }}
     </q-tooltip>
     <q-tooltip v-else-if="tooltip || !showLabel">
       {{ tooltip || t("search.shareLink") }}
     </q-tooltip>
-  </q-btn>
+  </OButton>
 </template>
 
 <script lang="ts">
@@ -39,25 +41,32 @@ import { defineComponent, ref, onBeforeUnmount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, copyToClipboard } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
 import shortURLService from "@/services/short_url";
 
 export default defineComponent({
   name: "ShareButton",
+  components: { OButton },
   props: {
     // The long URL to be copied and shortened
     url: {
       type: String,
       required: true,
     },
-    // Custom CSS classes for the button
+    // Custom CSS classes for the button (legacy — for non-dashboard callers)
     buttonClass: {
       type: String,
-      default: "q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border",
+      default: "",
     },
-    // Button size (Quasar sizes: xs, sm, md, lg, xl)
-    buttonSize: {
+    // OButton variant
+    variant: {
       type: String,
-      default: "xs",
+      default: "outline",
+    },
+    // OButton size
+    size: {
+      type: String,
+      default: "icon-xs",
     },
     // Show "Share" label text next to icon
     showLabel: {
@@ -165,7 +174,7 @@ export default defineComponent({
         } else if (attempts >= MAX_ATTEMPTS) {
           // Timeout: Stop polling after max attempts
           console.warn(
-            "Polling timeout: Short URL not received within time limit"
+            "Polling timeout: Short URL not received within time limit",
           );
           if (pollIntervalId) {
             clearInterval(pollIntervalId);

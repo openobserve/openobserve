@@ -21,21 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       conditions)
     </div>
     <template v-if="!fields.length">
-      <q-btn
+      <OButton
         data-test="alert-conditions-add-btn"
-        color="primary"
-        class="q-mt-sm text-bold add-field"
-        label="Add Condition"
+        variant="outline"
         size="sm"
-        icon="add"
-        style="
-          border-radius: 4px;
-          text-transform: capitalize;
-          background: #f2f2f2 !important;
-          color: #000 !important;
-        "
+        class="q-mt-sm"
         @click="addApiHeader"
-      />
+      >
+        <template #icon-left><q-icon name="add" /></template>
+        Add Condition
+      </OButton>
     </template>
     <template v-else>
       <div
@@ -115,35 +110,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-ml-none alerts-condition-action"
           style="margin-bottom: 12px"
         >
-          <q-btn
+          <OButton
             data-test="alert-conditions-delete-condition-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
+            class="q-ml-xs"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="t('alert_templates.edit')"
             @click="deleteApiHeader(field)"
-            style="min-width: auto"
-          />
-          <q-btn
+          >
+            <q-icon :name="outlinedDelete" />
+          </OButton>
+          <OButton
             data-test="alert-conditions-add-condition-btn"
             v-if="index === fields.length - 1"
-            icon="add"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
+            class="q-ml-xs"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="t('alert_templates.edit')"
             @click="addApiHeader()"
-            style="min-width: auto"
-          />
+          >
+            <q-icon name="add" />
+          </OButton>
         </div>
       </div>
     </template>
@@ -153,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import OButton from '@/lib/core/Button/OButton.vue';
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 
@@ -229,10 +217,5 @@ const newValueMode = computed(() => {
 }
 
 .alerts-condition-action {
-  .q-btn {
-    &.icon-dark {
-      filter: none !important;
-    }
-  }
 }
 </style>

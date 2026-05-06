@@ -29,16 +29,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :disable="disable"
       @update:model-value="$emit('update:modelValue', $event)"
     />
-    <q-btn
+    <OButton
       v-if="!disable"
-      flat
-      dense
-      icon="add"
-      size="xs"
-      class="tw:rounded tw:shrink-0 add-folder-btn"
+      variant="outline"
+      size="icon"
+      class="tw:shrink-0"
       title="Add Folder"
       @click="showDialog = true"
-    />
+    >
+      <q-icon name="add" />
+    </OButton>
     <q-dialog
       v-model="showDialog"
       position="right"
@@ -58,12 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
+import OButton from '@/lib/core/Button/OButton.vue';
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 
 export default defineComponent({
   name: "InlineSelectFolderDropdown",
-  components: { AddFolder },
+  components: { AddFolder, OButton },
   emits: ["update:modelValue"],
   props: {
     modelValue: {

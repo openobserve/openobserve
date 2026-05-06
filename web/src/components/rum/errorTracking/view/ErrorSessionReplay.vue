@@ -22,15 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ErrorTag :tag="{ key: tag, value }" />
       </template>
     </div>
-    <q-btn
-      class="bg-primary rounded text-white tw:mt-[0.625rem] q-mt-sm"
-      no-caps
+    <OButton
+      variant="primary"
+      size="sm-action"
+      class="tw:mt-[0.625rem] q-mt-sm"
       :title="t('rum.viewSessionReplay')"
       @click="playSessionReplay"
     >
-      <q-icon name="play_circle" size="1.125rem" class="q-mr-xs" /> 
+      <PlayCircle class="tw:size-4 tw:mr-1" /> 
       {{ t("rum.playSessionReplay") }}
-    </q-btn>
+    </OButton>
   </div>
 </template>
 
@@ -39,6 +40,8 @@ import { computed } from "vue";
 import ErrorTag from "./ErrorTag.vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { PlayCircle } from 'lucide-vue-next';
 
 const { t } = useI18n();
 

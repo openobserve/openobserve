@@ -108,26 +108,26 @@ describe("AddAnnotation", () => {
   });
 
   it("should render save/update and cancel buttons", () => {
-    const buttons = wrapper.findAllComponents({ name: "QBtn" });
+    const buttons = wrapper.findAllComponents({ name: "OButton" });
     expect(buttons.length).toBeGreaterThan(0);
   });
 
   it("should call create_timed_annotations when saving", async () => {
     annotationService.create_timed_annotations.mockResolvedValueOnce({});
-    
+
     const inputs = wrapper.findAllComponents({ name: "QInput" });
     if (inputs.length > 0) {
       await inputs[0].vm.$emit("update:modelValue", "New Annotation");
     }
     await flushPromises();
 
-    const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const saveButton = buttons.find((btn: any) => 
-      btn.props("label") === "Save" || btn.text().includes("Save")
+    const oButtons = wrapper.findAllComponents({ name: "OButton" });
+    const saveButton = oButtons.find((btn: any) =>
+      btn.text().includes("Save")
     );
-    
+
     if (saveButton) {
-      await saveButton.vm.$emit("click");
+      await saveButton.trigger("click");
       await flushPromises();
     }
 
@@ -162,13 +162,13 @@ describe("AddAnnotation", () => {
 
     annotationService.update_timed_annotations.mockResolvedValueOnce({});
 
-    const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const updateButton = buttons.find((btn: any) => 
-      btn.props("label") === "Update" || btn.text().includes("Update")
+    const oButtons = wrapper.findAllComponents({ name: "OButton" });
+    const updateButton = oButtons.find((btn: any) =>
+      btn.text().includes("Update")
     );
-    
+
     if (updateButton) {
-      await updateButton.vm.$emit("click");
+      await updateButton.trigger("click");
       await flushPromises();
     }
 
@@ -201,9 +201,9 @@ describe("AddAnnotation", () => {
     });
     await flushPromises();
 
-    const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const deleteButton = buttons.find((btn: any) => 
-      btn.props("label") === "Delete" || btn.text().includes("Delete")
+    const oButtons = wrapper.findAllComponents({ name: "OButton" });
+    const deleteButton = oButtons.find((btn: any) =>
+      btn.text().includes("Delete")
     );
     expect(deleteButton).toBeTruthy();
   });

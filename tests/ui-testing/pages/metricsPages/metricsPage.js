@@ -901,7 +901,7 @@ export class MetricsPage {
     }
 
     async getSidebarTabs() {
-        return this.page.locator('.q-tab, [role="tab"], .sidebar-tab').locator('visible');
+        return this.page.locator('[role="tab"], .sidebar-tab').locator('visible');
     }
 
     async getSidebarTabCount() {
@@ -910,7 +910,7 @@ export class MetricsPage {
     }
 
     async clickTabByText(tabText) {
-        const tab = this.page.locator('.q-tab, [role="tab"]').filter({ hasText: new RegExp(tabText, 'i') }).first();
+        const tab = this.page.locator('[role="tab"]').filter({ hasText: new RegExp(tabText, 'i') }).first();
         if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
             await tab.click();
             await this.page.waitForTimeout(500);
@@ -920,7 +920,7 @@ export class MetricsPage {
     }
 
     async getActiveTabPanel() {
-        return this.page.locator('.q-tab-panel, [role="tabpanel"], .tab-content').locator('visible').first();
+        return this.page.locator('[role="tabpanel"], .tab-content').locator('visible').first();
     }
 
     async isTabPanelVisible() {

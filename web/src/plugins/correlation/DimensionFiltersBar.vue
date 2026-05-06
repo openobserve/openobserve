@@ -55,19 +55,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tooltip>
       </div>
       <!-- Apply Button -->
-      <q-btn
+      <OButton
         v-if="showApplyButton"
-        flat
-        dense
-        no-caps
-        text-color="light-text"
-        :label="applyLabelComputed"
-        :disable="!hasPendingChanges"
+        variant="outline"
+        size="sm-action"
+        :disabled="!hasPendingChanges"
         @click="handleApply"
-        class="o2-secondary-button tw:ml-2"
+        class="tw:ml-2"
         data-test="apply-dimension-filters"
-        style="line-height: 2.2rem !important"
-      />
+      >
+        {{ applyLabelComputed }}
+      </OButton>
     </div>
   </div>
 </template>
@@ -75,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface Props {
   dimensions: Record<string, string>;

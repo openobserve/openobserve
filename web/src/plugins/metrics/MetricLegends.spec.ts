@@ -169,7 +169,7 @@ describe("MetricLegends", () => {
 
   describe("Template Rendering", () => {
     it("should render main button element", () => {
-      const button = wrapper.find('.q-btn');
+      const button = wrapper.find('[data-cy="metric-legends-button"]');
       expect(button.exists()).toBe(true);
     });
 
@@ -184,7 +184,7 @@ describe("MetricLegends", () => {
     });
 
     it("should render legend label text in button", () => {
-      const button = wrapper.find('.q-btn');
+      const button = wrapper.find('[data-cy="metric-legends-button"]');
       // The translation should be applied, so we expect the translated text "Legend"
       expect(button.text()).toContain('Legend');
     });
@@ -539,17 +539,17 @@ describe("MetricLegends", () => {
 
   describe("Accessibility and Standards", () => {
     it("should have proper button accessibility", () => {
-      const button = wrapper.find('.q-btn');
+      const button = wrapper.find('[data-cy="metric-legends-button"]');
       expect(button.exists()).toBe(true);
       expect(button.attributes('data-cy')).toBe('metric-legends-button');
     });
 
     it("should maintain semantic HTML structure", () => {
       // Check if the component maintains proper nesting
-      const button = wrapper.find('.q-btn');
+      const button = wrapper.find('[data-cy="metric-legends-button"]');
       const menu = wrapper.find('.q-menu');
       const card = wrapper.find('.q-card');
-      
+
       expect(button.exists()).toBe(true);
       expect(menu.exists()).toBe(true);
       expect(card.exists()).toBe(true);

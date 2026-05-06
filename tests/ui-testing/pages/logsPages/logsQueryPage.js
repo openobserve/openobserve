@@ -5,7 +5,7 @@ export class LogsQueryPage {
     this.page = page;
     this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
     this.dateTimeButton = '[data-test="date-time-btn"]';
-    this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block';
+    this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
     this.errorMessage = '[data-test="logs-search-error-message"]';
     this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';

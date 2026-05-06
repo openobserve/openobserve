@@ -27,7 +27,7 @@ export class ReportsPage {
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
     this.timeZoneOption = (zone) => `role=option[name="${zone}"]`;
-    this.signOutButton = page.getByText('Sign Out');
+    this.signOutButton = page.locator('[data-test="menu-link-logout-item"]');
     this.reportSearchInput = page.locator('[data-test="report-list-search-input"]');
     this.descriptionInput = (reportName) => page.getByRole('textbox', { name: 'Description' });
   }

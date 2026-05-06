@@ -75,19 +75,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >{{ item.text }}</span>
                 <!-- Expand button on the right (only for items with children) -->
-                <q-btn
+                <OButton
                   v-if="item.children.length > 0"
                   :data-test="`toc-level1-expand-btn-${item.id}`"
-                  flat
-                  dense
-                  round
-                  size="xs"
-                  :icon="expandedSections[item.id] ? 'expand_more' : 'chevron_right'"
+                  variant="ghost"
+                  size="icon-xs-circle"
                   @click="$emit('toggle-section', item, $event)"
                   class="tw:flex-shrink-0"
                 >
+                  <q-icon :name="expandedSections[item.id] ? 'expand_more' : 'chevron_right'" size="14px" />
                   <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[item.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
-                </q-btn>
+                </OButton>
               </div>
 
               <!-- Level 2 Children -->
@@ -123,19 +121,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ]"
                       >{{ child.text }}</span>
                       <!-- Expand button on the right (only for items with children) -->
-                      <q-btn
+                      <OButton
                         v-if="child.children.length > 0"
                         :data-test="`toc-level2-expand-btn-${child.id}`"
-                        flat
-                        dense
-                        round
-                        size="xs"
-                        :icon="expandedSections[child.id] ? 'expand_more' : 'chevron_right'"
+                        variant="ghost"
+                        size="icon-xs-circle"
                         @click="$emit('toggle-section', child, $event)"
                         class="tw:flex-shrink-0"
                       >
+                        <q-icon :name="expandedSections[child.id] ? 'expand_more' : 'chevron_right'" size="14px" />
                         <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[child.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
-                      </q-btn>
+                      </OButton>
                     </div>
 
                     <!-- Level 3 Children -->
@@ -169,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface TocItem {
   id: string;
@@ -180,6 +177,7 @@ interface TocItem {
 
 export default defineComponent({
   name: "IncidentTableOfContents",
+  components: { OButton },
   props: {
     tableOfContents: {
       type: Array as PropType<TocItem[]>,

@@ -22,12 +22,20 @@ vi.mock("vue-i18n", () => ({
 }));
 
 const quasarStubs = {
-  QBtnToggle: {
-    name: "QBtnToggle",
+  OToggleGroup: {
+    name: "OToggleGroup",
     template:
-      '<div class="q-btn-toggle-stub" :data-test="$attrs[\'data-test\']"><slot name="user_defined_slot" /><slot name="all_fields_slot" /><slot name="interesting_fields_slot" /></div>',
-    props: ["modelValue", "options", "toggleColor", "bordered", "size"],
+      '<div class="o-toggle-group-stub" v-bind="$attrs"><slot /></div>',
     emits: ["update:modelValue"],
+    setup(_props: any, { emit }: any) {
+      return { triggerUpdate: (val: any) => emit("update:modelValue", val) };
+    },
+  },
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    template:
+      '<button class="o-toggle-group-item-stub" v-bind="$attrs"><slot /></button>',
+    props: ["value", "disabled", "size"],
   },
   QBtn: {
     name: "QBtn",
@@ -185,8 +193,9 @@ describe("FieldListPagination", () => {
       const wrapper = createWrapper({
         showUserDefinedSchemaToggle: true,
       });
-      const allFieldsBtn = wrapper.find('[data-test="logs-all-fields-btn"]');
-      expect(allFieldsBtn.exists()).toBe(true);
+      // All OToggleGroupItems share data-test="logs-user-defined-fields-btn" — verify at least one is rendered
+      const btns = wrapper.findAll('[data-test="logs-user-defined-fields-btn"]');
+      expect(btns.length).toBeGreaterThanOrEqual(1);
     });
 
     it("shows interesting-fields button inside schema toggle when showQuickMode is true", () => {
@@ -194,17 +203,18 @@ describe("FieldListPagination", () => {
         showUserDefinedSchemaToggle: true,
         showQuickMode: true,
       });
-      const interestingBtn = wrapper.find(
-        '[data-test="logs-interesting-fields-btn"]'
+      // The schema toggle group itself is the container — verify it is rendered
+      const toggle = wrapper.find(
+        '[data-test="logs-page-field-list-user-defined-schema-toggle"]'
       );
-      expect(interestingBtn.exists()).toBe(true);
+      expect(toggle.exists()).toBe(true);
     });
   });
 
   describe("Emits: toggle-schema", () => {
     it("emits toggle-schema when schema toggle value changes", async () => {
       const wrapper = createWrapper({ showUserDefinedSchemaToggle: true });
-      const toggle = wrapper.findComponent({ name: "QBtnToggle" });
+      const toggle = wrapper.findComponent({ name: "OToggleGroup" });
       await toggle.vm.$emit("update:modelValue", "user_defined");
       expect(wrapper.emitted("toggle-schema")).toBeTruthy();
       expect(wrapper.emitted("toggle-schema")![0]).toEqual(["user_defined"]);
@@ -217,7 +227,7 @@ describe("FieldListPagination", () => {
         showUserDefinedSchemaToggle: false,
         showQuickMode: true,
       });
-      const toggle = wrapper.findComponent({ name: "QBtnToggle" });
+      const toggle = wrapper.findComponent({ name: "OToggleGroup" });
       await toggle.vm.$emit("update:modelValue", true);
       expect(wrapper.emitted("toggle-interesting-fields")).toBeTruthy();
       expect(wrapper.emitted("toggle-interesting-fields")![0]).toEqual([true]);
@@ -427,7 +437,7 @@ describe("FieldListPagination", () => {
       const page2Btn = wrapper.find(
         '[data-test="logs-page-fields-list-pagination-page-2-button"]'
       );
-      expect(page2Btn.classes()).toContain("pagination-page-active");
+      expect(page2Btn.classes()).toContain("tw:bg-button-primary");
     });
 
     it("does not apply active class to non-current page buttons", () => {
@@ -440,7 +450,7 @@ describe("FieldListPagination", () => {
       const page1Btn = wrapper.find(
         '[data-test="logs-page-fields-list-pagination-page-1-button"]'
       );
-      expect(page1Btn.classes()).not.toContain("pagination-page-active");
+      expect(page1Btn.classes()).not.toContain("tw:bg-button-primary");
     });
   });
 

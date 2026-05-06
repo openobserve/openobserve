@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -47,29 +47,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
 
           <!-- Refresh button -->
-          <q-btn
+          <OButton
             data-test="eval-template-list-refresh-btn"
-            class="q-ml-sm o2-secondary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            flat
-            no-caps
-            :label="t('common.refresh')"
+            variant="outline"
+            size="sm-action"
+            class="q-ml-sm"
             @click="loadTemplates"
-          />
+          >
+            {{ t('common.refresh') }}
+          </OButton>
 
           <!-- Add button -->
-          <q-btn
+          <OButton
             data-test="eval-template-list-add-btn"
-            class="q-ml-sm o2-primary-button tw:h-[36px]"
-            flat
-            no-caps
-            :label="t('evalTemplate.newTemplate')"
+            variant="primary"
+            size="sm-action"
+            class="q-ml-sm"
             @click="goToCreate"
-          />
+          >
+            {{ t('evalTemplate.newTemplate') }}
+          </OButton>
         </div>
       </div>
     </div>
@@ -142,28 +139,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
               <div class="tw:flex tw:items-center tw:justify-center actions-container">
-                <q-btn
+                <OButton
                   :data-test="`eval-template-list-${props.row.name}-edit-btn`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="edit"
+                  variant="ghost"
+                  size="icon-sm"
                   :title="t('common.edit')"
                   @click="goToEdit(props.row)"
-                />
-                <q-btn
+                >
+                  <Pencil class="tw:size-4" />
+                </OButton>
+                <OButton
                   :data-test="`eval-template-list-${props.row.name}-delete-btn`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :icon="outlinedDelete"
+                  variant="ghost-destructive"
+                  size="icon-sm"
                   :title="t('common.delete')"
                   @click="confirmDelete(props.row)"
-                />
+                >
+                  <Trash2 class="tw:size-4" />
+                </OButton>
               </div>
             </q-td>
           </template>
@@ -196,22 +189,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ resultTotal }} {{ t("evalTemplate.header") }}
                 </div>
-                <q-btn
+                <OButton
                   v-if="selectedItems.length > 0"
                   data-test="eval-template-list-bulk-delete-btn"
-                  class="flex items-center no-border o2-secondary-button tw:h-[36px]"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-secondary-button-dark'
-                      : 'o2-secondary-button-light'
-                  "
-                  no-caps
-                  dense
+                  variant="outline"
+                  size="sm-action"
                   @click="openBulkDeleteDialog"
                 >
-                  <q-icon name="delete" size="16px" />
-                  <span class="tw:ml-2">{{ t("common.delete") }}</span>
-                </q-btn>
+                  <Trash2 class="tw:size-4 tw:mr-1" />
+                  {{ t("common.delete") }}
+                </OButton>
               </div>
               <QTablePagination
                 :scope="scope"
@@ -257,6 +244,8 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 
 interface Template {
   id: string;

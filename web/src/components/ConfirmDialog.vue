@@ -48,26 +48,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions class="confirmActions">
-        <q-btn
-          v-close-popup
-          unelevated
-          no-caps
-          class="q-mr-sm o2-secondary-button"
-          @click="onCancel"
-          data-test="cancel-button"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </q-btn>
-        <q-btn
-          v-close-popup
-          unelevated
-          no-caps
-          class="o2-primary-button"
-          @click="onConfirm"
-          data-test="confirm-button"
-        >
-          {{ t("confirmDialog.ok") }}
-        </q-btn>
+        <div class="tw:flex tw:gap-2">
+          <OButton
+            v-close-popup
+            variant="outline"
+            size="sm-action"
+            @click="onCancel"
+            data-test="cancel-button"
+          >
+            {{ t("confirmDialog.cancel") }}
+          </OButton>
+          <OButton
+            v-close-popup
+            variant="primary"
+            size="sm-action"
+            @click="onConfirm"
+            data-test="confirm-button"
+          >
+            {{ t("confirmDialog.ok") }}
+          </OButton>
+        </div>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -78,11 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
   emits: ["update:ok", "update:cancel"],
   props: ["title", "message", "warningMessage"],
+  components: { OButton },
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();

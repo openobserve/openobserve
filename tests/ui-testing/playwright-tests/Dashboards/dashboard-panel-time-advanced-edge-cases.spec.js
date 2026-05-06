@@ -50,12 +50,16 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await assertPanelTimePickerInModal(page);
 
     // Step 5: Change time to "Last 6d" in modal
-    const modalPicker = page.locator('[data-test="dashboard-viewpanel-date-time-picker"]');
-    await modalPicker.click();
-    await page.locator('[data-test="date-time-relative-6-d-btn"]').click();
+    // Click the OButton (data-test="date-time-btn") inside the view panel screen — the outer
+    // wrapper div has the viewpanel data-test but the q-menu is attached to the inner button.
+    const viewPanelScreen = page.locator('[data-test="view-panel-screen"]');
+    await viewPanelScreen.locator('[data-test="date-time-btn"]').click();
+    const dateTimeDialog = page.locator('.date-time-dialog');
+    await dateTimeDialog.waitFor({ state: "visible", timeout: 10000 });
+    await dateTimeDialog.locator('[data-test="date-time-relative-6-d-btn"]').click();
 
     // Step 6: Click Apply
-    await page.locator('[data-test="date-time-apply-btn"]').click();
+    await dateTimeDialog.locator('[data-test="date-time-apply-btn"]').click();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Step 7: Verify URL remains unchanged (View Panel time is temporary)

@@ -266,7 +266,7 @@ describe("AddDashboard", () => {
     it("should close dialog when X button is clicked", async () => {
       wrapper = createWrapper();
       
-      const closeBtn = wrapper.findComponent({ name: 'QBtn' });
+      const closeBtn = wrapper.find('[data-test="dashboard-add-cancel"]');
       expect(closeBtn.exists()).toBe(true);
     });
 

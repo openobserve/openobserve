@@ -309,6 +309,15 @@ describe("RealUserMonitoring.vue", () => {
                 '<div class="app-tabs"><slot v-for="tab in tabs" :name="tab.value" /></div>',
               props: ["tabs", "activeTab"],
             },
+            OTabs: {
+              template: '<div class="app-tabs"><slot></slot></div>',
+              props: ["modelValue", "align", "dense"],
+              emits: ["update:modelValue", "change"],
+            },
+            OTab: {
+              template: '<div></div>',
+              props: ["name", "label"],
+            },
           },
         },
       });
