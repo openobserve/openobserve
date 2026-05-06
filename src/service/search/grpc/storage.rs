@@ -599,7 +599,15 @@ pub async fn tantivy_search(
         } {
             // Each result corresponds to a file in the file list
             match result {
-                Ok((file_name, result)) => {
+                Ok((file_name, result, has_skipped_conditions)) => {
+                    // If any AND condition was skipped because its field does
+                    // not exist in this tantivy index (e.g., a newly added
+                    // secondary-index field with no historical data), keep the
+                    // DataFusion filter so it can evaluate the skipped
+                    // predicates on the parquet data.
+                    if has_skipped_conditions {
+                        is_add_filter_back = true;
+                    }
                     if file_name.is_empty() {
                         // no need inverted index for this file, need add filter back
                         let took = start.elapsed().as_millis() as usize;
@@ -717,13 +725,18 @@ pub async fn get_tantivy_directory(
     Ok(PuffinDirReader::from_path(file_account, source).await?)
 }
 
+/// Returns (file_key, result, has_skipped_conditions).
+/// `has_skipped_conditions` is true when one or more AND conditions were skipped
+/// because the corresponding field does not exist in this tantivy index (e.g., a
+/// newly added secondary-index field). The caller must preserve the DataFusion
+/// filter to handle those skipped predicates.
 async fn search_tantivy_index(
     trace_id: &str,
     time_range: (i64, i64),
     index_condition: Option<IndexCondition>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
-) -> anyhow::Result<(String, TantivyResult)> {
+) -> anyhow::Result<(String, TantivyResult, bool)> {
     let file_account = parquet_file.account.clone();
     // TODO: this convert happen two times, once before cache_files and once in search_tantivy_index
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
@@ -744,7 +757,7 @@ async fn search_tantivy_index(
             metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
                 .with_label_values::<&str>(&[])
                 .inc();
-            return Ok((parquet_file.key.to_string(), result));
+            return Ok((parquet_file.key.to_string(), result, false));
         }
     }
 
@@ -793,7 +806,8 @@ async fn search_tantivy_index(
     // generate the tantivy query
     let condition: IndexCondition =
         index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
-    let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
+    let (query, has_skipped_conditions) =
+        condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
     let need_all_term_fields = condition
         .need_all_term_fields()
         .into_iter()
@@ -872,7 +886,7 @@ async fn search_tantivy_index(
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
-                return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
+                return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY), false));
             }
             // return early if the number of matched docs is too large
             let skip_threshold = cfg.limit.inverted_index_skip_threshold;
@@ -886,6 +900,7 @@ async fn search_tantivy_index(
                 return Ok((
                     "".to_string(),
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
+                    true,
                 ));
             }
             percent = row_ids_percent;
@@ -910,15 +925,17 @@ async fn search_tantivy_index(
     };
 
     // cache the result if the memory size is less than the limit
+    // Do not cache when conditions were skipped — the result is incomplete.
     if cfg.common.inverted_index_result_cache_enabled
         && !cache_key.is_empty()
+        && !has_skipped_conditions
         && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
             || percent < 1.0)
     {
         let entry = get_cache_entry(result.clone(), percent, parquet_file.meta.records as usize);
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
-    Ok((key, result))
+    Ok((key, result, has_skipped_conditions))
 }
 
 /// if simple distinct without filter, we need to warm up the field
