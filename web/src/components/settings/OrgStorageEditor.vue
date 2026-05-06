@@ -281,6 +281,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- AwsRoleArn Fields -->
               <template v-if="selectedProvider === 'AwsRoleArn'">
+                <div
+                  class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+                  :class="store.state.theme === 'dark'
+                    ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
+                    : 'tw:bg-blue-50 tw:border-blue-200'"
+                >
+                  <q-icon name="info" size="18px" color="primary" class="tw:flex-shrink-0 tw:mt-px" />
+                  <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
+                    <template v-if="isCloud">
+                      This uses AWS sts to assume role and perform operations. You must add Openobserve AWS account as trusted entity type for this role in AWS console. Please contact Openobserve team to get the account information or for further help setting this up.
+                    </template>
+                    <template v-else>
+                      This uses AWS sts to assume role and perform operations. Make sure you have configured aws credentials in the installation env that have access to this role.
+                    </template>
+                  </div>
+                </div>
                 <q-input
                   data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
