@@ -341,7 +341,7 @@ export default class DashboardFilter {
 
     // Step 2: Handle multiple matching elements for column dropdown
     const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+      `[data-test="dashboard-add-condition-column-${idx}"]`
     );
     const count = await allColumnLocators.count();
 
@@ -425,7 +425,7 @@ export default class DashboardFilter {
 
     // Step 7: Update the field name (appears in portal, use page scope)
     const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+      `[data-test="dashboard-add-condition-column-${idx}"]`
     );
     const count = await allColumnLocators.count();
 
