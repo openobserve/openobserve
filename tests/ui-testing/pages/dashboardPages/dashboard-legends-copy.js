@@ -105,7 +105,7 @@ export default class DashboardLegendsCopy {
   async copyLegend(index) {
     const item = this.getLegendItem(index);
     await item.hover(); // Hover to reveal copy button
-    const copyBtn = item.locator('.copy-btn');
+    const copyBtn = item.locator('[data-test="dashboard-legend-copy-btn"]');
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     await copyBtn.click();
     testLogger.info(`Copied legend at index ${index}`);
