@@ -135,6 +135,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
           </q-chip>
+
+          <!-- Resend Count Badge -->
+          <q-chip
+            v-if="spanHttpResendCount"
+            dense
+            square
+            class="toolbar-chip resend-chip"
+            :title="`Request resent ${spanHttpResendCount} time(s)`"
+            data-test="trace-details-sidebar-header-toolbar-resend-count"
+          >
+            <q-icon name="replay" size="12px" class="q-mr-xs" />
+            <span class="chip-label">Resends</span>
+            <span class="chip-value">{{ spanHttpResendCount }}</span>
+          </q-chip>
         </div>
 
         <div class="flex items-center">
@@ -685,6 +699,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+        <!-- DB Response Status Code -->
+        <div
+          v-if="hasSpanError && spanDbResponseStatusCode"
+          class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
+          :style="{
+            background: 'var(--o2-status-error-bg)',
+            borderColor: 'var(--o2-status-error-text)',
+          }"
+          data-test="trace-details-sidebar-db-response-status-code"
+        >
+          <div class="tw:flex-col tw:items-center tw:gap-1">
+            <div
+              class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
+            >
+              DB RESPONSE STATUS CODE
+            </div>
+            <div class="tw:flex tw:items-center tw:pl-[0.5rem]">
+              <span
+                class="tw:text-[0.9rem] tw:font-semibold"
+                :style="{ color: 'var(--o2-status-error-text)' }"
+                data-test="trace-details-sidebar-db-response-status-code-value"
+              >
+                {{ spanDbResponseStatusCode }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <!-- Process Exit Code -->
+        <div
+          v-if="hasSpanError && spanProcessExitCode"
+          class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
+          :style="{
+            background: 'var(--o2-status-error-bg)',
+            borderColor: 'var(--o2-status-error-text)',
+          }"
+          data-test="trace-details-sidebar-process-exit-code"
+        >
+          <div class="tw:flex-col tw:items-center tw:gap-1">
+            <div
+              class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
+            >
+              PROCESS EXIT CODE
+            </div>
+            <div class="tw:flex tw:items-center tw:pl-[0.5rem]">
+              <span
+                class="tw:text-[0.9rem] tw:font-semibold"
+                :style="{ color: 'var(--o2-status-error-text)' }"
+                data-test="trace-details-sidebar-process-exit-code-value"
+              >
+                {{ spanProcessExitCode }}
+              </span>
+            </div>
+          </div>
+        </div>
         <div
           v-if="
             hasSpanError &&
@@ -1214,6 +1282,30 @@ export default defineComponent({
       return attrs["error_type"] ?? null;
     });
 
+    const spanDbResponseStatusCode = computed(() => {
+      const attrs = props.span;
+      if (!attrs) return null;
+      return attrs["db_response_status_code"] ?? null;
+    });
+
+    const spanProcessExitCode = computed(() => {
+      const attrs = props.span;
+      if (!attrs) return null;
+      const code = attrs["process_exit_code"] ?? null;
+      if (code === null || code === undefined) return null;
+      const num = parseInt(String(code), 10);
+      return !isNaN(num) && num !== 0 ? String(code) : null;
+    });
+
+    const spanHttpResendCount = computed(() => {
+      const attrs = props.span;
+      if (!attrs) return null;
+      const count = attrs["http_request_resend_count"] ?? null;
+      if (count === null || count === undefined) return null;
+      const num = parseInt(String(count), 10);
+      return !isNaN(num) && num > 0 ? num : null;
+    });
+
     const hasSpanError = computed(() => {
       const isErrorStatus =
         props.span?.span_status === SpanStatus.ERROR ||
@@ -1225,6 +1317,8 @@ export default defineComponent({
       // HTTP 5xx / 4xx also indicate errors
       const httpCode = parseInt(String(spanStatusCode.value ?? ""), 10);
       if (!isNaN(httpCode) && httpCode >= 400) return true;
+      if (spanDbResponseStatusCode.value) return true;
+      if (spanProcessExitCode.value) return true;
       return false;
     });
 
@@ -1247,6 +1341,8 @@ export default defineComponent({
         const desc = HTTP_STATUS_MAP[String(spanStatusCode.value)];
         return desc ? desc : `HTTP ${spanStatusCode.value}`;
       }
+
+      return "";
     });
 
     const errorBannerMessage = computed(() => {
@@ -2573,6 +2669,9 @@ export default defineComponent({
       spanErrorType,
       spanGrpcErrorName,
       spanGrpcErrorMessage,
+      spanDbResponseStatusCode,
+      spanProcessExitCode,
+      spanHttpResendCount,
       navigateToError,
       getDuration,
       getTTFT,
