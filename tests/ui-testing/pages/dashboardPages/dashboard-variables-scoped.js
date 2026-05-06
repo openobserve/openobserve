@@ -692,7 +692,9 @@ export default class DashboardVariablesScoped {
     await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
     await operatorSelector.click();
 
-    const operatorOption = this.page.getByRole("option", { name: operator, exact: true }).locator("div").nth(2);
+    // Use .first() instead of .locator("div").nth(2) — Quasar may or may not include
+    // a q-focus-helper div making the nth(2) index unstable across renders.
+    const operatorOption = this.page.getByRole("option", { name: operator, exact: true }).first();
     await operatorOption.waitFor({ state: "visible", timeout: 10000 });
     await operatorOption.click();
 
@@ -813,7 +815,7 @@ export default class DashboardVariablesScoped {
     await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
     await operatorSelector.click();
 
-    const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).locator("div").nth(2);
+    const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).first();
     await operatorOption.waitFor({ state: "visible", timeout: 10000 });
     await operatorOption.click();
 
@@ -1332,9 +1334,13 @@ export default class DashboardVariablesScoped {
         const valueValue = typeof value === 'string' ? value : value.value;
         const isDefault = typeof value === 'object' && value.selected === true;
 
-        // If this is not the first item, add a new option
+        // If this is not the first item, add a new option.
+        // Quasar's q-field__bottom validation div can overlap the button after
+        // filling the previous row — use force:true to bypass the interception.
         if (i > 0) {
-          await this.page.locator('[data-test="dashboard-add-option-btn"]').click();
+          const addOptionBtn = this.page.locator('[data-test="dashboard-add-option-btn"]');
+          await addOptionBtn.scrollIntoViewIfNeeded();
+          await addOptionBtn.click({ force: true });
           await this.page.waitForTimeout(300);
         }
 
