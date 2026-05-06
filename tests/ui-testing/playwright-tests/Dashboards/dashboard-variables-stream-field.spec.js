@@ -618,7 +618,7 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, "[data-test=""dashboard-settings-dialog""]", { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -867,7 +867,7 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, "[data-test=""dashboard-settings-dialog""]", { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -956,7 +956,7 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, "[data-test=""dashboard-settings-dialog""]", { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1045,7 +1045,7 @@ test.describe(
       // This ensures variables are resolved from a fresh state (no leftover
       // settings-dialog state) which is the real-world usage scenario.
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, "[data-test=""dashboard-settings-dialog""]", { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1175,7 +1175,7 @@ test.describe(
 
       // Close settings and navigate away for a clean initial load
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, "[data-test=""dashboard-settings-dialog""]", { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1253,7 +1253,7 @@ test.describe(
         .waitFor({ state: "visible", timeout: 15000 });
 
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, "[data-test=""dashboard-settings-dialog""]", { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1333,7 +1333,7 @@ test.describe(
         .waitFor({ state: "visible", timeout: 15000 });
 
       await pm.dashboardSetting.closeSettingWindow();
-      await safeWaitForHidden(page, "[data-test=""dashboard-settings-dialog""]", { timeout: 10000 });
+      await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 10000 });
       await pm.dashboardCreate.backToDashboardList();
       await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForNetworkIdle(page, { timeout: 5000 });
