@@ -80,6 +80,11 @@ test.describe("Scheduled Pipeline Query Builder", { tag: ['@all', '@scheduledPip
     // Get query text from Monaco editor
     await pageManager.pipelinesPage.expectQueryToContain('e2e_automate');
 
+    // Verify exact default query format (Issue #11575)
+    await pageManager.pipelinesPage.expectQueryToContain('max(_timestamp)');
+    await pageManager.pipelinesPage.expectQueryToContain('count(_timestamp)');
+    await pageManager.pipelinesPage.expectQueryToContain('histogram(_timestamp)');
+
     // Change stream to k8s_json
     testLogger.info('Changing stream to k8s_json');
     await pageManager.pipelinesPage.selectStreamName('k8s_json');
@@ -90,6 +95,11 @@ test.describe("Scheduled Pipeline Query Builder", { tag: ['@all', '@scheduledPip
     await pageManager.pipelinesPage.expectQueryToContain('FROM');
     await pageManager.pipelinesPage.expectQueryToContain('k8s_json');
     await pageManager.pipelinesPage.expectQueryNotToContain('e2e_automate');
+
+    // Verify default query format preserved after stream change (Issue #11575)
+    await pageManager.pipelinesPage.expectQueryToContain('max(_timestamp)');
+    await pageManager.pipelinesPage.expectQueryToContain('count(_timestamp)');
+    await pageManager.pipelinesPage.expectQueryToContain('histogram(_timestamp)');
 
     testLogger.info('✅ Test passed: Query auto-generated correctly on stream change');
   });
@@ -195,6 +205,52 @@ test.describe("Scheduled Pipeline Query Builder", { tag: ['@all', '@scheduledPip
     await pageManager.pipelinesPage.expectQueryToContain('FROM');
 
     testLogger.info('✅ Test passed: PromQL tab independent of SQL watcher');
+  });
+
+  // P2 - Edge Case Tests
+
+  test("should enable Run Query button after default query populated (Issue #11575)", {
+    tag: ['@functional', '@P2']
+  }, async ({ page }) => {
+    testLogger.info('Testing Run Query button enabled after default query');
+
+    await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+    await pageManager.pipelinesPage.addPipeline();
+
+    // Drag Query button to canvas - opens Query form dialog
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
+    await page.waitForTimeout(500);
+
+    // Wait for scheduled pipeline form dialog to load
+    await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
+    await page.waitForTimeout(1000);
+
+    // Expand "Build Query" section
+    await pageManager.pipelinesPage.expandBuildQuerySection();
+    await page.waitForTimeout(500);
+
+    // Select stream type (logs)
+    await pageManager.pipelinesPage.selectStreamType('logs');
+    await page.waitForTimeout(1000);
+
+    // Verify Run Query button is disabled before stream selection (no query)
+    testLogger.info('Verifying Run Query button state before stream selection');
+    const runQueryBtn = pageManager.pipelinesPage.runQueryButton;
+    await expect(runQueryBtn).toBeDisabled({ timeout: 5000 });
+    testLogger.info('Run Query button is disabled before stream selection');
+
+    // Select first stream (e2e_automate)
+    await pageManager.pipelinesPage.selectStreamName('e2e_automate');
+    await pageManager.pipelinesPage.waitForStreamChangeWatcher();
+    await page.waitForTimeout(500);
+
+    // Verify Run Query button is enabled after default query populated
+    testLogger.info('Verifying Run Query button enabled after default query population');
+    await expect(runQueryBtn).toBeEnabled({ timeout: 5000 });
+    testLogger.info('Run Query button is enabled after default query populated');
+
+    testLogger.info('✅ Test passed: Run Query button enabled correctly');
   });
 
   // Note: Manual edit protection test removed
