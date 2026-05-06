@@ -86,7 +86,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
-export defineComponent({
+export default defineComponent({
   name: "NetworkingPage",
   components: { OTabs, ORouteTab },
   props: {

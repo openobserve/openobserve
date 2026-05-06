@@ -86,7 +86,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
-export defineComponent({
+export default defineComponent({
   name: "DevOpsPage",
   components: { OTabs, ORouteTab },
   props: {

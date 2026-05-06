@@ -139,7 +139,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { HardDrive, Database } from "lucide-vue-next";
 import BillingService from "@/services/billings";
 
-export defineComponent({
+export default defineComponent({
   name: "PageIngestion",
   components: {
     OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs },
