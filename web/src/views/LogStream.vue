@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filterQuery"
                 borderless
                 dense
-                data-test="log-stream-search-input"
                 class="q-ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('logStream.search')"
                 debounce="300"
