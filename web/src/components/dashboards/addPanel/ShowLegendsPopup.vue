@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon"
                 class="tw:ml-1"
+                data-test="dashboard-legend-copy-btn"
                 @click.stop="copyLegend(legend.name, index)"
               >
                 <template #icon-left
@@ -327,13 +328,13 @@ export default defineComponent({
       font-size: 12px;
     }
 
-    .copy-btn {
+    [data-test="dashboard-legend-copy-btn"] {
       opacity: 0;
       transition: opacity 0.2s ease-in-out;
       flex-shrink: 0;
     }
 
-    &:hover .copy-btn {
+    &:hover [data-test="dashboard-legend-copy-btn"] {
       opacity: 1;
     }
   }
