@@ -2827,13 +2827,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
-    // Vortex file format requires enterprise feature, fallback to parquet
-    #[cfg(not(feature = "enterprise"))]
-    if cfg.common.file_format == FileFormat::Vortex {
-        return Err(anyhow::anyhow!(
-            "Vortex file format requires enterprise feature, please change ZO_FILE_FORMAT to parquet or unset it"
-        ));
-    }
+    check_file_format_config(cfg);
 
     // check queue store
     if cfg.common.queue_store.is_empty() {
@@ -2922,6 +2916,17 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
+#[cfg(not(feature = "enterprise"))]
+fn check_file_format_config(cfg: &mut Config) {
+    if cfg.common.file_format != FileFormat::Parquet {
+        log::warn!("ZO_FILE_FORMAT is only supported in enterprise builds; using parquet");
+        cfg.common.file_format = FileFormat::Parquet;
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn check_file_format_config(_cfg: &mut Config) {}
 
 fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.grpc.tls_enabled
@@ -3660,6 +3665,28 @@ mod tests {
             FileFormat::from_extension("/some/path/file.parquet"),
             Some(FileFormat::Parquet)
         );
+    }
+
+    #[test]
+    #[cfg(not(feature = "enterprise"))]
+    fn test_non_enterprise_file_format_forces_parquet() {
+        let mut cfg = Config::default();
+        cfg.common.file_format = FileFormat::Vortex;
+
+        check_file_format_config(&mut cfg);
+
+        assert_eq!(cfg.common.file_format, FileFormat::Parquet);
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn test_enterprise_file_format_preserves_configured_value() {
+        let mut cfg = Config::default();
+        cfg.common.file_format = FileFormat::Vortex;
+
+        check_file_format_config(&mut cfg);
+
+        assert_eq!(cfg.common.file_format, FileFormat::Vortex);
     }
 
     #[test]

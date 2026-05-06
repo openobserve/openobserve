@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 clickable
                 @click="
                   !isSqlModeDisabled &&
-                    (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
+                  (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
                 "
                 data-test="logs-search-bar-menu-sql-mode-btn"
                 class="q-pa-sm saved-view-item"
@@ -878,7 +878,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
               <q-separator v-if="config.isEnterprise == 'true'" />
               <q-item
-                v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
+                v-if="
+                  config.isEnterprise == 'true' &&
+                  config.isCloud == 'false' &&
+                  store.state.zoConfig.search_inspector_enabled
+                "
                 data-test="search-inspect-btn"
                 class="q-pa-sm saved-view-item"
                 clickable
@@ -1244,7 +1248,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
                     : 'o2-run-query-button o2-color-primary',
-                  config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled
+                  config.isEnterprise == 'true' ||
+                  store.state.zoConfig.auto_query_enabled
                     ? 'search-button-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
                 ]"
@@ -1275,7 +1280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.zoConfig.auto_query_enabled &&
                     !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                   "
-                >{{ t("search.autoRunEnabled") }}</q-tooltip>
+                  >{{ t("search.autoRunEnabled") }}</q-tooltip
+                >
                 <q-icon
                   v-if="
                     searchObj.meta.liveMode &&
@@ -1294,11 +1300,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-btn>
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <q-separator
-                v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
+                v-if="
+                  config.isEnterprise == 'true' ||
+                  store.state.zoConfig.auto_query_enabled
+                "
                 class="tw:h-[29px] tw:w-[1px]"
               />
               <q-btn-dropdown
-                v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
+                v-if="
+                  config.isEnterprise == 'true' ||
+                  store.state.zoConfig.auto_query_enabled
+                "
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
@@ -1315,7 +1327,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                       ? 'o2-color-primary'
                       : '',
-                  config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled
+                  config.isEnterprise == 'true' ||
+                  store.state.zoConfig.auto_query_enabled
                     ? 'search-button-dropdown-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
                 ]"
@@ -1367,7 +1380,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <q-item-section avatar class="tw:min-w-0 tw:pr-2">
                         <q-icon
-                          :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
+                          :name="
+                            searchObj.meta.liveMode
+                              ? 'autorenew'
+                              : 'sync_disabled'
+                          "
                           size="16px"
                           :color="searchObj.meta.liveMode ? 'primary' : ''"
                         />
@@ -2693,7 +2710,6 @@ export default defineComponent({
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
 
-
     const {
       refreshData,
       handleRunQuery,
@@ -2837,12 +2853,8 @@ export default defineComponent({
     // <= 1440px: saved views + reset → left hamburger menu
     // <= 1280px: also histogram + SQL toggles → left hamburger menu
     // <= 1024px: also share + transform selector → right overflow menu
-    const shouldMoveSavedViewToMenu = computed(
-      () => windowWidth.value <= 1440,
-    );
-    const shouldMoveSqlToggleToMenu = computed(
-      () => windowWidth.value <= 1280,
-    );
+    const shouldMoveSavedViewToMenu = computed(() => windowWidth.value <= 1440);
+    const shouldMoveSqlToggleToMenu = computed(() => windowWidth.value <= 1280);
     const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
@@ -2889,9 +2901,7 @@ export default defineComponent({
     watch(
       () => searchObj.data.streamResults?.list,
       (list) => {
-        updateStreamKeywords(
-          (list ?? []).map((s: any) => ({ name: s.name })),
-        );
+        updateStreamKeywords((list ?? []).map((s: any) => ({ name: s.name })));
       },
       { immediate: true, deep: false },
     );
@@ -3008,8 +3018,7 @@ export default defineComponent({
       autoCompleteData.value.popup.open =
         queryEditorRef?.value?.triggerAutoComplete;
       // [NEW] Pass stream context for IndexedDB value lookups
-      autoCompleteData.value.org =
-        store.state.selectedOrganization.identifier;
+      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
       autoCompleteData.value.streamType =
         searchObj.data.stream.streamType ?? "logs";
       autoCompleteData.value.streamName =
@@ -3645,10 +3654,7 @@ export default defineComponent({
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
 
-      if (
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.liveMode
-      ) {
+      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
       }
     };
@@ -4791,7 +4797,10 @@ export default defineComponent({
 
     const toggleLiveMode = () => {
       searchObj.meta.liveMode = !searchObj.meta.liveMode;
-      localStorage.setItem("oo_toggle_auto_run", String(searchObj.meta.liveMode));
+      localStorage.setItem(
+        "oo_toggle_auto_run",
+        String(searchObj.meta.liveMode),
+      );
     };
 
     const handleHistogramMode = () => {};
@@ -5611,39 +5620,36 @@ export default defineComponent({
                   }
                 }
               } else {
-                if (query.toLowerCase().includes("order by")) {
-                  const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
+                // Find the earliest clause to insert WHERE before.
+                // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+                const terminatingClauses = [
+                  "group by",
+                  "having",
+                  "order by",
+                  "limit",
+                ];
+                const lowerQuery = query.toLowerCase();
+                let firstClause: string | null = null;
+                let firstIndex = Infinity;
+                for (const clause of terminatingClauses) {
+                  const idx = lowerQuery.indexOf(clause);
+                  if (idx !== -1 && idx < firstIndex) {
+                    firstIndex = idx;
+                    firstClause = clause;
+                  }
+                }
+                if (firstClause) {
+                  const [beforeClause, afterClause] = queryIndexSplit(
                     query,
-                    "order by",
+                    firstClause,
                   );
                   query =
-                    beforeOrderBy.trim() +
+                    beforeClause.trim() +
                     " where " +
                     filter +
-                    " order by" +
-                    afterOrderBy;
-                } else if (query.toLowerCase().includes("group by")) {
-                  const [beforeGroupBy, afterGroupBy] = queryIndexSplit(
-                    query,
-                    "group by",
-                  );
-                  query =
-                    beforeGroupBy.trim() +
-                    " where " +
-                    filter +
-                    " group by" +
-                    afterGroupBy;
-                } else if (query.toLowerCase().includes("limit")) {
-                  const [beforeLimit, afterLimit] = queryIndexSplit(
-                    query,
-                    "limit",
-                  );
-                  query =
-                    beforeLimit.trim() +
-                    " where " +
-                    filter +
-                    " limit" +
-                    afterLimit;
+                    " " +
+                    firstClause +
+                    afterClause;
                 } else {
                   query = query + " where " + filter;
                 }
@@ -5694,16 +5700,25 @@ export default defineComponent({
           const parsed = this.fnParsedSQL();
           if (parsed?.where) {
             const newWhere = removeFieldFromWhereAST(parsed.where, fieldName);
-            newValue = this.fnUnparsedSQL({ ...parsed, where: newWhere }).replaceAll("`", '"');
+            newValue = this.fnUnparsedSQL({
+              ...parsed,
+              where: newWhere,
+            }).replaceAll("`", '"');
           } else {
             newValue = this.searchObj.data.editorValue;
           }
         } catch (e) {
           console.log("Error removing field condition from SQL:", e);
-          newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
+          newValue = removeFieldCondition(
+            this.searchObj.data.editorValue,
+            fieldName,
+          );
         }
       } else {
-        newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
+        newValue = removeFieldCondition(
+          this.searchObj.data.editorValue,
+          fieldName,
+        );
       }
       this.searchObj.data.editorValue = newValue;
       this.searchObj.data.query = newValue;

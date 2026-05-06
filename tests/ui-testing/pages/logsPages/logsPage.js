@@ -3485,8 +3485,8 @@ export class LogsPage {
     }
 
     async openFirstLogDetails() {
-        // Click on the first log entry to open details (expand the _timestamp column)
-        await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        // Click on the first log entry to open details (expand the first column)
+        await this.page.locator('[data-index="0"] [data-test="table-row-expand-menu"]').click();
         await this.page.waitForTimeout(1000);
     }
 
@@ -6677,9 +6677,10 @@ export class LogsPage {
         // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
         // Use visible filter to avoid hidden cached PanelEditor instances.
         try {
-            const initIndicator = this.page.locator(
-                `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`
-            ).locator('visible=true').first();
+            const initIndicator = this.page
+                .locator(`${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`)
+                .filter({ visible: true })
+                .first();
             await initIndicator.waitFor({ state: 'visible', timeout });
             testLogger.info('Build tab initialization complete (chart/table/no-data visible)');
         } catch (error) {
