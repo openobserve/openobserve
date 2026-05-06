@@ -69,7 +69,7 @@ export class LogsPage {
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
         this.confirmButton = '[data-test="confirm-button"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
-        this.searchStreamInput = '[data-test="log-stream-search-input"] input';
+        this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
@@ -3882,8 +3882,8 @@ export class LogsPage {
     }
 
     async searchStreamByPlaceholder(searchText) {
-        await this.page.locator('[data-test="log-stream-search-input"] input').click();
-        return await this.page.locator('[data-test="log-stream-search-input"] input').fill(searchText);
+        await this.page.locator('[data-test="streams-search-stream-input"] input').click();
+        return await this.page.locator('[data-test="streams-search-stream-input"] input').fill(searchText);
     }
 
     async clickFirstExploreButton() {
