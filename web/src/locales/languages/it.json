@@ -2270,7 +2270,8 @@
       "addNewDestination": "Aggiungi nuova destinazione",
       "destinationRequired": "È richiesta almeno una destinazione!",
       "disabledNotificationsInfo": "Il rilevamento delle anomalie verrà comunque eseguito e scriverà i risultati nel flusso _anomalies. Abilita le notifiche per ricevere avvisi quando vengono rilevate anomalie."
-    }
+    },
+    "anomalyName": "Nome dell'anomalia"
   },
   "alert_templates": {
     "header": "Modelli",

@@ -206,6 +206,13 @@ const props = defineProps({
   },
 });
 
+// Strip axis labels from field config so ECharts doesn't render axis titles
+// and the grid margins shrink accordingly (hasXAxisName/hasYAxisName become false)
+const clearFieldLabels = (data: any) => {
+  data.queries[0].fields.x.forEach((f: any) => { f.label = ""; });
+  data.queries[0].fields.y.forEach((f: any) => { f.label = ""; });
+};
+
 // Helper function to get decoded VRL function
 const getDecodedVrlFunction = (): string | null => {
   if (!props.formData.query_condition?.vrl_function) {
@@ -546,6 +553,7 @@ const fetchQuerySchema = async () => {
       }
 
       chartData.value = cloneDeep(dashboardPanelData.data);
+      clearFieldLabels(chartData.value);
       selectedTimeObj.value = { ...dashboardPanelData.meta.dateTime };
       return;
     }
@@ -623,6 +631,7 @@ const fetchQuerySchema = async () => {
     }
 
     chartData.value = cloneDeep(dashboardPanelData.data);
+    clearFieldLabels(chartData.value);
     selectedTimeObj.value = { ...dashboardPanelData.meta.dateTime };
 
     // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
@@ -664,6 +673,7 @@ const fetchQuerySchema = async () => {
     }
 
     chartData.value = cloneDeep(dashboardPanelData.data);
+    clearFieldLabels(chartData.value);
     selectedTimeObj.value = { ...dashboardPanelData.meta.dateTime };
   }
 };
@@ -1067,6 +1077,7 @@ const refreshData = () => {
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
+    clearFieldLabels(newChartData);
     const newTimeObj = { ...dashboardPanelData.meta.dateTime };
 
     chartData.value = newChartData;
@@ -1116,6 +1127,7 @@ const refreshData = () => {
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
+    clearFieldLabels(newChartData);
     const newTimeObj = { ...dashboardPanelData.meta.dateTime };
 
     chartData.value = newChartData;
@@ -1150,6 +1162,7 @@ const refreshData = () => {
   // Note: Updating both chartData and selectedTimeObj may trigger two separate watchers
   // in usePanelDataLoader, resulting in duplicate query_range API calls for PromQL queries
   const newChartData = cloneDeep(dashboardPanelData.data);
+  clearFieldLabels(newChartData);
   const newTimeObj = { ...dashboardPanelData.meta.dateTime };
 
   chartData.value = newChartData;
