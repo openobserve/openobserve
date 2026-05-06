@@ -86,26 +86,26 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:disabled:opacity-60",
   ].join(" "),
   "ghost-warning": [
-    "tw:bg-transparent tw:text-[var(--q-warning)] tw:border-0",
-    "tw:enabled:hover:bg-[color:var(--q-warning)]/10",
-    "tw:enabled:active:bg-[color:var(--q-warning)]/20",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-[color:var(--q-warning)]/50",
+    "tw:bg-transparent tw:text-button-ghost-warning-text tw:border-0",
+    "tw:enabled:hover:bg-button-ghost-warning-hover-bg",
+    "tw:enabled:active:bg-button-ghost-warning-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-warning-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
-  // Outline warning: yellow bg + black text + yellow border — for pending-action indicators (e.g. refresh when variables changed)
+  // Outline warning: transparent bg + warning border + warning text — for pending-action indicators (e.g. refresh when variables changed)
   "outline-warning": [
-    "tw:bg-[var(--q-warning)] tw:text-gray-900 tw:border tw:border-[color:var(--q-warning)]",
-    "tw:enabled:hover:bg-[color:var(--q-warning)]/90",
-    "tw:enabled:active:bg-[color:var(--q-warning)]/80",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-[color:var(--q-warning)]/50",
+    "tw:bg-transparent tw:text-button-outline-warning-text tw:border tw:border-button-outline-warning-border",
+    "tw:enabled:hover:bg-button-outline-warning-hover-bg",
+    "tw:enabled:active:bg-button-outline-warning-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-outline-warning-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
-  // Solid warning: filled yellow background + dark text — for buttons requiring user attention
+  // Solid warning: filled amber background + dark text — for buttons requiring user attention
   warning: [
-    "tw:bg-[var(--q-warning)] tw:text-gray-900 tw:border tw:border-[color:var(--q-warning)]",
-    "tw:enabled:hover:bg-[color:var(--q-warning)]/90",
-    "tw:enabled:active:bg-[color:var(--q-warning)]/80",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-[color:var(--q-warning)]/50",
+    "tw:bg-button-warning tw:text-button-warning-foreground tw:border tw:border-button-warning-border",
+    "tw:enabled:hover:bg-button-warning-hover",
+    "tw:enabled:active:bg-button-warning-active",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-warning-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
   // Neutral ghost: inherits parent text color — used for compact inline action buttons
@@ -145,7 +145,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
   "sidebar-toggle": [
-    "tw:bg-[var(--q-color-btn-bg,var(--q-color-surface,#fff))] tw:text-button-ghost-text tw:border tw:border-button-border tw:shadow-sm",
+    "tw:bg-surface-panel tw:text-button-ghost-text tw:border tw:border-border-default tw:shadow-sm",
     "tw:enabled:hover:bg-button-ghost-hover-bg tw:enabled:hover:border-button-border-hover",
     "tw:enabled:active:bg-button-ghost-active-bg",
     "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-focus-ring",
@@ -161,7 +161,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels
   "on-dark-primary": [
-    "tw:bg-white tw:text-[var(--q-primary)] tw:font-bold tw:border-0 tw:shadow-md",
+    "tw:bg-white tw:text-primary-600 tw:font-bold tw:border-0 tw:shadow-md",
     "tw:enabled:hover:shadow-xl",
     "tw:enabled:active:opacity-90",
     "tw:focus-visible:ring-2 tw:focus-visible:ring-white/50",
@@ -209,10 +209,10 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
-    "tw:bg-transparent tw:text-inherit tw:border tw:border-[var(--o2-border-color)]",
+    "tw:bg-transparent tw:text-inherit tw:border tw:border-border-default",
     "tw:!rounded-[20px] tw:!text-xs tw:!font-medium tw:!h-auto tw:!py-[5px] tw:!px-[14px] tw:!gap-[6px]",
     "tw:transition-colors tw:duration-150",
-    "tw:enabled:hover:border-[var(--q-primary)] tw:enabled:hover:text-[var(--q-primary)] tw:enabled:hover:bg-[color-mix(in_srgb,var(--q-primary)_8%,transparent)]",
+    "tw:enabled:hover:border-primary-600 tw:enabled:hover:text-primary-600 tw:enabled:hover:bg-button-ghost-hover-bg",
     "tw:disabled:opacity-60",
   ].join(" "),
 };
