@@ -104,6 +104,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :done="step > 2"
             :header-nav="step > 2"
           >
+            <div
+              v-if="!isEditMode"
+              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+              :class="store.state.theme === 'dark'
+                ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
+                : 'tw:bg-blue-50 tw:border-blue-200'"
+            >
+              <q-icon name="info" size="18px" color="primary" class="tw:flex-shrink-0 tw:mt-px" />
+              <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
+                Once configured, only credential fields can be updated. All other fields will be locked.
+              </div>
+            </div>
             <div class="q-gutter-sm">
               <!-- AwsCredentials Fields -->
               <template v-if="selectedProvider === 'AwsCredentials'">
