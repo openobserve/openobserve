@@ -312,8 +312,8 @@ const isToolObservation = computed(() => {
 const toolMetadata = computed(() => {
   if (!isToolObservation.value || !props.span) return null;
   return {
-    name: props.span.llm_tool_name,
-    callId: props.span.llm_tool_call_id,
+    name: props.span.gen_ai_tool_name,
+    callId: props.span.gen_ai_tool_call_id,
   };
 });
 
@@ -323,9 +323,9 @@ const toolContent = computed(() => {
   let content = null;
   if (props.span) {
     if (props.contentType === "input") {
-      content = props.span.llm_tool_call_arguments;
+      content = props.span.gen_ai_tool_call_arguments;
     } else {
-      content = props.span.llm_tool_call_result;
+      content = props.span.gen_ai_tool_call_result;
     }
   }
 

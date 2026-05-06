@@ -1072,8 +1072,8 @@ describe("TraceTree", () => {
       spanKind: "Client",
       parentId: null,
       hasChildSpans: false,
-      llm_usage: { total: 1500, prompt: 1000, completion: 500 },
-      llm_cost: { total: 0.03 },
+      genAiUsage: { total: 1500, prompt: 1000, completion: 500 },
+      genAiCost: { total: 0.03 },
       style: {
         color: "#ab63fa",
         backgroundColor: "#ab63fa33",

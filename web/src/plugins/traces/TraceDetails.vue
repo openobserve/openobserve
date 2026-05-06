@@ -2141,16 +2141,6 @@ export default defineComponent({
     // Convert span object to required format
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
-      // Parse usage details from split fields
-      span = {
-        ...span,
-        llm_usage_details_input: span.llm_usage_tokens_input,
-        llm_usage_details_output: span.llm_usage_tokens_output,
-        llm_usage_details_total: span.llm_usage_tokens_total,
-        llm_cost_details_total: span.llm_usage_cost_total,
-        llm_input: span.llm_input || {},
-      };
-
       const usage = parseUsageDetails(span);
       const cost = parseCostDetails(span);
 
@@ -2163,8 +2153,8 @@ export default defineComponent({
         endTimeUs: Math.floor(span.end_time / 1000),
         durationMs: span?.duration
           ? Number((span?.duration / 1000).toFixed(4))
-          : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+          : 0,
+        durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0,
         idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
         busyMs: span.busy_ns ? convertTime(span.busy_ns) : 0,
         spanId: span.span_id || `generated_${Date.now()}_${Math.random()}`,
@@ -2179,8 +2169,8 @@ export default defineComponent({
           color: "",
         },
         links: JSON.parse(span.links || "[]"),
-        llm_usage: usage,
-        llm_cost: cost,
+        genAiUsage: usage,
+        genAiCost: cost,
       };
     };
 

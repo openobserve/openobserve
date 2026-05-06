@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-badge
           v-if="isLLMSpan"
           :label="
-            span.llm_observation_type?.charAt(0) +
-            span.llm_observation_type?.slice(1).toLowerCase()
+            span.gen_ai_operation_name?.charAt(0) +
+            span.gen_ai_operation_name?.slice(1).toLowerCase()
           "
-          :color="getObservationTypeColor(span.llm_observation_type)"
+          :color="getObservationTypeColor(span.gen_ai_operation_name)"
           class="q-mr-xs observation-type-badge"
           data-test="trace-details-sidebar-observation-badge"
         />
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Row 2: LLM Metrics (conditional) -->
       <div
-        v-if="isLLMSpan && llmMetrics && span.llm_model_name"
+        v-if="isLLMSpan && llmMetrics && span.gen_ai_response_model"
         class="flex items-center justify-between q-pa-xs llm-metrics-row"
         style="
           overflow-x: auto;
@@ -178,9 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             square
             class="llm-chip model-chip"
             icon="psychology"
-            :title="span.llm_model_name"
+            :title="span.gen_ai_response_model"
           >
-            <span class="chip-value text-bold">{{ span.llm_model_name }}</span>
+            <span class="chip-value text-bold">{{ span.gen_ai_response_model }}</span>
           </q-chip>
 
           <!-- Token Usage Group -->
@@ -227,8 +227,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center">
           <!-- Provider Badge -->
           <q-badge
-            v-if="span.llm_provider_name"
-            :label="span.llm_provider_name"
+            v-if="span.gen_ai_provider_name"
+            :label="span.gen_ai_provider_name"
             class="provider-badge"
           />
         </div>
@@ -332,24 +332,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon"
                       title="Copy input"
-                      @click="copyContent(span.llm_input, 'input')"
-                      :disabled="!hasContent(span.llm_input)"
+                      @click="copyContent(span.gen_ai_input_messages, 'input')"
+                      :disabled="!hasContent(span.gen_ai_input_messages)"
                     >
                       <q-icon name="content_copy" size="14px" />
                     </OButton>
                   </div>
                 </div>
                 <div class="llm-content-box">
+                  <!-- System Instructions (when available) -->
+                  <div v-if="parsedSystemInstructions" class="tw:mb-3">
+                    <q-expansion-item
+                      icon="settings"
+                      label="System Instructions"
+                      header-class="tw:text-xs tw:font-medium"
+                    >
+                      <div class="tw:p-2 tw:bg-[var(--o2-code-bg)]">
+                        <LLMContentRenderer
+                          :content="JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])"
+                          :observation-type="span.gen_ai_operation_name"
+                          content-type="input"
+                          view-mode="formatted"
+                        />
+                      </div>
+                    </q-expansion-item>
+                  </div>
                   <div
-                    v-if="!hasContent(span.llm_input)"
+                    v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
                     class="no-data-message"
                   >
                     No data available
                   </div>
                   <LLMContentRenderer
-                    v-else
-                    :content="span.llm_input"
-                    :observation-type="span.llm_observation_type"
+                    v-if="hasContent(span.gen_ai_input_messages)"
+                    :content="span.gen_ai_input_messages"
+                    :observation-type="span.gen_ai_operation_name"
                     content-type="input"
                     :span="span"
                     view-mode="formatted"
@@ -382,8 +399,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon"
                       title="Copy output"
-                      @click="copyContent(span.llm_output, 'output')"
-                      :disabled="!hasContent(span.llm_output)"
+                      @click="copyContent(span.gen_ai_output_messages, 'output')"
+                      :disabled="!hasContent(span.gen_ai_output_messages)"
                     >
                       <q-icon name="content_copy" size="14px" />
                     </OButton>
@@ -391,15 +408,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="llm-content-box">
                   <div
-                    v-if="!hasContent(span.llm_output)"
+                    v-if="!hasContent(span.gen_ai_output_messages)"
                     class="no-data-message"
                   >
                     No data available
                   </div>
                   <LLMContentRenderer
                     v-else
-                    :content="span.llm_output"
-                    :observation-type="span.llm_observation_type"
+                    :content="span.gen_ai_output_messages"
+                    :observation-type="span.gen_ai_operation_name"
                     content-type="output"
                     :span="span"
                     view-mode="formatted"
@@ -411,12 +428,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Model Parameters (collapsible) -->
             <q-expansion-item
-              v-if="span.llm_model_parameters"
+              v-if="span.llm_request_parameters"
               label="Model Parameters"
               class="q-mt-md"
             >
               <pre class="model-params-json q-pa-sm">{{
-                formatModelParams(span.llm_model_parameters)
+                formatModelParams(span.llm_request_parameters)
               }}</pre>
             </q-expansion-item>
           </div>
@@ -493,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
                 : 'tab-content-without-llm-metrics'
             "
@@ -574,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="tw:flex-1 traces-events-table-container tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
               :class="
-                isLLMSpan && llmMetrics && span.llm_model_name
+                isLLMSpan && llmMetrics && span.gen_ai_response_model
                   ? 'tab-content-with-llm-metrics'
                   : 'tab-content-without-llm-metrics'
               "
@@ -611,7 +628,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-dynamic-height"
             :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
                 : 'tab-content-without-llm-metrics'
             "
@@ -631,7 +648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rows-per-page-options="[0]"
             class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
             :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
                 : 'tab-content-without-llm-metrics'
             "
@@ -768,7 +785,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
             :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
                 : 'tab-content-without-llm-metrics'
             "
@@ -831,7 +848,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
             :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
                 : 'tab-content-without-llm-metrics'
             "
@@ -867,7 +884,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
             :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
                 : 'tab-content-without-llm-metrics'
             "
@@ -923,7 +940,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
             :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
                 : 'tab-content-without-llm-metrics'
             "
@@ -1188,8 +1205,9 @@ export default defineComponent({
 
     const attributesForDisplay = computed(() => {
       const attrs = { ...spanDetails.value.attrs };
-      delete attrs.llm_input;
-      delete attrs.llm_output;
+      delete attrs.gen_ai_input_messages;
+      delete attrs.gen_ai_output_messages;
+      delete attrs.gen_ai_system_instructions;
       return attrs;
     });
 
@@ -1269,12 +1287,12 @@ export default defineComponent({
 
     const getTTFT = computed(() => {
       // Only calculate for LLM spans with completion_start_time
-      if (!props.span.llm_completion_start_time || !props.span.start_time) {
+      if (!props.span.gen_ai_completion_start_time || !props.span.start_time) {
         return null;
       }
       // completion_start_time is in microseconds
       // start_time is in nanoseconds, convert to microseconds
-      const completionStartTime = props.span.llm_completion_start_time;
+      const completionStartTime = props.span.gen_ai_completion_start_time;
       const spanStartTimeUs = props.span.start_time / 1000;
       const ttftUs = completionStartTime - spanStartTimeUs;
       return formatTimeWithSuffix(ttftUs);
@@ -2073,6 +2091,28 @@ export default defineComponent({
       return true;
     };
 
+    const parsedSystemInstructions = computed(() => {
+      const raw = props.span?.gen_ai_system_instructions;
+      if (!raw) return null;
+      try {
+        let parsed;
+        if (typeof raw === "string") {
+          parsed = JSON.parse(raw);
+        } else {
+          parsed = raw;
+        }
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((p: any) => p.type === "text" && p.content)
+            .map((p: any) => p.content)
+            .join("\n") || null;
+        }
+        return null;
+      } catch {
+        return typeof raw === "string" ? raw : null;
+      }
+    });
+
     // Toggle fullscreen for both Input and Output side by side
     const toggleFullscreen = () => {
       if (ioContainerRef.value) {
@@ -2204,6 +2244,7 @@ export default defineComponent({
       formatModelParams,
       getObservationTypeColor,
       hasContent,
+      parsedSystemInstructions,
       ioContainerRef,
       isFullscreen,
       toggleFullscreen,

@@ -756,18 +756,18 @@ describe("useTraces", () => {
           service_name: [],
           spans: [1, 0],
           first_event: {},
-          llm_usage_tokens_input: 100,
-          llm_usage_tokens_output: 200,
-          llm_usage_tokens_total: 300,
-          llm_usage_cost_total: 0.05,
+          gen_ai_usage_input_tokens: 100,
+          gen_ai_usage_output_tokens: 200,
+          gen_ai_usage_total_tokens: 300,
+          gen_ai_usage_cost: 0.05,
         },
       ];
 
       const [item] = formatTracesMetaData(traces);
-      expect(item.llm_usage_details_input).toBe(100);
-      expect(item.llm_usage_details_output).toBe(200);
-      expect(item.llm_usage_details_total).toBe(300);
-      expect(item.llm_cost_details_total).toBe(0.05);
+      expect(item.gen_ai_usage_input_tokens).toBe(100);
+      expect(item.gen_ai_usage_output_tokens).toBe(200);
+      expect(item.gen_ai_usage_total_tokens).toBe(300);
+      expect(item.gen_ai_usage_cost).toBe(0.05);
     });
   });
 
