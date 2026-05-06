@@ -147,6 +147,10 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
+import {
+  DEFAULT_METRICS_X_FIELD,
+  DEFAULT_METRICS_Y_FIELD,
+} from "@/utils/metrics/constants";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -179,10 +183,10 @@ export default defineComponent({
     const {
       dashboardPanelData,
       resetDashboardPanelData,
-      resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
       validatePanel,
-      removeXYFilters,
+      updateGroupedFields,
+      makeAutoSQLQuery,
     } = useDashboardPanelData("metrics");
     const editMode = ref(false);
     const selectedDate: any = ref({
@@ -214,6 +218,20 @@ export default defineComponent({
       resetDashboardPanelData();
     });
 
+    /** Apply default SQL builder fields for metrics (histogram + avg) */
+    const applyMetricsDefaults = () => {
+      const query = dashboardPanelData.data.queries[0];
+      query.customQuery = false;
+      query.fields.x = [DEFAULT_METRICS_X_FIELD()];
+      query.fields.y = [DEFAULT_METRICS_Y_FIELD()];
+      query.fields.breakdown = [];
+      query.fields.filter = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      };
+    };
+
     // Initialize state before any child components mount so FieldList.vue sees
     // stream_type = "metrics" from the start, preventing a spurious
     // streams?type=logs request and the double stream-list fetch that results
@@ -221,7 +239,7 @@ export default defineComponent({
     onBeforeMount(() => {
       errorData.errors = [];
       editMode.value = false;
-      resetDashboardPanelDataAndAddTimeField();
+      resetDashboardPanelData();
 
       // for metrics page, use stream type as metric
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
@@ -234,14 +252,14 @@ export default defineComponent({
           dashboardPanelData.data.queries[0].fields.stream = persisted;
         }
       }
-      // need to remove the xy filters
-      removeXYFilters();
 
       // set default chart type as line
       dashboardPanelData.data.type = "line";
-      // set the default query type as promql for metrics
-      dashboardPanelData.data.queryType = "promql";
-      dashboardPanelData.data.queries[0].customQuery = false;
+      // set default query type as SQL with builder (auto) mode
+      dashboardPanelData.data.queryType = "sql";
+
+      // apply default histogram(_timestamp) + avg(value) fields
+      applyMetricsDefaults();
 
       // set the show query bar by default for metrics page
       dashboardPanelData.layout.showQueryBar = true;
@@ -252,6 +270,17 @@ export default defineComponent({
     onMounted(async () => {
       // DateTimePicker is now mounted; safe to read its value
       updateDateTime(selectedDate.value);
+
+      // If a stream was persisted, load its fields and generate the SQL query.
+      // onBeforeMount sets the defaults (histogram + avg) but PanelEditor's watcher
+      // can't generate SQL until stream fields are loaded.
+      const stream =
+        dashboardPanelData.data.queries[0].fields.stream;
+      if (stream && dashboardPanelData.data.queryType === "sql") {
+        await updateGroupedFields();
+        await makeAutoSQLQuery();
+        runQuery();
+      }
 
       // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
@@ -280,12 +309,33 @@ export default defineComponent({
 
     watch(
       () => dashboardPanelData.data.queries[0]?.fields?.stream,
-      (stream: string) => {
+      async (stream: string, oldStream: string) => {
         if (store.state.zoConfig?.auto_query_enabled && stream) {
           saveMetricsStream(
             store.state.selectedOrganization.identifier,
             stream,
           );
+        }
+
+        if (
+          stream &&
+          dashboardPanelData.data.queryType === "sql" &&
+          dashboardPanelData.data.queries[0]?.fields?.stream_type === "metrics"
+        ) {
+          // On stream change, reset to default SQL builder fields.
+          // On first stream selection (oldStream empty), fields are already
+          // set from onBeforeMount so only reset on actual change.
+          if (oldStream && stream !== oldStream) {
+            applyMetricsDefaults();
+          }
+
+          // Load stream fields, generate the SQL query, and run it.
+          // PanelEditor's field watcher can't generate the query on its own
+          // here because the x/y fields haven't changed (defaults were set
+          // in onBeforeMount).
+          await updateGroupedFields();
+          await makeAutoSQLQuery();
+          runQuery();
         }
       },
     );
