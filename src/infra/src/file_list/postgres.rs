@@ -1770,13 +1770,11 @@ GROUP BY stream;
     }
 
     async fn file_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
-        let sql = format!(
-            r#"SELECT 
+        let sql = r#"SELECT 
 SUM(original_size)::BIGINT AS storage_size,
 SUM(index_size)::BIGINT AS index_size
 FROM file_list
-WHERE org_id = $1 AND account = $2;"#
-        );
+WHERE org_id = $1 AND account = $2;"#;
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["stats_by_org_account", "file_list"])

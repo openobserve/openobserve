@@ -92,12 +92,11 @@ impl StorageClientFactory {
             }
         }
 
-        let storage = Self {
+        Self {
             accounts: ArcSwap::from_pointee(temp),
             only_default,
             stream_strategy,
-        };
-        storage
+        }
     }
 
     // here we use external locking to make sure the account is added correctly
