@@ -295,6 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="right"
         full-height
         maximized
+        data-test="dashboard-settings-dialog"
       >
         <DashboardSettings @refresh="loadDashboard" />
       </q-dialog>

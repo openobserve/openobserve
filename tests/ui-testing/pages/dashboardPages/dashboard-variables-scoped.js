@@ -1334,14 +1334,17 @@ export default class DashboardVariablesScoped {
         const valueValue = typeof value === 'string' ? value : value.value;
         const isDefault = typeof value === 'object' && value.selected === true;
 
-        // If this is not the first item, add a new option.
-        // Quasar's q-field__bottom validation div can overlap the button after
-        // filling the previous row — use force:true to bypass the interception.
+        // If this is not the first item, add a new option and wait for it to appear.
+        // The q-field__bottom Quasar validation div permanently intercepts pointer events over
+        // the button, blocking both regular and force clicks. Use evaluate() to call the DOM
+        // native click() which fires the full event sequence and bypasses CSS pointer-events.
         if (i > 0) {
           const addOptionBtn = this.page.locator('[data-test="dashboard-add-option-btn"]');
+          await addOptionBtn.waitFor({ state: "visible", timeout: 10000 });
           await addOptionBtn.scrollIntoViewIfNeeded();
-          await addOptionBtn.click({ force: true });
-          await this.page.waitForTimeout(300);
+          await addOptionBtn.evaluate(btn => btn.click());
+          // Wait for the new option row to appear in the DOM before proceeding
+          await this.page.locator(`[data-test="dashboard-custom-variable-${i}-label"]`).waitFor({ state: "visible", timeout: 10000 });
         }
 
         // Fill label and value for this option
