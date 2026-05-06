@@ -129,6 +129,73 @@ describe("Case 3: SQL ON — empty / SELECT * detection", () => {
 });
 
 // ============================================================================
+// Case 3a: SQL ON + SELECT <fields> FROM <stream> (no agg/group)
+// — bare-field-select gets default histogram/count
+// ============================================================================
+
+describe("Case 3a: SQL ON — bare-field-select queries get default histogram/count", () => {
+  it("single field: SELECT method FROM stream → defaults", async () => {
+    const r = await fullPipeline('SELECT method FROM "default"');
+    expect(r.customQuery).toBe(false);
+    expect(r.panelFields!.x.length).toBe(1);
+    expect(r.panelFields!.x[0].functionName).toBe("histogram");
+    expect(r.panelFields!.x[0].column).toBe("_timestamp");
+    expect(r.panelFields!.y.length).toBe(1);
+    expect(r.panelFields!.y[0].functionName).toBe("count");
+    expect(r.panelFields!.y[0].column).toBe("_timestamp");
+    expect(r.panelFields!.breakdown.length).toBe(0);
+  });
+
+  it("multiple fields: SELECT method, status FROM stream → defaults", async () => {
+    const r = await fullPipeline('SELECT method, status FROM "default"');
+    expect(r.customQuery).toBe(false);
+    expect(r.panelFields!.x.length).toBe(1);
+    expect(r.panelFields!.x[0].functionName).toBe("histogram");
+    expect(r.panelFields!.y.length).toBe(1);
+    expect(r.panelFields!.y[0].functionName).toBe("count");
+    expect(r.panelFields!.breakdown.length).toBe(0);
+  });
+
+  it("bare field with WHERE: SELECT method FROM stream WHERE code='200' → defaults + filter", async () => {
+    const r = await fullPipeline(
+      'SELECT method FROM "default" WHERE code = \'200\'',
+    );
+    expect(r.customQuery).toBe(false);
+    expect(r.panelFields!.x.length).toBe(1);
+    expect(r.panelFields!.x[0].functionName).toBe("histogram");
+    expect(r.panelFields!.y.length).toBe(1);
+    expect(r.panelFields!.y[0].functionName).toBe("count");
+    expect(r.panelFields!.breakdown.length).toBe(0);
+    const conds = flattenConditions(r.panelFields!.filter);
+    expect(conds.length).toBe(1);
+    expect(conds[0].column.field).toBe("code");
+    expect(conds[0].value).toBe("200");
+  });
+
+  it("does NOT apply defaults when aggregation present: SELECT method, count(*) FROM stream GROUP BY method", async () => {
+    const r = await fullPipeline(
+      'SELECT method, count(_timestamp) as "y_axis_1" FROM "default" GROUP BY method',
+    );
+    expect(r.customQuery).toBe(false);
+    // method should be on x-axis (moved from breakdown since x is empty), count on y-axis
+    expect(r.panelFields!.x.length).toBe(1);
+    expect(r.panelFields!.x[0].column).toBe("method");
+    expect(r.panelFields!.x[0].functionName).toBeNull();
+    expect(r.panelFields!.y.length).toBe(1);
+    expect(r.panelFields!.y[0].functionName).toBe("count");
+  });
+
+  it("does NOT apply defaults when histogram present: SELECT histogram(_timestamp) FROM stream", async () => {
+    const r = await fullPipeline(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "default" GROUP BY x_axis_1',
+    );
+    expect(r.customQuery).toBe(false);
+    expect(r.panelFields!.x[0].functionName).toBe("histogram");
+    expect(r.panelFields!.y[0].functionName).toBe("count");
+  });
+});
+
+// ============================================================================
 // Case 2: SQL OFF — WHERE clause → parseWhereClauseToFilter
 // ============================================================================
 

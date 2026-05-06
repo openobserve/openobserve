@@ -288,8 +288,31 @@ export async function parseSQL(
     // Extract fields, filters, and joins
     const { fields, filters, streamName, joins } = await getFieldsFromQuery(query);
 
-    // If no fields extracted (SELECT *), use auto mode with default histogram/count
-    if (!fields || fields.length === 0) {
+    // Classify fields into x, y, breakdown
+    const xFields: ParsedField[] = [];
+    const yFields: ParsedField[] = [];
+    const breakdownFields: ParsedField[] = [];
+
+    for (const field of fields) {
+      const classification = classifyField(field);
+      switch (classification) {
+        case "x":
+          xFields.push(field);
+          break;
+        case "y":
+          yFields.push(field);
+          break;
+        case "breakdown":
+          breakdownFields.push(field);
+          break;
+      }
+    }
+
+    // Use default histogram/count when there are no meaningful axis fields:
+    // - SELECT * (no fields extracted)
+    // - Bare-field-select (e.g., SELECT method, status FROM logs) where all
+    //   fields are plain columns with no aggregation or time functions
+    if (xFields.length === 0 && yFields.length === 0) {
       return {
         stream: stream || streamName || "",
         streamType,
@@ -313,26 +336,6 @@ export async function parseSQL(
         customQuery: false,
         rawQuery: query,
       };
-    }
-
-    // Classify fields into x, y, breakdown
-    const xFields: ParsedField[] = [];
-    const yFields: ParsedField[] = [];
-    const breakdownFields: ParsedField[] = [];
-
-    for (const field of fields) {
-      const classification = classifyField(field);
-      switch (classification) {
-        case "x":
-          xFields.push(field);
-          break;
-        case "y":
-          yFields.push(field);
-          break;
-        case "breakdown":
-          breakdownFields.push(field);
-          break;
-      }
     }
 
     return {
