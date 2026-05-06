@@ -37,16 +37,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
               @on:date-change="updateDateChange"
             />
-            <q-btn
+            <OButton
               data-test="metrics-explorer-run-query-button"
               data-cy="metrics-explorer-run-query-button"
-              dense
+              variant="primary"
+              size="sm-toolbar"
               :title="t('metrics.runQuery')"
-              class="q-pa-none tw:mr-none! o2-run-query-button o2-color-primary tw:h-[33px] element-box-shadow"
               @click="runQuery"
             >
               {{ t("metrics.runQuery") }}
-            </q-btn>
+            </OButton>
           </div>
         </div>
         <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
@@ -142,6 +142,7 @@ import {
   applyFilterTerm,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),

@@ -14,9 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-btn-group
+  <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs tw:h-[32px] function-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs function-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
     <div class="tw:flex tw:items-center">
       <q-toggle
@@ -32,26 +32,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-          {{ t('search.toggleFunctionEditor') }}
+          {{ t("search.toggleFunctionEditor") }}
         </q-tooltip>
       </q-toggle>
     </div>
-    <div>
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-        selectedFunctionTooltip
-      }}</q-tooltip>
-      <q-btn-dropdown
-        data-test="logs-search-bar-function-dropdown"
-        v-model="functionModel"
-        size="12px"
-        :icon="iconRight"
-        no-caps
-        class="btn-function no-case q-pr-none no-border no-outline tw:border-none"
-      >
-        <q-tooltip :delay="0">
-          {{ selectedFunctionTooltip }}
-        </q-tooltip>
-      <q-list data-test="logs-search-saved-function-list">
+    <ODropdown v-model:open="functionModel" side="bottom" align="start">
+      <template #trigger>
+        <OButton
+          data-test="logs-search-bar-function-dropdown"
+          variant="ghost"
+          size="icon-toolbar"
+        >
+          <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
+          <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
+          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
+            selectedFunctionTooltip
+          }}</q-tooltip>
+        </OButton>
+      </template>
+      <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
         <!-- Search Input -->
         <div>
           <q-input
@@ -76,12 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clickable
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
-            v-close-popup
+            @click="applyFunction(item, true)"
           >
-            <q-item-section
-              @click.stop="applyFunction(item, true)"
-              v-close-popup
-            >
+            <q-item-section>
               <q-item-label>{{ item.name }}</q-item-label>
             </q-item-section>
           </q-item>
@@ -96,23 +92,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item>
         </div>
       </q-list>
-    </q-btn-dropdown>
-    </div>
-    <q-btn
+    </ODropdown>
+    <OButton
       data-test="logs-search-bar-save-function-btn"
-      class="save-function-btn q-px-sm"
-      icon="save"
+      variant="ghost"
+      size="icon-toolbar"
       @click="fnSavedFunctionDialog"
     >
+      <q-icon name="save" size="16px" />
       <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
         {{ t("common.save") }}
       </q-tooltip>
-    </q-btn>
-  </q-btn-group>
+    </OButton>
+  </OButtonGroup>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
@@ -132,9 +131,9 @@ const store = useStore();
 const functionToggleIcon = computed(() => {
   return (
     "img:" +
-    (store.state.theme == 'dark' ?
-      getImageURL("images/common/function_dark.svg") :
-      getImageURL("images/common/function.svg"))
+    (store.state.theme == "dark"
+      ? getImageURL("images/common/function_dark.svg")
+      : getImageURL("images/common/function.svg"))
   );
 });
 
@@ -152,6 +151,8 @@ const iconRight = computed(() => {
 const functionModel = ref(false);
 
 const searchTerm = ref("");
+
+const functionIconUrl = computed(() => iconRight.value.replace("img:", ""));
 
 const fnSavedFunctionDialog = () => {
   emit("save:function");
@@ -175,13 +176,14 @@ const applyFunction = (
   item: { name: string; function: string },
   flag = false,
 ) => {
+  functionModel.value = false;
   emit("select:function", item, flag);
 };
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/logs/function-selector.scss';
-.save-function-btn{
+@import "@/styles/logs/function-selector.scss";
+.save-function-btn {
   border-left: 1px solid var(--o2-border-color);
 }
 </style>

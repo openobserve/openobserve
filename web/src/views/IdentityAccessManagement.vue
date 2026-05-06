@@ -20,17 +20,16 @@
         </div>
       </template>
       <template #separator>
-          <q-btn
+          <OButton
             data-test="logs-search-field-list-collapse-btn"
-            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
             :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+            variant="sidebar-button"
+            size="sidebar-button"
             :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
             @click="collapseSidebar"
-          />
+          >
+            <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" size="12px" />
+          </OButton>
       </template>
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
@@ -52,6 +51,7 @@ import config from "@/aws-exports";
 import { useRouter } from "vue-router";
 import { nextTick } from "vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const store = useStore();
 const { t } = useI18n();

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -52,15 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="col-auto">
-                <q-btn
-                  round
-                  flat
-                  dense
-                  size="sm"
-                  icon="cancel"
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
                   data-test="close-drawer-btn"
                   @click="$emit('close')"
-                />
+                >
+                  <X class="tw:size-4" />
+                </OButton>
               </div>
             </div>
             <div
@@ -104,38 +103,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div class="row q-pt-sm q-px-sm">
       <div class="col-12">
-        <q-tabs v-model="activeTab" shrink align="left">
-          <q-tab
+        <OTabs v-model="activeTab" align="left">
+          <OTab
             data-test="event-detail-overview-tab"
             name="overview"
             label="Overview"
           />
-          <q-tab
+          <OTab
             data-test="event-detail-network-tab"
             name="network"
             label="Network"
           />
-          <q-tab
+          <OTab
             data-test="event-detail-attributes-tab"
             name="attributes"
             label="Attributes"
           />
-        </q-tabs>
+        </OTabs>
       </div>
     </div>
 
     <q-separator />
 
     <!-- Tab Content -->
-    <q-tab-panels
+    <OTabPanels
       v-model="activeTab"
       animated
       keep-alive
-      class="tw:flex-1 tw:overflow-y-auto"
+      grow
+      scroll="y"
       data-test="tab-content-container"
     >
       <!-- Overview Tab -->
-      <q-tab-panel name="overview" class="q-pa-sm" data-test="overview-tab">
+      <OTabPanel name="overview" padding="sm" data-test="overview-tab">
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
           <div
@@ -388,34 +388,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
 
                     <!-- Clickable Trace Button -->
-                    <q-btn
+                    <OButton
                       v-if="item._oo_trace_id"
-                      dense
-                      :icon="outlinedAccountTree"
-                      outline
-                      size="0.75rem"
-                      class="tw:ml-[0.625rem]! tw:py-[0]! tw:px-[0.2rem]! tw:border-1! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]!"
+                      variant="ghost"
+                      size="icon-chip"
                       title="View trace details"
                       data-test="view-trace-btn"
                       @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
                     >
-                      <span
-                        v-if="item._oo_trace_id"
-                        class="tw:text-[10px] tw:pl-[0.2rem] tw:py-[0]! tw:text-[var(--o2-theme-primary)]"
-                      >
-                        Trace
-                      </span>
-                    </q-btn>
+                      <GitBranch class="tw:size-3" />
+                      <span v-if="item._oo_trace_id" class="tw:text-[10px] tw:pl-[0.2rem]">Trace</span>
+                    </OButton>
                   </div>
                 </div>
               </div>
             </template>
           </div>
         </template>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Network Tab -->
-      <q-tab-panel name="network" class="q-pa-sm" data-test="network-tab">
+      <OTabPanel name="network" padding="sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
           <div class="tw:font-bold tw:mb-2 tw:text-sm">
             Network Requests ({{ networkResources.length }})
@@ -468,39 +461,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No network requests found for this event
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Console Tab -->
-      <q-tab-panel name="console" class="q-pa-sm" data-test="console-tab">
+      <OTabPanel name="console" padding="sm" data-test="console-tab">
         <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
           Console logs coming soon
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Performance Tab -->
-      <q-tab-panel
+      <OTabPanel
         name="performance"
-        class="q-pa-sm"
+        padding="sm"
         data-test="performance-tab"
       >
         <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
           Performance metrics coming soon
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Attributes Tab -->
-      <q-tab-panel name="attributes" class="q-pa-sm" data-test="attributes-tab">
+      <OTabPanel name="attributes" padding="sm" data-test="attributes-tab">
         <div class="tw:flex tw:justify-start">
-          <q-btn
-            :label="t('common.copyToClipboard')"
-            dense
-            size="sm"
-            no-caps
-            class="q-px-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-            icon="content_copy"
-            @click="copyAttributesToClipboard"
+          <OButton
+            variant="outline"
+            size="sm-action"
+            class="q-px-sm"
             data-test="attributes-copy-btn"
-          />
+            @click="copyAttributesToClipboard"
+          >
+            <Copy class="tw:size-4 tw:mr-1" />
+            {{ t('common.copyToClipboard') }}
+          </OButton>
         </div>
         <div
           class="tw:p-2 tw:rounded tw:overflow-x-auto tw:font-mono tw:text-[10px]"
@@ -524,12 +517,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           </div>
         </div>
-      </q-tab-panel>
-    </q-tab-panels>
+      </OTabPanel>
+    </OTabPanels>
   </q-card>
 </template>
 
 <script setup lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -546,6 +543,8 @@ import EventDetailsSection from "./common/EventDetailsSection.vue";
 import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { X, GitBranch, Copy } from 'lucide-vue-next';
 
 const props = defineProps({
   event: {

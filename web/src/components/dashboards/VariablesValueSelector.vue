@@ -85,22 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-
     </div>
-      <!-- Add Variable Button -->
-      <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
-        <q-btn
-          outline
-          no-caps
-          icon="add"
-          label="Add Variable"
-          color="primary"
-          size="md"
-          class="el-border"
-          @click="openAddVariable"
-          data-test="dashboard-add-variable-btn"
-        />
-      </div>
+    <!-- Add Variable Button -->
+    <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
+      <OButton
+        variant="outline"
+        size="sm"
+        @click="openAddVariable"
+        data-test="dashboard-add-variable-btn"
+      >
+        <template #icon-left><q-icon name="add" /></template>
+        Add Variable
+      </OButton>
+    </div>
   </div>
 </template>
 
@@ -121,6 +118,7 @@ import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import {
@@ -189,6 +187,7 @@ export default defineComponent({
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
     VariableCustomValueSelector,
+    OButton,
   },
   setup(props: any, { emit }) {
     const store = useStore();
@@ -471,7 +470,9 @@ export default defineComponent({
           const hits = response.content.results.hits;
 
           // Resolve field name for searching in response
-          const resolvedFieldName = resolveVariableValue(variableObject.query_data.field);
+          const resolvedFieldName = resolveVariableValue(
+            variableObject.query_data.field,
+          );
 
           const fieldHit = hits.find(
             (field: any) => field.field === resolvedFieldName,
@@ -487,7 +488,8 @@ export default defineComponent({
               variableObject.options = [];
             }
 
-            const isFirstResponse = variableObject.isVariablePartialLoaded === false;
+            const isFirstResponse =
+              variableObject.isVariablePartialLoaded === false;
 
             variableLog(
               variableObject.name,
@@ -610,10 +612,14 @@ export default defineComponent({
                         : firstNonBlankOption.value;
                     } else {
                       // All options are blank - keep value unset
-                      variableObject.value = variableObject.multiSelect ? [] : null;
+                      variableObject.value = variableObject.multiSelect
+                        ? []
+                        : null;
                     }
                   } else {
-                    variableObject.value = variableObject.multiSelect ? [] : null;
+                    variableObject.value = variableObject.multiSelect
+                      ? []
+                      : null;
                   }
                 }
               }
@@ -693,7 +699,7 @@ export default defineComponent({
     // Helper function to resolve variable references in a string.
     // Uses the cached resolvedVarLookup computed (scope precedence: global → tab → current).
     const resolveVariableValue = (value: string): string => {
-      if (!value || typeof value !== 'string') return value ?? "";
+      if (!value || typeof value !== "string") return value ?? "";
 
       const varLookup = resolvedVarLookup.value;
 
@@ -703,17 +709,18 @@ export default defineComponent({
       return value.replace(
         /(?:\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z0-9_-]+))|(?:\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g,
         (fullMatch, dollarBraceVarName, dollarVarName, mustacheVarName) => {
-          const varName = dollarBraceVarName || dollarVarName || mustacheVarName;
+          const varName =
+            dollarBraceVarName || dollarVarName || mustacheVarName;
           if (varName in varLookup) {
             let varValue = varLookup[varName];
 
             // Handle array values (multi-select)
             // Stream and field must be single tokens, use first element only
             if (Array.isArray(varValue)) {
-              varValue = String(varValue[0] ?? '');
+              varValue = String(varValue[0] ?? "");
             }
 
-            return varValue ?? '';
+            return varValue ?? "";
           }
 
           // Keep original reference if variable not found
@@ -751,8 +758,12 @@ export default defineComponent({
       variableFirstResponseProcessed.value[variableObject.name] = false;
 
       // Resolve variable references in stream and field
-      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
-      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+      const resolvedStream = resolveVariableValue(
+        variableObject.query_data.stream,
+      );
+      const resolvedField = resolveVariableValue(
+        variableObject.query_data.field,
+      );
 
       const payload = {
         fields: [resolvedField],
@@ -866,8 +877,11 @@ export default defineComponent({
             : SELECT_ALL_VALUE;
         } else if (item.type === "custom") {
           // For custom type variables, set first option as default if no initial value
-          if (initialValue !== null && initialValue !== undefined &&
-              (Array.isArray(initialValue) ? initialValue.length > 0 : true)) {
+          if (
+            initialValue !== null &&
+            initialValue !== undefined &&
+            (Array.isArray(initialValue) ? initialValue.length > 0 : true)
+          ) {
             // Use initial value if it exists
             variableData.value = initialValue;
           } else if (variableData.options && variableData.options.length > 0) {
@@ -898,7 +912,8 @@ export default defineComponent({
         variablesData.values.push(variableData);
 
         // set old variables data - use the actual value that was set (which might be custom value, not just initialValue)
-        oldVariablesData[item.name] = variableData.value !== undefined ? variableData.value : initialValue;
+        oldVariablesData[item.name] =
+          variableData.value !== undefined ? variableData.value : initialValue;
 
         variableLog(
           variableData.name,
@@ -988,7 +1003,8 @@ export default defineComponent({
         // restored when API response arrives
         // HOWEVER: If variable has custom/all default, set it to that value instead
         const managerHasResetValue =
-          (currentValue === null || (Array.isArray(currentValue) && currentValue.length === 0)) &&
+          (currentValue === null ||
+            (Array.isArray(currentValue) && currentValue.length === 0)) &&
           oldValue !== undefined &&
           oldValue !== null &&
           (!Array.isArray(oldValue) || oldValue.length > 0);
@@ -997,7 +1013,10 @@ export default defineComponent({
           // Manager reset this variable
           if (hasCustomOrAllDefault) {
             // Variable has custom/all default - set it to the configured value
-            if (v.selectAllValueForMultiSelect === "custom" && v.customMultiSelectValue?.length > 0) {
+            if (
+              v.selectAllValueForMultiSelect === "custom" &&
+              v.customMultiSelectValue?.length > 0
+            ) {
               const customValue = v.multiSelect
                 ? v.customMultiSelectValue
                 : v.customMultiSelectValue[0];
@@ -1082,11 +1101,18 @@ export default defineComponent({
           // If variable has a valid value (e.g., from URL) and oldVariablesData is undefined,
           // sync it so the value is preserved when API response arrives
           oldVariablesData[v.name] = currentValue;
-        } else if (hasCustomOrAllDefault && oldVariablesData[v.name] === undefined && !isChildVariable) {
+        } else if (
+          hasCustomOrAllDefault &&
+          oldVariablesData[v.name] === undefined &&
+          !isChildVariable
+        ) {
           // If variable has custom or "all" default configured but oldVariablesData is undefined,
           // set it to the configured default value so it gets applied when API response arrives
           // BUT only for parent variables (non-child), not for child variables
-          if (v.selectAllValueForMultiSelect === "custom" && v.customMultiSelectValue?.length > 0) {
+          if (
+            v.selectAllValueForMultiSelect === "custom" &&
+            v.customMultiSelectValue?.length > 0
+          ) {
             oldVariablesData[v.name] = v.multiSelect
               ? v.customMultiSelectValue
               : v.customMultiSelectValue[0];
@@ -1171,7 +1197,7 @@ export default defineComponent({
         if (!useManager) return;
 
         syncManagerVariablesToLocal();
-        
+
         // Check for pending variables that need to be loaded
         // Use nextTick to ensure DOM and state are updated
         nextTick(() => {
@@ -1275,7 +1301,9 @@ export default defineComponent({
         // Check if old values should be preserved based on selectAllValueForMultiSelect setting
         // Filter out undefined values - when oldVariablesData is cleared, it becomes [undefined]
         const validOldValues = Array.isArray(oldVariableSelectedValues)
-          ? oldVariableSelectedValues.filter(v => v !== undefined && v !== null)
+          ? oldVariableSelectedValues.filter(
+              (v) => v !== undefined && v !== null,
+            )
           : [];
         const hasOldValues = validOldValues.length > 0;
 
@@ -1287,7 +1315,8 @@ export default defineComponent({
             if (
               currentVariable?.selectAllValueForMultiSelect === "custom" &&
               currentVariable?.customMultiSelectValue?.length > 0 &&
-              JSON.stringify(validOldValues.sort()) === JSON.stringify(currentVariable.customMultiSelectValue.sort())
+              JSON.stringify(validOldValues.sort()) ===
+                JSON.stringify(currentVariable.customMultiSelectValue.sort())
             ) {
               // Preserve custom values even if not in options
               currentVariable.value = currentVariable.customMultiSelectValue;
@@ -1394,7 +1423,8 @@ export default defineComponent({
         if (
           currentVariable.selectAllValueForMultiSelect === "custom" &&
           currentVariable.customMultiSelectValue?.length > 0 &&
-          oldVariableSelectedValues[0] === currentVariable.customMultiSelectValue[0]
+          oldVariableSelectedValues[0] ===
+            currentVariable.customMultiSelectValue[0]
         ) {
           // Preserve the custom value even if it's not in the API options
           currentVariable.value = currentVariable.customMultiSelectValue[0];
@@ -1430,7 +1460,9 @@ export default defineComponent({
 
             // customValue can be undefined or default value
             currentVariable.value =
-              customValue?.value ?? currentVariable.customMultiSelectValue?.[0] ?? currentVariable.options[0].value;
+              customValue?.value ??
+              currentVariable.customMultiSelectValue?.[0] ??
+              currentVariable.options[0].value;
           } else if (currentVariable.selectAllValueForMultiSelect === "all") {
             // Use SELECT_ALL_VALUE for single-select "all"
             currentVariable.value = SELECT_ALL_VALUE;
@@ -1790,7 +1822,9 @@ export default defineComponent({
                 variableObject.value = variableObject.multiSelect
                   ? variableObject.customMultiSelectValue
                   : variableObject.customMultiSelectValue[0];
-              } else if (variableObject.selectAllValueForMultiSelect === "all") {
+              } else if (
+                variableObject.selectAllValueForMultiSelect === "all"
+              ) {
                 variableObject.value = variableObject.multiSelect
                   ? [SELECT_ALL_VALUE]
                   : SELECT_ALL_VALUE;
@@ -1821,12 +1855,16 @@ export default defineComponent({
               );
 
               // Ensure value is set according to the configuration
-              if (variableObject.selectAllValueForMultiSelect === "custom" &&
-                  variableObject.customMultiSelectValue?.length > 0) {
+              if (
+                variableObject.selectAllValueForMultiSelect === "custom" &&
+                variableObject.customMultiSelectValue?.length > 0
+              ) {
                 variableObject.value = variableObject.multiSelect
                   ? variableObject.customMultiSelectValue
                   : variableObject.customMultiSelectValue[0];
-              } else if (variableObject.selectAllValueForMultiSelect === "all") {
+              } else if (
+                variableObject.selectAllValueForMultiSelect === "all"
+              ) {
                 // Set "all" value for both multiSelect and single-select
                 variableObject.value = variableObject.multiSelect
                   ? [SELECT_ALL_VALUE]
@@ -1972,8 +2010,12 @@ export default defineComponent({
         store.state.zoConfig.timestamp_column || "_timestamp";
 
       // Resolve variable references in stream and field names for SQL query
-      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
-      const resolvedField = resolveVariableValue(variableObject.query_data.field);
+      const resolvedStream = resolveVariableValue(
+        variableObject.query_data.stream,
+      );
+      const resolvedField = resolveVariableValue(
+        variableObject.query_data.field,
+      );
 
       let dummyQuery: string;
 
@@ -2019,7 +2061,10 @@ export default defineComponent({
 
         if (variable.isVariablePartialLoaded) {
           // Escape special regex characters in variable name
-          const escapedVarName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const escapedVarName = variable.name.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&",
+          );
 
           // Replace array values
           if (Array.isArray(variable.value)) {
@@ -2028,39 +2073,39 @@ export default defineComponent({
               .join(", ");
 
             // Mustache patterns: {{variable}} and {{variable:format}}
-            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, 'g');
+            const mustachePattern = new RegExp(
+              `\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`,
+              "g",
+            );
             queryContext = queryContext.replace(mustachePattern, arrayValues);
 
             // Dollar-sign patterns (existing)
             // Pattern 1: Unquoted placeholder like IN($variable) -> IN('val1', 'val2')
-            const unquotedPattern = new RegExp(`\\$${escapedVarName}(?!')`, 'g');
+            const unquotedPattern = new RegExp(
+              `\\$${escapedVarName}(?!')`,
+              "g",
+            );
             // Pattern 2: Quoted placeholder like '$variable' -> 'val1', 'val2'
-            const quotedPattern = new RegExp(`'\\$${escapedVarName}'`, 'g');
+            const quotedPattern = new RegExp(`'\\$${escapedVarName}'`, "g");
 
             // First replace unquoted patterns (for IN clauses)
-            queryContext = queryContext.replace(
-              unquotedPattern,
-              arrayValues,
-            );
+            queryContext = queryContext.replace(unquotedPattern, arrayValues);
             // Then replace quoted patterns
-            queryContext = queryContext.replace(
-              quotedPattern,
-              arrayValues,
-            );
+            queryContext = queryContext.replace(quotedPattern, arrayValues);
           } else if (variable.value !== null && variable.value !== undefined) {
             // Replace single values with regex to replace all occurrences
             const replacedValue = escapeSingleQuotes(variable.value);
 
             // Mustache pattern
-            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, 'g');
+            const mustachePattern = new RegExp(
+              `\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`,
+              "g",
+            );
             queryContext = queryContext.replace(mustachePattern, replacedValue);
 
             // Dollar-sign pattern (existing)
-            const pattern = new RegExp(`\\$${escapedVarName}`, 'g');
-            queryContext = queryContext.replace(
-              pattern,
-              replacedValue,
-            );
+            const pattern = new RegExp(`\\$${escapedVarName}`, "g");
+            queryContext = queryContext.replace(pattern, replacedValue);
           }
         }
       }

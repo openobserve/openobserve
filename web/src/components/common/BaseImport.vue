@@ -21,14 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]" :class="headerClass">
         <div class="col">
           <div class="flex">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
+            <OButton
+              variant="ghost"
+              size="icon"
               @click="handleBack"
-              icon="arrow_back_ios_new"
               :data-test="`${testPrefix}-import-back-btn`"
-            />
+            >
+              <q-icon name="arrow_back_ios_new" size="16px" />
+            </OButton>
             <div :class="titleClass" class="q-ml-md">{{ title }}</div>
           </div>
         </div>
@@ -36,29 +36,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
-        <div class="flex justify-center">
-          <q-btn
+        <div class="flex justify-center tw:gap-2">
+          <OButton
             v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('function.cancel')"
-            no-caps
-            flat
+            variant="outline"
+            size="sm-action"
             :class="cancelButtonClass"
             @click="handleCancel"
             :data-test="`${testPrefix}-import-cancel-btn`"
-          />
-          <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('dashboard.import')"
+          >{{ t('function.cancel') }}</OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
             type="submit"
-            no-caps
-            flat
             :class="importButtonClass"
             @click="handleImport"
             :loading="isImporting || $props.isImporting"
-            :disable="isImporting || $props.isImporting"
+            :disabled="isImporting || $props.isImporting"
             :data-test="`${testPrefix}-import-json-btn`"
-          />
+          >{{ t('dashboard.import') }}</OButton>
         </div>
       </div>
     </div>
@@ -233,6 +229,8 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
+import { Upload, Link } from "lucide-vue-next";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "BaseImport",
@@ -241,6 +239,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     AppTabs,
+    OButton,
   },
   props: {
     // Title for the import page
@@ -255,10 +254,12 @@ export default defineComponent({
         {
           label: "File Upload / JSON",
           value: "import_json_file",
+          icon: Upload,
         },
         {
           label: "URL Import",
           value: "import_json_url",
+          icon: Link,
         },
       ],
     },

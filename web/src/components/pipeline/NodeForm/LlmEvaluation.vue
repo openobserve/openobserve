@@ -25,8 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("pipeline.llmEvaluation") }}
       <div>
-        <q-btn v-close-popup="true" round
-flat icon="cancel"></q-btn>
+        <OButton variant="ghost" size="icon" v-close-popup>
+          <q-icon name="cancel" size="14px" />
+        </OButton>
       </div>
     </div>
     <q-separator />
@@ -108,17 +109,17 @@ flat icon="cancel"></q-btn>
               </q-item>
             </template>
           </q-select>
-          <q-btn
-            round
-            flat
-            dense
-            icon="refresh"
+          <OButton
+            variant="ghost-muted"
+            size="icon-xs-sq"
             @click="refreshTemplates"
             :loading="loadingTemplates"
             :title="t('common.refresh')"
             data-test="llm-evaluation-template-refresh-btn"
             class="q-mt-md"
-          />
+          >
+            <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
+          </OButton>
         </div>
 
         <!-- Enable Sampling Toggle -->
@@ -154,53 +155,26 @@ flat icon="cancel"></q-btn>
         </div>
 
         <!-- Action Buttons -->
-        <div
-          class="flex justify-start full-width q-mt-sm"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        >
-          <q-btn
+        <div class="tw:flex tw:gap-2 q-mt-sm">
+          <OButton
             v-if="pipelineObj.isEditNode"
             data-test="llm-evaluation-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            color="negative"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
+            variant="outline-destructive"
+            size="sm-action"
             @click="openDeleteDialog"
-          >
-            <q-icon name="delete" class="q-mr-xs" />
-            {{ t("pipeline.deleteNode") }}
-          </q-btn>
-          <q-btn
+          >{{ t("pipeline.deleteNode") }}</OButton>
+          <OButton
             data-test="llm-evaluation-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
+            variant="outline"
+            size="sm-action"
             @click="openCancelDialog"
-          />
-          <q-btn
+          >{{ t('alerts.cancel') }}</OButton>
+          <OButton
             data-test="llm-evaluation-save-btn"
-            :label="t('alerts.save')"
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
+            variant="primary"
+            size="sm-action"
             type="submit"
-          />
+          >{{ t('alerts.save') }}</OButton>
         </div>
       </q-form>
     </div>
@@ -222,10 +196,12 @@ import { useQuasar } from "quasar";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { RefreshCw } from "lucide-vue-next";
 
 export default defineComponent({
   name: "LlmEvaluation",
-  components: { ConfirmDialog },
+  components: { ConfirmDialog, OButton },
   emits: ["cancel:hideform"],
   setup(props, { emit }) {
     const store = useStore();
@@ -371,9 +347,14 @@ export default defineComponent({
 
       if (savedTemplate) {
         // Editing: restore saved template by ID to get full object (needed to display name)
-        const match = availableTemplates.value.find((t: any) => t.id === savedTemplate);
+        const match = availableTemplates.value.find(
+          (t: any) => t.id === savedTemplate,
+        );
         selectedTemplate.value = match || null;
-      } else if (!pipelineObj.isEditNode && availableTemplates.value.length > 0) {
+      } else if (
+        !pipelineObj.isEditNode &&
+        availableTemplates.value.length > 0
+      ) {
         // New node: default to first template
         selectedTemplate.value = availableTemplates.value[0];
       }

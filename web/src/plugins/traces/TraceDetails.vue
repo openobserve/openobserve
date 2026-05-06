@@ -35,22 +35,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:flex tw:items-center tw:space-x-4 tw:w-fit!">
             <!-- Back button -->
-            <q-btn
+            <OButton
               v-if="mode === 'standalone' && showBackButton"
               data-test="trace-details-back-btn"
-              class="tw:px-1! tw:mr-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
-              size="xs"
-              flat
-              dense
+              variant="ghost-muted"
+              size="icon-xs"
+              class="tw:mr-1.5"
               @click="handleBackOrClose"
             >
-              <q-icon class="tw:text-[1.1rem]!" name="arrow_back" />
+              <q-icon name="arrow_back" size="16px" />
               <q-tooltip>{{
                 areFiltersAdded
                   ? t("traces.applyPendingFilters")
                   : t("traces.backToTraces")
               }}</q-tooltip>
-            </q-btn>
+            </OButton>
 
             <div
               class="tw:flex tw:min-w-0 tw:w-full tw:gap-[0.625rem]! tw:items-center"
@@ -159,52 +158,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-fit!"
           >
             <!-- Apply filters button (standalone mode, right side) -->
-            <q-btn
+            <OButton
               v-if="mode === 'standalone' && areFiltersAdded"
               data-test="trace-details-apply-filters-btn-right"
-              class="tw:px-2! tw:mr-[0.625rem]! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:border-1! tw:border-solid! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]! tw:tracking-[0.03rem]"
+              variant="outline"
               size="xs"
-              icon="filter_alt"
-              no-caps
+              class="tw:mr-2.5"
               @click="openFilterPopover"
             >
-              <span class="tw:text-[0.75rem] tw:pl-[0.25rem]"
-                >{{ t("traces.viewFilters") }}
-              </span>
+              <template #icon-left
+                ><q-icon name="filter_alt" size="14px"
+              /></template>
+              <span class="tw:text-[0.75rem]">{{
+                t("traces.viewFilters")
+              }}</span>
               <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
-            </q-btn>
+            </OButton>
 
             <!-- Expand button (embedded mode) -->
-            <q-btn
+            <OButton
               v-if="mode === 'embedded' && showExpandButton"
               data-test="trace-details-expand-btn"
-              class="tw:px-1! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
-              size="xs"
-              icon="open_in_new"
+              variant="ghost-muted"
+              size="icon-xs"
+              class="tw:ml-1.5"
               @click="handleExpandToFullView"
             >
+              <q-icon name="open_in_new" size="14px" />
               <q-tooltip>{{ t("traces.openInTraces") }}</q-tooltip>
-            </q-btn>
+            </OButton>
 
             <!-- Share button (standalone mode) -->
             <share-button
               v-if="mode === 'standalone' && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
-              button-class="tw:px-1! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
+              variant="outline"
+              size="icon-xs"
             />
 
             <!-- Close button -->
-            <q-btn
+            <OButton
               v-if="mode === 'standalone' && showCloseButton"
               data-test="trace-details-close-btn"
-              class="tw:px-1! tw:mx-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
-              size="xs"
-              icon="close"
+              variant="ghost-muted"
+              size="icon-xs"
+              class="tw:mx-1.5"
               @click="handleBackOrClose"
             >
+              <q-icon name="close" size="14px" />
               <q-tooltip>{{ t("common.cancel") }}</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
         </header>
       </div>
@@ -219,11 +223,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem]"
           >
-            <AppTabs
-              :tabs="traceTabs"
-              :active-tab="activeTab"
-              @update:active-tab="activeTab = $event"
-            />
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="activeTab = $event as string"
+            >
+              <OToggleGroupItem value="waterfall" size="sm">
+                <template #icon-left
+                  ><AlignLeft class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                Waterfall
+              </OToggleGroupItem>
+              <OToggleGroupItem value="flame-graph" size="sm">
+                <template #icon-left
+                  ><Flame class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                Flame Graph
+              </OToggleGroupItem>
+              <OToggleGroupItem value="map" size="sm">
+                <template #icon-left
+                  ><Network class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                Trace Graph
+              </OToggleGroupItem>
+              <OToggleGroupItem v-if="hasLLMSpans" value="dag" size="sm">
+                <template #icon-left
+                  ><GitBranch class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                DAG
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                v-if="hasLLMSpans && evalPipelineExists && evalData.length > 0"
+                value="evaluations"
+                size="sm"
+              >
+                <template #icon-left
+                  ><ClipboardCheck class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                Evaluations
+              </OToggleGroupItem>
+            </OToggleGroup>
           </div>
 
           <div class="tw:flex tw:items-center tw:space-x-2">
@@ -261,33 +299,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="counter-total">{{ searchResults }}</span>
                 </div>
                 <div class="navigation-buttons">
-                  <q-btn
+                  <OButton
                     data-test="trace-details-search-prev-btn"
-                    :disable="!searchResults || currentIndex === 0"
-                    flat
-                    dense
-                    icon="keyboard_arrow_up"
-                    size="sm"
-                    class="nav-btn"
+                    :disabled="!searchResults || currentIndex === 0"
+                    variant="ghost-muted"
+                    size="icon"
                     @click="prevMatch"
                   >
+                    <q-icon name="keyboard_arrow_up" size="16px" />
                     <q-tooltip>{{ t("traces.previousMatch") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                   <div class="button-separator"></div>
-                  <q-btn
+                  <OButton
                     data-test="trace-details-search-next-btn"
-                    :disable="
+                    :disabled="
                       !searchResults || currentIndex + 1 === searchResults
                     "
-                    flat
-                    dense
-                    icon="keyboard_arrow_down"
-                    size="sm"
-                    class="nav-btn"
+                    variant="ghost-muted"
+                    size="icon"
                     @click="nextMatch"
                   >
+                    <q-icon name="keyboard_arrow_down" size="16px" />
                     <q-tooltip>{{ t("traces.nextMatch") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
             </div>
@@ -360,42 +394,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </q-select>
-              <q-btn
-                data-test="trace-details-view-logs-btn"
-                v-close-popup="true"
-                class="o2-secondary-button text-bold tw:px-[0.5rem]! tw:py-0! traces-view-logs-btn tw:border! tw:border-l-0! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                :label="
-                  searchObj.meta.redirectedFromLogs
-                    ? t('traces.backToLogs')
-                    : t('traces.viewLogs')
-                "
-                padding="sm sm"
-                size="sm"
-                no-caps
-                outline
-                icon="search"
-                flat
-                dense
-                unelevated
-                :title="t('traces.viewLogs')"
-                @click="redirectToLogs"
-              />
-              <q-btn
+              <span class="traces-view-logs-btn">
+                <OButton
+                  data-test="trace-details-view-logs-btn"
+                  variant="outline"
+                  size="sm"
+                  :title="t('traces.viewLogs')"
+                  @click="redirectToLogs"
+                >
+                  <template #icon-left
+                    ><q-icon name="search" size="14px"
+                  /></template>
+                  {{
+                    searchObj.meta.redirectedFromLogs
+                      ? t("traces.backToLogs")
+                      : t("traces.viewLogs")
+                  }}
+                </OButton>
+              </span>
+              <OButton
                 v-if="hasRumSessionId"
                 data-test="trace-details-view-session-replay-btn"
-                v-close-popup="true"
-                class="traces-view-session-replay-btn text-bold q-ml-md tw-text-[16px]! tw:border! tw:border-solid tw:border-[var(--o2-theme-color)]!"
-                :label="t('rum.playSessionReplay')"
-                padding="sm sm"
+                variant="outline"
                 size="sm"
-                no-caps
-                flat
-                color="primary"
-                outline
-                dense
-                :icon="outlinedPlayCircle"
+                class="tw:ml-2"
                 @click="redirectToSessionReplay"
-              />
+              >
+                <template #icon-left
+                  ><q-icon :name="outlinedPlayCircle" size="14px"
+                /></template>
+                {{ t("rum.playSessionReplay") }}
+              </OButton>
             </div>
           </div>
         </div>
@@ -701,7 +730,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("traces.traceFilters") }}
           </div>
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton variant="ghost-muted" size="icon" v-close-popup>
+            <q-icon name="close" size="16px" />
+          </OButton>
         </q-card-section>
 
         <q-card-section class="tw:flex-1 tw:p-4 tw:flex tw:flex-col">
@@ -720,20 +751,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align="right"
           class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
         >
-          <q-btn
-            flat
-            :label="t('common.cancel')"
-            color="primary"
-            v-close-popup
-            class="tw:normal-case"
-          />
-          <q-btn
-            unelevated
-            color="primary"
-            :label="t('traces.showTraces')"
-            @click="applyAndViewTraces"
-            class="tw:normal-case"
-          />
+          <div class="tw:flex tw:gap-2">
+            <OButton variant="outline" size="sm-action" v-close-popup>
+              {{ t("common.cancel") }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
+              @click="applyAndViewTraces"
+            >
+              {{ t("traces.showTraces") }}
+            </OButton>
+          </div>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -801,7 +830,16 @@ import {
   formatTimestamp,
   useTraceProcessing,
 } from "@/composables/traces/useTraceProcessing";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import {
+  AlignLeft,
+  Flame,
+  Network,
+  GitBranch,
+  ClipboardCheck,
+} from "lucide-vue-next";
 import pipelineService from "@/services/pipelines";
 
 // Import FlameGraphView
@@ -893,7 +931,14 @@ export default defineComponent({
     TraceHeader,
     FlameGraphView,
     TraceEvaluationsView,
-    AppTabs,
+    OToggleGroup,
+    OToggleGroupItem,
+    OButton,
+    AlignLeft,
+    Flame,
+    Network,
+    GitBranch,
+    ClipboardCheck,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
@@ -1212,28 +1257,7 @@ export default defineComponent({
       return Math.min(...spans.map((span: any) => span.start_time));
     });
 
-    // Tabs configuration matching TraceDetailsV2
-    const traceTabs = computed(() => {
-      const tabs = [
-        { label: "Waterfall", value: "waterfall" },
-        { label: "Flame Graph", value: "flame-graph" },
-        // { label: "Spans", value: "spans" },
-        { label: "Trace Graph", value: "map" },
-      ];
-      // Conditionally add DAG tab for LLM traces
-      if (hasLLMSpans.value) {
-        tabs.push({ label: "DAG", value: "dag" });
-      }
-      // Conditionally add Evaluations tab for LLM traces with evaluation data
-      if (
-        hasLLMSpans.value &&
-        evalPipelineExists.value &&
-        evalData.value.length > 0
-      ) {
-        tabs.push({ label: "Evaluations", value: "evaluations" });
-      }
-      return tabs;
-    });
+    // Tabs configuration matching TraceDetailsV2 — inlined into template
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -2765,7 +2789,6 @@ export default defineComponent({
       rootServiceName,
       traceStartTime,
       formatTimestamp,
-      traceTabs,
       // FlameGraph data
       flatSpans,
       traceMetadata,

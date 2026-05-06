@@ -72,10 +72,10 @@ export class TracesPage {
     // Metrics dashboard container
     this.tracesMetricsDashboard = '.traces-metrics-dashboard';
     // Analysis Dashboard Tabs (i18n labels: "Rate", "Latency", "Errors")
-    this.analysisDashboardTabs = '.analysis-dashboard-card .q-tabs';
-    this.rateTab = '.analysis-dashboard-card .q-tab:has-text("Rate")';
-    this.latencyTab = '.analysis-dashboard-card .q-tab:has-text("Duration")';
-    this.errorsTab = '.analysis-dashboard-card .q-tab:has-text("Errors")';
+    this.analysisDashboardTabs = '.analysis-dashboard-card [role="tablist"]';
+    this.rateTab = '.analysis-dashboard-card [role="tab"]:has-text("Rate")';
+    this.latencyTab = '.analysis-dashboard-card [role="tab"]:has-text("Duration")';
+    this.errorsTab = '.analysis-dashboard-card [role="tab"]:has-text("Errors")';
     // Analysis dashboard states
     this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
     this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
@@ -1844,7 +1844,7 @@ export class TracesPage {
    * @returns {Promise<boolean>}
    */
   async isTabActive(tabLabel) {
-    const activeTab = this.page.locator('.analysis-dashboard-card .q-tab--active, .analysis-dashboard-card .q-tab.q-tab--active')
+    const activeTab = this.page.locator('.analysis-dashboard-card [role="tab"][data-state="active"]')
       .filter({ hasText: new RegExp(tabLabel, 'i') });
     return await activeTab.first().isVisible({ timeout: 2000 }).catch(() => false);
   }
@@ -1854,7 +1854,7 @@ export class TracesPage {
    * @returns {Promise<number>}
    */
   async getVisibleTabCount() {
-    return await this.page.locator('.analysis-dashboard-card .q-tab').count();
+    return await this.page.locator('.analysis-dashboard-card [role="tab"]').count();
   }
 
   // --- Percentile Refresh (Latency tab only) ---

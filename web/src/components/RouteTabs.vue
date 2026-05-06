@@ -1,25 +1,24 @@
-<template>
-  <q-tabs
+﻿<template>
+  <OTabs
     :data-test="dataTest"
     v-model="activeTab"
-    indicator-color="transparent"
-    inline-label
-    :vertical="direction === 'vertical'"
+    :orientation="direction === 'vertical' ? 'vertical' : 'horizontal'"
     @update:model-value="handleTabChange"
   >
     <template v-for="tab in (tabs as any)" :key="tab.name">
-      <q-route-tab
+      <ORouteTab
         :data-test="tab.dataTest"
         :name="tab.name"
         :to="tab.to"
         :label="tab.label"
-        :content-class="tab.class"
       />
     </template>
-  </q-tabs>
+  </OTabs>
 </template>
 
 <script setup lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import { nextTick } from "vue";
 import { ref, watch } from "vue";
 

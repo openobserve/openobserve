@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,22 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header -->
       <div class="card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
+        <div
+          class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]"
+        >
           <div class="tw:flex tw:items-center">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              class="hideOnPrintMode"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
               @click="goBack"
               data-test="backfill-jobs-back-btn"
-            />
+            >
+              <template #icon-left>
+                <ChevronLeft class="tw:size-3.5 tw:shrink-0" />
+              </template>
+            </OButton>
             <div class="q-table__title tw:font-[600] q-ml-sm">
               Backfill Jobs
             </div>
@@ -81,30 +79,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pipeline-filter"
               />
             </div>
-            <q-btn
-              label="Clear Filters"
-              outline
-              no-caps
-              padding="xs sm"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
+            <OButton
+              variant="outline"
+              size="sm-action"
               @click="clearFilters"
               data-test="clear-filters-btn"
-            />
-            <q-btn
-              icon="refresh"
-              flat
-              round
-              dense
+            >
+              Clear Filters
+            </OButton>
+            <OButton
+              variant="ghost-muted"
+              size="icon-xs-sq"
               @click="refreshJobs"
-              :loading="loading"
+              :disabled="loading"
               data-test="refresh-btn"
             >
+              <template #icon-left>
+                <RefreshCw class="tw:size-3.5 tw:shrink-0" />
+              </template>
               <q-tooltip>Refresh</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
         </div>
       </div>
@@ -112,174 +106,181 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Jobs Table -->
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-127px)]">
-        <q-table
-          ref="qTableRef"
-          :rows="filteredJobs"
-          :columns="columns"
-          row-key="job_id"
-          :loading="loading"
-          :pagination="pagination"
-          binary-state-sort
-          :style="filteredJobs.length > 0
-            ? 'width: 100%; height: calc(100vh - 130px)'
-            : 'width: 100%'"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          data-test="backfill-jobs-table"
-        >
-          <!-- Empty State -->
-          <template v-slot:no-data>
-            <NoData />
-          </template>
+          <q-table
+            ref="qTableRef"
+            :rows="filteredJobs"
+            :columns="columns"
+            row-key="job_id"
+            :loading="loading"
+            :pagination="pagination"
+            binary-state-sort
+            :style="
+              filteredJobs.length > 0
+                ? 'width: 100%; height: calc(100vh - 130px)'
+                : 'width: 100%'
+            "
+            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            data-test="backfill-jobs-table"
+          >
+            <!-- Empty State -->
+            <template v-slot:no-data>
+              <NoData />
+            </template>
 
-          <!-- Pipeline Name Column -->
-          <template v-slot:body-cell-pipeline_name="props">
-            <q-td :props="props">
-              <div class="tw:font-medium">{{ props.row.pipeline_name || props.row.pipeline_id }}</div>
-            </q-td>
-          </template>
+            <!-- Pipeline Name Column -->
+            <template v-slot:body-cell-pipeline_name="props">
+              <q-td :props="props">
+                <div class="tw:font-medium">
+                  {{ props.row.pipeline_name || props.row.pipeline_id }}
+                </div>
+              </q-td>
+            </template>
 
-          <!-- Time Range Column -->
-          <template v-slot:body-cell-time_range="props">
-            <q-td :props="props">
-              <div class="text-caption">
-                {{ formatTimeRange(props.row.start_time, props.row.end_time) }}
-              </div>
-            </q-td>
-          </template>
+            <!-- Time Range Column -->
+            <template v-slot:body-cell-time_range="props">
+              <q-td :props="props">
+                <div class="text-caption">
+                  {{
+                    formatTimeRange(props.row.start_time, props.row.end_time)
+                  }}
+                </div>
+              </q-td>
+            </template>
 
-          <!-- Progress Column -->
-          <template v-slot:body-cell-progress_percent="props">
-            <q-td :props="props">
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <div class="tw:flex-1 tw:relative">
-                  <q-linear-progress
-                    :value="props.row.progress_percent / 100"
-                    :color="getProgressColor(props.row.deletion_status)"
-                    size="20px"
-                    rounded
-                    data-test="progress-bar"
-                  >
-                    <div class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center">
-                      <div class="text-caption tw:font-semibold tw:text-white tw:drop-shadow-sm">
-                        {{ props.row.progress_percent }}%
+            <!-- Progress Column -->
+            <template v-slot:body-cell-progress_percent="props">
+              <q-td :props="props">
+                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                  <div class="tw:flex-1 tw:relative">
+                    <q-linear-progress
+                      :value="props.row.progress_percent / 100"
+                      :color="getProgressColor(props.row.deletion_status)"
+                      size="20px"
+                      rounded
+                      data-test="progress-bar"
+                    >
+                      <div
+                        class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center"
+                      >
+                        <div
+                          class="text-caption tw:font-semibold tw:text-white tw:drop-shadow-sm"
+                        >
+                          {{ props.row.progress_percent }}%
+                        </div>
                       </div>
-                    </div>
-                  </q-linear-progress>
+                    </q-linear-progress>
+                  </div>
+                  <div
+                    v-if="props.row.chunks_total"
+                    class="text-caption text-grey-6 tw:whitespace-nowrap tw:pr-8"
+                  >
+                    {{ props.row.chunks_completed || 0 }}/{{
+                      props.row.chunks_total
+                    }}
+                    chunks
+                  </div>
                 </div>
-                <div v-if="props.row.chunks_total" class="text-caption text-grey-6 tw:whitespace-nowrap tw:pr-8">
-                  {{ props.row.chunks_completed || 0 }}/{{ props.row.chunks_total }} chunks
+              </q-td>
+            </template>
+
+            <!-- Created At Column -->
+            <template v-slot:body-cell-created_at="props">
+              <q-td :props="props">
+                <div class="text-caption">
+                  {{ formatTimestamp(props.row.created_at) }}
                 </div>
-              </div>
-            </q-td>
-          </template>
+              </q-td>
+            </template>
 
-          <!-- Created At Column -->
-          <template v-slot:body-cell-created_at="props">
-            <q-td :props="props">
-              <div class="text-caption">
-                {{ formatTimestamp(props.row.created_at) }}
-              </div>
-            </q-td>
-          </template>
+            <!-- Last Triggered At Column -->
+            <template v-slot:body-cell-last_triggered_at="props">
+              <q-td :props="props">
+                <div class="text-caption">
+                  {{ formatTimestamp(props.row.last_triggered_at) }}
+                </div>
+              </q-td>
+            </template>
 
-          <!-- Last Triggered At Column -->
-          <template v-slot:body-cell-last_triggered_at="props">
-            <q-td :props="props">
-              <div class="text-caption">
-                {{ formatTimestamp(props.row.last_triggered_at) }}
-              </div>
-            </q-td>
-          </template>
+            <!-- Actions Column -->
+            <template v-slot:body-cell-actions="props">
+              <q-td :props="props">
+                <div class="tw:flex tw:items-center tw:justify-center">
+                  <OButton
+                    v-if="canPauseJob(props.row)"
+                    variant="ghost-destructive"
+                    size="icon-xs-sq"
+                    @click="confirmPauseJob(props.row)"
+                    data-test="pause-job-btn"
+                  >
+                    <template #icon-left>
+                      <Pause class="tw:size-3.5 tw:shrink-0" />
+                    </template>
+                    <q-tooltip>Pause Job</q-tooltip>
+                  </OButton>
+                  <OButton
+                    v-if="canResumeJob(props.row)"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    @click="confirmResumeJob(props.row)"
+                    data-test="resume-job-btn"
+                  >
+                    <template #icon-left>
+                      <Play class="tw:size-3.5 tw:shrink-0" />
+                    </template>
+                    <q-tooltip>Resume Job</q-tooltip>
+                  </OButton>
+                  <OButton
+                    v-if="canEditJob(props.row.status)"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    @click="editJob(props.row)"
+                    data-test="edit-job-btn"
+                  >
+                    <template #icon-left>
+                      <Pencil class="tw:size-3.5 tw:shrink-0" />
+                    </template>
+                    <q-tooltip>Edit Job</q-tooltip>
+                  </OButton>
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    @click="viewJob(props.row)"
+                    data-test="view-job-btn"
+                  >
+                    <template #icon-left>
+                      <Eye class="tw:size-3.5 tw:shrink-0" />
+                    </template>
+                    <q-tooltip>View Details</q-tooltip>
+                  </OButton>
+                  <OButton
+                    v-if="canDeleteJob(props.row.status)"
+                    variant="ghost-destructive"
+                    size="icon-xs-sq"
+                    @click="confirmDeleteJob(props.row)"
+                    data-test="delete-job-btn"
+                  >
+                    <template #icon-left>
+                      <Trash2 class="tw:size-3.5 tw:shrink-0" />
+                    </template>
+                    <q-tooltip>Delete Job</q-tooltip>
+                  </OButton>
+                  <OButton
+                    v-if="props.row.error"
+                    variant="ghost-destructive"
+                    size="icon-xs-sq"
+                    @click="showErrorDialog(props.row)"
+                    data-test="error-indicator-btn"
+                  >
+                    <template #icon-left>
+                      <AlertCircle class="tw:size-3.5 tw:shrink-0" />
+                    </template>
+                    <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
+                  </OButton>
+                </div>
+              </q-td>
+            </template>
 
-          <!-- Actions Column -->
-          <template v-slot:body-cell-actions="props">
-            <q-td :props="props">
-              <div class="tw:flex tw:items-center tw:justify-center">
-                <q-btn
-                  v-if="canPauseJob(props.row)"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :icon="outlinedPause"
-                  color="negative"
-                  round
-                  flat
-                  @click="confirmPauseJob(props.row)"
-                  data-test="pause-job-btn"
-                >
-                  <q-tooltip>Pause Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="canResumeJob(props.row)"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :icon="outlinedPlayArrow"
-                  color="positive"
-                  round
-                  flat
-                  @click="confirmResumeJob(props.row)"
-                  data-test="resume-job-btn"
-                >
-                  <q-tooltip>Resume Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="canEditJob(props.row.status)"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  icon="edit"
-                  round
-                  flat
-                  @click="editJob(props.row)"
-                  data-test="edit-job-btn"
-                >
-                  <q-tooltip>Edit Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :icon="outlinedVisibility"
-                  round
-                  flat
-                  @click="viewJob(props.row)"
-                  data-test="view-job-btn"
-                >
-                  <q-tooltip>View Details</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="canDeleteJob(props.row.status)"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :icon="outlinedDelete"
-                  round
-                  flat
-                  @click="confirmDeleteJob(props.row)"
-                  data-test="delete-job-btn"
-                >
-                  <q-tooltip>Delete Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="props.row.error"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  icon="error"
-                  round
-                  flat
-                  color="negative"
-                  @click="showErrorDialog(props.row)"
-                  data-test="error-indicator-btn"
-                >
-                  <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
-                </q-btn>
-              </div>
-            </q-td>
-          </template>
-
-          <template v-slot:header="props">
+            <template v-slot:header="props">
               <q-tr :props="props">
                 <!-- Rendering the rest of the columns -->
                 <q-th
@@ -292,19 +293,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ col.label }}
                 </q-th>
               </q-tr>
-          </template>
+            </template>
 
-          <!-- Bottom Pagination -->
-          <template #bottom="scope">
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="filteredJobs.length"
-              :perPageOptions="perPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
-          </template>
-        </q-table>
+            <!-- Bottom Pagination -->
+            <template #bottom="scope">
+              <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="filteredJobs.length"
+                :perPageOptions="perPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+            </template>
+          </q-table>
         </div>
       </div>
     </div>
@@ -333,7 +334,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Backfill Job Error
           </div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton variant="ghost" size="icon" v-close-popup>
+            <q-icon name="close" size="14px" />
+          </OButton>
         </q-card-section>
 
         <q-separator />
@@ -341,12 +344,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section v-if="errorDialogData">
           <div class="q-mb-md">
             <div class="text-caption text-grey-6">Job ID</div>
-            <div class="text-body2 text-weight-medium">{{ errorDialogData.job_id }}</div>
+            <div class="text-body2 text-weight-medium">
+              {{ errorDialogData.job_id }}
+            </div>
           </div>
 
           <div class="q-mb-md">
             <div class="text-caption text-grey-6">Pipeline</div>
-            <div class="text-body2">{{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}</div>
+            <div class="text-body2">
+              {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
+            </div>
           </div>
 
           <div>
@@ -358,7 +365,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="outline" size="sm-action" v-close-popup>
+            Close
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -380,6 +389,8 @@ import { useRouter } from "vue-router";
 import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { ChevronLeft, RefreshCw, Pause, Play, Pencil, Eye, Trash2, AlertCircle } from "lucide-vue-next";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 import NoData from "../shared/grid/NoData.vue";
@@ -436,7 +447,7 @@ const perPageOptions = [
   { label: "100", value: 100 },
 ];
 
-const changePagination = (key:any) => {
+const changePagination = (key: any) => {
   selectedPerPage.value = key.value;
   pagination.value.rowsPerPage = key.value;
   qTableRef.value?.setPagination(pagination.value);
@@ -483,8 +494,8 @@ const columns = [
     label: "Actions",
     align: "center" as const,
     field: "actions",
-    classes:'actions-column',
-    style: 'width: 150px;',
+    classes: "actions-column",
+    style: "width: 150px;",
   },
 ];
 
@@ -521,10 +532,13 @@ const loadJobs = async () => {
 const loadPipelineOptions = () => {
   // Extract unique pipelines from jobs
   const pipelineMap = new Map(
-    jobs.value.map(job => [job.pipeline_id, {
-      label: job.pipeline_name || job.pipeline_id,
-      value: job.pipeline_id,
-    }])
+    jobs.value.map((job) => [
+      job.pipeline_id,
+      {
+        label: job.pipeline_name || job.pipeline_id,
+        value: job.pipeline_id,
+      },
+    ]),
   );
   const uniquePipelines = Array.from(pipelineMap.values());
 
@@ -536,7 +550,7 @@ const filterPipelines = (val: string, update: any) => {
   update(() => {
     const needle = val.toLowerCase();
     pipelineOptions.value = allPipelineOptions.value.filter(
-      (v) => v.label.toLowerCase().indexOf(needle) > -1
+      (v) => v.label.toLowerCase().indexOf(needle) > -1,
     );
   });
 };
@@ -545,7 +559,7 @@ const filterStatuses = (val: string, update: any) => {
   update(() => {
     const needle = val.toLowerCase();
     statusOptions.value = allStatusOptions.filter(
-      (v) => v.toLowerCase().indexOf(needle) > -1
+      (v) => v.toLowerCase().indexOf(needle) > -1,
     );
   });
 };
@@ -566,7 +580,9 @@ const filteredJobs = computed(() => {
   }
 
   if (filters.value.pipelineId) {
-    filtered = filtered.filter((job) => job.pipeline_id === filters.value.pipelineId);
+    filtered = filtered.filter(
+      (job) => job.pipeline_id === filters.value.pipelineId,
+    );
   }
 
   return filtered;
@@ -617,7 +633,12 @@ const canEditJob = (status: string) => {
 };
 
 const canDeleteJob = (status: string) => {
-  return status === "completed" || status === "failed" || status === "canceled" || status === "paused";
+  return (
+    status === "completed" ||
+    status === "failed" ||
+    status === "canceled" ||
+    status === "paused"
+  );
 };
 
 const resetConfirmDialog = () => {
@@ -756,10 +777,19 @@ const getProgressColor = (deletionStatus?: any) => {
 };
 
 const formatTimeRange = (startTime: number, endTime: number) => {
-  const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTimezone =
+    store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   // Convert from microseconds to milliseconds
-  const start = timestampToTimezoneDate(startTime / 1000, userTimezone, "MMM dd, yyyy");
-  const end = timestampToTimezoneDate(endTime / 1000, userTimezone, "MMM dd, yyyy");
+  const start = timestampToTimezoneDate(
+    startTime / 1000,
+    userTimezone,
+    "MMM dd, yyyy",
+  );
+  const end = timestampToTimezoneDate(
+    endTime / 1000,
+    userTimezone,
+    "MMM dd, yyyy",
+  );
   return `${start} - ${end}`;
 };
 
@@ -789,7 +819,7 @@ const formatTimestamp = (timestamp?: number) => {
   border-radius: 6px;
   background: rgba(239, 68, 68, 0.08);
   border-left: 3px solid #ef4444;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;

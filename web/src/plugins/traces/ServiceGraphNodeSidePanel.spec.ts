@@ -136,8 +136,58 @@ function mountPanel(
         TelemetryCorrelationDashboard: {
           template: '<div data-test="stub-telemetry" />',
         },
-        // Render dropdown content inline so data-test items are always queryable
-        QBtnDropdown: { template: "<div><slot /><slot name='default' /></div>" },
+        // Render ODropdown content inline so data-test items are always queryable
+        ODropdown: {
+          name: "ODropdown",
+          template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+          emits: ["update:open"],
+          props: ["open", "side", "align", "sideOffset"],
+        },
+        ODropdownItem: {
+          name: "ODropdownItem",
+          template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
+          emits: ["select"],
+        },
+        // OTabs stub — Reka UI-based, needs stub to avoid context errors
+        OTabs: {
+          name: "OTabs",
+          template: '<div class="o-tabs-stub" v-bind="$attrs"><slot /></div>',
+          props: ["modelValue", "dense", "align"],
+          emits: ["update:modelValue"],
+        },
+        OTab: {
+          name: "OTab",
+          template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+          props: ["name", "label", "style"],
+        },
+        // OTabPanels: provide reactive context via setup()
+        OTabPanels: {
+          name: "OTabPanels",
+          template: '<div class="o-tab-panels-stub"><slot /></div>',
+          props: ["modelValue", "animated", "keepAlive"],
+          emits: ["update:modelValue"],
+          setup(props) {
+            const { computed, provide } = require("vue");
+            const ctx = computed(() => ({ modelValue: props.modelValue }));
+            provide("tabPanelsCtx", ctx);
+            return {};
+          },
+        },
+        OTabPanel: {
+          name: "OTabPanel",
+          // v-bind="$attrs" forwards data-test; renders only when active
+          template: '<div v-if="isActive" v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
+          props: ["name", "padding", "layout", "stretch"],
+          setup(props) {
+            const { inject, computed } = require("vue");
+            const ctx = inject("tabPanelsCtx", { value: { modelValue: null } });
+            const isActive = computed(() => {
+              const mv = ctx?.value?.modelValue ?? ctx?.modelValue ?? null;
+              return mv === props.name;
+            });
+            return { isActive };
+          },
+        },
       },
     },
     props: {

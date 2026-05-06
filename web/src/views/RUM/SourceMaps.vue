@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -93,26 +93,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-select>
 
         <!-- Apply Button -->
-          <q-btn
-            class="o2-secondary-button tw:h-[36px]"
-            flat
-            no-caps
-            label="Apply Filters"
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="applyFilters"
             :loading="isLoading"
-          />
+          >Apply Filters</OButton>
 
       </div>
 
         <!-- Upload Button -->
 
-          <q-btn
-            class="o2-secondary-button tw:h-[36px]"
-            flat
-            no-caps
-            label="Upload Source Maps"
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="navigateToUpload"
-          />
+          >Upload Source Maps</OButton>
       </div>
     </div>
 
@@ -154,30 +150,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td v-for="col in props.cols" :key="col.name" :props="props">
                 <template v-if="col.name === 'expand'">
                   <div class="cursor-pointer" @click="toggleExpand(props.row)">
-                    <q-btn
-                      dense
-                      flat
-                      size="xs"
-                      :icon="
-                        expandedRow !== getRowKey(props.row)
-                          ? 'expand_more'
-                          : 'expand_less'
-                      "
-                    />
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      :icon="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
+                    >
+                      <q-icon
+                        :name="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
+                        size="14px"
+                      />
+                    </OButton>
                   </div>
                 </template>
                 <template v-else-if="col.name === 'actions'">
-                  <q-btn
+                  <OButton
                     :data-test="`source-maps-${props.row.service}-delete`"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    :icon="outlinedDelete"
+                    variant="ghost-destructive"
+                    size="icon-sm"
                     title="Delete"
                     @click="confirmDeleteSourceMap(props.row)"
-                  />
+                  >
+                    <q-icon :name="outlinedDelete" size="16px" />
+                  </OButton>
                 </template>
                 <template v-else>
                   <div class="cursor-pointer" @click="toggleExpand(props.row)">
@@ -242,25 +236,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn
-            v-close-popup
-            unelevated
-            no-caps
-            class="q-mr-sm o2-secondary-button"
-            data-test="cancel-button"
-          >
-            Cancel
-          </q-btn>
-          <q-btn
-            v-close-popup
-            unelevated
-            no-caps
-            class="o2-primary-button"
-            @click="deleteSourceMap"
-            data-test="confirm-button"
-          >
-            OK
-          </q-btn>
+          <div class="tw:flex tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="cancel-button"
+              @click="deleteDialog.show = false"
+            >
+              Cancel
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
+              @click="deleteSourceMap(); deleteDialog.show = false"
+              data-test="confirm-button"
+            >
+              OK
+            </OButton>
+          </div>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -268,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -275,6 +269,7 @@ import { useQuasar } from "quasar";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import sourcemapsService from "@/services/sourcemaps";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const store = useStore();
 const router = useRouter();

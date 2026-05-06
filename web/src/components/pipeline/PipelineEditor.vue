@@ -37,40 +37,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex justify-end items-center">
+        <div class="tw:flex tw:items-center tw:gap-2">
           <!-- this is normal secondary button but only icon is there without label -->
-            <q-btn
-              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw:h-[36px] o2-secondary-button tw:min-w-0"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              no-caps
-              flat
-              icon="code"
-              data-test="pipeline-json-edit-btn"
-              @click="openJsonEditor"
-            >
-                  <q-tooltip>{{ t('pipeline.editPipelineJson') }}</q-tooltip>
-                </q-btn>
-          <q-btn
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            class="hideOnPrintMode"
+            data-test="pipeline-json-edit-btn"
+            @click="openJsonEditor"
+          >
+            <template #icon-left><Code2 class="tw:size-4 tw:shrink-0" /></template>
+            <q-tooltip>{{ t('pipeline.editPipelineJson') }}</q-tooltip>
+          </OButton>
+          <OButton
             data-test="add-pipeline-cancel-btn"
-            :label="t('pipeline.cancel')"
-            flat
-            class="q-ml-md o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
+            variant="outline"
+            size="sm-action"
             @click="openCancelDialog"
-          />
-
-          <q-btn
+          >{{ t('pipeline.cancel') }}</OButton>
+          <OButton
             data-test="add-pipeline-save-btn"
-            :label="t('common.save')"
-            class="q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            no-caps
-            flat
+            variant="primary"
+            size="sm-action"
             :loading="isPipelineSaving"
-            :disable="isPipelineSaving"
+            :disabled="isPipelineSaving"
             @click="savePipeline"
-          />
+          >{{ t('common.save') }}</OButton>
         </div>
       </div>
 
@@ -208,6 +200,8 @@ import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Code2, Maximize2, Minimize2 } from "lucide-vue-next";
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -27,28 +27,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw:px-4 tw:flex tw:justify-start">
-        <q-tabs v-model="activeTab" inline-label dense @update:model-value="onTabChange">
-          <q-tab
+        <OTabs v-model="activeTab" dense @update:model-value="onTabChange">
+          <OTab
             name="services"
             :label="t('settings.correlation.discoveredServicesTab')"
-            no-caps
           />
-          <q-tab
+          <OTab
             name="discovery"
             :label="t('settings.correlation.serviceDiscoveryTab')"
-            no-caps
           />
-          <q-tab
+          <OTab
             name="alert-correlation"
             :label="t('settings.correlation.alertCorrelationTab')"
-            no-caps
           />
-          <q-tab
+          <OTab
             name="field-aliases"
             :label="t('settings.correlation.fieldAliasesTab')"
-            no-caps
           />
-        </q-tabs>
+        </OTabs>
       </div>
     </div>
 
@@ -86,6 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -95,6 +93,7 @@ import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationD
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Server, ScanSearch, Bell, Link2 } from "lucide-vue-next";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import serviceStreamsService from "@/services/service_streams";
 
@@ -106,6 +105,8 @@ export default defineComponent({
     ServiceIdentitySetup,
     AppTabs,
     SemanticFieldGroupsConfig,
+    OTabs,
+    OTab,
   },
   setup() {
     const store = useStore();
@@ -178,18 +179,22 @@ export default defineComponent({
       {
         label: t("settings.correlation.discoveredServicesTab"),
         value: "services",
+        icon: Server,
       },
       {
         label: t("settings.correlation.serviceDiscoveryTab"),
         value: "discovery",
+        icon: ScanSearch,
       },
       {
         label: t("settings.correlation.alertCorrelationTab"),
         value: "alert-correlation",
+        icon: Bell,
       },
       {
         label: t("settings.correlation.fieldAliasesTab"),
         value: "field-aliases",
+        icon: Link2,
       },
     ]);
 

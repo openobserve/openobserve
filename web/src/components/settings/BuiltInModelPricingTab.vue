@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="filters-bar q-pa-md">
       <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
         <!-- Text search -->
-         <div class="tw:flex tw:gap-3">
-        <q-input
+        <div class="tw:flex tw:gap-3">
+          <q-input
             v-model="searchQuery"
             :placeholder="t('modelPricing.searchByModelName')"
             borderless
@@ -35,19 +35,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
           </q-input>
-
-         </div>
+        </div>
 
         <!-- Refresh -->
         <div>
-          <q-btn
-            :label="t('modelPricing.refresh')"
-            flat
-            class="o2-secondary-button tw:w-[120px] tw:h-[36px]"
-            @click="refreshModels"
+          <OButton
+            variant="outline"
+            size="sm-action"
             :loading="loading"
+            @click="refreshModels"
             data-test="built-in-model-pricing-refresh-btn"
-          />
+          >
+            {{ t("modelPricing.refresh") }}
+          </OButton>
         </div>
       </div>
     </div>
@@ -55,110 +55,136 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div v-if="loading && models.length === 0" class="text-center q-pa-xl">
       <q-spinner-hourglass color="primary" size="50px" />
-      <div class="q-mt-md">{{ t('modelPricing.loadingModels') }}</div>
+      <div class="q-mt-md">{{ t("modelPricing.loadingModels") }}</div>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
       <q-icon name="error" size="50px" color="negative" />
       <div class="q-mt-md text-negative">{{ error }}</div>
-      <q-btn flat color="primary" :label="t('modelPricing.tryAgain')" @click="fetchModels()" class="q-mt-md" />
+      <span class="tw:mt-2">
+        <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
+          {{ t("modelPricing.tryAgain") }}
+        </OButton>
+      </span>
     </div>
 
     <div v-else class="q-mb-md q-px-md">
-        <q-table
-          :rows="filteredModels"
-          :columns="columns"
-          row-key="name"
-          flat
-          dense
-          :pagination="{ rowsPerPage: 0 }"
-          hide-pagination
-          class="o2-quasar-table tw:h-[calc(100vh-120px)] o2-row-md o2-quasar-table-header-sticky"
-          data-test="built-in-model-pricing-table"
-        >
-          <!-- Checkbox -->
-          <template #body-cell-select="props">
-            <q-td :props="props">
-              <q-checkbox
-                v-model="props.row.selected"
-                dense
-                size="xs"
-                :data-test="`built-in-model-pricing-checkbox-${props.rowIndex}`"
-              />
-            </q-td>
-          </template>
+      <q-table
+        :rows="filteredModels"
+        :columns="columns"
+        row-key="name"
+        flat
+        dense
+        :pagination="{ rowsPerPage: 0 }"
+        hide-pagination
+        class="o2-quasar-table tw:h-[calc(100vh-120px)] o2-row-md o2-quasar-table-header-sticky"
+        data-test="built-in-model-pricing-table"
+      >
+        <!-- Checkbox -->
+        <template #body-cell-select="props">
+          <q-td :props="props">
+            <q-checkbox
+              v-model="props.row.selected"
+              dense
+              size="xs"
+              :data-test="`built-in-model-pricing-checkbox-${props.rowIndex}`"
+            />
+          </q-td>
+        </template>
 
-          <!-- Model name + description -->
-          <template #body-cell-name="props">
-            <q-td :props="props">
-              <div class="tw:font-semibold">{{ props.row.name }}</div>
-              <div v-if="props.row.description" class="text-caption text-grey-7" style="max-width: 260px; white-space: normal; line-height: 1.3;">
-                {{ props.row.description }}
-              </div>
-            </q-td>
-          </template>
+        <!-- Model name + description -->
+        <template #body-cell-name="props">
+          <q-td :props="props">
+            <div class="tw:font-semibold">{{ props.row.name }}</div>
+            <div
+              v-if="props.row.description"
+              class="text-caption text-grey-7"
+              style="max-width: 260px; white-space: normal; line-height: 1.3"
+            >
+              {{ props.row.description }}
+            </div>
+          </q-td>
+        </template>
 
+        <!-- Pattern -->
+        <template #body-cell-pattern="props">
+          <q-td :props="props">
+            <code
+              class="text-caption"
+              style="word-break: break-all; white-space: normal"
+            >
+              {{ props.row.match_pattern || "—" }}
+            </code>
+          </q-td>
+        </template>
 
-          <!-- Pattern -->
-          <template #body-cell-pattern="props">
-            <q-td :props="props">
-              <code class="text-caption" style="word-break: break-all; white-space: normal;">
-                {{ props.row.match_pattern || '—' }}
-              </code>
-            </q-td>
-          </template>
-
-          <!-- Tiered pricing — each tier on its own row -->
-          <template #body-cell-pricing="props">
-            <q-td :props="props">
-              <div v-if="!props.row.tiers?.length">—</div>
-              <div v-else>
-                <div
-                  v-for="(tier, idx) in [...props.row.tiers].sort((a: any, b: any) => (a.condition ? 1 : 0) - (b.condition ? 1 : 0))"
-                  :key="idx"
-                  class="tier-row"
-                  :class="{ 'tier-conditional': !!tier.condition }"
-                >
-                  <div class="tier-name text-caption">
-                    <span v-if="tier.condition">
-                      {{ tier.name }}
-                      <span class="text-grey-6" style="font-weight: 400;">
-                        ({{ tier.condition.usage_key }} {{ tier.condition.operator }} {{ tier.condition.value.toLocaleString() }})
-                      </span>
+        <!-- Tiered pricing — each tier on its own row -->
+        <template #body-cell-pricing="props">
+          <q-td :props="props">
+            <div v-if="!props.row.tiers?.length">—</div>
+            <div v-else>
+              <div
+                v-for="(tier, idx) in [...props.row.tiers].sort(
+                  (a: any, b: any) =>
+                    (a.condition ? 1 : 0) - (b.condition ? 1 : 0),
+                )"
+                :key="idx"
+                class="tier-row"
+                :class="{ 'tier-conditional': !!tier.condition }"
+              >
+                <div class="tier-name text-caption">
+                  <span v-if="tier.condition">
+                    {{ tier.name }}
+                    <span class="text-grey-6" style="font-weight: 400">
+                      ({{ tier.condition.usage_key }}
+                      {{ tier.condition.operator }}
+                      {{ tier.condition.value.toLocaleString() }})
                     </span>
-                    <span v-else>{{ tier.name }}</span>
-                  </div>
-                  <div class="tier-prices">
-                    <span
-                      v-for="[key, price] in sortedPriceEntries(tier.prices)"
-                      :key="key"
-                      class="price-chip"
-                    >
-                      {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
-                    </span>
-                  </div>
+                  </span>
+                  <span v-else>{{ tier.name }}</span>
+                </div>
+                <div class="tier-prices">
+                  <span
+                    v-for="[key, price] in sortedPriceEntries(tier.prices)"
+                    :key="key"
+                    class="price-chip"
+                  >
+                    {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
+                  </span>
                 </div>
               </div>
-            </q-td>
-          </template>
-
-          <template #no-data>
-            <div class="full-width column flex-center q-pa-xl">
-              <q-icon name="search_off" size="50px" color="grey-5" />
-              <div class="q-mt-md text-grey-6">{{ t('modelPricing.noModelsFound') }}</div>
             </div>
-          </template>
+          </q-td>
+        </template>
 
-          <template #bottom>
-            <div class="tw:flex tw:items-center tw:gap-4 tw:py-2 tw:px-1 text-caption text-grey-7">
-              <span>{{ filteredModels.length }} model{{ filteredModels.length !== 1 ? 's' : '' }}</span>
-              <span v-if="selectedCount > 0" class="text-primary tw:font-semibold">
-                {{ selectedCount }} selected
-              </span>
+        <template #no-data>
+          <div class="full-width column flex-center q-pa-xl">
+            <q-icon name="search_off" size="50px" color="grey-5" />
+            <div class="q-mt-md text-grey-6">
+              {{ t("modelPricing.noModelsFound") }}
             </div>
-          </template>
-        </q-table>
+          </div>
+        </template>
+
+        <template #bottom>
+          <div
+            class="tw:flex tw:items-center tw:gap-4 tw:py-2 tw:px-1 text-caption text-grey-7"
+          >
+            <span
+              >{{ filteredModels.length }} model{{
+                filteredModels.length !== 1 ? "s" : ""
+              }}</span
+            >
+            <span
+              v-if="selectedCount > 0"
+              class="text-primary tw:font-semibold"
+            >
+              {{ selectedCount }} selected
+            </span>
+          </div>
+        </template>
+      </q-table>
     </div>
   </div>
 </template>
@@ -170,6 +196,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface ModelTier {
   name: string;
@@ -187,9 +214,9 @@ interface BuiltInModel {
   selected?: boolean;
 }
 
-
 export default defineComponent({
   name: "BuiltInModelPricingTab",
+  components: { OButton },
   emits: ["import-models"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -201,26 +228,51 @@ export default defineComponent({
     const error = ref("");
     const searchQuery = ref("");
     const columns = computed(() => [
-      { name: "select",   label: "",                              field: "selected",      align: "center" as const, style: "width: 40px" },
-      { name: "name",     label: t("modelPricing.colModel"),      field: "name",          align: "left"   as const, sortable: true },
-      { name: "pattern",  label: t("modelPricing.colPattern"),    field: "match_pattern", align: "left"   as const, style: "max-width: 200px" },
-      { name: "pricing",  label: t("modelPricing.colPricingSimple"), field: "tiers",      align: "left"   as const },
+      {
+        name: "select",
+        label: "",
+        field: "selected",
+        align: "center" as const,
+        style: "width: 40px",
+      },
+      {
+        name: "name",
+        label: t("modelPricing.colModel"),
+        field: "name",
+        align: "left" as const,
+        sortable: true,
+      },
+      {
+        name: "pattern",
+        label: t("modelPricing.colPattern"),
+        field: "match_pattern",
+        align: "left" as const,
+        style: "max-width: 200px",
+      },
+      {
+        name: "pricing",
+        label: t("modelPricing.colPricingSimple"),
+        field: "tiers",
+        align: "left" as const,
+      },
     ]);
 
     const filteredModels = computed(() => {
       let result = models.value;
       if (searchQuery.value) {
         const sq = searchQuery.value.toLowerCase();
-        result = result.filter(m =>
-          m.name.toLowerCase().includes(sq) ||
-          (m.description || "").toLowerCase().includes(sq)
+        result = result.filter(
+          (m) =>
+            m.name.toLowerCase().includes(sq) ||
+            (m.description || "").toLowerCase().includes(sq),
         );
       }
       return result;
     });
 
-    const selectedCount = computed(() => models.value.filter(m => m.selected).length);
-
+    const selectedCount = computed(
+      () => models.value.filter((m) => m.selected).length,
+    );
 
     // Deterministic key order: input before output, then alphabetical
     const PRICE_KEY_ORDER: Record<string, number> = {
@@ -228,7 +280,9 @@ export default defineComponent({
       output_tokens: 1,
     };
 
-    function sortedPriceEntries(prices: Record<string, number>): [string, number][] {
+    function sortedPriceEntries(
+      prices: Record<string, number>,
+    ): [string, number][] {
       return Object.entries(prices).sort(([a], [b]) => {
         const oa = PRICE_KEY_ORDER[a] ?? 99;
         const ob = PRICE_KEY_ORDER[b] ?? 99;
@@ -238,13 +292,13 @@ export default defineComponent({
     }
 
     function fmtKey(key: string): string {
-      return key.replace(/_tokens$/, '').replace(/_/g, '-');
+      return key.replace(/_tokens$/, "").replace(/_/g, "-");
     }
 
     function fmtPrice(perToken: number): string {
       const perM = perToken * 1_000_000;
-      if (perM >= 1)    return perM.toFixed(2);
-      if (perM >= 0.1)  return perM.toFixed(3);
+      if (perM >= 1) return perM.toFixed(2);
+      if (perM >= 0.1) return perM.toFixed(3);
       if (perM >= 0.01) return perM.toFixed(4);
       return perM.toPrecision(2);
     }
@@ -259,7 +313,10 @@ export default defineComponent({
       if (!clearCache) {
         const cached = ModelPricingCache.get<BuiltInModel[]>(orgId);
         if (cached) {
-          models.value = cached.map((m: BuiltInModel) => ({ ...m, selected: false }));
+          models.value = cached.map((m: BuiltInModel) => ({
+            ...m,
+            selected: false,
+          }));
           loading.value = false;
           q.notify({
             message: `${models.value.length} models loaded`,
@@ -275,7 +332,10 @@ export default defineComponent({
         const res = await modelPricingService.getBuiltIn(orgId);
         const fetched: BuiltInModel[] = res.data.models || [];
         ModelPricingCache.set(orgId, fetched);
-        models.value = fetched.map((m: BuiltInModel) => ({ ...m, selected: false }));
+        models.value = fetched.map((m: BuiltInModel) => ({
+          ...m,
+          selected: false,
+        }));
         q.notify({
           message: `${models.value.length} models loaded`,
           color: "positive",
@@ -283,8 +343,14 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (e: any) {
-        error.value = e.response?.data?.message || e.message || "Failed to load models";
-        q.notify({ type: "negative", message: error.value, position: "bottom", timeout: 4000 });
+        error.value =
+          e.response?.data?.message || e.message || "Failed to load models";
+        q.notify({
+          type: "negative",
+          message: error.value,
+          position: "bottom",
+          timeout: 4000,
+        });
       } finally {
         loading.value = false;
       }
@@ -293,28 +359,46 @@ export default defineComponent({
     const refreshModels = () => fetchModels(true);
 
     const importSelectedModels = () => {
-      const selected = models.value.filter(m => m.selected);
+      const selected = models.value.filter((m) => m.selected);
       if (selected.length === 0) {
-        q.notify({ message: "No models selected. Please select at least one model.", color: "warning", position: "bottom", timeout: 2000 });
+        q.notify({
+          message: "No models selected. Please select at least one model.",
+          color: "warning",
+          position: "bottom",
+          timeout: 2000,
+        });
         return;
       }
-      emit("import-models", selected.map(m => ({
-        name: m.name,
-        match_pattern: m.match_pattern,
-        tiers: m.tiers,
-        description: m.description || "",
-        sort_order: m.sort_order ?? 0,
-        enabled: true,
-      })));
+      emit(
+        "import-models",
+        selected.map((m) => ({
+          name: m.name,
+          match_pattern: m.match_pattern,
+          tiers: m.tiers,
+          description: m.description || "",
+          sort_order: m.sort_order ?? 0,
+          enabled: true,
+        })),
+      );
     };
 
     onMounted(() => fetchModels());
 
     return {
       t,
-      models, loading, error, searchQuery,
-      columns, filteredModels, selectedCount,
-      sortedPriceEntries, fmtKey, fmtPrice, fetchModels, refreshModels, importSelectedModels,
+      models,
+      loading,
+      error,
+      searchQuery,
+      columns,
+      filteredModels,
+      selectedCount,
+      sortedPriceEntries,
+      fmtKey,
+      fmtPrice,
+      fetchModels,
+      refreshModels,
+      importSelectedModels,
     };
   },
 });
@@ -335,7 +419,6 @@ export default defineComponent({
   overflow-y: auto;
   min-height: 0;
 }
-
 
 /* Tier pricing rows */
 .tier-row {
