@@ -92,15 +92,6 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-warning-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
-  // Outline warning: transparent bg + warning border + warning text — for pending-action indicators (e.g. refresh when variables changed)
-  "outline-warning": [
-    "tw:bg-transparent tw:text-button-outline-warning-text tw:border tw:border-button-outline-warning-border",
-    "tw:enabled:hover:bg-button-outline-warning-hover-bg",
-    "tw:enabled:active:bg-button-outline-warning-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-outline-warning-focus-ring",
-    "tw:disabled:opacity-60",
-  ].join(" "),
-  // Solid warning: filled amber background + dark text — for buttons requiring user attention
   warning: [
     "tw:bg-button-warning tw:text-button-warning-foreground tw:border tw:border-button-warning-border",
     "tw:enabled:hover:bg-button-warning-hover",

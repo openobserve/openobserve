@@ -72,7 +72,7 @@
         </OButton>
         <OButton
           v-else
-          :variant="isVariablesChanged ? 'outline' : 'outline-warning'"
+          :variant="isVariablesChanged ? 'outline' : 'warning'"
           size="icon-xs"
           @click="refreshData"
           :disabled="disable"
