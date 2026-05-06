@@ -264,6 +264,7 @@ report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 aes-siv = "0.7.0"
+openssl = { version = "0.10", features = ["vendored"] }
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
 axum-extra = { version = "0.12", features = [
