@@ -400,7 +400,7 @@ async function switchOrgViaDropdown(page, targetOrgId) {
   const escapedName = target.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const menuItem = page
     .locator('[data-test="organization-menu-item-label-item-label"]')
-    .filter({ hasText: new RegExp(`^\\s*${escapedName}\\s*$`) })
+    .filter({ hasText: new RegExp(`^\\s*${escapedName}\\s*\\|`) })
     .first();
   await menuItem.waitFor({ state: 'visible', timeout: 5000 });
   await menuItem.click();

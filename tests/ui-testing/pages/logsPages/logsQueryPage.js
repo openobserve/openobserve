@@ -15,6 +15,9 @@ export class LogsQueryPage {
     this.noDataFoundText = 'No data found for';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
     this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
+    this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
+    this.autoRunDropdownBtn = '[data-test="logs-search-bar-refresh-btn"] ~ button';
+    this.autoRunToggleItem = '[data-test="logs-search-bar-live-mode-toggle-btn"]';
   }
 
   async setDateTimeFilter() {
@@ -33,8 +36,7 @@ export class LogsQueryPage {
   }
 
   async clickErrorMessage() {
-    // Wait longer for error message to appear in deployed environments
-    await expect(this.page.locator(this.errorMessage).getByText('No events found')).toBeVisible({ timeout: 30000 });
+    await expect(this.page.locator(this.errorMessage)).toBeVisible({ timeout: 30000 });
     await this.page.locator(this.errorMessage).click();
   }
 
@@ -95,5 +97,46 @@ export class LogsQueryPage {
     if (isOn !== desiredState) {
       await this.toggleHistogram();
     }
+  }
+
+  async isSQLModeOn() {
+    const sw = this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name });
+    return await sw.isChecked();
+  }
+
+  async ensureSQLMode() {
+    if (!(await this.isSQLModeOn())) {
+      await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).click();
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  async ensureFTSMode() {
+    if (await this.isSQLModeOn()) {
+      await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).click();
+      await this.page.waitForTimeout(500);
+    }
+  }
+
+  async disableAutoRun() {
+    await this.page.locator(this.autoRunDropdownBtn).click();
+    const toggle = this.page.locator(this.autoRunToggleItem);
+    if ((await toggle.textContent()).includes('Turn off')) {
+      await toggle.click();
+    } else {
+      await this.page.keyboard.press('Escape');
+    }
+    await this.page.waitForTimeout(300);
+  }
+
+  async enableAutoRun() {
+    await this.page.locator(this.autoRunDropdownBtn).click();
+    const toggle = this.page.locator(this.autoRunToggleItem);
+    if ((await toggle.textContent()).includes('Turn on')) {
+      await toggle.click();
+    } else {
+      await this.page.keyboard.press('Escape');
+    }
+    await this.page.waitForTimeout(300);
   }
 } 

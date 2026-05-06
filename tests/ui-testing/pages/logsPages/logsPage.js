@@ -1863,6 +1863,26 @@ export class LogsPage {
         return await this.logsQueryPage.ensureHistogramState(desiredState);
     }
 
+    async isSQLModeOn() {
+        return await this.logsQueryPage.isSQLModeOn();
+    }
+
+    async ensureSQLMode() {
+        return await this.logsQueryPage.ensureSQLMode();
+    }
+
+    async ensureFTSMode() {
+        return await this.logsQueryPage.ensureFTSMode();
+    }
+
+    async disableAutoRun() {
+        return await this.logsQueryPage.disableAutoRun();
+    }
+
+    async enableAutoRun() {
+        return await this.logsQueryPage.enableAutoRun();
+    }
+
     // Login methods - delegate to LoginPage
     async loginAsInternalUser() {
         return await this.loginPage.loginAsInternalUser();
@@ -2640,19 +2660,9 @@ export class LogsPage {
     }
 
     async expectNotificationMessage(text) {
-        const notification = this.page.locator(this.notificationMessage);
-        // Retry since cloud notifications may lag
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                return await expect(notification).toContainText(text, { timeout: 10000 });
-            } catch (e) {
-                if (attempt < 3) {
-                    await this.page.waitForTimeout(2000);
-                } else {
-                    throw e;
-                }
-            }
-        }
+        await expect(
+            this.page.locator(this.notificationMessage).filter({ hasText: text }).first()
+        ).toBeVisible({ timeout: 15000 });
     }
 
     async expectIndexFieldSearchInputVisible() {
@@ -2713,15 +2723,11 @@ export class LogsPage {
         return await expect(table).toBeVisible();
     }
 
-    async waitForSearchResults() {
-        // Wait for search results to appear by checking for the logs table
+    async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
-        await table.waitFor({ state: 'visible', timeout: 30000 });
-        
-        // Also wait for at least one row to be present
+        await table.waitFor({ state: 'visible', timeout });
         const firstRow = this.page.locator(this.logTableColumnSource);
-        await firstRow.waitFor({ state: 'visible', timeout: 30000 });
-        
+        await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
 
@@ -2773,9 +2779,16 @@ export class LogsPage {
     }
 
     async fillIndexFieldSearchInput(text) {
-        await this.page.locator(this.logSearchIndexListFieldSearchInput).fill(text);
-        // Wait for the field list to filter after typing (cloud may be slow)
-        await this.page.waitForTimeout(1000);
+        const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
+        if (!text) {
+            await inputLocator.fill('');
+        } else {
+            // pressSequentially fires per-character input events that reliably
+            // trigger Quasar q-input's debounced update:model-value chain.
+            await inputLocator.click({ clickCount: 3 });
+            await inputLocator.pressSequentially(text, { delay: 30 });
+        }
+        await this.page.waitForTimeout(500);
     }
 
     async clickExpandLabel(label) {
@@ -3094,11 +3107,24 @@ export class LogsPage {
     }
 
     async clickInterestingFieldButton(field) {
-        // Default click (no force) — Playwright auto-waits for actionability
-        // and scrolls into view. force:true was previously used here but
-        // skips the stability check, leading to the click landing while the
-        // Vue handler hasn't been (re-)bound and silently doing nothing.
-        await this.page.locator(`.field_overlay ${this.interestingFieldBtn(field)}`).click({ force: true });
+        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
+        const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
+                .then(() => true).catch(() => false);
+            if (visible) {
+                await btnLocator.click({ force: true });
+                return;
+            }
+            // Button not visible — re-apply filter to ensure field is in the list.
+            await inputLocator.fill('');
+            await inputLocator.click();
+            await inputLocator.pressSequentially(field, { delay: 30 });
+            await this.page.waitForTimeout(500);
+        }
+        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
+        await btnLocator.click({ force: true });
     }
 
     async expectInterestingFieldInEditor(field) {
@@ -3580,19 +3606,49 @@ export class LogsPage {
     }
 
     async enableQuickModeIfDisabled() {
-        // Quick mode is now inside the utilities hamburger menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const toggleExists = await toggleInner.count() > 0;
-        if (toggleExists) {
-            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy')).catch(() => false);
-            if (isSwitchedOff) {
-                await toggleInner.click();
-            }
+        // The "interesting fields" toggle button in FieldListPagination only renders
+        // when showQuickMode = true — use it as a fast pre-check before opening the menu.
+        const quickModeIndicator = this.page.locator('[data-test="logs-interesting-fields-btn"]');
+        if (await quickModeIndicator.isVisible().catch(() => false)) {
+            return;
         }
-        // Always close the utilities menu
-        await this.page.keyboard.press('Escape');
+
+        // Quick Mode is off — open the utilities menu and enable it.
+        // Retry up to 3 times: under parallel load on alpha1, the first click may
+        // toggle the menu closed (if it was already open) or the menu may open slowly.
+        const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        for (let attempt = 0; attempt < 3; attempt++) {
+            // Dismiss any open overlay first to avoid toggle-closing on the next click
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(100);
+
+            await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+            const menuOpened = await quickModeItem.waitFor({ state: 'visible', timeout: 4000 })
+                .then(() => true).catch(() => false);
+
+            if (!menuOpened) continue;
+
+            // Check toggle state: Quasar adds --truthy class when toggle is ON
+            const toggleInner = quickModeItem.locator('.q-toggle__inner').first();
+            const isOn = await toggleInner.evaluate(
+                node => node.classList.contains('q-toggle__inner--truthy')
+            ).catch(() => false); // Assume off if check fails — safer to try enabling
+
+            if (isOn) {
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(200);
+                break;
+            }
+
+            await quickModeItem.click({ force: true });
+            await this.page.waitForTimeout(300);
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(200);
+            break;
+        }
+
+        // Wait for Quick Mode to take effect in the field list sidebar
+        await quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
     }
 
     async clickTimestampField() {
@@ -4064,7 +4120,11 @@ export class LogsPage {
     }
 
     async clickDateTimeButton() {
-        return await this.page.locator('[data-test="date-time-btn"]').click();
+        const btn = this.page.locator('[data-test="date-time-btn"]');
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        // force:true bypasses Playwright's stability check — the toolbar re-renders
+        // after search results load, causing brief layout shifts on the button.
+        return await btn.click({ force: true });
     }
 
     async selectRelative6Hours() {
@@ -5730,14 +5790,20 @@ export class LogsPage {
     }
 
     /**
-     * Toggle histogram on/off
-     * Bug #8928 - Histogram rendering
+     * Toggle histogram on/off.
+     * The histogram toggle is in the toolbar when viewport > 1280px (direct click).
+     * When viewport <= 1280px it moves into the utilities menu.
      */
     async toggleHistogram() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const histogramToggle = this.page.locator(this.histogramToggle);
-        await histogramToggle.click();
+        const toolbarToggle = this.page.locator(this.histogramToggle);
+        const isToolbarVisible = await toolbarToggle.isVisible({ timeout: 1000 }).catch(() => false);
+        if (isToolbarVisible) {
+            await toolbarToggle.click();
+        } else {
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await this.page.waitForTimeout(200);
+            await this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]').click();
+        }
         await this.page.waitForTimeout(500);
         testLogger.info('Histogram toggled');
     }

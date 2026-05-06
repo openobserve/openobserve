@@ -182,12 +182,5 @@ test.describe("Join for logs", () => {
     testLogger.info('Add/remove interesting field functionality completed');
   });
 
-  test.afterEach(async ({ page }) => {
-    try {
-      // await pm.commonActions.flipStreaming();
-      testLogger.info('Streaming flipped after test');
-    } catch (error) {
-      testLogger.warn('Streaming flip failed', { error: error.message });
-    }
-  });
 });
+

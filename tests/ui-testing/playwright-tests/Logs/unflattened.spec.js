@@ -1,65 +1,11 @@
 import { test, expect } from "../baseFixtures.js";
-// pageManager.commonActions is used for streaming flip; no direct import needed
 import logData from "../../fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
-// (unused CommonActions import removed)
 const testLogger = require('../utils/test-logger.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
+const { navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 
-test.describe.configure({ mode: "serial" });
-const streamName = `stream${Date.now()}`;
-
-async function login(page) {
-  const { isCloudEnvironment } = require('../utils/cloud-auth.js');
-  if (isCloudEnvironment()) {
-    // Cloud uses saved auth state (cookies from storageState).
-    // The org_identifier query param is required — without it the SPA
-    // defaults to _meta (system org) rather than the active org.
-    const orgParam = process.env["ORGNAME"]
-      ? `?org_identifier=${encodeURIComponent(process.env["ORGNAME"])}`
-      : '';
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/${orgParam}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30000
-    });
-    await page.waitForTimeout(2000);
-    return;
-  }
-  await page.goto(process.env["ZO_BASE_URL"]);
-  if (await page.getByText('Login as internal user').isVisible()) {
-    await page.getByText('Login as internal user').click();
-  }
-  await page.waitForTimeout(500);
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  await page.locator("label").filter({ hasText: "Password *" }).click();
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-}
-async function toggleQuickModeIfOff(page) {
-  // Quick mode is now inside the utilities hamburger menu
-  await page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
-  await page.waitForTimeout(200);
-  const toggleInner = await page.$(
-    '[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner'
-  );
-  if (toggleInner) {
-    const isSwitchedOff = await toggleInner.evaluate((node) =>
-      node.classList.contains("q-toggle__inner--falsy")
-    );
-    if (isSwitchedOff) {
-      await toggleInner.click();
-    } else {
-      await page.keyboard.press('Escape');
-    }
-  } else {
-    await page.keyboard.press('Escape');
-  }
-}
+test.describe.configure({ mode: "serial", timeout: 5 * 60 * 1000 });
 
 const { ingestTestData: ingestion } = require('../utils/data-ingestion.js');
 
@@ -71,22 +17,33 @@ test.describe("Unflattened testcases", () => {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
   async function applyQueryButton(page) {
+    // After stream selection, an auto-search may be in progress (button shows
+    // "Cancel").  Clicking refresh while a search is running just cancels it
+    // without starting a new one.  We click twice: first to cancel any
+    // in-flight search, then again to start a fresh one.
+    await page.waitForTimeout(3000);
+
+    // First click — cancels any in-progress auto-search.
+    await pageManager.logsPage.runQueryAndWaitForResults();
+
+    // Second click — reliably starts a new search now that no search is running.
     await page.waitForTimeout(1000);
-    await Promise.all([
-      page.waitForResponse(
-        resp => resp.url().includes('/_search') && resp.status() === 200,
-        { timeout: 60000 }
-      ),
-      pageManager.unflattenedPage.logsSearchBarRefreshButton.click({
-        force: true,
-      }),
-    ]);
+    await pageManager.logsPage.runQueryAndWaitForResults();
+
+    // 2-minute timeout: cloud re-indexing after Store Original Data changes takes longer than the default 30s
+    await pageManager.logsPage.waitForSearchResults(120000);
   }
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.waitForTimeout(2000);
     pageManager = new PageManager(page);
+    if (isCloudEnvironment()) {
+      await navigateToBase(page);
+    } else {
+      await pageManager.loginPage.gotoLoginPage();
+      await pageManager.loginPage.loginAsInternalUser();
+      await pageManager.loginPage.login();
+    }
+    await page.waitForTimeout(2000);
     await page.waitForTimeout(500);
     await ingestion(page);
     // Wait for data to be indexed before navigating to logs
@@ -131,8 +88,6 @@ test.describe("Unflattened testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
-    const orgName = getOrgIdentifier();
-    const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`);
     await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
   });
@@ -142,7 +97,8 @@ test.describe("Unflattened testcases", () => {
   });
 
   test("stream to toggle store original data toggle and display o2 id", {
-    tag: ['@unflattened', '@logs', '@all']
+    tag: ['@unflattened', '@logs', '@all'],
+    timeout: 5 * 60 * 1000,
   }, async ({ page }) => {
     testLogger.info('Starting test: toggle store original data and display o2 id');
 
@@ -184,27 +140,29 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.schemaUpdateButton.click();
     testLogger.info('Update Settings button clicked');
 
-    testLogger.info('Waiting for Stream settings updated snackbar');
-    await expect(pageManager.unflattenedPage.streamSettingsUpdatedSnackbar).toBeVisible({ timeout: 10000 });
-    testLogger.info('Stream settings successfully updated - snackbar confirmed');
+    testLogger.info('Waiting for Stream settings update to take effect');
+    await expect(pageManager.unflattenedPage.isStoreOriginalDataEnabled()).resolves.toBe(true);
+    testLogger.info('Store Original Data toggle confirmed ON');
     await page.waitForTimeout(1000);
 
     testLogger.info('Closing stream details dialog');
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
     testLogger.info('Stream details dialog closed');
-    await page.waitForTimeout(500);
+    // Wait for schema change to propagate before re-ingesting — cloud stream schema
+    // changes can put the stream in a transitional state where queries return errors.
+    await page.waitForTimeout(15000);
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 5s for indexing with _o2_id field');
-    await page.waitForTimeout(5000);
+    testLogger.info('Data ingestion completed, waiting 30s for indexing with _o2_id field');
+    await page.waitForTimeout(30000);
 
-    testLogger.info('Navigating to logs page to verify _o2_id field');
+    // Navigate to logs page first to establish page context, then selectStream
+    // handles navigation + stream selection. This matches the beforeEach pattern.
+    testLogger.info('Navigating to logs and selecting e2e_automate stream');
     await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await page.waitForTimeout(1000);
-
-    testLogger.info('Selecting e2e_automate stream in logs');
     await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
@@ -274,16 +232,17 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.schemaUpdateButton.click();
     testLogger.info('Update Settings button clicked');
 
-    testLogger.info('Waiting for Stream settings updated snackbar');
-    await expect(pageManager.unflattenedPage.streamSettingsUpdatedSnackbar).toBeVisible({ timeout: 10000 });
-    testLogger.info('Stream settings successfully updated - Store Original Data now OFF');
+    testLogger.info('Waiting for Stream settings update to take effect');
+    await expect(pageManager.unflattenedPage.isStoreOriginalDataEnabled()).resolves.toBe(false);
+    testLogger.info('Store Original Data toggle confirmed OFF');
 
     testLogger.info('Test completed successfully with cleanup');
   });
 
 
   test("stream to display o2 id when quick mode is on and select * query is added", {
-    tag: ['@unflattened', '@logs', '@all']
+    tag: ['@unflattened', '@logs', '@all'],
+    timeout: 5 * 60 * 1000,
   }, async ({ page }) => {
     testLogger.info('Starting test: display o2 id with quick mode and SELECT * query');
 
@@ -325,12 +284,14 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
     testLogger.info('Stream details dialog closed');
-    await page.waitForTimeout(500);
+    // Wait for schema change to propagate before re-ingesting — cloud stream schema
+    // changes can put the stream in a transitional state where queries return errors.
+    await page.waitForTimeout(15000);
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 5s for indexing with _o2_id field');
-    await page.waitForTimeout(5000);
+    testLogger.info('Data ingestion completed, waiting 30s for indexing with _o2_id field');
+    await page.waitForTimeout(30000);
 
     testLogger.info('Navigating to logs page to verify _o2_id field');
     await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
@@ -339,8 +300,8 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Selecting e2e_automate stream in logs');
     await pageManager.logsPage.selectStream("e2e_automate");
 
-    testLogger.info('Toggling Quick Mode if needed');
-    await toggleQuickModeIfOff(page);
+    testLogger.info('Ensuring Quick Mode is on');
+    await pageManager.logsPage.ensureQuickModeState(true);
     await page.waitForTimeout(500);
 
     await applyQueryButton(page);
@@ -356,14 +317,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Selecting kubernetes_pod_id field');
-    await page
-      .locator('[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]')
-      .first()
-      .waitFor();
-    await page
-      .locator('[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]')
-      .first()
-      .click();
+    await pageManager.unflattenedPage.clickInterestingFieldButton('kubernetes_pod_id');
 
     testLogger.info('Switching to SQL mode');
     await pageManager.unflattenedPage.sqlModeToggle.waitFor();
@@ -371,11 +325,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Verifying kubernetes_pod_id appears in query editor');
-    await expect(
-      pageManager.unflattenedPage.logsSearchBarQueryEditor
-        .getByText(/kubernetes_pod_id/)
-        .first()
-    ).toBeVisible();
+    await pageManager.unflattenedPage.expectQueryEditorContainsText(/kubernetes_pod_id/);
 
     testLogger.info('Replacing query with SELECT * FROM "e2e_automate"');
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.waitFor();
@@ -450,8 +400,8 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Stream details sidebar opened');
 
     testLogger.info('Switching to Configuration tab');
-    await page.getByRole('tab', { name: 'Configuration' }).waitFor({ state: "visible", timeout: 2000 });
-    await page.getByRole('tab', { name: 'Configuration' }).click();
+    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 2000 });
+    await pageManager.unflattenedPage.configurationTab.click();
 
     testLogger.info('Toggling Store Original Data OFF');
     await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();

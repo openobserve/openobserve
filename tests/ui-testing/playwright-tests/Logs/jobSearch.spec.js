@@ -33,8 +33,8 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
         await logsPage.selectRunQuery();
         await logsPageEP.searchSchedulerDropdown();
         await logsPageEP.searchSchedulerCreate();
-        await logsPageEP.searchSchedulerSubmit();
-        await logsPageEP.validateAddJob();
+        const jobId = await logsPageEP.searchSchedulerSubmit();
+        await logsPageEP.validateAddJob(jobId);
 
     });
 

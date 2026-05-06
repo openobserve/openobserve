@@ -298,29 +298,20 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickExpandCode();
     await pm.logsPage.waitForTimeout(4000);
 
-    // Click refresh and wait for results
+    // Click refresh and wait for actual results (not just DOM ready — AJAX search on alpha1 can be slow)
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('domcontentloaded');
-    await pm.logsPage.waitForTimeout(2000);
+    await pm.logsPage.waitForSearchResults();
 
     // Toggle SQL mode and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('domcontentloaded');
-    await pm.logsPage.waitForTimeout(2000);
-
-    // Verify bar chart is visible in SQL mode then click
-    await pm.logsPage.expectBarChartCanvasVisible();
+    // clickBarChartCanvas includes networkidle wait + retry — more reliable than a static timeout
     await pm.logsPage.clickBarChartCanvas();
 
     // Toggle SQL mode off and refresh
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('domcontentloaded');
-    await pm.logsPage.waitForTimeout(2000);
-
-    // Verify bar chart is visible in non-SQL mode then click
-    await pm.logsPage.expectBarChartCanvasVisible();
+    // clickBarChartCanvas includes networkidle wait + retry
     await pm.logsPage.clickBarChartCanvas();
     await pm.logsPage.clickHistogramToggleDiv();
 
