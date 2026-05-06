@@ -9,7 +9,7 @@ RUN apt-get update && \
     htop iftop nload iptraf ncdu tcpdump sysstat procps lsof net-tools sqlite3 && \
     update-ca-certificates
 COPY ./bin/openobserve /
-COPY ./web/dist/ /web/
+COPY ./openobserve/web/dist/ /web/
 ENV ZO_WEB_DIST_PATH=/web
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]
