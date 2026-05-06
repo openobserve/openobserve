@@ -375,7 +375,7 @@ describe("TraceDetailsSidebar", async () => {
       const tabs = wrapper.findAll('[data-test="trace-details-sidebar-tabs"]');
       expect(tabs.length).toBeGreaterThan(0);
 
-      const tabNames = ["attributes", "events", "exceptions", "links"];
+      const tabNames = ["attributes", "events", "links"];
       tabNames.forEach((tabName) => {
         const tab = wrapper.find(
           `[data-test="trace-details-sidebar-tabs-${tabName}"]`,
@@ -547,108 +547,6 @@ describe("TraceDetailsSidebar", async () => {
           const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
           expect(eventRows.length).toBeGreaterThan(0);
         });
-      });
-    });
-  });
-
-  describe("Exceptions tab", () => {
-    beforeEach(async () => {
-      const exceptionsTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-exceptions"]',
-      );
-      await exceptionsTab.trigger("click");
-    });
-
-    it("should display events table", () => {
-      // When there are no exceptions, the table doesn't exist, only the no-exceptions message
-      const noExceptionsMsg = wrapper.find(
-        '[data-test="trace-details-sidebar-no-exceptions"]',
-      );
-      expect(noExceptionsMsg.exists()).toBe(true);
-    });
-
-    it("should display no exceptions message when no exception events", () => {
-      const noExceptionsMsg = wrapper.find(
-        '[data-test="trace-details-sidebar-no-exceptions"]',
-      );
-      expect(noExceptionsMsg.exists()).toBe(true);
-      expect(noExceptionsMsg.text()).toContain(
-        "No exceptions present for this span",
-      );
-    });
-
-    describe("When exceptions exist", () => {
-      beforeEach(async () => {
-        await wrapper.setProps({
-          span: {
-            ...mockSpan,
-            events: mockExceptions,
-          },
-        });
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-      });
-
-      it("should display exceptions when exception events exist", () => {
-        const exceptionsTable = wrapper.find(
-          '[data-test="trace-details-sidebar-exceptions-table"]',
-        );
-        expect(exceptionsTable.exists()).toBe(true);
-      });
-
-      it("should display exception rows", async () => {
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        const exceptionRows = wrapper.findAll(
-          '[data-test^="trace-event-detail-"]',
-        );
-        expect(exceptionRows.length).toBeGreaterThan(0);
-      });
-
-      it("should not display no exceptions message", () => {
-        const noExceptionsMsg = wrapper.find(
-          '[data-test="trace-details-sidebar-no-exceptions"]',
-        );
-        expect(noExceptionsMsg.exists()).toBe(false);
-      });
-
-      it("should expand exception when clicked", async () => {
-        const exceptionRow = wrapper.find(
-          '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-        );
-        await exceptionRow.trigger("click");
-        expect(
-          wrapper
-            .find(
-              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-            )
-            .exists(),
-        ).toBe(true);
-      });
-
-      it("should collapse exception when clicked again", async () => {
-        const exceptionRow = wrapper.find(
-          '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-        );
-        await exceptionRow.trigger("click");
-
-        expect(
-          wrapper
-            .find(
-              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-            )
-            .exists(),
-        ).toBe(true);
-
-        await exceptionRow.trigger("click");
-
-        expect(
-          wrapper
-            .find(
-              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-            )
-            .exists(),
-        ).toBe(false);
       });
     });
   });
@@ -1006,7 +904,9 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should return the raw string start_time from props.span, not the formatted display string", async () => {
       const rawStartTime = "1700000000123456789";
-      await wrapper.setProps({ span: { ...mockSpan, start_time: rawStartTime } });
+      await wrapper.setProps({
+        span: { ...mockSpan, start_time: rawStartTime },
+      });
       const result = wrapper.vm.getFilterValue("start_time", "formatted-date");
       expect(result).toBe(rawStartTime);
     });
@@ -1048,16 +948,28 @@ describe("TraceDetailsSidebar", async () => {
       const spanWithTsCol = { ...mockSpan, "@timestamp": rawTsValue };
       const tsWrapper = mount(TraceDetailsSidebar, {
         attachTo: "#app",
-        props: { span: spanWithTsCol, baseTracePosition: mockBaseTracePosition, searchQuery: "" },
+        props: {
+          span: spanWithTsCol,
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+        },
         global: {
           plugins: [i18n, router],
           provide: { store: mockStore },
-          stubs: { "q-resize-observer": true, "q-virtual-scroll": { template: "<div><slot /></div>", props: ["items"] } },
+          stubs: {
+            "q-resize-observer": true,
+            "q-virtual-scroll": {
+              template: "<div><slot /></div>",
+              props: ["items"],
+            },
+          },
         },
       });
       await tsWrapper.vm.$nextTick();
       const displayValue = "2025-07-14T10:14:52.843Z";
-      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(rawTsValue);
+      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(
+        rawTsValue,
+      );
       tsWrapper.unmount();
     });
 
@@ -1096,8 +1008,12 @@ describe("TraceDetailsSidebar", async () => {
       // The NS patching pipeline no longer injects _start_time_ns / _end_time_ns into spans.
       // mockSpan represents a normal span that does not carry those keys, so they must not
       // appear in the rendered attribute list.
-      expect(Object.prototype.hasOwnProperty.call(mockSpan, "_start_time_ns")).toBe(false);
-      expect(Object.prototype.hasOwnProperty.call(mockSpan, "_end_time_ns")).toBe(false);
+      expect(
+        Object.prototype.hasOwnProperty.call(mockSpan, "_start_time_ns"),
+      ).toBe(false);
+      expect(
+        Object.prototype.hasOwnProperty.call(mockSpan, "_end_time_ns"),
+      ).toBe(false);
 
       const attributesTable = wrapper.find(
         '[data-test="trace-details-sidebar-attributes-table"]',
@@ -1152,7 +1068,12 @@ describe("TraceDetailsSidebar", async () => {
             // Stub JsonPreview to render its #field-dropdown slot inline for each key
             // in `value`, so the q-item inside is immediately clickable without a popup.
             JsonPreview: {
-              props: ["value", "highlightQuery", "showCopyButton", "copyButtonClass"],
+              props: [
+                "value",
+                "highlightQuery",
+                "showCopyButton",
+                "copyButtonClass",
+              ],
               template: `
                 <div data-test="trace-details-sidebar-attributes-table">
                   <div
