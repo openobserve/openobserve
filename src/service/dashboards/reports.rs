@@ -542,7 +542,6 @@ pub enum SendReportError {
 
     #[error(transparent)]
     GenerateReportError(#[from] GenerateReportError),
-
 }
 
 #[async_trait]
