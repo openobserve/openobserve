@@ -127,21 +127,42 @@ impl IndexCondition {
     }
 
     // get the tantivy query for the index condition
+    // Returns (query, has_skipped):
+    //   has_skipped = true means some conditions were skipped because the field
+    //   does not exist in this tantivy index (e.g., a newly added index field
+    //   that has no historical data). The caller must keep the DataFusion filter
+    //   so that the skipped predicates are still evaluated.
     pub fn to_tantivy_query(
         &self,
         schema: Schema,
         default_field: Option<Field>,
-    ) -> anyhow::Result<Box<dyn Query>> {
-        let queries = self
-            .conditions
-            .iter()
-            .map(|condition| {
-                condition
-                    .to_tantivy_query(&schema, default_field)
-                    .map(|condition| (Occur::Must, condition))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        Ok(Box::new(BooleanQuery::from(queries)))
+    ) -> anyhow::Result<(Box<dyn Query>, bool)> {
+        let mut has_skipped = false;
+        let mut queries: Vec<(Occur, Box<dyn Query>)> = Vec::with_capacity(self.conditions.len());
+        for condition in &self.conditions {
+            match condition.to_tantivy_query(&schema, default_field) {
+                Ok(query) => {
+                    queries.push((Occur::Must, query));
+                }
+                Err(e) => {
+                    // Field not present in this tantivy index file (e.g., a
+                    // secondary index field that was added after this file was
+                    // created). Skip the condition and let DataFusion handle it.
+                    log::debug!("to_tantivy_query: skipping condition due to missing field: {e}");
+                    has_skipped = true;
+                }
+            }
+        }
+        if queries.is_empty() {
+            // All conditions were skipped because none of the queried fields
+            // exist in this tantivy index. Return an error so the caller falls
+            // back to a direct parquet scan instead of doing a full-index scan.
+            Err(anyhow::anyhow!(
+                "All AND conditions reference fields missing from the tantivy index"
+            ))
+        } else {
+            Ok((Box::new(BooleanQuery::from(queries)), has_skipped))
+        }
     }
 
     // get the fields use for search in datafusion(for add filter back logical)
@@ -2102,5 +2123,96 @@ mod tests {
                 sqlparser::ast::ObjectNamePart::Identifier(Ident::new("table")),
             ])));
         assert_eq!(get_arg_name(&unnamed_other), UNKNOWN_NAME);
+    }
+
+    /// Build a minimal tantivy schema containing only the given text field names.
+    fn build_tantivy_schema(fields: &[&str]) -> Schema {
+        let mut builder = Schema::builder();
+        for name in fields {
+            builder.add_text_field(name, tantivy::schema::TEXT);
+        }
+        builder.build()
+    }
+
+    /// Collect the distinct tantivy fields referenced by a query's terms.
+    fn collect_query_fields(query: &dyn Query) -> HashSet<Field> {
+        let mut fields = HashSet::new();
+        query.query_terms(&mut |term, _| {
+            fields.insert(term.field());
+        });
+        fields
+    }
+
+    #[test]
+    fn test_to_tantivy_query_all_fields_present() {
+        // Schema has both A and B.
+        let schema = build_tantivy_schema(&["A", "B"]);
+        let field_a = schema.get_field("A").unwrap();
+        let field_b = schema.get_field("B").unwrap();
+
+        let mut cond = IndexCondition::new();
+        cond.add_condition(Condition::Equal("A".into(), "a".into()));
+        cond.add_condition(Condition::Equal("B".into(), "b".into()));
+
+        let (query, has_skipped) = cond
+            .to_tantivy_query(schema, None)
+            .expect("query build should succeed");
+        assert!(!has_skipped, "no field is missing, should not skip");
+
+        let referenced = collect_query_fields(query.as_ref());
+        assert!(referenced.contains(&field_a));
+        assert!(referenced.contains(&field_b));
+    }
+
+    #[test]
+    fn test_to_tantivy_query_missing_field_is_skipped() {
+        // Schema only has A; condition references B (newly added index field,
+        // no historical data in this tantivy file).
+        let schema = build_tantivy_schema(&["A"]);
+        let field_a = schema.get_field("A").unwrap();
+
+        let mut cond = IndexCondition::new();
+        cond.add_condition(Condition::Equal("A".into(), "a".into()));
+        cond.add_condition(Condition::Equal("B".into(), "b".into()));
+
+        let (query, has_skipped) = cond
+            .to_tantivy_query(schema, None)
+            .expect("query build should succeed even when a field is missing");
+        assert!(has_skipped, "missing field B should be reported as skipped");
+
+        let referenced = collect_query_fields(query.as_ref());
+        // Only A should be referenced; B was dropped.
+        assert_eq!(referenced.len(), 1);
+        assert!(referenced.contains(&field_a));
+    }
+
+    #[test]
+    fn test_to_tantivy_query_all_fields_missing_returns_error() {
+        // Schema has no matching fields for any condition.
+        // Should return an error so the caller falls back to parquet scan.
+        let schema = build_tantivy_schema(&["other_field"]);
+        let mut cond = IndexCondition::new();
+        cond.add_condition(Condition::Equal("A".into(), "a".into()));
+        cond.add_condition(Condition::Equal("B".into(), "b".into()));
+
+        let result = cond.to_tantivy_query(schema, None);
+        assert!(
+            result.is_err(),
+            "should return error when all fields are missing"
+        );
+    }
+
+    #[test]
+    fn test_to_tantivy_query_single_condition_missing_field() {
+        // Single condition whose field is missing — should return an error.
+        let schema = build_tantivy_schema(&["A"]);
+        let mut cond = IndexCondition::new();
+        cond.add_condition(Condition::Equal("B".into(), "b".into()));
+
+        let result = cond.to_tantivy_query(schema, None);
+        assert!(
+            result.is_err(),
+            "should return error when the only field is missing"
+        );
     }
 }
