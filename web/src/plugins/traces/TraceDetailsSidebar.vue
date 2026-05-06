@@ -1196,7 +1196,7 @@ export default defineComponent({
     const spanGrpcStatusCode = computed(() => {
       const attrs = props.span;
       if (!attrs) return null;
-      return attrs["rpc_grpc_status_code"] ?? null;
+      return attrs["rpc_grpc_status_code"] ?? attrs["grpc_status_code"] ?? null;
     });
 
     const spanErrorType = computed(() => {
