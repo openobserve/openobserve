@@ -219,12 +219,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-close-popup="true"
             variant="outline"
             size="sm-action"
-            data-test="cancel-refresh-service-token"
+            data-test="cancel-button"
           >
             {{ t("user.cancel") }}
           </OButton>
           <OButton
-            data-test="confirm-refresh-service-token"
+            data-test="confirm-button"
             v-close-popup="true"
             variant="primary"
             size="sm-action"
@@ -243,13 +243,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
+          <OButton v-close-popup="true" variant="outline" size="sm-action" data-test="cancel-button">
             {{ t("user.cancel") }}
           </OButton>
           <OButton
             v-close-popup="true"
             variant="primary"
             size="sm-action"
+            data-test="confirm-button"
             @click="deleteUser"
           >
             {{ t("user.ok") }}
