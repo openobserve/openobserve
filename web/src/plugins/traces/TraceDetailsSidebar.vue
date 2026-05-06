@@ -686,7 +686,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
-          v-if="hasSpanError && errorBannerTitle && errorBannerMessage"
+          v-if="
+            hasSpanError &&
+            (errorBannerTitle || errorBannerMessage || spanErrorType)
+          "
           class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
           :style="{
             background: 'var(--o2-status-error-bg)',
@@ -717,24 +720,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-error-summary-message"
           >
             {{ errorBannerMessage }}
-          </div>
-          <!-- Error type / category row -->
-          <div
-            v-if="spanErrorType"
-            class="tw:ml-[1.5rem] tw:flex tw:items-center tw:gap-2"
-            data-test="trace-details-sidebar-error-summary-type"
-          >
-            <span
-              class="tw:text-[0.75rem]"
-              :style="{ color: 'var(--o2-text-muted)' }"
-              >Category:</span
-            >
-            <q-badge
-              :label="spanErrorType"
-              color="var(--o2-status-error-bg)"
-              text-color="var(--o2-status-error-text)"
-              class="tw:text-[0.7rem]"
-            />
           </div>
         </div>
 
@@ -1188,15 +1173,35 @@ export default defineComponent({
     const spanStatusCode = computed(() => {
       const attrs = props.span;
       if (!attrs) return null;
-      return (
-        attrs["http_status_code"] ?? attrs["http_response_status_code"] ?? null
-      );
+      const code =
+        attrs["http_status_code"] ?? attrs["http_response_status_code"] ?? null;
+      if (code === null || code === undefined) return null;
+      const num = parseInt(String(code), 10);
+      if (isNaN(num)) return null;
+      return num >= 400 ? String(code) : null;
     });
 
     const spanGrpcStatusCode = computed(() => {
       const attrs = props.span;
       if (!attrs) return null;
-      return attrs["rpc_grpc_status_code"] ?? attrs["grpc_status_code"] ?? null;
+      const code =
+        attrs["rpc_grpc_status_code"] ?? attrs["grpc_status_code"] ?? null;
+      if (code === null || code === undefined) return null;
+      const num = parseInt(String(code), 10);
+      if (isNaN(num)) return null;
+      return num !== 0 ? String(code) : null;
+    });
+
+    const spanGrpcErrorName = computed(() => {
+      const attrs = props.span;
+      if (!attrs) return null;
+      return attrs["grpc_error_name"] ?? null;
+    });
+
+    const spanGrpcErrorMessage = computed(() => {
+      const attrs = props.span;
+      if (!attrs) return null;
+      return attrs["grpc_error_message"] ?? null;
     });
 
     const spanErrorType = computed(() => {
@@ -1212,6 +1217,7 @@ export default defineComponent({
       if (isErrorStatus) return true;
       if (hasExceptionEvents.value.length > 0) return true;
       if (spanErrorType.value) return true;
+      if (spanGrpcErrorName.value || spanGrpcErrorMessage.value) return true;
       // HTTP 5xx / 4xx also indicate errors
       const httpCode = parseInt(String(spanStatusCode.value ?? ""), 10);
       if (!isNaN(httpCode) && httpCode >= 400) return true;
@@ -1224,6 +1230,7 @@ export default defineComponent({
         return firstExc["exception.type"] || "Exception";
       }
       if (spanErrorType.value) return spanErrorType.value;
+      if (spanGrpcErrorName.value) return spanGrpcErrorName.value;
       return "Error";
     });
 
@@ -1243,7 +1250,7 @@ export default defineComponent({
         const firstExc = hasExceptionEvents.value[0];
         return firstExc["exception.message"] || "";
       }
-      return props.span?.status_message || "";
+      return props.span?.status_message || spanGrpcErrorMessage.value || "";
     });
 
     // Map HTTP/gRPC status codes to short human-readable labels
@@ -2563,6 +2570,8 @@ export default defineComponent({
       spanStatusCode,
       spanGrpcStatusCode,
       spanErrorType,
+      spanGrpcErrorName,
+      spanGrpcErrorMessage,
       navigateToError,
       getDuration,
       getTTFT,
