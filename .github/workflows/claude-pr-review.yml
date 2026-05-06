@@ -38,6 +38,9 @@ jobs:
             echo "No existing review comment found, will create new one"
           fi
 
+      - name: Ensure Claude install directory exists
+        run: mkdir -p "$HOME/.local/bin"
+
       - name: PR Review with Progress Tracking
         uses: anthropics/claude-code-action@v1
         env:
