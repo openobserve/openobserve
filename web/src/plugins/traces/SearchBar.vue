@@ -64,13 +64,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
+          <OToggleGroupItem
+            data-test="traces-search-mode-llm-insights-btn"
+            value="llm-insights"
+            size="sm"
+          >
+            <template #icon-left
+              ><Sparkles class="tw:size-3.5 tw:shrink-0"
+            /></template>
+            LLM Insights
+          </OToggleGroupItem>
         </OToggleGroup>
 
         <!-- Show search controls only when not on Service Graph or Services Catalog -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
-            searchObj.meta.searchMode !== 'services-catalog'
+            searchObj.meta.searchMode !== 'services-catalog' &&
+            searchObj.meta.searchMode !== 'llm-insights'
           "
         >
           <div
@@ -387,6 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.searchMode !== 'services-catalog' &&
+        searchObj.meta.searchMode !== 'llm-insights' &&
         searchObj.meta.showQuery
       "
       class="row tw:h-[calc(100%-3.1rem)]!"
@@ -441,7 +453,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { Layers, Network, GitBranch, Share2, BookOpen } from "lucide-vue-next";
+import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -473,6 +485,7 @@ export default defineComponent({
     GitBranch,
     Share2,
     BookOpen,
+    Sparkles,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -497,6 +510,10 @@ export default defineComponent({
     // so have added as prop
     // Run query btn was not getting disabled while loading
     isLoading: {
+      type: Boolean,
+      default: false,
+    },
+    isLLMSpanPresent: {
       type: Boolean,
       default: false,
     },
