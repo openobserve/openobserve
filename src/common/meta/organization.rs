@@ -1195,6 +1195,8 @@ mod tests {
             dark_mode_theme_color: None,
             max_series_per_query: None,
             usage_stream_enabled: None,
+            #[cfg(feature = "enterprise")]
+            claim_parser_function: None,
             cross_links: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
