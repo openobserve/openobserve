@@ -17,14 +17,12 @@ class UnflattenedPage {
         // Wait for stream list to populate after search
         await this.page.waitForTimeout(2000);
 
-        // Scope the "Stream Detail" button click to the row matching streamName.
-        // Search for the row by stream name first, then click that row's
-        // Stream Detail action — this avoids accidentally targeting a different
-        // row when multiple streams match the search prefix.
+        // The Stream Detail button is hidden until the row is hovered.
+        // Hover first to make it visible, then click with force as a fallback.
         const row = this.page.getByRole('row').filter({ hasText: streamName }).first();
-        const detailBtn = row.getByRole('button', { name: /Stream Detail/i }).first();
-        await detailBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await detailBtn.click({ force: true });
+        await row.hover();
+        const detailBtn = row.locator('[title="Stream Detail"]').first();
+        await detailBtn.click({ force: true, timeout: 15000 });
 
         // Wait for the dialog to render — the Schema tab signals the dialog is ready
         await this.page.getByRole('tab', { name: 'Schema' }).first().waitFor({ state: 'visible', timeout: 15000 });

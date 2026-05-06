@@ -1,9 +1,8 @@
-import { test, expect } from "../baseFixtures.js";
-import logData from "../../fixtures/log.json";
-import PageManager from '../../pages/page-manager.js';
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const logData = require("../../fixtures/log.json");
+const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
-const { navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 
 test.describe.configure({ mode: "serial", timeout: 5 * 60 * 1000 });
 
@@ -49,10 +48,12 @@ test.describe("Unflattened testcases", () => {
     // Wait for data to be indexed before navigating to logs
     await page.waitForTimeout(2000);
 
-    // Check and disable Store Original Data if it's enabled
-    testLogger.info('Navigating to Streams menu to check Store Original Data setting');
-    await pageManager.unflattenedPage.streamsMenu.waitFor();
-    await pageManager.unflattenedPage.streamsMenu.click();
+    // Check and disable Store Original Data if it's enabled.
+    // Navigate directly to the streams URL with the correct org — clicking the
+    // sidebar link would use the Pinia store's active org which may still be _meta.
+    testLogger.info('Navigating to Streams page with correct org');
+    await page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(500);
 
     testLogger.info('Searching for stream: e2e_automate');
@@ -102,12 +103,12 @@ test.describe("Unflattened testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Starting test: toggle store original data and display o2 id');
 
-    // Navigate to Streams Menu
-    testLogger.info('Navigating to Streams menu');
-    await pageManager.unflattenedPage.streamsMenu.waitFor();
-    await pageManager.unflattenedPage.streamsMenu.click();
+    // Navigate directly — sidebar click uses Pinia store org which may still be _meta
+    testLogger.info('Navigating to Streams page');
+    await page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(500);
 
-    // Search for Stream and access details
     testLogger.info('Searching for stream: e2e_automate');
     await pageManager.unflattenedPage.searchStreamInput.waitFor();
     await pageManager.unflattenedPage.searchStreamInput.click();
@@ -116,54 +117,33 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Opening stream detail dialog');
     await pageManager.unflattenedPage.openStreamDetail('e2e_automate');
-
-    // Wait for stream details sidebar to fully open and load
     await page.waitForTimeout(2000);
-    testLogger.info('Stream details sidebar opened');
 
     testLogger.info('Switching to Configuration tab');
     await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 5000 });
     await pageManager.unflattenedPage.configurationTab.click();
-    testLogger.info('Configuration tab clicked, waiting for content to load');
     await page.waitForTimeout(1000);
 
-    testLogger.info('Waiting for Store Original Data toggle to be visible');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
-    testLogger.info('Clicking Store Original Data toggle to enable');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-    testLogger.info('Toggle clicked');
-    await page.waitForTimeout(500);
-
-    testLogger.info('Waiting for Update Settings button to be visible');
-    await pageManager.unflattenedPage.schemaUpdateButton.waitFor({ state: "visible", timeout: 5000 });
-    testLogger.info('Clicking Update Settings button');
-    await pageManager.unflattenedPage.schemaUpdateButton.click();
-    testLogger.info('Update Settings button clicked');
-
-    testLogger.info('Waiting for Stream settings update to take effect');
-    await expect(pageManager.unflattenedPage.isStoreOriginalDataEnabled()).resolves.toBe(true);
-    testLogger.info('Store Original Data toggle confirmed ON');
-    await page.waitForTimeout(1000);
+    testLogger.info('Enabling Store Original Data toggle');
+    const wasDisabled = await pageManager.unflattenedPage.ensureStoreOriginalDataEnabled();
+    testLogger.info(wasDisabled ? 'Store Original Data enabled' : 'Store Original Data was already enabled');
 
     testLogger.info('Closing stream details dialog');
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
-    testLogger.info('Stream details dialog closed');
-    // Wait for schema change to propagate before re-ingesting — cloud stream schema
-    // changes can put the stream in a transitional state where queries return errors.
-    await page.waitForTimeout(15000);
+
+    // Short wait for query engine to pick up schema change before ingesting
+    await page.waitForTimeout(5000);
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 30s for indexing with _o2_id field');
-    await page.waitForTimeout(30000);
 
-    // Navigate to logs page first to establish page context, then selectStream
-    // handles navigation + stream selection. This matches the beforeEach pattern.
-    testLogger.info('Navigating to logs and selecting e2e_automate stream');
-    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-    await page.waitForTimeout(1000);
-    await pageManager.logsPage.selectStream("e2e_automate");
+    // Navigate directly with stream in URL — selectStream would deselect it because
+    // the Pinia store already has e2e_automate selected from beforeEach
+    testLogger.info('Navigating to logs with e2e_automate stream');
+    await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3000);
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
 
@@ -197,46 +177,24 @@ test.describe("Unflattened testcases", () => {
 
     // Cleanup: Toggle Store Original Data back OFF
     testLogger.info('Cleanup: Toggling Store Original Data back OFF');
-    testLogger.info('Navigating to Streams menu');
-    await pageManager.unflattenedPage.streamsMenu.waitFor();
-    await pageManager.unflattenedPage.streamsMenu.click();
+    await page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(500);
 
-    testLogger.info('Searching for stream: e2e_automate');
     await pageManager.unflattenedPage.searchStreamInput.waitFor();
     await pageManager.unflattenedPage.searchStreamInput.click();
     await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
     await page.waitForTimeout(500);
 
-    testLogger.info('Opening stream detail dialog');
     await pageManager.unflattenedPage.openStreamDetail('e2e_automate');
-
     await page.waitForTimeout(2000);
-    testLogger.info('Stream details sidebar opened');
 
-    testLogger.info('Switching to Configuration tab');
     await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 5000 });
     await pageManager.unflattenedPage.configurationTab.click();
-    testLogger.info('Configuration tab clicked, waiting for content to load');
     await page.waitForTimeout(1000);
 
-    testLogger.info('Waiting for Store Original Data toggle to be visible');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
-    testLogger.info('Clicking Store Original Data toggle to turn OFF');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-    testLogger.info('Toggle clicked (turned OFF)');
-    await page.waitForTimeout(500);
-
-    testLogger.info('Waiting for Update Settings button to be visible');
-    await pageManager.unflattenedPage.schemaUpdateButton.waitFor({ state: "visible", timeout: 5000 });
-    testLogger.info('Clicking Update Settings button');
-    await pageManager.unflattenedPage.schemaUpdateButton.click();
-    testLogger.info('Update Settings button clicked');
-
-    testLogger.info('Waiting for Stream settings update to take effect');
-    await expect(pageManager.unflattenedPage.isStoreOriginalDataEnabled()).resolves.toBe(false);
-    testLogger.info('Store Original Data toggle confirmed OFF');
-
-    testLogger.info('Test completed successfully with cleanup');
+    await pageManager.unflattenedPage.ensureStoreOriginalDataDisabled();
+    testLogger.info('Store Original Data confirmed OFF — test completed successfully');
   });
 
 
@@ -246,9 +204,10 @@ test.describe("Unflattened testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Starting test: display o2 id with quick mode and SELECT * query');
 
-    testLogger.info('Navigating to Streams menu');
-    await pageManager.unflattenedPage.streamsMenu.waitFor();
-    await pageManager.unflattenedPage.streamsMenu.click();
+    testLogger.info('Navigating to Streams page');
+    await page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(500);
 
     testLogger.info('Searching for stream: e2e_automate');
     await pageManager.unflattenedPage.searchStreamInput.waitFor();
@@ -283,22 +242,18 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Closing stream details dialog');
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
-    testLogger.info('Stream details dialog closed');
-    // Wait for schema change to propagate before re-ingesting — cloud stream schema
-    // changes can put the stream in a transitional state where queries return errors.
-    await page.waitForTimeout(15000);
+
+    await page.waitForTimeout(5000);
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
-    testLogger.info('Data ingestion completed, waiting 30s for indexing with _o2_id field');
-    await page.waitForTimeout(30000);
 
-    testLogger.info('Navigating to logs page to verify _o2_id field');
-    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-    await page.waitForTimeout(1000);
-
-    testLogger.info('Selecting e2e_automate stream in logs');
-    await pageManager.logsPage.selectStream("e2e_automate");
+    // Navigate directly with stream in URL — selectStream would deselect it because
+    // the Pinia store already has e2e_automate selected from beforeEach
+    testLogger.info('Navigating to logs with e2e_automate stream');
+    await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3000);
 
     testLogger.info('Ensuring Quick Mode is on');
     await pageManager.logsPage.ensureQuickModeState(true);
@@ -328,16 +283,10 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.expectQueryEditorContainsText(/kubernetes_pod_id/);
 
     testLogger.info('Replacing query with SELECT * FROM "e2e_automate"');
-    await pageManager.unflattenedPage.logsSearchBarQueryEditor.waitFor();
-    await pageManager.unflattenedPage.logsSearchBarQueryEditor.click();
-    await page.keyboard.press('Control+a');
-    await page.keyboard.type('SELECT * FROM "e2e_automate"');
+    await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
 
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
-    await page.waitForTimeout(500);
-    await pageManager.unflattenedPage.logsSearchBarRefreshButton.click();
-    testLogger.info('Query executed, waiting for results to load');
-    await page.waitForTimeout(2000);
+    await applyQueryButton(page);
 
     testLogger.info('Expanding first log row from SELECT * results');
     await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
@@ -382,9 +331,9 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeDialog.click();
 
     testLogger.info('Toggling Store Original Data back OFF to clean up');
-    testLogger.info('Navigating back to Streams menu');
-    await pageManager.unflattenedPage.streamsMenu.waitFor();
-    await pageManager.unflattenedPage.streamsMenu.click();
+    await page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(500);
 
     testLogger.info('Searching for stream: e2e_automate');
     await pageManager.unflattenedPage.searchStreamInput.waitFor();
@@ -394,22 +343,14 @@ test.describe("Unflattened testcases", () => {
 
     testLogger.info('Opening stream detail dialog');
     await pageManager.unflattenedPage.openStreamDetail('e2e_automate');
-
-    // Wait for stream details sidebar to fully open and load
     await page.waitForTimeout(2000);
-    testLogger.info('Stream details sidebar opened');
 
     testLogger.info('Switching to Configuration tab');
-    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 2000 });
+    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 5000 });
     await pageManager.unflattenedPage.configurationTab.click();
+    await page.waitForTimeout(1000);
 
-    testLogger.info('Toggling Store Original Data OFF');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor();
-    await pageManager.unflattenedPage.storeOriginalDataToggle.click();
-
-    testLogger.info('Updating schema');
-    await pageManager.unflattenedPage.schemaUpdateButton.waitFor();
-    await pageManager.unflattenedPage.schemaUpdateButton.click();
+    await pageManager.unflattenedPage.ensureStoreOriginalDataDisabled();
 
     testLogger.info('Closing dialog');
     await pageManager.unflattenedPage.closeButton.waitFor();

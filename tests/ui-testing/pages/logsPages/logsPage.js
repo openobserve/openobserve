@@ -1560,18 +1560,28 @@ export class LogsPage {
             await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 30000 });
         } catch (error) {
             testLogger.error('Error in validateResult:', error);
-            // Check if there's an error message visible
-            const errorMessage = this.page.locator(this.errorMessage);
-            if (await errorMessage.isVisible()) {
-                const errorText = await errorMessage.textContent();
-                testLogger.error('Error message found:', errorText);
-                throw new Error(`Query failed with error: ${errorText}`);
+            if (this.page.isClosed()) {
+                throw error;
             }
-            // Check if there's a "no data found" message
-            const noDataMessage = this.page.getByText('No data found');
-            if (await noDataMessage.isVisible()) {
-                testLogger.debug('No data found for the query');
-                return; // This is acceptable for some queries
+            try {
+                // Check if there's an error message visible
+                const errorMessage = this.page.locator(this.errorMessage);
+                if (await errorMessage.isVisible({ timeout: 3000 })) {
+                    const errorText = await errorMessage.textContent();
+                    testLogger.error('Error message found:', errorText);
+                    throw new Error(`Query failed with error: ${errorText}`);
+                }
+                // Check if there's a "no data found" message
+                const noDataMessage = this.page.getByText('No data found');
+                if (await noDataMessage.isVisible({ timeout: 3000 })) {
+                    testLogger.debug('No data found for the query');
+                    return; // This is acceptable for some queries
+                }
+            } catch (innerError) {
+                if (innerError.message && innerError.message.includes('Query failed with error')) {
+                    throw innerError;
+                }
+                // Page closed or other transient error — fall through to original error
             }
             throw error;
         }
@@ -3993,17 +4003,19 @@ export class LogsPage {
 
     async ensureQuickModeState(desiredState) {
         // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).waitFor({ state: 'visible', timeout: 15000 });
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
+        // Wait for the menu to render the quick mode toggle before reading or clicking
+        const quickModeBtn = this.page.locator(this.quickModeToggle);
+        await quickModeBtn.waitFor({ state: 'visible', timeout: 5000 });
         const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
         const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
 
         if (desiredState !== isOn) {
             await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
             await this.page.waitForTimeout(500);
-        } else {
-            await this.page.keyboard.press('Escape');
         }
+        await this.page.keyboard.press('Escape');
     }
 
     async ensureHistogramToggleState(desiredState) {

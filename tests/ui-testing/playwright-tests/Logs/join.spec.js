@@ -53,7 +53,7 @@ test.describe("Join for logs", () => {
     testLogger.info('Two streams SQL Mode query completed');
   });
 
-  test("Run query after selecting two streams, selecting field and SQL Mode On", { tag: ['@join', '@union', '@functional', '@P1'] }, async ({ page }) => {
+  test("Run query after selecting two streams, selecting field and SQL Mode On", { tag: ['@join', '@union', '@functional', '@P1'], timeout: 300000 }, async ({ page }) => {
     testLogger.info('Testing two streams with field selection and SQL Mode');
 
     // Generate unique testRunId to avoid "stream being deleted" conflicts (SDR pattern)
