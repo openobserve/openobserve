@@ -41,19 +41,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
               class="q-mr-sm"
             >
-              <OToggleGroupItem value="all" size="sm">
+              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
                 <template #icon-left><List class="tw:size-3.5 tw:shrink-0" /></template>
                 {{ t("alerts.all") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="scheduled" size="sm">
+              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
                 <template #icon-left><q-icon name="schedule" size="14px" /></template>
                 {{ t("alerts.scheduled") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="realTime" size="sm">
+              <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
                 <template #icon-left><q-icon name="bolt" size="14px" /></template>
                 {{ t("alerts.realTime") }}
               </OToggleGroupItem>
-              <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm">
+              <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
                 <template #icon-left><q-icon name="query_stats" size="14px" /></template>
                 {{ t("alerts.anomalyDetection") }}
               </OToggleGroupItem>
