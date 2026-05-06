@@ -44,10 +44,13 @@
   --color-success-500: #22c55e;
   --color-success-700: #15803d;
 
-  /* --- Warning palette --- */
-  --color-warning-50:  #fffbeb;
-  --color-warning-500: #f59e0b;
-  --color-warning-700: #b45309;
+  /* --- Warning palette (Tailwind yellow scale) --- */
+  --color-warning-50:  #fefce8;
+  --color-warning-100: #fef9c3;
+  --color-warning-400: #facc15;
+  --color-warning-500: #eab308;
+  --color-warning-600: #ca8a04;
+  --color-warning-700: #a16207;
 
   /* --- White / Black --- */
   --color-white: #ffffff;

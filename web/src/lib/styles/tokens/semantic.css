@@ -68,6 +68,14 @@
   --color-error-600: var(--color-error-600);
   --color-error-700: var(--color-error-700);
 
+  /* Warning (re-exports from base.css) */
+  --color-warning-50:  var(--color-warning-50);
+  --color-warning-100: var(--color-warning-100);
+  --color-warning-400: var(--color-warning-400);
+  --color-warning-500: var(--color-warning-500);
+  --color-warning-600: var(--color-warning-600);
+  --color-warning-700: var(--color-warning-700);
+
   /* Radius / Shadow (re-exports from base.css) */
   --radius-sm:   var(--radius-sm);
   --radius-md:   var(--radius-md);

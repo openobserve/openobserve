@@ -85,8 +85,13 @@
     --color-tabs-hover-bg: var(--color-primary-900);
     --color-tabs-bar-border: var(--color-grey-700);
 
+    /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */
+    --color-button-ghost-warning-text: var(--color-warning-400);
+    --color-button-outline-warning-text: var(--color-warning-400);
+    --color-button-outline-warning-border: var(--color-warning-500);
+
     /* RefreshButton — staleness dot (slightly muted in dark mode) */
-    --color-refresh-dot-stale: var(--color-warning-700);
+    --color-refresh-dot-stale: var(--color-warning-500);
     --color-refresh-dot-critical: var(--color-error-400);
 }
 

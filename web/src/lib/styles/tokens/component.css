@@ -72,6 +72,27 @@
   --color-button-ghost-subtle-active-bg: var(--color-primary-100);
   --color-button-ghost-subtle-focus-ring: var(--color-primary-400);
 
+  /* Button — ghost-warning (yellow-600 text for contrast on white, faint yellow tint on hover) */
+  --color-button-ghost-warning-text: var(--color-warning-600);
+  --color-button-ghost-warning-hover-bg: color-mix(in srgb, var(--color-warning-400) 12%, transparent);
+  --color-button-ghost-warning-active-bg: color-mix(in srgb, var(--color-warning-400) 22%, transparent);
+  --color-button-ghost-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+
+  /* Button — outline-warning (transparent bg, yellow-600 border + text) */
+  --color-button-outline-warning-text: var(--color-warning-600);
+  --color-button-outline-warning-border: var(--color-warning-600);
+  --color-button-outline-warning-hover-bg: color-mix(in srgb, var(--color-warning-400) 12%, transparent);
+  --color-button-outline-warning-active-bg: color-mix(in srgb, var(--color-warning-400) 22%, transparent);
+  --color-button-outline-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+
+  /* Button — warning (bright yellow-400 bg, yellow-500 hover — never goes brown) */
+  --color-button-warning: var(--color-warning-400);
+  --color-button-warning-hover: var(--color-warning-500);
+  --color-button-warning-active: var(--color-warning-600);
+  --color-button-warning-foreground: var(--color-grey-900);
+  --color-button-warning-border: var(--color-warning-400);
+  --color-button-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+
   /* Button — destructive */
   --color-button-destructive: var(--color-error-600);
   --color-button-destructive-hover: var(--color-error-700);
@@ -209,6 +230,27 @@
   --color-button-ghost-subtle-hover-bg: var(--color-button-ghost-subtle-hover-bg);
   --color-button-ghost-subtle-active-bg: var(--color-button-ghost-subtle-active-bg);
   --color-button-ghost-subtle-focus-ring: var(--color-button-ghost-subtle-focus-ring);
+
+  /* Button — ghost-warning */
+  --color-button-ghost-warning-text: var(--color-button-ghost-warning-text);
+  --color-button-ghost-warning-hover-bg: var(--color-button-ghost-warning-hover-bg);
+  --color-button-ghost-warning-active-bg: var(--color-button-ghost-warning-active-bg);
+  --color-button-ghost-warning-focus-ring: var(--color-button-ghost-warning-focus-ring);
+
+  /* Button — outline-warning */
+  --color-button-outline-warning-text: var(--color-button-outline-warning-text);
+  --color-button-outline-warning-border: var(--color-button-outline-warning-border);
+  --color-button-outline-warning-hover-bg: var(--color-button-outline-warning-hover-bg);
+  --color-button-outline-warning-active-bg: var(--color-button-outline-warning-active-bg);
+  --color-button-outline-warning-focus-ring: var(--color-button-outline-warning-focus-ring);
+
+  /* Button — warning */
+  --color-button-warning: var(--color-button-warning);
+  --color-button-warning-hover: var(--color-button-warning-hover);
+  --color-button-warning-active: var(--color-button-warning-active);
+  --color-button-warning-foreground: var(--color-button-warning-foreground);
+  --color-button-warning-border: var(--color-button-warning-border);
+  --color-button-warning-focus-ring: var(--color-button-warning-focus-ring);
 
   /* Button — destructive */
   --color-button-destructive: var(--color-button-destructive);

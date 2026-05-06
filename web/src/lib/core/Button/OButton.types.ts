@@ -51,7 +51,6 @@ export type ButtonSize =
   | "chip"
   | "sm"
   | "sm-action"
-  | "xs"
   | "md"
   | "lg"
   | "icon"

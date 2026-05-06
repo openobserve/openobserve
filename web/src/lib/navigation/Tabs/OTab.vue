@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OTabProps, OTabSlots } from './OTab.types'
-import { computed, inject } from 'vue'
+import { computed, inject, type ComputedRef } from 'vue'
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsTrigger } from 'reka-ui'
@@ -11,7 +11,7 @@ const props = withDefaults(defineProps<OTabProps>(), {
 
 defineSlots<OTabSlots>()
 
-const context = inject<{ value: TabsContext }>(TABS_CONTEXT_KEY)
+const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY)
 
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name)
 const isDense = computed<boolean>(() => context?.value.dense ?? false)
@@ -76,6 +76,8 @@ const heightClasses = computed<string>(() => {
     :value="name"
     :disabled="disable"
     :aria-disabled="disable || undefined"
+    :id="`tab-${name}`"
+    :aria-controls="`tab-panel-${name}`"
     :class="[baseClasses, stateClasses, heightClasses]"
   >
     <!--
