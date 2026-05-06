@@ -35,6 +35,11 @@
 
   &.oo_right {
     border-right: none;
+    position: sticky;
+    top: var(--navbar-height, 36px);
+    align-self: flex-start;
+    height: calc(100vh - var(--navbar-height, 36px));
+    flex-shrink: 0;
   }
 
   &.oo_sidebar--expanded {
