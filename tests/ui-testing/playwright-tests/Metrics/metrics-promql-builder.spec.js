@@ -1407,3 +1407,145 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Save → edit → verify → cleanup complete');
   });
 });
+
+// ============================================================================
+// Metrics — Default SQL Builder Mode
+// ============================================================================
+
+test.describe("Metrics — Default SQL Builder Mode", () => {
+  test.beforeAll(async () => {
+    await ensureMetricsIngested();
+  });
+
+  async function setupTest(page, testInfo) {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    const pm = new PageManager(page);
+    await pm.metricsPage.gotoMetricsPage();
+    await page.waitForTimeout(2000);
+    testLogger.info('Metrics SQL default test setup completed');
+    return pm;
+  }
+
+  test.afterEach(async ({}, testInfo) => {
+    testLogger.testEnd(testInfo.title, testInfo.status);
+  });
+
+  test("Metrics page defaults to SQL mode on load", {
+    tag: ['@metrics', '@metricsSqlDefault', '@smoke', '@P0', '@all']
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
+
+    const isSql = await pm.metricsBuilderPage.isModeSelected('sql');
+    expect(isSql).toBeTruthy();
+
+    testLogger.info('Metrics defaults to SQL mode - PASSED');
+  });
+
+  test("Metrics page defaults to Builder mode (not Custom)", {
+    tag: ['@metrics', '@metricsSqlDefault', '@smoke', '@P0', '@all']
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
+
+    const isBuilder = await pm.metricsBuilderPage.isModeSelected('builder');
+    expect(isBuilder).toBeTruthy();
+
+    testLogger.info('Metrics defaults to Builder mode - PASSED');
+  });
+
+  test("Selecting a metric stream populates default histogram and avg fields", {
+    tag: ['@metrics', '@metricsSqlDefault', '@P0', '@all']
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
+
+    // Select a metric stream
+    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
+    await streamSelector.waitFor({ state: 'visible', timeout: 15000 });
+    await streamSelector.click();
+    const firstOption = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').first();
+    await firstOption.waitFor({ state: 'visible', timeout: 10000 });
+    await firstOption.click();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Verify X-axis has histogram(_timestamp)
+    const xAxisItems = page.locator('[data-test="dashboard-x-layout"] [data-test^="dashboard-x-item-"]');
+    await expect(xAxisItems.first()).toBeVisible({ timeout: 15000 });
+    const xText = await xAxisItems.first().textContent();
+    expect(xText).toContain('histogram');
+
+    // Verify Y-axis has avg(value)
+    const yAxisItems = page.locator('[data-test="dashboard-y-layout"] [data-test^="dashboard-y-item-"]');
+    await expect(yAxisItems.first()).toBeVisible({ timeout: 15000 });
+    const yText = await yAxisItems.first().textContent();
+    expect(yText).toContain('avg');
+
+    testLogger.info('Default histogram + avg fields populated - PASSED');
+  });
+
+  test("Selecting a metric stream generates SQL query with histogram and avg", {
+    tag: ['@metrics', '@metricsSqlDefault', '@P1', '@all']
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
+
+    // Select a stream
+    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
+    await streamSelector.waitFor({ state: 'visible', timeout: 15000 });
+    await streamSelector.click();
+    const firstOption = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').first();
+    await firstOption.waitFor({ state: 'visible', timeout: 10000 });
+    await firstOption.click();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Verify query preview contains histogram and avg
+    const queryText = await pm.metricsBuilderPage.getQueryPreviewText();
+    expect(queryText).toContain('histogram');
+    expect(queryText).toContain('avg');
+    expect(queryText).toContain('SELECT');
+
+    testLogger.info('SQL query generated with histogram + avg - PASSED');
+  });
+
+  test("Changing metric stream resets fields to defaults", {
+    tag: ['@metrics', '@metricsSqlDefault', '@P1', '@all']
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
+
+    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
+    await streamSelector.waitFor({ state: 'visible', timeout: 15000 });
+
+    // Select first stream
+    await streamSelector.click();
+    const options = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    await options.first().waitFor({ state: 'visible', timeout: 10000 });
+    const optionCount = await options.count();
+
+    if (optionCount < 2) {
+      testLogger.warn('Only one metric stream available, skipping stream change test');
+      test.skip();
+      return;
+    }
+
+    await options.first().click();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Change to second stream
+    await streamSelector.click();
+    await page.waitForTimeout(500);
+    const secondOptions = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    await secondOptions.nth(1).click();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Verify defaults re-applied
+    const xAxisItems = page.locator('[data-test="dashboard-x-layout"] [data-test^="dashboard-x-item-"]');
+    await expect(xAxisItems.first()).toBeVisible({ timeout: 15000 });
+    const xText = await xAxisItems.first().textContent();
+    expect(xText).toContain('histogram');
+
+    const yAxisItems = page.locator('[data-test="dashboard-y-layout"] [data-test^="dashboard-y-item-"]');
+    await expect(yAxisItems.first()).toBeVisible({ timeout: 15000 });
+    const yText = await yAxisItems.first().textContent();
+    expect(yText).toContain('avg');
+
+    testLogger.info('Stream change resets to defaults - PASSED');
+  });
+});
