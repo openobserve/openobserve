@@ -11,12 +11,17 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   });
 
   /** Create a fresh PageManager per test — avoids data races in parallel workers. */
-  async function setupTest(page, testInfo) {
+  async function setupTest(page, testInfo, { switchToPromQL = true } = {}) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForTimeout(2000);
+    // Metrics page now defaults to SQL mode; switch to PromQL for PromQL builder tests
+    if (switchToPromQL) {
+      await pm.metricsBuilderPage.switchToPromQLMode();
+      await page.waitForTimeout(1000);
+    }
     testLogger.info('Test setup completed - navigated to metrics page');
     return pm;
   }
@@ -32,7 +37,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P0: Builder mode tabs, UI elements, and mode switching", {
     tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
   }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
+    // Don't auto-switch to PromQL — this test verifies default state first
+    const pm = await setupTest(page, testInfo, { switchToPromQL: false });
     const builder = pm.metricsBuilderPage;
 
     // 1. Verify all mode buttons visible
@@ -42,18 +48,23 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await expect(page.locator(builder.customModeButton)).toBeVisible();
     testLogger.info('All mode buttons visible');
 
-    // 2. Verify default mode is PromQL + Builder
-    expect(await builder.isModeSelected('promql')).toBe(true);
+    // 2. Verify default mode is SQL + Builder (changed from PromQL)
+    expect(await builder.isModeSelected('sql')).toBe(true);
     expect(await builder.isModeSelected('builder')).toBe(true);
-    testLogger.info('Default mode: PromQL + Builder');
+    testLogger.info('Default mode: SQL + Builder');
 
-    // 3. Verify Builder UI elements visible
+    // 3. Switch to PromQL mode for PromQL Builder UI verification
+    await builder.switchToPromQLMode();
+    await page.waitForTimeout(1000);
+    expect(await builder.isModeSelected('promql')).toBe(true);
+
+    // 4. Verify PromQL Builder UI elements visible
     expect(await builder.isMetricSelectorVisible()).toBe(true);
     expect(await builder.isAddLabelFilterVisible()).toBe(true);
     expect(await builder.isAddOperationVisible()).toBe(true);
     expect(await builder.isOptionsVisible()).toBe(true);
     await expect(page.locator(builder.runQueryButton).first()).toBeVisible();
-    testLogger.info('All Builder UI elements visible');
+    testLogger.info('All PromQL Builder UI elements visible');
 
     // 4. Switch SQL -> PromQL -> Custom -> Builder
     await builder.switchToSQLMode();
