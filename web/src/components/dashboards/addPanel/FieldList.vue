@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : ''
             "
             v-bind="scope.itemProps"
+            :data-test="`index-dropdown-stream-option-${scope.opt.name}`"
           >
             <q-item-section avatar class="metric-explore-metric-icon">
               <q-icon

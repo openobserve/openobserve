@@ -111,8 +111,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 2. Open dropdown and verify metrics listed
     await streamSelector.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-    const menuItems = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    await page.waitForTimeout(1000);
+    const menuItems = page.locator('[data-test^="index-dropdown-stream-option-"]');
     const menuCount = await menuItems.count();
     expect(menuCount).toBeGreaterThan(0);
     testLogger.info(`Dropdown shows ${menuCount} metrics`);
@@ -120,18 +120,18 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 3. Search and filter metrics
     await streamSelector.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    await page.waitForTimeout(500);
     await streamSelector.clear();
     await streamSelector.fill('cpu');
     await page.waitForTimeout(1000);
-    const filtered = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    const filtered = page.locator('[data-test^="index-dropdown-stream-option-"]');
     const filteredCount = await filtered.count();
     expect(filteredCount).toBeGreaterThan(0);
     testLogger.info(`Filtered to ${filteredCount} metrics matching "cpu"`);
 
     // Select first filtered item
     await filtered.first().click();
-    await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(500);
 
     // 4. Set time range and run query
     await pm.metricsPage.openDatePicker();
@@ -539,7 +539,19 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // 1. Set time range and run default query first
+    // 1. Select a known metric stream, set time range, and run query
+    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
+    await streamSelector.click();
+    await page.waitForTimeout(500);
+    await streamSelector.clear();
+    await streamSelector.fill('cpu');
+    await page.waitForTimeout(1000);
+    const firstOption = page.locator('[data-test^="index-dropdown-stream-option-"]').first();
+    if (await firstOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await firstOption.click();
+    }
+    await page.waitForTimeout(500);
+
     await pm.metricsPage.openDatePicker();
     await pm.metricsPage.selectLast15Minutes();
     await page.waitForTimeout(1000);
@@ -1480,7 +1492,7 @@ test.describe("Metrics — Default SQL Builder Mode", () => {
     const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
     await streamSelector.waitFor({ state: 'visible', timeout: 15000 });
     await streamSelector.click();
-    const firstOption = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').first();
+    const firstOption = page.locator('[data-test^="index-dropdown-stream-option-"]').first();
     await firstOption.waitFor({ state: 'visible', timeout: 10000 });
     await firstOption.click();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -1509,7 +1521,7 @@ test.describe("Metrics — Default SQL Builder Mode", () => {
     const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
     await streamSelector.waitFor({ state: 'visible', timeout: 15000 });
     await streamSelector.click();
-    const firstOption = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').first();
+    const firstOption = page.locator('[data-test^="index-dropdown-stream-option-"]').first();
     await firstOption.waitFor({ state: 'visible', timeout: 10000 });
     await firstOption.click();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -1533,7 +1545,7 @@ test.describe("Metrics — Default SQL Builder Mode", () => {
 
     // Select first stream
     await streamSelector.click();
-    const options = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    const options = page.locator('[data-test^="index-dropdown-stream-option-"]');
     await options.first().waitFor({ state: 'visible', timeout: 10000 });
     const optionCount = await options.count();
 
@@ -1549,7 +1561,7 @@ test.describe("Metrics — Default SQL Builder Mode", () => {
     // Change to second stream
     await streamSelector.click();
     await page.waitForTimeout(500);
-    const secondOptions = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    const secondOptions = page.locator('[data-test^="index-dropdown-stream-option-"]');
     await secondOptions.nth(1).click();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
