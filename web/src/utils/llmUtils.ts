@@ -96,6 +96,10 @@ export function isLLMTrace(data: any): boolean {
   if (hasValue(data.gen_ai_usage_cost)) return true;
   if (hasValue(data.llm_request_parameters)) return true;
 
+  // Check formatted span fields (added by getFormattedSpan in TraceDetails.vue)
+  if (hasValue(data.genAiUsage?.total)) return true;
+  if (hasValue(data.genAiCost?.total)) return true;
+
   return false;
 }
 
