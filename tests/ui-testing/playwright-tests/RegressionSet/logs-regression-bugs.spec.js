@@ -908,17 +908,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     await ingestTestData(page, secondStream);
     await page.waitForTimeout(2000);
 
-    // Select second stream via search
+    // Select second stream for multi-stream mode (without page navigation)
     testLogger.info('Selecting second stream for multi-stream mode');
-    await page.locator('[data-test="log-search-index-list-select-stream"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="log-search-index-list-select-stream"]').fill(secondStream);
-    await page.waitForTimeout(1000);
-    const secondStreamToggle = page.locator(`[data-test="log-search-index-list-stream-toggle-${secondStream}"] div`).first();
-    if (await secondStreamToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await secondStreamToggle.click();
-      testLogger.info(`Second stream (${secondStream}) selected for multi-stream mode`);
-    }
+    await pm.logsPage.addStreamToSelection(secondStream);
     await page.waitForTimeout(1000);
 
     // Run query
@@ -927,8 +919,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: _timestamp column should be visible in the table header
-    const timestampColumn = page.locator('[data-test="log-table-column-1-_timestamp"]');
-    await expect(timestampColumn, 'Bug #5894: _timestamp column should be visible').toBeVisible({ timeout: 5000 });
+    await pm.logsPage.expectTimestampColumnVisible();
     testLogger.info('✓ _timestamp column visible in table');
 
     testLogger.info('✓ PASSED: Timestamp column displayed for multi stream (Bug #5894)');
@@ -954,14 +945,9 @@ test.describe("Logs Regression Bug Fixes", () => {
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(1000);
 
-      // Verify run query button exists and is not in loading state
-      const refreshBtn = page.locator('[data-test="logs-search-bar-refresh-btn"]');
-      await expect(refreshBtn, `Bug #10344: Run query button should be visible on logs page (cycle ${i + 1})`).toBeVisible({ timeout: 5000 });
-
-      // Check that the button does not have a loading spinner
-      const loadingSpinner = refreshBtn.locator('.q-spinner, .q-spinner-mat, .q-btn__progress, [role="progressbar"]');
-      const hasSpinner = await loadingSpinner.isVisible().catch(() => false);
-      expect(hasSpinner, `Bug #10344: Run query button should NOT be in loading state (cycle ${i + 1})`).toBe(false);
+      // Verify run query button is visible and not in loading state
+      await pm.logsPage.expectRefreshButtonVisible();
+      await pm.logsPage.expectRefreshButtonEnabled();
       testLogger.info(`✓ Run query button not loading after logs navigation (cycle ${i + 1})`);
 
       // Go to home page
@@ -1001,45 +987,30 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForTimeout(2000);
 
     // Expand a log row to reveal the detail dialog with correlation tabs
-    const expandMenu = page.locator('[data-test="table-row-expand-menu"]').first();
-    const rowExpandable = await expandMenu.isVisible({ timeout: 5000 }).catch(() => false);
-    if (!rowExpandable) {
-      testLogger.info('No expandable row found — skipping Bug #11469 correlation check');
-      testLogger.info('✓ PASSED: Bug #11469 correlation check skipped (no expandable data)');
-      return;
-    }
-    await expandMenu.click();
+    await pm.logsPage.clickTableExpandMenuFirst();
     await page.waitForTimeout(1000);
 
-    // Open the correlation / View Related button in the detail dialog
-    const viewRelatedBtn = page.locator('[data-test="log-correlation-btn"]');
-    const correlationAvailable = await viewRelatedBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    // Check if View Related button is available (enterprise correlation feature)
+    const correlationAvailable = await pm.logsPage.isViewRelatedButtonVisible();
     if (correlationAvailable) {
-      await viewRelatedBtn.click();
+      await pm.logsPage.clickViewRelatedButton();
       await page.waitForTimeout(2000);
       testLogger.info('Opened correlation / View Related panel');
 
       // Bug assertion: hover over the correlation panel and verify no
       // copy/include/exclude context menu appears on simple hover
-      const correlationPanel = page.locator('[data-test="correlation-dashboard-close"]').locator('..');
-      if (await correlationPanel.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await correlationPanel.hover();
-        await page.waitForTimeout(500);
-        const contextMenu = page.locator('.q-menu:visible, [role="menu"]:visible');
-        const menuVisible = await contextMenu.isVisible().catch(() => false);
-        expect(menuVisible, 'Bug #11469: No context menu should appear on hover over correlation panel').toBe(false);
-        testLogger.info('✓ No unwanted context menu on hover over correlation panel');
-      }
+      await pm.logsPage.hoverOnCorrelationDashboard();
+      await page.waitForTimeout(500);
+      await pm.logsPage.expectNoContextMenuVisible();
+      testLogger.info('✓ No unwanted context menu on hover over correlation panel');
     } else {
       // Fallback: check the log detail dialog doesn't leak hover menus
       testLogger.info('Correlation panel not available — checking detail dialog hover behavior');
-      const detailDialog = page.locator('[data-test="logs-search-result-detail-dialog"]');
+      const detailDialog = page.locator(pm.logsPage.logDetailDialog);
       if (await detailDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
         await detailDialog.hover();
         await page.waitForTimeout(500);
-        const contextMenu = page.locator('.q-menu:visible, [role="menu"]:visible');
-        const menuVisible = await contextMenu.isVisible().catch(() => false);
-        expect(menuVisible, 'Bug #11469: No context menu should appear on simple hover over detail dialog').toBe(false);
+        await pm.logsPage.expectNoContextMenuVisible();
         testLogger.info('✓ No unwanted context menu on hover over detail dialog');
       }
     }
@@ -1089,13 +1060,13 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForTimeout(3000);
 
     // Check for query-level errors
-    const errorVisible = await page.locator('[data-test="logs-search-error-message"]').isVisible({ timeout: 3000 }).catch(() => false);
+    const errorVisible = await page.locator(pm.logsPage.errorMessage).isVisible({ timeout: 3000 }).catch(() => false);
     testLogger.info(`Query error message visible: ${errorVisible}`);
 
     // Expand first log detail if available
-    const expandMenu = page.locator('[data-test="table-row-expand-menu"]').first();
+    const expandMenu = page.locator(pm.logsPage.tableRowExpandMenu).first();
     if (await expandMenu.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await expandMenu.click();
+      await pm.logsPage.clickTableExpandMenuFirst();
       await page.waitForTimeout(1000);
       testLogger.info('Expanded first log detail');
     }
@@ -1194,17 +1165,7 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     // Deselect the stream while query is in progress
     testLogger.info('Deselecting stream while query in progress');
-    const streamDropdown = page.locator('[data-test="log-search-index-list-select-stream"]');
-    if (await streamDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await streamDropdown.click();
-      await page.waitForTimeout(500);
-      // Toggle off e2e_automate stream (the test stream being queried)
-      const automateToggle = page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first();
-      if (await automateToggle.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await automateToggle.click();
-        testLogger.info('Deselected e2e_automate stream during query');
-      }
-    }
+    await pm.logsPage.deselectStream('e2e_automate');
 
     // Wait for page to settle
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -1218,7 +1179,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('✓ No partitions-related console errors');
 
     // Verify no error message displayed on page
-    const errorMsg = page.locator('[data-test="logs-search-error-message"]');
+    const errorMsg = page.locator(pm.logsPage.errorMessage);
     const errorVisible = await errorMsg.isVisible({ timeout: 2000 }).catch(() => false);
     if (errorVisible) {
       const errorText = await errorMsg.textContent();
@@ -1325,9 +1286,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('✓ Result pagination visible for distinct query');
 
     // Verify the results table has the expected column from the distinct query
-    // (the kubernetes_pod_name column should be visible in the results)
-    const resultColumn = page.locator('[data-test="log-search-result-table-th-kubernetes_pod_name"]');
-    const columnVisible = await resultColumn.isVisible({ timeout: 3000 }).catch(() => false);
+    const columnVisible = await pm.logsPage.expectTableColumnHeaderVisible('kubernetes_pod_name');
     testLogger.info(`Distinct query result column visible: ${columnVisible}`);
     if (columnVisible) {
       testLogger.info('✓ Distinct query results show expected column');
@@ -1370,14 +1329,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForTimeout(2000);
 
     // Bug assertion: the histogram must NOT be blank — it must have rendered content
-    const histogramChart = page.locator('[data-test="logs-search-result-bar-chart"]');
-    await expect(histogramChart, 'Bug #4315: Histogram chart should be visible after toggle/re-query').toBeVisible({ timeout: 5000 });
-
-    const canvasInChart = histogramChart.locator('canvas, svg');
-    const canvasCount = await canvasInChart.count().catch(() => 0);
-    testLogger.info(`Histogram contains ${canvasCount} canvas/SVG elements`);
-    expect(canvasCount, 'Bug #4315: Histogram must contain rendered chart content (canvas or SVG), not blank').toBeGreaterThan(0);
-    testLogger.info('✓ Histogram contains rendered chart content (not blank)');
+    await pm.logsPage.expectBarChartHasContent();
 
     testLogger.info('✓ PASSED: Histogram not blank after toggle/re-query (Bug #4315)');
   });
