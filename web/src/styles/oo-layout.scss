@@ -22,11 +22,10 @@
   text-align: center;
 }
 
-/* ---- body area (grid: main | right sidebar) ---- */
-/* grid-template-columns set dynamically via :style based on AI chat state */
+/* ---- body area (flex row: main | right sidebar) ---- */
 .oo_body {
   flex: 1;
-  display: grid;
+  display: flex;
   min-height: 0;
 }
 
