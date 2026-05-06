@@ -390,7 +390,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('✓ Field added to table successfully');
     
     // Enable SQL mode
-    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
     
     // Execute blank query with keyboard shortcut
@@ -439,7 +439,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('Testing that cmd+enter makes exactly 1 search + 1 histogram API call when histogram is enabled');
     
     // Enable SQL mode
-    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
     
     // Ensure histogram is enabled (it should be by default, but let's verify)
@@ -466,7 +466,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('Testing that cmd+enter does not add unwanted characters or move cursor position in SQL editor');
 
     // Enable SQL mode
-    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
 
     // Setup editor for cursor test
