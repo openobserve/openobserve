@@ -3485,8 +3485,8 @@ export class LogsPage {
     }
 
     async openFirstLogDetails() {
-        // Click on the first log entry to open details (expand the _timestamp column)
-        await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        // Click on the first log entry to open details (expand the first column)
+        await this.page.locator('[data-index="0"] [data-test="table-row-expand-menu"]').click();
         await this.page.waitForTimeout(1000);
     }
 
