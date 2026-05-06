@@ -101,9 +101,15 @@ const useTraceDetails = (span: Ref<any> | ComputedRef<any>) => {
 
   const spanErrorType = computed(() => span.value?.["error_type"] ?? null);
 
-  const spanDbResponseStatusCode = computed(
-    () => span.value?.["db_response_status_code"] ?? null,
-  );
+  const spanDbResponseStatusCode = computed(() => {
+    if (!span.value) return null;
+    const code = span.value["db_response_status_code"] ?? null;
+    if (code === null || code === undefined) return null;
+    const str = String(code).trim();
+    // SQLSTATE success codes are all-zero (e.g. "00000"); numeric 0 is also success
+    if (/^0+$/.test(str)) return null;
+    return str;
+  });
 
   const spanProcessExitCode = computed(() => {
     if (!span.value) return null;

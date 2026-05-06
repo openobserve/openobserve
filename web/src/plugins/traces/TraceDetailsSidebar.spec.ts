@@ -480,6 +480,10 @@ describe("TraceDetailsSidebar", async () => {
           span: { ...mockSpan, events: mockEvents },
         });
 
+        const eventsTab = wrapper.find(
+          '[data-test="trace-details-sidebar-tabs-events"]',
+        );
+        await eventsTab.trigger("click");
         await flushPromises();
         await wrapper.vm.$nextTick();
       });
@@ -576,6 +580,11 @@ describe("TraceDetailsSidebar", async () => {
         await wrapper.setProps({
           span: { ...mockSpan, links: mockLinks },
         });
+
+        const linksTab = wrapper.find(
+          '[data-test="trace-details-sidebar-tabs-links"]',
+        );
+        await linksTab.trigger("click");
         await flushPromises();
         await wrapper.vm.$nextTick();
       });
@@ -625,6 +634,11 @@ describe("TraceDetailsSidebar", async () => {
         await wrapper.setProps({
           span: { ...mockSpan, links: JSON.parse(mockLinks) },
         });
+
+        const linksTab = wrapper.find(
+          '[data-test="trace-details-sidebar-tabs-links"]',
+        );
+        await linksTab.trigger("click");
         await flushPromises();
         await wrapper.vm.$nextTick();
       });
@@ -657,6 +671,11 @@ describe("TraceDetailsSidebar", async () => {
         await wrapper.setProps({
           span: { ...mockSpan, links: "invalid-json" },
         });
+
+        const linksTab = wrapper.find(
+          '[data-test="trace-details-sidebar-tabs-links"]',
+        );
+        await linksTab.trigger("click");
         await flushPromises();
         await wrapper.vm.$nextTick();
       });

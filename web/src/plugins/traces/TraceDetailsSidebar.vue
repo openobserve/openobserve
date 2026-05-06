@@ -1139,6 +1139,11 @@ export default defineComponent({
       () => {
         tags.value = {};
         spanDetails.value = getFormattedSpanDetails();
+        activeTab.value = hasSpanError.value
+          ? "error"
+          : isLLMSpan.value
+            ? "preview"
+            : "attributes";
       },
       {
         deep: true,
