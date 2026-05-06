@@ -104,7 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <q-icon name="schedule" size="12px" class="q-mr-xs" />
+            <q-icon name="schedule" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
           </q-chip>
@@ -118,7 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <q-icon name="speed" size="12px" class="q-mr-xs" />
+            <q-icon name="speed" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
           </q-chip>
@@ -131,7 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <q-icon name="access_time" size="12px" class="q-mr-xs" />
+            <q-icon name="access_time" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
           </q-chip>
@@ -145,7 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
-            <q-icon name="replay" size="12px" class="q-mr-xs" />
+            <q-icon name="replay" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
           </q-chip>
@@ -162,7 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <q-icon name="tag" size="12px" class="q-mr-xs" />
+            <q-icon name="tag" size="12px"
+class="q-mr-xs" />
             <span class="chip-value">{{ span.span_id }}</span>
             <q-icon
               name="content_copy"
@@ -220,7 +225,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <q-icon name="arrow_upward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_upward" size="10px"
+class="q-mr-xs" />
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </q-chip>
@@ -232,7 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <q-icon name="arrow_downward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_downward" size="10px"
+class="q-mr-xs" />
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </q-chip>
@@ -663,295 +670,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           No events present for this span
         </div>
       </q-tab-panel>
-      <q-tab-panel name="error">
-        <!-- Error Summary -->
-        <div
-          v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-          class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
-          :style="{
-            background: 'var(--o2-status-error-bg)',
-            borderColor: 'var(--o2-status-error-text)',
-          }"
-          data-test="trace-details-sidebar-error-summary"
-        >
-          <!-- Title row: icon + status badge + error title -->
-
-          <div class="tw:flex-col tw:items-center tw:gap-1">
-            <div
-              class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
-            >
-              {{ spanStatusCode ? "HTTP STATUS CODE" : "GRPC STATUS CODE" }}
-            </div>
-            <div class="tw:flex tw:items-center">
-              <SpanStatusCodeBadge
-                v-if="spanStatusCode || spanGrpcStatusCode"
-                :code="spanStatusCode"
-                :grpc-code="spanGrpcStatusCode"
-                class="tw:text-[0.9rem]! tw:flex! tw:items-center"
-              />
-              <span
-                class="tw:text-[0.9rem] tw:font-semibold"
-                :style="{ color: 'var(--o2-status-error-text)' }"
-                data-test="trace-details-sidebar-error-summary-title"
-              >
-                {{ statusCodeTitle }}
-              </span>
-            </div>
-          </div>
-        </div>
-        <!-- DB Response Status Code -->
-        <div
-          v-if="hasSpanError && spanDbResponseStatusCode"
-          class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
-          :style="{
-            background: 'var(--o2-status-error-bg)',
-            borderColor: 'var(--o2-status-error-text)',
-          }"
-          data-test="trace-details-sidebar-db-response-status-code"
-        >
-          <div class="tw:flex-col tw:items-center tw:gap-1">
-            <div
-              class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
-            >
-              DB RESPONSE STATUS CODE
-            </div>
-            <div class="tw:flex tw:items-center tw:pl-[0.5rem]">
-              <span
-                class="tw:text-[0.9rem] tw:font-semibold"
-                :style="{ color: 'var(--o2-status-error-text)' }"
-                data-test="trace-details-sidebar-db-response-status-code-value"
-              >
-                {{ spanDbResponseStatusCode }}
-              </span>
-            </div>
-          </div>
-        </div>
-        <!-- Process Exit Code -->
-        <div
-          v-if="hasSpanError && spanProcessExitCode"
-          class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
-          :style="{
-            background: 'var(--o2-status-error-bg)',
-            borderColor: 'var(--o2-status-error-text)',
-          }"
-          data-test="trace-details-sidebar-process-exit-code"
-        >
-          <div class="tw:flex-col tw:items-center tw:gap-1">
-            <div
-              class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
-            >
-              PROCESS EXIT CODE
-            </div>
-            <div class="tw:flex tw:items-center tw:pl-[0.5rem]">
-              <span
-                class="tw:text-[0.9rem] tw:font-semibold"
-                :style="{ color: 'var(--o2-status-error-text)' }"
-                data-test="trace-details-sidebar-process-exit-code-value"
-              >
-                {{ spanProcessExitCode }}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div
-          v-if="
-            hasSpanError &&
-            (errorBannerTitle || errorBannerMessage || spanErrorType)
-          "
-          class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
-          :style="{
-            background: 'var(--o2-status-error-bg)',
-            borderColor: 'var(--o2-status-error-text)',
-          }"
-          data-test="trace-details-sidebar-error-summary"
-        >
-          <!-- Title row: icon + status badge + error title -->
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mb-[0.25rem]">
-            <q-icon
-              name="error"
-              size="1rem"
-              class="tw:text-[var(--o2-status-error-text)]"
-            />
-            <span
-              class="tw:text-[1rem] tw:font-semibold"
-              :style="{ color: 'var(--o2-status-error-text)' }"
-              data-test="trace-details-sidebar-error-summary-title"
-            >
-              {{ errorBannerTitle }}
-            </span>
-          </div>
-          <!-- Message row -->
-          <div
-            v-if="errorBannerMessage"
-            class="tw:ml-[1.5rem] tw:text-[0.875rem] tw:mb-[0.25rem]"
-            :style="{ color: 'var(--o2-text-secondary)' }"
-            data-test="trace-details-sidebar-error-summary-message"
-          >
-            {{ errorBannerMessage }}
-          </div>
-        </div>
-
-        <!-- Exceptions Table -->
-        <template v-if="hasExceptionEvents.length">
-          <div
-            class="tw:text-[0.9rem] tw:pt-[0.325rem]! tw:font-semibold tw:pb-[0.325rem] tw:text-[var(--o2-text-secondary)]!"
-          >
-            Exceptions ({{ hasExceptionEvents.length }})
-          </div>
-          <q-table
-            ref="qTable"
-            data-test="trace-details-sidebar-exceptions-table"
-            :rows="hasExceptionEvents"
-            :columns="exceptionEventColumns"
-            row-key="name"
-            :rows-per-page-options="[0]"
-            class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
-                ? 'tab-content-with-llm-metrics'
-                : 'tab-content-without-llm-metrics'
-            "
-            dense
-          >
-            <template v-slot:body="props">
-              <q-tr
-                :data-test="`trace-event-detail-${
-                  props.row[store.state.zoConfig.timestamp_column]
-                }`"
-                :key="props.key"
-                @click="expandEvent(props.rowIndex)"
-                style="cursor: pointer"
-                class="pointer"
-              >
-                <q-td
-                  v-for="column in exceptionEventColumns"
-                  :key="props.rowIndex + '-' + column.name"
-                  class="field_list text-left"
-                  style="cursor: pointer"
-                >
-                  <div class="flex row items-center no-wrap">
-                    <q-btn
-                      v-if="column.name === '@timestamp'"
-                      :icon="
-                        expandedEvents[props.rowIndex.toString()]
-                          ? 'expand_more'
-                          : 'chevron_right'
-                      "
-                      dense
-                      size="xs"
-                      flat
-                      class="q-mr-xs"
-                      @click.stop="expandEvent(props.rowIndex)"
-                      :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
-                    ></q-btn>
-                    <span
-                      v-if="column.name !== '@timestamp'"
-                      v-html="
-                        highlightTextMatch(column.prop(props.row), searchQuery)
-                      "
-                    />
-                    <span v-else> {{ column.prop(props.row) }}</span>
-                  </div>
-                </q-td>
-              </q-tr>
-              <q-tr
-                v-if="expandedEvents[props.rowIndex.toString()]"
-                :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${props.rowIndex}`"
-              >
-                <q-td
-                  colspan="2"
-                  class="exception-details-container tw:px-[0.5rem]!"
-                >
-                  <div class="exception-content">
-                    <!-- Exception Type -->
-                    <div class="exception-field">
-                      <span
-                        class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                        >Type:</span
-                      >
-                      <span class="exception-type">{{
-                        props.row["exception.type"]
-                      }}</span>
-                    </div>
-
-                    <!-- Exception Message -->
-                    <div class="exception-field">
-                      <span
-                        class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                        >Message:</span
-                      >
-                      <div class="exception-message">
-                        {{
-                          formatExceptionMessage(props.row["exception.message"])
-                        }}
-                      </div>
-                    </div>
-
-                    <!-- Escaped -->
-                    <div class="exception-field">
-                      <span
-                        class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                        >Escaped:</span
-                      >
-                      <span class="exception-value">{{
-                        props.row["exception.escaped"]
-                      }}</span>
-                    </div>
-
-                    <!-- Stacktrace -->
-                    <div class="exception-field">
-                      <div class="stacktrace-header">
-                        <span
-                          class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                          >Stacktrace:</span
-                        >
-                        <q-btn
-                          v-if="
-                            props.row['exception.stacktrace'] &&
-                            props.row['exception.stacktrace'].trim()
-                          "
-                          flat
-                          dense
-                          size="xs"
-                          icon="content_copy"
-                          class="copy-btn"
-                          @click.stop="
-                            copyStackTrace(props.row['exception.stacktrace'])
-                          "
-                          title="Copy stacktrace"
-                        >
-                          <q-tooltip>Copy stacktrace</q-tooltip>
-                        </q-btn>
-                      </div>
-                      <div
-                        v-if="
-                          props.row['exception.stacktrace'] &&
-                          props.row['exception.stacktrace'].trim()
-                        "
-                        class="stacktrace-container"
-                      >
-                        <pre
-                          class="stacktrace-content"
-                          v-html="
-                            DOMPurify.sanitize(
-                              formatStackTrace(
-                                props.row['exception.stacktrace'],
-                              ),
-                            )
-                          "
-                        ></pre>
-                      </div>
-                      <div v-else class="stacktrace-empty">
-                        <q-icon name="info" size="16px" class="q-mr-xs" />
-                        <span>No stacktrace available</span>
-                      </div>
-                    </div>
-                  </div>
-                </q-td>
-              </q-tr>
-            </template>
-          </q-table>
-        </template>
+      <q-tab-panel name="error" class="q-pa-sm">
+        <TraceErrorTab
+          :span="span"
+          :search-query="searchQuery"
+          :show-llm-metrics="!!(isLLMSpan && llmMetrics && span.llm_model_name)"
+        />
       </q-tab-panel>
 
       <q-tab-panel name="links">
@@ -1164,13 +888,12 @@ import {
   getObservationTypeColor,
   formatModelParameters,
 } from "@/utils/llmUtils";
-import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
-import SpanStatusCodeBadge from "./components/SpanStatusCodeBadge.vue";
-import { SpanStatus } from "@/ts/interfaces/traces/span.types";
+import useTraceDetails from "@/composables/traces/useTraceDetails";
+import TraceErrorTab from "./components/TraceErrorTab.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1213,7 +936,7 @@ export default defineComponent({
     NotEqualIcon,
     AttributeValueCell,
     DeployedCode,
-    SpanStatusCodeBadge,
+    TraceErrorTab,
   },
   emits: [
     "close",
@@ -1234,68 +957,10 @@ export default defineComponent({
       attrs: {},
       events: [],
     });
-    // ---- Error detection helpers ----
 
-    const hasExceptionEvents = computed(() => {
-      return spanDetails.value?.events?.filter(
-        (event: any) => event.name === "exception",
-      );
-    });
-
-    const spanStatusCode = computed(() => {
-      const attrs = props.span;
-      if (!attrs) return null;
-      const code =
-        attrs["http_status_code"] ?? attrs["http_response_status_code"] ?? null;
-      if (code === null || code === undefined) return null;
-      const num = parseInt(String(code), 10);
-      if (isNaN(num)) return null;
-      return num >= 400 ? String(code) : null;
-    });
-
-    const spanGrpcStatusCode = computed(() => {
-      const attrs = props.span;
-      if (!attrs) return null;
-      const code =
-        attrs["rpc_grpc_status_code"] ?? attrs["grpc_status_code"] ?? null;
-      if (code === null || code === undefined) return null;
-      const num = parseInt(String(code), 10);
-      if (isNaN(num)) return null;
-      return num !== 0 ? String(code) : null;
-    });
-
-    const spanGrpcErrorName = computed(() => {
-      const attrs = props.span;
-      if (!attrs) return null;
-      return attrs["grpc_error_name"] ?? null;
-    });
-
-    const spanGrpcErrorMessage = computed(() => {
-      const attrs = props.span;
-      if (!attrs) return null;
-      return attrs["grpc_error_message"] ?? null;
-    });
-
-    const spanErrorType = computed(() => {
-      const attrs = props.span;
-      if (!attrs) return null;
-      return attrs["error_type"] ?? null;
-    });
-
-    const spanDbResponseStatusCode = computed(() => {
-      const attrs = props.span;
-      if (!attrs) return null;
-      return attrs["db_response_status_code"] ?? null;
-    });
-
-    const spanProcessExitCode = computed(() => {
-      const attrs = props.span;
-      if (!attrs) return null;
-      const code = attrs["process_exit_code"] ?? null;
-      if (code === null || code === undefined) return null;
-      const num = parseInt(String(code), 10);
-      return !isNaN(num) && num !== 0 ? String(code) : null;
-    });
+    const { hasSpanError, hasExceptionEvents } = useTraceDetails(
+      computed(() => props.span),
+    );
 
     const spanHttpResendCount = computed(() => {
       const attrs = props.span;
@@ -1305,92 +970,6 @@ export default defineComponent({
       const num = parseInt(String(count), 10);
       return !isNaN(num) && num > 0 ? num : null;
     });
-
-    const hasSpanError = computed(() => {
-      const isErrorStatus =
-        props.span?.span_status === SpanStatus.ERROR ||
-        props.span?.span_status === "ERROR";
-      if (isErrorStatus) return true;
-      if (hasExceptionEvents.value.length > 0) return true;
-      if (spanErrorType.value) return true;
-      if (spanGrpcErrorName.value || spanGrpcErrorMessage.value) return true;
-      // HTTP 5xx / 4xx also indicate errors
-      const httpCode = parseInt(String(spanStatusCode.value ?? ""), 10);
-      if (!isNaN(httpCode) && httpCode >= 400) return true;
-      if (spanDbResponseStatusCode.value) return true;
-      if (spanProcessExitCode.value) return true;
-      return false;
-    });
-
-    const errorBannerTitle = computed(() => {
-      if (hasExceptionEvents.value.length > 0) {
-        const firstExc = hasExceptionEvents.value[0];
-        return firstExc["exception.type"] || "Exception";
-      }
-      if (spanErrorType.value) return spanErrorType.value;
-      if (spanGrpcErrorName.value) return spanGrpcErrorName.value;
-      return "Error";
-    });
-
-    const statusCodeTitle = computed(() => {
-      if (spanGrpcStatusCode.value) {
-        const desc = GRPC_STATUS_MAP[String(spanGrpcStatusCode.value)];
-        return desc ? desc : `gRPC ${spanGrpcStatusCode.value}`;
-      }
-      if (spanStatusCode.value) {
-        const desc = HTTP_STATUS_MAP[String(spanStatusCode.value)];
-        return desc ? desc : `HTTP ${spanStatusCode.value}`;
-      }
-
-      return "";
-    });
-
-    const errorBannerMessage = computed(() => {
-      if (hasExceptionEvents.value.length > 0) {
-        const firstExc = hasExceptionEvents.value[0];
-        return firstExc["exception.message"] || "";
-      }
-      return props.span?.status_message || spanGrpcErrorMessage.value || "";
-    });
-
-    // Map HTTP/gRPC status codes to short human-readable labels
-    const GRPC_STATUS_MAP: Record<string, string> = {
-      "0": "OK",
-      "1": "Cancelled",
-      "2": "Unknown",
-      "3": "Invalid Argument",
-      "4": "Deadline Exceeded",
-      "5": "Not Found",
-      "6": "Already Exists",
-      "7": "Permission Denied",
-      "8": "Resource Exhausted",
-      "9": "Failed Precondition",
-      "10": "Aborted",
-      "11": "Out of Range",
-      "12": "Unimplemented",
-      "13": "Internal",
-      "14": "Unavailable",
-      "15": "Data Loss",
-      "16": "Unauthenticated",
-    };
-
-    const HTTP_STATUS_MAP: Record<string, string> = {
-      "400": "Bad Request",
-      "401": "Unauthorized",
-      "402": "Payment Required",
-      "403": "Forbidden",
-      "404": "Not Found",
-      "405": "Method Not Allowed",
-      "408": "Request Timeout",
-      "409": "Conflict",
-      "410": "Gone",
-      "429": "Too Many Requests",
-      "500": "Internal Server Error",
-      "501": "Not Implemented",
-      "502": "Bad Gateway",
-      "503": "Service Unavailable",
-      "504": "Gateway Timeout",
-    };
 
     const activeTab = ref(
       hasSpanError.value ? "error" : isLLMSpan.value ? "preview" : "attributes",
@@ -1614,7 +1193,6 @@ export default defineComponent({
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");
 
-    const expandedEvents: any = ref({});
     const eventColumns = ref([
       {
         name: "@timestamp",
@@ -1739,29 +1317,6 @@ export default defineComponent({
       return cols;
     });
 
-    const exceptionEventColumns = ref([
-      {
-        name: "@timestamp",
-        field: "@timestamp",
-        prop: (row: any) =>
-          date.formatDate(
-            Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
-          ),
-        label: "Timestamp",
-        align: "left" as const,
-        sortable: true,
-      },
-      {
-        name: "type",
-        field: "exception.type",
-        prop: (row: any) => row["exception.type"],
-        label: "Type",
-        align: "left" as const,
-        sortable: true,
-      },
-    ]);
-
     const linkColumns = ref([
       {
         name: "traceId",
@@ -1778,12 +1333,6 @@ export default defineComponent({
         sortable: true,
       },
     ]);
-
-    const expandEvent = (index: number) => {
-      if (expandedEvents.value[index.toString()])
-        delete expandedEvents.value[index.toString()];
-      else expandedEvents.value[index.toString()] = true;
-    };
 
     const getSpanKind = (id: number | string | null | undefined): string => {
       if (id === null || id === undefined || id === "") return "Unspecified";
@@ -1870,297 +1419,6 @@ export default defineComponent({
         immediate: true,
       },
     );
-    function detectStackLanguage(lines: string[]): string {
-      const sample = lines.slice(0, 20).join("\n");
-      // Check for Java/Go-style: "at com.example.Class.method(File.java:42)"
-      if (/^\s+at\s+\w+/.test(sample)) return "java";
-      // Check for Go: "goroutine" / "panic:" / "created by"
-      if (/\bgoroutine\b|\bpanic:/i.test(sample)) return "go";
-      // Check for Node/JS: "at func (/path/file.js:N:M)"
-      if (/^\s+at\s+\S+\s+\(/.test(sample)) return "node";
-      // Check for Rust: "at src/main.rs:N:M" or backtrace number prefix
-      if (/^\s+\d+:/.test(sample) || /^\s+at\s+src\//.test(sample))
-        return "rust";
-      // Default to Python
-      return "python";
-    }
-
-    function formatStackTrace(trace: any) {
-      if (!trace) return "";
-
-      const lines = trace.split("\n");
-      const lang = detectStackLanguage(lines);
-
-      if (lang === "java") {
-        return formatJavaStackTrace(lines);
-      } else if (lang === "go") {
-        return formatGoStackTrace(lines);
-      } else if (lang === "node") {
-        return formatNodeStackTrace(lines);
-      } else if (lang === "rust") {
-        return formatRustStackTrace(lines);
-      }
-
-      return formatPythonStackTrace(lines);
-    }
-
-    function formatPythonStackTrace(lines: string[]): string {
-      const formattedLines = lines.map((line: string) => {
-        const trimmed = line.trim();
-
-        if (!trimmed) return '<div class="stack-line stack-empty"></div>';
-
-        // File "path", line N, in func
-        if (trimmed.startsWith("File ")) {
-          const fileMatch = line.match(
-            /(File\s+)"([^"]+)"(,\s+line\s+)(\d+)(,\s+in\s+)(.+)/,
-          );
-          if (fileMatch) {
-            return `<div class="stack-line stack-file">  ${escapeHtml(fileMatch[1])}<span class="stack-path">"${escapeHtml(fileMatch[2])}"</span>${escapeHtml(fileMatch[3])}<span class="stack-lineno">${escapeHtml(fileMatch[4])}</span>${escapeHtml(fileMatch[5])}<span class="stack-function">${escapeHtml(fileMatch[6])}</span></div>`;
-          }
-        }
-
-        // raise ExceptionName
-        if (trimmed.startsWith("raise ") || trimmed.includes("raise ")) {
-          const highlighted = escapeHtml(line).replace(
-            /(raise\s+)(\w+)/,
-            '<span class="stack-keyword">$1</span><span class="stack-exception">$2</span>',
-          );
-          return `<div class="stack-line stack-raise">${highlighted}</div>`;
-        }
-
-        // Traceback header
-        if (trimmed.startsWith("Traceback ")) {
-          return `<div class="stack-line stack-traceback"><span class="stack-traceback-header">${escapeHtml(line)}</span></div>`;
-        }
-
-        // "During handling" messages
-        if (trimmed.startsWith("During handling of")) {
-          return `<div class="stack-line stack-during"><span class="stack-during-text">${escapeHtml(line)}</span></div>`;
-        }
-
-        // Indented code lines
-        if (line.startsWith("    ") && !trimmed.startsWith("File ")) {
-          let highlighted = escapeHtml(line)
-            .replace(
-              /(return|await|async|yield|raise|for|if|else|try|except|finally|with|as|import|from)\s/g,
-              '<span class="stack-keyword">$1</span> ',
-            )
-            .replace(/(\w+\()/g, '<span class="stack-call">$1</span>')
-            .replace(/(\.\.\.)/g, '<span class="stack-ellipsis">$1</span>');
-          return `<div class="stack-line stack-code">${highlighted}</div>`;
-        }
-
-        // Error type at end (e.g., httpx.HTTPStatusError: ...)
-        if (trimmed.match(/^\w+\.\w+Error:/)) {
-          const errorMatch = line.match(/^(\s*)(\w+(?:\.\w+)*Error:)(.+)/);
-          if (errorMatch) {
-            return `<div class="stack-line stack-error">${escapeHtml(errorMatch[1])}<span class="stack-exception">${escapeHtml(errorMatch[2])}</span><span class="stack-error-msg">${escapeHtml(errorMatch[3])}</span></div>`;
-          }
-        }
-
-        return `<div class="stack-line">${escapeHtml(line)}</div>`;
-      });
-
-      return formattedLines.join("");
-    }
-
-    function formatJavaStackTrace(lines: string[]): string {
-      const formattedLines = lines.map((line: string) => {
-        const trimmed = line.trim();
-
-        if (!trimmed) return '<div class="stack-line stack-empty"></div>';
-
-        // at com.example.Class.method(File.java:42)
-        const javaAtMatch = trimmed.match(
-          /^(at\s+)([\w.]+)\.([\w<>$]+)\(([\w.]+):(\d+)\)/,
-        );
-        if (javaAtMatch) {
-          return `<div class="stack-line stack-java-at">  <span class="stack-keyword">${escapeHtml(javaAtMatch[1])}</span><span class="stack-java-package">${escapeHtml(javaAtMatch[2])}</span>.<span class="stack-function">${escapeHtml(javaAtMatch[3])}</span>(<span class="stack-path">${escapeHtml(javaAtMatch[4])}</span>:<span class="stack-lineno">${escapeHtml(javaAtMatch[5])}</span>)</div>`;
-        }
-
-        // Caused by: java.exception.Type: message
-        if (trimmed.startsWith("Caused by:")) {
-          const causedMatch = trimmed.match(
-            /^(Caused by:\s+)([\w.]+)(:?\s*)(.*)/,
-          );
-          if (causedMatch) {
-            return `<div class="stack-line stack-java-caused"><span class="stack-keyword">${escapeHtml(causedMatch[1])}</span><span class="stack-exception">${escapeHtml(causedMatch[2])}</span><span class="stack-error-msg">${escapeHtml(causedMatch[3])}${escapeHtml(causedMatch[4])}</span></div>`;
-          }
-        }
-
-        // Exception type header: java.exception.Type: message
-        if (
-          trimmed.match(/^[\w.]+Exception:/) ||
-          trimmed.match(/^[\w.]+Error:/)
-        ) {
-          const excMatch = trimmed.match(
-            /^([\w.]+(?:Exception|Error))(:?\s*)(.*)/,
-          );
-          if (excMatch) {
-            return `<div class="stack-line stack-error"><span class="stack-exception">${escapeHtml(excMatch[1])}</span><span class="stack-error-msg">${escapeHtml(excMatch[2])}${escapeHtml(excMatch[3])}</span></div>`;
-          }
-        }
-
-        // "..." ellipsis (suppressed frames)
-        if (trimmed.match(/^\.\.\.\s+\d+\s+more/)) {
-          return `<div class="stack-line stack-ellipsis-line"><span class="stack-ellipsis">${escapeHtml(line)}</span></div>`;
-        }
-
-        return `<div class="stack-line">${escapeHtml(line)}</div>`;
-      });
-
-      return formattedLines.join("");
-    }
-
-    function formatGoStackTrace(lines: string[]): string {
-      const formattedLines = lines.map((line: string) => {
-        const trimmed = line.trim();
-
-        if (!trimmed) return '<div class="stack-line stack-empty"></div>';
-
-        // panic: message
-        if (trimmed.startsWith("panic:")) {
-          return `<div class="stack-line stack-go-panic"><span class="stack-keyword">${escapeHtml(trimmed)}</span></div>`;
-        }
-
-        // goroutine N [state]:
-        if (trimmed.startsWith("goroutine ")) {
-          return `<div class="stack-line stack-go-routine"><span class="stack-keyword">${escapeHtml(trimmed)}</span></div>`;
-        }
-
-        // created by package.func
-        if (trimmed.startsWith("created by ")) {
-          return `<div class="stack-line stack-go-created"><span class="stack-keyword">${escapeHtml(trimmed)}</span></div>`;
-        }
-
-        // file.go:42 +0xNNN (stack frame)
-        const goFrameMatch = trimmed.match(
-          /^(.+)\(.*\)\s+([\w./-]+):(\d+)\s+\+0x[0-9a-f]+/,
-        );
-        if (goFrameMatch) {
-          return `<div class="stack-line stack-go-frame">  <span class="stack-function">${escapeHtml(goFrameMatch[1])}</span>(...)<br/>      <span class="stack-path">${escapeHtml(goFrameMatch[2])}</span>:<span class="stack-lineno">${escapeHtml(goFrameMatch[3])}</span></div>`;
-        }
-
-        return `<div class="stack-line">${escapeHtml(line)}</div>`;
-      });
-
-      return formattedLines.join("");
-    }
-
-    function formatNodeStackTrace(lines: string[]): string {
-      const formattedLines = lines.map((line: string) => {
-        const trimmed = line.trim();
-
-        if (!trimmed) return '<div class="stack-line stack-empty"></div>';
-
-        // ErrorType: message
-        if (trimmed.match(/^\w+(Error|Exception):/)) {
-          const excMatch = trimmed.match(
-            /^(\w+(?:Error|Exception))(:?\s*)(.*)/,
-          );
-          if (excMatch) {
-            return `<div class="stack-line stack-error"><span class="stack-exception">${escapeHtml(excMatch[1])}</span><span class="stack-error-msg">${escapeHtml(excMatch[2])}${escapeHtml(excMatch[3])}</span></div>`;
-          }
-        }
-
-        // at functionName (/path/to/file.js:42:15)
-        const nodeAtMatch = trimmed.match(
-          /^(at\s+)([\w.<>$\s]+?)\s+\(([^)]+):(\d+):(\d+)\)/,
-        );
-        if (nodeAtMatch) {
-          return `<div class="stack-line stack-node-at">  <span class="stack-keyword">${escapeHtml(nodeAtMatch[1])}</span><span class="stack-function">${escapeHtml(nodeAtMatch[2])}</span> (<span class="stack-path">${escapeHtml(nodeAtMatch[3])}</span>:<span class="stack-lineno">${escapeHtml(nodeAtMatch[4])}</span>:<span class="stack-lineno">${escapeHtml(nodeAtMatch[5])}</span>)</div>`;
-        }
-
-        return `<div class="stack-line">${escapeHtml(line)}</div>`;
-      });
-
-      return formattedLines.join("");
-    }
-
-    function formatRustStackTrace(lines: string[]): string {
-      const formattedLines = lines.map((line: string) => {
-        const trimmed = line.trim();
-
-        if (!trimmed) return '<div class="stack-line stack-empty"></div>';
-
-        // Numbered frame: "   N: function::name"
-        const rustNumMatch = trimmed.match(/^(\d+):\s+(.+)/);
-        if (rustNumMatch) {
-          return `<div class="stack-line stack-rust-frame"><span class="stack-lineno">${escapeHtml(rustNumMatch[1])}</span>: <span class="stack-function">${escapeHtml(rustNumMatch[2])}</span></div>`;
-        }
-
-        // "at path/file.rs:N:M"
-        const rustAtMatch = trimmed.match(/^(at\s+)([\w./-]+\.rs):(\d+):(\d+)/);
-        if (rustAtMatch) {
-          return `<div class="stack-line stack-rust-loc">   <span class="stack-keyword">${escapeHtml(rustAtMatch[1])}</span><span class="stack-path">${escapeHtml(rustAtMatch[2])}</span>:<span class="stack-lineno">${escapeHtml(rustAtMatch[3])}</span>:<span class="stack-lineno">${escapeHtml(rustAtMatch[4])}</span></div>`;
-        }
-
-        // Error: message
-        if (trimmed.startsWith("Error:")) {
-          return `<div class="stack-line stack-rust-panic"><span class="stack-exception">${escapeHtml(trimmed)}</span></div>`;
-        }
-
-        return `<div class="stack-line">${escapeHtml(line)}</div>`;
-      });
-
-      return formattedLines.join("");
-    }
-
-    function formatExceptionMessage(message: any) {
-      if (!message) return "";
-
-      // Try to format as JSON if it looks like JSON
-      if (
-        typeof message === "string" &&
-        (message.includes("{") || message.includes("["))
-      ) {
-        try {
-          // Extract JSON parts and format them
-          const jsonMatch = message.match(/\{[^}]+\}/g);
-          if (jsonMatch) {
-            let formatted = message;
-            jsonMatch.forEach((json) => {
-              try {
-                const parsed = JSON.parse(json);
-                const pretty = JSON.stringify(parsed, null, 2);
-                formatted = formatted.replace(json, "\n" + pretty);
-              } catch {
-                // Keep original if can't parse
-              }
-            });
-            return formatted;
-          }
-        } catch {
-          // Keep original if parsing fails
-        }
-      }
-
-      return message;
-    }
-
-    function copyStackTrace(stacktrace: string) {
-      if (!stacktrace) return;
-
-      navigator.clipboard
-        .writeText(stacktrace)
-        .then(() => {
-          $q.notify({
-            message: "Stacktrace copied to clipboard",
-            color: "positive",
-            position: "top",
-            timeout: 2000,
-          });
-        })
-        .catch(() => {
-          $q.notify({
-            message: "Failed to copy stacktrace",
-            color: "negative",
-            position: "top",
-            timeout: 2000,
-          });
-        });
-    }
 
     const viewSpanLogs = () => {
       const queryDetails = buildQueryDetails(props.span);
@@ -2645,8 +1903,6 @@ export default defineComponent({
       filterActions,
       closeSidebar,
       eventColumns,
-      expandedEvents,
-      expandEvent,
       eventsWrap,
       eventsTableColumns,
       handleEventsColumnOrder,
@@ -2655,22 +1911,8 @@ export default defineComponent({
       spanDetails,
       store,
       tags,
-      formatStackTrace,
-      formatExceptionMessage,
-      copyStackTrace,
       hasExceptionEvents,
-      exceptionEventColumns,
       hasSpanError,
-      errorBannerTitle,
-      statusCodeTitle,
-      errorBannerMessage,
-      spanStatusCode,
-      spanGrpcStatusCode,
-      spanErrorType,
-      spanGrpcErrorName,
-      spanGrpcErrorMessage,
-      spanDbResponseStatusCode,
-      spanProcessExitCode,
       spanHttpResendCount,
       navigateToError,
       getDuration,
@@ -2708,7 +1950,6 @@ export default defineComponent({
       isFullscreen,
       toggleFullscreen,
       isDarkMode,
-      DOMPurify,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,
@@ -3556,281 +2797,6 @@ body.body--dark {
     th {
       background-color: #424242 !important;
     }
-  }
-}
-
-// Exception Details Styling
-.exception-details-container {
-  padding: 0.75rem !important;
-  font-size: 12px;
-  font-family:
-    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
-  background-color: var(--o2-code-bg);
-}
-
-.exception-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.exception-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.exception-label {
-  font-weight: 700;
-  color: var(--o2-text-primary);
-  font-size: 0.75rem;
-  margin-bottom: 0;
-  padding: 0.25rem 0;
-}
-
-.exception-type {
-  color: #d32f2f;
-  font-weight: 600;
-  background: rgba(211, 47, 47, 0.1);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  display: inline-block;
-}
-
-.exception-message {
-  color: var(--o2-text-secondary);
-  background: rgba(0, 0, 0, 0.05);
-  padding: 0.5rem;
-  border-radius: 4px;
-  border-left: 3px solid #ff9800;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.5;
-}
-
-.exception-value {
-  color: var(--o2-text-secondary);
-}
-
-.stacktrace-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-
-  .copy-btn {
-    margin-left: auto;
-    color: var(--o2-text-secondary);
-    opacity: 0.7;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.stacktrace-container {
-  background: #f8f9fa;
-  border-radius: 4px;
-  border: 1px solid #dee2e6;
-  overflow: auto;
-  max-height: 600px;
-  padding: 0.75rem;
-}
-
-.stacktrace-content {
-  margin: 0;
-  padding: 0;
-  font-size: 11px;
-  line-height: 1.6;
-  color: #2c3e50;
-  font-family:
-    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-
-  .stack-line {
-    padding: 2px 0;
-  }
-
-  .stack-empty {
-    height: 0.5em;
-  }
-
-  .stack-file {
-    color: #0066cc;
-    font-weight: 500;
-  }
-
-  .stack-path {
-    color: #d63384;
-  }
-
-  .stack-lineno {
-    color: #087990;
-    font-weight: 600;
-  }
-
-  .stack-function {
-    color: #6f42c1;
-  }
-
-  .stack-keyword {
-    color: #8250df;
-    font-weight: 600;
-  }
-
-  .stack-exception {
-    color: #d73a49;
-    font-weight: 600;
-  }
-
-  .stack-traceback {
-    color: #6c757d;
-    font-style: italic;
-  }
-
-  .stack-traceback-header {
-    color: #6c757d;
-    font-weight: 600;
-  }
-
-  .stack-during {
-    color: #6c757d;
-    margin: 0.5em 0;
-  }
-
-  .stack-during-text {
-    font-style: italic;
-  }
-
-  .stack-code {
-    color: #2c3e50;
-    padding-left: 2em;
-  }
-
-  .stack-call {
-    color: #0969da;
-  }
-
-  .stack-ellipsis {
-    color: #6c757d;
-  }
-
-  .stack-error {
-    margin-top: 0.5em;
-  }
-
-  .stack-error-msg {
-    color: #2c3e50;
-  }
-
-  .stack-raise {
-    color: #d73a49;
-  }
-}
-
-.stacktrace-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background: #f8f9fa;
-  border: 1px dashed #dee2e6;
-  border-radius: 4px;
-  color: #6c757d;
-  font-size: 12px;
-  font-style: italic;
-}
-
-// Dark Mode Adjustments
-body.body--dark {
-  .exception-details-container {
-    background-color: #1a1a1a;
-  }
-
-  .exception-type {
-    color: #ef5350;
-    background: rgba(239, 83, 80, 0.15);
-  }
-
-  .exception-message {
-    background: rgba(255, 255, 255, 0.05);
-    border-left-color: #ffb74d;
-    color: #e0e0e0;
-  }
-
-  .stacktrace-container {
-    background: #0d0d0d;
-    border-color: #2a2a2a;
-  }
-
-  .stacktrace-content {
-    color: #d4d4d4;
-
-    .stack-file {
-      color: #9cdcfe;
-    }
-
-    .stack-path {
-      color: #ce9178;
-    }
-
-    .stack-lineno {
-      color: #b5cea8;
-    }
-
-    .stack-function {
-      color: #dcdcaa;
-    }
-
-    .stack-keyword {
-      color: #c586c0;
-    }
-
-    .stack-exception {
-      color: #f48771;
-    }
-
-    .stack-traceback {
-      color: #808080;
-    }
-
-    .stack-traceback-header {
-      color: #808080;
-    }
-
-    .stack-during {
-      color: #808080;
-    }
-
-    .stack-code {
-      color: #d4d4d4;
-    }
-
-    .stack-call {
-      color: #4ec9b0;
-    }
-
-    .stack-ellipsis {
-      color: #808080;
-    }
-
-    .stack-error-msg {
-      color: #d4d4d4;
-    }
-
-    .stack-raise {
-      color: #f48771;
-    }
-  }
-
-  .stacktrace-empty {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: #4a5568;
-    color: #a0aec0;
   }
 }
 </style>
