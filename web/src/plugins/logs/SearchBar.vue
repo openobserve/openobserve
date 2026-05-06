@@ -534,6 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="searchObj.meta.quickMode"
                         size="xs"
                         flat
+                        data-test="logs-search-bar-quick-mode-toggle"
                         class="o2-toggle-button-xs"
                         :class="
                           store.state.theme === 'dark'

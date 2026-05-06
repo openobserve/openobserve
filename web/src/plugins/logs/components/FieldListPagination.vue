@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="opt in selectedFieldsBtnGroupOption"
           :key="opt.value"
           :value="opt.value"
+          :data-test="opt.slot === 'all_fields_slot' ? 'logs-all-fields-btn' : 'logs-interesting-fields-btn'"
         >
           <template v-if="opt.slot === 'all_fields_slot'">
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
