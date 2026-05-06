@@ -1162,10 +1162,14 @@ export default defineComponent({
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
 
+    const spanDetails: any = ref({
+      attrs: {},
+      events: [],
+    });
     // ---- Error detection helpers ----
 
     const hasExceptionEvents = computed(() => {
-      return spanDetails.value.events.filter(
+      return spanDetails.value?.events?.filter(
         (event: any) => event.name === "exception",
       );
     });
@@ -1312,10 +1316,7 @@ export default defineComponent({
     const closeSidebar = () => {
       emit("close");
     };
-    const spanDetails: any = ref({
-      attrs: {},
-      events: [],
-    });
+
     const pagination: any = ref({
       rowsPerPage: 0,
     });

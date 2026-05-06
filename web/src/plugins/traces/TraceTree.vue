@@ -98,8 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex span-row"
           :class="{
             'span-row-selected':
-              (spans as any[])[virtualRow.index].spanId === selectedSpanId,
+              (spans as any[])[virtualRow.index].spanId === highlightedSpanId,
           }"
+          @mouseleave="onUnhoverSpan"
           :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
         >
           <div :style="{ width: leftWidth + 'px' }" class="tw:pl-[0.375rem]">
@@ -128,8 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
                 @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
                 @mouseover="
-                  selectedSpanId &&
-                  selectSpan((spans as any[])[virtualRow.index].spanId)
+                  onHoverSpan((spans as any[])[virtualRow.index].spanId)
                 "
               >
                 <div
@@ -475,6 +475,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    hoveredSpanId: {
+      type: String,
+      default: "",
+    },
     isSidebarOpen: {
       type: Boolean,
       default: false,
@@ -487,6 +491,8 @@ export default defineComponent({
   emits: [
     "toggleCollapse",
     "selectSpan",
+    "hoverSpan",
+    "unhoverSpan",
     "update-current-index",
     "search-result",
   ],
@@ -509,6 +515,10 @@ export default defineComponent({
 
     const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
     const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+
+    const highlightedSpanId = computed(
+      () => props.hoveredSpanId || props.selectedSpanId,
+    );
 
     onMounted(() => {
       if (props.selectedSpanId) {
@@ -575,6 +585,12 @@ export default defineComponent({
     }
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
+    };
+    const onHoverSpan = (spanId: string) => {
+      emit("hoverSpan", spanId);
+    };
+    const onUnhoverSpan = () => {
+      emit("unhoverSpan");
     };
 
     const viewSpanLogs = (span: any) => {
@@ -784,6 +800,9 @@ export default defineComponent({
     return {
       toggleSpanCollapse,
       selectSpan,
+      onHoverSpan,
+      onUnhoverSpan,
+      highlightedSpanId,
       store,
       viewSpanLogs,
       t,
