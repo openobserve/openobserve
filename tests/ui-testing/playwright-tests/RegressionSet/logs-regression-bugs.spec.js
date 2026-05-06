@@ -901,15 +901,22 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(1000);
 
-    // Select a second stream to enable multi-stream mode
-    // Use the page object's selectIndexAndStreamJoinUnion or direct stream toggle
-    testLogger.info('Selecting additional stream for multi-stream mode');
+    // Ingest data into a second stream for multi-stream testing
+    const secondStream = `e2e_multistream_${Date.now()}`;
+    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
+    await ingestTestData(page, secondStream);
+    await page.waitForTimeout(2000);
+
+    // Select second stream via search
+    testLogger.info('Selecting second stream for multi-stream mode');
     await page.locator('[data-test="log-search-index-list-select-stream"]').click();
     await page.waitForTimeout(500);
-    const secondStreamToggle = page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first();
-    if (await secondStreamToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await page.locator('[data-test="log-search-index-list-select-stream"]').fill(secondStream);
+    await page.waitForTimeout(1000);
+    const secondStreamToggle = page.locator(`[data-test="log-search-index-list-stream-toggle-${secondStream}"] div`).first();
+    if (await secondStreamToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
       await secondStreamToggle.click();
-      testLogger.info('Second stream (default) selected for multi-stream mode');
+      testLogger.info(`Second stream (${secondStream}) selected for multi-stream mode`);
     }
     await page.waitForTimeout(1000);
 
@@ -1178,10 +1185,11 @@ test.describe("Logs Regression Bug Fixes", () => {
     if (await streamDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
       await streamDropdown.click();
       await page.waitForTimeout(500);
-      const defaultToggle = page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first();
-      if (await defaultToggle.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await defaultToggle.click();
-        testLogger.info('Switched stream selection during query');
+      // Toggle off e2e_automate stream (the test stream being queried)
+      const automateToggle = page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first();
+      if (await automateToggle.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await automateToggle.click();
+        testLogger.info('Deselected e2e_automate stream during query');
       }
     }
 
