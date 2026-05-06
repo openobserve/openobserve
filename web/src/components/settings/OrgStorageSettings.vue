@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ========== NOT CONFIGURED: cloud hero ========== -->
     <div
-      v-else-if="true"
+      v-else-if="!isConfigured && isCloud"
       class="hero-page"
       :class="store.state.theme === 'dark' ? 'hero-page--dark' : ''"
     >
