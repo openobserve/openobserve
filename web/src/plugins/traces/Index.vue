@@ -402,7 +402,8 @@ const toggleErrorDetails = () => {
 };
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams();
-const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
+const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } =
+  useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
@@ -1292,17 +1293,14 @@ async function extractFields() {
         schema.map((row: any) => [row.name, row.type]),
       );
       Object.keys(importantFields).forEach((rowName) => {
-        if (fields[rowName] == undefined) {
-          fields[rowName] = {};
-          searchObj.data.stream.selectedStreamFields.push({
-            name: rowName,
-            ftsKey: ftsKeys.has(rowName),
-            showValues: !idFields[rowName],
-            label: rowName,
-            dataType: schemaTypeMap.get(rowName),
-            isSchemaField: true,
-          });
-        }
+        fields[rowName] = {};
+        searchObj.data.stream.selectedStreamFields.push({
+          name: rowName,
+          ftsKey: ftsKeys.has(rowName),
+          showValues: !idFields[rowName],
+          dataType: schemaTypeMap.get(rowName),
+          isSchemaField: true,
+        });
       });
 
       schema.forEach((row: any) => {
@@ -1322,23 +1320,31 @@ async function extractFields() {
 
       // Apply field grouping
       try {
-        const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
-        const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
-          isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
-          loadKeyFields(),
-          loadFieldGrouping(),
-        ]);
+        const isEnterprise =
+          config.isEnterprise === "true" || config.isCloud === "true";
+        const [semanticAliases, keyFieldsConfig, fieldGrouping] =
+          await Promise.all([
+            isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
+            loadKeyFields(),
+            loadFieldGrouping(),
+          ]);
         const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
           ? (fieldGrouping as FieldGroupingConfig)
           : null;
         const semanticIndex =
-          semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
+          semanticAliases.length > 0
+            ? buildSemanticIndex(semanticAliases, grouping)
+            : null;
         const keySpec = (keyFieldsConfig as KeyFieldsConfig)["traces"] ?? {
           fields: [],
           groups: [],
         };
-        const keyFieldSet = new Set(keySpec.fields.map((f: string) => f.toLowerCase()));
-        const keyGroupSet = new Set(keySpec.groups.map((g: string) => g.toLowerCase()));
+        const keyFieldSet = new Set(
+          keySpec.fields.map((f: string) => f.toLowerCase()),
+        );
+        const keyGroupSet = new Set(
+          keySpec.groups.map((g: string) => g.toLowerCase()),
+        );
 
         searchObj.data.stream.selectedStreamFields = applyFieldGrouping(
           searchObj.data.stream.selectedStreamFields as FieldObj[],
@@ -1347,7 +1353,10 @@ async function extractFields() {
           keyGroupSet,
         );
       } catch (groupErr) {
-        console.warn("Field grouping failed for traces, using flat list", groupErr);
+        console.warn(
+          "Field grouping failed for traces, using flat list",
+          groupErr,
+        );
       }
     }
   } catch (e) {

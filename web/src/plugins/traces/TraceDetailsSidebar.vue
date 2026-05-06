@@ -349,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-type="input"
                   :span="span"
                   view-mode="formatted"
+                  :instance-id="`${span.span_id}-input`"
                 />
               </div>
             </div>
@@ -396,6 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-type="output"
                   :span="span"
                   view-mode="formatted"
+                  :instance-id="`${span.span_id}-output`"
                 />
               </div>
             </div>
@@ -2823,20 +2825,11 @@ body.body--dark {
     overflow-x: hidden;
     background-color: var(--o2-code-bg);
 
-    // Enhance hover visibility for code/text content (exclude VueJsonPretty)
+    // Enhance hover visibility for code/text content
     ::v-deep {
       .plain-text-content {
         &:hover {
           background-color: rgba(0, 0, 0, 0.04) !important;
-        }
-      }
-
-      // Don't apply hover to VueJsonPretty elements
-      .vjs-tree {
-        * {
-          &:hover {
-            background-color: transparent !important;
-          }
         }
       }
     }
@@ -2895,15 +2888,6 @@ body.body--dark {
       .plain-text-content {
         &:hover {
           background-color: rgba(255, 255, 255, 0.05) !important;
-        }
-      }
-
-      // Don't apply hover to VueJsonPretty elements in dark mode
-      .vjs-tree {
-        * {
-          &:hover {
-            background-color: transparent !important;
-          }
         }
       }
     }
