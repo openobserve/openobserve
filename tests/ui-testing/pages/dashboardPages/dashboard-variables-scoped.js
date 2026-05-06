@@ -1334,7 +1334,7 @@ export default class DashboardVariablesScoped {
 
         // If this is not the first item, add a new option
         if (i > 0) {
-          await this.page.locator('button:has-text("Add Option")').click();
+          await this.page.locator('[data-test="dashboard-add-option-btn"]').click();
           await this.page.waitForTimeout(300);
         }
 
