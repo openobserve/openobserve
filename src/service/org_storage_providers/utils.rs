@@ -74,16 +74,20 @@ pub fn get_gcp(
     config: GcpCredentials,
 ) -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
     let cfg = get_config();
-    let builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
+    let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
                 .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
                 .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
         )
-        .with_url(&config.server_url)
         .with_bucket_name(&config.bucket_name)
         .with_service_account_path(&config.access_key);
+
+    if !config.server_url.is_empty() {
+        builder = builder.with_url(&config.server_url);
+    }
+
     builder.build()
 }
 
