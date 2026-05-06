@@ -278,13 +278,6 @@ impl AuthExtractorRejection {
             status_code: StatusCode::UNAUTHORIZED,
         }
     }
-
-    fn forbidden(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-            status_code: StatusCode::FORBIDDEN,
-        }
-    }
 }
 
 impl IntoResponse for AuthExtractorRejection {
