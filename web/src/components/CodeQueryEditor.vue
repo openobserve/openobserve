@@ -112,6 +112,14 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showLineNumbers: {
+      type: Boolean,
+      default: true,
+    },
+    stickyScroll: {
+      type: Boolean,
+      default: true,
+    },
     language: {
       type: String,
       default: "sql",
@@ -659,7 +667,7 @@ export default defineComponent({
         folding: enableCodeFolding.value,
         wordWrap: "on",
         automaticLayout: true,
-        lineNumbers: "on",
+        lineNumbers: props.showLineNumbers ? "on" : "off",
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
         fixedOverflowWidgets: true,
@@ -682,6 +690,9 @@ export default defineComponent({
         minimap: { enabled: false },
         readOnly: props.readOnly,
         renderValidationDecorations: "on",
+        stickyScroll: {
+          enabled: props.stickyScroll,
+        },
       });
 
       editorObj.onDidChangeModelContent(
@@ -840,6 +851,16 @@ export default defineComponent({
       () => props.readOnly,
       () => {
         editorObj?.updateOptions({ readOnly: props.readOnly });
+      },
+    );
+
+    // update lineNumbers when prop value changes
+    watch(
+      () => props.showLineNumbers,
+      () => {
+        editorObj?.updateOptions({
+          lineNumbers: props.showLineNumbers ? "on" : "off",
+        });
       },
     );
 

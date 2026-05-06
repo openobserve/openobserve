@@ -95,4 +95,31 @@ mod tests {
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
         assert_eq!(visitor.name.len(), 1);
     }
+
+    #[test]
+    fn test_name_visitor_new_starts_empty() {
+        let visitor = MetricNameVisitor::new();
+        assert!(visitor.name.is_empty());
+    }
+
+    #[test]
+    fn test_name_visitor_no_name_label_selector_inserts_empty_string() {
+        // A selector with no explicit metric name (only label matchers) gives name = None
+        let promql = r#"{job="test"}"#;
+        let ast = parser::parse(promql).unwrap();
+        let mut visitor = MetricNameVisitor::new();
+        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        // name field is None → get_name_from_expr returns "" → inserted into set
+        assert!(visitor.name.contains(""));
+    }
+
+    #[test]
+    fn test_name_visitor_non_selector_expr_ignored() {
+        // A scalar literal has no VectorSelector/MatrixSelector, so nothing is added
+        let promql = "1 + 2";
+        let ast = parser::parse(promql).unwrap();
+        let mut visitor = MetricNameVisitor::new();
+        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        assert!(visitor.name.is_empty());
+    }
 }

@@ -53,3 +53,18 @@ enum CipherKeys {
     Table,
     IsSystem,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20260414_000001_add_is_system_to_cipher_keys"
+        );
+    }
+}

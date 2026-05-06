@@ -786,4 +786,49 @@ mod tests {
         assert_eq!(weeks_json, r#""weeks""#);
         assert_eq!(cron_json, r#""cron""#);
     }
+
+    #[test]
+    fn test_report_dashboard_variable_id_none_absent_from_json() {
+        let v = ReportDashboardVariable {
+            key: "k".to_string(),
+            value: "v".to_string(),
+            id: None,
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("id"));
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_id_some_present_in_json() {
+        let v = ReportDashboardVariable {
+            key: "k".to_string(),
+            value: "v".to_string(),
+            id: Some("var_id_1".to_string()),
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("id"));
+        assert_eq!(obj["id"], serde_json::json!("var_id_1"));
+    }
+
+    #[test]
+    fn test_report_dashboard_attachment_dimensions_none_absent() {
+        let d = ReportDashboard {
+            dashboard: "dash1".to_string(),
+            folder: "default".to_string(),
+            tabs: vec!["tab1".to_string()],
+            variables: vec![],
+            timerange: ReportTimerange::default(),
+            report_type: ReportMediaType::default(),
+            email_attachment_type: ReportEmailAttachmentType::default(),
+            attachment_dimensions: None,
+        };
+        let json = serde_json::to_value(&d).unwrap();
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("attachment_dimensions")
+        );
+    }
 }

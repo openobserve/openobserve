@@ -30,3 +30,31 @@ pub fn set_running(stream: &str) {
 pub fn clear_running(stream: &str) {
     STREAMS.remove(stream);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_running_returns_false_for_unknown_stream() {
+        assert!(!is_running("compact_test_unknown_xyz_12345"));
+    }
+
+    #[test]
+    fn test_set_running_makes_stream_active() {
+        let stream = "compact_test_set_running_abc_99";
+        assert!(!is_running(stream));
+        set_running(stream);
+        assert!(is_running(stream));
+        clear_running(stream);
+    }
+
+    #[test]
+    fn test_clear_running_removes_stream() {
+        let stream = "compact_test_clear_running_def_88";
+        set_running(stream);
+        assert!(is_running(stream));
+        clear_running(stream);
+        assert!(!is_running(stream));
+    }
+}

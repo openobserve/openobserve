@@ -23,3 +23,28 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: 1,
+            org: "myorg".to_string(),
+            service: Some("api".to_string()),
+            env: Some("prod".to_string()),
+            version: Some("1.0.0".to_string()),
+            source_file_name: "main.js".to_string(),
+            source_map_file_name: "main.js.map".to_string(),
+            file_store_id: "store-1".to_string(),
+            file_type: 0,
+            created_at: 1000,
+            cluster: "cluster-1".to_string(),
+        };
+        assert_eq!(m.id, 1);
+        assert_eq!(m.source_file_name, "main.js");
+        assert_eq!(m.service.as_deref(), Some("api"));
+    }
+}

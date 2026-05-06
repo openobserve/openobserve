@@ -103,6 +103,7 @@ mod tests {
     use datafusion::{
         common::Result,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
+        physical_optimizer::PhysicalOptimizerRule,
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
@@ -113,6 +114,18 @@ mod tests {
         planner::extension_planner::OpenobserveQueryPlanner,
         table_provider::empty_table::NewEmptyTable,
     };
+
+    #[test]
+    fn test_join_reorder_rule_name() {
+        let rule = JoinReorderRule::new();
+        assert_eq!(rule.name(), "JoinReorderRule");
+    }
+
+    #[test]
+    fn test_join_reorder_rule_schema_check() {
+        let rule = JoinReorderRule::new();
+        assert!(rule.schema_check());
+    }
 
     #[tokio::test]
     async fn test_join_reorder() -> Result<()> {

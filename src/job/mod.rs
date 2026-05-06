@@ -130,6 +130,70 @@ async fn patch_sre_readonly_eval_templates() {
 }
 
 #[cfg(feature = "enterprise")]
+async fn patch_sre_readonly_alerts_incidents() {
+    use bytes::Bytes;
+
+    const MIGRATION_ORG: &str = "_migration";
+    const FLAG_KEY: &str = "sre_readonly_afolder_incidents_v1";
+
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
+        return;
+    }
+
+    let is_leader = infra::cluster::get_cached_online_nodes()
+        .await
+        .and_then(|mut nodes| {
+            nodes.sort_by_key(|n| n.id);
+            nodes.into_iter().next()
+        })
+        .map(|first| first.id == LOCAL_NODE.id)
+        .unwrap_or(true);
+
+    if !is_leader {
+        log::debug!("patch_sre_readonly_alerts_incidents: not the lowest-id node, skipping");
+        return;
+    }
+
+    let orgs = match crate::service::db::organization::list(None).await {
+        Ok(orgs) => orgs,
+        Err(e) => {
+            log::error!("Failed to list orgs for sre-readonly alerts/incidents patch: {e}");
+            return;
+        }
+    };
+
+    let mut failed = false;
+    for org in orgs {
+        if let Err(e) =
+            o2_openfga::authorizer::roles::patch_sre_readonly_role_alerts_incidents(&org.identifier)
+                .await
+        {
+            log::warn!(
+                "Failed to patch sre-readonly alerts/incidents for org '{}': {e}",
+                org.identifier
+            );
+            failed = true;
+        }
+    }
+
+    if failed {
+        log::warn!("sre-readonly alerts/incidents patch had failures — will retry on next startup");
+        return;
+    }
+
+    if let Err(e) =
+        crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+    {
+        log::error!("Failed to set sre_readonly_afolder_incidents migration flag: {e}");
+    } else {
+        log::info!("sre-readonly alerts/incidents patch complete");
+    }
+}
+
+#[cfg(feature = "enterprise")]
 async fn backfill_sys_rca_agent_openfga_tuples() {
     use bytes::Bytes;
 
@@ -404,6 +468,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // migration even in multi-node deployments. KV flag prevents re-runs.
         backfill_sys_rca_agent_openfga_tuples().await;
         patch_sre_readonly_eval_templates().await;
+        patch_sre_readonly_alerts_incidents().await;
     }
 
     tokio::task::spawn(promql_self_consume::run());

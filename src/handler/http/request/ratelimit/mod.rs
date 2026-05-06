@@ -577,3 +577,24 @@ async fn parse_and_validate_ratelimit_payload(
 
     Ok(RatelimitRuleUpdater(result))
 }
+
+#[cfg(test)]
+mod tests {
+    #[cfg(not(feature = "enterprise"))]
+    use super::QueryParams;
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn test_query_params_oss_clone() {
+        let q = QueryParams();
+        let q2 = q.clone();
+        let _ = format!("{q2:?}");
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn test_query_params_oss_deserialize() {
+        let q: QueryParams = serde_json::from_str("[]").unwrap();
+        let _ = q.clone();
+    }
+}

@@ -388,7 +388,9 @@
     "turnOnLiveMode": "Aktiviere den Live-Modus",
     "turnOffLiveMode": "Schalten Sie den Live-Modus aus",
     "autoRunEnabled": "Automatischer Lauf aktiviert",
-    "selectStreamFirst": "Wähle zuerst einen Stream"
+    "selectStreamFirst": "Wähle zuerst einen Stream",
+    "traces": "Spuren",
+    "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln"
   },
   "menu": {
     "home": "Startseite",
@@ -977,7 +979,8 @@
     "fieldName": "Feldname",
     "fieldRequired": "Feld ist erforderlich!",
     "dataType": "Datentyp",
-    "dataTypeRequired": "Datentyp ist erforderlich!"
+    "dataTypeRequired": "Datentyp ist erforderlich!",
+    "udsFieldAlreadyInSchema": "Ein oder mehrere ausgewählte Felder sind bereits Teil des definierten Schemas"
   },
   "function": {
     "header": "Funktionen",
@@ -1122,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub-Protokolle"
+    "pubsub": "Pub/Sub-Protokolle",
+    "aiLabel": "KI-Integrationen"
   },
   "dashboard": {
     "selectField": "Feld",
@@ -2877,7 +2881,38 @@
       "multiStepAgent": "Mehrstufiger Agent"
     },
     "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar",
-    "spansTruncatedWarning": "Es werden {count} der {total} Spannweiten angezeigt — die Spur ist möglicherweise unvollständig. Grenzen Sie den Zeitraum ein oder wenden Sie sich an Ihren Administrator, um das Zeitlimit zu erhöhen."
+    "spansTruncatedWarning": "Es werden {count} der {total} Spannweiten angezeigt — die Spur ist möglicherweise unvollständig. Grenzen Sie den Zeitraum ein oder wenden Sie sich an Ihren Administrator, um das Zeitlimit zu erhöhen.",
+    "servicesCatalog": {
+      "tabLabel": "Servicekatalog",
+      "title": "Servicekatalog",
+      "filterPlaceholder": "Nach Dienstnamen filtern...",
+      "noServicesFound": "Im ausgewählten Zeitraum wurden keine Dienste gefunden.",
+      "loading": "Dienste werden geladen...",
+      "columns": {
+        "serviceName": "Bedienung",
+        "status": "Status",
+        "requests": "Anfragen",
+        "errorRate": "Fehlerrate",
+        "errors": "Fehler",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Durchschnittliche Latenz",
+        "lastSeen": "Zuletzt gesehen",
+        "operations": "Operationen"
+      },
+      "status": {
+        "healthy": "Gesund",
+        "warning": "Warnung",
+        "degraded": "Degradiert"
+      },
+      "viewTraces": "Spuren ansehen",
+      "exportCsv": "CSV exportieren",
+      "justNow": "Gerade eben",
+      "minutesAgo": "vor {n} m",
+      "hoursAgo": "vor {n} h",
+      "daysAgo": "vor {n} d"
+    }
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

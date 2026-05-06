@@ -379,6 +379,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_cardinality_from_cache_expired_entry_returns_miss() {
+        let now = now_micros();
+        let org_id = "test_org_expired";
+        let stream_type = StreamType::Logs;
+        let stream_name = "test_stream_expired";
+        let field_name = format!("expired_field_{now}");
+
+        // Insert an already-expired entry directly
+        let cache_key = generate_cache_key(org_id, stream_type, stream_name, &field_name);
+        let expired_entry = CardinalityCacheEntry {
+            value: 77.0,
+            timestamp: now - CACHE_EXPIRATION_MICROS - 1000,
+        };
+        CARDINALITY_CACHE.insert(cache_key.clone(), expired_entry);
+
+        // Should get a cache miss because the entry is expired
+        let result =
+            get_cardinality_from_cache(org_id, stream_type, stream_name, &field_name).await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("cache miss"), "expected cache miss: {msg}");
+
+        // The expired entry should have been removed
+        assert!(
+            CARDINALITY_CACHE.get(&cache_key).is_none(),
+            "expired entry should be removed from cache"
+        );
+    }
+
+    #[tokio::test]
     async fn test_cache_operations() {
         let org_id = "test_org";
         let stream_type = StreamType::Logs;

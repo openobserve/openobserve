@@ -85,3 +85,13 @@ impl LogsService for LogsServer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_logs_server_default() {
+        let _server = LogsServer::default();
+    }
+}

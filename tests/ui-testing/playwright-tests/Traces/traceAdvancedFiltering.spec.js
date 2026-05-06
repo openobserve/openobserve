@@ -25,9 +25,9 @@ test.describe("Trace Advanced Filtering testcases", () => {
     // Navigate to traces page
     await pm.tracesPage.navigateToTracesUrl();
 
-    if (await pm.tracesPage.isStreamSelectVisible()) {
-      await pm.tracesPage.selectTraceStream('default');
-    }
+    await pm.tracesPage.isStreamSelectVisible()
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForTimeout(2000);
 
     testLogger.info('Test setup completed for advanced trace filtering');
   });

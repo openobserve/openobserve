@@ -1391,23 +1391,27 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         Ok(ret)
     }
 
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<()> {
+    async fn set_job_pending(&self, ids: &[i64]) -> Result<u64> {
         let pool = CLIENT.clone();
-        let sql = format!(
-            "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
-            ids.iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        );
+        let sql = if ids.is_empty() {
+            "UPDATE file_list_jobs SET status = $1;".to_string()
+        } else {
+            format!(
+                "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
+                ids.iter()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        };
         DB_QUERY_NUMS
             .with_label_values(&["update", "file_list_jobs"])
             .inc();
-        sqlx::query(&sql)
+        let ret = sqlx::query(&sql)
             .bind(super::FileListJobStatus::Pending)
             .execute(&pool)
             .await?;
-        Ok(())
+        Ok(ret.rows_affected())
     }
 
     async fn set_job_done(&self, ids: &[i64]) -> Result<()> {

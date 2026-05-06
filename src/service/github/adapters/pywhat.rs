@@ -261,4 +261,47 @@ mod tests {
         assert!(tags.contains(&"SSH".to_string()));
         assert!(tags.contains(&"PII".to_string()));
     }
+
+    #[test]
+    fn test_default_rarity_is_half() {
+        assert!((default_rarity() - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_from_generic_pattern_maps_fields() {
+        let gp = GenericPattern {
+            name: "Test Pattern".to_string(),
+            regex: "^test$".to_string(),
+            description: Some("A test pattern".to_string()),
+            rarity: 0.8,
+            url: Some("https://example.com".to_string()),
+            tags: vec!["test".to_string()],
+            examples: None,
+            plural_name: false,
+        };
+        let response = BuiltInPatternResponse::from(gp);
+        assert_eq!(response.name, "Test Pattern");
+        assert_eq!(response.pattern, "^test$");
+        assert_eq!(response.description, "A test pattern");
+        assert_eq!(response.rarity, 0.8);
+        assert!(response.examples.valid.is_empty());
+    }
+
+    #[test]
+    fn test_from_generic_pattern_uses_default_examples_when_none() {
+        let gp = GenericPattern {
+            name: "P".to_string(),
+            regex: ".*".to_string(),
+            description: None,
+            rarity: 0.5,
+            url: None,
+            tags: vec![],
+            examples: None,
+            plural_name: false,
+        };
+        let response = BuiltInPatternResponse::from(gp);
+        assert!(response.description.is_empty());
+        assert!(response.examples.valid.is_empty());
+        assert!(response.examples.invalid.is_empty());
+    }
 }

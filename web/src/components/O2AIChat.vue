@@ -105,7 +105,7 @@
             </q-btn>
           </div>
 
-          <div>
+          <div class="tw:flex tw:items-center tw:gap-1 chat-header-actions">
             <!-- Edit title button -->
             <q-btn
               v-if="currentChatId"
@@ -119,6 +119,17 @@
               <q-tooltip :delay="500">Edit title</q-tooltip>
             </q-btn>
             <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
+            <q-btn
+              flat
+              round
+              dense
+              size="md"
+              :icon="store.state.isAiChatExpanded ? 'close_fullscreen' : 'open_in_full'"
+              data-test="ai-chat-expand-btn"
+              @click="toggleExpand"
+            >
+              <q-tooltip :delay="500">{{ store.state.isAiChatExpanded ? 'Collapse' : 'Expand' }} ({{ isMac ? '⌘' : 'Ctrl+' }}B)</q-tooltip>
+            </q-btn>
             <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
           </div>
         </div>
@@ -308,16 +319,22 @@
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section" :class="{ 'welcome-section--centered': centeredStart }">
-            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full">
-              <img :src="o2AiTitleLogo" />
-              <div class="tw:relative tw:inline-block">
-                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
-                <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full" :class="{ 'tw:relative': centeredStart }">
+              <div
+                class="tw:flex tw:flex-col tw:items-center"
+                :class="{ 'tw:absolute tw:left-1/2 tw:-translate-x-1/2': centeredStart }"
+                :style="centeredStart ? { top: 'calc(50% - 150px)' } : {}"
+              >
+                <img :src="o2AiTitleLogo" />
+                <div class="tw:relative tw:inline-block">
+                  <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
+                  <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+                </div>
               </div>
               <!-- Input rendered here when centeredStart so it appears mid-screen -->
               <div v-if="centeredStart" class="centered-input-wrap">
-                <div
-                  class="unified-input-box"
+                  <div
+                    class="unified-input-box"
                   :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
                   @dragover="handleDragOver"
                   @drop="handleDrop"
@@ -352,7 +369,7 @@
               </div>
             </div>
           </div>
-          <div v-for="(message, index) in processedMessages" 
+          <div v-for="(message, index) in processedMessages"
             :key="index" 
             class="message" 
             :class="[
@@ -1066,6 +1083,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
+import useKeyboardShortcuts from '@/composables/useKeyboardShortcuts';
 import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -1151,6 +1169,7 @@ export default defineComponent({
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore ();
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
     // Chat history composable
@@ -2852,6 +2871,28 @@ export default defineComponent({
       displayedStreamingContent.value = '';
     };
 
+    const toggleExpand = () => {
+      store.dispatch('setIsAiChatExpanded', !store.state.isAiChatExpanded);
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    useKeyboardShortcuts([
+      {
+        key: 'Escape',
+        handler: () => {
+          if (store.state.isAiChatExpanded) {
+            store.dispatch('setIsAiChatExpanded', false);
+            window.dispatchEvent(new Event('resize'));
+          }
+        },
+      },
+      {
+        key: 'b',
+        ctrlOrMeta: true,
+        handler: () => toggleExpand(),
+      },
+    ]);
+
     const addNewChat = () => {
       detachCurrentStream();
 
@@ -4142,10 +4183,25 @@ export default defineComponent({
           setTimeout(() => {
             componentReady.value = true;
             processPendingChips();
+            focusInput();
           }, 100);
         });
       }
     });
+
+    // Auto-focus input when chat is expanded
+    watch(
+      () => store.state.isAiChatExpanded,
+      (isExpanded) => {
+        if (isExpanded) {
+          nextTick(() => {
+            setTimeout(() => {
+              focusInput();
+            }, 150);
+          });
+        }
+      },
+    );
 
     // Watch for organization switches — reset current chat and reload history
     // scoped to the new org so users never see cross-org chat history.
@@ -4222,6 +4278,7 @@ export default defineComponent({
       if(!store.state.currentChatTimestamp) {
         addNewChat();
       }
+
     })
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
@@ -4769,6 +4826,7 @@ export default defineComponent({
       chatHistory,
       currentChatId,
       addNewChat,
+      toggleExpand,
       openHistory,
       loadChat,
       showEditTitleDialog,
@@ -4800,6 +4858,7 @@ export default defineComponent({
       formatTime,
       loadHistory,
       store,
+      isMac,
       outlinedThumbUpOffAlt,
       outlinedThumbDownOffAlt,
       matThumbUpAlt,
@@ -4863,12 +4922,12 @@ export default defineComponent({
 <style lang="scss" scoped>
 .chat-container {
   width: 100%;
-  height: calc(100vh - 50px);
+  height: calc(100vh - var(--navbar-height) - 10px);
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: var(--o2-card-bg);
+  background-color: var(--o2-card-bg-solid);
   border-radius: 0.375rem;
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
 

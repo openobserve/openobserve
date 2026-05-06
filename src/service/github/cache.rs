@@ -114,3 +114,69 @@ pub struct CacheStats {
     pub total_size_bytes: usize,
     pub max_size_bytes: usize,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_new_cache_is_empty() {
+        let cache = CacheManager::new(1024 * 1024);
+        let stats = cache.stats().await;
+        assert_eq!(stats.total_entries, 0);
+        assert_eq!(stats.total_size_bytes, 0);
+        assert_eq!(stats.max_size_bytes, 1024 * 1024);
+    }
+
+    #[tokio::test]
+    async fn test_get_on_empty_cache_returns_none() {
+        let cache = CacheManager::new(1024 * 1024);
+        assert!(cache.get("missing_key").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_set_and_get_roundtrip() {
+        let cache = CacheManager::new(1024 * 1024);
+        let data = CachedData::new(bytes::Bytes::from("hello"), 3600);
+        cache.set("key1".to_string(), data).await.unwrap();
+        let result = cache.get("key1").await;
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), bytes::Bytes::from("hello"));
+    }
+
+    #[tokio::test]
+    async fn test_invalidate_removes_entry() {
+        let cache = CacheManager::new(1024 * 1024);
+        let data = CachedData::new(bytes::Bytes::from("value"), 3600);
+        cache.set("key2".to_string(), data).await.unwrap();
+        assert!(cache.get("key2").await.is_some());
+        cache.invalidate("key2").await;
+        assert!(cache.get("key2").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_clear_removes_all_entries() {
+        let cache = CacheManager::new(1024 * 1024);
+        for i in 0..3 {
+            let data = CachedData::new(bytes::Bytes::from(format!("v{i}")), 3600);
+            cache.set(format!("k{i}"), data).await.unwrap();
+        }
+        let stats = cache.stats().await;
+        assert_eq!(stats.total_entries, 3);
+        cache.clear().await;
+        let stats = cache.stats().await;
+        assert_eq!(stats.total_entries, 0);
+    }
+
+    #[tokio::test]
+    async fn test_expired_entry_not_returned() {
+        let cache = CacheManager::new(1024 * 1024);
+        let data = CachedData {
+            data: bytes::Bytes::from("old data"),
+            fetched_at: 0,
+            ttl_secs: 60,
+        };
+        cache.set("expired_key".to_string(), data).await.unwrap();
+        assert!(cache.get("expired_key").await.is_none());
+    }
+}

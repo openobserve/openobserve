@@ -49,3 +49,51 @@ impl RangeFunc for QuantileOverTimeFunc {
         quantile(&input, self.phi_quantile)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_samples(values: &[f64]) -> Vec<Sample> {
+        values
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| Sample {
+                timestamp: i as i64 * 1_000_000,
+                value: v,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_quantile_over_time_name() {
+        assert_eq!(QuantileOverTimeFunc::new(0.5).name(), "quantile_over_time");
+    }
+
+    #[test]
+    fn test_quantile_over_time_empty() {
+        let func = QuantileOverTimeFunc::new(0.5);
+        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
+    }
+
+    #[test]
+    fn test_quantile_over_time_median() {
+        let func = QuantileOverTimeFunc::new(0.5);
+        let samples = make_samples(&[1.0, 2.0, 3.0]);
+        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(2.0));
+    }
+
+    #[test]
+    fn test_quantile_over_time_min() {
+        let func = QuantileOverTimeFunc::new(0.0);
+        let samples = make_samples(&[3.0, 1.0, 2.0]);
+        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(1.0));
+    }
+
+    #[test]
+    fn test_quantile_over_time_max() {
+        let func = QuantileOverTimeFunc::new(1.0);
+        let samples = make_samples(&[3.0, 1.0, 2.0]);
+        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(3.0));
+    }
+}

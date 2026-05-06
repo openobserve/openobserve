@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps flat dense
                 class="ai-hover-btn"
                 :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-                style="border-radius: 50%; width: 32px; height: 32px;"
+                style="border-radius: 6px; width: 32px; height: 32px;"
                 @mouseenter="isHovered = true"
                 @mouseleave="isHovered = false"
               >
@@ -1351,7 +1351,7 @@ const getBtnLogo = computed(() => {
 }
 
 .ai-btn-active {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
 }
 
 // Force no transitions on collapsible output sections

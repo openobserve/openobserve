@@ -54,6 +54,7 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   }),
 }));
 
+import componentSource from "@/plugins/traces/TraceDetailsSidebar.vue?raw";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 import i18n from "@/locales";
@@ -1006,7 +1007,9 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should return the raw string start_time from props.span, not the formatted display string", async () => {
       const rawStartTime = "1700000000123456789";
-      await wrapper.setProps({ span: { ...mockSpan, start_time: rawStartTime } });
+      await wrapper.setProps({
+        span: { ...mockSpan, start_time: rawStartTime },
+      });
       const result = wrapper.vm.getFilterValue("start_time", "formatted-date");
       expect(result).toBe(rawStartTime);
     });
@@ -1048,16 +1051,28 @@ describe("TraceDetailsSidebar", async () => {
       const spanWithTsCol = { ...mockSpan, "@timestamp": rawTsValue };
       const tsWrapper = mount(TraceDetailsSidebar, {
         attachTo: "#app",
-        props: { span: spanWithTsCol, baseTracePosition: mockBaseTracePosition, searchQuery: "" },
+        props: {
+          span: spanWithTsCol,
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+        },
         global: {
           plugins: [i18n, router],
           provide: { store: mockStore },
-          stubs: { "q-resize-observer": true, "q-virtual-scroll": { template: "<div><slot /></div>", props: ["items"] } },
+          stubs: {
+            "q-resize-observer": true,
+            "q-virtual-scroll": {
+              template: "<div><slot /></div>",
+              props: ["items"],
+            },
+          },
         },
       });
       await tsWrapper.vm.$nextTick();
       const displayValue = "2025-07-14T10:14:52.843Z";
-      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(rawTsValue);
+      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(
+        rawTsValue,
+      );
       tsWrapper.unmount();
     });
 
@@ -1096,8 +1111,12 @@ describe("TraceDetailsSidebar", async () => {
       // The NS patching pipeline no longer injects _start_time_ns / _end_time_ns into spans.
       // mockSpan represents a normal span that does not carry those keys, so they must not
       // appear in the rendered attribute list.
-      expect(Object.prototype.hasOwnProperty.call(mockSpan, "_start_time_ns")).toBe(false);
-      expect(Object.prototype.hasOwnProperty.call(mockSpan, "_end_time_ns")).toBe(false);
+      expect(
+        Object.prototype.hasOwnProperty.call(mockSpan, "_start_time_ns"),
+      ).toBe(false);
+      expect(
+        Object.prototype.hasOwnProperty.call(mockSpan, "_end_time_ns"),
+      ).toBe(false);
 
       const attributesTable = wrapper.find(
         '[data-test="trace-details-sidebar-attributes-table"]',
@@ -1152,7 +1171,12 @@ describe("TraceDetailsSidebar", async () => {
             // Stub JsonPreview to render its #field-dropdown slot inline for each key
             // in `value`, so the q-item inside is immediately clickable without a popup.
             JsonPreview: {
-              props: ["value", "highlightQuery", "showCopyButton", "copyButtonClass"],
+              props: [
+                "value",
+                "highlightQuery",
+                "showCopyButton",
+                "copyButtonClass",
+              ],
               template: `
                 <div data-test="trace-details-sidebar-attributes-table">
                   <div
@@ -1281,6 +1305,150 @@ describe("TraceDetailsSidebar", async () => {
         // but we can verify the component didn't crash
         expect(wrapper.exists()).toBe(true);
       }
+    });
+  });
+
+  describe("LLM Preview tab — LLMContentRenderer instance-id", () => {
+    const LLM_SPAN_ID = "d9603ec7f76eb499";
+
+    const mockLLMSpan = {
+      _timestamp: 1752490492843047,
+      start_time: 1752490492843000000,
+      end_time: 1752490493164419300,
+      duration: 321372,
+      span_id: LLM_SPAN_ID,
+      trace_id: "6262666637a9ae45ad3e25f5111dd59f",
+      operation_name: "ChatCompletion",
+      service_name: "openai-service",
+      span_status: "UNSET",
+      span_kind: 2,
+      parent_id: "6702b0494b2b6e57",
+      events: "",
+      links: "",
+      llm_input: '{"messages": [{"role": "user", "content": "Hello"}]}',
+      llm_output: '{"choices": [{"message": {"content": "Hi there!"}}]}',
+      llm_observation_type: "LLM",
+      llm_model_name: "gpt-4",
+    };
+
+    let llmWrapper: any;
+
+    beforeEach(async () => {
+      llmWrapper = mount(TraceDetailsSidebar, {
+        attachTo: "#app",
+        props: {
+          span: mockLLMSpan,
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: {
+            "q-resize-observer": true,
+            "q-virtual-scroll": {
+              template: `
+                <div>
+                  <slot name="before"></slot>
+                  <div v-for="(item, index) in items" :key="index">
+                    <slot :item="item" :index="index"></slot>
+                  </div>
+                </div>
+              `,
+              props: ["items"],
+            },
+            LLMContentRenderer: {
+              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId"><slot /></div>`,
+              props: [
+                "content",
+                "observationType",
+                "contentType",
+                "span",
+                "viewMode",
+                "instanceId",
+              ],
+            },
+            TenstackTable: true,
+            "q-expansion-item": true,
+            CodemirrorEditor: true,
+            CodeQueryEditor: true,
+          },
+        },
+      });
+
+      await llmWrapper.vm.$nextTick();
+    });
+
+    afterEach(() => {
+      llmWrapper?.unmount();
+    });
+
+    it("should render the preview tab by default for an LLM span", () => {
+      expect(llmWrapper.vm.activeTab).toBe("preview");
+    });
+
+    it("should render the input LLMContentRenderer when llm_input has content", () => {
+      const inputRenderer = llmWrapper.find(
+        '[data-test="llm-content-renderer-input"]',
+      );
+      expect(inputRenderer.exists()).toBe(true);
+    });
+
+    it("should render the output LLMContentRenderer when llm_output has content", () => {
+      const outputRenderer = llmWrapper.find(
+        '[data-test="llm-content-renderer-output"]',
+      );
+      expect(outputRenderer.exists()).toBe(true);
+    });
+
+    it("should pass instance-id ending with -input to the input LLMContentRenderer", () => {
+      const inputRenderer = llmWrapper.find(
+        '[data-test="llm-content-renderer-input"]',
+      );
+      expect(inputRenderer.exists()).toBe(true);
+      expect(inputRenderer.attributes("data-instance-id")).toBe(
+        `${LLM_SPAN_ID}-input`,
+      );
+    });
+
+    it("should pass instance-id ending with -output to the output LLMContentRenderer", () => {
+      const outputRenderer = llmWrapper.find(
+        '[data-test="llm-content-renderer-output"]',
+      );
+      expect(outputRenderer.exists()).toBe(true);
+      expect(outputRenderer.attributes("data-instance-id")).toBe(
+        `${LLM_SPAN_ID}-output`,
+      );
+    });
+
+    it("should include the span_id in the input instance-id", () => {
+      const inputRenderer = llmWrapper.find(
+        '[data-test="llm-content-renderer-input"]',
+      );
+      expect(inputRenderer.exists()).toBe(true);
+      expect(inputRenderer.attributes("data-instance-id")).toContain(
+        LLM_SPAN_ID,
+      );
+    });
+
+    it("should include the span_id in the output instance-id", () => {
+      const outputRenderer = llmWrapper.find(
+        '[data-test="llm-content-renderer-output"]',
+      );
+      expect(outputRenderer.exists()).toBe(true);
+      expect(outputRenderer.attributes("data-instance-id")).toContain(
+        LLM_SPAN_ID,
+      );
+    });
+  });
+
+  describe("CSS verification — .vjs-tree removal", () => {
+    it("should not reference .vjs-tree in component styles", () => {
+      // Verify that the removed .vjs-tree CSS selector is absent from the
+      // component's <style> blocks. The ?raw import returns the exact
+      // source content, so a regex scan confirms no style block targets
+      // .vjs-tree (the hover-suppression rules that were removed).
+      expect(componentSource).not.toMatch(/\.vjs-tree/);
     });
   });
 });

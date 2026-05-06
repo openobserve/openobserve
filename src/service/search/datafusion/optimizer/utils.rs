@@ -326,3 +326,104 @@ pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
     })
     .unwrap_or(true)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use datafusion::{
+        common::DFSchema,
+        logical_expr::{EmptyRelation, LogicalPlan},
+    };
+
+    use super::*;
+
+    fn empty_relation_plan() -> LogicalPlan {
+        LogicalPlan::EmptyRelation(EmptyRelation {
+            produce_one_row: false,
+            schema: Arc::new(DFSchema::empty()),
+        })
+    }
+
+    #[test]
+    fn test_is_complex_query_empty_relation_is_not_complex() {
+        let plan = empty_relation_plan();
+        assert!(!is_complex_query(&plan));
+    }
+
+    #[test]
+    fn test_is_empty_relation_true_for_empty_relation() {
+        let plan = empty_relation_plan();
+        assert!(is_empty_relation(&plan));
+    }
+
+    #[test]
+    fn test_is_contain_deduplication_plan_false_for_empty_relation() {
+        let plan = empty_relation_plan();
+        assert!(!is_contain_deduplication_plan(&plan));
+    }
+
+    #[test]
+    fn test_is_empty_relation_false_for_non_empty() {
+        // Values plan is not empty relation
+        let schema = Arc::new(DFSchema::empty());
+        let plan = LogicalPlan::EmptyRelation(EmptyRelation {
+            produce_one_row: true,
+            schema,
+        });
+        // still EmptyRelation variant so is_empty_relation == true
+        assert!(is_empty_relation(&plan));
+    }
+
+    #[test]
+    fn test_get_int_from_expr_with_int64() {
+        use datafusion::{prelude::Expr, scalar::ScalarValue};
+
+        let expr = Expr::Literal(ScalarValue::Int64(Some(42)), None);
+        let result = get_int_from_expr(&Some(Box::new(expr)));
+        assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn test_get_int_from_expr_with_none() {
+        let result = get_int_from_expr(&None);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_get_int_from_expr_null_int64() {
+        use datafusion::{prelude::Expr, scalar::ScalarValue};
+
+        let expr = Expr::Literal(ScalarValue::Int64(None), None);
+        let result = get_int_from_expr(&Some(Box::new(expr)));
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_get_int_from_expr_non_int_literal() {
+        use datafusion::{prelude::Expr, scalar::ScalarValue};
+
+        let expr = Expr::Literal(ScalarValue::Utf8(Some("hello".to_string())), None);
+        let result = get_int_from_expr(&Some(Box::new(expr)));
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_is_complex_query_and_is_not_complex() {
+        use std::sync::Arc;
+
+        use datafusion::{
+            common::DFSchema,
+            logical_expr::{EmptyRelation, LogicalPlan},
+        };
+
+        let schema = Arc::new(DFSchema::empty());
+        let plan = LogicalPlan::EmptyRelation(EmptyRelation {
+            produce_one_row: false,
+            schema,
+        });
+        assert!(!is_complex_query(&plan));
+        assert!(is_empty_relation(&plan));
+        assert!(!is_contain_deduplication_plan(&plan));
+    }
+}
