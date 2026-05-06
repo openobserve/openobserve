@@ -622,6 +622,7 @@ pub fn generate_presigned_url(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[allow(clippy::too_many_arguments)]
 pub async fn check_permissions(
     _object_id: &str,
     _org_id: &str,
