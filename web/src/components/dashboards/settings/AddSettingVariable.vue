@@ -647,6 +647,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 class="tw:mt-3"
                 @click="addField()"
+                data-test="dashboard-add-option-btn"
               >
                 <template #icon-left><q-icon name="add" /></template>
                 Add Option

@@ -360,12 +360,17 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .click();
-    await this.page.getByRole("option", { name: type }).click();
+    const typeOption = this.page.getByRole("option", { name: type });
+    await typeOption.waitFor({ state: "visible", timeout: 10000 });
+    await typeOption.click();
     await this.page.locator('[data-test="dashboard-variable-name"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-name"]')
       .fill(variableName);
-    await this.page.getByRole("button", { name: "Add Option" }).click();
+    const addOptionBtn = this.page.locator('[data-test="dashboard-add-option-btn"]');
+    await addOptionBtn.waitFor({ state: "visible", timeout: 10000 });
+    await addOptionBtn.scrollIntoViewIfNeeded();
+    await addOptionBtn.click();
 
     await this.page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
