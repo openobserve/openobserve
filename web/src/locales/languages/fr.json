@@ -1125,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Journaux Pub/Sub"
+    "pubsub": "Journaux Pub/Sub",
+    "aiLabel": "Intégrations d'IA"
   },
   "dashboard": {
     "selectField": "Champ",
@@ -2282,7 +2283,8 @@
       "addNewDestination": "Ajouter une nouvelle destination",
       "destinationRequired": "Au moins une destination est requise !",
       "disabledNotificationsInfo": "La détection des anomalies sera toujours exécutée et les résultats seront enregistrés dans le flux _anomalies. Activez les notifications pour recevoir des alertes lorsque des anomalies sont détectées."
-    }
+    },
+    "anomalyName": "Nom de l'anomalie"
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2880,7 +2882,38 @@
       "multiStepAgent": "Agent en plusieurs étapes"
     },
     "noLogsAvailableForService": "Aucun journal disponible pour ce service",
-    "spansTruncatedWarning": "Affichage de {count} de {total} spans — la trace est peut-être incomplète. Réduisez la plage de temps ou contactez votre administrateur pour augmenter la limite de durée."
+    "spansTruncatedWarning": "Affichage de {count} de {total} spans — la trace est peut-être incomplète. Réduisez la plage de temps ou contactez votre administrateur pour augmenter la limite de durée.",
+    "servicesCatalog": {
+      "tabLabel": "Catalogue de services",
+      "title": "Catalogue de services",
+      "filterPlaceholder": "Filtrer par nom de service...",
+      "noServicesFound": "Aucun service n'a été trouvé dans la plage horaire sélectionnée.",
+      "loading": "Services de chargement...",
+      "columns": {
+        "serviceName": "Service",
+        "status": "État",
+        "requests": "Demandes",
+        "errorRate": "Taux d'erreur",
+        "errors": "Erreurs",
+        "p50Latency": "P50",
+        "p95Latency": "PAGE 95",
+        "p99Latency": "P99",
+        "avgLatency": "Latence moyenne",
+        "lastSeen": "Vu pour la dernière fois",
+        "operations": "Opérations"
+      },
+      "status": {
+        "healthy": "En bonne santé",
+        "warning": "Avertissement",
+        "degraded": "Dégradé"
+      },
+      "viewTraces": "Afficher les traces",
+      "exportCsv": "Exporter au format CSV",
+      "justNow": "Tout à l'heure",
+      "minutesAgo": "il y a {n} m",
+      "hoursAgo": "il y a {n} h",
+      "daysAgo": "il y a {n} d"
+    }
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",

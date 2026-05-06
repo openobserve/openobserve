@@ -259,3 +259,47 @@ pub async fn delete_event(key: &str, start_dt: Option<i64>) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_meta_event_put_converts_to_db_event_put() {
+        let ev = MetaEvent {
+            action: MetaAction::Put,
+            key: "/test/key".to_string(),
+            start_dt: Some(1000),
+            value: None,
+        };
+        let db_ev: crate::db::Event = ev.into();
+        assert!(matches!(db_ev, crate::db::Event::Put(d) if d.key == "/test/key"));
+    }
+
+    #[test]
+    fn test_meta_event_delete_converts_to_db_event_delete() {
+        let ev = MetaEvent {
+            action: MetaAction::Delete,
+            key: "/test/del".to_string(),
+            start_dt: None,
+            value: None,
+        };
+        let db_ev: crate::db::Event = ev.into();
+        assert!(matches!(db_ev, crate::db::Event::Delete(d) if d.key == "/test/del"));
+    }
+
+    #[test]
+    fn test_meta_event_preserves_start_dt() {
+        let ev = MetaEvent {
+            action: MetaAction::Put,
+            key: "k".to_string(),
+            start_dt: Some(42),
+            value: None,
+        };
+        if let crate::db::Event::Put(data) = crate::db::Event::from(ev) {
+            assert_eq!(data.start_dt, Some(42));
+        } else {
+            panic!("expected Put variant");
+        }
+    }
+}

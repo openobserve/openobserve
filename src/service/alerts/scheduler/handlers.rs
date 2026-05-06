@@ -89,8 +89,7 @@ async fn handle_anomaly_detection_triggers(
     mut trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     use config::utils::time::now_micros;
-    use infra::table::entity::anomaly_detection_config;
-    use sea_orm::EntityTrait;
+    use infra::table::anomaly_detection::config as anomaly_config_table;
 
     let anomaly_id = trigger.module_key.clone();
 
@@ -103,18 +102,24 @@ async fn handle_anomaly_detection_triggers(
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-    let config = anomaly_detection_config::Entity::find_by_id(&anomaly_id)
-        .one(db)
-        .await?;
+    let config = anomaly_config_table::get_by_id(db, &trigger.org, &anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-    // If config was deleted, clean up the trigger.
+    // If config is not found locally, it may not have synced yet from the primary
+    // region (super cluster race: trigger row arrives before ConfigCreate NATS message).
+    // Reschedule instead of deleting so detection can proceed once the config syncs.
+    // The trigger is cleaned up via ConfigDelete in the super cluster queue, not here.
     let Some(config) = config else {
-        db::scheduler::delete(
-            &trigger.org,
-            db::scheduler::TriggerModule::AnomalyDetection,
-            &anomaly_id,
-        )
-        .await?;
+        log::warn!(
+            "[anomaly_detection] config not found locally for id={anomaly_id} org={} — \
+             trigger row arrived before ConfigCreate synced; rescheduling +60s. \
+             If this persists the ConfigCreate NATS message may have been lost.",
+            trigger.org
+        );
+        trigger.next_run_at = now_micros() + 60 * 1_000_000;
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        db::scheduler::update_trigger(trigger, false, "").await?;
         return Ok(());
     };
 
@@ -220,9 +225,8 @@ async fn handle_anomaly_detection_triggers(
     if trigger_status == TriggerDataStatus::Completed && config.is_trained {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
-            use infra::table::entity::anomaly_detection_config;
-            use sea_orm::{ActiveModelTrait, Set};
-            let mut active: anomaly_detection_config::ActiveModel = config.into();
+            use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+            let mut active = config.into_active_model();
             active.status = Set(AnomalyStatus::Active.to_i32());
             active.updated_at = Set(run_end_us);
             if let Err(e) = active.update(db).await {
@@ -4021,5 +4025,273 @@ mod tests {
 
         // The final timestamp should be adjusted based on the logic
         assert!(final_timestamp >= supposed_to_run_at);
+    }
+
+    // ── parse_detection_interval_to_micros ───────────────────────────────────
+
+    #[test]
+    fn test_parse_detection_interval_minutes() {
+        // "5m" → 5 * 60 * 1_000_000
+        let result = parse_detection_interval_to_micros("5m");
+        assert_eq!(result, 5 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_hours() {
+        // "2h" → 2 * 3600 * 1_000_000
+        let result = parse_detection_interval_to_micros("2h");
+        assert_eq!(result, 2 * 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_one_hour() {
+        let result = parse_detection_interval_to_micros("1h");
+        assert_eq!(result, 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_ten_minutes() {
+        let result = parse_detection_interval_to_micros("10m");
+        assert_eq!(result, 10 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_bare_number_treated_as_minutes() {
+        // Bare number has no suffix → treated as minutes via the fallback branch
+        let result = parse_detection_interval_to_micros("15");
+        assert_eq!(result, 15 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_invalid_suffix_defaults_to_five_minutes() {
+        // Unknown suffix falls through to the bare-number branch which tries parse().
+        // "abc" parse fails → unwrap_or(5) * 60 * 1_000_000
+        let result = parse_detection_interval_to_micros("abcm");
+        // "abcm".strip_suffix('m') = Some("abc"), parse::<i64>() fails → unwrap_or(5)
+        assert_eq!(result, 5 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_invalid_hour_defaults_to_one_hour() {
+        // "xh" → strip_suffix('h') = Some("x"), parse fails → unwrap_or(1) * 3600
+        let result = parse_detection_interval_to_micros("xh");
+        assert_eq!(result, 1 * 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_empty_string_defaults() {
+        // Empty string: no suffix matches, parse fails → unwrap_or(5) * 60
+        let result = parse_detection_interval_to_micros("");
+        assert_eq!(result, 5 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_whitespace_trimmed() {
+        // Surrounding whitespace is trimmed before parsing
+        let result = parse_detection_interval_to_micros("  3m  ");
+        assert_eq!(result, 3 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_whitespace_with_hour() {
+        let result = parse_detection_interval_to_micros("  4h  ");
+        assert_eq!(result, 4 * 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_zero_minutes() {
+        // "0m" → 0 * 60 * 1_000_000 = 0
+        let result = parse_detection_interval_to_micros("0m");
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_zero_hours() {
+        let result = parse_detection_interval_to_micros("0h");
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_large_value() {
+        let result = parse_detection_interval_to_micros("100m");
+        assert_eq!(result, 100 * 60 * 1_000_000);
+    }
+
+    // ── get_pipeline_info_from_module_key additional edge cases ──────────────
+
+    #[test]
+    fn test_get_pipeline_info_pipeline_name_with_slash() {
+        // pipeline_name contains a '/' – the function takes columns[2] as the name
+        // and columns[last] as the id, so intermediate slashes become part of the name.
+        let module_key = "logs/org1/my/pipeline/name/actual_id";
+        let result = get_pipeline_info_from_module_key(module_key);
+        assert!(result.is_ok());
+        let (org_id, stream_type, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "org1");
+        assert_eq!(stream_type, StreamType::Logs);
+        assert_eq!(pipeline_name, "my"); // columns[2]
+        assert_eq!(pipeline_id, "actual_id"); // columns[last]
+    }
+
+    #[test]
+    fn test_get_pipeline_info_metrics_stream_type() {
+        let module_key = "metrics/metrics_org/pipe/id999";
+        let result = get_pipeline_info_from_module_key(module_key);
+        assert!(result.is_ok());
+        let (org_id, stream_type, _, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "metrics_org");
+        assert_eq!(stream_type, StreamType::Metrics);
+        assert_eq!(pipeline_id, "id999");
+    }
+
+    #[test]
+    fn test_get_pipeline_info_traces_stream_type() {
+        let module_key = "traces/trace_org/trace_pipe/trace_id";
+        let result = get_pipeline_info_from_module_key(module_key);
+        assert!(result.is_ok());
+        let (_, stream_type, ..) = result.unwrap();
+        assert_eq!(stream_type, StreamType::Traces);
+    }
+
+    #[test]
+    fn test_get_pipeline_info_too_few_parts_one() {
+        let result = get_pipeline_info_from_module_key("onlyonepart");
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid module_key")
+        );
+    }
+
+    #[test]
+    fn test_get_pipeline_info_too_few_parts_two() {
+        let result = get_pipeline_info_from_module_key("logs/org");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_pipeline_info_too_few_parts_three() {
+        let result = get_pipeline_info_from_module_key("logs/org/pipeline");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_pipeline_info_exactly_four_parts() {
+        let module_key = "logs/org/pipe/id";
+        let result = get_pipeline_info_from_module_key(module_key);
+        assert!(result.is_ok());
+        let (org_id, _, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "org");
+        assert_eq!(pipeline_name, "pipe");
+        assert_eq!(pipeline_id, "id");
+    }
+
+    #[test]
+    fn test_get_pipeline_info_unknown_stream_type_falls_back() {
+        // Unknown stream type strings fall through to the From<&str> impl which
+        // is expected to produce a value (likely a default).  The important
+        // thing is the function does NOT return Err just because the type is unknown.
+        let module_key = "unknown_type/some_org/some_pipe/some_id";
+        let result = get_pipeline_info_from_module_key(module_key);
+        // Should succeed (no length check failure)
+        assert!(result.is_ok());
+        let (org_id, _, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "some_org");
+        assert_eq!(pipeline_name, "some_pipe");
+        assert_eq!(pipeline_id, "some_id");
+    }
+
+    #[test]
+    fn test_get_destination_stream_excludes_source_node() {
+        use config::meta::pipeline::{
+            Pipeline,
+            components::{Node, PipelineSource},
+        };
+
+        let source_node = Node::new(
+            "source".to_string(),
+            NodeData::Stream(StreamParams::new("org", "input-stream", StreamType::Logs)),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let output_node = Node::new(
+            "output-1".to_string(),
+            NodeData::Stream(StreamParams::new("org", "output-stream", StreamType::Logs)),
+            100.0,
+            0.0,
+            "output".to_string(),
+        );
+        let pipeline = Pipeline {
+            id: "p1".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![source_node, output_node],
+            edges: vec![],
+        };
+
+        let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].stream_name.as_str(), "output-stream");
+    }
+
+    #[test]
+    fn test_get_destination_stream_no_stream_nodes_returns_error() {
+        use config::meta::pipeline::{
+            Pipeline,
+            components::{FunctionParams, Node, PipelineSource},
+        };
+
+        let func_node = Node::new(
+            "func-1".to_string(),
+            NodeData::Function(FunctionParams {
+                name: "my_func".to_string(),
+                after_flatten: false,
+                num_args: 0,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        );
+        let pipeline = Pipeline {
+            id: "p2".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![func_node],
+            edges: vec![],
+        };
+
+        let result = get_destination_stream_from_pipeline(&pipeline);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_destination_stream_empty_pipeline_returns_error() {
+        use config::meta::pipeline::{Pipeline, components::PipelineSource};
+
+        let pipeline = Pipeline {
+            id: "p3".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        let result = get_destination_stream_from_pipeline(&pipeline);
+        assert!(result.is_err());
     }
 }

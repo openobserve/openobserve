@@ -33,3 +33,21 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            session_id: "sess-1".to_string(),
+            access_token: "tok-abc".to_string(),
+            created_at: 1000,
+            updated_at: 2000,
+            expires_at: 9999,
+        };
+        assert_eq!(m.session_id, "sess-1");
+        assert!(m.expires_at > m.created_at);
+    }
+}

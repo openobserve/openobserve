@@ -105,3 +105,69 @@ impl TableProvider for NewEmptyTable {
         Ok(vec![TableProviderFilterPushDown::Inexact; filters.len()])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        datasource::{TableProvider, TableType},
+        logical_expr::TableProviderFilterPushDown,
+    };
+
+    use super::*;
+
+    fn test_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]))
+    }
+
+    #[test]
+    fn test_new_defaults() {
+        let table = NewEmptyTable::new("test", test_schema());
+        assert!(!table.sorted_by_time);
+    }
+
+    #[test]
+    fn test_with_sorted_by_time() {
+        let table = NewEmptyTable::new("test", test_schema()).with_sorted_by_time(true);
+        assert!(table.sorted_by_time);
+    }
+
+    #[test]
+    fn test_with_partitions() {
+        let table = NewEmptyTable::new("test", test_schema()).with_partitions(4);
+        assert_eq!(table.partitions, 4);
+    }
+
+    #[test]
+    fn test_schema_returns_correct_schema() {
+        let schema = test_schema();
+        let table = NewEmptyTable::new("test", schema.clone());
+        assert_eq!(table.schema().fields().len(), 1);
+        assert_eq!(table.schema().field(0).name(), "id");
+    }
+
+    #[test]
+    fn test_table_type_is_base() {
+        let table = NewEmptyTable::new("test", test_schema());
+        assert_eq!(table.table_type(), TableType::Base);
+    }
+
+    #[test]
+    fn test_supports_filters_pushdown_inexact() {
+        let table = NewEmptyTable::new("test", test_schema());
+        let dummy_expr = Expr::Literal(datafusion::scalar::ScalarValue::Boolean(Some(true)), None);
+        let filters = vec![&dummy_expr];
+        let result = table.supports_filters_pushdown(&filters).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], TableProviderFilterPushDown::Inexact);
+    }
+
+    #[test]
+    fn test_supports_filters_pushdown_empty() {
+        let table = NewEmptyTable::new("test", test_schema());
+        let result = table.supports_filters_pushdown(&[]).unwrap();
+        assert!(result.is_empty());
+    }
+}

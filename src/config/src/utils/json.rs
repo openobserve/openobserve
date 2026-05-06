@@ -568,4 +568,29 @@ mod tests {
         assert!(estimated_size > 0);
         assert!(estimated_size <= actual_size);
     }
+
+    #[test]
+    fn test_estimate_json_bytes_bool_false() {
+        // Bool(false) is 5 bytes, Bool(true) is 4 bytes
+        let true_val = json!(true);
+        let false_val = json!(false);
+        assert_eq!(estimate_json_bytes(&true_val), 4);
+        assert_eq!(estimate_json_bytes(&false_val), 5);
+    }
+
+    #[test]
+    fn test_estimate_json_bytes_skips_special_cols() {
+        use crate::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
+        // Object fields named _original and _all_values should be skipped
+        let with_special = json!({
+            ORIGINAL_DATA_COL_NAME: "ignored_value",
+            ALL_VALUES_COL_NAME: "also_ignored",
+            "normal": "kept"
+        });
+        let without_special = json!({"normal": "kept"});
+        assert_eq!(
+            estimate_json_bytes(&with_special),
+            estimate_json_bytes(&without_special)
+        );
+    }
 }

@@ -71,6 +71,18 @@ mod tests {
     }
 
     #[test]
+    fn test_irate_value_none_input() {
+        let result = irate_test_helper(Value::None).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_irate_invalid_input_returns_err() {
+        let result = irate_test_helper(Value::Float(1.0));
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_irate_function() {
         // Create a range value with increasing counter values
         let samples = vec![
@@ -103,5 +115,36 @@ mod tests {
             }
             _ => panic!("Expected Matrix result"),
         }
+    }
+
+    #[test]
+    fn test_irate_exec_less_than_two_samples_returns_none() {
+        let func = IrateFunc::new();
+        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
+        assert!(
+            func.exec(&[Sample::new(1000, 5.0)], 1000, &Duration::ZERO)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn test_irate_exec_same_timestamp_returns_zero() {
+        let func = IrateFunc::new();
+        let samples = vec![Sample::new(1000, 10.0), Sample::new(1000, 20.0)];
+        let result = func.exec(&samples, 1000, &Duration::ZERO);
+        assert_eq!(result, Some(0.0));
+    }
+
+    #[test]
+    fn test_irate_exec_counter_reset_uses_last_value() {
+        let func = IrateFunc::new();
+        // Counter reset: last.value < previous.value
+        // dt = (2000 - 1000) / 1_000_000 = 0.001s
+        // expected: last.value / dt = 5.0 / 0.001 = 5000.0
+        let samples = vec![Sample::new(1_000_000, 100.0), Sample::new(2_000_000, 5.0)];
+        let result = func.exec(&samples, 2_000_000, &Duration::ZERO);
+        assert!(result.is_some());
+        let rate = result.unwrap();
+        assert!((rate - 5.0).abs() < 1e-9); // 5.0 / 1.0s = 5.0
     }
 }

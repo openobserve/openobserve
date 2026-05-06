@@ -1125,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apaçi",
     "iis": "IIS",
-    "pubsub": "Pub/Alt Günlükleri"
+    "pubsub": "Pub/Alt Günlükleri",
+    "aiLabel": "Yapay Zeka Entegrasyonları"
   },
   "dashboard": {
     "selectField": "Tarla",
@@ -2280,7 +2281,8 @@
       "addNewDestination": "Yeni Hedef Ekle",
       "destinationRequired": "En az bir varış noktası gereklidir!",
       "disabledNotificationsInfo": "Anomali algılama çalışmaya devam edecek ve sonuçları _anomaliler akışına yazacaktır. Anormallikler tespit edildiğinde uyarı almak için bildirimleri etkinleştirin."
-    }
+    },
+    "anomalyName": "Anomali Adı"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2891,7 +2893,38 @@
       "multiStepAgent": "Çok adımlı Ajan"
     },
     "noLogsAvailableForService": "Bu hizmet için günlük yok",
-    "spansTruncatedWarning": "{total} açıklığın {count} gösterilmesi — izleme eksik olabilir. Zaman aralığını daraltın veya süre sınırını artırmak için yöneticinizle iletişime geçin."
+    "spansTruncatedWarning": "{total} açıklığın {count} gösterilmesi — izleme eksik olabilir. Zaman aralığını daraltın veya süre sınırını artırmak için yöneticinizle iletişime geçin.",
+    "servicesCatalog": {
+      "tabLabel": "Hizmet Kataloğu",
+      "title": "Hizmet Kataloğu",
+      "filterPlaceholder": "Hizmet adına göre filtrele...",
+      "noServicesFound": "Seçilen zaman aralığında hiçbir hizmet bulunamadı.",
+      "loading": "Hizmetler yükleniyor...",
+      "columns": {
+        "serviceName": "Hizmet",
+        "status": "Durum",
+        "requests": "İstekler",
+        "errorRate": "Hata Oranı",
+        "errors": "Hatalar",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Ortalama Gecikme",
+        "lastSeen": "Son Görülen",
+        "operations": "Operasyonlar"
+      },
+      "status": {
+        "healthy": "Sağlıklı",
+        "warning": "Uyarı",
+        "degraded": "Bozulmuş"
+      },
+      "viewTraces": "İzleri Görüntüle",
+      "exportCsv": "CSV'yi dışa aktarma",
+      "justNow": "Hemen şimdi",
+      "minutesAgo": "{n} m önce",
+      "hoursAgo": "{n} saat önce",
+      "daysAgo": "{n} d önce"
+    }
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

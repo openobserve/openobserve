@@ -62,3 +62,18 @@ enum EnrichmentTableUrls {
     Table,
     IsLocalRegion,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20251226_000001_add_enrichment_table_urls_is_local_region"
+        );
+    }
+}

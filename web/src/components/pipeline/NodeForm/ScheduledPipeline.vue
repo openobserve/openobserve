@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 100%"
+          style="border-radius: 6px"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
@@ -89,7 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           {{ t("search.runQuery") }}
-          <q-tooltip v-if="!selectedStreamName" anchor="bottom middle" self="top middle">
+          <q-tooltip
+            v-if="!selectedStreamName"
+            anchor="bottom middle"
+            self="top middle"
+          >
             {{ t("search.selectStreamFirst") }}
           </q-tooltip>
         </q-btn>
@@ -1184,7 +1188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info" color="primary"
+size="md" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6
@@ -1199,7 +1204,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info" color="primary"
+size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
                   </div>
@@ -1553,14 +1559,13 @@ watch(
 );
 
 // Watch for stream name changes and auto-generate query
-// Fix for issue #9658: Auto-generate SELECT * query when stream changes
 watch(
   () => selectedStreamName.value,
   (newStreamName, oldStreamName) => {
     if (newStreamName && oldStreamName && oldStreamName !== newStreamName) {
-      // Stream changed: Generate new SELECT * query for the new stream
+      // Stream changed: Generate default query for the new stream
       if (tab.value === "sql") {
-        query.value = `SELECT * FROM "${newStreamName}"`;
+        query.value = `SELECT max(_timestamp) as _timestamp, count(_timestamp) as total_events\nFROM "${newStreamName}"\nGROUP BY histogram(_timestamp)`;
         updateQueryValue(query.value);
       } else if (tab.value === "promql") {
         query.value = `${newStreamName}{}`;
@@ -1569,7 +1574,7 @@ watch(
     } else if (!oldStreamName && newStreamName) {
       // Initial stream selection: Generate default query
       if (tab.value === "sql" && !query.value.trim()) {
-        query.value = `SELECT * FROM "${newStreamName}"`;
+        query.value = `SELECT max(_timestamp) as _timestamp, count(_timestamp) as total_events\nFROM "${newStreamName}"\nGROUP BY histogram(_timestamp)`;
         updateQueryValue(query.value);
       } else if (tab.value === "promql" && !query.value.trim()) {
         query.value = `${newStreamName}{}`;

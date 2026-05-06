@@ -20,3 +20,27 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            pipeline_id: "pipe-1".to_string(),
+            org_id: "myorg".to_string(),
+            pipeline_name: "my-pipeline".to_string(),
+            last_error_timestamp: 1000,
+            error_summary: Some("connection refused".to_string()),
+            node_errors: Some(serde_json::json!([{"node": "n1", "error": "timeout"}])),
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        assert_eq!(m.pipeline_id, "pipe-1");
+        assert_eq!(m.org_id, "myorg");
+        assert_eq!(m.pipeline_name, "my-pipeline");
+        assert!(m.error_summary.is_some());
+        assert!(m.node_errors.is_some());
+    }
+}

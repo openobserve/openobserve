@@ -84,6 +84,31 @@ fn create_index_created_at_stmt() -> IndexCreateStatement {
         .to_owned()
 }
 
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_table_name() {
+        let sql = create_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("search_queue"));
+    }
+
+    #[test]
+    fn test_work_group_idx_name() {
+        let sql = create_index_work_group_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(SEARCH_QUEUE_WORK_GROUP_IDX));
+    }
+
+    #[test]
+    fn test_created_at_idx_name() {
+        let sql = create_index_created_at_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(SEARCH_QUEUE_CREATED_AT_IDX));
+    }
+}
+
 #[derive(DeriveIden)]
 enum SearchQueue {
     Table,

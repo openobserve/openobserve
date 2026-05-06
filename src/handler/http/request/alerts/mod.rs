@@ -1455,3 +1455,258 @@ pub async fn generate_sql(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{http::StatusCode, response::Response};
+
+    use crate::service::alerts::alert::AlertError;
+
+    fn status(err: AlertError) -> StatusCode {
+        Response::from(err).status()
+    }
+
+    // 400 Bad Request
+    #[test]
+    fn test_alert_name_missing_is_bad_request() {
+        assert_eq!(
+            status(AlertError::AlertNameMissing),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_alert_name_contains_forward_slash_is_bad_request() {
+        assert_eq!(
+            status(AlertError::AlertNameContainsForwardSlash),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_alert_name_ofga_unsupported_is_bad_request() {
+        assert_eq!(
+            status(AlertError::AlertNameOfgaUnsupported),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_alert_destination_missing_is_bad_request() {
+        assert_eq!(
+            status(AlertError::AlertDestinationMissing),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_alert_id_missing_is_bad_request() {
+        assert_eq!(status(AlertError::AlertIdMissing), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_sql_missing_query_is_bad_request() {
+        assert_eq!(status(AlertError::SqlMissingQuery), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_sql_contains_select_star_is_bad_request() {
+        assert_eq!(
+            status(AlertError::SqlContainsSelectStar),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_promql_missing_query_is_bad_request() {
+        assert_eq!(
+            status(AlertError::PromqlMissingQuery),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_realtime_missing_custom_query_is_bad_request() {
+        assert_eq!(
+            status(AlertError::RealtimeMissingCustomQuery),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_template_not_configured_is_bad_request() {
+        assert_eq!(
+            status(AlertError::TemplateNotConfigured {
+                dest: "slack".to_string()
+            }),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_period_exceeds_max_query_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::PeriodExceedsMaxQueryRange {
+                max_query_range_hours: 24,
+                stream_name: "logs".to_string(),
+            }),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    // 404 Not Found
+    #[test]
+    fn test_alert_not_found_is_not_found() {
+        assert_eq!(status(AlertError::AlertNotFound), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_create_folder_not_found_is_not_found() {
+        assert_eq!(
+            status(AlertError::CreateFolderNotFound),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_move_destination_folder_not_found_is_not_found() {
+        assert_eq!(
+            status(AlertError::MoveDestinationFolderNotFound),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_alert_destination_not_found_is_not_found() {
+        assert_eq!(
+            status(AlertError::AlertDestinationNotFound {
+                dest: "pagerduty".to_string()
+            }),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_stream_not_found_is_not_found() {
+        assert_eq!(
+            status(AlertError::StreamNotFound {
+                stream_name: "events".to_string()
+            }),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_alert_template_not_found_is_not_found() {
+        assert_eq!(
+            status(AlertError::AlertTemplateNotFound {
+                template: "default".to_string()
+            }),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    // 409 Conflict
+    #[test]
+    fn test_create_already_exists_is_conflict() {
+        assert_eq!(
+            status(AlertError::CreateAlreadyExists),
+            StatusCode::CONFLICT
+        );
+    }
+
+    // 403 Forbidden
+    #[test]
+    fn test_permitted_alerts_missing_user_is_forbidden() {
+        assert_eq!(
+            status(AlertError::PermittedAlertsMissingUser),
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    #[test]
+    fn test_permission_denied_is_forbidden() {
+        assert_eq!(status(AlertError::PermissionDenied), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_user_not_found_is_forbidden() {
+        assert_eq!(status(AlertError::UserNotFound), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_permitted_alerts_validator_is_forbidden() {
+        assert_eq!(
+            status(AlertError::PermittedAlertsValidator("err".to_string())),
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    // 500 Internal Server Error
+    #[test]
+    fn test_create_default_folder_error_is_internal_error() {
+        assert_eq!(
+            status(AlertError::CreateDefaultFolderError),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_send_notification_error_is_internal_error() {
+        assert_eq!(
+            status(AlertError::SendNotificationError {
+                error_message: "timeout".to_string()
+            }),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_resolve_stream_name_error_is_internal_error() {
+        assert_eq!(
+            status(AlertError::ResolveStreamNameError(anyhow::anyhow!("err"))),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_infra_error_is_internal_server_error() {
+        let err = infra::errors::Error::DbError(infra::errors::DbError::SeaORMError(
+            "db unavailable".to_string(),
+        ));
+        assert_eq!(
+            status(AlertError::InfraError(err)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_decode_vrl_is_bad_request() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::InvalidData, "bad vrl");
+        assert_eq!(
+            status(AlertError::DecodeVrl(io_err)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_parse_cron_is_bad_request() {
+        use std::str::FromStr as _;
+        let cron_err = cron::Schedule::from_str("not-a-cron").unwrap_err();
+        assert_eq!(
+            status(AlertError::ParseCron(cron_err)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_get_destination_with_template_error_is_internal_server_error() {
+        use crate::service::db::alerts::destinations::DestinationError;
+        assert_eq!(
+            status(AlertError::GetDestinationWithTemplateError(
+                DestinationError::NotFound
+            )),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+}

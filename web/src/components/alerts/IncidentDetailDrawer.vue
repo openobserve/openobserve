@@ -3104,7 +3104,7 @@ body.body--dark .ai-chat-panel::-webkit-scrollbar-thumb {
 
 /* AI Button Styles */
 .ai-btn-active {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
 }
 
 .ai-hover-btn {

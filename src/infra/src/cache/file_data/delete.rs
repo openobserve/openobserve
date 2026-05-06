@@ -51,3 +51,14 @@ pub fn add(files: Vec<String>) {
         PENDING_CHANNEL.add(files)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_empty_files_does_not_panic() {
+        // Empty vec short-circuits before touching PENDING_CHANNEL (which needs tokio)
+        add(vec![]);
+    }
+}

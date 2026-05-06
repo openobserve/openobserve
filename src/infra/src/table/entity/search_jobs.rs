@@ -32,3 +32,36 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "job-1".to_string(),
+            trace_id: "trace-1".to_string(),
+            org_id: "org".to_string(),
+            user_id: "user".to_string(),
+            stream_type: "logs".to_string(),
+            stream_names: "stream1".to_string(),
+            payload: "{}".to_string(),
+            start_time: 0,
+            end_time: 1000,
+            created_at: 100,
+            updated_at: 200,
+            started_at: None,
+            ended_at: None,
+            cluster: None,
+            node: None,
+            status: 0,
+            result_path: None,
+            error_message: None,
+            partition_num: None,
+        };
+        assert_eq!(m.org_id, "org");
+        assert_eq!(m.status, 0);
+        assert!(m.started_at.is_none());
+    }
+}

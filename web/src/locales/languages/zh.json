@@ -1125,7 +1125,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub Logs"
+    "pubsub": "Pub/Sub Logs",
+    "aiLabel": "人工智能集成"
   },
   "dashboard": {
     "selectField": "字段",
@@ -2282,7 +2283,8 @@
       "addNewDestination": "添加新目的地",
       "destinationRequired": "至少需要一个目的地！",
       "disabledNotificationsInfo": "异常检测仍将运行并将结果写入 _anomalies 流。启用通知以在检测到异常时接收警报。"
-    }
+    },
+    "anomalyName": "异常名称"
   },
   "alert_templates": {
     "header": "模板",
@@ -2884,7 +2886,38 @@
       "multiStepAgent": "多步代理"
     },
     "noLogsAvailableForService": "此服务没有可用的日志",
-    "spansTruncatedWarning": "显示 {total} 跨度的 {count} — 跟踪可能不完整。缩小时间范围或联系管理员以增加跨度限制。"
+    "spansTruncatedWarning": "显示 {total} 跨度的 {count} — 跟踪可能不完整。缩小时间范围或联系管理员以增加跨度限制。",
+    "servicesCatalog": {
+      "tabLabel": "服务目录",
+      "title": "服务目录",
+      "filterPlaceholder": "按服务名称筛选...",
+      "noServicesFound": "在所选时间范围内未找到任何服务。",
+      "loading": "正在加载服务...",
+      "columns": {
+        "serviceName": "服务",
+        "status": "状态",
+        "requests": "请求",
+        "errorRate": "错误率",
+        "errors": "错误",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "平均延迟",
+        "lastSeen": "上次看到",
+        "operations": "运营"
+      },
+      "status": {
+        "healthy": "健康",
+        "warning": "警告",
+        "degraded": "已降级"
+      },
+      "viewTraces": "查看踪迹",
+      "exportCsv": "导出 CSV",
+      "justNow": "刚才",
+      "minutesAgo": "{n} 我之前",
+      "hoursAgo": "{n} 小时前",
+      "daysAgo": "{n} d 之前"
+    }
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

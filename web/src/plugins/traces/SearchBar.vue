@@ -42,10 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="traces-search-mode-traces-btn"
                 :class="[
-                  'button tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
-                  config.isEnterprise == 'true'
-                    ? 'button-center tw:rounded-none!'
-                    : 'button-right tw:rounded-l-none!',
+                  'button button-center tw:rounded-none! tw:w-[5.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
                   searchObj.meta.searchMode === 'traces' ? 'selected' : '',
                 ]"
                 @click="$emit('update:searchMode', 'traces')"
@@ -59,25 +56,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="config.isEnterprise == 'true'">
               <q-btn
                 data-test="traces-service-graph-toggle"
-                :class="
+                :class="[
+                  'button button-center tw:rounded-none! tw:w-[6.1rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
                   searchObj.meta.searchMode === 'service-graph'
                     ? 'selected'
-                    : ''
-                "
+                    : '',
+                ]"
                 @click="$emit('update:searchMode', 'service-graph')"
                 no-caps
                 size="sm"
-                class="button button-right tw:w-[6.1rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!"
               >
                 Service Graph
                 <q-tooltip>Service Graph</q-tooltip>
               </q-btn>
             </div>
+            <div>
+              <q-btn
+                data-test="traces-search-mode-services-catalog-btn"
+                :class="[
+                  'button button-right tw:w-[7.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  searchObj.meta.searchMode === 'services-catalog'
+                    ? 'selected'
+                    : '',
+                ]"
+                @click="$emit('update:searchMode', 'services-catalog')"
+                no-caps
+                size="sm"
+              >
+                {{ t("traces.servicesCatalog.tabLabel") }}
+                <q-tooltip>{{ t("traces.servicesCatalog.tabLabel") }}</q-tooltip>
+              </q-btn>
+            </div>
           </div>
         </div>
 
-        <!-- Show search controls only when not on Service Graph -->
-        <template v-if="searchObj.meta.searchMode !== 'service-graph'">
+        <!-- Show search controls only when not on Service Graph or Services Catalog -->
+        <template
+          v-if="
+            searchObj.meta.searchMode !== 'service-graph' &&
+            searchObj.meta.searchMode !== 'services-catalog'
+          "
+        >
           <div
             class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
           >
@@ -150,7 +169,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
       <div
-        v-if="searchObj.meta.searchMode !== 'service-graph'"
+        v-if="
+          searchObj.meta.searchMode !== 'service-graph' &&
+          searchObj.meta.searchMode !== 'services-catalog'
+        "
         class="float-right col-auto"
       >
         <div class="float-left tw:mr-[0.375rem]">
@@ -364,10 +386,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
+
+      <!-- Services Catalog right toolbar: DateTime, Refresh -->
+      <div
+        v-if="searchObj.meta.searchMode === 'services-catalog'"
+        class="float-right col-auto o2-input-full"
+      >
+        <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
+          <date-time
+            ref="dateTimeRef"
+            auto-apply
+            :default-type="searchObj.data.datetime.type"
+            :default-absolute-time="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+            data-test="services-catalog-date-time-picker"
+            class="tw:h-[2rem]!"
+            @on:date-change="updateDateTime"
+          />
+          <q-btn
+            data-test="services-catalog-refresh-btn"
+            class="tw:mr-[0.375rem] tw:w-[1rem]! tw:min-h-[1.9rem]! tw:h-[1.9rem]! el-border"
+            icon="refresh"
+            @click="$emit('services-catalog-refresh')"
+          >
+            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+          </q-btn>
+        </div>
+      </div>
     </div>
     <div
       v-if="
         searchObj.meta.searchMode !== 'service-graph' &&
+        searchObj.meta.searchMode !== 'services-catalog' &&
         searchObj.meta.showQuery
       "
       class="row tw:h-[calc(100%-3.1rem)]!"
@@ -452,6 +505,7 @@ export default defineComponent({
     "filters-reset",
     "onChangeTimezone",
     "service-graph-refresh",
+    "services-catalog-refresh",
   ],
   props: {
     fieldValues: {
@@ -819,6 +873,10 @@ export default defineComponent({
 
       // Clear brush selections from metrics dashboard
       searchObj.meta.metricsRangeFilters.clear();
+
+      // Reset sort to defaults
+      searchObj.meta.resultGrid.sortBy = "start_time";
+      searchObj.meta.resultGrid.sortOrder = "desc";
 
       // Emit event to notify parent that filters were reset
       emit("filters-reset");

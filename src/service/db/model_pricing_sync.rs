@@ -167,3 +167,27 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
         disabled,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_last_sync_timestamp_initial_value() {
+        // Initial value is 0 (never synced), unless tests run after sync
+        let ts = last_sync_timestamp();
+        assert!(ts >= 0);
+    }
+
+    #[test]
+    fn test_sync_result_fields() {
+        let r = SyncResult {
+            created: 3,
+            updated: 1,
+            disabled: 0,
+        };
+        assert_eq!(r.created, 3);
+        assert_eq!(r.updated, 1);
+        assert_eq!(r.disabled, 0);
+    }
+}

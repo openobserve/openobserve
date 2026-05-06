@@ -28,4 +28,19 @@ mod tests {
         let services = [LOGS, METRICS, TRACES];
         assert!(HashSet::from(services).len() == services.len());
     }
+
+    #[test]
+    fn test_logs_constant_value() {
+        assert_eq!(LOGS, "logs");
+    }
+
+    #[test]
+    fn test_metrics_constant_value() {
+        assert_eq!(METRICS, "metrics");
+    }
+
+    #[test]
+    fn test_traces_constant_value() {
+        assert_eq!(TRACES, "traces");
+    }
 }

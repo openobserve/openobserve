@@ -1142,7 +1142,8 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Subログ",
-    "oracle": "オラクル"
+    "oracle": "オラクル",
+    "aiLabel": "AI インテグレーション"
   },
   "dashboard": {
     "selectField": "フィールド",
@@ -2299,7 +2300,8 @@
       "addNewDestination": "新しい目的地を追加",
       "destinationRequired": "少なくとも 1 つの目的地が必要です!",
       "disabledNotificationsInfo": "異常検出は引き続き実行され、結果が _anomalies ストリームに書き込まれます。異常が検出されたときにアラートを受け取るように通知を有効にします。"
-    }
+    },
+    "anomalyName": "アノマリー名"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2901,7 +2903,38 @@
       "multiStepAgent": "マルチステップエージェント"
     },
     "noLogsAvailableForService": "このサービスで利用できるログはありません",
-    "spansTruncatedWarning": "{total} スパンのうち {count} を表示中 — トレースが不完全である可能性があります。時間範囲を狭めるか、管理者に連絡してスパン制限を増やしてください。"
+    "spansTruncatedWarning": "{total} スパンのうち {count} を表示中 — トレースが不完全である可能性があります。時間範囲を狭めるか、管理者に連絡してスパン制限を増やしてください。",
+    "servicesCatalog": {
+      "tabLabel": "サービスカタログ",
+      "title": "サービスカタログ",
+      "filterPlaceholder": "サービス名で絞り込み...",
+      "noServicesFound": "選択した時間範囲にサービスが見つかりません。",
+      "loading": "サービスを読み込んでいます...",
+      "columns": {
+        "serviceName": "サービス",
+        "status": "ステータス",
+        "requests": "リクエスト",
+        "errorRate": "エラー率",
+        "errors": "エラー",
+        "p50Latency": "50",
+        "p95Latency": "95",
+        "p99Latency": "99",
+        "avgLatency": "平均レイテンシー",
+        "lastSeen": "最後に見たもの",
+        "operations": "オペレーション"
+      },
+      "status": {
+        "healthy": "ヘルシー",
+        "warning": "警告",
+        "degraded": "劣化しました"
+      },
+      "viewTraces": "トレースを表示",
+      "exportCsv": "CSV をエクスポート",
+      "justNow": "たった今",
+      "minutesAgo": "{n} 分前",
+      "hoursAgo": "{n} 時間前",
+      "daysAgo": "{n} 日前"
+    }
   },
   "actions": {
     "testAction": "アクションをテスト",
