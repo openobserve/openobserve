@@ -160,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   :title="t('logStream.schemaHeader')"
+                  data-test="log-stream-schema-btn"
                   variant="ghost"
                   size="icon-sm"
                   @click="listSchema(props)"
