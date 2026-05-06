@@ -690,24 +690,47 @@ export class AlertCreationWizard {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // Forcefully remove any remaining q-portal elements that intercept clicks
+        // Clean up residual q-portal dialog overlays from the closed SQL Editor,
+        // scoped to already-hidden portals and the Monaco editor's portal specifically
+        // so we don't hide any other legitimately open dialog.
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
+            document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => {
+                const isHidden = el.getAttribute('aria-hidden') === 'true';
+                const hasMonaco = el.querySelector('.monaco-editor');
+                if (isHidden || hasMonaco) el.style.display = 'none';
+            });
+        }).catch(e => testLogger.warn('Failed to remove dialog portals', { error: e.message }));
         await this.page.waitForTimeout(300);
 
-        testLogger.info('Closed SQL Editor dialog');
+        testLogger.info('Closed SQL Editor dialog — portal cleaned up');
 
         // ==================== ALERT SETTINGS ====================
-        // In v3 UI, threshold operator + input are in QueryConfig as part of the "Alert if *" section
-        // For SQL mode, the condition row shows "Alert if No. of events *" (not "matching logs")
+        // In v3 UI, threshold operator + input are in the Alert Rules tab ("Alert if No. of events *")
         const thresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'No. of events' }).first();
-        const thresholdOperator = thresholdSection.locator('.alert-v3-select').first();
+        await thresholdSection.waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Threshold section visible');
+
+        const thresholdOperator = thresholdSection.locator('.alert-v3-select, .q-select').first();
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        await thresholdOperator.click({ force: true });
-        await this.page.waitForTimeout(500);
-        // Scope to visible menu to avoid strict mode violation (selected value + dropdown option)
-        await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click();
+        // Click the q-field__control area to open the dropdown (more reliable than clicking the whole component)
+        await thresholdOperator.locator('.q-field__control, .q-field').first().click({ timeout: 5000 }).catch(async () => {
+            testLogger.info('q-field click failed, clicking main element with force');
+            await thresholdOperator.click({ force: true });
+        });
+        // Wait for the dropdown menu to actually appear before selecting an option
+        await this.page.locator('[role="listbox"]:visible, .q-menu:visible').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        // Use role-based option selection (bypasses q-portal visibility issues)
+        // Use a flag to track success so the fallback error isn't silently swallowed
+        let operatorSelected = false;
+        try {
+            await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 });
+            operatorSelected = true;
+        } catch {
+            testLogger.warn('Role option not found, trying q-menu fallback');
+        }
+        if (!operatorSelected) {
+            await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click({ timeout: 3000 });
+        }
         testLogger.info('Set threshold operator: >=');
 
         const thresholdInput = thresholdSection.locator('input[type="number"]').first();
@@ -1032,10 +1055,16 @@ export class AlertCreationWizard {
     }
 
     async _switchToTab(tabName) {
-        // The "Alert Rules" tab has required:true so text is "Alert Rules *"
-        const tab = this.page.locator('div.alert-v3-tabs > div').filter({ hasText: tabName }).first();
+        // v3 UI: tabs are inner divs within the tab header bar (first child of .alert-v3-tabs)
+        // e.g. <div>Alert Rules *</div> and <div>Advanced</div>
+        const tab = this.page.locator('.alert-v3-tabs > div:first-child > div').filter({ hasText: tabName }).first();
+        // Check if this tab is already active (has active-tab class)
+        const isActive = await tab.evaluate(el => el.classList.contains('active-tab')).catch(() => false);
+        if (isActive) {
+            testLogger.info('Tab already active, skipping click', { tabName });
+            return;
+        }
         await tab.waitFor({ state: 'visible', timeout: 5000 });
-        // Use force:true to bypass any residual q-portal overlays from closed dialogs
         await tab.click({ force: true });
         await this.page.waitForTimeout(500);
         testLogger.info('Switched to tab', { tabName });
