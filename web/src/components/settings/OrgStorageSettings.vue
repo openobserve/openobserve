@@ -45,18 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="hero-page__body">
         <!-- left -->
         <div class="hero-page__left">
-          <div class="hero-page__eyebrow">
-            <q-icon name="verified_user" size="13px" />
-            Save on storage costs
-          </div>
 
           <div class="hero-page__headline">
             Bring your own storage to <span class="hero-page__brand-text">OpenObserve.</span>
           </div>
 
           <div class="hero-page__sub">
-            Connect your own cloud bucket and stop paying for data retention.
-            Your data stays in your infrastructure — full control, zero lock-in.
+            Connect your own cloud bucket , data stays in your infrastructure — full control, zero lock-in.
           </div>
 
           <div class="hero-page__actions">
@@ -77,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="hero-page__inline-label">Supported providers</span>
             <div class="hero-page__inline-logos">
               <div
-                v-for="p in providerDefinitions"
+                v-for="p in availableProviders"
                 :key="p.value"
                 class="hero-page__inline-logo-wrap"
               >
@@ -121,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="ent-empty__title">No custom storage configured</div>
+      <div class="ent-empty__title">No storage configured</div>
 
       <div class="ent-empty__desc">
         Route this org's data to a dedicated bucket — independently of other orgs and global defaults.
@@ -282,12 +277,12 @@ const features = [
   {
     icon: "dataset",
     title: "Own your data end-to-end",
-    desc: "Store ingested data directly in your bucket — no copies, no intermediaries. Maintain absolute data sovereignty.",
+    desc: "Store ingested data directly in your own bucket and stay in complete control of who can access it.",
   },
   {
     icon: "security",
     title: "Secure & compliant",
-    desc: "Use AWS IAM roles or access keys. Your sensitive data never leaves your infrastructure.",
+    desc: "Fine grained access keys, your sensitive data stays in your infrastructure.",
   },
 ];
 
@@ -360,6 +355,22 @@ const providerDefinitions = [
   },
 ];
 
+
+const cloudProviders = computed(() => {
+  const raw = (store.state as any).zoConfig?.org_storage_providers;
+  if (!raw || !isCloud.value) return null;
+  return raw.split(",").map((s: string) => s.trim());
+});
+
+const availableProviders = computed(() => {
+  let providers = [...providerDefinitions];
+  if (isCloud.value && cloudProviders.value) {
+    providers = providers.filter((p) =>
+      cloudProviders.value!.includes(p.value)
+    );
+  }
+  return providers;
+});
 async function fetchExistingConfig() {
   loading.value = true;
   try {
