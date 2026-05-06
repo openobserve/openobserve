@@ -40,6 +40,7 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
   ZO_ENABLE_CROSS_LINKING: true
+  ZO_AUTO_QUERY_ENABLED: true
   # Allow alert destinations to target localhost so the test validation stream
   # (http://localhost:5080/api/.../..._json) is not blocked by the SSRF guard.
   ZO_SSRF_ALLOW_LOOPBACK: true
