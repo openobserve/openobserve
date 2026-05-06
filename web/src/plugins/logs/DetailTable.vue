@@ -227,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <ODropdownItem
                         v-for="crossLink in getCrossLinksForField(props.row.field)"
                         :key="crossLink.name"
+                        :data-test="`log-details-cross-link-${crossLink.name}`"
                         @select.stop="openCrossLink(crossLink.resolvedUrl)"
                       >
                         <template #icon-left><ExternalLink class="tw:size-4" /></template>
