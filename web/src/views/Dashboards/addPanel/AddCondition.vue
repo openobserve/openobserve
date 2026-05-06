@@ -10,7 +10,7 @@
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
-      :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
+      :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup class="axis-field" radius="sm">
       <OButton

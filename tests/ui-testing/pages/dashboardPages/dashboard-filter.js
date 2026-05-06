@@ -115,6 +115,13 @@ export default class DashboardFilter {
         .getByRole("option", { name: operator, exact: true })
         .first()
         .click();
+      // Wait for the operator dropdown portal to fully close before step 5.
+      // The Quasar q-select portal animates out and intercepts pointer events
+      // during the animation — wait for the listbox to be hidden first.
+      await this.page
+        .locator('[role="listbox"]')
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 5: Enter value (if required)
@@ -298,6 +305,11 @@ export default class DashboardFilter {
       // Wait until option is visible with increased timeout
       await optionLocator.waitFor({ state: "visible", timeout: 10000 });
       await optionLocator.click();
+      // Wait for the operator dropdown portal to fully close before step 5.
+      await this.page
+        .locator('[role="listbox"]')
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 5: Fill value field
@@ -383,6 +395,11 @@ export default class DashboardFilter {
 
       await operatorOption.waitFor({ state: "visible", timeout: 10000 });
       await operatorOption.click();
+      // Wait for the operator dropdown portal to fully close before step 6.
+      await this.page
+        .locator('[role="listbox"]')
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 6: Fill value if provided (appears in portal, use page scope)
@@ -395,13 +412,15 @@ export default class DashboardFilter {
       await valueInput.click();
       await valueInput.fill(value);
 
-      // Wait for autocomplete suggestion
+      // Wait for autocomplete suggestion — element may re-attach while the
+      // autocomplete list re-renders; use a longer timeout so Playwright's
+      // built-in retry has enough time to succeed after re-attachment.
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
 
-      await suggestion.waitFor({ state: "visible", timeout: 5000 });
-      await suggestion.click();
+      await suggestion.waitFor({ state: "visible", timeout: 10000 });
+      await suggestion.click({ timeout: 15000 });
     }
 
     // Step 7: Update the field name (appears in portal, use page scope)

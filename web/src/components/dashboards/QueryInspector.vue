@@ -98,6 +98,7 @@
               <div class="tw:relative tw:group">
                 <div
                   class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  :data-test="`query-inspector-original-query-${index}`"
                   v-html="
                     highlightSearch(
                       colorizedQueries[`${index}-Original Query`] ||
@@ -126,6 +127,7 @@
               <div class="tw:relative tw:group">
                 <div
                   class="tw:p-2 tw:rounded-lg tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  :data-test="`query-inspector-executed-query-${index}`"
                   v-html="
                     highlightSearch(
                       colorizedQueries[`${index}-Query`] || query.query,
