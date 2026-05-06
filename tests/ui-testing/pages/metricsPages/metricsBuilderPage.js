@@ -67,7 +67,8 @@ export class MetricsBuilderPage {
         const builderBtn = this.page.locator(this.builderModeButton);
         if (await builderBtn.isVisible({ timeout: 3000 })) {
             const classes = await builderBtn.getAttribute('class') || '';
-            if (!classes.includes('selected')) {
+            const dataState = await builderBtn.getAttribute('data-state') || '';
+            if (!classes.includes('selected') && dataState !== 'on') {
                 await builderBtn.click();
                 await this.page.waitForTimeout(500);
 
@@ -139,7 +140,8 @@ export class MetricsBuilderPage {
         const btn = this.page.locator(selectorMap[mode]);
         if (await btn.isVisible({ timeout: 2000 })) {
             const classes = await btn.getAttribute('class') || '';
-            return classes.includes('selected');
+            const dataState = await btn.getAttribute('data-state') || '';
+            return classes.includes('selected') || dataState === 'on';
         }
         return false;
     }
@@ -1019,15 +1021,32 @@ export class MetricsBuilderPage {
      */
     async selectDashboardTab(tabName = 'Default') {
         const tabDropdown = this.page.locator('[data-test="dashboard-dropdown-tab-selection"]');
-        if (await tabDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await tabDropdown.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-            const option = this.page.locator('.q-menu .q-item').filter({ hasText: tabName }).first();
-            if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await option.click();
-                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-                return true;
-            }
+
+        // Wait for the tab dropdown to become visible (it appears only after a dashboard is selected)
+        if (!await tabDropdown.isVisible({ timeout: 8000 }).catch(() => false)) {
+            return false;
+        }
+
+        // Wait for the tab list to auto-load and auto-select (SelectTabDropdown onMounted async fetch)
+        await this.page.waitForTimeout(2000);
+
+        // Click the dialog title (a neutral element) to close any open dropdown menus.
+        // Quasar dropdowns close when clicking outside them, so even if the title click
+        // is intercepted by an open menu, that menu will close.
+        const dialogTitle = this.page.locator('[data-test="schema-title-text"]');
+        if (await dialogTitle.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await dialogTitle.click({ force: true });
+            await this.page.waitForTimeout(300);
+        }
+
+        // Now click the tab dropdown normally
+        await tabDropdown.click();
+        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        const option = this.page.locator('.q-menu .q-item').filter({ hasText: tabName }).first();
+        if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await option.click();
+            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            return true;
         }
         return false;
     }
