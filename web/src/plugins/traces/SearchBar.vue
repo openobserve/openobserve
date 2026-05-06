@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="traces-search-mode-services-catalog-btn"
                 :class="[
-                  'button button-right tw:w-[7.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  'button button-center tw:rounded-none! tw:w-[7.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
                   searchObj.meta.searchMode === 'services-catalog'
                     ? 'selected'
                     : '',
@@ -87,6 +87,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip>{{ t("traces.servicesCatalog.tabLabel") }}</q-tooltip>
               </q-btn>
             </div>
+            <div>
+              <q-btn
+                data-test="traces-search-mode-llm-insights-btn"
+                :class="[
+                  'button button-right tw:w-[6.5rem]! tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.94rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                  searchObj.meta.searchMode === 'llm-insights'
+                    ? 'selected'
+                    : '',
+                ]"
+                @click="$emit('update:searchMode', 'llm-insights')"
+                no-caps
+                size="sm"
+              >
+                LLM Insights
+                <q-tooltip>LLM Insights</q-tooltip>
+              </q-btn>
+            </div>
           </div>
         </div>
 
@@ -94,7 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
-            searchObj.meta.searchMode !== 'services-catalog'
+            searchObj.meta.searchMode !== 'services-catalog' &&
+            searchObj.meta.searchMode !== 'llm-insights'
           "
         >
           <div
@@ -421,6 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.searchMode !== 'services-catalog' &&
+        searchObj.meta.searchMode !== 'llm-insights' &&
         searchObj.meta.showQuery
       "
       class="row tw:h-[calc(100%-3.1rem)]!"
@@ -516,6 +535,10 @@ export default defineComponent({
     // so have added as prop
     // Run query btn was not getting disabled while loading
     isLoading: {
+      type: Boolean,
+      default: false,
+    },
+    isLLMSpanPresent: {
       type: Boolean,
       default: false,
     },

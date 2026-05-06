@@ -23,14 +23,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div id="tracesSecondLevel" class="full-height">
       <q-splitter
-        class="traces-horizontal-splitter full-height"
+        :class="[
+          'traces-horizontal-splitter full-height',
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
+            ? 'hide-splitter-separator'
+            : '',
+        ]"
         v-model="splitterModel"
         :disable="
-          activeTab === 'service-graph' || activeTab === 'services-catalog'
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
         "
         horizontal
         :before-class="
-          activeTab === 'service-graph' || activeTab === 'services-catalog'
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
             ? 'tw:max-h-[3.54rem]!'
             : ''
         "
@@ -47,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :fieldValues="fieldValues"
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
+              :isLLMSpanPresent="isLLMSpanPresent"
               class="card-container"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
@@ -86,6 +92,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="servicesCatalogRef"
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
+            />
+          </div>
+
+          <!-- LLM Insights Tab Content -->
+          <div
+            v-if="activeTab === 'llm-insights'"
+            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+          >
+            <LLMInsightsDashboard
+              :streamName="selectedStreamName"
+              :startTime="insightsTimeRange.startTime"
+              :endTime="insightsTimeRange.endTime"
+              class="tw:h-full"
             />
           </div>
 
@@ -351,12 +370,16 @@ const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 const ServicesCatalog = defineAsyncComponent(
   () => import("./ServicesCatalog.vue"),
 );
+const LLMInsightsDashboard = defineAsyncComponent(
+  () => import("./LLMInsightsDashboard.vue"),
+);
 
 const store = useStore();
 const activeTab = computed(() => {
   if (searchObj.meta.searchMode === "service-graph") return "service-graph";
   if (searchObj.meta.searchMode === "services-catalog")
     return "services-catalog";
+  if (searchObj.meta.searchMode === "llm-insights") return "llm-insights";
   return "search";
 });
 const router = useRouter();
@@ -439,6 +462,30 @@ const tracesPartitionMap: Record<
 const selectedStreamName = computed(
   () => searchObj.data.stream.selectedStream.value,
 );
+
+// Bumped whenever Run Query is clicked while on the LLM Insights tab. Used as
+// a reactive dep of `insightsTimeRange` so a click on Run Query forces the
+// computed to re-evaluate (otherwise relative ranges like "Past 1 hour" return
+// the cached value because Date.now() is not reactive).
+const llmRefreshNonce = ref(0);
+
+const insightsTimeRange = computed(() => {
+  // Touch the nonce so re-running with the same relative period still
+  // produces a fresh window.
+  void llmRefreshNonce.value;
+
+  const dt = searchObj.data.datetime;
+  if (!dt) return { startTime: 0, endTime: 0 };
+  if (dt.type === "relative") {
+    const relativePeriod: any = dt.relativeTimePeriod;
+    if (!relativePeriod) return { startTime: 0, endTime: 0 };
+    return getConsumableRelativeTime(relativePeriod) || { startTime: 0, endTime: 0 };
+  }
+  return {
+    startTime: typeof dt.startTime === "number" ? dt.startTime : new Date(dt.startTime).getTime() * 1000,
+    endTime: typeof dt.endTime === "number" ? dt.endTime : new Date(dt.endTime).getTime() * 1000,
+  };
+});
 
 const isLLMSpanPresent = ref(false);
 
@@ -1584,8 +1631,8 @@ function restoreUrlQueryParams() {
   if (
     tab !== undefined &&
     (
-      ["service-graph", "traces", "spans", "services-catalog"] as const
-    ).includes(tab as "service-graph" | "traces" | "spans" | "services-catalog")
+      ["service-graph", "traces", "spans", "llm-insights", "services-catalog"] as const
+    ).includes(tab as "service-graph" | "traces" | "spans" | "llm-insights" | "services-catalog")
   ) {
     if (tab === "service-graph" && config.isEnterprise !== "true") return;
     searchObj.meta.searchMode = tab as TraceSearchMode;
@@ -1683,10 +1730,10 @@ const onErrorOnlyToggled = (value: boolean) => {
 
 // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
 const onSearchModeChange = (
-  mode: "traces" | "spans" | "service-graph" | "services-catalog",
+  mode: "traces" | "spans" | "llm-insights" | "service-graph" | "services-catalog",
 ) => {
   searchObj.meta.searchMode = mode;
-  if (mode === "service-graph" || mode === "services-catalog") return;
+  if (mode === "service-graph" || mode === "services-catalog" || mode === "llm-insights") return;
   if (
     mode === "traces" &&
     searchObj.meta.resultGrid.sortBy !== "start_time" &&
@@ -1854,6 +1901,13 @@ const searchData = () => {
       searchObj.data.stream.selectedStream?.label
     )
   ) {
+    return;
+  }
+
+  if (activeTab.value === "llm-insights") {
+    // Force the insightsTimeRange computed to re-evaluate so panels reload
+    // even when the relative range string ("Past 1 hour") hasn't changed.
+    llmRefreshNonce.value++;
     return;
   }
 
@@ -2213,6 +2267,12 @@ watch(
   .traces-horizontal-splitter .q-splitter__before {
     z-index: auto;
     overflow: visible;
+  }
+
+  .traces-horizontal-splitter.hide-splitter-separator
+    > .q-splitter__separator {
+    background: transparent !important;
+    border: none !important;
   }
 }
 </style>
