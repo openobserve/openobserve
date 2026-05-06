@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="addTab"
           icon="add"
           style="margin-right: 10px"
-          data-test="`dashboard-panel-query-tab-add`"
+          data-test="dashboard-panel-query-tab-add"
         ></q-btn>
       </div>
       <div style="display: flex; gap: 4px; flex-shrink: 0">

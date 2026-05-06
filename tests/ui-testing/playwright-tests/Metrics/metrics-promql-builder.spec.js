@@ -133,7 +133,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await filtered.first().click();
     await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
-    // 4. Run query and verify visualization
+    // 4. Set time range and run query
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
+
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
     const hasError = await pm.metricsPage.isErrorNotificationVisible();
@@ -404,7 +408,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // Run query first to enable Add to Dashboard
+    // Set time range and run query first to enable Add to Dashboard
+    await pm.metricsPage.openDatePicker();
+    await pm.metricsPage.selectLast15Minutes();
+    await page.waitForTimeout(1000);
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
 

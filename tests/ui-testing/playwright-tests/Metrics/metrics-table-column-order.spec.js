@@ -71,6 +71,14 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
   async function setupTableChart(page, tableMode = 'all') {
     testLogger.info(`Setting up table chart with mode: ${tableMode}`);
 
+    // Switch to PromQL mode - Column Order button requires promqlMode
+    const promqlBtn = page.locator('[data-test="dashboard-promql-query-type"]');
+    if (await promqlBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await promqlBtn.click();
+      await page.waitForTimeout(1000);
+      testLogger.info('Switched to PromQL mode');
+    }
+
     // Set time range to Last 15 minutes
     testLogger.info('Setting time range to Last 15 minutes');
     await pm.metricsPage.openDatePicker();
