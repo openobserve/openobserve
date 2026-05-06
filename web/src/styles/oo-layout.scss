@@ -31,9 +31,16 @@
 
 /* ---- sidebars ---- */
 .oo_sidebar {
-  overflow-y: auto;
+  &.oo_left {
+    background-color: var(--o2-card-bg);
+    border-radius: 0.375rem;
+    box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+    margin-top: 0.25rem;
+    margin-bottom: 0.675rem;
+  }
 
   &.oo_right {
+    overflow-y: auto;
     border-right: none;
     position: sticky;
     top: var(--navbar-height, 36px);
