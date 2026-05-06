@@ -27,8 +27,22 @@ export default class DashboardTimeRefresh {
 
   //relative time selection
   async setRelative(date, time) {
-    await this.timeTab.waitFor({ state: "attached" });
+    // Wait until the trigger is visible (not just attached). attached only
+    // checks DOM presence, but in CI the button can be in the DOM before its
+    // q-menu is ready to open — clicking too early opens nothing and the
+    // subsequent relativeTime.click() waits forever.
+    await this.timeTab.waitFor({ state: "visible" });
+
+    // Click the trigger and verify the menu actually opened. If the relative
+    // tab doesn't show within a short window, click again — the first click
+    // sometimes lands while the chart is re-rendering and gets swallowed.
     await this.timeTab.click();
+    try {
+      await this.relativeTime.waitFor({ state: "visible", timeout: 5000 });
+    } catch (e) {
+      await this.timeTab.click();
+      await this.relativeTime.waitFor({ state: "visible", timeout: 10000 });
+    }
 
     await this.relativeTime.click();
     await this.page
