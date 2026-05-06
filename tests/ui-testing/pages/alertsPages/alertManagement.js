@@ -316,55 +316,63 @@ export class AlertManagement {
         testLogger.info('Found alert cell', { alertName });
 
         const alertRow = alertCell.locator('xpath=ancestor::tr');
-        const moreOptionsBtn = alertRow.locator('button').filter({ has: this.page.locator('[name="more_vert"], .q-icon') }).last();
+        const moreOptionsBtn = alertRow.locator(`[data-test="alert-list-${alertName}-more-options"]`);
         await moreOptionsBtn.waitFor({ state: 'visible', timeout: 5000 });
         await moreOptionsBtn.click();
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked more options menu');
 
-        // Note: The menu text is just "Trigger" (from i18n key alerts.triggerAlert)
-        const triggerOption = this.page.getByText('Trigger', { exact: true }).first();
+        const triggerOption = this.page.locator(`[data-test="alert-list-${alertName}-trigger-alert"]`);
         await triggerOption.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Start watching for the PATCH /trigger API call BEFORE clicking,
+        // so we never miss it regardless of how fast the API responds.
+        const triggerApiResponse = this.page.waitForResponse(
+            resp =>
+                resp.request().method() === 'PATCH' &&
+                /\/alerts\/[^/?]+\/trigger/.test(resp.url()),
+            { timeout: 10000 }
+        );
+
         await triggerOption.click();
         testLogger.info('Clicked Trigger option');
 
-        // Wait for notification to appear
-        await this.page.waitForTimeout(2000);
-
-        // Check for success notification
-        const successNotification = this.page.getByText('Alert triggered successfully');
-        const isSuccess = await successNotification.isVisible({ timeout: 5000 }).catch(() => false);
-
-        if (isSuccess) {
-            testLogger.info('Alert trigger success notification received');
-            return true;
+        // Primary check: verify the API call was made and succeeded.
+        try {
+            const response = await triggerApiResponse;
+            const status = response.status();
+            if (response.ok()) {
+                testLogger.info('Alert trigger API call succeeded', { status });
+                return true;
+            }
+            const body = await response.json().catch(() => null);
+            testLogger.error('Alert trigger API call failed', { status, body });
+            return false;
+        } catch (apiErr) {
+            // API call not detected — fall back to notification polling.
+            testLogger.warn('Trigger API response not detected, falling back to notification check', { error: apiErr.message });
         }
 
-        // Check for error notification - can be "Failed to trigger alert" or "Error sending notification..."
-        const errorNotification = this.page.getByText(/Failed to trigger|Error sending notification/i);
-        const isError = await errorNotification.isVisible({ timeout: 2000 }).catch(() => false);
+        // Fallback: poll for the success toast (2s lifetime — use waitFor, not isVisible).
+        try {
+            await this.page.getByText('Alert triggered successfully').waitFor({ state: 'visible', timeout: 7000 });
+            testLogger.info('Alert trigger success notification received');
+            return true;
+        } catch (_) {
+            // not found — fall through to error check
+        }
 
-        if (isError) {
+        try {
+            const errorNotification = this.page.getByText(/Failed to trigger|Error sending notification/i);
+            await errorNotification.waitFor({ state: 'visible', timeout: 3000 });
             const errorText = await errorNotification.textContent().catch(() => 'Unknown error');
             testLogger.error('Alert trigger failed - error notification shown', { errorText });
             return false;
+        } catch (_) {
+            // no error notification either
         }
 
-        // Check for any other notification content
-        const notification = this.page.locator('.q-notification');
-        const hasNotification = await notification.isVisible({ timeout: 2000 }).catch(() => false);
-        if (hasNotification) {
-            const notificationText = await notification.textContent().catch(() => 'Unable to get text');
-            testLogger.warn('Found notification but not success/error match', { notificationText });
-            // If notification contains "success" text, consider it success
-            if (notificationText.toLowerCase().includes('success')) {
-                testLogger.info('Notification contains success - treating as successful');
-                return true;
-            }
-        } else {
-            testLogger.warn('No notification found at all after trigger');
-        }
-
+        testLogger.warn('No notification found after trigger');
         return false;
     }
 

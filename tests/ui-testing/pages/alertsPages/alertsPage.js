@@ -247,7 +247,7 @@ export class AlertsPage {
             tableBodyRowWithIndex: 'tbody tr[data-index]',
             tableLocator: 'table',
             tableCheckbox: '.o2-table-checkbox',
-            headerCheckbox: '[data-test="alert-list-table"] thead .o2-table-checkbox',
+            headerCheckbox: '[data-test="alert-list-select-all-checkbox"]',
 
             // Alert settings inline locators
             silenceNotificationInput: '.silence-notification-input input',

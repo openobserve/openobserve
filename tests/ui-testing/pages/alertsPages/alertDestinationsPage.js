@@ -641,6 +641,10 @@ export class AlertDestinationsPage {
         await this.page.locator(this.submitButton).click();
         await expect(this.page.getByText(this.successMessage)).toBeVisible();
 
+        // Navigate back to the list so the dialog is fully closed before verifying
+        await this.navigateToDestinations();
+        await this.page.waitForTimeout(2000);
+
         // Verify the destination exists
         await this.verifyDestinationExists(destinationName);
         testLogger.info('Created destination with headers', { destinationName, url, headerCount: Object.keys(headers).length });
