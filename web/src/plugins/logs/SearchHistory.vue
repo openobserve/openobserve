@@ -148,8 +148,8 @@
                               <q-icon name="content_copy" /> </OButton></span
                         ></strong>
                         <OButton
-                          variant="ghost-destructive"
-                          size="sm"
+                          variant="outline-destructive"
+                          size="chip"
                           class="copy-btn tw:mx-2"
                           @click.stop="goToLogs(props.row)"
                         >
