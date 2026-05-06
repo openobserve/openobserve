@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class LogsQueryPage {
   constructor(page) {
@@ -18,6 +19,7 @@ export class LogsQueryPage {
     this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
     this.autoRunDropdownBtn = '[data-test="logs-search-bar-refresh-btn"] ~ button';
     this.autoRunToggleItem = '[data-test="logs-search-bar-live-mode-toggle-btn"]';
+    this._autoQueryEnabledCache = undefined;
   }
 
   async setDateTimeFilter() {
@@ -118,10 +120,30 @@ export class LogsQueryPage {
     }
   }
 
-  async disableAutoRun() {
+  async _isAutoQueryEnabled() {
+    if (this._autoQueryEnabledCache !== undefined) return this._autoQueryEnabledCache;
+    this._autoQueryEnabledCache = await this.page.evaluate(async () => {
+      try {
+        const res = await fetch('/config', { credentials: 'include' });
+        if (!res.ok) return false;
+        const cfg = await res.json();
+        return cfg?.auto_query_enabled === true;
+      } catch {
+        return false;
+      }
+    });
+    return this._autoQueryEnabledCache;
+  }
+
+  async _toggleAutoRun(expectedLabel) {
+    if (!(await this._isAutoQueryEnabled())) {
+      testLogger.info(`auto_query_enabled=false on this env — skipping ${expectedLabel === 'Turn off' ? 'disableAutoRun' : 'enableAutoRun'}`);
+      return;
+    }
     await this.page.locator(this.autoRunDropdownBtn).click();
     const toggle = this.page.locator(this.autoRunToggleItem);
-    if ((await toggle.textContent()).includes('Turn off')) {
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    if ((await toggle.textContent()).includes(expectedLabel)) {
       await toggle.click();
     } else {
       await this.page.keyboard.press('Escape');
@@ -129,14 +151,11 @@ export class LogsQueryPage {
     await this.page.waitForTimeout(300);
   }
 
-  async enableAutoRun() {
-    await this.page.locator(this.autoRunDropdownBtn).click();
-    const toggle = this.page.locator(this.autoRunToggleItem);
-    if ((await toggle.textContent()).includes('Turn on')) {
-      await toggle.click();
-    } else {
-      await this.page.keyboard.press('Escape');
-    }
-    await this.page.waitForTimeout(300);
+  async disableAutoRun() {
+    await this._toggleAutoRun('Turn off');
   }
-} 
+
+  async enableAutoRun() {
+    await this._toggleAutoRun('Turn on');
+  }
+}
