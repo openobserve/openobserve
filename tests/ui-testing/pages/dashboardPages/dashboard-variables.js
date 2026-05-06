@@ -38,9 +38,7 @@ export default class DashboardVariables {
 
     // Select Stream Type
     await this.page
-      .locator(
-        'div.row label:has-text("Stream Type") >> [data-test="dashboard-variable-stream-type-select"]'
-      )
+      .locator('[data-test="dashboard-variable-stream-type-select"]')
       .click();
 
     await this.page
