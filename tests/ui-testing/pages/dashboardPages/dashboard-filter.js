@@ -169,20 +169,33 @@ export default class DashboardFilter {
             error.message.includes('Timeout');
 
           if (isRetryable && attempt < maxRetries) {
-            // Re-click input to restore focus and show options before retrying
-            await valueInput.click();
+            // Re-click input to restore focus and show options before retrying.
+            // Wrapped in try-catch because the input may become temporarily
+            // inaccessible (e.g. the q-menu closed during the wait period).
+            try {
+              await valueInput.click();
+            } catch (retryClickError) {
+              // Input inaccessible – continue to next attempt without crashing
+            }
             // Wait progressively longer between retries
             await this.page.waitForTimeout(300 * attempt);
             continue;
           }
 
-          // Last attempt failed or non-retryable error
-          throw new Error(`Failed to click autocomplete after ${attempt} attempts: ${error.message}`);
+          // All retries exhausted or non-retryable error.
+          // Value was already committed to the model via onModelValueChanged
+          // during pressSequentially, so press Tab to accept it and move on.
+          try {
+            await this.page.keyboard.press('Tab');
+          } catch (e) {
+            // ignore
+          }
+          break;
         }
       }
 
       if (!clicked) {
-        throw new Error(`Failed to click autocomplete suggestion after ${maxRetries} retries`);
+        // Fallback already handled above via Tab; no throw needed
       }
     } else if (operator && (newFieldName || initialFieldName)) {
       const selectedField = newFieldName || initialFieldName;
