@@ -69,8 +69,8 @@ export class LogsPage {
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
         this.confirmButton = '[data-test="confirm-button"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
-        this.searchStreamInput = '[placeholder="Search Stream"]';
-        this.exploreButtonRole = { role: 'button', name: 'Explore' };
+        this.searchStreamInput = '[data-test="log-stream-search-input"] input';
+        this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
@@ -2063,7 +2063,7 @@ export class LogsPage {
     }
 
     async clickExploreButton() {
-        return await this.page.getByRole(this.exploreButtonRole.role, { name: this.exploreButtonRole.name }).first().click({ force: true });
+        return await this.page.locator(this.exploreButtonSelector).first().click({ force: true });
     }
 
     async waitForSavedViewsButton() {
@@ -3882,12 +3882,12 @@ export class LogsPage {
     }
 
     async searchStreamByPlaceholder(searchText) {
-        await this.page.getByPlaceholder("Search Stream").click();
-        return await this.page.getByPlaceholder("Search Stream").fill(searchText);
+        await this.page.locator('[data-test="log-stream-search-input"] input').click();
+        return await this.page.locator('[data-test="log-stream-search-input"] input').fill(searchText);
     }
 
     async clickFirstExploreButton() {
-        return await this.page.getByRole("button", { name: "Explore" }).first().click({ force: true });
+        return await this.page.locator('[data-test="log-stream-explore-btn"]').first().click({ force: true });
     }
 
     // Additional methods for multistream functionality
