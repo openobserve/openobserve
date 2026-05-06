@@ -242,7 +242,7 @@ pub async fn update(Path(org_id): Path<String>, Json(req): Json<SetupStorageRequ
         };
 
     if existing.provider_type != req.provider {
-        HttpResponse::bad_request("cannot change provider type after initial setup");
+        return HttpResponse::bad_request("cannot change provider type after initial setup");
     }
 
     let new_creds = match crate::service::org_storage_providers::merge_configs(

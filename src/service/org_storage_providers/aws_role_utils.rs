@@ -57,35 +57,55 @@ impl object_store::CredentialProvider for CredentialProvider {
         // if already expired or almost near expiry, do a refresh, get new
         // credentials, update the cache with them
         if expiry <= now || expiry - now <= EXPIRY_BUFFER_SEC {
-            log::info!(
-                "attempting to refresh credentials via sts for org {}",
-                self.org_id
-            );
-            let (expiry, credentials) =
-                get_sts_credentials(&self.org_id, &self.region, &self.role_arn)
-                    .await
-                    .map_err(|e| {
-                        log::info!(
-                            "error in refreshing credentials via sts for org {} : {e}",
-                            self.org_id
-                        );
-                        object_store::Error::Generic {
-                            store: "org_level_storage_sts",
-                            source: Box::new(std::io::Error::other(e)),
-                        }
-                    })?;
+            // acquire a lock
             let mut lock = self.cache.write().await;
-            *lock = Arc::new(AwsCredential {
-                key_id: credentials.access_key_id().to_string(),
-                secret_key: credentials.secret_access_key().to_string(),
-                token: credentials.session_token().map(|v| v.to_string()),
-            });
-            self.expiry.store(expiry, Ordering::Relaxed);
+            // re-load the expiry, in case some other thread has already updated it
+            let expiry = self.expiry.load(Ordering::Relaxed);
+            let now = chrono::Utc::now().timestamp();
+            if expiry <= now || expiry - now <= EXPIRY_BUFFER_SEC {
+                // if the expiry condition still holds, do the sts call
+                // and update the credentials and expiry
+                log::info!(
+                    "attempting to refresh credentials via sts for org {}",
+                    self.org_id
+                );
+                let (expiry, credentials) =
+                    get_sts_credentials(&self.org_id, &self.region, &self.role_arn)
+                        .await
+                        .map_err(|e| {
+                            log::info!(
+                                "error in refreshing credentials via sts for org {} : {e}",
+                                self.org_id
+                            );
+                            object_store::Error::Generic {
+                                store: "org_level_storage_sts",
+                                source: Box::new(std::io::Error::other(e)),
+                            }
+                        })?;
+                *lock = Arc::new(AwsCredential {
+                    key_id: credentials.access_key_id().to_string(),
+                    secret_key: credentials.secret_access_key().to_string(),
+                    token: credentials.session_token().map(|v| v.to_string()),
+                });
+                self.expiry.store(expiry, Ordering::Relaxed);
+                log::info!(
+                    "successfully updated credentials via sts for org {}",
+                    self.org_id
+                );
+            } else {
+                log::info!(
+                    "some other thread already updated credentials via sts for org {}",
+                    self.org_id
+                );
+            }
+            // if expiry condition does not hold after we got the lock, i.e.
+            // some thread had already acquired it before us and updated the creds,
+            // simply drop the lock and use the new credentials
             drop(lock);
         }
 
-        // in both expiry and non-expiry path, we simply get a read lock and clone the creds to
-        // return in case of cred expiry, the above if-block would have updated the cache,
+        // in both expiry and non-expiry path, we simply get a read lock and clone the creds
+        // in case of cred expiry, the above if-block would have updated the cache,
         // so we will get refreshed credentials
         let lock = self.cache.read().await;
         let creds = lock.clone();

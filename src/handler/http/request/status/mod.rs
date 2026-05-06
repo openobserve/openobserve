@@ -209,6 +209,7 @@ struct ConfigResponse<'a> {
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
+    #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
     org_storage_providers: String,

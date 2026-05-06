@@ -1775,8 +1775,7 @@ GROUP BY stream;
 SUM(original_size)::BIGINT AS storage_size,
 SUM(index_size)::BIGINT AS index_size
 FROM file_list
-WHERE org_id = $1 AND account = $2
-GROUP BY stream;"#
+WHERE org_id = $1 AND account = $2;"#
         );
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS

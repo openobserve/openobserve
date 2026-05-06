@@ -82,7 +82,7 @@ pub struct AwsRoleArn {
 
 impl From<String> for ProviderType {
     fn from(value: String) -> Self {
-        match value.as_str().to_ascii_lowercase().as_str() {
+        match value.as_str() {
             "AwsCredentials" => Self::AwsCredentials,
             "GcpCredentials" => Self::GcpCredentials,
             "AzureCredentials" => Self::AzureCredentials,
@@ -164,7 +164,7 @@ pub async fn add(entry: OrgStorageProvider) -> Result<(), errors::Error> {
 
 pub async fn get_for_org(org_id: &str) -> Result<Option<OrgStorageProvider>, errors::Error> {
     {
-        let cache = CACHE.write().unwrap();
+        let cache = CACHE.read().unwrap();
         if let Some(v) = cache.get(org_id) {
             return Ok(v.clone());
         }

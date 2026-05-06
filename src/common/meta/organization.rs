@@ -1282,6 +1282,7 @@ mod tests {
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
+            org_storage_enabled: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1309,6 +1310,7 @@ mod tests {
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
+            org_storage_enabled: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
