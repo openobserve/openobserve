@@ -83,9 +83,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-drawer>
 
     <q-page-container>
-      <div class="oo_body" :style="ooBodyGridStyle">
+      <div class="oo_body">
         <!-- Main Panel -->
-        <main class="oo_main">
+        <main
+          class="oo_main"
+          :style="{
+            width:
+              store.state.isAiChatEnabled && !store.state.isAiChatExpanded
+                ? '75%'
+                : '100%',
+          }"
+        >
           <div class="oo_content-scroll">
             <div
               v-show="isLoading"
@@ -103,12 +111,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="store.state.isAiChatEnabled && isLoading"
           class="oo_sidebar oo_right"
           :class="[
-            store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container',
-            { 'oo_sidebar--expanded': store.state.isAiChatExpanded }
+            store.state.theme == 'dark'
+              ? 'dark-mode-chat-container'
+              : 'light-mode-chat-container',
+            { 'oo_sidebar--expanded': store.state.isAiChatExpanded },
           ]"
-          :style="store.state.isAiChatExpanded
-            ? { position: 'fixed', top: 0, right: 0, width: '50%', maxWidth: '100%', minWidth: '300px', height: '100vh', zIndex: 200 }
-            : {}"
+          :style="
+            store.state.isAiChatExpanded
+              ? {
+                  position: 'fixed',
+                  top: 0,
+                  right: 0,
+                  width: '50%',
+                  maxWidth: '100%',
+                  minWidth: '300px',
+                  height: '100vh',
+                  zIndex: 200,
+                }
+              : {
+                  width: '25%',
+                  maxWidth: '100%',
+                  minWidth: '75px',
+                }
+          "
         >
           <O2AIChat
             :header-height="42.5"
@@ -336,7 +361,11 @@ export default defineComponent({
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
     const aiChatAutoSend = ref(false);
-    const aiChatPayload = ref<{ text: string; autoSend: boolean; id: number } | null>(null);
+    const aiChatPayload = ref<{
+      text: string;
+      autoSend: boolean;
+      id: number;
+    } | null>(null);
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
 
@@ -546,10 +575,11 @@ export default defineComponent({
     watch(
       () => store.state.isWebinarBannerVisible,
       (visible) => {
-        const navbarHeight = visible
-          ? "calc(36px + 27px)"
-          : "36px";
-        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
+        const navbarHeight = visible ? "calc(36px + 27px)" : "36px";
+        document.documentElement.style.setProperty(
+          "--navbar-height",
+          navbarHeight,
+        );
       },
       { immediate: true },
     );
@@ -1086,11 +1116,22 @@ export default defineComponent({
     const toggleAIChat = () => {
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
-        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
+        window.dispatchEvent(
+          new CustomEvent("o2:home-switch-tab", { detail: "ai" }),
+        );
         return;
       }
-      const isEnabled = !store.state.isAiChatEnabled;
-      store.dispatch("setIsAiChatEnabled", isEnabled);
+      if (!store.state.isAiChatEnabled) {
+        // Closed → Open inline sidebar
+        store.dispatch("setIsAiChatEnabled", true);
+        store.dispatch("setIsAiChatExpanded", false);
+      } else if (!store.state.isAiChatExpanded) {
+        // Inline sidebar → Expanded overlay
+        store.dispatch("setIsAiChatExpanded", true);
+      } else {
+        // Expanded overlay → Back to inline sidebar
+        store.dispatch("setIsAiChatExpanded", false);
+      }
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -1099,14 +1140,6 @@ export default defineComponent({
       store.dispatch("setIsAiChatExpanded", false);
       window.dispatchEvent(new Event("resize"));
     };
-
-    const ooBodyGridStyle = computed(() => {
-      const aiChatVisible = store.state.isAiChatEnabled && !store.state.isAiChatExpanded;
-      if (!aiChatVisible) {
-        return { gridTemplateColumns: '1fr' };
-      }
-      return { gridTemplateColumns: '1fr 25%' };
-    });
 
     const getBtnLogo = computed(() => {
       if (isHovered.value) {
@@ -1124,7 +1157,11 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
+    const sendToAiChat = (
+      value: any,
+      append: boolean = true,
+      autoSend: boolean = false,
+    ) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
@@ -1147,7 +1184,9 @@ export default defineComponent({
       aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = text;
-        nextTick(() => { aiChatInputContext.value = ""; });
+        nextTick(() => {
+          aiChatInputContext.value = "";
+        });
       });
     };
 
@@ -1205,7 +1244,6 @@ export default defineComponent({
       splitterModel,
       toggleAIChat,
       closeChat,
-      ooBodyGridStyle,
       getBtnLogo,
       isHovered,
       showGetStarted,
@@ -1676,7 +1714,6 @@ body.ai-chat-open {
 }
 .light-mode-chat-container {
 }
-
 
 .ai-btn-active {
   background: linear-gradient(
