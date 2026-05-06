@@ -98,6 +98,7 @@ test.describe("Scheduled Pipeline Query Builder", { tag: ['@all', '@scheduledPip
 
     // Verify default query format preserved after stream change (Issue #11575)
     await pageManager.pipelinesPage.expectQueryToContain('max(_timestamp)');
+    await pageManager.pipelinesPage.expectQueryToContain('count(_timestamp)');
     await pageManager.pipelinesPage.expectQueryToContain('histogram(_timestamp)');
 
     testLogger.info('✅ Test passed: Query auto-generated correctly on stream change');
@@ -233,11 +234,11 @@ test.describe("Scheduled Pipeline Query Builder", { tag: ['@all', '@scheduledPip
     await pageManager.pipelinesPage.selectStreamType('logs');
     await page.waitForTimeout(1000);
 
-    // Verify Run Query button state before stream selection (no query)
+    // Verify Run Query button is disabled before stream selection (no query)
     testLogger.info('Verifying Run Query button state before stream selection');
     const runQueryBtn = pageManager.pipelinesPage.runQueryButton;
-    const isDisabledBefore = await runQueryBtn.isDisabled().catch(() => true);
-    testLogger.info(`Run Query disabled before stream selection: ${isDisabledBefore}`);
+    await expect(runQueryBtn).toBeDisabled({ timeout: 5000 });
+    testLogger.info('Run Query button is disabled before stream selection');
 
     // Select first stream (e2e_automate)
     await pageManager.pipelinesPage.selectStreamName('e2e_automate');
@@ -246,8 +247,7 @@ test.describe("Scheduled Pipeline Query Builder", { tag: ['@all', '@scheduledPip
 
     // Verify Run Query button is enabled after default query populated
     testLogger.info('Verifying Run Query button enabled after default query population');
-    const isEnabledAfter = await runQueryBtn.isEnabled({ timeout: 5000 });
-    expect(isEnabledAfter).toBeTruthy();
+    await expect(runQueryBtn).toBeEnabled({ timeout: 5000 });
     testLogger.info('Run Query button is enabled after default query populated');
 
     testLogger.info('✅ Test passed: Run Query button enabled correctly');
