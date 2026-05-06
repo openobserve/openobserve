@@ -1960,12 +1960,7 @@ export class LogsPage {
         // Close any open dialogs/menus first (e.g., saved views dropdown)
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(200);
-
-        // Saved views is now a split dropdown button on the toolbar.
-        // The left (first) button triggers the save dialog (fnSavedView).
-        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
-        const saveButton = savedViewsGroup.locator('button').first();
-        return await saveButton.click();
+        return await this.page.locator('[data-test="logs-search-saved-views-btn"]').click();
     }
 
     async fillSavedViewName(name) {
@@ -3378,12 +3373,12 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const toggleExists = await toggleInner.count() > 0;
+        const toggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]');
+        const toggleExists = await toggle.count() > 0;
         if (toggleExists) {
-            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy')).catch(() => false);
-            if (isSwitchedOff) {
-                await toggleInner.click();
+            const isChecked = await toggle.getAttribute('aria-checked').catch(() => null);
+            if (isChecked === 'false') {
+                await toggle.click();
             }
         }
         // Always close the utilities menu
@@ -3781,7 +3776,7 @@ export class LogsPage {
     }
 
     async toggleStreamSelection(streamName) {
-        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).nth(2).click();
+        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"]`).click();
     }
 
     async toggleQueryModeEditor() {
