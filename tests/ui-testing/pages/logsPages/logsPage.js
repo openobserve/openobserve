@@ -5684,11 +5684,8 @@ export class LogsPage {
      * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        // Saved views are now a split dropdown button on the toolbar.
-        // Click the dropdown arrow (second button) to expand the saved views list.
-        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
-        await savedViewsGroup.waitFor({ state: 'visible', timeout: 10000 });
-        const dropdownArrow = savedViewsGroup.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
+        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
         await dropdownArrow.click();
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked saved views dropdown arrow');
@@ -5699,19 +5696,16 @@ export class LogsPage {
      * Tries arrow click first, then main button if search input doesn't appear
      */
     async expandSavedViewsDropdown() {
-        // First try clicking the dropdown arrow
         try {
             await this.clickSavedViewsDropdownArrow();
             const searchInput = this.page.locator(this.savedViewSearchInput);
             await searchInput.waitFor({ state: 'visible', timeout: 5000 });
             return;
         } catch (e) {
-            testLogger.debug('Arrow click did not show search input, trying main button');
+            testLogger.debug('Arrow click did not show search input, retrying');
         }
 
-        // Fallback: retry the dropdown arrow click on the saved views button
-        const btn = this.getSavedViewsButtonLocator();
-        const dropdownArrow = btn.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
         await dropdownArrow.click();
         await this.page.waitForTimeout(500);
     }
