@@ -3687,7 +3687,7 @@
     "clearAllTitle": "Cancella tutte le chat",
     "clearAllMessage": "Ciò eliminerà definitivamente tutta la cronologia chat. Questa azione non può essere annullata."
   },
-  "org_storage": {
+  "storage_settings": {
     "tabLabel": "Storage dell'organizzazione",
     "title": "Storage dell'organizzazione",
     "notEnabled": "l'archiviazione dell'organizzazione non è abilitata per questa organizzazione",

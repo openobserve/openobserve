@@ -144,24 +144,24 @@ const useManagementRoutes = () => {
           },
         },
         {
-          path: "org_storage",
-          name: "orgStorageSettings",
+          path: "storage_settings",
+          name: "storageSettings",
           component: () =>
             import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
-            title: "Org Storage",
+            title: "Storage Settings",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
         },
         {
-          path: "org_storage/create",
-          name: "orgStorageEditor",
+          path: "storage_settings/create",
+          name: "storageSettingsEditor",
           component: () =>
             import("@/components/settings/OrgStorageEditor.vue"),
           meta: {
-            title: "Configure Org Storage",
+            title: "Configure Storage Settings",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

@@ -3682,7 +3682,7 @@
     "clearAllTitle": "清除所有聊天",
     "clearAllMessage": "这将永久删除所有聊天记录。此操作无法撤消。"
   },
-  "org_storage": {
+  "storage_settings": {
     "tabLabel": "组织存储",
     "title": "组织存储",
     "notEnabled": "未为此组织启用组织存储",

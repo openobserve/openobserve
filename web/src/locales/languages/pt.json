@@ -3678,7 +3678,7 @@
     "clearAllTitle": "Limpar todos os bate-papos",
     "clearAllMessage": "Isso excluirá permanentemente todo o histórico de bate-papo. Essa ação não pode ser desfeita."
   },
-  "org_storage": {
+  "storage_settings": {
     "tabLabel": "Armazenamento organizacional",
     "title": "Armazenamento organizacional",
     "notEnabled": "o armazenamento da organização não está habilitado para esta organização",

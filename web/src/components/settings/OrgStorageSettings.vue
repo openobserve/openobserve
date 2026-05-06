@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
       >
         <div class="q-table__title tw:font-[600]">
-          {{ t('org_storage.title') }}
+          {{ t('storage_settings.title') }}
         </div>
       </div>
     <!-- Loading state -->
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="isCloud && !orgStorageEnabled"
       class="text-body2 text-grey q-py-md"
     >
-      {{ t('org_storage.notEnabled') }}
+      {{ t('storage_settings.notEnabled') }}
     </div>
 
     <!-- ========== NOT CONFIGURED: cloud hero ========== -->
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="hero-page__actions">
             <q-btn
-              data-test="org-storage-configure-btn"
+              data-test="storage-settings-configure-btn"
               icon="cloud_upload"
               label="Configure storage"
               class="no-border o2-primary-button hero-cta-btn"
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-btn
-        data-test="org-storage-configure-btn"
+        data-test="storage-settings-configure-btn"
         icon="cloud_upload"
         label="Configure storage"
         class="no-border o2-primary-button ent-empty__btn"
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <q-btn
-            data-test="org-storage-update-btn"
+            data-test="storage-settings-update-btn"
             label="Update Storage"
             class="no-border o2-primary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
@@ -375,7 +375,7 @@ async function fetchExistingConfig() {
 
 function navigateToCreate() {
   router.push({
-    name: "orgStorageEditor",
+    name: "storageSettingsEditor",
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
     },
@@ -384,7 +384,7 @@ function navigateToCreate() {
 
 function navigateToEdit() {
   router.push({
-    name: "orgStorageEditor",
+    name: "storageSettingsEditor",
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
       edit: "true",

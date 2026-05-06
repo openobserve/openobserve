@@ -131,7 +131,7 @@ describe("OrgStorageSettings", () => {
 
     expect(wrapper.text()).toContain("configure a custom storage provider");
     expect(
-      wrapper.find('[data-test="org-storage-configure-btn"]').exists()
+      wrapper.find('[data-test="storage-settings-configure-btn"]').exists()
     ).toBe(true);
   });
 
@@ -141,12 +141,12 @@ describe("OrgStorageSettings", () => {
     await nextTick();
 
     await wrapper
-      .find('[data-test="org-storage-configure-btn"]')
+      .find('[data-test="storage-settings-configure-btn"]')
       .trigger("click");
     await nextTick();
 
     expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "orgStorageEditor",
+      name: "storageSettingsEditor",
       query: { org_identifier: "test-org-123" },
     });
   });
@@ -177,7 +177,7 @@ describe("OrgStorageSettings", () => {
     expect(wrapper.text()).toContain("AKI***789");
     expect(wrapper.text()).toContain("********");
     expect(
-      wrapper.find('[data-test="org-storage-update-btn"]').exists()
+      wrapper.find('[data-test="storage-settings-update-btn"]').exists()
     ).toBe(true);
   });
 
@@ -200,12 +200,12 @@ describe("OrgStorageSettings", () => {
     await nextTick();
 
     await wrapper
-      .find('[data-test="org-storage-update-btn"]')
+      .find('[data-test="storage-settings-update-btn"]')
       .trigger("click");
     await nextTick();
 
     expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "orgStorageEditor",
+      name: "storageSettingsEditor",
       query: { org_identifier: "test-org-123", edit: "true" },
     });
   });

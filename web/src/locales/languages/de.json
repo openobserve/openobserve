@@ -3678,7 +3678,7 @@
     "clearAllTitle": "Alle Chats löschen",
     "clearAllMessage": "Dadurch wird der gesamte Chatverlauf dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
   },
-  "org_storage": {
+  "storage_settings": {
     "tabLabel": "Org-Speicher",
     "title": "Org-Speicher",
     "notEnabled": "Der Organisationsspeicher ist für diese Organisation nicht aktiviert",

@@ -15,19 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none o2-custom-bg org-storage-editor">
+  <q-page class="q-pa-none o2-custom-bg storage-settings-editor">
     <!-- Header -->
     <div class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]">
       <div class="flex items-center tw:h-[60px]">
         <div
-          data-test="org-storage-editor-back-btn"
+          data-test="storage-settings-editor-back-btn"
           class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="goBack"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div class="text-h6" data-test="org-storage-editor-title">
+        <div class="text-h6" data-test="storage-settings-editor-title">
           {{ isEditMode ? 'Update Storage' : 'New Storage Configuration' }}
         </div>
       </div>
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="provider in availableProviders"
                 :key="provider.value"
-                :data-test="`org-storage-provider-card-${provider.value}`"
+                :data-test="`storage-settings-provider-card-${provider.value}`"
                 class="destination-type-card"
                 :class="{
                   selected: selectedProvider === provider.value,
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="selectedProvider === 'AwsCredentials'">
                 <q-input
                   v-if="!isCloud"
-                  data-test="org-storage-server-url-input"
+                  data-test="storage-settings-server-url-input"
                   v-model="formData.server_url"
                   label="Server URL"
                   class="no-border showLabelOnTop"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disable="isEditMode"
                 />
                 <q-input
-                  data-test="org-storage-region-input"
+                  data-test="storage-settings-region-input"
                   v-model="formData.region"
                   label="Region"
                   class="no-border showLabelOnTop"
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disable="isEditMode || !!cloudRegion"
                 />
                 <q-input
-                  data-test="org-storage-bucket-name-input"
+                  data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
                   label="Bucket Name *"
                   class="no-border showLabelOnTop"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 />
                 <q-input
-                  data-test="org-storage-access-key-input"
+                  data-test="storage-settings-access-key-input"
                   v-model="formData.access_key"
                   label="Access Key *"
                   class="no-border showLabelOnTop"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 />
                 <q-input
-                  data-test="org-storage-secret-key-input"
+                  data-test="storage-settings-secret-key-input"
                   v-model="formData.secret_key"
                   label="Secret Key *"
                   class="no-border showLabelOnTop"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AzureCredentials Fields -->
               <template v-if="selectedProvider === 'AzureCredentials'">
                 <q-input
-                  data-test="org-storage-bucket-name-input"
+                  data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
                   label="Bucket Name *"
                   class="no-border showLabelOnTop"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) => !!val?.trim() || 'Bucket name is required']"
                 />
                 <q-input
-                  data-test="org-storage-access-key-input"
+                  data-test="storage-settings-access-key-input"
                   v-model="formData.access_key"
                   label="Access Key *"
                   class="no-border showLabelOnTop"
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) => !!val?.trim() || 'Access key is required']"
                 />
                 <q-input
-                  data-test="org-storage-secret-key-input"
+                  data-test="storage-settings-secret-key-input"
                   v-model="formData.secret_key"
                   label="Secret Key *"
                   class="no-border showLabelOnTop"
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-input
                   v-if="!isCloud"
-                  data-test="org-storage-server-url-input"
+                  data-test="storage-settings-server-url-input"
                   v-model="formData.server_url"
                   label="Server URL"
                   class="no-border showLabelOnTop"
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- GcpCredentials Fields -->
               <template v-if="selectedProvider === 'GcpCredentials'">
                 <q-input
-                  data-test="org-storage-bucket-name-input"
+                  data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
                   label="Bucket Name *"
                   class="no-border showLabelOnTop"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) => !!val?.trim() || 'Bucket name is required']"
                 />
                 <q-input
-                  data-test="org-storage-access-key-input"
+                  data-test="storage-settings-access-key-input"
                   v-model="formData.access_key"
                   label="Access Key *"
                   class="no-border showLabelOnTop"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-input
                   v-if="!isCloud"
-                  data-test="org-storage-server-url-input"
+                  data-test="storage-settings-server-url-input"
                   v-model="formData.server_url"
                   label="Server URL *"
                   class="no-border showLabelOnTop"
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AwsRoleArn Fields -->
               <template v-if="selectedProvider === 'AwsRoleArn'">
                 <q-input
-                  data-test="org-storage-bucket-name-input"
+                  data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
                   label="Bucket Name *"
                   class="no-border showLabelOnTop"
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) => !!val?.trim() || 'Bucket name is required']"
                 />
                 <q-input
-                  data-test="org-storage-region-input"
+                  data-test="storage-settings-region-input"
                   v-model="formData.region"
                   label="Region *"
                   class="no-border showLabelOnTop"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :rules="[(val: any) => !!val?.trim() || 'Region is required']"
                 />
                 <q-input
-                  data-test="org-storage-role-arn-input"
+                  data-test="storage-settings-role-arn-input"
                   v-model="formData.role_arn"
                   label="Role ARN *"
                   class="no-border showLabelOnTop"
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBack"
             />
             <q-btn
-              data-test="org-storage-submit-btn"
+              data-test="storage-settings-submit-btn"
               :label="isEditMode ? 'Update' : 'Save'"
               class="no-border q-ml-sm o2-primary-button tw:h-[36px]"
               :class="
@@ -481,7 +481,7 @@ function prevStep() {
 
 function goBack() {
   router.push({
-    name: "orgStorageSettings",
+    name: "storageSettings",
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
     },
@@ -695,7 +695,7 @@ watch(selectedProvider, (newProvider) => {
 </style>
 
 <style lang="scss">
-.org-storage-editor {
+.storage-settings-editor {
   .q-stepper {
     background: transparent !important;
   }

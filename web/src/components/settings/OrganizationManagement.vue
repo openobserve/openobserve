@@ -561,22 +561,22 @@ export default defineComponent({
     const toggleOrgStorage = (row: any) => {
       const label = row.org_storage_enabled ? "Disable" : "Enable";
       $q.dialog({
-        title: `${label} Org Storage`,
-        message: `Are you sure you want to ${label.toLowerCase()} org storage for "${row.name}"?`,
+        title: `${label} Storage Settings`,
+        message: `Are you sure you want to ${label.toLowerCase()} storage settings for "${row.name}"?`,
         cancel: true,
         persistent: true,
       }).onOk(() => {
         loading.value = true;
         const dismiss = $q.notify({
           spinner: true,
-          message: `${label.toLowerCase()}ing org storage...`,
+          message: `${label.toLowerCase()}ing storage settings...`,
         });
         orgStorageService
           .enable(row.identifier)
           .then(() => {
             $q.notify({
               type: "positive",
-              message: `Org storage ${label.toLowerCase()}d successfully.`,
+              message: `Storage settings ${label.toLowerCase()}d successfully.`,
             });
             getData();
             loading.value = false;

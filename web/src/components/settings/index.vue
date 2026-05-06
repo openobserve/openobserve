@@ -122,17 +122,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-route-tab>
                 <q-route-tab
                   v-if="config.isEnterprise == 'true' && (config.isCloud != 'true' || store.state.zoConfig.org_storage_enabled === true)"
-                  data-test="org-storage-tab"
-                  name="orgStorageSettings"
+                  data-test="storage-settings-tab"
+                  name="storageSettings"
                   :to="{
-                    name: 'orgStorageSettings',
+                    name: 'storageSettings',
                     query: {
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
                   content-class="tab_content"
                   icon="cloud"
-                  :label="t('org_storage.tabLabel')"
+                  :label="t('storage_settings.tabLabel')"
                 >
                 </q-route-tab>
                 <q-route-tab

@@ -3678,7 +3678,7 @@
     "clearAllTitle": "Effacer tous les chats",
     "clearAllMessage": "Cela supprimera définitivement tout l'historique des discussions. Cette action ne peut pas être annulée."
   },
-  "org_storage": {
+  "storage_settings": {
     "tabLabel": "Stockage de l'organisation",
     "title": "Stockage de l'organisation",
     "notEnabled": "le stockage de l'organisation n'est pas activé pour cette organisation",
