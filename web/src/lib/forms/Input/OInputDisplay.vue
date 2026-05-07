@@ -16,18 +16,24 @@ const heightClasses: Record<NonNullable<InputDisplayProps["size"]>, string> = {
   md: "tw:min-h-10 tw:text-sm",
 };
 
-const rootStyle = computed(() => ({
-  width:
-    props.width === undefined
-      ? "100%"
-      : typeof props.width === "number"
-        ? `${props.width}px`
-        : props.width,
-}));
+const fieldWidthClass = computed(() => {
+  switch (props.width) {
+    case "xs":
+      return "tw:w-[var(--spacing-field-width-xs)]";
+    case "sm":
+      return "tw:w-[var(--spacing-field-width-sm)]";
+    case "md":
+      return "tw:w-[var(--spacing-field-width-md)]";
+    case "lg":
+      return "tw:w-[var(--spacing-field-width-lg)]";
+    default:
+      return "tw:w-full";
+  }
+});
 </script>
 
 <template>
-  <div :style="rootStyle" class="tw:flex tw:flex-col tw:gap-1">
+  <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <span
       v-if="label"
       class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none"

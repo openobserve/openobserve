@@ -2,6 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SelectProps, SelectEmits, SelectSlots } from "./OSelect.types";
+import { SELECT_VALUE_MAP_KEY } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import {
   SelectRoot,
@@ -13,7 +14,7 @@ import {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "reka-ui";
-import { computed } from "vue";
+import { computed, provide, ref } from "vue";
 
 const props = withDefaults(defineProps<SelectProps>(), {
   size: "md",
@@ -26,16 +27,53 @@ const emit = defineEmits<SelectEmits>();
 
 defineSlots<SelectSlots>();
 
-const hasError = computed(() => props.error === true || !!props.errorMessage);
+// Value map populated by OSelectItem children to preserve original types
+// (Reka UI requires string values; this lets us recover number originals)
+const valueMap = new Map<string, string | number>();
+provide(SELECT_VALUE_MAP_KEY, valueMap);
+
+// ── Validation ─────────────────────────────────────────────────────────────
+const ruleError = ref<string | null>(null);
+
+function runRules(val: string | number | undefined): void {
+  if (!props.rules?.length) return;
+  for (const rule of props.rules) {
+    const result = rule(val);
+    if (result !== true) {
+      ruleError.value = result;
+      return;
+    }
+  }
+  ruleError.value = null;
+}
+
+// ── Error state ────────────────────────────────────────────────────────────
+const effectiveError = computed(
+  () =>
+    props.errorMessage ||
+    (props.error ? " " : null) ||
+    ruleError.value ||
+    null,
+);
+const hasError = computed(() => !!effectiveError.value);
 
 const stringValue = computed(() =>
   props.modelValue !== undefined ? String(props.modelValue) : undefined,
 );
 
 function handleUpdate(value: string) {
-  // Convert back to number if original options are numbers
+  // Recover the original type: prefer props.options, then the slot-item registry
   const opt = props.options?.find((o) => String(o.value) === value);
-  emit("update:modelValue", opt !== undefined ? opt.value : value);
+  let resolved: string | number;
+  if (opt !== undefined) {
+    resolved = opt.value;
+  } else if (valueMap.has(value)) {
+    resolved = valueMap.get(value)!;
+  } else {
+    resolved = value;
+  }
+  runRules(resolved);
+  emit("update:modelValue", resolved);
 }
 
 function handleClear() {
@@ -48,18 +86,24 @@ const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   md: "tw:h-10 tw:text-sm",
 };
 
-const rootStyle = computed(() => ({
-  width:
-    props.width === undefined
-      ? "100%"
-      : typeof props.width === "number"
-        ? `${props.width}px`
-        : props.width,
-}));
+const fieldWidthClass = computed(() => {
+  switch (props.width) {
+    case "xs":
+      return "tw:w-[var(--spacing-field-width-xs)]";
+    case "sm":
+      return "tw:w-[var(--spacing-field-width-sm)]";
+    case "md":
+      return "tw:w-[var(--spacing-field-width-md)]";
+    case "lg":
+      return "tw:w-[var(--spacing-field-width-lg)]";
+    default:
+      return "tw:w-full";
+  }
+});
 </script>
 
 <template>
-  <div :style="rootStyle" class="tw:flex tw:flex-col tw:gap-1">
+  <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
       v-if="label"
@@ -229,11 +273,11 @@ const rootStyle = computed(() => ({
 
     <!-- Error message -->
     <span
-      v-if="errorMessage"
+      v-if="effectiveError && effectiveError.trim()"
       class="tw:text-xs tw:text-select-error-text tw:leading-none"
       role="alert"
     >
-      {{ errorMessage }}
+      {{ effectiveError }}
     </span>
   </div>
 </template>

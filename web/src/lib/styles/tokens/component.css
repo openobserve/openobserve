@@ -158,6 +158,17 @@
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
 
+  /* Field semantic widths (OInput, OInputDisplay, OSelect) */
+  /* xs  ~120px — zip codes, CVV, short numbers          */
+  /* sm  ~200px — dates, narrow labels                   */
+  /* md  ~280px — names, phone numbers (default narrow)  */
+  /* lg  ~400px — emails, full addresses                 */
+  /* full is 100% — no token needed, handled in CSS var  */
+  --spacing-field-width-xs: 7.5rem;
+  --spacing-field-width-sm: 12.5rem;
+  --spacing-field-width-md: 17.5rem;
+  --spacing-field-width-lg: 25rem;
+
   /* ── Dialog ──────────────────────────────────────────────── */
 
   /* Overlay */
@@ -347,6 +358,12 @@
   --color-tabs-focus-ring: var(--color-tabs-focus-ring);
   --spacing-tabs-height: var(--spacing-tabs-height);
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
+
+  /* Field semantic widths (used by OInput, OInputDisplay, OSelect) */
+  --spacing-field-width-xs: var(--spacing-field-width-xs);
+  --spacing-field-width-sm: var(--spacing-field-width-sm);
+  --spacing-field-width-md: var(--spacing-field-width-md);
+  --spacing-field-width-lg: var(--spacing-field-width-lg);
 
 
   /* Dialog */
