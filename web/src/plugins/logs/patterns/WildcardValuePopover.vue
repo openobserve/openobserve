@@ -33,25 +33,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Body - bar chart distribution -->
     <div class="wildcard-popover-body">
       <div
-        v-for="(item, i) in displayValues.slice(0, 10)"
+        v-for="(item, i) in topValues.slice(0, 10)"
         :key="i"
         class="wildcard-value-row"
         :data-test="`wildcard-value-row-${i}`"
       >
-        <span class="wildcard-value-count" :style="countColumnStyle">{{ formatCount(item.count) }}</span>
-        <span class="wildcard-value-text">
-          <div class="wildcard-value-bar-wrapper">
-            <div
-              class="wildcard-value-bar"
-              :style="{ width: barWidth(item.count) }"
-              :class="barColorClass"
-            ></div>
-          </div>
-          <span class="wildcard-value-text-inner">{{ item.value || "(empty)" }}</span>
-        </span>
+        <div class="wildcard-value-bar-wrapper">
+          <div
+            class="wildcard-value-bar"
+            :style="{ width: barWidth(item.count) }"
+            :class="barColorClass"
+          ></div>
+        </div>
+        <span class="wildcard-value-count">{{ formatCount(item.count) }}</span>
+        <span class="wildcard-value-text">{{ item.value || "(empty)" }}</span>
+        <div class="wildcard-value-actions">
+          <button
+            class="wildcard-value-action-btn"
+            :data-test="`wildcard-value-row-${i}-include-btn`"
+            @click.stop="emit('filter-value', item.value, 'include')"
+          >
+            =
+          </button>
+          <button
+            class="wildcard-value-action-btn"
+            :data-test="`wildcard-value-row-${i}-exclude-btn`"
+            @click.stop="emit('filter-value', item.value, 'exclude')"
+          >
+            &ne;
+          </button>
+        </div>
       </div>
       <div
-        v-if="displayValues.length === 0"
+        v-if="topValues.length === 0"
         class="tw:text-[0.6875rem] tw:opacity-50 tw:py-4 tw:text-center"
       >
         {{ t("search.patternNoValuesAvailable") }}
@@ -63,14 +77,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
-import { formatCount } from "@/utils/logs/convertLogData";
 import { wildcardChipColor } from "@/composables/useLogs/useTemplateTokenizer";
-import type { WildcardDisplayValue } from "./useWildcardHover";
+import type { WildcardTopValue } from "@/composables/useLogs/useTemplateTokenizer";
 
 const props = defineProps<{
   visible: boolean;
   token: string;
-  displayValues: WildcardDisplayValue[];
+  topValues: WildcardTopValue[];
   anchorEl: HTMLElement | null;
 }>();
 
@@ -84,29 +97,20 @@ const { t } = useI18n();
 const popoverRef = ref<HTMLElement | null>(null);
 const flipUpward = ref(false);
 
-watch(
-  () => [props.visible, props.token, props.displayValues],
-  () => {
-    console.log("[WildcardValuePopover] props updated", {
-      visible: props.visible,
-      token: props.token,
-      displayValues: props.displayValues,
-    });
-  },
-  { immediate: true },
-);
-
-const maxCount = computed(() =>
-  Math.max(...props.displayValues.map((v) => v.count), 1),
-);
-
-const countColumnStyle = computed(() => {
-  const chars = formatCount(maxCount.value).length;
-  return { width: `${chars * 0.5 + 0.125}rem` };
+const compactFormatter = new Intl.NumberFormat("en", {
+  notation: "compact",
+  compactDisplay: "short",
 });
 
+function formatCount(count: number): string {
+  return compactFormatter.format(count);
+}
+
+const maxCount = computed(() =>
+  Math.max(...props.topValues.map((v) => v.count), 1),
+);
+
 const barWidth = (count: number): string => {
-  if (!count) return "0%";
   const pct = (count / maxCount.value) * 100;
   return `${Math.max(pct, 2)}%`;
 };
@@ -270,49 +274,19 @@ watch(
   position: relative;
 }
 
-.wildcard-value-count {
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-  text-align: right;
-  font-size: 0.75rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--o2-text-primary, #111827);
-  line-height: 1.4;
-
-}
-
-.wildcard-value-text {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  min-width: 0;
-  font-family: monospace;
-  font-size: 0.75rem;
-  color: var(--o2-text-primary, #111827);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.4;
-}
-
-.wildcard-value-text-inner {
-  position: relative;
-  z-index: 1;
-}
-
 .wildcard-value-bar-wrapper {
   position: absolute;
   inset: 0;
+  border-radius: 0;
   overflow: hidden;
   pointer-events: none;
 }
 
 .wildcard-value-bar {
   height: 100%;
+  border-radius: 0;
   opacity: 0.18;
-  min-width: 0;
+  min-width: 0.25rem;
   transition: opacity 0.1s ease;
 
   .wildcard-value-row:hover & {
@@ -339,4 +313,67 @@ watch(
   }
 }
 
+.wildcard-value-count {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--o2-text-primary, #111827);
+  line-height: 1.4;
+
+  .wildcard-value-row:hover & {
+    display: none;
+  }
+}
+
+.wildcard-value-text {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--o2-text-primary, #111827);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* ── Action buttons (= / ≠) ── */
+.wildcard-value-actions {
+  display: none;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  gap: 0.125rem;
+
+  .wildcard-value-row:hover & {
+    display: flex;
+  }
+}
+
+.wildcard-value-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: monospace;
+  cursor: pointer;
+  background: transparent;
+  color: var(--o2-text-secondary, #4b5563);
+  transition: background 0.1s ease, color 0.1s ease;
+
+  &:hover {
+    color: var(--o2-text-primary, #111827);
+    background: rgba(0, 0, 0, 0.08);
+  }
+}
 </style>

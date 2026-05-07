@@ -33,27 +33,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'tw:flex-nowrap tw:overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
+        :title="pattern.template"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
           <span
             v-if="tok.kind === 'text'"
             :class="wrap ? 'tw:whitespace-pre-wrap tw:break-all' : 'tw:whitespace-pre'"
           >{{ tok.value }}</span>
-          <span
+          <q-chip
             v-else
-            class="tw:inline-flex"
-            @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
+            dense
+            size="xs"
+            class="wildcard-chip q-my-none q-mx-none"
+            :class="wildcardChipColor(tok.value)"
+            @mouseenter="onMouseEnter(tok.value, tok.topValues, $event)"
             @mouseleave="onMouseLeave"
           >
-            <q-chip
-              dense
-              size="xs"
-              class="wildcard-chip q-my-none q-mx-none"
-              :class="wildcardChipColor(tok.value)"
-            >
-              {{ tok.value }}
-            </q-chip>
-          </span>
+            {{ tok.value }}
+          </q-chip>
         </template>
       </div>
 
