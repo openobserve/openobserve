@@ -463,7 +463,7 @@ export class LogsPage {
                     .locator('.q-toggle__inner')
                     .first()
                     .evaluate(el => el.classList.contains('q-toggle__inner--truthy'))
-                    .catch(() => false);
+                    .catch(() => true); // treat transient DOM errors as "already on" — safer than deselecting
                 if (!isDefaultOn) {
                     await defaultToggle.click({ force: true });
                     await this.page.waitForTimeout(500);
@@ -1729,9 +1729,7 @@ export class LogsPage {
             await this.page.waitForTimeout(3000);
             const retryText = await editor.textContent().catch(() => '');
             if (retryText && retryText.includes(field)) return;
-            // Only re-click as a last resort when field is definitely not added
-            await this.clickInterestingFieldButton(field);
-            await this.page.waitForTimeout(2000);
+            throw new Error(`clickInterestingFields: field "${field}" not in editor after retry — toggle re-click is unsafe`);
         }
     }
 

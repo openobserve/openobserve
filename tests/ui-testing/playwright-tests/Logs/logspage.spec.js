@@ -147,12 +147,10 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickSavedViewsButton();
     await pm.logsPage.fillSavedViewName("e2e@@@@@");
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    // Start watching for the notification BEFORE clicking save — the
-    // notification has timeout=1000ms and disappears almost immediately.
-    const notificationPromise = pm.logsPage.watchForNotification(15000);
+    // Wait for the specific validation notification — using text-filtered wait
+    // avoids false matches when another toast (e.g. streaming) stacks first.
     await pm.logsPage.clickSavedViewDialogSave();
-    await notificationPromise;
-    await pm.logsPage.expectNotificationContainsText("Please provide valid view name");
+    await pm.logsPage.waitForNotificationWithText("Please provide valid view name", 15000);
 
     testLogger.info('Saved views special characters validation test completed');
   });
