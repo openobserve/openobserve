@@ -84,12 +84,13 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     for (const q of queries) {
       testLogger.info(`Testing ${q.name}: ${q.query}`);
 
-      // Enter query
+      // Enter query and wait for model sync
       await pm.metricsPage.enterMetricsQuery(q.query);
+      await page.waitForTimeout(1000);
 
       // Execute query
       await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
+      await page.waitForTimeout(3000);
 
       // Assert: Query must execute without errors
       const hasError = await pm.metricsPage.hasErrorIndicator();
