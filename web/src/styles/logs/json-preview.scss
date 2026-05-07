@@ -22,6 +22,16 @@
   font-weight: normal;
 }
 
+// Compact dropdown trigger button for JSON field actions — matches original q-btn-dropdown size="0.5rem"
+.log-json-field-dropdown-btn {
+  height: 20px !important;
+  width: 20px !important;
+  min-height: 20px !important;
+  min-width: 20px !important;
+  padding: 0 !important;
+  vertical-align: middle;
+}
+
 // Styling for JSON key-value pairs
 .log-key {
   color: #b71c1c; // Red color for keys in light theme

@@ -12,6 +12,7 @@ flamegraph.html
 /bin/
 /docs/
 /.claude/*
+/.agents/*
 
 # data
 /tmp/

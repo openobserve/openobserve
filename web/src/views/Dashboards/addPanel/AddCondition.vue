@@ -15,7 +15,7 @@
     <OButtonGroup class="axis-field" radius="sm">
       <OButton
         variant="primary"
-        size="chip"
+        size="chip-12"
         :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
       >
         {{ computedLabel(condition) }}

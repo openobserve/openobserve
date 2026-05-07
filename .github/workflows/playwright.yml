@@ -318,6 +318,7 @@ jobs:
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
                 # "alerts-regression.spec.js",
+                "alerts-stream-switching-regression.spec.js",
                 "metrics-regression.spec.js",
                 "traces-regression.spec.js",
               ]

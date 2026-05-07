@@ -1797,7 +1797,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
             componentInstance.searchObj.data.stream.selectedStream.length > 1) {
           componentInstance.$q.notify({
             type: "negative",
-            message: "Please enable SQL mode or select a single stream to visualize",
+            message: "Please enable SQL mode or select a single stream to use timechart",
           });
           return;
         }
@@ -2192,7 +2192,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     expect(componentInstance.$q.notify).toHaveBeenCalledWith({
       type: "negative",
-      message: "Please enable SQL mode or select a single stream to visualize",
+      message: "Please enable SQL mode or select a single stream to use timechart",
     });
   });
 
