@@ -16,7 +16,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await navigateToBase(page);
     const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(6000);
     // Metrics page now defaults to SQL mode; switch to PromQL for PromQL builder tests
     if (switchToPromQL) {
       await pm.metricsBuilderPage.switchToPromQLMode();
