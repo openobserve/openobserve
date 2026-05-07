@@ -59,8 +59,11 @@ export class LoginPage {
     }
 
     // Already authenticated (serial mode: cookies persist between tests).
-    // If the login form isn't present within 3s, we're already at the app — skip re-login.
-    const loginFormVisible = await this.userIdInput.isVisible({ timeout: 3000 }).catch(() => false);
+    // If the login form still isn't visible after 3s, we're already at the app — skip re-login.
+    const loginFormVisible = await this.userIdInput
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
     if (!loginFormVisible) return;
     await this.passwordInput.waitFor({ state: 'visible', timeout: 15000 });
 

@@ -11,9 +11,6 @@ export class LogsQueryPage {
     this.errorMessage = '[data-test="logs-search-error-message"]';
     this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
-    // Quasar q-icon renders icon name as text content (e.g. "warning"),
-    // concatenated with the label text. Use partial match.
-    this.noDataFoundText = 'No data found for';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
     this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
     this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
@@ -140,7 +137,7 @@ export class LogsQueryPage {
       testLogger.info(`auto_query_enabled=false on this env — skipping ${expectedLabel === 'Turn off' ? 'disableAutoRun' : 'enableAutoRun'}`);
       return;
     }
-    await this.page.locator(this.autoRunDropdownBtn).click();
+    await this.page.locator(this.autoRunDropdownBtn).first().click();
     const toggle = this.page.locator(this.autoRunToggleItem);
     await expect(toggle).toBeVisible({ timeout: 5000 });
     if (((await toggle.textContent()) || '').includes(expectedLabel)) {

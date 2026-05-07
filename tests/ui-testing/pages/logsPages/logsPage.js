@@ -2242,14 +2242,11 @@ export class LogsPage {
             // Fallback: click the content span, only press Enter if that fails too
             // (otherwise a successful content click would be followed by a stray
             // Enter, risking double-submit on the form)
-            let contentClicked = false;
             try {
                 await this.page.locator(this.savedViewDialogSaveContent).click({ force: true, timeout: 5000 });
-                contentClicked = true;
-            } catch (e2) { /* fall through to Enter */ }
-            if (!contentClicked) {
-                await this.page.keyboard.press('Enter');
-            }
+                return;
+            } catch (e2) { /* content click failed, fall through to Enter */ }
+            await this.page.keyboard.press('Enter');
         }
     }
 
