@@ -325,6 +325,13 @@ class="q-mr-xs" />
           />
         </OTab>
         <OTab
+          v-if="hasDbSpan"
+          name="database"
+          :label="t('common.db')"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-exceptions"
+        />
+        <OTab
           name="links"
           :label="t('common.links')"
           style="text-transform: capitalize"
@@ -697,6 +704,10 @@ class="tw:h-5! tw:text-[0.75rem]!">
           />
         </OTabPanel>
 
+        <OTabPanel name="database" class="tw:p-0 tw:h-full">
+          <DbSpanDetails :span="span" />
+        </OTabPanel>
+
         <OTabPanel name="links">
           <div v-if="spanLinks.length">
             <q-virtual-scroll
@@ -923,6 +934,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
+import DbSpanDetails from "./DbSpanDetails.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -979,6 +991,7 @@ export default defineComponent({
     AttributeValueCell,
     DeployedCode,
     TraceErrorTab,
+    DbSpanDetails,
   },
   emits: [
     "close",
@@ -1985,6 +1998,7 @@ export default defineComponent({
       config,
       // LLM
       isLLMSpan,
+      hasDbSpan,
       llmMetrics,
       copyContent,
       formatModelParams,

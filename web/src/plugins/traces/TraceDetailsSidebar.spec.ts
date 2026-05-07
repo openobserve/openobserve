@@ -448,11 +448,17 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
-    it("should switch to attributes tab by default", () => {
+    it("should switch to attributes tab by default when span has no db_ attributes", () => {
       expect(wrapper.vm.activeTab).toBe("attributes");
     });
 
-    it("should emit update:activeTab when events tab is clicked", async () => {
+    it("should not show database tab when span has no db_ attributes", () => {
+      expect(
+        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should switch tabs when clicked", async () => {
       const eventsTab = wrapper.find(
         '[data-test="trace-details-sidebar-tabs-events"]',
       );
@@ -460,6 +466,26 @@ describe("TraceDetailsSidebar", async () => {
 
       expect(wrapper.emitted("update:activeTab")).toBeTruthy();
       expect(wrapper.emitted("update:activeTab")![0]).toEqual(["events"]);
+    });
+
+    it("should show database tab when span has db_ attributes", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, db_system: "postgresql" },
+      });
+      expect(
+        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should report hasDbSpan as true when span has db_ attributes", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, db_system: "postgresql" },
+      });
+      expect(wrapper.vm.hasDbSpan).toBe(true);
+    });
+
+    it("should report hasDbSpan as false when span has no db_ attributes", () => {
+      expect(wrapper.vm.hasDbSpan).toBe(false);
     });
   });
 
