@@ -949,7 +949,6 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
-    part_num = 3;
 
     // if the partition number is too large, we limit it to ENV ZO_QUERY_PARTITION_MAX_NUM
     let max_partition_num = cfg.limit.query_partition_max_num.max(1);

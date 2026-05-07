@@ -311,7 +311,11 @@ impl Ord for HeapHit {
         } else {
             compare_string_values(&self.hit, &other.hit, &self.col)
         };
-        if self.is_descending { ord } else { ord.reverse() }
+        if self.is_descending {
+            ord
+        } else {
+            ord.reverse()
+        }
     }
 }
 
