@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,29 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    style="display: flex"
+    style="display: flex; align-items: center"
     @mouseover="isHovered = true"
     @mouseleave="isHovered = false"
   >
-    <q-tabs
+    <OTabs
       v-model="selectedTabId"
       :align="'left'"
       dense
-      inline-label
-      outside-arrows
       mobile-arrows
       @click.stop
       style="max-width: calc(100% - 40px)"
       data-test="dashboard-tab-list"
     >
-      <q-tab
-        no-caps
-        :ripple="false"
+      <OTab
         v-for="(tab, index) in tabs"
         :key="index"
         :name="tab.tabId"
         @click.stop
-        content-class="tab_content"
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
         <div class="full-width row justify-between no-wrap">
@@ -54,25 +49,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ tab?.name }}</span
           >
         </div>
-      </q-tab>
-    </q-tabs>
-    <q-btn
+      </OTab>
+    </OTabs>
+    <OButton
       v-if="!viewOnly"
       v-show="isHovered"
-      class="text-bold no-border q-ml-xs"
-      no-caps
-      no-outline
-      rounded
-      icon="add"
-      padding="xs"
+      variant="ghost"
+      size="icon"
+      class="tw:ml-1"
       @click="
         () => {
           showAddTabDialog = true;
         }
       "
       data-test="dashboard-tab-add-btn"
-      ><q-tooltip>Add Tab</q-tooltip></q-btn
     >
+      <template #icon-left><q-icon name="add" /></template>
+      <q-tooltip>Add Tab</q-tooltip>
+    </OButton>
     <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
       <AddTab
         :dashboard-id="dashboardData?.dashboardId"
@@ -83,6 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
@@ -94,6 +91,9 @@ export default defineComponent({
   components: {
     AddTab,
     ConfirmDialog,
+    OTabs,
+    OTab,
+    OButton,
   },
   props: {
     dashboardData: {
@@ -136,18 +136,18 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-tabs {
-  .q-tab {
+.o-tabs {
+  .o-tab {
     text-transform: none;
   }
   &--vertical {
     margin: 5px;
-    .q-tab {
+    .o-tab {
       justify-content: flex-start;
       padding: 0 1rem 0 1.25rem;
       border-radius: 0.5rem;
       &__content.tab_content {
-        .q-tab {
+        .o-tab {
           &__icon + &__label {
             padding-left: 0.875rem;
             font-weight: 600;

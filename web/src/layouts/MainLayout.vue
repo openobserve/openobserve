@@ -1603,7 +1603,11 @@ export default defineComponent({
 }
 
 .header-menu {
-  .q-btn {
+  display: flex;
+  align-items: center;
+
+  .q-btn,
+  [data-o2-btn] {
     transition: transform 0.2s ease;
 
     &:hover {
@@ -1619,7 +1623,8 @@ export default defineComponent({
   }
 
   // Skip bounce for org selector (inside div)
-  [data-test="navbar-organizations-select"] .q-btn {
+  [data-test="navbar-organizations-select"] .q-btn,
+  [data-test="navbar-organizations-select"] [data-o2-btn] {
     &:hover {
       transform: none;
     }

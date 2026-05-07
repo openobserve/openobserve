@@ -37,8 +37,11 @@ export class MetricsQueryEditorPage {
     /**
      * Switch to PromQL Custom mode
      *
-     * In the metrics page, there are mode buttons: SQL, PromQL, Builder, Custom
-     * This function clicks the "Custom" button to enable free-form PromQL query typing.
+     * In the metrics page, there are two toggle groups:
+     *   - Query type: SQL / PromQL  (data-test="dashboard-sql-query-type" / "dashboard-promql-query-type")
+     *   - Builder mode: Builder / Custom  (data-test="dashboard-builder-query-type" / "dashboard-custom-query-type")
+     *
+     * OToggleGroupItem (Reka UI) signals the active item via data-state="on", not a CSS class.
      *
      * @returns {Promise<boolean>} - True if successfully switched
      */
@@ -49,44 +52,32 @@ export class MetricsQueryEditorPage {
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(300);
 
-        // Look for the "Custom" button - try multiple selector strategies
-        const customButtonSelectors = [
-            'button:has-text("Custom")',
-            '.q-btn:has-text("Custom")',
-            '[data-test*="custom"]',
-            'button[class*="custom"]'
-        ];
+        // Primary selector — the Custom builder-mode button in QueryTypeSelector.vue
+        const customButton = this.page.locator('[data-test="dashboard-custom-query-type"]').first();
 
-        for (const selector of customButtonSelectors) {
-            const customButton = this.page.locator(selector).first();
+        if (await customButton.isVisible({ timeout: 3000 })) {
+            // OToggleGroupItem uses data-state="on" (Reka UI) for active state
+            const dataState = await customButton.getAttribute('data-state') || '';
 
-            if (await customButton.isVisible({ timeout: 2000 })) {
-                // Check if already active
-                const classes = await customButton.getAttribute('class');
-                const isActive = classes.includes('active') || classes.includes('text-primary');
-
-                if (!isActive) {
-                    await customButton.click();
-                    await this.page.waitForTimeout(1000);
-                    this.testLogger.info('✓ Switched to PromQL Custom mode');
-                } else {
-                    this.testLogger.info('✓ Already in PromQL Custom mode');
-                }
-
+            if (dataState === 'on') {
+                this.testLogger.info('✓ Already in PromQL Custom mode');
                 return true;
             }
-        }
 
-        // Fallback: Try to find by exact text match
-        const exactCustomButton = this.page.getByRole('button', { name: 'Custom', exact: true });
-        if (await exactCustomButton.isVisible({ timeout: 2000 })) {
-            await exactCustomButton.click();
+            await customButton.click();
             await this.page.waitForTimeout(1000);
-            this.testLogger.info('✓ Switched to PromQL Custom mode (via exact match)');
+
+            // Confirm active state flipped
+            const newState = await customButton.getAttribute('data-state') || '';
+            if (newState === 'on') {
+                this.testLogger.info('✓ Switched to PromQL Custom mode');
+            } else {
+                this.testLogger.warn('Custom mode button clicked but data-state did not become "on"');
+            }
             return true;
         }
 
-        this.testLogger.warn('Could not find Custom mode button - assuming already in custom mode');
+        this.testLogger.warn('Could not find [data-test="dashboard-custom-query-type"] — assuming already in custom mode');
         return false;
     }
 
@@ -279,7 +270,11 @@ export class MetricsQueryEditorPage {
     }
 
     /**
-     * Switch to a specific query tab
+     * Switch to a specific query tab (1-based)
+     *
+     * Tabs in DashboardQueryEditor.vue are rendered as OTab (Reka UI TabsTrigger)
+     * with data-test="dashboard-panel-query-tab-{0-based-index}" and
+     * data-state="active" when selected.
      *
      * @param {number} tabNumber - The tab number to switch to (1-based)
      * @returns {Promise<boolean>} - True if successfully switched
@@ -291,52 +286,44 @@ export class MetricsQueryEditorPage {
 
         this.testLogger.info(`Attempting to switch to tab ${tabNumber}`);
 
-        // First, try to find tab by text (Query 1, Query 2, etc.)
-        const tabSelector = this.page.locator(this.tabSelector).filter({
-            hasText: new RegExp(`Query ${tabNumber}|Tab ${tabNumber}`, 'i')
-        }).first();
+        // Primary: use the data-test attribute (0-based index internally)
+        const zeroIdx = tabNumber - 1;
+        const tabByDataTest = this.page.locator(`[data-test="dashboard-panel-query-tab-${zeroIdx}"]`).first();
 
-        if (await tabSelector.isVisible({ timeout: 3000 })) {
-            await tabSelector.click({ force: true });
-            await this.page.waitForTimeout(1500); // Increased wait for UI to update
-
-            // Verify we're on the right tab by checking active state
-            const isActive = await tabSelector.evaluate(el => {
-                return el.classList.contains('q-tab--active') ||
-                       el.getAttribute('aria-selected') === 'true';
-            });
-
-            if (isActive) {
-                this.testLogger.info(`✓ Switched to tab ${tabNumber} (verified active)`);
+        if (await tabByDataTest.isVisible({ timeout: 3000 })) {
+            // Check if already active
+            const currentState = await tabByDataTest.getAttribute('data-state') || '';
+            if (currentState === 'active') {
+                this.testLogger.info(`✓ Tab ${tabNumber} is already active`);
                 return true;
-            } else {
-                this.testLogger.warn(`Tab ${tabNumber} clicked but not active`);
             }
-        }
 
-        // Alternative: try nth-child approach
-        // Note: tabs might start at index 0 or have other tabs before query tabs
-        const allTabs = this.page.locator(this.tabSelector);
-        const tabCount = await allTabs.count();
-        this.testLogger.info(`Found ${tabCount} total tabs`);
-
-        // Try to click the specific index (adjusting for 0-based indexing)
-        if (tabNumber <= tabCount) {
-            const nthTab = allTabs.nth(tabNumber - 1);
-            const tabText = await nthTab.textContent();
-            this.testLogger.info(`Clicking tab at index ${tabNumber - 1}: "${tabText}"`);
-
-            await nthTab.click({ force: true });
+            await tabByDataTest.click({ force: true });
             await this.page.waitForTimeout(1500);
 
-            // Verify active
-            const isActive = await nthTab.evaluate(el => {
-                return el.classList.contains('q-tab--active') ||
-                       el.getAttribute('aria-selected') === 'true';
-            });
+            const newState = await tabByDataTest.getAttribute('data-state') || '';
+            if (newState === 'active') {
+                this.testLogger.info(`✓ Switched to tab ${tabNumber} (verified active)`);
+                return true;
+            }
+            this.testLogger.warn(`Tab ${tabNumber} clicked but data-state is "${newState}"`);
+        }
+
+        // Fallback: locate by role="tab" text content
+        const tabByText = this.page.locator(this.tabSelector).filter({
+            hasText: new RegExp(`Query ${tabNumber}`, 'i')
+        }).first();
+
+        if (await tabByText.isVisible({ timeout: 3000 })) {
+            await tabByText.click({ force: true });
+            await this.page.waitForTimeout(1500);
+
+            const isActive = await tabByText.evaluate(el =>
+                el.getAttribute('data-state') === 'active' || el.getAttribute('aria-selected') === 'true'
+            );
 
             if (isActive) {
-                this.testLogger.info(`✓ Switched to tab ${tabNumber} via nth (verified active)`);
+                this.testLogger.info(`✓ Switched to tab ${tabNumber} via text filter (verified active)`);
                 return true;
             }
         }
@@ -364,10 +351,10 @@ export class MetricsQueryEditorPage {
             '[data-test*="dashboard-panel-query-tab-add"]',   // Contains match (handles backtick variant)
             '[data-test="dashboard-panel-query-tab-add"]',    // Exact data-test attribute
             'button[data-test*="panel-query-tab-add"]',       // Partial match
-            'button.q-btn[icon="add"]',                        // Button with add icon
-            'button.q-btn.q-btn--round.q-btn--flat',          // Round flat button (likely the add button)
-            '.q-tab__content + button[icon="add"]',           // Add button next to tabs
-            'button.q-btn:has(.q-icon[name="add"])',          // Button containing add icon
+            'button[data-o2-btn][aria-label="add"]',          // O2 button with add aria-label
+            '[role="tablist"] ~ button[data-o2-btn]',         // O2 add button after tablist
+            '[role="tablist"] + button[data-o2-btn]',         // O2 add button immediately after tablist
+            'button[data-o2-btn]:has-text("")',               // O2 add button (icon-only, empty text)
         ];
 
         for (const selector of selectors) {
@@ -389,15 +376,17 @@ export class MetricsQueryEditorPage {
             }
         }
 
-        // If specific selectors don't work, try finding any round button with add icon
-        const roundButtons = this.page.locator('button.q-btn--round');
-        const buttonCount = await roundButtons.count();
-        this.testLogger.info(`Found ${buttonCount} round buttons`);
+        // If specific selectors don't work, try finding any O2 button with add icon near the tab list
+        const o2Buttons = this.page.locator('button[data-o2-btn]');
+        const buttonCount = await o2Buttons.count();
+        this.testLogger.info(`Found ${buttonCount} O2 buttons`);
 
         for (let i = 0; i < buttonCount; i++) {
-            const btn = roundButtons.nth(i);
-            const hasAddIcon = await btn.locator('.q-icon').first().evaluate(icon => {
-                return icon.textContent === 'add' || icon.getAttribute('aria-label')?.includes('add');
+            const btn = o2Buttons.nth(i);
+            const hasAddIcon = await btn.evaluate(el => {
+                const ariaLabel = el.getAttribute('aria-label') || '';
+                const textContent = el.textContent || '';
+                return ariaLabel.toLowerCase().includes('add') || textContent.trim() === 'add' || textContent.trim() === '';
             }).catch(() => false);
 
             if (hasAddIcon && await btn.isVisible()) {

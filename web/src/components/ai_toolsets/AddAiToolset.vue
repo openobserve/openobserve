@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
+  <q-page class="q-pa-none" style="min-height: inherit">
     <!-- Header -->
     <div class="row items-center no-wrap q-mx-md q-pt-sm">
       <div class="flex items-center tw:py-2">
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-form
       ref="formRef"
       @submit="onSubmit"
-      style="height: calc(100vh - 120px); overflow: auto;"
+      style="height: calc(100vh - 120px); overflow: auto"
     >
       <div class="tw:max-w-2xl tw:mx-4 tw:mt-4">
         <!-- Name -->
@@ -55,8 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rules="[
               (val: string) => !!val || t('aiToolset.nameRequired'),
               (val: string) =>
-                /^[a-zA-Z0-9_-]+$/.test(val) ||
-                t('aiToolset.nameInvalid'),
+                /^[a-zA-Z0-9_-]+$/.test(val) || t('aiToolset.nameInvalid'),
               (val: string) => val.length <= 256 || t('aiToolset.nameTooLong'),
             ]"
           />
@@ -97,7 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- MCP fields -->
         <template v-if="form.kind === 'mcp'">
-          <div class="text-subtitle1 tw:font-semibold tw:mb-3">{{ t("aiToolset.mcpConfig") }}</div>
+          <div class="text-subtitle1 tw:font-semibold tw:mb-3">
+            {{ t("aiToolset.mcpConfig") }}
+          </div>
           <div class="o2-input tw:mb-4">
             <q-input
               data-test="ai-toolset-mcp-url"
@@ -134,12 +135,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-input
               v-model="header.key"
               :label="t('aiToolset.headerKey')"
-              borderless dense class="o2-input tw:flex-1"
+              borderless
+              dense
+              class="o2-input tw:flex-1"
             />
             <q-input
               v-model="header.value"
               :label="t('aiToolset.headerValue')"
-              borderless dense class="o2-input tw:flex-1"
+              borderless
+              dense
+              class="o2-input tw:flex-1"
               :type="header.visible ? 'text' : 'password'"
             >
               <template #append>
@@ -150,22 +155,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
             </q-input>
-            <q-btn flat round dense icon="delete" size="sm" @click="removeHeader(idx)" />
+            <OButton
+              variant="ghost-destructive"
+              size="icon-xs-sq"
+              @click="removeHeader(idx)"
+            >
+              <q-icon name="delete" size="14px" />
+            </OButton>
           </div>
-          <q-btn
-            flat no-caps size="sm"
-            icon="add" :label="t('aiToolset.addHeader')"
-            class="tw:mb-4"
-            @click="addHeader"
-          />
+          <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addHeader">
+            <template #icon-left><q-icon name="add" size="14px" /></template>
+            {{ t("aiToolset.addHeader") }}
+          </OButton>
         </template>
 
         <!-- CLI fields -->
         <template v-if="form.kind === 'cli'">
           <div class="tw:flex tw:items-center tw:gap-3 tw:mb-4">
-            <div class="text-subtitle1 tw:font-semibold">{{ t("aiToolset.cliConfig") }}</div>
+            <div class="text-subtitle1 tw:font-semibold">
+              {{ t("aiToolset.cliConfig") }}
+            </div>
             <div class="tw:flex tw:items-center tw:gap-1">
-              <span class="text-caption text-grey-6">{{ t("aiToolset.presets") }}:</span>
+              <span class="text-caption text-grey-6"
+                >{{ t("aiToolset.presets") }}:</span
+              >
               <q-chip
                 v-for="preset in CLI_PRESETS"
                 :key="preset.id"
@@ -191,7 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               dense
               placeholder="kubectl"
-              :rules="[(val: string) => !!val || t('aiToolset.cliCommandRequired')]"
+              :rules="[
+                (val: string) => !!val || t('aiToolset.cliCommandRequired'),
+              ]"
             />
           </div>
           <div class="o2-input tw:mb-4">
@@ -212,7 +227,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model.number="cliData.timeout_seconds"
                 :label="t('aiToolset.timeoutSeconds')"
                 class="showLabelOnTop full-width"
-                stack-label borderless dense type="number" min="1"
+                stack-label
+                borderless
+                dense
+                type="number"
+                min="1"
               />
             </div>
             <div class="o2-input tw:flex-1">
@@ -220,7 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model.number="cliData.max_output_bytes"
                 :label="t('aiToolset.maxOutputBytes')"
                 class="showLabelOnTop full-width"
-                stack-label borderless dense type="number" min="1"
+                stack-label
+                borderless
+                dense
+                type="number"
+                min="1"
               />
             </div>
           </div>
@@ -238,11 +261,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="'env-' + idx"
             class="tw:flex tw:gap-2 tw:mb-2"
           >
-            <q-input v-model="env.key" :label="t('aiToolset.envKey')" borderless dense class="o2-input tw:flex-1" />
+            <q-input
+              v-model="env.key"
+              :label="t('aiToolset.envKey')"
+              borderless
+              dense
+              class="o2-input tw:flex-1"
+            />
             <q-input
               v-model="env.value"
               :label="t('aiToolset.envValue')"
-              borderless dense class="o2-input tw:flex-1"
+              borderless
+              dense
+              class="o2-input tw:flex-1"
               :type="env.visible ? 'text' : 'password'"
             >
               <template #append>
@@ -253,12 +284,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
             </q-input>
-            <q-btn flat round dense icon="delete" size="sm" @click="removeEnvVar(idx)" />
+            <OButton
+              variant="ghost-destructive"
+              size="icon-xs-sq"
+              @click="removeEnvVar(idx)"
+            >
+              <q-icon name="delete" size="14px" />
+            </OButton>
           </div>
-          <q-btn flat no-caps size="sm" icon="add" :label="t('aiToolset.addEnvVar')" class="tw:mb-4" @click="addEnvVar" />
+          <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addEnvVar">
+            <template #icon-left><q-icon name="add" size="14px" /></template>
+            {{ t("aiToolset.addEnvVar") }}
+          </OButton>
 
           <!-- Credential files -->
-          <div class="tw:mb-2 text-subtitle2">{{ t("aiToolset.credentialFiles") }}</div>
+          <div class="tw:mb-2 text-subtitle2">
+            {{ t("aiToolset.credentialFiles") }}
+          </div>
           <div
             v-for="(cred, idx) in cliCredFiles"
             :key="'cred-' + idx"
@@ -269,11 +311,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="cred.key"
                 :label="t('aiToolset.credEnvVar')"
                 hint="e.g. KUBECONFIG"
-                borderless dense class="o2-input tw:w-48"
+                borderless
+                dense
+                class="o2-input tw:w-48"
               />
-              <q-btn flat round dense icon="delete" size="sm" :title="t('common.delete')" @click="removeCredFile(idx)" />
+              <OButton
+                variant="ghost-destructive"
+                size="icon-xs-sq"
+                :title="t('common.delete')"
+                @click="removeCredFile(idx)"
+              >
+                <q-icon name="delete" size="14px" />
+              </OButton>
             </div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mb-1">{{ t("aiToolset.credContentHint") }}</div>
+            <div class="tw:text-xs tw:text-gray-500 tw:mb-1">
+              {{ t("aiToolset.credContentHint") }}
+            </div>
             <query-editor
               :editor-id="`cred-file-editor-${idx}`"
               class="monaco-editor-cred"
@@ -281,12 +334,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:query="cred.value"
             />
           </div>
-          <q-btn flat no-caps size="sm" icon="add" :label="t('aiToolset.addCredFile')" class="tw:mb-4" @click="addCredFile" />
+          <OButton
+            variant="ghost"
+            size="sm"
+            class="tw:mb-4"
+            @click="addCredFile"
+          >
+            <template #icon-left><q-icon name="add" size="14px" /></template>
+            {{ t("aiToolset.addCredFile") }}
+          </OButton>
         </template>
 
         <!-- Skill fields -->
         <template v-if="form.kind === 'skill'">
-          <div class="text-subtitle1 tw:font-semibold tw:mb-2">{{ t("aiToolset.skillConfig") }}</div>
+          <div class="text-subtitle1 tw:font-semibold tw:mb-2">
+            {{ t("aiToolset.skillConfig") }}
+          </div>
           <div class="tw:mb-1 text-caption text-grey-7">
             {{ t("aiToolset.skillContent") }} *
           </div>
@@ -310,36 +373,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-t-[1px] tw:sticky tw:bottom-0 tw:bg-white dark:tw:bg-[#1a1a1a]"
       >
-        <q-btn
+        <OButton
           data-test="ai-toolset-save-btn"
-          :label="isEditing ? t('common.update') : t('common.save')"
-          class="o2-primary-button tw:h-[36px]"
-          no-caps
-          flat
+          variant="primary"
+          size="sm-action"
           type="submit"
           :loading="saving"
-        />
-        <q-btn
+        >
+          {{ isEditing ? t("common.update") : t("common.save") }}
+        </OButton>
+        <OButton
           data-test="ai-toolset-cancel-btn"
-          :label="t('common.cancel')"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          no-caps
-          flat
+          variant="outline"
+          size="sm-action"
           @click="$emit('cancel:hideform')"
-        />
+        >
+          {{ t("common.cancel") }}
+        </OButton>
       </div>
     </q-form>
   </q-page>
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, ref, watch, onMounted } from "vue";
+import {
+  defineAsyncComponent,
+  defineComponent,
+  ref,
+  watch,
+  onMounted,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 
 const QueryEditor = defineAsyncComponent(
@@ -348,7 +417,7 @@ const QueryEditor = defineAsyncComponent(
 
 export default defineComponent({
   name: "AddAiToolset",
-  components: { QueryEditor },
+  components: { QueryEditor, OButton },
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
     const store = useStore();
@@ -409,8 +478,11 @@ export default defineComponent({
 
     // MCP
     const mcpData = ref({ url: "", timeout_seconds: 30 });
-    const mcpHeaders = ref<Array<{ key: string; value: string; visible: boolean }>>([]);
-    const addHeader = () => mcpHeaders.value.push({ key: "", value: "", visible: false });
+    const mcpHeaders = ref<
+      Array<{ key: string; value: string; visible: boolean }>
+    >([]);
+    const addHeader = () =>
+      mcpHeaders.value.push({ key: "", value: "", visible: false });
     const removeHeader = (i: number) => mcpHeaders.value.splice(i, 1);
 
     // CLI
@@ -421,9 +493,12 @@ export default defineComponent({
       max_output_bytes: 100000,
       requires_confirmation: false,
     });
-    const cliEnvVars = ref<Array<{ key: string; value: string; visible: boolean }>>([]);
+    const cliEnvVars = ref<
+      Array<{ key: string; value: string; visible: boolean }>
+    >([]);
     const cliCredFiles = ref<Array<{ key: string; value: string }>>([]);
-    const addEnvVar = () => cliEnvVars.value.push({ key: "", value: "", visible: false });
+    const addEnvVar = () =>
+      cliEnvVars.value.push({ key: "", value: "", visible: false });
     const removeEnvVar = (i: number) => cliEnvVars.value.splice(i, 1);
     const addCredFile = () => cliCredFiles.value.push({ key: "", value: "" });
     const removeCredFile = (i: number) => cliCredFiles.value.splice(i, 1);
@@ -451,19 +526,24 @@ export default defineComponent({
           mcpData.value.url = data.url || "";
           mcpData.value.timeout_seconds = data.timeout_seconds ?? 30;
           mcpHeaders.value = Object.entries(data.headers || {}).map(
-            ([k, v]) => ({ key: k, value: v as string, visible: false })
+            ([k, v]) => ({ key: k, value: v as string, visible: false }),
           );
         } else if (t.kind === "cli") {
           cliData.value.command = data.command || "";
-          cliData.value.allowed_subcommands_raw = (data.allowed_subcommands || []).join(", ");
+          cliData.value.allowed_subcommands_raw = (
+            data.allowed_subcommands || []
+          ).join(", ");
           cliData.value.timeout_seconds = data.timeout_seconds ?? 30;
           cliData.value.max_output_bytes = data.max_output_bytes ?? 100000;
-          cliData.value.requires_confirmation = data.requires_confirmation ?? false;
-          cliEnvVars.value = Object.entries(data.env || {}).map(
-            ([k, v]) => ({ key: k, value: v as string, visible: false })
-          );
+          cliData.value.requires_confirmation =
+            data.requires_confirmation ?? false;
+          cliEnvVars.value = Object.entries(data.env || {}).map(([k, v]) => ({
+            key: k,
+            value: v as string,
+            visible: false,
+          }));
           cliCredFiles.value = Object.entries(data.credential_files || {}).map(
-            ([k, v]) => ({ key: k, value: v as string })
+            ([k, v]) => ({ key: k, value: v as string }),
           );
         } else if (t.kind === "skill") {
           skillData.value.content = data.content || "";
@@ -489,7 +569,9 @@ export default defineComponent({
         const headers: Record<string, string> = {};
         mcpHeaders.value
           .filter((h) => h.key.trim())
-          .forEach((h) => { headers[h.key.trim()] = h.value; });
+          .forEach((h) => {
+            headers[h.key.trim()] = h.value;
+          });
         return {
           url: mcpData.value.url,
           headers,
@@ -502,9 +584,17 @@ export default defineComponent({
           .map((s) => s.trim())
           .filter(Boolean);
         const env: Record<string, string> = {};
-        cliEnvVars.value.filter((e) => e.key.trim()).forEach((e) => { env[e.key.trim()] = e.value; });
+        cliEnvVars.value
+          .filter((e) => e.key.trim())
+          .forEach((e) => {
+            env[e.key.trim()] = e.value;
+          });
         const credential_files: Record<string, string> = {};
-        cliCredFiles.value.filter((c) => c.key.trim()).forEach((c) => { credential_files[c.key.trim()] = c.value; });
+        cliCredFiles.value
+          .filter((c) => c.key.trim())
+          .forEach((c) => {
+            credential_files[c.key.trim()] = c.value;
+          });
         return {
           command: cliData.value.command,
           ...(allowed.length ? { allowed_subcommands: allowed } : {}),
@@ -543,7 +633,11 @@ export default defineComponent({
             description: form.value.description || undefined,
             data,
           });
-          $q.notify({ type: "positive", message: t("aiToolset.updatedSuccessfully"), timeout: 2000 });
+          $q.notify({
+            type: "positive",
+            message: t("aiToolset.updatedSuccessfully"),
+            timeout: 2000,
+          });
         } else {
           await aiToolsetsService.create(org, {
             name: form.value.name,
@@ -551,13 +645,19 @@ export default defineComponent({
             description: form.value.description || undefined,
             data,
           });
-          $q.notify({ type: "positive", message: t("aiToolset.createdSuccessfully"), timeout: 2000 });
+          $q.notify({
+            type: "positive",
+            message: t("aiToolset.createdSuccessfully"),
+            timeout: 2000,
+          });
         }
         emit("cancel:hideform");
       } catch (err: any) {
         const msg =
           err?.response?.data?.message ||
-          (isEditing.value ? t("aiToolset.updateFailed") : t("aiToolset.createFailed"));
+          (isEditing.value
+            ? t("aiToolset.updateFailed")
+            : t("aiToolset.createFailed"));
         $q.notify({ type: "negative", message: msg, timeout: 4000 });
       } finally {
         saving.value = false;

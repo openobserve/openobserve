@@ -309,6 +309,42 @@ const sharedStubs = {
       '<button data-test="logs-search-bar-share-link-btn" class="share-btn-stub" />',
     props: ["url", "buttonClass", "buttonSize"],
   },
+  // OToggleGroup: stub to render inline without Reka UI context requirements
+  OToggleGroup: {
+    name: "OToggleGroup",
+    template: '<div class="o-toggle-group-stub logs-visualize-toggle button-group" v-bind="$attrs"><slot /></div>',
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+  },
+  // OToggleGroupItem: stub that emits the value up to the parent OToggleGroup
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    template: `<button
+      class="o-toggle-group-item-stub"
+      :class="{ selected: isSelected }"
+      :data-state="isSelected ? 'on' : 'off'"
+      v-bind="$attrs"
+      @click="$parent.$emit('update:modelValue', value)"
+    ><slot name="icon-left" /><slot /></button>`,
+    props: ["value", "size"],
+    computed: {
+      isSelected() {
+        return this.$parent?.modelValue === this.value;
+      },
+    },
+  },
+  // ODropdown stub to render portal content inline
+  ODropdown: {
+    name: "ODropdown",
+    template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+    emits: ["update:open"],
+    props: ["open", "side", "align", "sideOffset"],
+  },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
+    emits: ["select"],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -370,9 +406,8 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find(".button-group.logs-visualize-toggle").exists()).toBe(
-        true,
-      );
+      // OToggleGroup replaces the old .button-group.logs-visualize-toggle div
+      expect(wrapper.find(".o-toggle-group-stub").exists()).toBe(true);
       expect(
         wrapper.find('[data-test="traces-search-mode-traces-btn"]').exists(),
       ).toBe(true);
@@ -802,7 +837,8 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find(".download-logs-btn").exists()).toBe(true);
+      // OButton: the download button uses title="Export Traces" (no .download-logs-btn class)
+      expect(wrapper.find('[title="Export Traces"]').exists()).toBe(true);
     });
 
     it("should be disabled when queryResults.hits is empty", async () => {
@@ -810,9 +846,10 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find(".download-logs-btn").classes()).toContain(
-        "disabled",
-      );
+      // OButton uses native HTML disabled attribute (not a CSS "disabled" class)
+      const btn = wrapper.find('[title="Export Traces"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
     });
 
     it("should be enabled when queryResults.hits has entries", async () => {
@@ -827,9 +864,10 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(wrapper.find(".download-logs-btn").classes()).not.toContain(
-        "disabled",
-      );
+      // OButton: when enabled, native disabled attribute should be absent
+      const btn = wrapper.find('[title="Export Traces"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeUndefined();
     });
   });
 

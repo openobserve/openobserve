@@ -19,9 +19,9 @@ export class CorrelationSettingsPage {
         this.pageTitle = '.general-page-title';
         this.pageSubtitle = '.general-page-subtitle';
 
-        // Tab selectors (Quasar tabs - use role="tab" or .q-tab class)
-        // Note: Quasar tabs use name attribute: services, discovery, alert-correlation, field-aliases
-        this.tabsContainer = '.q-tabs';
+        // Tab selectors (OTabs - render as [role="tablist"] / [role="tab"])
+        // Note: tabs use name attribute: services, discovery, alert-correlation, field-aliases
+        this.tabsContainer = '[role="tablist"]';
         this.servicesTabName = 'Services';
         this.serviceDiscoveryTabName = 'Configuration';
         this.alertCorrelationTabName = 'Alert Correlation';

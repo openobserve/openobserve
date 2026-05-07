@@ -474,8 +474,9 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, {});
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      const qBtn = button.findComponent({ name: "QBtn" });
-      expect(qBtn.props("icon")).toBe("chevron_right");
+      // OButton renders q-icon as a Quasar icon span inside the button
+      // When collapsed, expandedSections[item.id] is falsy → chevron_right
+      expect(button.html()).toContain("chevron_right");
     });
 
     it("should show expand_more icon when expanded", () => {
@@ -483,8 +484,9 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      const qBtn = button.findComponent({ name: "QBtn" });
-      expect(qBtn.props("icon")).toBe("expand_more");
+      // OButton renders q-icon as a Quasar icon span inside the button
+      // When expanded, expandedSections[item.id] is truthy → expand_more
+      expect(button.html()).toContain("expand_more");
     });
 
     it("should emit toggle-section when clicking expand button", async () => {

@@ -1,33 +1,31 @@
 <template>
   <div data-test="add-stream-fields-section">
     <div v-if="showHeader" data-test="alert-conditions-text" class="text-bold">
-      {{ t('logStream.fields') }}
+      {{ t("logStream.fields") }}
     </div>
     <template v-if="!fields.length">
-      <q-btn
+      <OButton
         data-test="add-stream-add-field-btn"
-        color="primary"
-        class="q-mt-sm text-bold add-field"
-        :label="t('logStream.addField')"
-        size="sm"
-        icon="add"
-        style="
-          border-radius: 4px;
-          text-transform: capitalize;
-          background: #f2f2f2 !important;
-          color: #000 !important;
-        "
+        variant="outline"
+        size="sm-action"
+        class="q-mt-sm"
         @click="addApiHeader"
-      />
+      >
+        <Plus :size="14" class="tw:mr-1" />
+        {{ t("logStream.addField") }}
+      </OButton>
     </template>
     <template v-else>
       <div
-        v-for="(field, index) in (fields as any)"
+        v-for="(field, index) in fields as any"
         :key="field.uuid"
         class="flex justify-start items-end q-col-gutter-sm"
         :data-test="`alert-conditions-${index + 1}`"
       >
-        <div data-test="add-stream-field-name-input" class="q-ml-none o2-input flex items-center ">
+        <div
+          data-test="add-stream-field-name-input"
+          class="q-ml-none o2-input flex items-center"
+        >
           <q-input
             v-model="field.name"
             :placeholder="t('logStream.fieldName') + ' *'"
@@ -35,7 +33,9 @@
             stack-label
             borderless
             dense
-            :rules="[(val: any) => !!val.trim() || t('logStream.fieldRequired')]"
+            :rules="[
+              (val: any) => !!val.trim() || t('logStream.fieldRequired'),
+            ]"
             tabindex="0"
             :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
@@ -83,7 +83,11 @@
             use-input
             fill-input
             style="width: 250px"
-            :placeholder="!isFocused && (!field.index_type || field.index_type.length === 0) ? t('logStream.indexType') : ''"
+            :placeholder="
+              !isFocused && (!field.index_type || field.index_type.length === 0)
+                ? t('logStream.indexType')
+                : ''
+            "
             @update:model-value="emits('input:update', 'conditions', field)"
             @focus="handleFocus"
             @blur="handleBlur"
@@ -109,46 +113,42 @@
             hide-selected
             emit-value
             style="width: 250px"
-            :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? t('logStream.dataType') + ' *' : ''"
+            :placeholder="
+              !isDataTypeFocused && (!field.type || field.type.length === 0)
+                ? t('logStream.dataType') + ' *'
+                : ''
+            "
             :rules="[(val: any) => !!val || t('logStream.dataTypeRequired')]"
             @update:model-value="emits('input:update', 'conditions', field)"
             @focus="handleDataTypeFocus"
             @blur="handleDataTypeBlur"
           />
         </div>
-        <div
-          class="q-ml-none "
-          style="margin-bottom: 8px;"
-        >
-          <q-btn
+        <div class="q-ml-none" style="margin-bottom: 8px">
+          <OButton
             data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
-            icon="add"
-            class="q-ml-xs "
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            flat
-            :disable="field.name === '' ||  (fields.length === 1 && field.name == '' )"
+            variant="outline"
+            size="icon-sm"
+            class="q-ml-xs"
+            :disabled="
+              field.name === '' || (fields.length === 1 && field.name == '')
+            "
             :title="t('alert_templates.edit')"
             @click="addApiHeader()"
-            style="min-width: auto;border: 1px solid #5960B2; color: #5960B2;"
-          />
-          <q-btn
+          >
+            <Plus :size="14" />
+          </OButton>
+          <OButton
             data-test="add-stream-delete-field-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs "
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            flat
-            
+            variant="outline-destructive"
+            size="icon-sm"
+            class="q-ml-xs"
             :title="t('alert_templates.edit')"
             @click="deleteApiHeader(field, index)"
-            style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
-          />
+          >
+            <Trash2 :size="14" />
+          </OButton>
         </div>
       </div>
     </template>
@@ -160,6 +160,8 @@ import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Plus, Trash2 } from "lucide-vue-next";
 
 defineProps({
   fields: {
@@ -227,10 +229,9 @@ const store = useStore();
 
 const { t } = useI18n();
 
-const isFocused = ref(false)
+const isFocused = ref(false);
 //repetitive need to refactor
-const isDataTypeFocused = ref(false)
-
+const isDataTypeFocused = ref(false);
 
 const deleteApiHeader = (field: any, index: number) => {
   emits("remove", field, index);
@@ -252,22 +253,29 @@ const disableOptions = (schema: any, option: any) => {
     }
     selectedIndices += schema.index_type[i];
   }
-  if(selectedIndices.includes('prefixPartition') && option.value.includes('keyPartition')){
-        return true;
-      }
-  if(selectedIndices.includes('keyPartition') && option.value.includes('prefixPartition')){
+  if (
+    selectedIndices.includes("prefixPartition") &&
+    option.value.includes("keyPartition")
+  ) {
+    return true;
+  }
+  if (
+    selectedIndices.includes("keyPartition") &&
+    option.value.includes("prefixPartition")
+  ) {
     return true;
   }
   if (
     selectedIndices.includes("hashPartition") &&
     selectedHashPartition !== option.value &&
     (option.value.includes("hashPartition") ||
-      option.value.includes("keyPartition") || option.value.includes("prefixPartition"))
-
+      option.value.includes("keyPartition") ||
+      option.value.includes("prefixPartition"))
   )
     return true;
   if (
-    ( selectedIndices.includes("keyPartition") || selectedIndices.includes("prefixPartition"))&&
+    (selectedIndices.includes("keyPartition") ||
+      selectedIndices.includes("prefixPartition")) &&
     option.value.includes("hashPartition")
   )
     return true;
@@ -275,21 +283,20 @@ const disableOptions = (schema: any, option: any) => {
   return false;
 };
 
-
 const handleFocus = () => {
-  isFocused.value = true
-}
+  isFocused.value = true;
+};
 
 const handleBlur = () => {
-  isFocused.value = false
-}
+  isFocused.value = false;
+};
 const handleDataTypeFocus = () => {
-  isDataTypeFocused.value = true
-}
+  isDataTypeFocused.value = true;
+};
 
 const handleDataTypeBlur = () => {
-  isDataTypeFocused.value = false
-}
+  isDataTypeFocused.value = false;
+};
 
 // Expose methods and data for testing
 defineExpose({
@@ -305,7 +312,7 @@ defineExpose({
   isFocused,
   isDataTypeFocused,
   store,
-  t
+  t,
 });
 </script>
 

@@ -63,13 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="row justify-between q-pa-md tw:mt-[18px] ">
-      <q-btn
-        :label="t('billing.contactLabel')"
-        text-color="white"
-        class="full-width bg-primary text-capitalize text-bold text-subtitle1"
-        flat
+      <OButton
+        variant="primary"
+        size="sm-action"
+        block
         @click="contactSales"
-      />
+      >
+        {{ t('billing.contactLabel') }}
+      </OButton>
     </div>
   </q-card>
 </template>
@@ -78,9 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { siteURL } from "@/constants/config";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 export default defineComponent({
   name: "enterprisePlan",
+  components: { OButton },
   props: ["features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();

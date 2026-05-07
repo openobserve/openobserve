@@ -153,7 +153,7 @@ describe("MemberInvitation Component", () => {
       expect(emailInput.exists()).toBe(true);
       
       await emailInput.setValue("invalid-email");
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
       
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
@@ -169,7 +169,7 @@ describe("MemberInvitation Component", () => {
       expect(emailInput.exists()).toBe(true);
       
       await emailInput.setValue("test1@example.com; invalid-email, test2@example.com");
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
       
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
@@ -194,7 +194,7 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
       
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -221,7 +221,7 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
@@ -248,7 +248,7 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
@@ -273,7 +273,7 @@ describe("MemberInvitation Component", () => {
         }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(segment.track).toHaveBeenCalledWith(
@@ -296,7 +296,7 @@ describe("MemberInvitation Component", () => {
       await emailInput.setValue("");
       await nextTick();
       
-      const inviteButton = wrapper.find('.q-btn');
+      const inviteButton = wrapper.find('button[data-o2-btn]');
       expect(inviteButton.attributes('disabled')).toBeDefined();
     });
 
@@ -307,7 +307,7 @@ describe("MemberInvitation Component", () => {
       await emailInput.setValue("test@example.com");
       await nextTick();
       
-      const inviteButton = wrapper.find('.q-btn');
+      const inviteButton = wrapper.find('button[data-o2-btn]');
       expect(inviteButton.attributes('disabled')).toBeUndefined();
     });
 
@@ -330,7 +330,7 @@ describe("MemberInvitation Component", () => {
       const error = new Error("Network error");
       vi.mocked(organizationsService.add_members).mockRejectedValue(error);
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
@@ -368,7 +368,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -393,7 +393,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -413,7 +413,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(organizationsService.add_members).toHaveBeenCalledWith(
@@ -453,7 +453,7 @@ describe("MemberInvitation Component", () => {
         new Promise(resolve => setTimeout(() => resolve({ data: { data: {}, message: "Success" } }), 100))
       );
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       
       expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -475,7 +475,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(dismissMock).toHaveBeenCalled();
@@ -572,7 +572,7 @@ describe("MemberInvitation Component", () => {
         data: { data: {}, message: "Success" }
       });
 
-      await wrapper.find('.q-btn').trigger('click');
+      await wrapper.find('button[data-o2-btn]').trigger('click');
       await flushPromises();
 
       expect(wrapper.vm.userEmail).toBe("");

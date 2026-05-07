@@ -15,35 +15,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="show" class="flex items-center o2-tabs">
-    <div
-      :key="tab.value + tab.disabled"
-      v-for="tab in tabs as Tab[]"
-      class="cursor-pointer"
+  <OToggleGroup
+    v-if="show"
+    :model-value="activeTab"
+    @update:model-value="onSelect"
+  >
+    <OToggleGroupItem
+      v-for="tab in visibleTabs"
+      :key="tab.value"
+      :value="tab.value"
+      :disabled="tab.disabled ?? false"
+      :size="size"
+      :title="tab.title ?? tab.label"
+      :style="tab.style"
+      :data-test="`tab-${tab.value}`"
     >
-      <div
-        :data-test="`tab-${tab.value}`"
-        class="q-px-lg q-py-sm o2-tab text-center"
-        :style="tab.style"
-        :title="tab.title || tab.label"
-        :class="[
-          activeTab === tab.value ? 'active text-primary' : '',
-          tab.disabled && 'disabled',
-          tab.hide && 'hidden',
-          activeTab !== tab.value ? 'inactive' : ''
-        ]"
-        @click="changeTab(tab)"
-      >
-        {{ tab.label }}
-        <q-tooltip v-if="tab.tooltipLabel">
-          {{ tab.tooltipLabel }}
-        </q-tooltip>
-      </div>
-    </div>
-  </div>
+      <template v-if="tab.icon" #icon-left>
+        <component :is="tab.icon" class="tw:size-3.5 tw:shrink-0" />
+      </template>
+      {{ tab.label }}
+      <q-tooltip v-if="tab.tooltipLabel">{{ tab.tooltipLabel }}</q-tooltip>
+    </OToggleGroupItem>
+  </OToggleGroup>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+import type { Component } from "vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import type { ToggleGroupItemSize } from "@/lib/core/ToggleGroup/OToggleGroupItem.types";
+
 interface Tab {
   label: string;
   value: string;
@@ -52,42 +54,30 @@ interface Tab {
   title?: string;
   tooltipLabel?: string;
   hide?: boolean;
+  icon?: Component;
 }
 
 const emit = defineEmits(["update:activeTab"]);
-const props = defineProps({
-  show: {
-    type: Boolean,
-    default: true,
-  },
-  tabs: {
-    type: Array,
-    required: true,
-  },
-  activeTab: {
-    type: String,
-    required: true,
-  },
-});
 
-const changeTab = (tab: Tab) => {
-  if (tab.disabled || tab.hide) return;
-  emit("update:activeTab", tab.value);
+const props = withDefaults(
+  defineProps<{
+    show?: boolean;
+    tabs: Tab[];
+    activeTab: string;
+    size?: ToggleGroupItemSize;
+  }>(),
+  {
+    show: true,
+    size: "sm",
+  }
+);
+
+const visibleTabs = computed(() =>
+  (props.tabs as Tab[]).filter((t) => !t.hide)
+);
+
+const onSelect = (value: unknown) => {
+  if (!value) return;
+  emit("update:activeTab", value);
 };
 </script>
-
-<style lang="scss" scoped>
-.o2-tabs {
-  .o2-tab {
-    border-bottom: 2px solid transparent;
-    width: auto;
-    min-width: 80px;
-    white-space: nowrap;
-  }
-  .active {
-    border-bottom: 2px solid var(--o2-primary-btn-bg);
-    background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-    color: var(--o2-card-text) !important;
-  }
-}
-</style>

@@ -76,6 +76,17 @@ describe("FunctionSelector", () => {
             template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
             props: ["icon", "class"],
           },
+          ODropdown: {
+            name: "ODropdown",
+            template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+            emits: ["update:open"],
+            props: ["open", "side", "align", "sideOffset"],
+          },
+          ODropdownItem: {
+            name: "ODropdownItem",
+            template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+            emits: ["select"],
+          },
           "q-tooltip": {
             template: '<div class="q-tooltip"><slot /></div>',
             props: ["class", "offset", "delay"],

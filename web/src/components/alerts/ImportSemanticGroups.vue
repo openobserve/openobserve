@@ -62,16 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-file>
             </div>
             <div class="col-12 col-md-4 text-right q-pl-sm">
-              <q-btn
+              <OButton
                 v-if="diffData"
-                label="Apply Changes"
-                color="primary"
+                variant="primary"
+                size="sm"
                 @click="applyChanges"
                 :disable="!hasSelectedChanges"
                 :loading="isApplying"
-                size="sm"
-                no-caps
-              />
+              >Apply Changes</OButton>
             </div>
           </div>
         </div>
@@ -97,35 +95,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-chip>
               </div>
               <div class="col">
-                <q-btn-group flat class="float-right">
-                  <q-btn
-                    flat
-                    dense
-                    label="Select All New"
+                <OButtonGroup class="float-right">
+                  <OButton
+                    variant="ghost-primary"
+                    size="xs"
                     @click="selectAllAdditions"
-                    color="positive"
-                    size="sm"
-                    class="action-btn"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    label="Select All Modified"
+                  >Select All New</OButton>
+                  <OButton
+                    variant="ghost-warning"
+                    size="xs"
                     @click="selectAllModifications"
-                    color="warning"
-                    size="sm"
-                    class="action-btn"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    label="Clear All"
+                  >Select All Modified</OButton>
+                  <OButton
+                    variant="ghost-muted"
+                    size="xs"
                     @click="deselectAll"
-                    color="grey-7"
-                    size="sm"
-                    class="action-btn"
-                  />
-                </q-btn-group>
+                  >Clear All</OButton>
+                </OButtonGroup>
               </div>
             </div>
           </div>
@@ -164,14 +150,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
-                    <q-btn
-                      flat
-                      dense
-                      round
-                      icon="visibility"
-                      size="xs"
+                    <OButton
+                      variant="ghost"
+                      size="icon-circle-sm"
                       @click.stop="viewGroup(group)"
-                    />
+                    >
+                      <q-icon name="visibility" />
+                    </OButton>
                   </q-item-section>
                 </q-item>
               </q-list>
@@ -208,14 +193,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
-                    <q-btn
-                      flat
-                      dense
-                      round
-                      icon="compare"
-                      size="xs"
+                    <OButton
+                      variant="ghost"
+                      size="icon-circle-sm"
                       @click.stop="viewModification(mod)"
-                    />
+                    >
+                      <q-icon name="compare" />
+                    </OButton>
                   </q-item-section>
                 </q-item>
               </q-list>
@@ -288,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
+        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -343,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
+        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -351,6 +335,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";

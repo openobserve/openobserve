@@ -15,49 +15,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :class="isCompact ? '' : 'q-pl-sm float-left'">
+  <div :class="isCompact ? 'tw:flex tw:items-center' : 'q-pl-sm float-left'">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
-    <q-btn
+    <OButton
       v-if="isCompact"
       data-test="logs-search-bar-refresh-interval-btn"
-      flat
-      dense
-      no-caps
-      :class="[
-        'compact-refresh-btn',
-        isAnimating ? 'active-refresh-btn' : ''
-      ]"
+      size="icon-toolbar"
+      variant="outline"
+      :active="isAnimating"
     >
       <q-icon
         name="update"
-        :class="[
-          isAnimating ? 'rotating-icon' : '',
-          isAnimating ? 'text-white' : ''
-        ]"
+        :class="isAnimating ? 'rotating-icon' : ''"
         size="18px"
       />
       <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-        {{ t('search.autoRefresh') }}: {{ selectedLabel }}
+        {{ t("search.autoRefresh") }}: {{ selectedLabel }}
       </q-tooltip>
 
       <!-- Dropdown menu for interval selection -->
       <q-menu content-style="z-index: 10001">
         <div class="row">
-          <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
-            <q-btn
+          <div
+            class="col col-12 q-pa-sm"
+            style="text-align: center; width: 300px"
+          >
+            <OButton
               data-test="logs-search-off-refresh-interval"
-              no-caps
-              :flat="modelValue.toString() !== '0'"
-              size="md"
-              :class="
-                'no-border full-width ' +
-                (modelValue.toString() === '0' ? 'selected' : '')
-              "
+              :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
+              size="sm"
+              :block="true"
               v-close-popup="true"
               @click="onItemClick({ label: t('common.off'), value: 0 })"
             >
               {{ t("common.off") }}
-            </q-btn>
+            </OButton>
           </div>
         </div>
         <q-separator />
@@ -68,18 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col col-4 q-pa-sm"
             style="text-align: center"
           >
-            <q-btn
+            <OButton
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
-              no-caps
-              :flat="Number(modelValue) !== item.value"
-              size="md"
-              :class="[
-                'no-border ' +
-                  (Number(modelValue) === item.value ? 'selected' : ''),
-              ]"
+              :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
+              size="sm"
               @click="onItemClick(item)"
               v-close-popup="true"
-              :disable="item.disabled"
+              :disabled="item.disabled"
             >
               <q-tooltip
                 v-if="item.disabled"
@@ -91,87 +78,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ minRangeRestrictionMessageVal }}
               </q-tooltip>
               {{ item.label }}
-            </q-btn>
+            </OButton>
           </div>
         </div>
       </q-menu>
-    </q-btn>
+    </OButton>
 
     <!-- Full mode: Dropdown with label -->
-    <q-btn-dropdown
+    <ODropdown
       v-else
-      data-test="logs-search-bar-refresh-interval-btn-dropdown"
-      v-model="btnRefreshInterval"
-      no-caps
-      class="q-pa-xs element-box-shadow el-border"
-      content-style="z-index: 10001"
+      v-model:open="btnRefreshInterval"
+      side="bottom"
+      align="start"
     >
-      <template v-slot:label>
-        <div class="row items-center no-wrap">
-          <q-icon
-            left
-            name="update"
-            :class="[
-              isAnimating ? 'rotating-icon' : '',
-              isAnimating ? 'text-primary' : ''
-            ]"
-          />
-          <div class="text-center">{{ selectedLabel }}</div>
-        </div>
-      </template>
-      <div class="row">
-        <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
-          <q-btn
-            data-test="logs-search-off-refresh-interval"
-            no-caps
-            :flat="modelValue.toString() !== '0'"
-            size="md"
-            :class="
-              'no-border full-width ' +
-              (modelValue.toString() === '0' ? 'selected' : '')
-            "
-            v-close-popup="true"
-            @click="onItemClick({ label: t('common.off'), value: 0 })"
-          >
-            {{ t("common.off") }}
-          </q-btn>
-        </div>
-      </div>
-      <q-separator />
-      <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
-        <div
-          v-for="(item, j) in items"
-          :key="'col_' + i + '_' + j"
-          class="col col-4 q-pa-sm"
-          style="text-align: center"
+      <template #trigger>
+        <OButton
+          data-test="logs-search-bar-refresh-interval-btn-dropdown"
+          variant="outline"
+          size="sm-toolbar"
         >
-          <q-btn
-            :data-test="`logs-search-bar-refresh-time-${item.value}`"
-            no-caps
-            :flat="Number(modelValue) !== item.value"
-            size="md"
-            :class="[
-              'no-border ' +
-                (Number(modelValue) === item.value ? 'selected' : ''),
-            ]"
-            @click="onItemClick(item)"
-            v-close-popup="true"
-            :disable="item.disabled"
+          <div class="row items-center no-wrap">
+            <q-icon
+              left
+              name="update"
+              :class="[
+                isAnimating ? 'rotating-icon' : '',
+                isAnimating ? 'text-primary' : '',
+              ]"
+            />
+            <div class="text-center">{{ selectedLabel }}</div>
+            <q-icon
+              name="arrow_drop_down"
+              size="16px"
+              class="tw:ml-0.5"
+            />
+          </div>
+        </OButton>
+      </template>
+      <div class="tw:w-[300px] tw:p-2">
+        <div class="row">
+          <div
+            class="col col-12 q-pa-sm"
+            style="text-align: center"
           >
-            <q-tooltip
-              v-if="item.disabled"
-              style="z-index: 10001; font-size: 14px"
-              anchor="center right"
-              self="center left"
-              max-width="300px"
+            <OButton
+              data-test="logs-search-off-refresh-interval"
+              :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
+              size="sm"
+              :block="true"
+              @click="() => { onItemClick({ label: t('common.off'), value: 0 }); btnRefreshInterval = false; }"
             >
-              {{ minRangeRestrictionMessageVal }}
-            </q-tooltip>
-            {{ item.label }}
-          </q-btn>
+              {{ t("common.off") }}
+            </OButton>
+          </div>
+        </div>
+        <ODropdownSeparator />
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+          <div
+            v-for="(item, j) in items"
+            :key="'col_' + i + '_' + j"
+            class="col col-4 q-pa-sm"
+            style="text-align: center"
+          >
+            <OButton
+              :data-test="`logs-search-bar-refresh-time-${item.value}`"
+              :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
+              size="sm"
+              @click="() => { onItemClick(item); btnRefreshInterval = false; }"
+              :disabled="item.disabled"
+            >
+              <q-tooltip
+                v-if="item.disabled"
+                style="z-index: 10001; font-size: 14px"
+                anchor="center right"
+                self="center left"
+                max-width="300px"
+              >
+                {{ minRangeRestrictionMessageVal }}
+              </q-tooltip>
+              {{ item.label }}
+            </OButton>
+          </div>
         </div>
       </div>
-    </q-btn-dropdown>
+    </ODropdown>
   </div>
 </template>
 
@@ -189,9 +179,13 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { generateDurationLabel } from "../utils/date";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
+  components: { OButton, ODropdown, ODropdownSeparator },
   props: {
     modelValue: {
       type: Number,
@@ -267,7 +261,9 @@ export default defineComponent({
       }
 
       // Find the label from refreshTimes
-      const found = refreshTimes.value.flat().find((it: any) => it.value == selectedValue.value);
+      const found = refreshTimes.value
+        .flat()
+        .find((it: any) => it.value == selectedValue.value);
       return found?.label || generateDurationLabel(selectedValue.value);
     });
 
@@ -344,7 +340,10 @@ export default defineComponent({
           item.disabled = isDisabled(item.value);
         });
       });
-      minRangeRestrictionMessageVal.value = t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval });
+      minRangeRestrictionMessageVal.value = t(
+        "common.minRefreshIntervalMessage",
+        { interval: props.minRefreshInterval },
+      );
     };
 
     onMounted(() => {
@@ -385,25 +384,6 @@ export default defineComponent({
   min-height: 30px;
   line-height: 30px;
   padding: 0px 5px;
-}
-
-.compact-refresh-btn {
-  min-width: 24px !important;
-  height: 28px !important;
-  padding: 2px 4px !important;
-  border: 1px solid var(--o2-border-color) !important;
-  border-radius: 4px !important;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.active-refresh-btn {
-  background-color: var(--q-primary) !important;
-  border-color: var(--q-primary) !important;
-}
-
-.active-refresh-btn:hover {
-  background-color: var(--q-primary) !important;
-  opacity: 0.9;
 }
 
 @keyframes rotate {
