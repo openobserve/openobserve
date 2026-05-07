@@ -124,7 +124,8 @@
     "create": "创建",
     "resources": "资源",
     "updated_at": "更新于",
-    "error": "错误"
+    "error": "错误",
+    "db": "数据库"
   },
   "search": {
     "selectIndex": "选择数据流",
