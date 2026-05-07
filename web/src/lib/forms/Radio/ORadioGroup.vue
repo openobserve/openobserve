@@ -8,7 +8,7 @@ import type {
 } from "./ORadio.types";
 import { RadioGroupRoot } from "reka-ui";
 
-const props = withDefaults(defineProps<RadioGroupProps>(), {
+withDefaults(defineProps<RadioGroupProps>(), {
   disabled: false,
   orientation: "vertical",
 });

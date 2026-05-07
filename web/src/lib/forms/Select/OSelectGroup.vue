@@ -4,7 +4,7 @@
 import type { SelectGroupProps, SelectGroupSlots } from "./OSelect.types";
 import { SelectGroup, SelectLabel } from "reka-ui";
 
-const props = defineProps<SelectGroupProps>();
+defineProps<SelectGroupProps>();
 
 defineSlots<SelectGroupSlots>();
 </script>

@@ -13,7 +13,7 @@
 import type { RadioProps, RadioSlots } from "./ORadio.types";
 import { RadioGroupItem, RadioGroupIndicator } from "reka-ui";
 
-const props = withDefaults(defineProps<RadioProps>(), {
+withDefaults(defineProps<RadioProps>(), {
   size: "md",
   disabled: false,
 });

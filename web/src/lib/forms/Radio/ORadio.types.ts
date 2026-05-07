@@ -16,7 +16,7 @@ export interface RadioGroupProps {
 }
 
 export interface RadioGroupEmits {
-  (e: "update:modelValue", value: string | number | boolean): void;
+  (_e: "update:modelValue", _value: string | number | boolean): void;
 }
 
 export interface RadioGroupSlots {

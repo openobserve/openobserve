@@ -39,18 +39,25 @@ export interface SelectProps {
   id?: string;
   /** HTML name */
   name?: string;
+  /**
+   * Override the component width.
+   * Pass a number for pixels (e.g. `:width="200"` → `200px`)
+   * or a CSS string (e.g. `width="50%"` / `width="12rem"`).
+   * Defaults to `100%` (fills the container).
+   */
+  width?: string | number;
 }
 
 export interface SelectEmits {
-  (e: "update:modelValue", value: string | number | undefined): void;
-  (e: "clear"): void;
+  (_e: "update:modelValue", _value: string | number | undefined): void;
+  (_e: "clear"): void;
 }
 
 export interface SelectSlots {
   /** Custom options — render OSelectItem / OSelectGroup nodes here */
   default?: () => unknown;
   /** Custom trigger content — overrides the default value display */
-  trigger?: (scope: { value: string | number | undefined }) => unknown;
+  trigger?: (_scope: { value: string | number | undefined }) => unknown;
 }
 
 // ── Item ─────────────────────────────────────────────────────────────────

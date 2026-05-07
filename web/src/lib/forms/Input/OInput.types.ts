@@ -51,16 +51,23 @@ export interface InputProps {
   name?: string;
   /** HTML autocomplete */
   autocomplete?: string;
+  /**
+   * Override the component width.
+   * Pass a number for pixels (e.g. `:width="200"` → `200px`)
+   * or a CSS string (e.g. `width="50%"` / `width="12rem"`).
+   * Defaults to `100%` (fills the container).
+   */
+  width?: string | number;
 }
 
 export interface InputEmits {
-  (e: "update:modelValue", value: string | number): void;
-  (e: "clear"): void;
-  (e: "blur", event: FocusEvent): void;
-  (e: "focus", event: FocusEvent): void;
-  (e: "keydown", event: KeyboardEvent): void;
-  (e: "keyup", event: KeyboardEvent): void;
-  (e: "keypress", event: KeyboardEvent): void;
+  (_e: "update:modelValue", _value: string | number): void;
+  (_e: "clear"): void;
+  (_e: "blur", _event: FocusEvent): void;
+  (_e: "focus", _event: FocusEvent): void;
+  (_e: "keydown", _event: KeyboardEvent): void;
+  (_e: "keyup", _event: KeyboardEvent): void;
+  (_e: "keypress", _event: KeyboardEvent): void;
 }
 
 export interface InputSlots {
@@ -80,14 +87,21 @@ export interface InputSlots {
 // placeholder before a real value has been chosen.
 
 export interface InputDisplayProps {
-  /** Label above the stub */
+  /** Label above the field */
   label?: string;
   /** Placeholder text when no content is slotted */
   placeholder?: string;
-  /** Marks the stub as disabled */
+  /** Marks the field as disabled */
   disabled?: boolean;
   /** Control size */
   size?: InputSize;
+  /**
+   * Override the component width.
+   * Pass a number for pixels (e.g. `:width="200"` → `200px`)
+   * or a CSS string (e.g. `width="50%"` / `width="12rem"`).
+   * Defaults to `100%` (fills the container).
+   */
+  width?: string | number;
 }
 
 export interface InputDisplaySlots {
