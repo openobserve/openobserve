@@ -1893,6 +1893,31 @@ export class LogsPage {
         return await this.logsQueryPage.enableAutoRun();
     }
 
+    /**
+     * After a mode change (SQL/FTS toggle), either wait for the auto-run that
+     * fires automatically on cloud envs, or trigger the query explicitly on
+     * local envs where auto_query_enabled=false.
+     */
+    async runQueryAfterModeChange(timeout = 60000) {
+        if (await this.logsQueryPage._isAutoQueryEnabled()) {
+            // Auto-run fires after mode switch — wait for the button to return
+            // to "Run Query" (not disabled / loading / Cancel) before asserting.
+            await this.page.waitForFunction(
+                (sel) => {
+                    const b = document.querySelector(sel);
+                    if (!b) return false;
+                    return !b.hasAttribute('disabled')
+                        && !b.classList.contains('q-btn--loading')
+                        && !(b.textContent?.trim()?.includes('Cancel'));
+                },
+                this.queryButton,
+                { timeout }
+            ).catch(() => {});
+        } else {
+            await this.runQueryAndWaitForResults(timeout);
+        }
+    }
+
     // Login methods - delegate to LoginPage
     async loginAsInternalUser() {
         return await this.loginPage.loginAsInternalUser();

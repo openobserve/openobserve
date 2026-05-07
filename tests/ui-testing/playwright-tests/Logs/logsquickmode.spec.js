@@ -167,6 +167,8 @@ test.describe("Logs Quickmode testcases", () => {
     await pm.logsPage.clickInterestingFieldButton("level");
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.waitForQueryEditorTextbox();
+    await pm.logsPage.runQueryAfterModeChange();
+    await pm.logsPage.waitForSearchResults();
     await pm.logsPage.expectLogTableColumnSourceVisible();
     await pm.logsPage.clickInterestingFieldButton("level");
     await pm.logsPage.expectQueryEditorNotContainsText("level");
@@ -205,7 +207,7 @@ test.describe("Logs Quickmode testcases", () => {
     await pm.logsPage.clickSQLModeToggle();
     testLogger.info('Validated: switched to SQL mode');
     await pm.logsPage.waitForQueryEditorTextbox();
-    testLogger.info('Validated: SQL query editor is ready — auto-run triggered by mode switch');
+    await pm.logsPage.runQueryAfterModeChange();
     await pm.logsPage.waitForSearchResults();
     testLogger.info('Validated: search results loaded');
     await pm.logsPage.expectExactTextVisible("source");
