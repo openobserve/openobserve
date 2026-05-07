@@ -35,64 +35,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              :label="t('settings.extendTrial')"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
-              size="sm"
-              padding="xs"
-              text-color="primary"
-              data-test="otg-management-extend-trial-btn"
-              @click.stop="toggleExtendTrialDialog(props.row)"
-            ></q-btn>
-            <q-btn
-              v-if="props.row.billing_provider === '-'"
-              label="Add Contract"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
-              size="sm"
-              padding="xs"
-              text-color="positive"
-              data-test="org-management-add-contract-btn"
-              @click.stop="toggleContractDialog(props.row, 'create')"
-            ></q-btn>
-            <q-btn
-              v-if="props.row.billing_provider === 'no_op'"
-              label="Extend Contract"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
-              size="sm"
-              padding="xs"
-              text-color="positive"
-              data-test="org-management-extend-contract-btn"
-              @click.stop="toggleContractDialog(props.row, 'extend')"
-            ></q-btn>
-            <q-btn
-              v-if="props.row.billing_provider === 'no_op'"
-              label="Revoke"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
-              size="sm"
-              padding="xs"
-              text-color="negative"
-              data-test="org-management-revoke-contract-btn"
-              @click.stop="confirmRevokeContract(props.row)"
-            ></q-btn>
-            <q-btn
-              :label="props.row.org_storage_enabled ? 'Disable Storage' : 'Enable Storage'"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
-              size="sm"
-              padding="xs"
-              :text-color="props.row.org_storage_enabled ? 'negative' : 'positive'"
-              data-test="org-management-storage-toggle-btn"
-              @click.stop="toggleOrgStorage(props.row)"
-            ></q-btn>
+            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+              <q-btn
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="event"
+                :title="t('settings.extendTrial')"
+                data-test="otg-management-extend-trial-btn"
+                @click.stop="toggleExtendTrialDialog(props.row)"
+              />
+              <q-btn
+                v-if="props.row.billing_provider === '-'"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="note_add"
+                title="Add Contract"
+                data-test="org-management-add-contract-btn"
+                @click.stop="toggleContractDialog(props.row, 'create')"
+              />
+              <q-btn
+                v-if="props.row.billing_provider === 'no_op'"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="event"
+                title="Extend Contract"
+                data-test="org-management-extend-contract-btn"
+                @click.stop="toggleContractDialog(props.row, 'extend')"
+              />
+              <q-btn
+                v-if="props.row.billing_provider === 'no_op'"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                icon="block"
+                title="Revoke"
+                data-test="org-management-revoke-contract-btn"
+                @click.stop="confirmRevokeContract(props.row)"
+              />
+              <q-btn
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :icon="props.row.org_storage_enabled ? 'cloud_off' : 'cloud_upload'"
+                :title="props.row.org_storage_enabled ? 'Disable Storage' : 'Enable Storage'"
+                data-test="org-management-storage-toggle-btn"
+                @click.stop="toggleOrgStorage(props.row)"
+              />
+            </div>
           </q-td>
         </template>
         <template #top="scope">
@@ -368,7 +370,8 @@ export default defineComponent({
         label: t("settings.actions"),
         align: "center",
         sortable: false,
-        style: "width: 430px",
+        classes: "actions-column",
+        style: "width: 220px",
       },
     ]);
     const perPageOptions: any = [
