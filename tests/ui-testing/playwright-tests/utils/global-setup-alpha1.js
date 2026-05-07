@@ -83,16 +83,14 @@ async function globalSetup() {
     try {
       await performDexLogin(page, baseUrl, userEmail, userPassword);
 
-      // Navigate to the correct org before saving auth state
-      // Dex login lands on the user's default org (e.g. automation_dashboard)
-      // but tests need to run against the org specified by ORGNAME env var
+      // Switch to target org via UI dropdown — URL ?org_identifier=... alone
+      // does NOT update the Pinia store, so API calls keep using the user's
+      // default org. The dropdown click triggers the proper store update,
+      // and the active org is then persisted in cookies/localStorage which
+      // storageState captures below.
       const targetOrg = process.env.ORGNAME;
       if (targetOrg && targetOrg !== 'default') {
-        const orgUrl = `${baseUrl}/web/?org_identifier=${targetOrg}`;
-        testLogger.info(`[alpha1] Switching to target org: ${targetOrg}`);
-        await page.goto(orgUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        testLogger.info(`[alpha1] Now on: ${page.url()}`);
+        await switchOrgViaDropdown(page, targetOrg);
       }
 
       await context.storageState({ path: AUTH_FILE });
@@ -353,6 +351,71 @@ async function submitDexLoginForm(page) {
 }
 
 /**
+ * Switch the active org via the navbar dropdown — necessary because the
+ * Pinia store binds API calls to whatever org was loaded at login. Setting
+ * ?org_identifier=... in the URL does NOT update the store; only the
+ * dropdown click flow does.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} targetOrgId  org identifier from ORGNAME env (e.g. 3B4JlN…)
+ */
+async function switchOrgViaDropdown(page, targetOrgId) {
+  testLogger.info(`[alpha1] Switching active org to: ${targetOrgId}`);
+
+  // Land on /web/ so the navbar (and its org dropdown) renders
+  const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+  await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: 20000 });
+  await page.waitForTimeout(2000); // navbar dropdown needs SPA hydration
+
+  // Map identifier → org name (dropdown options are by name, not identifier)
+  const orgs = await page.evaluate(async () => {
+    const r = await fetch('/api/organizations?page_num=0&page_size=100');
+    return r.ok ? (await r.json()).data : null;
+  });
+  if (!orgs || !orgs.length) {
+    throw new Error('[alpha1] /api/organizations returned no data — cannot resolve target org');
+  }
+  const target = orgs.find(o => o.identifier === targetOrgId);
+  if (!target) {
+    const available = orgs.map(o => `${o.name} (${o.identifier})`).join(', ');
+    throw new Error(`[alpha1] Target org ${targetOrgId} not found. Available: ${available}`);
+  }
+  testLogger.info(`[alpha1] Target org resolved: ${target.name} (${target.identifier})`);
+
+  // Open dropdown → search-filter → click menu item
+  // (search-input + menu-item-label is more reliable than role=option matching)
+  const dropdown = page.locator('[data-test="navbar-organizations-select"]');
+  await dropdown.waitFor({ state: 'visible', timeout: 15000 });
+  await dropdown.getByText('arrow_drop_down').click({ force: true });
+  await page.waitForTimeout(1500);
+
+  const searchInput = page.locator('[data-test="organization-search-input"]');
+  await searchInput.waitFor({ state: 'visible', timeout: 10000 });
+  await searchInput.fill(target.name);
+  await page.waitForTimeout(1500);
+
+  // Filter menu items by exact org name (regex anchors prevent partial matches
+  // — e.g. an org "Foo" would otherwise also match a row containing "Foo Bar")
+  const escapedName = target.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const menuItem = page
+    .locator('[data-test="organization-menu-item-label-item-label"]')
+    .filter({ hasText: new RegExp(`^\\s*${escapedName}\\s*\\|`) })
+    .first();
+  await menuItem.waitFor({ state: 'visible', timeout: 5000 });
+  await menuItem.click();
+
+  // Wait for URL to reflect new org (Vue router updates on store change)
+  await page.waitForFunction(
+    (orgId) => new URL(location.href).searchParams.get('org_identifier') === orgId,
+    targetOrgId,
+    { timeout: 15000 },
+  ).catch(() => testLogger.warn('[alpha1] URL did not reflect new org after switch'));
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  testLogger.info(`[alpha1] Org switch complete; current URL: ${page.url()}`);
+}
+
+/**
  * Fetch org identifier and passcode, save to cloud-config.json.
  */
 async function fetchCloudConfig(page) {
@@ -506,12 +569,14 @@ async function verifySharedAuth(baseUrl) {
   const page = await context.newPage();
 
   try {
-    // Navigate to the correct org — shared auth may have been saved on a different default org
+    // Navigate with org_identifier so the SPA loads the target org and the
+    // URL reflects it — without this, page.url() never has the param and
+    // the active-org check below would always trigger a needless re-switch.
     const targetOrg = process.env.ORGNAME;
-    const verifyUrl = (targetOrg && targetOrg !== 'default')
-      ? `${baseUrl}/web/?org_identifier=${targetOrg}`
+    const navUrl = (targetOrg && targetOrg !== 'default')
+      ? `${baseUrl}/web/?org_identifier=${encodeURIComponent(targetOrg)}`
       : `${baseUrl}/web/`;
-    await page.goto(verifyUrl, { timeout: 60000, waitUntil: 'domcontentloaded' });
+    await page.goto(navUrl, { timeout: 60000, waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // If we ended up on Dex or login page, the session is invalid
@@ -525,6 +590,17 @@ async function verifySharedAuth(baseUrl) {
     const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
     testLogger.info('[alpha1] Shared auth verified — menu visible');
+
+    // Re-apply org switch + persist if active org doesn't match target
+    if (targetOrg && targetOrg !== 'default') {
+      const activeOrg = new URL(page.url()).searchParams.get('org_identifier');
+      if (activeOrg !== targetOrg) {
+        testLogger.info(`[alpha1] Active org (${activeOrg}) != target (${targetOrg}); re-switching`);
+        await switchOrgViaDropdown(page, targetOrg);
+        await context.storageState({ path: AUTH_FILE });
+        testLogger.info(`[alpha1] Auth state re-saved with target org active`);
+      }
+    }
     return true;
   } catch (e) {
     testLogger.warn(`[alpha1] Shared auth verification error: ${e.message}`);
