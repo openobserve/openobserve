@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 use tracing::Instrument;
 
 use super::{
-    sorting::{merge_hits_topk, order_search_results},
+    sorting::{TopKHeap, order_search_results},
     utils::{calculate_progress_percentage, get_top_k_values},
 };
 #[cfg(feature = "enterprise")]
@@ -116,6 +116,19 @@ pub async fn do_partitioned_search(
     } else {
         0
     };
+
+    // Incremental top-k heap for non-ts ORDER BY: fed one partition at a time so the
+    // heap never holds more than k = (from + size) elements regardless of partition count.
+    let mut topk_heap = if is_non_ts_order_by {
+        Some(TopKHeap::new(
+            original_from + original_size,
+            &order_by_col,
+            order_by_desc,
+        ))
+    } else {
+        None
+    };
+    let mut non_ts_has_partial = false;
 
     // The order by for the partitions is the same as the order by in the query
     // unless the query is a dashboard or histogram
@@ -225,7 +238,15 @@ pub async fn do_partitioned_search(
         }
 
         // Accumulate the result
-        if is_streaming_aggs {
+        if is_non_ts_order_by {
+            // Feed directly into the heap — never stores more than k hits in memory
+            if search_res.is_partial {
+                non_ts_has_partial = true;
+            }
+            if let Some(ref mut heap) = topk_heap {
+                heap.push_hits(std::mem::take(&mut search_res.hits));
+            }
+        } else if is_streaming_aggs {
             // Only accumulate the results of the last partition
             if idx == partitions.len() - 1 {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
@@ -234,8 +255,9 @@ pub async fn do_partitioned_search(
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
         }
 
-        // add top k values for values search
-        if req.search_type == Some(SearchEventType::Values)
+        // add top k values for values search (not applicable for non-ts ORDER BY)
+        if !is_non_ts_order_by
+            && req.search_type == Some(SearchEventType::Values)
             && let Some(values_ctx) = values_ctx.as_ref()
         {
             let search_stream_span = tracing::info_span!(
@@ -337,38 +359,19 @@ pub async fn do_partitioned_search(
         }
     }
 
-    // For non-ts ORDER BY: k-way merge all partition hits globally, skip `from`, return `size`
+    // For non-ts ORDER BY: drain the heap (already bounded to k elements) into the final result
     if is_non_ts_order_by {
-        let has_partial = accumulated_results.iter().any(|r| {
-            if let SearchResultType::Search(s) = r {
-                s.is_partial
-            } else {
-                false
-            }
-        });
-
-        let all_hits: Vec<Vec<_>> = accumulated_results
-            .drain(..)
-            .filter_map(|r| match r {
-                SearchResultType::Search(s) => Some(s.hits),
-                _ => None,
-            })
-            .collect();
-
-        let merged = merge_hits_topk(
-            all_hits,
-            &order_by_col,
-            order_by_desc,
-            original_from,
-            original_size,
-        );
+        let merged = topk_heap
+            .take()
+            .map(|h| h.into_sorted_vec(original_from))
+            .unwrap_or_default();
 
         let mut final_res = Response::default();
         final_res.hits = merged;
         final_res.total = final_res.hits.len();
         final_res.size = final_res.total as i64;
 
-        if has_partial || !range_error.is_empty() {
+        if non_ts_has_partial || !range_error.is_empty() {
             final_res.is_partial = true;
             if !range_error.is_empty() {
                 final_res.function_error = vec![range_error.clone()];

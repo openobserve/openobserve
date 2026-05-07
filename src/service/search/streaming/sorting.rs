@@ -214,56 +214,79 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
 /// Merges hits from N partitions using a min-heap, returns the correct page.
 /// Each partition's hits should be sorted by `order_by_col` already (DataFusion
 /// sorts per partition). Uses O(from+size) memory regardless of total input size.
-pub fn merge_hits_topk(
-    partition_hits: Vec<Vec<Value>>,
-    order_by_col: &str,
+/// Incremental top-k heap for merging hits across partitions.
+///
+/// Feed one partition at a time via `push_hits` — the heap never exceeds k elements
+/// regardless of how many partitions exist. Peak memory = k + one_partition_size,
+/// not total_partitions × partition_size.
+pub struct TopKHeap {
+    heap: BinaryHeap<std::cmp::Reverse<HeapHit>>,
+    k: usize,
+    col: String,
     is_descending: bool,
-    from: usize,
-    size: usize,
-) -> Vec<Value> {
-    let k = from + size;
-    if k == 0 || order_by_col.is_empty() {
-        return vec![];
-    }
+    is_numeric: Option<bool>,
+}
 
-    // detect numeric vs string from first non-null value across all partitions
-    let is_numeric = partition_hits
-        .iter()
-        .flat_map(|hits| hits.iter())
-        .find_map(|hit| hit.get(order_by_col))
-        .map(|v| v.is_number())
-        .unwrap_or(false);
-
-    let mut heap: BinaryHeap<std::cmp::Reverse<HeapHit>> = BinaryHeap::with_capacity(k + 1);
-
-    for hit in partition_hits.into_iter().flatten() {
-        let candidate = HeapHit::new(hit, order_by_col, is_numeric, is_descending);
-        if heap.len() < k {
-            heap.push(std::cmp::Reverse(candidate));
-        } else if let Some(std::cmp::Reverse(min)) = heap.peek()
-            && candidate > *min
-        {
-            heap.pop();
-            heap.push(std::cmp::Reverse(candidate));
+impl TopKHeap {
+    pub fn new(k: usize, col: &str, is_descending: bool) -> Self {
+        Self {
+            heap: BinaryHeap::with_capacity(k + 1),
+            k,
+            col: col.to_string(),
+            is_descending,
+            is_numeric: None,
         }
     }
 
-    let mut result: Vec<Value> = heap.into_iter().map(|std::cmp::Reverse(h)| h.hit).collect();
-
-    result.sort_by(|a, b| {
-        let ord = if is_numeric {
-            compare_numeric_values(a, b, order_by_col)
-        } else {
-            compare_string_values(a, b, order_by_col)
-        };
-        if is_descending { ord.reverse() } else { ord }
-    });
-
-    if from >= result.len() {
-        return vec![];
+    /// Feed one partition's hits into the heap. Hits that don't make the top-k are
+    /// dropped immediately — only k elements are retained in memory at any time.
+    pub fn push_hits(&mut self, hits: Vec<Value>) {
+        for hit in hits {
+            let is_numeric = self.is_numeric.get_or_insert_with(|| {
+                hit.get(&self.col)
+                    .map(|v| v.is_number())
+                    .unwrap_or(false)
+            });
+            let candidate = HeapHit::new(hit, &self.col, *is_numeric, self.is_descending);
+            if self.heap.len() < self.k {
+                self.heap.push(std::cmp::Reverse(candidate));
+            } else if let Some(std::cmp::Reverse(min)) = self.heap.peek()
+                && candidate > *min
+            {
+                self.heap.pop();
+                self.heap.push(std::cmp::Reverse(candidate));
+            }
+        }
     }
-    result[from..].to_vec()
+
+    /// Drain the heap into a sorted vec and apply the `from` offset.
+    pub fn into_sorted_vec(self, from: usize) -> Vec<Value> {
+        let is_numeric = self.is_numeric.unwrap_or(false);
+        let col = self.col.clone();
+        let is_descending = self.is_descending;
+
+        let mut result: Vec<Value> = self
+            .heap
+            .into_iter()
+            .map(|std::cmp::Reverse(h)| h.hit)
+            .collect();
+
+        result.sort_by(|a, b| {
+            let ord = if is_numeric {
+                compare_numeric_values(a, b, &col)
+            } else {
+                compare_string_values(a, b, &col)
+            };
+            if is_descending { ord.reverse() } else { ord }
+        });
+
+        if from >= result.len() {
+            return vec![];
+        }
+        result[from..].to_vec()
+    }
 }
+
 
 /// Wrapper around a JSON hit that implements `Ord` by the ORDER BY column value.
 ///
