@@ -1193,11 +1193,25 @@ async fn process_latest_traces_stream(
     // Partitions from search_partition are already in DESC order (newest-first) by default,
     // since the partition SQL has no ORDER BY and the default is OrderBy::Desc.
     let partitions_desc = if sql_order_expr == "zo_sql_timestamp DESC" {
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=DESC",
+            partitions.len()
+        );
         partitions
     } else if sql_order_expr == "zo_sql_timestamp ASC" {
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=ASC",
+            partitions.len()
+        );
         partitions.into_iter().rev().collect::<Vec<_>>()
     } else {
         // order by other fields can't be multiple partitions
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] sort_by non-timestamp ({sql_order_expr}), \
+            forcing single partition [{}, {}]",
+            partition_req.start_time,
+            partition_req.end_time,
+        );
         vec![[partition_req.start_time, partition_req.end_time]]
     };
 
