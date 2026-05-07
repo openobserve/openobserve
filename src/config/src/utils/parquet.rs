@@ -157,11 +157,11 @@ where
 
 pub async fn get_recordbatch_reader_from_bytes(
     file_format: FileFormat,
-    data: &bytes::Bytes,
+    data: bytes::Bytes,
 ) -> Result<(Arc<Schema>, RecordBatchStream), anyhow::Error> {
     match file_format {
         FileFormat::Parquet => {
-            let schema_reader = Cursor::new(data.clone());
+            let schema_reader = Cursor::new(data);
             let (schema, reader) = get_recordbatch_reader(schema_reader).await?;
             let stream: RecordBatchStream = Box::pin(reader.map_err(ArrowError::from));
             Ok((schema, stream))
@@ -218,7 +218,7 @@ pub async fn get_recordbatch_reader_from_bytes(
 // should not have such function in the config
 pub async fn read_recordbatch_from_bytes(
     file_format: FileFormat,
-    data: &bytes::Bytes,
+    data: bytes::Bytes,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
     let (schema, reader) = get_recordbatch_reader_from_bytes(file_format, data).await?;
     let batches = reader.try_collect().await?;
@@ -474,7 +474,7 @@ mod tests {
 
         // Read back
         let (read_schema, read_batches) =
-            read_recordbatch_from_bytes(FileFormat::Parquet, &bytes::Bytes::from(data))
+            read_recordbatch_from_bytes(FileFormat::Parquet, bytes::Bytes::from(data))
                 .await
                 .unwrap();
 

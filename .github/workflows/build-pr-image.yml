@@ -34,8 +34,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
+      - name: Install frontend dependencies
+        run: cd web && npm ci
+
+      - name: Lint frontend code
+        run: cd web && npm run lint:ci
+
       - name: Build frontend code
-        run: cd web && npm ci && npm run build
+        run: cd web && npm run build
 
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4

@@ -297,6 +297,7 @@ export class LogsPage {
         this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
         this.searchResultText = '[data-test="logs-search-search-result"]';
         this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
+        this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
     }
 
 
@@ -711,6 +712,38 @@ export class LogsPage {
 
         // All retries exhausted
         throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
+    }
+
+    async deselectStream(streamName) {
+        testLogger.info(`Deselecting stream: ${streamName}`);
+        const streamDropdown = this.page.locator(this.indexDropDown);
+        await streamDropdown.click();
+        await this.page.waitForTimeout(500);
+        const streamToggle = this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first();
+        if (await streamToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await streamToggle.click();
+            testLogger.info(`Deselected stream: ${streamName}`);
+        }
+    }
+
+    async addStreamToSelection(streamName) {
+        testLogger.info(`Adding stream to selection: ${streamName}`);
+        const searchInput = this.page.locator(this.indexDropDown);
+        await searchInput.click();
+        await this.page.waitForTimeout(500);
+        await searchInput.fill(streamName);
+        await this.page.waitForTimeout(1000);
+        const streamToggle = this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first();
+        if (await streamToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await streamToggle.click();
+            testLogger.info(`Selected additional stream: ${streamName}`);
+        }
+    }
+
+    async expectTimestampColumnVisible() {
+        const timestampColumn = this.page.locator('[data-test="log-table-column-1-_timestamp"]');
+        await expect(timestampColumn, 'Timestamp column should be visible').toBeVisible({ timeout: 5000 });
+        testLogger.info('Timestamp column visible in table');
     }
 
     async selectIndexStreamOld(streamName) {
@@ -2444,6 +2477,19 @@ export class LogsPage {
         }
     }
 
+    async hoverOnCorrelationDashboard() {
+        const closeBtn = this.page.locator(this.correlationDashboardClose);
+        const dashboardPanel = closeBtn.locator('..');
+        await dashboardPanel.hover();
+        testLogger.info('Hovered over correlation dashboard panel');
+    }
+
+    async expectNoContextMenuVisible() {
+        const contextMenu = this.page.locator('[role="menu"]:visible');
+        await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
+        testLogger.info('No context menu visible');
+    }
+
     async clickSavedViewDialogSaveContent() {
         return await this.page.locator(this.savedViewDialogSaveContent).click();
     }
@@ -3072,6 +3118,21 @@ export class LogsPage {
     async expectBarChartVisible() {
         const barChart = this.page.locator(this.logsTable);
         return await expect(barChart).toBeTruthy();
+    }
+
+    async expectBarChartHasContent() {
+        const histogramChart = this.page.locator('[data-test="logs-search-result-bar-chart"]');
+        await expect(histogramChart).toBeVisible({ timeout: 5000 });
+        const chartContent = histogramChart.locator('canvas, svg');
+        const count = await chartContent.count();
+        expect(count, 'Histogram must contain rendered chart content (canvas or SVG)').toBeGreaterThan(0);
+        testLogger.info(`Histogram contains ${count} canvas/SVG elements`);
+    }
+
+    async expectTableColumnHeaderVisible(columnName) {
+        const columnHeader = this.page.locator(`[data-test="log-search-result-table-th-${columnName}"]`);
+        await expect(columnHeader, `Column header ${columnName} should be visible`).toBeVisible({ timeout: 5000 });
+        testLogger.info(`Column header ${columnName} is visible`);
     }
 
     async expectUrlContainsLogs() {
