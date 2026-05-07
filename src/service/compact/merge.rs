@@ -929,7 +929,7 @@ pub async fn merge_files(
                     &retain_file_list,
                     &mut new_file_meta,
                     latest_schema.clone(),
-                    &buf,
+                    buf,
                 )
                 .await?;
             }
@@ -975,7 +975,7 @@ pub async fn merge_files(
                         &retain_file_list,
                         &mut new_file_meta,
                         latest_schema.clone(),
-                        &buf,
+                        buf,
                     )
                     .await?;
                 }
@@ -1006,7 +1006,7 @@ async fn generate_inverted_index(
     retain_file_list: &[FileKey],
     new_file_meta: &mut FileMeta,
     latest_schema: Arc<Schema>,
-    buf: &Bytes,
+    buf: Bytes,
 ) -> Result<(), anyhow::Error> {
     let file_format = get_config().common.file_format;
     let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
