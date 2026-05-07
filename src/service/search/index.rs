@@ -134,6 +134,7 @@ impl IndexCondition {
     //   so that the skipped predicates are still evaluated.
     pub fn to_tantivy_query(
         &self,
+        trace_id: &str,
         schema: Schema,
         default_field: Option<Field>,
     ) -> anyhow::Result<(Box<dyn Query>, bool)> {
@@ -145,20 +146,16 @@ impl IndexCondition {
                     queries.push((Occur::Must, query));
                 }
                 Err(e) => {
-                    // Field not present in this tantivy index file (e.g., a
-                    // secondary index field that was added after this file was
-                    // created). Skip the condition and let DataFusion handle it.
-                    log::debug!("to_tantivy_query: skipping condition due to missing field: {e}");
+                    log::info!(
+                        "[trace_id {trace_id}] to_tantivy_query: skipping condition due to error: {e}"
+                    );
                     has_skipped = true;
                 }
             }
         }
         if queries.is_empty() {
-            // All conditions were skipped because none of the queried fields
-            // exist in this tantivy index. Return an error so the caller falls
-            // back to a direct parquet scan instead of doing a full-index scan.
             Err(anyhow::anyhow!(
-                "All AND conditions reference fields missing from the tantivy index"
+                "All AND conditions are failed to generate tantivy query"
             ))
         } else {
             Ok((Box::new(BooleanQuery::from(queries)), has_skipped))
@@ -2155,7 +2152,7 @@ mod tests {
         cond.add_condition(Condition::Equal("B".into(), "b".into()));
 
         let (query, has_skipped) = cond
-            .to_tantivy_query(schema, None)
+            .to_tantivy_query("test", schema, None)
             .expect("query build should succeed");
         assert!(!has_skipped, "no field is missing, should not skip");
 
@@ -2176,7 +2173,7 @@ mod tests {
         cond.add_condition(Condition::Equal("B".into(), "b".into()));
 
         let (query, has_skipped) = cond
-            .to_tantivy_query(schema, None)
+            .to_tantivy_query("test", schema, None)
             .expect("query build should succeed even when a field is missing");
         assert!(has_skipped, "missing field B should be reported as skipped");
 
@@ -2195,7 +2192,7 @@ mod tests {
         cond.add_condition(Condition::Equal("A".into(), "a".into()));
         cond.add_condition(Condition::Equal("B".into(), "b".into()));
 
-        let result = cond.to_tantivy_query(schema, None);
+        let result = cond.to_tantivy_query("test", schema, None);
         assert!(
             result.is_err(),
             "should return error when all fields are missing"
@@ -2209,7 +2206,7 @@ mod tests {
         let mut cond = IndexCondition::new();
         cond.add_condition(Condition::Equal("B".into(), "b".into()));
 
-        let result = cond.to_tantivy_query(schema, None);
+        let result = cond.to_tantivy_query("test", schema, None);
         assert!(
             result.is_err(),
             "should return error when the only field is missing"
