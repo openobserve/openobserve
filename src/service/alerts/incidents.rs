@@ -672,7 +672,7 @@ async fn query_service_discovery_key(
             crate::service::db::system_settings::get_service_identity_config(org_id).await;
 
         let semantic_groups =
-            o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file();
+            crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
 
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
