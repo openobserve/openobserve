@@ -363,6 +363,7 @@ pub async fn save_identity_config(
     }
 
     // Validate that all tracked_alias_ids exist in canonical groups (defaults + custom DB groups)
+    #[cfg(feature = "enterprise")]
     {
         use std::collections::HashSet;
         let known_ids: HashSet<String> =
