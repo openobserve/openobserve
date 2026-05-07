@@ -152,7 +152,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
 
     let data = storage::get_bytes(&file.account, &file.key).await?;
     let file_format = FileFormat::from_extension(&file.key).unwrap_or_default();
-    let (_, batches) = read_recordbatch_from_bytes(file_format, &data)
+    let (_, batches) = read_recordbatch_from_bytes(file_format, data)
         .await
         .map_err(|e| anyhow::anyhow!("read_recordbatch_from_bytes error: {}", e))?;
     let new_batches = generate_vertical_partition_recordbatch(&batches)
