@@ -1461,13 +1461,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     onBuildModeToggle(($event as string) === 'builder')
                   "
                 >
-                  <OToggleGroupItem value="builder" size="xs">
+                  <OToggleGroupItem value="builder" size="xs" data-test="logs-build-mode-builder-btn">
                     <template #icon-left
                       ><Wrench class="tw:size-3 tw:shrink-0"
                     /></template>
                     Builder
                   </OToggleGroupItem>
-                  <OToggleGroupItem value="custom" size="xs">
+                  <OToggleGroupItem value="custom" size="xs" data-test="logs-build-mode-custom-btn">
                     <template #icon-left
                       ><Code2 class="tw:size-3 tw:shrink-0"
                     /></template>

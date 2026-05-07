@@ -6364,18 +6364,13 @@ export class LogsPage {
      */
     async clickBuilderQueryType() {
         await this.page.locator(this.builderQueryType).click();
-        // Switching Custom → Builder shows a confirmation dialog
-        // ("Are you sure? X/Y/Filters will be wiped off.")
+        // Confirmation dialog only appears when switching Custom → Builder
+        // AND there's an existing query that would be wiped
         const confirmBtn = this.page.locator('[data-test="confirm-button"]');
-        try {
-            await confirmBtn.waitFor({ state: 'visible', timeout: 3000 });
+        if (await confirmBtn.isVisible({ timeout: 500 }).catch(() => false)) {
             await confirmBtn.click();
             testLogger.info('Confirmed Builder mode switch (dialog dismissed)');
-        } catch (e) {
-            // No dialog appeared — direct switch (e.g., first time or already in builder)
-            testLogger.info('No confirmation dialog appeared');
         }
-        await this.page.waitForLoadState('domcontentloaded').catch(() => {});
         testLogger.info('Clicked Builder query type');
     }
 
@@ -6507,43 +6502,39 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
-    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 30000) {
-        if (shouldBeSelected) {
-            // Use waitForFunction to reliably detect the selected chart type in DOM
-            // This approach is immune to Playwright locator timing issues with reactive re-renders
-            try {
-                await this.page.waitForFunction((expectedChart) => {
-                    const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
-                    for (const item of items) {
-                        const classes = item.className || '';
-                        if (classes.includes('bg-grey-3') || classes.includes('bg-grey-5')) {
-                            const child = item.querySelector(`[data-test="selected-chart-${expectedChart}-item"]`);
-                            if (child) return true;
-                        }
+    async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
+        // Use waitForFunction to directly check the DOM for the bg-grey class
+        // on the chart selection item. This survives Vue reactive re-renders better
+        // than Playwright's locator.toHaveClass polling.
+        try {
+            await this.page.waitForFunction(
+                ({ chartId, shouldBeSelected }) => {
+                    // Find all visible chart selection sections for this chart type
+                    const sections = document.querySelectorAll(
+                        `[data-test="selected-chart-${chartId}-item"]`
+                    );
+                    for (const section of sections) {
+                        // Skip sections inside display:none containers (e.g. cached Visualize tab)
+                        if (!/** @type {HTMLElement} */ (section).offsetParent) continue;
+                        // Check the parent q-item for the bg-grey selection class
+                        const parent = section.parentElement;
+                        if (!parent) continue;
+                        const hasBgGrey = /\bbg-grey-[35]\b/.test(parent.className);
+                        if (hasBgGrey === shouldBeSelected) return true;
                     }
                     return false;
-                }, chartId, { timeout });
-                testLogger.info(`Chart type "${chartId}" is selected (verified via waitForFunction)`);
-            } catch (error) {
-                // Fallback: check what IS selected for better error messages
-                const actual = await this.waitForChartTypeStabilized(5000);
-                throw new Error(`Expected chart type "${chartId}" to be selected, but found "${actual || 'none'}"`);
-            }
-        } else {
-            // Verify chart is NOT selected
-            const result = await this.page.evaluate((expectedChart) => {
-                const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
-                for (const item of items) {
-                    const classes = item.className || '';
-                    if (classes.includes('bg-grey-3') || classes.includes('bg-grey-5')) {
-                        const child = item.querySelector(`[data-test="selected-chart-${expectedChart}-item"]`);
-                        if (child) return true;
-                    }
-                }
-                return false;
-            }, chartId);
-            expect(result).toBe(false);
-            testLogger.info(`Chart type "${chartId}" is NOT selected (verified via bg-grey class)`);
+                },
+                { chartId, shouldBeSelected },
+                { timeout, polling: 'raf' }
+            );
+            testLogger.info(
+                `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
+            );
+        } catch (error) {
+            throw new Error(
+                `Chart type "${chartId}" was expected to be ${shouldBeSelected ? 'selected' : 'not selected'} ` +
+                `but was ${shouldBeSelected ? 'not selected' : 'selected'} within ${timeout}ms`
+            );
         }
     }
 
