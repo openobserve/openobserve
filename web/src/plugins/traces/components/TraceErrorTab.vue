@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:flex-col tw:items-center tw:gap-1">
       <div
-        class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
+        class="tw:text-[var(--o2-text-4)]! tw:text-[0.85rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
       >
-        {{ spanStatusCode ? "HTTP STATUS CODE" : "GRPC STATUS CODE" }}
+        {{ spanStatusCode ? "HTTP Stats Code" : "gRPC Status Code" }}
       </div>
       <div class="tw:flex tw:items-center">
         <SpanStatusCodeBadge
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, date } from "quasar";
 import DOMPurify from "dompurify";
@@ -358,6 +358,18 @@ const exceptionEventColumns = ref([
     sortable: true,
   },
 ]);
+
+watch(
+  hasExceptionEvents,
+  (events) => {
+    const expanded: Record<string, boolean> = {};
+    events.forEach((_: any, index: number) => {
+      expanded[index.toString()] = true;
+    });
+    expandedEvents.value = expanded;
+  },
+  { immediate: true },
+);
 
 const expandEvent = (index: number) => {
   if (expandedEvents.value[index.toString()])
