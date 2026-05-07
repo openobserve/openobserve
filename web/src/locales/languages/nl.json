@@ -123,7 +123,8 @@
     "create": "Creëren",
     "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
     "resources": "Hulpbronnen",
-    "updated_at": "Bijgewerkt op"
+    "updated_at": "Bijgewerkt op",
+    "error": "Fout"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

@@ -123,7 +123,8 @@
     "version": "版本",
     "create": "创建",
     "resources": "资源",
-    "updated_at": "更新于"
+    "updated_at": "更新于",
+    "error": "错误"
   },
   "search": {
     "selectIndex": "选择数据流",

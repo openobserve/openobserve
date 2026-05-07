@@ -123,7 +123,8 @@
     "version": "[バージョン]",
     "create": "作成",
     "resources": "リソース",
-    "updated_at": "更新日"
+    "updated_at": "更新日",
+    "error": "[エラー]"
   },
   "search": {
     "metrics": "メトリクス",
