@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{cmp::Ordering, collections::BinaryHeap};
+
 use config::{
     meta::{search::Response, sql::OrderBy},
     utils::json::Value,
@@ -207,6 +209,110 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
     }
     log::warn!("No suitable sort column found in results");
     None
+}
+
+/// Merges hits from N partitions using a min-heap, returns the correct page.
+/// Each partition's hits should be sorted by `order_by_col` already (DataFusion
+/// sorts per partition). Uses O(from+size) memory regardless of total input size.
+pub fn merge_hits_topk(
+    partition_hits: Vec<Vec<Value>>,
+    order_by_col: &str,
+    is_descending: bool,
+    from: usize,
+    size: usize,
+) -> Vec<Value> {
+    let k = from + size;
+    if k == 0 || order_by_col.is_empty() {
+        return vec![];
+    }
+
+    // detect numeric vs string from first non-null value across all partitions
+    let is_numeric = partition_hits
+        .iter()
+        .flat_map(|hits| hits.iter())
+        .find_map(|hit| hit.get(order_by_col))
+        .map(|v| v.is_number())
+        .unwrap_or(false);
+
+    let mut heap: BinaryHeap<std::cmp::Reverse<HeapHit>> = BinaryHeap::with_capacity(k + 1);
+
+    for hit in partition_hits.into_iter().flatten() {
+        let candidate = HeapHit::new(hit, order_by_col, is_numeric, is_descending);
+        if heap.len() < k {
+            heap.push(std::cmp::Reverse(candidate));
+        } else if let Some(std::cmp::Reverse(min)) = heap.peek()
+            && candidate > *min
+        {
+            heap.pop();
+            heap.push(std::cmp::Reverse(candidate));
+        }
+    }
+
+    let mut result: Vec<Value> = heap.into_iter().map(|std::cmp::Reverse(h)| h.hit).collect();
+
+    result.sort_by(|a, b| {
+        let ord = if is_numeric {
+            compare_numeric_values(a, b, order_by_col)
+        } else {
+            compare_string_values(a, b, order_by_col)
+        };
+        if is_descending { ord.reverse() } else { ord }
+    });
+
+    if from >= result.len() {
+        return vec![];
+    }
+    result[from..].to_vec()
+}
+
+/// Wrapper around a JSON hit that implements `Ord` by the ORDER BY column value.
+///
+/// The comparison is direction-aware so that `Reverse<HeapHit>` always evicts the
+/// "current worst" regardless of sort direction:
+///
+/// - DESC (keep k largest): ascending cmp → `Reverse` = min-heap → evicts smallest
+/// - ASC  (keep k smallest): descending cmp → `Reverse` = max-heap by ascending → evicts largest
+struct HeapHit {
+    hit: Value,
+    col: String,
+    is_numeric: bool,
+    is_descending: bool,
+}
+
+impl HeapHit {
+    fn new(hit: Value, col: &str, is_numeric: bool, is_descending: bool) -> Self {
+        Self {
+            hit,
+            col: col.to_string(),
+            is_numeric,
+            is_descending,
+        }
+    }
+}
+
+impl PartialEq for HeapHit {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for HeapHit {}
+
+impl PartialOrd for HeapHit {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for HeapHit {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let ord = if self.is_numeric {
+            compare_numeric_values(&self.hit, &other.hit, &self.col)
+        } else {
+            compare_string_values(&self.hit, &other.hit, &self.col)
+        };
+        if self.is_descending { ord } else { ord.reverse() }
+    }
 }
 
 #[cfg(test)]

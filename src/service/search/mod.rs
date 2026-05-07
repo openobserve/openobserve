@@ -893,6 +893,9 @@ pub async fn search_partition(
         #[cfg(feature = "enterprise")]
         streaming_id: None,
         is_histogram_eligible,
+        is_non_ts_order_by: false,
+        order_by_col: None,
+        order_by_desc: true,
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -946,6 +949,7 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
+    part_num = 3;
 
     // if the partition number is too large, we limit it to ENV ZO_QUERY_PARTITION_MAX_NUM
     let max_partition_num = cfg.limit.query_partition_max_num.max(1);
@@ -1011,20 +1015,27 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    if cfg.limit.disable_partitions_for_non_ts_order_by
-        && !is_aggregate
+    let is_non_ts_order_by = !is_aggregate
         && !is_histogram
         && sql
             .order_by
             .first()
             .map(|(field, _)| {
-                field.as_str() != TIMESTAMP_COL_NAME
-                    && (ts_column.as_deref() != Some(field.as_str()))
+                field.as_str() != TIMESTAMP_COL_NAME && ts_column.as_deref() != Some(field.as_str())
             })
-            .unwrap_or(false)
-    {
+            .unwrap_or(false);
+
+    resp.is_non_ts_order_by = is_non_ts_order_by;
+    resp.order_by_col = sql.order_by.first().map(|(f, _)| f.clone());
+    resp.order_by_desc = sql
+        .order_by
+        .first()
+        .map(|(_, o)| matches!(o, OrderBy::Desc))
+        .unwrap_or(true);
+
+    if cfg.limit.disable_partitions_for_non_ts_order_by && is_non_ts_order_by {
         log::info!(
-            "[trace_id {trace_id}] search_partition: ORDER BY on non-timestamp column, disabling partitioning"
+            "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
         );
         resp.partitions = vec![[req.start_time, req.end_time]];
         return Ok(resp);

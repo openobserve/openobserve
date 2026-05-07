@@ -614,6 +614,12 @@ pub struct SearchPartitionResponse {
     pub streaming_id: Option<String>,
     #[serde(default)]
     pub is_histogram_eligible: bool,
+    #[serde(default)]
+    pub is_non_ts_order_by: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub order_by_col: Option<String>,
+    #[serde(default)]
+    pub order_by_desc: bool,
 }
 
 /// Request parameters for querying search history
