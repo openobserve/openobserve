@@ -124,6 +124,26 @@ export default [
           message: 'Use <OButton> with <ODropdown> instead of <q-btn-dropdown>.'
         },
         {
+          element: 'q-checkbox',
+          message: 'Use <OCheckbox> from "@/lib/forms/Checkbox/OCheckbox.vue" instead of <q-checkbox>.'
+        },
+        {
+          element: 'q-input',
+          message: 'Use <OInput> from "@/lib/forms/Input/OInput.vue" instead of <q-input>.'
+        },
+        {
+          element: 'q-radio',
+          message: 'Use <ORadio> inside <ORadioGroup> from "@/lib/forms/Radio/" instead of <q-radio>.'
+        },
+        {
+          element: 'q-select',
+          message: 'Use <OSelect> from "@/lib/forms/Select/OSelect.vue" instead of <q-select>.'
+        },
+        {
+          element: 'q-toggle',
+          message: 'Use <OToggle> from "@/lib/forms/Toggle/OToggle.vue" instead of <q-toggle>.'
+        },
+        {
           element: 'q-dialog',
           message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.'
         }
