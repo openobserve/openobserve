@@ -613,7 +613,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let sql = r#"
 SELECT date
     FROM file_list
-    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND original_size < $5
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND original_size <= $5
     GROUP BY date HAVING count(*) >= $6;
             "#;
 
