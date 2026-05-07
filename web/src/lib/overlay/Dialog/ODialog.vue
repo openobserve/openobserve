@@ -201,7 +201,7 @@ const contentStyle = computed(() =>
             <!-- Plain title prop — use span to avoid browser h2/heading default styles -->
             <span
               v-else-if="title"
-              class="tw:text-sm tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+              class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
             >
               {{ title }}
             </span>
@@ -245,9 +245,10 @@ const contentStyle = computed(() =>
         <!-- ── Content (default slot) ───────────────────────── -->
         <!-- min-h-0 is required in some browsers for flex children to overflow correctly -->
         <!-- overflow-x-hidden prevents horizontal scrollbar when content is wider than dialog -->
+        <!-- No flex-1: panel height = content height (capped at max-h), footer flows below body -->
         <div
           :class="[
-            'tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
+            'tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
             'tw:px-(--spacing-dialog-content-px) tw:py-(--spacing-dialog-content-py)',
             'tw:text-dialog-content-text',
           ]"

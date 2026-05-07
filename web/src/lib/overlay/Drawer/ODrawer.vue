@@ -150,7 +150,8 @@ const contentStyle = computed(() => {
           'tw:fixed tw:inset-y-0',
           isRight ? 'tw:right-0' : 'tw:left-0',
           // Flex column so header/footer are shrink-0 and body scrolls
-          'tw:flex tw:flex-col tw:overflow-hidden tw:h-screen',
+          // max-h-screen (not h-screen): panel shrinks to content, footer flows below body on short content
+          'tw:flex tw:flex-col tw:overflow-hidden tw:max-h-screen',
           sizeClasses,
           // Surface — reuse dialog tokens (same visual language)
           'tw:bg-dialog-bg tw:text-dialog-content-text',
@@ -198,7 +199,7 @@ const contentStyle = computed(() => {
             <slot v-if="slots.header" name="header" />
             <span
               v-else-if="title"
-              class="tw:text-sm tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+              class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
             >
               {{ title }}
             </span>
@@ -241,9 +242,10 @@ const contentStyle = computed(() => {
 
         <!-- ── Content (scrollable body) ───────────────────── -->
         <!-- min-h-0 is required for flex children to overflow correctly -->
+        <!-- No flex-1: panel shrinks to content, footer flows below body (not pinned to bottom) -->
         <div
           :class="[
-            'tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
+            'tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
             'tw:text-dialog-content-text',
           ]"
         >
