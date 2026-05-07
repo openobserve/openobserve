@@ -266,7 +266,7 @@ describe("PatternCard", () => {
 
   describe("Wildcard chip hover interactions", () => {
     it("should render wildcard chips for each wildcard in the template", () => {
-      const chips = wrapper.findAllComponents({ name: "QChip" });
+      const chips = wrapper.findAll(".wildcard-chip");
       expect(chips.length).toBeGreaterThan(0);
     });
 

@@ -266,6 +266,12 @@ describe("usePatternActions", () => {
       vi.mocked(extractConstantsFromPattern).mockReturnValue([
         "User logged in",
       ]);
+      // Re-set buildPatternAlertData return value (cleared by outer beforeEach vi.clearAllMocks)
+      vi.mocked(buildPatternAlertData).mockReturnValue({
+        streamName: "test-stream",
+        sqlQuery: "SELECT *",
+        alertName: "Alert_test-stream_User",
+      });
     });
 
     it("should navigate to addAlert with pattern data", () => {
