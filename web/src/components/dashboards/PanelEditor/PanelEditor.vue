@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Mode selection (left) + Add To Dashboard (right) row -->
                   <div
-                    class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-2"
+                    class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-1"
                   >
                     <QueryTypeSelector
                       v-if="pageType === 'build'"
@@ -136,24 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div v-else />
                     <div class="tw:flex tw:items-center tw:gap-2">
-                      <PanelErrorButtons
-                        :error="errorMessage"
-                        :maxQueryRangeWarning="maxQueryRangeWarning"
-                        :limitNumberOfSeriesWarningMessage="
-                          limitNumberOfSeriesWarningMessage
-                        "
-                        :isCachedDataDifferWithCurrentTimeRange="
-                          isCachedDataDifferWithCurrentTimeRange
-                        "
-                        :isPartialData="isPartialData"
-                        :isPanelLoading="isPanelLoading"
-                        :lastTriggeredAt="
-                          resolvedConfig.showLastRefreshedTime
-                            ? (lastTriggeredAt as any)
-                            : null
-                        "
-                        :viewOnly="false"
-                      />
                       <OButton
                         v-if="resolvedConfig.showAddToDashboardButton"
                         variant="primary"
@@ -226,6 +208,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "Apply" button to run the query again
                       </div>
                     </div>
+                  </div>
+
+                  <!-- Warning icons and last refreshed time -->
+                  <div
+                    class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2"
+                  >
+                    <PanelErrorButtons
+                      :error="errorMessage"
+                      :maxQueryRangeWarning="maxQueryRangeWarning"
+                      :limitNumberOfSeriesWarningMessage="
+                        limitNumberOfSeriesWarningMessage
+                      "
+                      :isCachedDataDifferWithCurrentTimeRange="
+                        isCachedDataDifferWithCurrentTimeRange
+                      "
+                      :isPartialData="isPartialData"
+                      :isPanelLoading="isPanelLoading"
+                      :lastTriggeredAt="
+                        resolvedConfig.showLastRefreshedTime
+                          ? (lastTriggeredAt as any)
+                          : null
+                      "
+                      :viewOnly="false"
+                    />
                   </div>
 
                   <!-- Chart Area -->
