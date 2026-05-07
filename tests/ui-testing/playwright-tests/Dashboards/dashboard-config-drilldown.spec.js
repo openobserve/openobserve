@@ -597,7 +597,7 @@ test.describe(
           .waitFor({ state: "visible", timeout: 10000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         await pm.dashboardSetting.closeSettingWindow();
-        await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
+        await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         testLogger.info(`Variable '${variableName}' created`);
 
@@ -781,7 +781,7 @@ test.describe(
           .waitFor({ state: "visible", timeout: 10000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         await pm.dashboardSetting.closeSettingWindow();
-        await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
+        await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
         // ── 3. Add table panel with byDashboard drilldown, passAllVariables ──
@@ -945,7 +945,7 @@ test.describe(
           .waitFor({ state: "visible", timeout: 10000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         await pm.dashboardSetting.closeSettingWindow();
-        await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
+        await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         testLogger.info(`Variable '${variableName}' created`);
 
@@ -955,7 +955,7 @@ test.describe(
         await pm.dashboardSetting.openSetting();
         await pm.dashboardSetting.addTabAndWait(secondTabName);
         await pm.dashboardSetting.closeSettingDashboard();
-        await safeWaitForHidden(page, ".q-dialog", { timeout: 5000 });
+        await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
         await page.waitForTimeout(400); // allow Quasar fade-out animation to complete
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         testLogger.info(`Second tab '${secondTabName}' added`);
