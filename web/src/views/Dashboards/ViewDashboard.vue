@@ -331,14 +331,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <ODrawer
         v-model:open="showJsonEditorDialog"
-        :width="72"
-        persistent
+        :width="70"
+        title="Edit Dashboard JSON"
       >
         <DashboardJsonEditor
+          ref="jsonEditorRef"
           :dashboard-data="currentDashboardData.data"
           :save-json-dashboard="saveJsonDashboard"
-          @close="showJsonEditorDialog = false"
         />
+        <template #footer>
+          <div class="tw:flex tw:justify-end tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="json-editor-cancel"
+              @click="showJsonEditorDialog = false"
+              >{{ t("common.cancel") }}</OButton
+            >
+            <OButton
+              variant="primary"
+              size="sm-action"
+              :loading="saveJsonDashboard.isLoading.value"
+              :disabled="saveJsonDashboard.isLoading.value"
+              data-test="json-editor-save"
+              @click="jsonEditorRef?.saveChanges()"
+              >{{ t("common.save") }}</OButton
+            >
+          </div>
+        </template>
       </ODrawer>
     </div>
   </q-page>
@@ -1825,6 +1845,7 @@ export default defineComponent({
 
     // Add these new refs and methods
     const showJsonEditorDialog = ref(false);
+    const jsonEditorRef = ref(null);
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
@@ -1923,6 +1944,7 @@ export default defineComponent({
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
+      jsonEditorRef,
       setTimeForVariables,
       runId,
       onVariablesManagerReady,
