@@ -220,7 +220,7 @@ pub async fn all_organizations(
                 None
             }
         });
-        let settings = crate::service::db::organization::get_org_setting(org.identifier)
+        let settings = crate::service::db::organization::get_org_setting(&org.identifier)
             .await
             .unwrap_or_default();
         let org = AllOrgListDetails {
