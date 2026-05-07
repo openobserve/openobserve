@@ -192,6 +192,7 @@
     "patternNavPrevious": "Previous",
     "patternNavNext": "Next",
     "patternWildcardSampleValues": "Sample values",
+    "patternNoValuesAvailable": "No values available",
     "wildcardSampleValues": "Sample values",
     "sqlModeLabel": "SQL Mode",
     "nlpModeLabel": "Natural Language Mode",

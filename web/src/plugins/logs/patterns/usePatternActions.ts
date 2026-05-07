@@ -91,6 +91,21 @@ export const usePatternActions = () => {
     searchObj.meta.logsVisualizeToggle = "logs";
   };
 
+  const addWildcardValueToSearch = (
+    value: string,
+    action: "include" | "exclude",
+  ) => {
+    const escaped = escapeForMatchAll(value);
+    let filterExpression = `match_all('${escaped}')`;
+
+    if (action === "exclude") {
+      filterExpression = `NOT ${filterExpression}`;
+    }
+
+    searchObj.data.stream.addToFilter = filterExpression;
+    searchObj.meta.logsVisualizeToggle = "logs";
+  };
+
   const createAlertFromPattern = (pattern: any) => {
     const streamName = searchObj.data.stream.selectedStream[0];
     if (!streamName) {
@@ -145,6 +160,7 @@ export const usePatternActions = () => {
     openPatternDetails,
     navigatePatternDetail,
     addPatternToSearch,
+    addWildcardValueToSearch,
     createAlertFromPattern,
   };
 };
