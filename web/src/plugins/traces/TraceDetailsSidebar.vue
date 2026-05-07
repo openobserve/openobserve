@@ -933,7 +933,6 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
-import TraceErrorTab from "./components/TraceErrorTab.vue";
 import DbSpanDetails from "./DbSpanDetails.vue";
 
 export default defineComponent({
@@ -990,7 +989,6 @@ export default defineComponent({
     NotEqualIcon,
     AttributeValueCell,
     DeployedCode,
-    TraceErrorTab,
     DbSpanDetails,
   },
   emits: [
@@ -1126,6 +1124,10 @@ export default defineComponent({
     const RAW_VALUE_FILTER_FIELDS = new Set([
       store.state?.zoConfig?.timestamp_column || "_timestamp",
     ]);
+
+    const hasDbSpan = computed(() =>
+      Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),
+    );
 
     const filterActions = [
       { operator: "=" as const, iconComponent: EqualIcon },

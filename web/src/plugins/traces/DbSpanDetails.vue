@@ -66,7 +66,7 @@ const metadataRows = computed(() =>
     },
     {
       label: "Database",
-      value: String(props.span.db_namespace ?? ""),
+      value: String(props.span.db_namespace ?? props.span.db_name),
       key: "namespace",
     },
     {
@@ -87,20 +87,25 @@ const metadataRows = computed(() =>
 
 <template>
   <div class="tw:flex tw:flex-col tw:h-full tw:overflow-auto tw:gap-3 tw:p-2">
-    <q-card flat bordered data-test="traces-db-span-details-metadata-grid">
-      <q-card-section class="tw:py-2 tw:px-3">
-        <div class="tw:grid tw:grid-cols-2 tw:gap-x-4 tw:gap-y-1">
-          <template v-for="row in metadataRows" :key="row.key">
-            <div class="tw:text-xs" style="color: var(--o2-text-secondary)">
-              {{ row.label }}
-            </div>
-            <div
-              class="tw:text-xs tw:font-mono tw:break-all"
-              style="color: var(--o2-text-primary)"
+    <q-card flat data-test="traces-db-span-details-metadata-grid">
+      <q-card-section class="tw:py-[0.375rem]! tw:px-0!">
+        <div class="tw:flex tw:flex-wrap tw:gap-2">
+          <span
+            v-for="row in metadataRows"
+            :key="row.key"
+            :data-test="`traces-db-span-details-tag-${row.key}`"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded-md tw:px-2 tw:py-1 tw:text-[0.85rem]"
+            style="
+              background: var(--o2-card-background);
+              border: 1px solid var(--o2-border);
+              color: var(--o2-text-primary);
+            "
+          >
+            <span style="color: var(--o2-text-secondary)"
+              >{{ row.label }}:</span
             >
-              {{ row.value }}
-            </div>
-          </template>
+            <span class="tw:break-all">{{ row.value }}</span>
+          </span>
         </div>
       </q-card-section>
     </q-card>
@@ -111,7 +116,9 @@ const metadataRows = computed(() =>
       class="tw:flex-1 tw:flex tw:flex-col"
       data-test="traces-db-span-details-query-editor"
     >
-      <q-card-section class="tw:flex-1 tw:flex tw:flex-col tw:p-0">
+      <q-card-section
+        class="tw:flex-1 tw:flex tw:flex-col tw:p-0 tw:min-h-[18.75rem] tw:p-[0.375rem]!"
+      >
         <CodeQueryEditor
           v-if="queryText"
           :query="queryText"

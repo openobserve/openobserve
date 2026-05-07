@@ -124,7 +124,8 @@
     "reset": "Reset",
     "retry": "Retry",
     "resources": "Resources",
-    "error": "Error"
+    "error": "Error",
+    "db": "Database"
   },
   "validation": {
     "required": "This field is required",
