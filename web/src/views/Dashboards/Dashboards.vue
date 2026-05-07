@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODrawer
                 v-model:open="showAddDashboardDialog"
                 :width="30"
-                :show-close="false"
+                :title="t('dashboard.createdashboard')"
                 data-test="dashboard-add-dialog"
               >
                 <AddDashboard
@@ -520,23 +520,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODrawer
                 v-model:open="showAddFolderDialog"
                 :width="30"
-                :show-close="false"
-                @close="showAddFolderDialog = false"
+                :title="isFolderEditMode ? t('dashboard.updateFolder') : t('dashboard.newFolder')"
                 data-test="dashboard-folder-dialog"
               >
                 <AddFolder
+                  ref="addFolderRef"
                   @update:modelValue="updateFolderList"
-                  @close="showAddFolderDialog = false"
                   :edit-mode="isFolderEditMode"
                   :folder-id="selectedFolderToEdit ?? 'default'"
                 />
+                <template #footer>
+                  <div class="tw:flex tw:justify-start tw:gap-2">
+                    <OButton variant="outline" size="sm-action" @click="showAddFolderDialog = false" data-test="dashboard-folder-add-cancel">{{ t('dashboard.cancel') }}</OButton>
+                    <OButton variant="primary" size="sm-action" data-test="dashboard-folder-add-save" @click="addFolderRef?.submit()">{{ t('dashboard.save') }}</OButton>
+                  </div>
+                </template>
               </ODrawer>
 
               <!-- move dashboard to another folder -->
               <ODrawer
                 v-model:open="showMoveDashboardDialog"
                 size="lg"
-                :show-close="false"
+                title="Move Dashboard"
                 @close="showMoveDashboardDialog = false"
                 data-test="dashboard-move-to-another-folder-dialog"
               >
@@ -674,6 +679,7 @@ export default defineComponent({
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
     const showAddFolderDialog = ref(false);
+    const addFolderRef: any = ref(null);
     const qTable: any = ref(null);
     const router = useRouter();
     const route = useRoute();
@@ -1472,6 +1478,7 @@ export default defineComponent({
       activeFolderId,
       addFolder,
       showAddFolderDialog,
+      addFolderRef,
       isFolderEditMode,
       updateFolderList,
       editFolder,

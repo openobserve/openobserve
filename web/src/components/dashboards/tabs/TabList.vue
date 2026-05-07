@@ -69,10 +69,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <ODrawer v-model:open="showAddTabDialog" size="md" :show-close="false" @close="showAddTabDialog = false">
       <AddTab
+        ref="addTabRef"
         :dashboard-id="dashboardData?.dashboardId"
         @refresh="refreshDashboard"
         @close="showAddTabDialog = false"
       />
+      <template #footer>
+        <div class="tw:flex tw:justify-start tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showAddTabDialog = false" data-test="dashboard-add-cancel">Cancel</OButton>
+          <OButton variant="primary" size="sm-action" data-test="dashboard-add-tab-submit" @click="addTabRef?.submit()">Save</OButton>
+        </div>
+      </template>
     </ODrawer>
   </div>
 </template>
@@ -112,6 +119,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const route = useRoute();
     const showAddTabDialog = ref(false);
+    const addTabRef: any = ref(null);
     const isHovered = ref(false);
 
     // inject selected tab, default will be default tab
@@ -128,6 +136,7 @@ export default defineComponent({
 
     return {
       showAddTabDialog,
+      addTabRef,
       refreshDashboard,
       tabs,
       route,

@@ -270,7 +270,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       v-model:open="showIndexSchemaDialog"
       size="lg"
-      :show-close="false"
       @close="showIndexSchemaDialog = false"
     >
       <SchemaIndex v-model="schemaData" @close="showIndexSchemaDialog = false" />

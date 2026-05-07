@@ -15,34 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section
-      class="q-px-md q-py-md"
-      data-test="dashboard-folder-move-header"
-    >
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold">
-            Move Dashboard To Another Folder
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            @click="$emit('close')"
-            variant="ghost"
-            size="icon-circle"
-            data-test="dashboard-folder-move-cancel"
-          >
-            <template #icon-left><q-icon name="cancel" /></template>
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section
-      class="q-w-md q-mx-lg"
-      data-test="dashboard-folder-move-body"
-    >
+  <div class="q-w-md q-mx-lg" data-test="dashboard-folder-move-body">
       <q-form
         ref="moveFolderForm"
         @submit.stop="onSubmit.execute()"
@@ -90,8 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
       </q-form>
-    </q-card-section>
-  </q-card>
+  </div>
 </template>
 
 <script lang="ts">

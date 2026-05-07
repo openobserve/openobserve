@@ -122,4 +122,38 @@ describe("ODrawer", () => {
     // The overlay scrim should no longer be present
     expect(wrapper.findAll("[data-o2-drawer]").length).toBeLessThanOrEqual(1);
   });
+
+  describe("sticky layout structure", () => {
+    it("header has shrink-0 class (pinned, never scrolls)", () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test" },
+      });
+      // The close button is a direct child of the header div
+      const closeBtn = wrapper.find('button[aria-label="Close drawer"]');
+      const headerEl = closeBtn.element.parentElement;
+      expect(headerEl?.className).toContain("tw:shrink-0");
+    });
+
+    it("body has flex-1 and overflow-y-auto classes (scrollable)", () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true },
+        slots: { default: '<p data-testid="body-content">body</p>' },
+      });
+      const bodyContent = wrapper.find('[data-testid="body-content"]');
+      const bodyEl = bodyContent.element.parentElement;
+      expect(bodyEl?.className).toContain("tw:flex-1");
+      expect(bodyEl?.className).toContain("tw:min-h-0");
+      expect(bodyEl?.className).toContain("tw:overflow-y-auto");
+    });
+
+    it("footer has shrink-0 class (pinned, never scrolls)", () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true },
+        slots: { footer: '<button data-testid="footer-btn">Save</button>' },
+      });
+      const footerBtn = wrapper.find('[data-testid="footer-btn"]');
+      const footerEl = footerBtn.element.parentElement;
+      expect(footerEl?.className).toContain("tw:shrink-0");
+    });
+  });
 });

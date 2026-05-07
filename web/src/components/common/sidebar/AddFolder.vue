@@ -65,26 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
           />
   
-          <div class="tw:flex tw:gap-2 q-mt-sm">
-            <OButton
-              @click="$emit('close')"
-              variant="outline"
-              size="sm-action"
-              data-test="dashboard-folder-add-cancel"
-            >
-              {{ t('dashboard.cancel') }}
-            </OButton>
-            <OButton
-              data-test="dashboard-folder-add-save"
-              :disabled="folderData.name.trim() === ''"
-              :loading="onSubmit.isLoading.value"
-              variant="primary"
-              size="sm-action"
-              type="submit"
-            >
-              {{ t('common.save') }}
-            </OButton>
-          </div>
+
         </q-form>
       </q-card-section>
     </q-card>
@@ -200,6 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         });
       });
   
+      const submit = () => onSubmit.execute();
+
       return {
         t,
         disableColor,
@@ -212,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         getImageURL,
         onSubmit,
         defaultValue,
+        submit,
       };
     },
   });

@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODrawer
         v-model:open="showDashboardSettingsDialog"
         :width="73"
-        :show-close="false"
+        title="Dashboard Settings"
         @close="showDashboardSettingsDialog = false"
       >
         <DashboardSettings @refresh="loadDashboard" @close="showDashboardSettingsDialog = false" />
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODrawer
         v-model:open="selectedPanelConfig.show"
         size="sm"
-        :show-close="false"
+        :title="t('panel.layout')"
         @close="selectedPanelConfig.show = false"
       >
         <PanelLayoutSettings
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODrawer
         v-model:open="showScheduledReportsDialog"
         :width="60"
-        :show-close="false"
+        :title="t('dashboard.scheduledReports')"
         @close="showScheduledReportsDialog = false"
       >
         <ScheduledDashboards

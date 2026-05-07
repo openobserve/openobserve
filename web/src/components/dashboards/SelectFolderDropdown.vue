@@ -55,12 +55,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- add folder -->
   <ODrawer
     v-model:open="showAddFolderDialog"
+    :title="t('common.addFolder')"
     :width="30"
-    :show-close="false"
-    @close="showAddFolderDialog = false"
     data-test="dashboard-folder-move-dialog"
   >
-    <AddFolder @update:modelValue="updateFolderList" @close="showAddFolderDialog = false" :edit-mode="false" />
+    <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
+    <template #footer>
+      <div class="tw:flex tw:justify-start tw:gap-2">
+        <OButton variant="outline" size="sm-action" @click="showAddFolderDialog = false" data-test="dashboard-folder-add-cancel">{{ t('dashboard.cancel') }}</OButton>
+        <OButton variant="primary" size="sm-action" data-test="dashboard-folder-add-save" @click="addFolderRef?.submit()">{{ t('dashboard.save') }}</OButton>
+      </div>
+    </template>
   </ODrawer>
 </template>
 
@@ -89,6 +94,7 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
+      const addFolderRef: any = ref(null);
 
     const getInitialFolderValue = () => {
       // priority: activeFolderId > query.folder > default
@@ -151,6 +157,7 @@ export default defineComponent({
       selectedFolder,
       updateFolderList,
       showAddFolderDialog,
+      addFolderRef,
       computedStyle,
     };
   },

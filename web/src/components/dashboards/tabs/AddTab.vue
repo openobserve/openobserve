@@ -62,24 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-add-tab-name"
         />
 
-        <div class="flex justify-start tw:gap-2">
-          <OButton
-            @click="$emit('close')"
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-add-cancel"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            :disabled="tabData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            data-test="dashboard-add-tab-submit"
-            >{{ t("dashboard.save") }}</OButton
-          >
-        </div>
+
       </q-form>
     </q-card-section>
   </q-card>
@@ -230,6 +213,8 @@ export default defineComponent({
       });
     });
 
+    const submit = () => onSubmit.execute();
+
     return {
       t,
       tabData,
@@ -237,6 +222,7 @@ export default defineComponent({
       store,
       isValidIdentifier,
       onSubmit,
+      submit,
     };
   },
 });

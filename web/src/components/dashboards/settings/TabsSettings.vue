@@ -130,16 +130,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showAddTabDialog"
       size="md"
       :show-close="false"
-      @close="showAddTabDialog = false"
       data-test="dashboard-tab-settings-add-tab-dialog"
     >
       <AddTab
+        ref="addTabRef"
         :edit-mode="isTabEditMode"
         :tabId="selectedTabIdToEdit"
         :dashboard-id="currentDashboardData.data.dashboardId"
         @refresh="refreshRequired"
         @close="showAddTabDialog = false"
       />
+      <template #footer>
+        <div class="tw:flex tw:justify-start tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showAddTabDialog = false" data-test="dashboard-add-cancel">{{ t('dashboard.cancel') }}</OButton>
+          <OButton variant="primary" size="sm-action" data-test="dashboard-add-tab-submit" @click="addTabRef?.submit()">{{ t('dashboard.save') }}</OButton>
+        </div>
+      </template>
     </ODrawer>
     <!-- delete tab dialog -->
     <TabsDeletePopUp
@@ -187,6 +193,7 @@ export default defineComponent({
     const route = useRoute();
 
     const showAddTabDialog = ref(false);
+    const addTabRef: any = ref(null);
     const isTabEditMode = ref(false);
     const selectedTabIdToEdit: any = ref("");
 
@@ -383,6 +390,7 @@ export default defineComponent({
       outlinedDelete,
       addNewItem,
       showAddTabDialog,
+      addTabRef,
       isTabEditMode,
       selectedTabIdToEdit,
       currentDashboardData,

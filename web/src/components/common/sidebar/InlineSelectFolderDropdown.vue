@@ -43,14 +43,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showDialog"
       :width="30"
       :show-close="false"
-      @close="showDialog = false"
     >
       <AddFolder
+        ref="addFolderRef"
         :type="type"
         :edit-mode="false"
         @update:modelValue="onFolderAdded"
         @close="showDialog = false"
       />
+      <template #footer>
+        <div class="tw:flex tw:justify-start tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showDialog = false" data-test="dashboard-folder-add-cancel">Cancel</OButton>
+          <OButton variant="primary" size="sm-action" data-test="dashboard-folder-add-save" @click="addFolderRef?.submit()">Save</OButton>
+        </div>
+      </template>
     </ODrawer>
   </div>
 </template>
@@ -84,6 +90,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const showDialog = ref(false);
+    const addFolderRef: any = ref(null);
 
     const folderOptions = computed(() =>
       store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
@@ -106,6 +113,7 @@ export default defineComponent({
     return {
       store,
       showDialog,
+      addFolderRef,
       folderOptions,
       onFolderAdded,
     };

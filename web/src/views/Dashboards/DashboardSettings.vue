@@ -20,23 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ t("dashboard.setting") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <q-icon
-          data-test="dashboard-settings-close-btn"
-          name="cancel"
-          class="cursor-pointer tw:mr-5"
-          size="20px"
-          @click="$emit('close')"
-        />
-      </div>
-    </div>
-    <q-separator></q-separator>
+
     <q-splitter
       v-model="splitterModel"
       unit="px"
