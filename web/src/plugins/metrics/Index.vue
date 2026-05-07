@@ -82,11 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-else
-              variant="primary"
-              size="sm-toolbar"
+              variant="ghost"
               data-test="metrics-apply"
               :loading="disable"
               :disabled="disable"
+              class="q-pa-none tw:h-[1.875rem]! element-box-shadow o2-run-query-button o2-color-primary search-button-normal-border-radius"
               @click="runQuery"
             >
               {{ t("metrics.runQuery") }}
@@ -526,6 +526,28 @@ export default defineComponent({
 </style>
 
 <style lang="scss">
+.o2-run-query-button {
+  font-size: 11px;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 0px !important;
+  width: 94px !important;
+  transition:
+    box-shadow 0.3s ease,
+    opacity 0.2s ease;
+}
+.o2-color-primary {
+  background-color: var(--o2-primary-btn-bg) !important;
+  color: var(--o2-primary-btn-text) !important;
+  &:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
+  }
+}
+.search-button-normal-border-radius {
+  border-radius: 0.375rem !important;
+}
+
 .dashboards-auto-refresh-interval {
   .q-btn {
     min-height: 2rem; // 30px
