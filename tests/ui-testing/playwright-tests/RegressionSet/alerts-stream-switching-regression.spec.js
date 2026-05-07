@@ -59,7 +59,15 @@ test.describe("Alerts Stream Switching Regression", () => {
     await pm.alertsPage.clickAddAlertButton();
     await pm.alertsPage.fillAlertName(`auto_sw_${Date.now()}`);
     await pm.alertsPage.selectStreamType(streamType);
-    await page.waitForTimeout(500);
+    // Wait for stream dropdown to repopulate after stream-type change,
+    // then verify the target option is attached before delegating to selectStreamByName
+    const streamDropdown = page.locator('[data-test="alert-stream-name-dropdown"]');
+    await expect(streamDropdown).toBeVisible({ timeout: 10000 });
+    await streamDropdown.click();
+    const streamOption = page.locator('.q-menu:visible').getByText(streamName, { exact: true });
+    await expect(streamOption).toBeAttached({ timeout: 10000 });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
     await pm.alertsPage.creationWizard.selectStreamByName(streamName);
     await pm.alertsPage.selectScheduledAlertType();
     testLogger.info('Wizard setup complete - query config visible (v3 flat layout)');
@@ -94,7 +102,9 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     // Verify PromQL is gone for logs
     await pm.alertsPage.expectPromqlTabNotVisible();
-    testLogger.info('PromQL tab NOT visible for logs stream (fix confirmed)');
+    // Also verify the editor doesn't retain PromQL content from the metrics phase
+    await pm.alertsPage.expectEditorContentDoesNotContain('rate(');
+    testLogger.info('PromQL tab NOT visible for logs stream and editor is clean (fix confirmed)');
     await pm.alertsPage.clickBackButton();
     testLogger.info('Bug #11580 test passed');
   });
@@ -239,14 +249,19 @@ test.describe("Alerts Stream Switching Regression", () => {
     const allFields = await pm.alertsPage.getAvailableFields();
     expect(allFields.length, 'Baseline field list should not be empty').toBeGreaterThan(0);
 
-    // avg: only numeric fields — must be a strict subset of baseline
+    // avg: identify numeric vs non-numeric fields from the stream's actual data
     await pm.alertsPage.selectAggregationFunction('avg');
     await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields);
     const avgFields = await pm.alertsPage.getAvailableFields();
+    const numericFields = avgFields; // fields kept by avg = numeric
+    const stringFields = allFields.filter(f => !avgFields.includes(f)); // fields dropped = string
 
-    // sum: must produce the SAME fields as avg (both filter to numeric-only)
+    // sum: verify same filtering, plus cross-check with known types
     await pm.alertsPage.selectAggregationFunction('sum');
-    await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields);
+    await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields, {
+        knownNumeric: numericFields,
+        knownString: stringFields,
+    });
     const sumFields = await pm.alertsPage.getAvailableFields();
     expect(avgFields.sort(), 'avg and sum should filter to the same numeric-only field set').toEqual(sumFields.sort());
 

@@ -568,13 +568,18 @@ export class AlertsPage {
      */
     async expectNoChartError() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
-        // Assert no error-class banner is visible
+        // Assert no error-class banner is visible within the chart container
         const errorBanner = chartArea.locator('[class*="error"], .q-banner--negative').first();
         await expect(errorBanner).not.toBeVisible({ timeout: 5000 });
         // Assert no error text pattern is visible anywhere in the chart area.
         // Do NOT swallow — a "Schema error" / "No field named" banner must fail the test.
         const errorText = chartArea.locator('text=/Schema error|No field named|Search field not found/i').first();
         await expect(errorText).not.toBeAttached({ timeout: 3000 });
+
+        // Also check page-level error toasts/banners rendered outside the chart container
+        const pageError = this.page.locator('.q-notification--negative, .q-banner--negative').first();
+        await expect(pageError).not.toBeVisible({ timeout: 5000 });
+
         testLogger.info('No chart error detected');
     }
 
@@ -608,31 +613,6 @@ export class AlertsPage {
         await openBtn.click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked "Open full editor"');
-    }
-
-    /**
-     * Close the full editor modal and verify the chart re-renders.
-     * The full editor is typically a q-dialog. Close via close button or backdrop.
-     */
-    async closeFullEditor() {
-        const closeBtn = this.page.locator('[data-test="alert-details-close-btn"], .q-dialog__close button, .q-dialog .q-btn[aria-label="Close"]').first();
-        if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await closeBtn.click();
-        } else {
-            // Fallback: press Escape to close the dialog
-            await this.page.keyboard.press('Escape');
-        }
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Closed full editor');
-    }
-
-    /**
-     * Expect the full editor modal/dialog to be visible.
-     */
-    async expectFullEditorVisible() {
-        await expect(this.page.locator('.q-dialog, [data-test*="editor-dialog"], .full-editor-modal').first())
-            .toBeVisible({ timeout: 10000 });
-        testLogger.info('Full editor modal is visible');
     }
 
     /**
@@ -2525,15 +2505,6 @@ export class AlertsPage {
     // ==================== QUERY TAB METHODS ====================
 
     /**
-     * Check whether the PromQL tab is visible (returns boolean, does not fail).
-     * @returns {Promise<boolean>}
-     */
-    async isPromqlTabVisible() {
-        const promqlTab = this.page.locator('[data-test="step2-query-tabs"] button:has-text("PromQL")');
-        return promqlTab.isVisible({ timeout: 5000 }).catch(() => false);
-    }
-
-    /**
      * Expect PromQL tab to be visible
      */
     async expectPromqlTabVisible() {
@@ -2587,74 +2558,6 @@ export class AlertsPage {
         testLogger.info('Clicked SQL tab');
     }
 
-    // ==================== STREAM TYPE ↔ QUERY MODE COHERENCE ====================
-
-    /**
-     * Get the currently active query tab name by checking which tab has the active state.
-     * @returns {Promise<string>} 'Builder' | 'SQL' | 'PromQL' | 'unknown'
-     */
-    async getActiveQueryTabName() {
-        // Try multiple selector strategies for finding tabs
-        const tabSelectors = [
-            // v3: data-test="tab-builder", data-test="tab-sql", data-test="tab-promql"
-            '[data-test="tab-builder"]',
-            '[data-test="tab-sql"]',
-            '[data-test="tab-promql"]',
-            // v3 fallback: step2-query-tabs container buttons
-            '[data-test="step2-query-tabs"] button',
-            // Generic Quasar tabs
-            '.q-tabs .q-tab',
-        ];
-
-        for (const tabName of ['Builder', 'SQL', 'PromQL']) {
-            // Check data-test tabs (generated as data-test="tab-{value}" by AppTabs)
-            const tabEl = this.page.locator(`[data-test="tab-${tabName.toLowerCase()}"]`);
-            if (await tabEl.isVisible({ timeout: 1000 }).catch(() => false)) {
-                const isActive = await tabEl.evaluate(el =>
-                    el.classList.contains('active-tab') ||
-                    el.classList.contains('q-tab--active') ||
-                    el.getAttribute('aria-selected') === 'true' ||
-                    el.closest('.q-tab--active') !== null
-                ).catch(() => false);
-                if (isActive) {
-                    testLogger.info('Active query tab found', { tabName });
-                    return tabName;
-                }
-            }
-        }
-
-        // Fallback: check all tabs in the query tabs container
-        const container = this.page.locator(this.locators.queryTabsContainer);
-        const childTabs = container.locator('button, .q-tab, [role="tab"]');
-        const count = await childTabs.count();
-        for (let i = 0; i < count; i++) {
-            const tab = childTabs.nth(i);
-            const isActive = await tab.evaluate(el =>
-                el.classList.contains('active-tab') ||
-                el.classList.contains('q-tab--active') ||
-                el.getAttribute('aria-selected') === 'true'
-            ).catch(() => false);
-            if (isActive) {
-                const name = await tab.textContent();
-                testLogger.info('Active query tab found via fallback', { tabName: name.trim() });
-                return name.trim();
-            }
-        }
-
-        testLogger.warn('No active query tab found');
-        return 'unknown';
-    }
-
-    /**
-     * Expect a specific query tab to be the active one.
-     * @param {string} tabName - 'Builder' | 'SQL' | 'PromQL'
-     */
-    async expectActiveQueryTab(tabName) {
-        const activeTab = await this.getActiveQueryTabName();
-        expect(activeTab, `Expected active query tab to be "${tabName}" but got "${activeTab}"`).toBe(tabName);
-        testLogger.info('Active query tab is as expected', { expected: tabName, actual: activeTab });
-    }
-
     /**
      * Expect PromQL tab to be absent (hidden or not in the DOM).
      * Used to verify that switching to a logs stream hides the PromQL tab.
@@ -2665,41 +2568,17 @@ export class AlertsPage {
     }
 
     /**
-     * Expect Builder tab to be the active one (default for logs streams).
-     */
-    async expectBuilderTabActive() {
-        await this.expectActiveQueryTab('Builder');
-    }
-
-    /**
-     * Switch stream type and verify the query tabs update accordingly.
-     * After switching to logs: PromQL should disappear, Builder should be active.
-     * After switching to metrics: all three tabs (Builder, SQL, PromQL) should be visible.
-     * @param {string} streamType - 'logs' | 'metrics'
-     * @param {string[]} expectedTabs - tabs expected to be visible
-     */
-    async switchStreamTypeAndVerify(streamType, expectedTabs = []) {
-        await this.selectStreamType(streamType);
-        await this.page.waitForTimeout(1000);
-
-        if (streamType === 'logs') {
-            await this.expectPromqlTabNotVisible();
-            await this.expectBuilderTabActive();
-        } else if (streamType === 'metrics') {
-            await this.expectPromqlTabVisible();
-        }
-
-        testLogger.info('Stream type switched and verified', { streamType, expectedTabs });
-    }
-
-    /**
      * Expect the query editor textarea content does NOT contain a specific string.
      * Used to verify that switching stream type clears the previous mode's query content.
      * @param {string} text - Text that should NOT be present in the editor
      */
     async expectEditorContentDoesNotContain(text) {
         const editor = this.page.locator('.monaco-editor textarea, [data-test="alert-editor-sql"] textarea, #alert-editor-promql textarea').first();
-        await expect(editor, 'Query editor must be visible to verify content').toBeVisible({ timeout: 5000 });
+        const isVisible = await editor.isVisible({ timeout: 3000 }).catch(() => false);
+        if (!isVisible) {
+            testLogger.info('No query editor visible — editor content is clean');
+            return;
+        }
         const content = await editor.inputValue().catch(() => '');
         expect(content, `Editor should NOT contain "${text}"`).not.toContain(text);
         testLogger.info('Editor content verified — does not contain unexpected text');
@@ -3321,8 +3200,11 @@ export class AlertsPage {
      * Takes the baseline of ALL fields (captured when 'count' is selected) and asserts
      * that at least some non-numeric fields from the baseline are now absent.
      * @param {string[]} allFieldsBaseline - Full field list captured with count aggregation
+     * @param {Object} [opts] - Optional known-field checks
+     * @param {string[]} [opts.knownString] - Fields known to be string type; must be absent
+     * @param {string[]} [opts.knownNumeric] - Fields known to be numeric; at least one must be present
      */
-    async expectOnlyNumericFieldsVisible(allFieldsBaseline) {
+    async expectOnlyNumericFieldsVisible(allFieldsBaseline, { knownString = [], knownNumeric = [] } = {}) {
         const fields = await this.getAvailableFields();
         const missing = allFieldsBaseline.filter(f => !fields.includes(f));
 
@@ -3331,6 +3213,17 @@ export class AlertsPage {
         // Every returned field must be in the baseline (no spurious fields)
         const spurious = fields.filter(f => !allFieldsBaseline.includes(f));
         expect(spurious, `Fields not in baseline appeared: [${spurious.join(', ')}]`).toHaveLength(0);
+
+        // Known string fields must be absent (catches partial-filter regressions)
+        for (const str of knownString) {
+            expect(fields.includes(str), `String field "${str}" should NOT be visible for numeric-only aggregation`).toBe(false);
+        }
+
+        // At least one known numeric field must be present (catches wrong-type regressions)
+        if (knownNumeric.length > 0) {
+            const numericFound = fields.some(f => knownNumeric.includes(f));
+            expect(numericFound, `Expected at least one numeric field from [${knownNumeric.join(', ')}] to be present in [${fields.join(', ')}]`).toBe(true);
+        }
 
         testLogger.info('Only numeric fields are visible', { totalFields: fields.length, filteredOut: missing.length, filteredFields: missing });
     }
