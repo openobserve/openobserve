@@ -74,7 +74,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-30
 
     steps:
       - name: Remove unused tools
@@ -145,6 +145,7 @@ jobs:
     #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
     #   options: --user root 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - testfolder: "GeneralTests"

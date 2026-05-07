@@ -115,13 +115,6 @@ export default class DashboardFilter {
         .getByRole("option", { name: operator, exact: true })
         .first()
         .click();
-      // Wait for the operator dropdown portal to fully close before step 5.
-      // The Quasar q-select portal animates out and intercepts pointer events
-      // during the animation — wait for the listbox to be hidden first.
-      await this.page
-        .locator('[role="listbox"]')
-        .waitFor({ state: "hidden", timeout: 5000 })
-        .catch(() => {});
     }
 
     // Step 5: Enter value (if required)
@@ -176,33 +169,20 @@ export default class DashboardFilter {
             error.message.includes('Timeout');
 
           if (isRetryable && attempt < maxRetries) {
-            // Re-click input to restore focus and show options before retrying.
-            // Wrapped in try-catch because the input may become temporarily
-            // inaccessible (e.g. the q-menu closed during the wait period).
-            try {
-              await valueInput.click();
-            } catch (retryClickError) {
-              // Input inaccessible – continue to next attempt without crashing
-            }
+            // Re-click input to restore focus and show options before retrying
+            await valueInput.click();
             // Wait progressively longer between retries
             await this.page.waitForTimeout(300 * attempt);
             continue;
           }
 
-          // All retries exhausted or non-retryable error.
-          // Value was already committed to the model via onModelValueChanged
-          // during pressSequentially, so press Tab to accept it and move on.
-          try {
-            await this.page.keyboard.press('Tab');
-          } catch (e) {
-            // ignore
-          }
-          break;
+          // Last attempt failed or non-retryable error
+          throw new Error(`Failed to click autocomplete after ${attempt} attempts: ${error.message}`);
         }
       }
 
       if (!clicked) {
-        // Fallback already handled above via Tab; no throw needed
+        throw new Error(`Failed to click autocomplete suggestion after ${maxRetries} retries`);
       }
     } else if (operator && (newFieldName || initialFieldName)) {
       const selectedField = newFieldName || initialFieldName;
@@ -305,11 +285,6 @@ export default class DashboardFilter {
       // Wait until option is visible with increased timeout
       await optionLocator.waitFor({ state: "visible", timeout: 10000 });
       await optionLocator.click();
-      // Wait for the operator dropdown portal to fully close before step 5.
-      await this.page
-        .locator('[role="listbox"]')
-        .waitFor({ state: "hidden", timeout: 5000 })
-        .catch(() => {});
     }
 
     // Step 5: Fill value field
@@ -341,7 +316,7 @@ export default class DashboardFilter {
 
     // Step 2: Handle multiple matching elements for column dropdown
     const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}"]`
+      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
     );
     const count = await allColumnLocators.count();
 
@@ -395,11 +370,6 @@ export default class DashboardFilter {
 
       await operatorOption.waitFor({ state: "visible", timeout: 10000 });
       await operatorOption.click();
-      // Wait for the operator dropdown portal to fully close before step 6.
-      await this.page
-        .locator('[role="listbox"]')
-        .waitFor({ state: "hidden", timeout: 5000 })
-        .catch(() => {});
     }
 
     // Step 6: Fill value if provided (appears in portal, use page scope)
@@ -412,20 +382,18 @@ export default class DashboardFilter {
       await valueInput.click();
       await valueInput.fill(value);
 
-      // Wait for autocomplete suggestion — element may re-attach while the
-      // autocomplete list re-renders; use a longer timeout so Playwright's
-      // built-in retry has enough time to succeed after re-attachment.
+      // Wait for autocomplete suggestion
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
 
-      await suggestion.waitFor({ state: "visible", timeout: 10000 });
-      await suggestion.click({ timeout: 15000 });
+      await suggestion.waitFor({ state: "visible", timeout: 5000 });
+      await suggestion.click();
     }
 
     // Step 7: Update the field name (appears in portal, use page scope)
     const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}"]`
+      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
     );
     const count = await allColumnLocators.count();
 

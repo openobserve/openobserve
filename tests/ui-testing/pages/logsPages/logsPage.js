@@ -3480,8 +3480,8 @@ export class LogsPage {
     }
 
     async openFirstLogDetails() {
-        // Click on the first log entry to open details (expand the first column)
-        await this.page.locator('[data-index="0"] [data-test="table-row-expand-menu"]').click();
+        // Click on the first log entry to open details (expand the _timestamp column)
+        await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
         await this.page.waitForTimeout(1000);
     }
 
@@ -6489,44 +6489,22 @@ export class LogsPage {
 
     /**
      * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
-     * Uses page.waitForFunction to poll the DOM directly, which is more reliable than
-     * locator-based polling during Vue reactive re-renders.
+     * Uses the parent element's background class to detect selection state.
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
     async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
-        // Use waitForFunction to directly check the DOM for the bg-grey class
-        // on the chart selection item. This survives Vue reactive re-renders better
-        // than Playwright's locator.toHaveClass polling.
-        try {
-            await this.page.waitForFunction(
-                ({ chartId, shouldBeSelected }) => {
-                    // Find all visible chart selection sections for this chart type
-                    const sections = document.querySelectorAll(
-                        `[data-test="selected-chart-${chartId}-item"]`
-                    );
-                    for (const section of sections) {
-                        // Skip sections inside display:none containers (e.g. cached Visualize tab)
-                        if (!/** @type {HTMLElement} */ (section).offsetParent) continue;
-                        // Check the parent q-item for the bg-grey selection class
-                        const parent = section.parentElement;
-                        if (!parent) continue;
-                        const hasBgGrey = /\bbg-grey-[35]\b/.test(parent.className);
-                        if (hasBgGrey === shouldBeSelected) return true;
-                    }
-                    return false;
-                },
-                { chartId, shouldBeSelected },
-                { timeout, polling: 'raf' }
-            );
-            testLogger.info(
-                `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
-            );
-        } catch (error) {
-            throw new Error(
-                `Chart type "${chartId}" was expected to be ${shouldBeSelected ? 'selected' : 'not selected'} ` +
-                `but was ${shouldBeSelected ? 'not selected' : 'selected'} within ${timeout}ms`
-            );
+        // Use visible() filter — there can be multiple PanelEditor instances in DOM
+        // (e.g., cached Visualize tab + active Build tab). Only check the visible one.
+        const selector = this.chartTypeItem(chartId);
+        const parentLocator = this.page.locator(selector).locator('visible=true').locator('..');
+
+        if (shouldBeSelected) {
+            await expect(parentLocator).toHaveClass(/bg-grey-[35]/, { timeout });
+            testLogger.info(`Chart type "${chartId}" is selected (verified via bg-grey class)`);
+        } else {
+            await expect(parentLocator).not.toHaveClass(/bg-grey-[35]/, { timeout: 5000 });
+            testLogger.info(`Chart type "${chartId}" is NOT selected (verified via bg-grey class)`);
         }
     }
 
@@ -6649,10 +6627,9 @@ export class LogsPage {
         // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
         // Use visible filter to avoid hidden cached PanelEditor instances.
         try {
-            const initIndicator = this.page
-                .locator(`${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`)
-                .filter({ visible: true })
-                .first();
+            const initIndicator = this.page.locator(
+                `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`
+            ).locator('visible=true').first();
             await initIndicator.waitFor({ state: 'visible', timeout });
             testLogger.info('Build tab initialization complete (chart/table/no-data visible)');
         } catch (error) {

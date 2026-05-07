@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("pipeline.streamTitle") }}
       <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
+        <OButton variant="ghost" size="icon" @click="$emit('cancel:hideform')">
           <q-icon name="cancel" size="14px" />
         </OButton>
       </div>
@@ -146,19 +146,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline-destructive"
               size="sm-action"
               @click="openDeleteDialog"
-            >{{ t("pipeline.deleteNode") }}</OButton>
+              >{{ t("pipeline.deleteNode") }}</OButton
+            >
             <OButton
               data-test="input-node-stream-cancel-btn"
               variant="outline"
               size="sm-action"
               @click="openCancelDialog"
-            >{{ t('alerts.cancel') }}</OButton>
+              >{{ t("alerts.cancel") }}</OButton
+            >
             <OButton
               data-test="input-node-stream-save-btn"
               variant="primary"
               size="sm-action"
               type="submit"
-            >{{ t('alerts.save') }}</OButton>
+              >{{ t("alerts.save") }}</OButton
+            >
           </div>
         </div>
         <div v-else class="pipeline-add-stream">

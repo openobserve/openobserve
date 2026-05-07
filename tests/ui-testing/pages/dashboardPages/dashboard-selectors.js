@@ -114,8 +114,6 @@ const ROLES = {
  */
 const INSPECTOR = {
   QUERY_EDITOR: '.inspector-query-editor',
-  ORIGINAL_QUERY: (index = 0) => `[data-test="query-inspector-original-query-${index}"]`,
-  EXECUTED_QUERY: (index = 0) => `[data-test="query-inspector-executed-query-${index}"]`,
 };
 
 /**

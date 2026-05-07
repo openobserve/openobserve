@@ -32,6 +32,8 @@ export type ButtonVariant =
   | "on-dark-ghost"
   // Solid warning (yellow) background — use to draw attention to a required action
   | "warning"
+  // Outline warning — transparent bg + yellow border + yellow text — for pending-action indicators
+  | "outline-warning"
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   | "preview-slack"
   | "preview-teams"

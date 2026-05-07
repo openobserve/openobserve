@@ -99,12 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <q-dialog
-    v-model="pipelineObj.dialog.show"
-    full-width
-    position="right"
+  <ODrawer
+    v-model:open="pipelineObj.dialog.show"
+    size="full"
+    :show-close="false"
     @keydown.stop
-    maximized
   >
     <div
       data-test="pipeline-nodes-list-dragable"
@@ -146,23 +145,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @cancel:hideform="resetDialog"
       />
     </div>
-  </q-dialog>
-  <q-dialog
-        v-model="showJsonEditorDialog"
-        position="right"
-        full-height
-        maximized
-        :persistent="true"
-      >
-        <JsonEditor
-          :data="pipelineObj.currentSelectedPipeline"
-          :title="t('pipeline.editPipelineJSON')"
-          :type="'pipelines'"
-          :validation-errors="validationErrors"
-          @close="showJsonEditorDialog = false"
-          @saveJson="savePipelineJson"
-        />
-      </q-dialog>
+  </ODrawer>
+  <ODrawer
+    v-model:open="showJsonEditorDialog"
+    size="lg"
+    :show-close="false"
+    persistent
+  >
+    <JsonEditor
+      :data="pipelineObj.currentSelectedPipeline"
+      :title="t('pipeline.editPipelineJSON')"
+      :type="'pipelines'"
+      :validation-errors="validationErrors"
+      @close="showJsonEditorDialog = false"
+      @saveJson="savePipelineJson"
+    />
+  </ODrawer>
   <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -201,6 +199,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { Code2, Maximize2, Minimize2 } from "lucide-vue-next";
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";

@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="position: sticky; bottom: 0; right: 0"
         >
           <OButton
-            v-close-popup
+            @click="$emit('close')"
             variant="outline"
             size="sm-action"
             data-test="add-regex-pattern-cancel-btn"
@@ -425,6 +425,7 @@ import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "AddRegexPattern",
+  emits: ["close"],
   props: {
     data: {
       type: Object,

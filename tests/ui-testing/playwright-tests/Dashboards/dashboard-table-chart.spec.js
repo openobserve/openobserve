@@ -326,24 +326,13 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await streamPromise2;
       await pm.chartTypeSelector.waitForTableDataLoad();
 
-      // Verify the VRL-created field appears as a column in the table.
-      // Poll until the header appears (the table re-renders asynchronously after
-      // dynamic columns are enabled and the stream completes).
-      await expect
-        .poll(
-          async () => {
-            const headers = await getTableHeaders(page);
-            return headers.map((h) => h.toLowerCase()).some((h) => h.includes("vrl_test_field"));
-          },
-          { timeout: 15000, intervals: [500, 1000, 2000] }
-        )
-        .toBe(true);
-
+      // Verify the VRL-created field appears as a column in the table
       const headers = await getTableHeaders(page);
-      const hasVrlField = headers.map((h) => h.toLowerCase()).some((h) => h.includes("vrl_test_field"));
+      const headerTexts = headers.map((h) => h.toLowerCase());
+      const hasVrlField = headerTexts.some((h) => h.includes("vrl_test_field"));
       expect(hasVrlField).toBe(true);
 
-      testLogger.info("VRL field visible as dynamic column", { headers });
+      testLogger.info("VRL field visible as dynamic column", { headers: headerTexts });
 
       await pm.dashboardPanelActions.savePanel();
       await cleanupTestDashboard(page, pm, dashboardName);

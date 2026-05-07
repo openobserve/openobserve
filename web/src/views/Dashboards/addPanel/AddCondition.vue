@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="condition">
     <q-select
       v-if="conditionIndex !== 0"
@@ -10,7 +10,7 @@
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
-      :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
+      :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
     />
     <OButtonGroup class="axis-field" radius="sm">
       <OButton
@@ -29,7 +29,7 @@
               class="tw:w-full"
               :streams="getAllSelectedStreams()"
               v-model="condition.column"
-              :data-test="`dashboard-add-condition-column-${conditionIndex}`"
+              :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
             />
             <OButton
               variant="ghost"

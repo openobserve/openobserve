@@ -367,14 +367,20 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-name"]')
       .fill(variableName);
-    // Selecting "Custom" type auto-creates the first option row (index 0).
-    // Do NOT click "Add Option" — that would add a second empty row and fail validation.
+    const addOptionBtn = this.page.locator('[data-test="dashboard-add-option-btn"]');
+    await addOptionBtn.waitFor({ state: "visible", timeout: 10000 });
+    await addOptionBtn.scrollIntoViewIfNeeded();
+    await addOptionBtn.click();
+
     await this.page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
-      .waitFor({ state: "visible", timeout: 10000 });
+      .click();
     await this.page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
       .fill(label);
+    await this.page
+      .locator('[data-test="dashboard-custom-variable-0-value"]')
+      .click();
     await this.page
       .locator('[data-test="dashboard-custom-variable-0-value"]')
       .fill(value);

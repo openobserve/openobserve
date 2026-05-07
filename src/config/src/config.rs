@@ -1895,7 +1895,7 @@ pub struct Compact {
     pub strategy: String,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
-    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 2048)] // MB
+    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
@@ -1907,6 +1907,8 @@ pub struct Compact {
     pub old_data_max_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_HOURS", default = 2)] // hours
     pub old_data_min_hours: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
+    pub old_data_min_records: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
     pub old_data_min_files: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
@@ -2825,7 +2827,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
-    check_file_format_config(cfg);
+    // Vortex file format requires enterprise feature, fallback to parquet
+    #[cfg(not(feature = "enterprise"))]
+    if cfg.common.file_format == FileFormat::Vortex {
+        return Err(anyhow::anyhow!(
+            "Vortex file format requires enterprise feature, please change ZO_FILE_FORMAT to parquet or unset it"
+        ));
+    }
 
     // check queue store
     if cfg.common.queue_store.is_empty() {
@@ -2914,17 +2922,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     Ok(())
 }
-
-#[cfg(not(feature = "enterprise"))]
-fn check_file_format_config(cfg: &mut Config) {
-    if cfg.common.file_format != FileFormat::Parquet {
-        log::warn!("ZO_FILE_FORMAT is only supported in enterprise builds; using parquet");
-        cfg.common.file_format = FileFormat::Parquet;
-    }
-}
-
-#[cfg(feature = "enterprise")]
-fn check_file_format_config(_cfg: &mut Config) {}
 
 fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.grpc.tls_enabled
@@ -3264,6 +3261,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_hours < 1 {
         cfg.compact.old_data_min_hours = 2;
+    }
+    if cfg.compact.old_data_min_records < 1 {
+        cfg.compact.old_data_min_records = 100;
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
@@ -3672,28 +3672,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "enterprise"))]
-    fn test_non_enterprise_file_format_forces_parquet() {
-        let mut cfg = Config::default();
-        cfg.common.file_format = FileFormat::Vortex;
-
-        check_file_format_config(&mut cfg);
-
-        assert_eq!(cfg.common.file_format, FileFormat::Parquet);
-    }
-
-    #[test]
-    #[cfg(feature = "enterprise")]
-    fn test_enterprise_file_format_preserves_configured_value() {
-        let mut cfg = Config::default();
-        cfg.common.file_format = FileFormat::Vortex;
-
-        check_file_format_config(&mut cfg);
-
-        assert_eq!(cfg.common.file_format, FileFormat::Vortex);
-    }
-
-    #[test]
     fn test_tls_root_certificates_display() {
         assert_eq!(TlsRootCertificates::Webpki.to_string(), "webpki");
         assert_eq!(TlsRootCertificates::Native.to_string(), "native");
@@ -3958,6 +3936,7 @@ mod tests {
         cfg.compact.old_data_interval = 0;
         cfg.compact.old_data_max_days = 0;
         cfg.compact.old_data_min_hours = 0;
+        cfg.compact.old_data_min_records = 0;
         cfg.compact.old_data_min_files = 0;
         cfg.compact.file_list_deleted_batch_size = 0;
         cfg.compact.batch_size = 0;
@@ -3969,6 +3948,7 @@ mod tests {
         assert_eq!(cfg.compact.old_data_interval, 3600);
         assert_eq!(cfg.compact.old_data_max_days, 7);
         assert_eq!(cfg.compact.old_data_min_hours, 2);
+        assert_eq!(cfg.compact.old_data_min_records, 100);
         assert_eq!(cfg.compact.old_data_min_files, 10);
         assert_eq!(cfg.compact.file_list_deleted_batch_size, 1000);
         assert_eq!(cfg.compact.batch_size, 100);

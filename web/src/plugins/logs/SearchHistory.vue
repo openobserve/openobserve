@@ -278,6 +278,7 @@
   <!-- Show NoData component if there's no data to display -->
 </template>
 <script lang="ts">
+
 //@ts-nocheck
 import { ref, watch, onMounted, nextTick, computed, onUnmounted } from "vue";
 import {
