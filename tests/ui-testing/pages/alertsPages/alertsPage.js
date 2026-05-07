@@ -2299,6 +2299,25 @@ export class AlertsPage {
     }
 
     /**
+     * Select a stream by name from the dropdown, using keyboard typing to filter
+     * through Quasar's virtual scroll (only rendered items are in the DOM).
+     * @param {string} streamName - Exact stream name to select
+     */
+    async selectStreamByName(streamName) {
+        const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
+        await expect(streamDropdown).toBeVisible({ timeout: 10000 });
+        await streamDropdown.click();
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.type(streamName, { delay: 30 });
+        await this.page.waitForTimeout(1500);
+        const streamOption = this.page.getByText(streamName, { exact: true }).first();
+        await expect(streamOption).toBeVisible({ timeout: 10000 });
+        await streamOption.click();
+        testLogger.info('Selected stream by name', { stream: streamName });
+    }
+
+    /**
      * Select scheduled alert type via v3 dropdown
      */
     async selectScheduledAlertType() {
@@ -2310,6 +2329,20 @@ export class AlertsPage {
      */
     async selectRealtimeAlertType() {
         await this.creationWizard._selectAlertType('Real-time');
+    }
+
+    /**
+     * Switch stream type + stream name + alert type in one flow.
+     * Used by stream-switching regression tests to change the stream under test
+     * while the wizard is already open (v3 flat layout — no Continue button).
+     * @param {string} streamType - e.g. "logs" or "metrics"
+     * @param {string} streamName - Exact stream name to select
+     */
+    async switchStreamAndReconfirm(streamType, streamName) {
+        await this.selectStreamType(streamType);
+        await this.page.waitForTimeout(2000);
+        await this.selectStreamByName(streamName);
+        await this.selectScheduledAlertType();
     }
 
     /**

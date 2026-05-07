@@ -108,29 +108,17 @@ test.describe("Alerts Stream Switching Regression", () => {
   // Clicks the stream option in a single dropdown session — no Escape+reopen
   // that could race with async option-set repopulation.
   // ============================================================================
-  async function switchStreamAndReconfirm(page, streamType, streamName) {
-    await pm.alertsPage.selectStreamType(streamType);
-    await page.waitForTimeout(2000);
-    const streamDropdown = page.locator(pm.alertsPage.locators.streamNameDropdown);
-    await expect(streamDropdown).toBeVisible({ timeout: 10000 });
-    await streamDropdown.click();
-    await page.waitForTimeout(500);
-    await page.keyboard.press('Control+a');
-    await page.keyboard.type(streamName, { delay: 30 });
-    await page.waitForTimeout(1500);
-    const streamOption = page.getByText(streamName, { exact: true }).first();
-    await expect(streamOption).toBeVisible({ timeout: 10000 });
-    await streamOption.click();
-    await pm.alertsPage.selectScheduledAlertType();
+  async function switchStreamAndReconfirm(streamType, streamName) {
+    await pm.alertsPage.switchStreamAndReconfirm(streamType, streamName);
   }
 
   // ============================================================================
   // Helper: Setup wizard to query config step (v3 flat layout, no Continue btn)
   // ============================================================================
-  async function setupToQueryConfig(page, streamType, streamName) {
+  async function setupToQueryConfig(streamType, streamName) {
     await pm.alertsPage.clickAddAlertButton();
     await pm.alertsPage.fillAlertName(`auto_sw_${Date.now()}`);
-    await switchStreamAndReconfirm(page, streamType, streamName);
+    await switchStreamAndReconfirm(streamType, streamName);
     testLogger.info('Wizard setup complete - query config visible (v3 flat layout)');
   }
 
@@ -147,7 +135,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Start with metrics - PromQL tab must be visible
-    await setupToQueryConfig(page, 'metrics', METRICS_STREAM);
+    await setupToQueryConfig('metrics', METRICS_STREAM);
 
     // Assert PromQL is available on the metrics stream — missing PromQL on a
     // metrics stream is a real regression and should fail, not skip silently.
@@ -156,7 +144,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     testLogger.info('PromQL tab selected on metrics stream');
 
     // Switch to logs: change stream type + stream directly (v3 flat layout keeps dropdowns visible)
-    await switchStreamAndReconfirm(page, 'logs', TEST_LOG_STREAM);
+    await switchStreamAndReconfirm('logs', TEST_LOG_STREAM);
 
     // Verify PromQL is gone for logs
     await pm.alertsPage.expectPromqlTabNotVisible();
@@ -180,17 +168,17 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Phase 1: Logs - chart OK
-    await setupToQueryConfig(page, 'logs', TEST_LOG_STREAM);
+    await setupToQueryConfig('logs', TEST_LOG_STREAM);
     await page.waitForTimeout(2000);
     testLogger.info('Logs stream: setup complete');
 
     // Phase 2: Switch to metrics directly (v3 flat layout keeps dropdowns visible)
-    await switchStreamAndReconfirm(page, 'metrics', METRICS_STREAM);
+    await switchStreamAndReconfirm('metrics', METRICS_STREAM);
     await pm.alertsPage.clickPromqlTab();
     testLogger.info('Metrics stream: PromQL selected');
 
     // Phase 3: Switch BACK to logs directly - verify NO chart error
-    await switchStreamAndReconfirm(page, 'logs', TEST_LOG_STREAM);
+    await switchStreamAndReconfirm('logs', TEST_LOG_STREAM);
 
     await pm.alertsPage.expectPreviewChartVisible();
     await pm.alertsPage.expectNoChartError();
@@ -214,7 +202,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    await setupToQueryConfig(page, 'logs', TEST_LOG_STREAM);
+    await setupToQueryConfig('logs', TEST_LOG_STREAM);
 
     // Switch to SQL tab and open the query editor dialog
     await pm.alertsPage.clickSqlTab();
@@ -260,7 +248,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    await setupToQueryConfig(page, 'logs', TEST_LOG_STREAM);
+    await setupToQueryConfig('logs', TEST_LOG_STREAM);
 
     // Switch to SQL mode, open editor, type query, run
     await pm.alertsPage.clickSqlTab();
@@ -292,7 +280,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    await setupToQueryConfig(page, 'logs', TEST_LOG_STREAM);
+    await setupToQueryConfig('logs', TEST_LOG_STREAM);
 
     // Bug #11578 is about the aggregation field dropdown. After selecting an
     // aggregation function (avg/sum), the field dropdown next to it must only
