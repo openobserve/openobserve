@@ -77,16 +77,12 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Start with metrics - PromQL tab should be visible
+    // Start with metrics - PromQL tab must be visible
     await setupToQueryConfig(page, 'metrics', METRICS_STREAM);
 
-    const promqlVisible = await pm.alertsPage.isPromqlTabVisible();
-    if (!promqlVisible) {
-      testLogger.warn('PromQL tab not visible - metrics stream may not support PromQL, skipping test');
-      await pm.alertsPage.clickBackButton();
-      test.skip(true, 'Metrics stream does not support PromQL on this environment');
-      return;
-    }
+    // Assert PromQL is available on the metrics stream — missing PromQL on a
+    // metrics stream is a real regression and should fail, not skip silently.
+    await pm.alertsPage.expectPromqlTabVisible();
     await pm.alertsPage.clickPromqlTab();
     testLogger.info('PromQL tab selected on metrics stream');
 
@@ -174,8 +170,8 @@ test.describe("Alerts Stream Switching Regression", () => {
       document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
     }).catch(() => {});
 
-    // PRIMARY: Chart visible after SQL mode
-    await pm.alertsPage.expectPreviewChartVisible();
+    // PRIMARY: Chart is not blank after SQL mode (Bug #11571: "blank table instead of line")
+    await pm.alertsPage.expectPreviewChartNotBlank();
 
     // SECONDARY: No "preview not available" message
     const notAvailableMsg = pm.alertsPage.getPreviewNotAvailableMessage();
@@ -184,7 +180,7 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     // TERTIARY: No chart error
     await pm.alertsPage.expectNoChartError();
-    testLogger.info('SQL mode: chart renders (fix confirmed)');
+    testLogger.info('SQL mode: chart renders with canvas (fix confirmed)');
 
     await pm.alertsPage.clickBackButton();
     testLogger.info('Bug #11571 test passed');
@@ -217,8 +213,9 @@ test.describe("Alerts Stream Switching Regression", () => {
     // PRIMARY: Close the editor and verify chart survives (the core of Bug #11573)
     await pm.alertsPage.clickBackButton();
 
-    await pm.alertsPage.expectPreviewChartVisible();
-    testLogger.info('Chart preserved after editor close (fix confirmed)');
+    // Bug #11573: editor close was blanking the graph — assert canvas exists, not just container
+    await pm.alertsPage.expectPreviewChartNotBlank();
+    testLogger.info('Chart preserved (canvas intact) after editor close (fix confirmed)');
 
     await pm.alertsPage.clickBackButton();
     testLogger.info('Bug #11573 test passed');
@@ -238,28 +235,23 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     await setupToQueryConfig(page, 'logs', TEST_LOG_STREAM);
 
-    // Add a condition and select a column
-    await pm.alertsPage.clickAddConditionButton();
-    await pm.alertsPage.clickFirstConditionColumnSelect();
-    await pm.alertsPage.selectFirstFieldOption();
+    // Bug #11578 is about the aggregation field dropdown. After selecting an
+    // aggregation function (avg/sum), the field dropdown next to it must only
+    // show numeric fields. Use expectOnlyNumericFieldsVisible which verifies
+    // that known non-numeric field names are absent.
 
     // avg: only numeric fields
     await pm.alertsPage.selectAggregationFunction('avg');
-    const avgFields = await pm.alertsPage.getAvailableFields();
-    testLogger.info('Fields with avg', { count: avgFields.length });
+    await pm.alertsPage.expectOnlyNumericFieldsVisible();
 
     // sum: same filtering
     await pm.alertsPage.selectAggregationFunction('sum');
-    const sumFields = await pm.alertsPage.getAvailableFields();
-    testLogger.info('Fields with sum', { count: sumFields.length });
+    await pm.alertsPage.expectOnlyNumericFieldsVisible();
 
-    // count: all fields available
+    // count: all fields available (no filtering)
     await pm.alertsPage.selectAggregationFunction('count');
-    const countFields = await pm.alertsPage.getAvailableFields();
-    testLogger.info('Fields with count', { count: countFields.length });
-
-    expect(countFields.length, 'Count should show all fields').toBeGreaterThanOrEqual(avgFields.length);
-    testLogger.info('Bug #11578: field filtering verified');
+    await pm.alertsPage.expectAllFieldsVisible();
+    testLogger.info('Bug #11578: aggregation field filtering verified');
 
     await pm.alertsPage.clickBackButton();
     testLogger.info('Bug #11578 test passed');

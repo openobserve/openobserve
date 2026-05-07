@@ -572,9 +572,10 @@ export class AlertsPage {
         // Assert no error-class banner is visible
         const errorBanner = chartArea.locator('[class*="error"], .q-banner--negative').first();
         await expect(errorBanner).not.toBeVisible({ timeout: 5000 });
-        // Assert no error text pattern is visible anywhere in the chart area
+        // Assert no error text pattern is visible anywhere in the chart area.
+        // Do NOT swallow — a "Schema error" / "No field named" banner must fail the test.
         const errorText = chartArea.locator('text=/Schema error|No field named|Search field not found/i').first();
-        await expect(errorText).not.toBeAttached({ timeout: 3000 }).catch(() => {});
+        await expect(errorText).not.toBeAttached({ timeout: 3000 });
         testLogger.info('No chart error detected');
     }
 
@@ -2721,10 +2722,9 @@ export class AlertsPage {
      */
     async expectEditorContentDoesNotContain(text) {
         const editor = this.page.locator('.monaco-editor textarea, [data-test="alert-editor-sql"] textarea, #alert-editor-promql textarea').first();
-        if (await editor.isVisible({ timeout: 3000 }).catch(() => false)) {
-            const content = await editor.inputValue().catch(() => '');
-            expect(content, `Editor should NOT contain "${text}"`).not.toContain(text);
-        }
+        await expect(editor, 'Query editor must be visible to verify content').toBeVisible({ timeout: 5000 });
+        const content = await editor.inputValue().catch(() => '');
+        expect(content, `Editor should NOT contain "${text}"`).not.toContain(text);
         testLogger.info('Editor content verified — does not contain unexpected text');
     }
 
@@ -3296,14 +3296,26 @@ export class AlertsPage {
     }
 
     /**
-     * Get the list of visible field names from the field dropdown in the condition row.
-     * Opens the field dropdown, reads all visible option labels, then closes it.
+     * Get the locator for the aggregation field dropdown (the field selector next to
+     * the aggregation function dropdown in the "Alert if" row). This is the second
+     * .alert-v3-select in the alert-condition-row that contains "Alert if".
+     * @returns {Locator}
+     */
+    getAggregationFieldSelect() {
+        const alertIfSection = this.page.locator('.alert-condition-row').filter({ hasText: 'Alert if' }).first();
+        return alertIfSection.locator('.alert-v3-select').nth(1);
+    }
+
+    /**
+     * Get the list of visible field names from the aggregation field dropdown.
+     * Opens the dropdown, reads all visible option labels, then closes it.
+     * Used for Bug #11578: verifying that avg/sum filter to numeric-only fields.
      * @returns {Promise<string[]>} Array of field name strings
      */
     async getAvailableFields() {
-        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
-        await columnSelect.waitFor({ state: 'visible', timeout: 10000 });
-        await columnSelect.click();
+        const fieldSelect = this.getAggregationFieldSelect();
+        await fieldSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await fieldSelect.click();
         await this.page.waitForTimeout(500);
 
         const menuItems = this.page.locator('.q-menu:visible .q-item, [role="listbox"]:visible [role="option"]');
@@ -3320,7 +3332,7 @@ export class AlertsPage {
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(300);
 
-        testLogger.info('Available fields in dropdown', { count: fields.length, fields });
+        testLogger.info('Available fields in aggregation dropdown', { count: fields.length, fields });
         return fields;
     }
 

@@ -1771,8 +1771,7 @@ export class AlertCreationWizard {
         }
 
         if (!clicked) {
-            // Some modes auto-run queries — just wait and check
-            testLogger.info('No Run Query button found — query may auto-run');
+            throw new Error('No Run Query button found — expected at least one visible run/query button in the editor dialog. The query was not executed.');
         }
 
         await this.page.waitForTimeout(2000);
