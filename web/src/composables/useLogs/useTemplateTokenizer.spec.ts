@@ -115,14 +115,15 @@ describe("tokenizeTemplate", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("handles template with only wildcards", () => {
+  it("handles template with only wildcards (space between becomes text)", () => {
     const result = tokenizeTemplate("<*> <:IP>", [
       { position: 0, token: "<*>", sample_values: ["a"] },
       { position: 1, token: "<:IP>", sample_values: ["b"] },
     ]);
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3); // wildcard, text(" "), wildcard
     expect(result[0]).toMatchObject({ kind: "wildcard", value: "<*>" });
-    expect(result[1]).toMatchObject({ kind: "wildcard", value: "<:IP>" });
+    expect(result[1]).toEqual({ kind: "text", value: " " });
+    expect(result[2]).toMatchObject({ kind: "wildcard", value: "<:IP>" });
   });
 
   it("handles consecutive wildcards without intervening text", () => {
