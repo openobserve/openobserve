@@ -30,12 +30,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stack-label
             class="showLabelOnTop"
             @update:model-value="handleDisplayChange"
+            @blur="handleDisplayBlur"
           />
         </div>
         <!-- Show ID as read-only caption for existing groups -->
         <div v-if="localGroup.id" class="text-caption text-grey-6">
           {{ t("common.id") }}: {{ localGroup.id }}
         </div>
+        <q-toggle
+          v-model="localGroup.is_workload_type"
+          :label="t('correlation.isWorkloadType')"
+          dense
+          size="sm"
+          class="q-mt-xs"
+          @update:model-value="emitUpdate"
+        >
+          <q-tooltip>{{ t('correlation.isWorkloadTypeTooltip') }}</q-tooltip>
+        </q-toggle>
       </div>
 
       <!-- Right Column: Field Names spanning both rows -->
@@ -83,6 +94,8 @@ interface SemanticGroup {
   id: string;
   display: string;
   fields: string[];
+  group?: string;
+  is_workload_type?: boolean;
 }
 
 interface Props {
@@ -96,25 +109,30 @@ const emit = defineEmits<{
 }>();
 
 const isProtected = computed(() => props.group.id === "service");
-const localGroup = ref<SemanticGroup>({ ...props.group });
+
+const normalizeGroup = (g: SemanticGroup): SemanticGroup => ({
+  ...g,
+  is_workload_type: g.is_workload_type ?? false,
+});
+
+const localGroup = ref<SemanticGroup>(normalizeGroup(props.group));
 
 watch(
   () => props.group,
   (newGroup) => {
-    localGroup.value = { ...newGroup };
+    localGroup.value = normalizeGroup(newGroup);
   },
   { deep: true },
 );
 
-// Auto-generate ID from display name for new groups (when ID is empty)
+const slugify = (s: string): string =>
+  s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+// Generate ID as "{category-slug}-{display-slug}" for new groups
 const generateIdFromDisplay = (display: string): string => {
-  return display
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+  const displaySlug = slugify(display);
+  const categorySlug = slugify(localGroup.value.group || "");
+  return categorySlug ? `${categorySlug}-${displaySlug}` : displaySlug;
 };
 
 // Handle display name change (just emit, don't generate ID yet)
