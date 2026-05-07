@@ -110,11 +110,11 @@ test.describe("Alerts Stream Switching Regression", () => {
   // ============================================================================
   async function switchStreamAndReconfirm(page, streamType, streamName) {
     await pm.alertsPage.selectStreamType(streamType);
+    await page.waitForTimeout(2000);
     const streamDropdown = page.locator(pm.alertsPage.locators.streamNameDropdown);
     await expect(streamDropdown).toBeVisible({ timeout: 10000 });
     await streamDropdown.click();
     await page.waitForTimeout(500);
-    // Type to filter, then click the target option in the same dropdown opening
     await page.keyboard.press('Control+a');
     await page.keyboard.type(streamName, { delay: 30 });
     await page.waitForTimeout(1500);
@@ -221,11 +221,12 @@ test.describe("Alerts Stream Switching Regression", () => {
     await pm.alertsPage.clickOpenFullEditor();
 
     // Type SQL query into the editor and run it
-    await pm.alertsPage.typeInQueryEditor(`SELECT COUNT(*) as cnt FROM "${TEST_LOG_STREAM}"`);
+    await pm.alertsPage.typeInQueryEditor(`SELECT histogram(_timestamp, interval '1 minute') as zo_sql_ts, COUNT(*) as zo_sql_value FROM "${TEST_LOG_STREAM}" GROUP BY zo_sql_ts ORDER BY zo_sql_ts`);
     await pm.alertsPage.clickRunQueryButton();
 
     // Close editor dialog (scoped to dialog to avoid ambiguity with wizard back button)
     await pm.alertsPage.closeEditorDialog();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // PRIMARY: Chart is not blank after SQL mode (Bug #11571: "blank table instead of line")
     await pm.alertsPage.expectPreviewChartNotBlank();
@@ -264,11 +265,12 @@ test.describe("Alerts Stream Switching Regression", () => {
     // Switch to SQL mode, open editor, type query, run
     await pm.alertsPage.clickSqlTab();
     await pm.alertsPage.clickOpenFullEditor();
-    await pm.alertsPage.typeInQueryEditor(`SELECT COUNT(*) as cnt FROM "${TEST_LOG_STREAM}"`);
+    await pm.alertsPage.typeInQueryEditor(`SELECT histogram(_timestamp, interval '1 minute') as zo_sql_ts, COUNT(*) as zo_sql_value FROM "${TEST_LOG_STREAM}" GROUP BY zo_sql_ts ORDER BY zo_sql_ts`);
     await pm.alertsPage.clickRunQueryButton();
 
     // PRIMARY: Close the editor dialog and verify chart survives (the core of Bug #11573)
     await pm.alertsPage.closeEditorDialog();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Bug #11573: editor close was blanking the graph — assert canvas exists, not just container
     await pm.alertsPage.expectPreviewChartNotBlank();
