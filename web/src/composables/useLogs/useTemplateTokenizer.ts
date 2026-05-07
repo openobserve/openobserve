@@ -61,12 +61,31 @@ export function tokenizeTemplate(
       tokens.push({ kind: "text", value: template.slice(lastIndex, match.index) });
     }
 
-    const wv = wildcardValues.find((w) => w.position === wildcardIndex);
+    // Try to match by position first, fall back to array index
+    let wv = wildcardValues.find((w) => w.position === wildcardIndex);
+    if (!wv) {
+      wv = wildcardValues[wildcardIndex];
+    }
+    // Handle both snake_case and camelCase from the API
+    const rawValues: string[] =
+      (wv as any)?.sample_values ??
+      (wv as any)?.sampleValues ??
+      (wv as any)?.top_values ??
+      (wv as any)?.topValues ??
+      (wv as any)?.values ??
+      [];
+    if (rawValues.length === 0 && wv) {
+      console.log("[tokenizeTemplate] Found wildcard item but no values", {
+        wildcardIndex,
+        wv,
+        wvKeys: Object.keys(wv),
+      });
+    }
     tokens.push({
       kind: "wildcard",
       value: match[0],
       position: wildcardIndex,
-      sampleValues: wv?.sample_values ?? [],
+      sampleValues: rawValues,
     });
 
     wildcardIndex++;
