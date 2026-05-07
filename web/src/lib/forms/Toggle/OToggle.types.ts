@@ -20,8 +20,8 @@ export interface ToggleProps {
 }
 
 export interface ToggleEmits {
-  (e: "update:modelValue", value: boolean): void;
-  (e: "change", value: boolean): void;
+  (_e: "update:modelValue", _value: boolean): void;
+  (_e: "change", _value: boolean): void;
 }
 
 export interface ToggleSlots {

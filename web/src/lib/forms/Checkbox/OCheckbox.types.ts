@@ -26,9 +26,9 @@ export interface CheckboxProps {
 }
 
 export interface CheckboxEmits {
-  (e: "update:modelValue", value: boolean | "indeterminate"): void;
+  (_e: "update:modelValue", _value: boolean | "indeterminate"): void;
   /** Fired when the checkbox is inside a group — emits the item value */
-  (e: "change", value: boolean | "indeterminate"): void;
+  (_e: "change", _value: boolean | "indeterminate"): void;
 }
 
 export interface CheckboxSlots {
@@ -44,8 +44,8 @@ export type CheckboxGroupValue = Array<string | number | boolean>;
 export interface CheckboxGroupContext {
   modelValue: CheckboxGroupValue;
   disabled: boolean;
-  toggle(value: string | number | boolean): void;
-  isChecked(value: string | number | boolean): boolean;
+  toggle(_value: string | number | boolean): void;
+  isChecked(_value: string | number | boolean): boolean;
 }
 
 export const CHECKBOX_GROUP_KEY: InjectionKey<CheckboxGroupContext> =
@@ -59,7 +59,7 @@ export interface CheckboxGroupProps {
 }
 
 export interface CheckboxGroupEmits {
-  (e: "update:modelValue", value: CheckboxGroupValue): void;
+  (_e: "update:modelValue", _value: CheckboxGroupValue): void;
 }
 
 export interface CheckboxGroupSlots {

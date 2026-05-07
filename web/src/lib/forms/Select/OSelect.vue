@@ -10,7 +10,6 @@ import {
   SelectPortal,
   SelectContent,
   SelectViewport,
-  SelectSeparator,
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "reka-ui";
@@ -48,10 +47,19 @@ const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "tw:h-8 tw:text-sm",
   md: "tw:h-10 tw:text-sm",
 };
+
+const rootStyle = computed(() => ({
+  width:
+    props.width === undefined
+      ? "100%"
+      : typeof props.width === "number"
+        ? `${props.width}px`
+        : props.width,
+}));
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div :style="rootStyle" class="tw:flex tw:flex-col tw:gap-1">
     <!-- Label -->
     <label
       v-if="label"

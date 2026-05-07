@@ -4,7 +4,7 @@
 import type { SelectItemProps, SelectItemSlots } from "./OSelect.types";
 import { SelectItem, SelectItemText, SelectItemIndicator } from "reka-ui";
 
-const props = withDefaults(defineProps<SelectItemProps>(), {
+withDefaults(defineProps<SelectItemProps>(), {
   disabled: false,
 });
 
