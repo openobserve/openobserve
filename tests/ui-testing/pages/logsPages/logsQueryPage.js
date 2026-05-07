@@ -66,9 +66,7 @@ export class LogsQueryPage {
         continue;
       }
     }
-    const fallback = this.page.getByText('No data').first();
-    await fallback.waitFor({ state: 'visible', timeout: 20000 });
-    await fallback.click({ force: true });
+    throw new Error('No "no data" message matched — expected one of: ' + patterns.join(', '));
   }
 
   async clickResultDetail() {

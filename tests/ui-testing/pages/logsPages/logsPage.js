@@ -891,6 +891,20 @@ export class LogsPage {
         const errorMessage = this.page.locator(this.errorMessage);
         const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            // Wait for button to leave Cancel/loading state before clicking —
+            // otherwise a click on "Cancel" aborts the in-flight query instead
+            // of starting a fresh one.
+            await this.page.waitForFunction(
+                (sel) => {
+                    const b = document.querySelector(sel);
+                    if (!b) return false;
+                    return !b.hasAttribute('disabled')
+                        && !b.classList.contains('q-btn--loading')
+                        && !(b.textContent?.trim()?.includes('Cancel'));
+                },
+                this.queryButton,
+                { timeout: 30000 },
+            ).catch(() => {});
             await queryBtn.click();
             await this.page.waitForTimeout(3000);
 
@@ -1709,7 +1723,15 @@ export class LogsPage {
         } catch (e) {
             const editorText = await editor.textContent().catch(() => '');
             if (editorText && editorText.includes(field)) return;
+            // Don't re-click — the star icon is a toggle. If the first click
+            // turned it on but the editor hadn't refreshed yet, re-clicking
+            // would remove it. Instead, give the editor more time and re-check.
+            await this.page.waitForTimeout(3000);
+            const retryText = await editor.textContent().catch(() => '');
+            if (retryText && retryText.includes(field)) return;
+            // Only re-click as a last resort when field is definitely not added
             await this.clickInterestingFieldButton(field);
+            await this.page.waitForTimeout(2000);
         }
     }
 
@@ -3719,6 +3741,7 @@ export class LogsPage {
         // Retry up to 3 times: under parallel load on alpha1, the first click may
         // toggle the menu closed (if it was already open) or the menu may open slowly.
         const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        let enabled = false;
         for (let attempt = 0; attempt < 3; attempt++) {
             // Dismiss any open overlay first to avoid toggle-closing on the next click
             await this.page.keyboard.press('Escape');
@@ -3739,6 +3762,7 @@ export class LogsPage {
             if (isOn) {
                 await this.page.keyboard.press('Escape');
                 await this.page.waitForTimeout(200);
+                enabled = true;
                 break;
             }
 
@@ -3746,11 +3770,16 @@ export class LogsPage {
             await this.page.waitForTimeout(300);
             await this.page.keyboard.press('Escape');
             await this.page.waitForTimeout(200);
+            enabled = true;
             break;
         }
 
+        if (!enabled) {
+            throw new Error('Quick Mode could not be enabled after 3 attempts');
+        }
+
         // Wait for Quick Mode to take effect in the field list sidebar
-        await quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+        await quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 });
     }
 
     async clickTimestampField() {
