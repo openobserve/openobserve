@@ -468,35 +468,27 @@ pub async fn save_semantic_groups(
         }
     }
 
-    // Get existing groups from system_settings (with caching)
+    // The PUT body is the authoritative new list of semantic groups for the org.
+    // Previously this endpoint did an upsert-only merge against existing groups
+    // (or the bundled defaults when the DB row was empty), which silently
+    // resurrected any group the UI had deleted. Treat the incoming list as the
+    // full replacement — but re-inject protected groups (like "service") from the
+    // existing config if the client omitted them, so they can never be lost.
     let existing_groups =
         crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
 
-    // Merge incoming groups with existing ones
-    // Build a map of incoming groups by ID for quick lookup
-    let incoming_map: std::collections::HashMap<String, FieldAlias> = incoming_groups
-        .into_iter()
-        .map(|g| (g.id.clone(), g))
-        .collect();
+    let incoming_ids: std::collections::HashSet<String> =
+        incoming_groups.iter().map(|g| g.id.clone()).collect();
 
-    // Update existing groups if they're in incoming, keep others unchanged
-    let mut merged_groups: Vec<FieldAlias> = existing_groups
-        .into_iter()
-        .map(|existing| {
-            if let Some(updated) = incoming_map.get(&existing.id) {
-                updated.clone()
-            } else {
-                existing
-            }
-        })
-        .collect();
+    let mut merged_groups: Vec<FieldAlias> = incoming_groups;
 
-    // Add new groups that don't exist in current config
-    let existing_ids: std::collections::HashSet<String> =
-        merged_groups.iter().map(|g| g.id.clone()).collect();
-    for (id, group) in incoming_map {
-        if !existing_ids.contains(&id) {
-            merged_groups.push(group);
+    // Re-inject protected groups (always present, never deletable)
+    const PROTECTED_GROUP_IDS: &[&str] = &["service"];
+    for protected_id in PROTECTED_GROUP_IDS {
+        if !incoming_ids.contains(*protected_id)
+            && let Some(existing) = existing_groups.iter().find(|g| g.id == *protected_id)
+        {
+            merged_groups.push(existing.clone());
         }
     }
 
