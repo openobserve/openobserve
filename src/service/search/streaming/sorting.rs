@@ -245,10 +245,10 @@ impl TopKHeap {
             // Only set is_numeric when ORDER BY column is actually present (non-null).
             // get_or_insert_with would lock to false on null hits, causing numeric
             // values to be compared as strings ("100" < "20").
-            if self.is_numeric.is_none() {
-                if let Some(v) = hit.get(&self.col) {
-                    self.is_numeric = Some(v.is_number());
-                }
+            if self.is_numeric.is_none()
+                && let Some(v) = hit.get(&self.col)
+            {
+                self.is_numeric = Some(v.is_number());
             }
             let is_numeric = self.is_numeric.unwrap_or(false);
             let candidate = HeapHit::new(hit, &self.col, is_numeric, self.is_descending);
