@@ -77,7 +77,9 @@ pub async fn get_dimension_analytics(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::calculate_dimension_analytics(&org_id)
+        let semantic_groups =
+            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::calculate_dimension_analytics(&org_id, semantic_groups)
             .await
         {
             Ok(analytics) => MetaHttpResponse::json(analytics),
@@ -360,7 +362,7 @@ pub async fn save_identity_config(
         return MetaHttpResponse::bad_request(e);
     }
 
-    // Validate that all tracked_alias_ids exist in canonical groups
+    // Validate that all tracked_alias_ids exist in canonical groups (defaults + custom DB groups)
     #[cfg(feature = "enterprise")]
     {
         use std::collections::HashSet;
