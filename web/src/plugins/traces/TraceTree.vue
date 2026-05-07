@@ -473,6 +473,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    hoveredSpanId: {
+      type: String,
+      default: "",
+    },
     isSidebarOpen: {
       type: Boolean,
       default: false,
