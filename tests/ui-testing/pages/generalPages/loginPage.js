@@ -58,8 +58,10 @@ export class LoginPage {
       return;
     }
 
-    // Wait for login form elements to be available
-    await this.userIdInput.waitFor({ state: 'visible', timeout: 15000 });
+    // Already authenticated (serial mode: cookies persist between tests).
+    // If the login form isn't present within 3s, we're already at the app — skip re-login.
+    const loginFormVisible = await this.userIdInput.isVisible({ timeout: 3000 }).catch(() => false);
+    if (!loginFormVisible) return;
     await this.passwordInput.waitFor({ state: 'visible', timeout: 15000 });
 
     await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
