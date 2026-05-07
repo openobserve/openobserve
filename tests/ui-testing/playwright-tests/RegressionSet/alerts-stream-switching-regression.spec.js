@@ -53,14 +53,12 @@ test.describe("Alerts Stream Switching Regression", () => {
   });
 
   // ============================================================================
-  // Helper: Setup wizard to query config step (v3 flat layout, no Continue btn)
+  // Helper: Switch stream type + stream, waiting for dropdown repopulation.
+  // Replaces the fragile selectStreamType → waitForTimeout(500) → selectStreamByName
+  // pattern with an explicit wait for the target option to be attached.
   // ============================================================================
-  async function setupToQueryConfig(page, streamType, streamName) {
-    await pm.alertsPage.clickAddAlertButton();
-    await pm.alertsPage.fillAlertName(`auto_sw_${Date.now()}`);
+  async function switchStreamAndReconfirm(page, streamType, streamName) {
     await pm.alertsPage.selectStreamType(streamType);
-    // Wait for stream dropdown to repopulate after stream-type change,
-    // then verify the target option is attached before delegating to selectStreamByName
     const streamDropdown = page.locator('[data-test="alert-stream-name-dropdown"]');
     await expect(streamDropdown).toBeVisible({ timeout: 10000 });
     await streamDropdown.click();
@@ -70,6 +68,15 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.waitForTimeout(200);
     await pm.alertsPage.creationWizard.selectStreamByName(streamName);
     await pm.alertsPage.selectScheduledAlertType();
+  }
+
+  // ============================================================================
+  // Helper: Setup wizard to query config step (v3 flat layout, no Continue btn)
+  // ============================================================================
+  async function setupToQueryConfig(page, streamType, streamName) {
+    await pm.alertsPage.clickAddAlertButton();
+    await pm.alertsPage.fillAlertName(`auto_sw_${Date.now()}`);
+    await switchStreamAndReconfirm(page, streamType, streamName);
     testLogger.info('Wizard setup complete - query config visible (v3 flat layout)');
   }
 
@@ -95,10 +102,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     testLogger.info('PromQL tab selected on metrics stream');
 
     // Switch to logs: change stream type + stream directly (v3 flat layout keeps dropdowns visible)
-    await pm.alertsPage.selectStreamType('logs');
-    await page.waitForTimeout(500);
-    await pm.alertsPage.creationWizard.selectStreamByName(TEST_LOG_STREAM);
-    await pm.alertsPage.selectScheduledAlertType();
+    await switchStreamAndReconfirm(page, 'logs', TEST_LOG_STREAM);
 
     // Verify PromQL is gone for logs
     await pm.alertsPage.expectPromqlTabNotVisible();
@@ -127,18 +131,12 @@ test.describe("Alerts Stream Switching Regression", () => {
     testLogger.info('Logs stream: setup complete');
 
     // Phase 2: Switch to metrics directly (v3 flat layout keeps dropdowns visible)
-    await pm.alertsPage.selectStreamType('metrics');
-    await page.waitForTimeout(500);
-    await pm.alertsPage.creationWizard.selectStreamByName(METRICS_STREAM);
-    await pm.alertsPage.selectScheduledAlertType();
+    await switchStreamAndReconfirm(page, 'metrics', METRICS_STREAM);
     await pm.alertsPage.clickPromqlTab();
     testLogger.info('Metrics stream: PromQL selected');
 
     // Phase 3: Switch BACK to logs directly - verify NO chart error
-    await pm.alertsPage.selectStreamType('logs');
-    await page.waitForTimeout(500);
-    await pm.alertsPage.creationWizard.selectStreamByName(TEST_LOG_STREAM);
-    await pm.alertsPage.selectScheduledAlertType();
+    await switchStreamAndReconfirm(page, 'logs', TEST_LOG_STREAM);
 
     await pm.alertsPage.expectPreviewChartVisible();
     await pm.alertsPage.expectNoChartError();

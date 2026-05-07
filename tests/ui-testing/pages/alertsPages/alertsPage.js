@@ -2573,15 +2573,18 @@ export class AlertsPage {
      * @param {string} text - Text that should NOT be present in the editor
      */
     async expectEditorContentDoesNotContain(text) {
-        const editor = this.page.locator('.monaco-editor textarea, [data-test="alert-editor-sql"] textarea, #alert-editor-promql textarea').first();
-        const isVisible = await editor.isVisible({ timeout: 3000 }).catch(() => false);
-        if (!isVisible) {
-            testLogger.info('No query editor visible — editor content is clean');
-            return;
+        // Check ALL Monaco editor textareas in the DOM (visible or hidden).
+        // A hidden textarea with stale PromQL content is still a regression.
+        const editors = this.page.locator('.monaco-editor textarea, [data-test="alert-editor-sql"] textarea, #alert-editor-promql textarea');
+        const count = await editors.count();
+        testLogger.info('Checking editor content', { textareasFound: count });
+        for (let i = 0; i < count; i++) {
+            const content = await editors.nth(i).inputValue().catch(() => '');
+            if (content) {
+                expect(content, `Editor textarea #${i} should NOT contain "${text}", got: "${content}"`).not.toContain(text);
+            }
         }
-        const content = await editor.inputValue().catch(() => '');
-        expect(content, `Editor should NOT contain "${text}"`).not.toContain(text);
-        testLogger.info('Editor content verified — does not contain unexpected text');
+        testLogger.info('No editor contains the forbidden text', { text, textareasChecked: count });
     }
 
     // ==================== PROMQL CONDITION ROW METHODS ====================
