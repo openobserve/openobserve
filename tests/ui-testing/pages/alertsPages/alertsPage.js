@@ -2577,6 +2577,7 @@ export class AlertsPage {
         // A hidden textarea with stale PromQL content is still a regression.
         const editors = this.page.locator('.monaco-editor textarea, [data-test="alert-editor-sql"] textarea, #alert-editor-promql textarea');
         const count = await editors.count();
+        expect(count, 'Expected at least one Monaco editor textarea in the DOM — editor may not have mounted').toBeGreaterThan(0);
         testLogger.info('Checking editor content', { textareasFound: count });
         for (let i = 0; i < count; i++) {
             const content = await editors.nth(i).inputValue().catch(() => '');
