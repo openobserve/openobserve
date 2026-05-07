@@ -42,10 +42,10 @@ export class LogsPage {
         this.matchingFieldsSelector = '[data-test*="log-search-expand-"]';
         this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
-        this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"] > .q-btn__content';
-        this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block';
-        this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"] > .q-btn__content';
-        this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"] > .q-btn__content > .block';
+        this.searchBarRefreshButton = '[data-cy="search-bar-refresh-button"]';
+        this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
+        this.relative6WeeksButton = '[data-test="date-time-relative-6-w-btn"]';
+        this.relative30SecondsButton = '[data-test="date-time-relative-30-s-btn"]';
         this.relative1HourButton = '[data-test="date-time-relative-1-h-btn"]';
         this.absoluteTab = '[data-test="date-time-absolute-tab"]';
         this.scheduleText = '[data-test="date-time-btn"]';
@@ -69,15 +69,15 @@ export class LogsPage {
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
         this.confirmButton = '[data-test="confirm-button"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
-        this.searchStreamInput = '[placeholder="Search Stream"]';
-        this.exploreButtonRole = { role: 'button', name: 'Explore' };
+        this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
+        this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
         this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
-        this.includeExcludeFieldButton = ':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon';
+        this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
-        this.closeDialog = '[data-test="close-dialog"] > .q-btn__content';
-        this.savedViewDialogSaveContent = '[data-test="saved-view-dialog-save-btn"] > .q-btn__content';
+        this.closeDialog = '[data-test="close-dialog"]';
+        this.savedViewDialogSaveContent = '[data-test="saved-view-dialog-save-btn"]';
         this.savedViewByLabel = '.q-item__label';
         this.notificationMessage = '.q-notification__message';
         this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
@@ -98,7 +98,7 @@ export class LogsPage {
         this.schemaStreamIndexSelect = ':nth-child(2) > [data-test="schema-stream-index-select"]';
         this.fullTextSearch = '.q-virtual-scroll__content';
         this.schemaUpdateSettingsButton = '[data-test="schema-update-settings-button"]';
-        this.colAutoButton = '.col-auto > .q-btn > .q-btn__content';
+        this.colAutoButton = '.col-auto button';
         this.exploreTitle = '[title="Explore"]';
         this.streamsSearchStreamInput = '[data-test="streams-search-stream-input"]';
         this.logSearchIndexListFieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
@@ -115,7 +115,7 @@ export class LogsPage {
         this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
-        this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"] > .q-btn__content';
+        this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
         this.menuLink = link => `[data-test="menu-link-${link}"]`;
         this.searchAroundBtn = '[data-test="logs-search-bar-search-around-btn"]';
         this.pagination = '[data-test="logs-search-pagination"]';
@@ -223,9 +223,9 @@ export class LogsPage {
         this.applyDimensionFiltersEmbedded = '[data-test="apply-dimension-filters-embedded"]';
         this.metricSelectorButton = '[data-test="metric-selector-button"]';
         // Correlation tabs in detail drawer (tab names, not data-test)
-        this.correlatedLogsTab = '.q-tab[name="correlated-logs"], .q-tabs .q-tab:has-text("Logs"):not([data-test="log-detail-json-tab"])';
-        this.correlatedMetricsTab = '.q-tab[name="correlated-metrics"], .q-tabs .q-tab:has-text("Metrics")';
-        this.correlatedTracesTab = '.q-tab[name="correlated-traces"], .q-tabs .q-tab:has-text("Traces")';
+        this.correlatedLogsTab = '[role="tablist"] [role="tab"]:has-text("Logs"):not([data-test="log-detail-json-tab"]):not([data-test="log-detail-table-tab"])';
+        this.correlatedMetricsTab = '[role="tab"]:has-text("Metrics")';
+        this.correlatedTracesTab = '[role="tab"]:has-text("Traces")';
         // Correlation loading and error states
         this.correlationLoadingSpinner = '.q-spinner-hourglass';
         this.correlationErrorMessage = '.tw\\:text-red-500';
@@ -297,6 +297,7 @@ export class LogsPage {
         this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
         this.searchResultText = '[data-test="logs-search-search-result"]';
         this.logDetailPanel = '.q-dialog, [data-test*="log-detail"]';
+        this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
     }
 
 
@@ -713,6 +714,38 @@ export class LogsPage {
         throw new Error(`selectStream: Failed to find stream "${stream}" after ${maxRetries} attempts`);
     }
 
+    async deselectStream(streamName) {
+        testLogger.info(`Deselecting stream: ${streamName}`);
+        const streamDropdown = this.page.locator(this.indexDropDown);
+        await streamDropdown.click();
+        await this.page.waitForTimeout(500);
+        const streamToggle = this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first();
+        if (await streamToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await streamToggle.click();
+            testLogger.info(`Deselected stream: ${streamName}`);
+        }
+    }
+
+    async addStreamToSelection(streamName) {
+        testLogger.info(`Adding stream to selection: ${streamName}`);
+        const searchInput = this.page.locator(this.indexDropDown);
+        await searchInput.click();
+        await this.page.waitForTimeout(500);
+        await searchInput.fill(streamName);
+        await this.page.waitForTimeout(1000);
+        const streamToggle = this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).first();
+        if (await streamToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await streamToggle.click();
+            testLogger.info(`Selected additional stream: ${streamName}`);
+        }
+    }
+
+    async expectTimestampColumnVisible() {
+        const timestampColumn = this.page.locator('[data-test="log-table-column-1-_timestamp"]');
+        await expect(timestampColumn, 'Timestamp column should be visible').toBeVisible({ timeout: 5000 });
+        testLogger.info('Timestamp column visible in table');
+    }
+
     async selectIndexStreamOld(streamName) {
         testLogger.debug(`selectIndexStreamOld: Starting selection for stream: ${streamName}`);
         try {
@@ -1068,7 +1101,7 @@ export class LogsPage {
 
     async setDateTimeTo15Minutes() {
         await this.page.locator(this.dateTimeButton).click();
-        await this.page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click();
+        await this.page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     }
 
     async setAbsoluteDate(year, month, day, currentMonth, currentYear) {
@@ -1794,7 +1827,7 @@ export class LogsPage {
             (selector) => {
                 const btn = document.querySelector(selector);
                 if (!btn) return false;
-                return btn.hasAttribute('disabled') || btn.classList.contains('q-btn--loading') || btn.textContent?.trim()?.includes('Cancel');
+                return btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true' || btn.textContent?.trim()?.includes('Cancel');
             },
             this.queryButton,
             { timeout: 5000 }
@@ -1808,7 +1841,7 @@ export class LogsPage {
                 const btn = document.querySelector(selector);
                 if (!btn) return false;
                 const isDisabled = btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true';
-                const isLoading = btn.classList.contains('q-btn--loading');
+                const isLoading = btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true';
                 const text = btn.textContent?.trim() || '';
                 return !isDisabled && !isLoading && !text.includes('Cancel');
             },
@@ -1960,12 +1993,7 @@ export class LogsPage {
         // Close any open dialogs/menus first (e.g., saved views dropdown)
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(200);
-
-        // Saved views is now a split dropdown button on the toolbar.
-        // The left (first) button triggers the save dialog (fnSavedView).
-        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
-        const saveButton = savedViewsGroup.locator('button').first();
-        return await saveButton.click();
+        return await this.page.locator('[data-test="logs-search-saved-views-btn"]').click();
     }
 
     async fillSavedViewName(name) {
@@ -2068,7 +2096,7 @@ export class LogsPage {
     }
 
     async clickExploreButton() {
-        return await this.page.getByRole(this.exploreButtonRole.role, { name: this.exploreButtonRole.name }).first().click({ force: true });
+        return await this.page.locator(this.exploreButtonSelector).first().click({ force: true });
     }
 
     async waitForSavedViewsButton() {
@@ -2186,8 +2214,8 @@ export class LogsPage {
         const jsonTab = this.page.locator(this.logDetailJsonTab);
         await expect(jsonTab).toBeVisible();
 
-        // Check if JSON tab is selected (has 'q-tab--active' class)
-        const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
+        // Check if JSON tab is selected (has data-state="active" for Reka OTab)
+        const isJsonTabActive = await jsonTab.evaluate(el => el.getAttribute('data-state') === 'active');
         expect(isJsonTabActive, 'JSON tab should be selected by default (Bug #9724)').toBe(true);
 
         // Verify JSON content is visible
@@ -2233,7 +2261,7 @@ export class LogsPage {
      */
     async verifyTableTabSelected() {
         const tableTab = this.page.locator(this.logDetailTableTab);
-        const isTableTabActive = await tableTab.evaluate(el => el.classList.contains('q-tab--active'));
+        const isTableTabActive = await tableTab.evaluate(el => el.getAttribute('data-state') === 'active');
         expect(isTableTabActive, 'Table tab should be selected').toBe(true);
         await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
         testLogger.info('✓ Table tab is selected and content is visible');
@@ -2245,7 +2273,7 @@ export class LogsPage {
      */
     async verifyJsonTabSelected() {
         const jsonTab = this.page.locator(this.logDetailJsonTab);
-        const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
+        const isJsonTabActive = await jsonTab.evaluate(el => el.getAttribute('data-state') === 'active');
         expect(isJsonTabActive, 'JSON tab should be selected').toBe(true);
         await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
         testLogger.info('✓ JSON tab is selected and content is visible');
@@ -2365,9 +2393,9 @@ export class LogsPage {
         await this.page.waitForTimeout(2000);
 
         // Check for correlation tabs by looking for tabs with specific text
-        const logsTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Logs' });
-        const metricsTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Metrics' });
-        const tracesTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Traces' });
+        const logsTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Logs' });
+        const metricsTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Metrics' });
+        const tracesTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Traces' });
 
         // At least one correlation tab should be visible
         const anyCorrelationTabVisible = await logsTab.or(metricsTab).or(tracesTab).first().isVisible().catch(() => false);
@@ -2380,7 +2408,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedLogsTab() {
-        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Logs' }).last();
+        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Logs' }).last();
         await tab.click();
         testLogger.info('Clicked Correlated Logs tab');
         await this.page.waitForTimeout(1000);
@@ -2391,7 +2419,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedMetricsTab() {
-        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Metrics' });
+        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Metrics' });
         await tab.click();
         testLogger.info('Clicked Correlated Metrics tab');
         await this.page.waitForTimeout(1000);
@@ -2402,7 +2430,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedTracesTab() {
-        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Traces' });
+        const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Traces' });
         await tab.click();
         testLogger.info('Clicked Correlated Traces tab');
         await this.page.waitForTimeout(1000);
@@ -2447,6 +2475,19 @@ export class LogsPage {
             await closeBtn.click();
             testLogger.info('Closed correlation dashboard');
         }
+    }
+
+    async hoverOnCorrelationDashboard() {
+        const closeBtn = this.page.locator(this.correlationDashboardClose);
+        const dashboardPanel = closeBtn.locator('..');
+        await dashboardPanel.hover();
+        testLogger.info('Hovered over correlation dashboard panel');
+    }
+
+    async expectNoContextMenuVisible() {
+        const contextMenu = this.page.locator('[role="menu"]:visible');
+        await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
+        testLogger.info('No context menu visible');
     }
 
     async clickSavedViewDialogSaveContent() {
@@ -2859,16 +2900,16 @@ export class LogsPage {
     }
 
     async clickPaginationPage(pageNumber) {
-        return await this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first().click();
+        return await this.page.locator(`${this.resultPagination} button`).filter({ hasText: pageNumber.toString() }).first().click();
     }
 
     async getPaginationPageCount() {
-        const pageButtons = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: /^\d+$/ });
+        const pageButtons = this.page.locator(`${this.resultPagination} button`).filter({ hasText: /^\d+$/ });
         return await pageButtons.count();
     }
 
     async getPaginationPageClasses(pageNumber) {
-        const pageButton = this.page.locator(`${this.resultPagination} .q-btn`).filter({ hasText: pageNumber.toString() }).first();
+        const pageButton = this.page.locator(`${this.resultPagination} button`).filter({ hasText: pageNumber.toString() }).first();
         return await pageButton.getAttribute('class');
     }
 
@@ -2878,7 +2919,7 @@ export class LogsPage {
     }
 
     async getActivePaginationPageText() {
-        return await this.page.locator(`${this.resultPagination} .q-btn--unelevated`).first().textContent({ timeout: 5000 }).catch(() => 'unknown');
+        return await this.page.locator(`${this.resultPagination} button[aria-current='true'], ${this.resultPagination} button[aria-pressed='true'], ${this.resultPagination} button[data-state='active']`).first().textContent({ timeout: 5000 }).catch(() => 'unknown');
     }
 
     async expectSQLPaginationNotVisible() {
@@ -3077,6 +3118,21 @@ export class LogsPage {
     async expectBarChartVisible() {
         const barChart = this.page.locator(this.logsTable);
         return await expect(barChart).toBeTruthy();
+    }
+
+    async expectBarChartHasContent() {
+        const histogramChart = this.page.locator('[data-test="logs-search-result-bar-chart"]');
+        await expect(histogramChart).toBeVisible({ timeout: 5000 });
+        const chartContent = histogramChart.locator('canvas, svg');
+        const count = await chartContent.count();
+        expect(count, 'Histogram must contain rendered chart content (canvas or SVG)').toBeGreaterThan(0);
+        testLogger.info(`Histogram contains ${count} canvas/SVG elements`);
+    }
+
+    async expectTableColumnHeaderVisible(columnName) {
+        const columnHeader = this.page.locator(`[data-test="log-search-result-table-th-${columnName}"]`);
+        await expect(columnHeader, `Column header ${columnName} should be visible`).toBeVisible({ timeout: 5000 });
+        testLogger.info(`Column header ${columnName} is visible`);
     }
 
     async expectUrlContainsLogs() {
@@ -3378,12 +3434,12 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const toggleExists = await toggleInner.count() > 0;
+        const toggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]');
+        const toggleExists = await toggle.count() > 0;
         if (toggleExists) {
-            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy')).catch(() => false);
-            if (isSwitchedOff) {
-                await toggleInner.click();
+            const isChecked = await toggle.getAttribute('aria-checked').catch(() => null);
+            if (isChecked === 'false') {
+                await toggle.click();
             }
         }
         // Always close the utilities menu
@@ -3485,8 +3541,8 @@ export class LogsPage {
     }
 
     async openFirstLogDetails() {
-        // Click on the first log entry to open details (expand the _timestamp column)
-        await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        // Click on the first log entry to open details (expand the first column)
+        await this.page.locator('[data-index="0"] [data-test="table-row-expand-menu"]').click();
         await this.page.waitForTimeout(1000);
     }
 
@@ -3781,7 +3837,7 @@ export class LogsPage {
     }
 
     async toggleStreamSelection(streamName) {
-        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"] div`).nth(2).click();
+        return await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${streamName}"]`).click();
     }
 
     async toggleQueryModeEditor() {
@@ -3887,12 +3943,12 @@ export class LogsPage {
     }
 
     async searchStreamByPlaceholder(searchText) {
-        await this.page.getByPlaceholder("Search Stream").click();
-        return await this.page.getByPlaceholder("Search Stream").fill(searchText);
+        await this.page.locator('[data-test="streams-search-stream-input"] input').click();
+        return await this.page.locator('[data-test="streams-search-stream-input"] input').fill(searchText);
     }
 
     async clickFirstExploreButton() {
-        return await this.page.getByRole("button", { name: "Explore" }).first().click({ force: true });
+        return await this.page.locator('[data-test="log-stream-explore-btn"]').first().click({ force: true });
     }
 
     // Additional methods for multistream functionality
@@ -5684,11 +5740,8 @@ export class LogsPage {
      * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        // Saved views are now a split dropdown button on the toolbar.
-        // Click the dropdown arrow (second button) to expand the saved views list.
-        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
-        await savedViewsGroup.waitFor({ state: 'visible', timeout: 10000 });
-        const dropdownArrow = savedViewsGroup.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
+        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
         await dropdownArrow.click();
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked saved views dropdown arrow');
@@ -5699,19 +5752,16 @@ export class LogsPage {
      * Tries arrow click first, then main button if search input doesn't appear
      */
     async expandSavedViewsDropdown() {
-        // First try clicking the dropdown arrow
         try {
             await this.clickSavedViewsDropdownArrow();
             const searchInput = this.page.locator(this.savedViewSearchInput);
             await searchInput.waitFor({ state: 'visible', timeout: 5000 });
             return;
         } catch (e) {
-            testLogger.debug('Arrow click did not show search input, trying main button');
+            testLogger.debug('Arrow click did not show search input, retrying');
         }
 
-        // Fallback: retry the dropdown arrow click on the saved views button
-        const btn = this.getSavedViewsButtonLocator();
-        const dropdownArrow = btn.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
+        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
         await dropdownArrow.click();
         await this.page.waitForTimeout(500);
     }
@@ -6500,22 +6550,44 @@ export class LogsPage {
 
     /**
      * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
-     * Uses the parent element's background class to detect selection state.
+     * Uses page.waitForFunction to poll the DOM directly, which is more reliable than
+     * locator-based polling during Vue reactive re-renders.
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
     async verifyChartTypeSelected(chartId, shouldBeSelected = true, timeout = 20000) {
-        // Use visible() filter — there can be multiple PanelEditor instances in DOM
-        // (e.g., cached Visualize tab + active Build tab). Only check the visible one.
-        const selector = this.chartTypeItem(chartId);
-        const parentLocator = this.page.locator(selector).locator('visible=true').locator('..');
-
-        if (shouldBeSelected) {
-            await expect(parentLocator).toHaveClass(/bg-grey-[35]/, { timeout });
-            testLogger.info(`Chart type "${chartId}" is selected (verified via bg-grey class)`);
-        } else {
-            await expect(parentLocator).not.toHaveClass(/bg-grey-[35]/, { timeout: 5000 });
-            testLogger.info(`Chart type "${chartId}" is NOT selected (verified via bg-grey class)`);
+        // Use waitForFunction to directly check the DOM for the bg-grey class
+        // on the chart selection item. This survives Vue reactive re-renders better
+        // than Playwright's locator.toHaveClass polling.
+        try {
+            await this.page.waitForFunction(
+                ({ chartId, shouldBeSelected }) => {
+                    // Find all visible chart selection sections for this chart type
+                    const sections = document.querySelectorAll(
+                        `[data-test="selected-chart-${chartId}-item"]`
+                    );
+                    for (const section of sections) {
+                        // Skip sections inside display:none containers (e.g. cached Visualize tab)
+                        if (!/** @type {HTMLElement} */ (section).offsetParent) continue;
+                        // Check the parent q-item for the bg-grey selection class
+                        const parent = section.parentElement;
+                        if (!parent) continue;
+                        const hasBgGrey = /\bbg-grey-[35]\b/.test(parent.className);
+                        if (hasBgGrey === shouldBeSelected) return true;
+                    }
+                    return false;
+                },
+                { chartId, shouldBeSelected },
+                { timeout, polling: 'raf' }
+            );
+            testLogger.info(
+                `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
+            );
+        } catch (error) {
+            throw new Error(
+                `Chart type "${chartId}" was expected to be ${shouldBeSelected ? 'selected' : 'not selected'} ` +
+                `but was ${shouldBeSelected ? 'not selected' : 'selected'} within ${timeout}ms`
+            );
         }
     }
 
@@ -6638,9 +6710,10 @@ export class LogsPage {
         // initializeBuild parses query, sets chart type, runs query, renders chart/table/no-data.
         // Use visible filter to avoid hidden cached PanelEditor instances.
         try {
-            const initIndicator = this.page.locator(
-                `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`
-            ).locator('visible=true').first();
+            const initIndicator = this.page
+                .locator(`${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`)
+                .filter({ visible: true })
+                .first();
             await initIndicator.waitFor({ state: 'visible', timeout });
             testLogger.info('Build tab initialization complete (chart/table/no-data visible)');
         } catch (error) {

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -82,14 +82,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </div>
 
-            <q-btn
+            <OButton
               data-test="report-list-add-report-btn"
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="t(`reports.add`)"
+              variant="primary"
+              size="sm-action"
+              class="q-ml-sm"
               @click="createNewReport"
-            />
+            >
+              {{ t(`reports.add`) }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -223,58 +224,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="secondary"
                       />
                     </div>
-                    <q-btn
+                    <OButton
                       v-else
                       :data-test="`report-list-${props.row.name}-pause-start-report`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      :color="props.row.enabled ? 'negative' : 'positive'"
-                      :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                      round
-                      flat
+                      :variant="props.row.enabled ? 'ghost-destructive' : 'ghost'"
+                      size="icon-sm"
                       :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
                       @click="toggleReportState(props.row)"
-                    />
+                    >
+                      <Pause v-if="props.row.enabled" class="tw:size-4" />
+                      <Play v-else class="tw:size-4" />
+                    </OButton>
 
                     <!-- Edit -->
-                    <q-btn
+                    <OButton
                       :data-test="`report-list-${props.row.name}-edit-report`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      icon="edit"
+                      variant="ghost"
+                      size="icon-sm"
                       :title="t('alerts.edit')"
                       @click="editReport(props.row)"
-                    />
+                    >
+                      <Pencil class="tw:size-4" />
+                    </OButton>
 
                     <!-- Move to folder -->
-                    <q-btn
+                    <OButton
                       :data-test="`report-list-${props.row.name}-move-report`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :icon="outlinedDriveFileMove"
+                      variant="ghost"
+                      size="icon-sm"
                       title="Move to Folder"
                       @click="openMoveDialog(props.row)"
-                    />
+                    >
+                      <FolderInput class="tw:size-4" />
+                    </OButton>
 
                     <!-- Delete -->
-                    <q-btn
+                    <OButton
                       :data-test="`report-list-${props.row.name}-delete-report`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :icon="outlinedDelete"
+                      variant="ghost-destructive"
+                      size="icon-sm"
                       :title="t('alerts.delete')"
                       @click="confirmDeleteReport(props.row)"
-                    />
+                    >
+                      <Trash2 class="tw:size-4" />
+                    </OButton>
                   </q-td>
                 </template>
 
@@ -286,38 +279,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="o2-table-footer-title tw:flex tw:items-center tw:whitespace-nowrap">
                         {{ resultTotal }} {{ t("reports.header") }}
                       </div>
-                      <q-btn
+                      <OButton
                         v-if="selectedReports.length > 0"
                         data-test="report-list-move-reports-btn"
-                        class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-secondary-button-dark'
-                            : 'o2-secondary-button-light'
-                        "
-                        no-caps
-                        dense
+                        variant="outline"
+                        size="sm-action"
                         @click="moveMultipleReports"
                       >
-                        <q-icon :name="outlinedDriveFileMove" size="16px" />
-                        <span class="tw:ml-2">Move</span>
-                      </q-btn>
-                      <q-btn
+                        <FolderInput class="tw:size-4 tw:mr-1" />
+                        Move
+                      </OButton>
+                      <OButton
                         v-if="selectedReports.length > 0"
                         data-test="report-list-delete-reports-btn"
-                        class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-secondary-button-dark'
-                            : 'o2-secondary-button-light'
-                        "
-                        no-caps
-                        dense
+                        variant="outline-destructive"
+                        size="sm-action"
                         @click="openBulkDeleteDialog"
                       >
-                        <q-icon name="delete" size="16px" />
-                        <span class="tw:ml-2">Delete</span>
-                      </q-btn>
+                        <Trash2 class="tw:size-4 tw:mr-1" />
+                        Delete
+                      </OButton>
                     </div>
                     <!-- Right: pagination -->
                     <QTablePagination
@@ -374,6 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
@@ -395,6 +377,8 @@ import { cloneDeep, debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { Pause, Play, Pencil, Trash2, FolderInput, CalendarClock, Database } from 'lucide-vue-next';
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -439,8 +423,8 @@ const reportListTableRef: Ref<any> = ref(null);
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
 const tabs = reactive([
-  { label: t("reports.scheduled"), value: "shared" },
-  { label: t("reports.cached"),    value: "cached" },
+  { label: t("reports.scheduled"), value: "shared", icon: CalendarClock },
+  { label: t("reports.cached"),    value: "cached", icon: Database },
 ]);
 
 const perPageOptions: any = [

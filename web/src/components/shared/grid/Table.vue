@@ -36,13 +36,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="search" class="cursor-pointer" />
         </template>
       </q-input>
-      <q-btn
+      <OButton
         class="q-ml-sm"
-        color="primary"
-        icon="add"
-        :label="t(`ticket.add`)"
+        variant="primary"
+        size="sm-action"
         @click="addTicket"
-      />
+      >
+        <q-icon name="add" size="14px" class="q-mr-xs" />
+        {{ t(`ticket.add`) }}
+      </OButton>
     </template>
 
     <template v-slot:body-cell-#="props">
@@ -56,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const { t } = useI18n();
 

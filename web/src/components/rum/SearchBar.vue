@@ -25,15 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></syntax-guide>
       </div>
       <div class="float-right col-auto">
-        <q-btn
+        <OButton
           v-if="searchObj.data.queryResults.hits"
           class="q-mr-sm float-left download-logs-btn"
-          size="sm"
-          :disable="!searchObj.data.queryResults.hits.length"
-          icon="download"
+          variant="ghost"
+          size="icon-sm"
+          :disabled="!searchObj.data.queryResults.hits.length"
           :title="t('search.exportLogs')"
           @click="downloadLogs"
-        ></q-btn>
+        >
+          <Download class="tw:size-4" />
+        </OButton>
         <div class="float-left">
           <date-time
             auto-apply
@@ -48,20 +50,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="search-time q-pl-sm float-left">
-          <q-btn
+          <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
-            dense
-            flat
-            :title="t('search.runQuery')"
-            class="q-pa-none search-button bg-secondary"
-            @click="searchData"
-            :disable="
+            variant="primary"
+            size="sm-action"
+            :disabled="
               searchObj.loading ||
               searchObj.data.streamResults?.list?.length == 0
             "
-            >{{ t("search.runQuery") }}</q-btn
+            @click="searchData"
           >
+            {{ t("search.runQuery") }}
+          </OButton>
         </div>
       </div>
     </div>
@@ -102,6 +103,8 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { Download } from 'lucide-vue-next';
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -115,6 +118,8 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     SyntaxGuide,
+    OButton,
+    Download,
   },
   emits: ["searchdata", "date-change"],
   props: {

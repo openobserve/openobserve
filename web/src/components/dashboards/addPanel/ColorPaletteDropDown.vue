@@ -93,17 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("dashboard.colorSeriesBy") }}
       <div>
-        <q-btn-toggle
-          v-model="dashboardPanelData.data.config.color.seriesBy"
-          push
-          toggle-color="primary"
-          size="md"
-          :options="[
-            { label: 'Last', value: 'last' },
-            { label: 'Min', value: 'min' },
-            { label: 'Max', value: 'max' },
-          ]"
-        />
+        <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
+          <OToggleGroupItem value="last">Last</OToggleGroupItem>
+          <OToggleGroupItem value="min">Min</OToggleGroupItem>
+          <OToggleGroupItem value="max">Max</OToggleGroupItem>
+        </OToggleGroup>
       </div>
     </div>
   </div>
@@ -114,9 +108,12 @@ import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 export default defineComponent({
   name: "ColorPaletteDropdown",
+  components: { OToggleGroup, OToggleGroupItem },
   setup() {
     const { t } = useI18n();
 

@@ -46,17 +46,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Column Visibility Dropdown -->
           <div class="tw:pr-4">
-            <q-btn-dropdown
-              flat
-              dense
-              no-caps
-              :label="t('search.showHideColumns')"
-              icon="view_column"
-              class="o2-secondary-button"
+            <ODropdown
+              side="bottom"
+              align="end"
               data-test="column-visibility-dropdown"
-              :disable="!hasResults"
             >
-              <q-list class="column-visibility-list">
+              <template #trigger>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :disabled="!hasResults"
+                >
+                  <template v-if="true">
+                    <q-icon name="view_column" size="16px" class="tw:mr-1" />
+                    {{ t('search.showHideColumns') }}
+                  </template>
+                </OButton>
+              </template>
+              <div class="column-visibility-list tw:min-w-[220px] tw:max-h-[320px] tw:overflow-y-auto">
                 <!-- Select All / Deselect All -->
                 <q-item
                   dense
@@ -115,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </q-item-section>
                 </q-item>
-              </q-list>
-            </q-btn-dropdown>
+              </div>
+            </ODropdown>
           </div>
         </div>
       </template>
@@ -238,6 +245,8 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";

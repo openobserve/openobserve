@@ -37,30 +37,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section>{{ item.label }}</q-item-section>
             <q-item-section side>
               <div class="tw:flex tw:gap-1">
-                <q-btn
-                  flat
-                  dense
-                  size="sm"
-                  icon="arrow_upward"
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  :disabled="index === 0"
                   @click.stop="moveUp(index)"
-                  :disable="index === 0"
-                />
-                <q-btn
-                  flat
-                  dense
-                  size="sm"
-                  icon="arrow_downward"
+                >
+                  <q-icon name="arrow_upward" size="14px" />
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  :disabled="index === modelValue.length - 1"
                   @click.stop="moveDown(index)"
-                  :disable="index === modelValue.length - 1"
-                />
-                <q-btn
-                  flat
-                  dense
-                  size="sm"
-                  icon="delete"
-                  color="negative"
+                >
+                  <q-icon name="arrow_downward" size="14px" />
+                </OButton>
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-xs"
                   @click.stop="removeItem(item.value)"
-                />
+                >
+                  <q-icon name="delete" size="14px" />
+                </OButton>
               </div>
             </q-item-section>
           </q-item>
@@ -75,42 +74,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Center Buttons -->
     <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2">
-      <q-btn
-        outline
-        dense
-        icon="arrow_back"
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        :disabled="rightSelected.length === 0"
         @click="addSelected"
-        :disable="rightSelected.length === 0"
       >
+        <q-icon name="arrow_back" size="16px" />
         <q-tooltip>Add selected</q-tooltip>
-      </q-btn>
-      <q-btn
-        outline
-        dense
-        icon="keyboard_double_arrow_left"
+      </OButton>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        :disabled="availableItems.length === 0"
         @click="addAll"
-        :disable="availableItems.length === 0"
       >
+        <q-icon name="keyboard_double_arrow_left" size="16px" />
         <q-tooltip>Add all</q-tooltip>
-      </q-btn>
-      <q-btn
-        outline
-        dense
-        icon="arrow_forward"
+      </OButton>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        :disabled="leftSelected.length === 0"
         @click="removeSelected"
-        :disable="leftSelected.length === 0"
       >
+        <q-icon name="arrow_forward" size="16px" />
         <q-tooltip>Remove selected</q-tooltip>
-      </q-btn>
-      <q-btn
-        outline
-        dense
-        icon="keyboard_double_arrow_right"
+      </OButton>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        :disabled="modelValue.length === 0"
         @click="removeAll"
-        :disable="modelValue.length === 0"
       >
+        <q-icon name="keyboard_double_arrow_right" size="16px" />
         <q-tooltip>Remove all</q-tooltip>
-      </q-btn>
+      </OButton>
     </div>
 
     <!-- Available Items (Right) -->
@@ -150,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import OButton from '@/lib/core/Button/OButton.vue';
 
 interface Item {
   label: string;

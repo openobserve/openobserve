@@ -121,66 +121,64 @@ describe("DashboardHeader", () => {
   describe("Back Button Functionality", () => {
     it("should not show back button by default", () => {
       wrapper = createWrapper();
-      
-      const backButton = wrapper.findComponent({ name: 'QBtn' });
+
+      const backButton = wrapper.findComponent({ name: 'OButton' });
       expect(backButton.exists()).toBe(false);
     });
 
     it("should show back button when backButton prop is true", () => {
       wrapper = createWrapper({ backButton: true });
-      
+
       const backButtonContainer = wrapper.find('.col-auto');
-      const backButton = wrapper.findComponent({ name: 'QBtn' });
-      
+      const backButton = wrapper.findComponent({ name: 'OButton' });
+
       expect(backButtonContainer.exists()).toBe(true);
       expect(backButton.exists()).toBe(true);
     });
 
     it("should have correct back button attributes", () => {
       wrapper = createWrapper({ backButton: true });
-      
-      const backButton = wrapper.findComponent({ name: 'QBtn' });
-      
-      expect(backButton.props('noCaps')).toBe(true);
-      expect(backButton.props('padding')).toBe('xs');
-      expect(backButton.props('outline')).toBe(true);
-      expect(backButton.props('icon')).toBe('arrow_back_ios_new');
-      expect(backButton.classes()).toContain('q-mr-md');
+
+      const backButton = wrapper.findComponent({ name: 'OButton' });
+
+      expect(backButton.props('variant')).toBe('outline');
+      expect(backButton.props('size')).toBe('icon-xs');
+      expect(backButton.classes()).toContain('q-mr-sm');
     });
 
     it("should emit back event when back button is clicked", async () => {
       wrapper = createWrapper({ backButton: true });
-      
-      const backButton = wrapper.findComponent({ name: 'QBtn' });
+
+      const backButton = wrapper.findComponent({ name: 'OButton' });
       await backButton.trigger('click');
-      
+
       expect(wrapper.emitted('back')).toBeTruthy();
       expect(wrapper.emitted('back')).toHaveLength(1);
     });
 
     it("should emit back event multiple times when clicked multiple times", async () => {
       wrapper = createWrapper({ backButton: true });
-      
-      const backButton = wrapper.findComponent({ name: 'QBtn' });
+
+      const backButton = wrapper.findComponent({ name: 'OButton' });
       await backButton.trigger('click');
       await backButton.trigger('click');
       await backButton.trigger('click');
-      
+
       expect(wrapper.emitted('back')).toHaveLength(3);
     });
 
     it("should toggle back button visibility when prop changes", async () => {
       wrapper = createWrapper({ backButton: false });
-      
-      expect(wrapper.findComponent({ name: 'QBtn' }).exists()).toBe(false);
-      
+
+      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(false);
+
       await wrapper.setProps({ backButton: true });
-      
-      expect(wrapper.findComponent({ name: 'QBtn' }).exists()).toBe(true);
-      
+
+      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(true);
+
       await wrapper.setProps({ backButton: false });
-      
-      expect(wrapper.findComponent({ name: 'QBtn' }).exists()).toBe(false);
+
+      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(false);
     });
   });
 
@@ -363,8 +361,8 @@ describe("DashboardHeader", () => {
   describe("Accessibility", () => {
     it("should be focusable when back button is present", () => {
       wrapper = createWrapper({ backButton: true });
-      
-      const backButton = wrapper.findComponent({ name: 'QBtn' });
+
+      const backButton = wrapper.findComponent({ name: 'OButton' });
       expect(backButton.exists()).toBe(true);
     });
 
@@ -378,16 +376,16 @@ describe("DashboardHeader", () => {
 
     it("should support keyboard navigation for back button", async () => {
       wrapper = createWrapper({ backButton: true });
-      
-      const backButton = wrapper.findComponent({ name: 'QBtn' });
-      
+
+      const backButton = wrapper.findComponent({ name: 'OButton' });
+
       // Simulate keyboard events
       await backButton.trigger('keydown.enter');
       await backButton.trigger('keydown.space');
-      
+
       // Should still be able to click
       await backButton.trigger('click');
-      
+
       expect(wrapper.emitted('back')).toBeTruthy();
     });
   });
@@ -419,22 +417,22 @@ describe("DashboardHeader", () => {
       await wrapper.setProps({ title: "Final", backButton: true });
       
       expect(wrapper.find('.text-h6').text()).toBe("Final");
-      expect(wrapper.findComponent({ name: 'QBtn' }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(true);
     });
 
     it("should maintain component integrity after multiple re-renders", async () => {
       wrapper = createWrapper();
-      
+
       for (let i = 0; i < 10; i++) {
-        await wrapper.setProps({ 
-          title: `Title ${i}`, 
-          backButton: i % 2 === 0 
+        await wrapper.setProps({
+          title: `Title ${i}`,
+          backButton: i % 2 === 0
         });
       }
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('.text-h6').text()).toBe("Title 9");
-      expect(wrapper.findComponent({ name: 'QBtn' }).exists()).toBe(false); // 9 % 2 !== 0
+      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(false); // 9 % 2 !== 0
     });
   });
 });

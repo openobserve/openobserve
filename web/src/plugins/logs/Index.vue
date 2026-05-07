@@ -80,11 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #separator>
-                <q-btn
+                <OButton
                   data-test="logs-search-field-list-collapse-btn"
-                  :icon="
-                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
-                  "
+                  variant="sidebar-button"
+                  size="sidebar-button"
                   :title="
                     searchObj.meta.showFields
                       ? 'Collapse Fields'
@@ -95,12 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'logs-splitter-icon-expand'
                       : 'logs-splitter-icon-collapse'
                   "
-                  color="primary"
-                  size="sm"
-                  dense
-                  round
                   @click="collapseFieldList"
-                />
+                  ><template #icon-left>
+                    <q-icon
+                      :name="
+                        searchObj.meta.showFields
+                          ? 'chevron_left'
+                          : 'chevron_right'
+                      "
+                    />
+                  </template>
+                </OButton>
               </template>
               <template #after>
                 <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
@@ -145,16 +149,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           Result not found.
-                          <q-btn
+                          <OButton
                             v-if="
                               searchObj.data.errorMsg != '' ||
                               searchObj?.data?.functionError != ''
                             "
                             @click="toggleErrorDetails"
-                            size="sm"
-                            class="o2-secondary-button"
+                            variant="outline"
+                            size="sm-action"
                             data-test="logs-page-result-error-details-btn-result-not-found"
-                            >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                            >{{ t("search.functionErrorBtnLabel") }}</OButton
                           >
                         </div>
                         <div
@@ -163,33 +167,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-else
                         >
                           Error occurred while retrieving search events.
-                          <q-btn
+                          <OButton
                             v-if="
                               searchObj.data.errorMsg != '' ||
                               searchObj?.data?.functionError != ''
                             "
                             @click="toggleErrorDetails"
-                            size="sm"
-                            class="o2-secondary-button"
+                            variant="outline"
+                            size="sm-action"
                             data-test="logs-page-result-error-details-btn"
-                            >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                            >{{ t("search.histogramErrorBtnLabel") }}</OButton
                           >
                         </div>
                         <div
                           data-test="logs-search-error-20003"
                           v-if="parseInt(searchObj.data.errorCode) == 20003"
                         >
-                          <q-btn
-                            no-caps
-                            unelevated
-                            size="sm"
-                            bg-secondary
-                            class="no-border bg-secondary text-white"
+                          <OButton
+                            variant="primary"
+                            size="sm-action"
+                            as="RouterLink"
                             :to="
                               '/streams?dialog=' +
                               searchObj.data.stream.selectedStream.label
                             "
-                            >Click here</q-btn
+                            >Click here</OButton
                           >
                           to configure a full text search field to the stream.
                         </div>
@@ -231,15 +233,16 @@ size="md" />
                         <q-icon name="info" color="primary"
 size="md" />
                         {{ t("search.noRecordFound") }}
-                        <q-btn
+                        <OButton
                           v-if="
                             searchObj.data.errorMsg != '' ||
                             searchObj?.data?.functionError != ''
                           "
                           @click="toggleErrorDetails"
-                          size="sm"
+                          variant="outline"
+                          size="sm-action"
                           data-test="logs-page-result-error-details-btn-norecord"
-                          >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                          >{{ t("search.functionErrorBtnLabel") }}</OButton
                         ><br />
                       </h6>
                     </div>
@@ -399,14 +402,13 @@ size="20px" />
               >
             </div>
 
-            <q-btn
+            <OButton
               class="q-mt-xl"
-              color="secondary"
-              unelevated
-              :label="t('search.redirect_to_logs_page')"
-              no-caps
+              variant="outline"
+              size="sm-action"
               @click="redirectBackToLogs"
-            />
+              >{{ t("search.redirect_to_logs_page") }}</OButton
+            >
           </div>
         </div>
       </div>
@@ -497,6 +499,8 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { ChevronRight, ChevronLeft } from "lucide-vue-next";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -509,6 +513,9 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList,
+    OButton,
+    ChevronRight,
+    ChevronLeft,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),

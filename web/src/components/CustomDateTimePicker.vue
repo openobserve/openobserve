@@ -1,21 +1,25 @@
-<template>
+﻿<template>
   <div>
-    <q-btn
+    <OButton
       :style="{
         width: changeStyle ? '170px' : '180px',
         height: changeStyle ? '40px' : '',
       }"
       data-test="date-time-btn"
-      :label="changeStyle ? getTrimmedDisplayValue() : getDisplayValue()"
-      :icon="changeStyle ? '' : 'schedule'"
-      icon-right="arrow_drop_down"
+      variant="outline"
       class="date-time-button"
       :class="changeStyle ? computedClass : ''"
-      outline
-      no-caps
-      :disable="isFirstEntry"
+      :disabled="isFirstEntry"
       @click="picker.showMenu = !picker.showMenu"
-    />
+    >
+      <template v-if="!changeStyle" #icon-left>
+        <q-icon name="schedule" />
+      </template>
+      {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
+      <template #icon-right>
+        <q-icon name="arrow_drop_down" />
+      </template>
+    </OButton>
     <q-menu
       v-if="picker.showMenu"
       class="date-time-dialog"
@@ -23,74 +27,74 @@
       self="top left"
       no-route-dismiss
     >
-      <q-tab-panels
-        class="tw:flex tw:justify-between"
-        v-model="picker.activeTab"
-      >
-        <q-tab-panel name="relative" class="q-pa-none">
-          <div class="date-time-table relative column">
-            <div
-              class="relative-row q-px-md q-py-sm"
-              v-for="(period, periodIndex) in relativePeriods"
-              :key="'date_' + periodIndex"
-            >
-              <div class="relative-period-name">{{ period.label }}</div>
+      <div class="tw:flex tw:justify-between">
+        <OTabPanels v-model="picker.activeTab">
+          <OTabPanel name="relative">
+            <div class="date-time-table relative column">
               <div
-                v-for="(item, itemIndex) in relativeDates[period.value]"
-                :key="item"
+                class="relative-row q-px-md q-py-sm"
+                v-for="(period, periodIndex) in relativePeriods"
+                :key="'date_' + periodIndex"
               >
-                <q-btn
-                  :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                  :label="item"
-                  :class="
-                    isSelected(item, period.value)
-                      ? 'rp-selector-selected'
-                      : 'rp-selector'
-                  "
-                  outline
-                  dense
-                  flat
-                  @click="setRelativeDate(period, item)"
-                />
-              </div>
-            </div>
-            <div class="relative-row q-px-md q-py-sm">
-              <div class="relative-period-name">Custom</div>
-              <div class="row q-gutter-sm">
-                <div class="col">
-                  <q-input
-                    v-model.number="picker.data.selectedDate.relative.value"
-                    type="number"
-                    dense
-                    filled
-                    min="1"
-                  />
-                </div>
-                <div class="col">
-                  <q-select
-                    v-model="picker.data.selectedDate.relative.period"
-                    :options="relativePeriodsSelect"
-                    dense
-                    filled
-                    emit-value
-                    style="width: 100px"
-                    @update:model-value="updateCustomPeriod"
+                <div class="relative-period-name">{{ period.label }}</div>
+                <div
+                  v-for="(item, itemIndex) in relativeDates[period.value]"
+                  :key="item"
+                >
+                  <OButton
+                    :data-test="`date-time-relative-${item}-${period.value}-btn`"
+                    variant="ghost"
+                    :class="
+                      isSelected(item, period.value)
+                        ? 'rp-selector-selected'
+                        : 'rp-selector'
+                    "
+                    @click="setRelativeDate(period, item)"
+                    >{{ item }}</OButton
                   >
-                    <template v-slot:selected-item>
-                      <div>{{ getPeriodLabel() }}</div>
-                    </template>
-                  </q-select>
+                </div>
+              </div>
+              <div class="relative-row q-px-md q-py-sm">
+                <div class="relative-period-name">Custom</div>
+                <div class="row q-gutter-sm">
+                  <div class="col">
+                    <q-input
+                      v-model.number="picker.data.selectedDate.relative.value"
+                      type="number"
+                      dense
+                      filled
+                      min="1"
+                    />
+                  </div>
+                  <div class="col">
+                    <q-select
+                      v-model="picker.data.selectedDate.relative.period"
+                      :options="relativePeriodsSelect"
+                      dense
+                      filled
+                      emit-value
+                      style="width: 100px"
+                      @update:model-value="updateCustomPeriod"
+                    >
+                      <template v-slot:selected-item>
+                        <div>{{ getPeriodLabel() }}</div>
+                      </template>
+                    </q-select>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </q-tab-panel>
-      </q-tab-panels>
+          </OTabPanel>
+        </OTabPanels>
+      </div>
     </q-menu>
   </div>
 </template>
 
 <script setup>
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, reactive, watch, computed } from "vue";
 import { useStore } from "vuex";
 
@@ -101,8 +105,8 @@ const props = defineProps({
   changeStyle: {
     default: false,
     required: false,
-    type: Boolean
-  }
+    type: Boolean,
+  },
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -201,8 +205,8 @@ const getDisplayValue = () => {
 };
 
 const getTrimmedDisplayValue = () => {
-return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
-}
+  return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
+};
 
 // Check if the current selection matches the modelValue
 const isSelected = (value, period) => {
@@ -221,8 +225,12 @@ const getPeriodLabel = () => {
 };
 
 const computedClass = computed(() => {
-  return props.changeStyle ? store.state.theme === 'dark' ? 'dark-mode-date-time-picker' : 'light-mode-date-time-picker' : ''
-})
+  return props.changeStyle
+    ? store.state.theme === "dark"
+      ? "dark-mode-date-time-picker"
+      : "light-mode-date-time-picker"
+    : "";
+});
 </script>
 
 <style scoped>
@@ -246,9 +254,6 @@ const computedClass = computed(() => {
 }
 </style>
 <style lang="scss" scoped>
-.q-btn--rectangle {
-  border-radius: 3px;
-}
 .date-time-button {
   height: 100%;
   border-radius: 3px;
@@ -462,11 +467,11 @@ const computedClass = computed(() => {
   background: #f2f2f2 !important;
   color: #000 !important;
 }
-.dark-mode-date-time-picker{
-  background-color: #2A2828 !important;
+.dark-mode-date-time-picker {
+  background-color: #2a2828 !important;
   color: #ffffff !important;
 }
-.light-mode-date-time-picker{
+.light-mode-date-time-picker {
   background-color: #ffffff !important;
 }
 </style>

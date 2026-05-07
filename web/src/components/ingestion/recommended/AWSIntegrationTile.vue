@@ -25,20 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tile-name tw:font-semibold tw:text-base">
           {{ integration.displayName }}
         </div>
-        <q-btn
+        <OButton
           v-if="integration.documentationUrl"
-          flat
-          dense
-          round
-          size="sm"
-          icon="description"
-          color="primary"
+          variant="ghost"
+          size="icon-circle-sm"
           @click="handleDocumentation()"
           class="docs-btn"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
+          <q-icon name="description" />
           <q-tooltip>View Documentation</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
         {{ integration.description }}
@@ -47,35 +44,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-card-actions class="tw:px-4 tw:pb-4 tw:flex tw:flex-row tw:gap-2">
       <!-- Add Source Button -->
-      <q-btn
+      <OButton
         v-if="hasCloudFormation"
-        color="primary"
-        label="Add Source"
+        variant="primary"
+        size="sm"
         @click="handleAddSource()"
-        unelevated
         class="tw:flex-1"
         :data-test="`aws-${integration.id}-add-source-btn`"
-      />
+        >Add Source</OButton
+      >
       <!-- Documentation Button (only shown if no CloudFormation) -->
-      <q-btn
+      <OButton
         v-else-if="integration.documentationUrl"
-        color="primary"
-        label="Documentation"
+        variant="primary"
+        size="sm"
         @click="handleDocumentation()"
-        unelevated
         class="tw:flex-1"
         :data-test="`aws-${integration.id}-documentation-btn`"
-      />
+        >Documentation</OButton
+      >
       <!-- Add Dashboard Button -->
-      <q-btn
-        outline
-        color="primary"
-        label="Add Dashboard"
+      <OButton
+        variant="outline"
+        size="sm"
         @click="handleAddDashboard"
-        :disable="!integration.hasDashboard || !integration.dashboardGithubUrl"
+        :disabled="!integration.hasDashboard || !integration.dashboardGithubUrl"
         class="tw:flex-1"
         :data-test="`aws-${integration.id}-add-dashboard-btn`"
-      />
+        >Add Dashboard</OButton
+      >
     </q-card-actions>
 
     <!-- Unified Integration Method Selection Dialog -->
@@ -98,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-ripple
               @click="handleTemplateSelection(template)"
               class="q-mb-sm rounded-borders"
-              style="border: 1px solid rgba(0,0,0,0.12)"
+              style="border: 1px solid rgba(0, 0, 0, 0.12)"
             >
               <q-item-section>
                 <q-item-label class="text-weight-medium">
@@ -121,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-ripple
               @click="handleComponentSelection(option)"
               class="q-mb-sm rounded-borders"
-              style="border: 1px solid rgba(0,0,0,0.12)"
+              style="border: 1px solid rgba(0, 0, 0, 0.12)"
             >
               <q-item-section>
                 <q-item-label class="text-weight-medium">
@@ -139,7 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Cancel" color="primary" v-close-popup />
+          <OButton variant="outline" size="sm-action" v-close-popup
+            >Cancel</OButton
+          >
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -150,7 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">{{ selectedComponentTitle }}</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton variant="ghost" size="icon-circle-sm" v-close-popup>
+            <q-icon name="close" />
+          </OButton>
         </q-card-section>
 
         <q-card-section>
@@ -167,11 +168,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import type { AWSIntegration, CloudFormationTemplate, ComponentOption } from "@/utils/awsIntegrations";
-import { generateCloudFormationURL, generateDashboardURL } from "@/utils/awsIntegrations";
+import type {
+  AWSIntegration,
+  CloudFormationTemplate,
+  ComponentOption,
+} from "@/utils/awsIntegrations";
+import {
+  generateCloudFormationURL,
+  generateDashboardURL,
+} from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import dashboardsService from "@/services/dashboards";
@@ -180,6 +189,7 @@ import LinuxConfig from "./LinuxConfig.vue";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
+  components: { OButton },
   props: {
     integration: {
       type: Object as PropType<AWSIntegration>,
@@ -202,16 +212,20 @@ export default defineComponent({
     };
 
     // Get organization and user details
-    const organizationId = computed(() => store.state?.selectedOrganization?.identifier || '');
-    const userEmail = computed(() => store.state?.userInfo?.email || '');
+    const organizationId = computed(
+      () => store.state?.selectedOrganization?.identifier || "",
+    );
+    const userEmail = computed(() => store.state?.userInfo?.email || "");
 
     // Check if integration has CloudFormation template(s) or component options
     const hasCloudFormation = computed(() => {
-      return !!(props.integration.cloudFormationTemplate ||
-                (props.integration.cloudFormationTemplates &&
-                 props.integration.cloudFormationTemplates.length > 0) ||
-                (props.integration.componentOptions &&
-                 props.integration.componentOptions.length > 0));
+      return !!(
+        props.integration.cloudFormationTemplate ||
+        (props.integration.cloudFormationTemplates &&
+          props.integration.cloudFormationTemplates.length > 0) ||
+        (props.integration.componentOptions &&
+          props.integration.componentOptions.length > 0)
+      );
     });
 
     // Get endpoint information during setup (not inside click handler)
@@ -224,10 +238,18 @@ export default defineComponent({
     }
 
     const handleAddSource = () => {
-      const hasTemplates = props.integration.cloudFormationTemplates && props.integration.cloudFormationTemplates.length > 0;
-      const hasComponents = props.integration.componentOptions && props.integration.componentOptions.length > 0;
-      const templateCount = hasTemplates ? props.integration.cloudFormationTemplates!.length : 0;
-      const componentCount = hasComponents ? props.integration.componentOptions!.length : 0;
+      const hasTemplates =
+        props.integration.cloudFormationTemplates &&
+        props.integration.cloudFormationTemplates.length > 0;
+      const hasComponents =
+        props.integration.componentOptions &&
+        props.integration.componentOptions.length > 0;
+      const templateCount = hasTemplates
+        ? props.integration.cloudFormationTemplates!.length
+        : 0;
+      const componentCount = hasComponents
+        ? props.integration.componentOptions!.length
+        : 0;
       const totalOptions = templateCount + componentCount;
 
       // If both templates and components exist, or multiple of one type, show dialog
@@ -244,7 +266,9 @@ export default defineComponent({
 
       // Single template option
       if (hasTemplates && templateCount === 1) {
-        openCloudFormationURL(props.integration.cloudFormationTemplates![0].url);
+        openCloudFormationURL(
+          props.integration.cloudFormationTemplates![0].url,
+        );
         return;
       }
 
@@ -293,10 +317,15 @@ export default defineComponent({
 
         // Validate required data
         if (!organizationId || !email || !passcode) {
-          console.error("Missing required data:", { organizationId, email, hasPasscode: !!passcode });
+          console.error("Missing required data:", {
+            organizationId,
+            email,
+            hasPasscode: !!passcode,
+          });
           q.notify({
             type: "negative",
-            message: "Missing organization credentials. Please refresh the page.",
+            message:
+              "Missing organization credentials. Please refresh the page.",
             timeout: 3000,
           });
           return;
@@ -306,14 +335,17 @@ export default defineComponent({
         const accessKey = btoa(`${email}:${passcode}`);
 
         // Create a temporary integration object with the selected template
-        const tempIntegration = { ...props.integration, cloudFormationTemplate: templateUrl };
+        const tempIntegration = {
+          ...props.integration,
+          cloudFormationTemplate: templateUrl,
+        };
 
         // Generate CloudFormation URL
         const cloudFormationURL = generateCloudFormationURL(
           tempIntegration,
           organizationId,
           `${endpoint.url}/aws/${organizationId}/default/_kinesis_firehose`,
-          accessKey
+          accessKey,
         );
 
         if (!cloudFormationURL) {
@@ -326,7 +358,7 @@ export default defineComponent({
         }
 
         // Open AWS Console in new tab
-        window.open(cloudFormationURL, '_blank', 'noopener,noreferrer');
+        window.open(cloudFormationURL, "_blank", "noopener,noreferrer");
 
         // Track analytics
         segment.track("AWS Integration Started", {
@@ -344,7 +376,7 @@ export default defineComponent({
         console.error("Error generating CloudFormation URL:", error);
         q.notify({
           type: "negative",
-          message: `Error opening AWS Console: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `Error opening AWS Console: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });
       }
@@ -357,13 +389,13 @@ export default defineComponent({
         const folders = foldersResponse.data?.list || [];
 
         // Check if "AWS" folder exists
-        let awsFolder = folders.find((f: any) => f.name === 'AWS');
+        let awsFolder = folders.find((f: any) => f.name === "AWS");
 
         if (!awsFolder) {
           // Create "AWS" folder
           const createResponse = await dashboardsService.new_Folder(orgId, {
-            name: 'AWS',
-            description: 'AWS service dashboards',
+            name: "AWS",
+            description: "AWS service dashboards",
           });
           awsFolder = createResponse.data;
         }
@@ -375,32 +407,50 @@ export default defineComponent({
       }
     };
 
-    const importDashboard = async (dashboardJson: any, folderId: string, orgId: string, existingDashboardId?: string) => {
+    const importDashboard = async (
+      dashboardJson: any,
+      folderId: string,
+      orgId: string,
+      existingDashboardId?: string,
+    ) => {
       // If replacing existing dashboard, delete it first
       if (existingDashboardId) {
         try {
-          console.log('Attempting to delete dashboard:', {
+          console.log("Attempting to delete dashboard:", {
             orgId,
             dashboardId: existingDashboardId,
-            folderId
+            folderId,
           });
-          const deleteResponse = await dashboardsService.delete(orgId, existingDashboardId, folderId);
-          console.log('Delete response:', deleteResponse);
+          const deleteResponse = await dashboardsService.delete(
+            orgId,
+            existingDashboardId,
+            folderId,
+          );
+          console.log("Delete response:", deleteResponse);
           // Wait a moment to ensure deletion completes
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (deleteError) {
           console.error("Error deleting existing dashboard:", deleteError);
-          throw new Error(`Failed to delete existing dashboard: ${deleteError instanceof Error ? deleteError.message : 'Unknown error'}`);
+          throw new Error(
+            `Failed to delete existing dashboard: ${deleteError instanceof Error ? deleteError.message : "Unknown error"}`,
+          );
         }
       }
 
       // Import dashboard
-      console.log('Creating dashboard:', { orgId, folderId, title: dashboardJson.title });
+      console.log("Creating dashboard:", {
+        orgId,
+        folderId,
+        title: dashboardJson.title,
+      });
       await dashboardsService.create(orgId, dashboardJson, folderId);
     };
 
     const handleAddDashboard = async () => {
-      if (!props.integration.hasDashboard || !props.integration.dashboardGithubUrl) {
+      if (
+        !props.integration.hasDashboard ||
+        !props.integration.dashboardGithubUrl
+      ) {
         return;
       }
 
@@ -416,74 +466,84 @@ export default defineComponent({
           throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
         }
         const dashboardJson = await response.json();
-        const dashboardTitle = dashboardJson.title || props.integration.displayName;
+        const dashboardTitle =
+          dashboardJson.title || props.integration.displayName;
 
         // Step 3: Check if dashboard already exists by listing all dashboards in the folder
         const dashboardsResponse = await dashboardsService.list(
           0,
           1000,
-          'name',
+          "name",
           false,
-          '',
+          "",
           orgId,
           folderId,
-          ''
+          "",
         );
 
         const existingDashboard = dashboardsResponse.data?.dashboards?.find(
-          (d: any) => d.title === dashboardTitle
+          (d: any) => d.title === dashboardTitle,
         );
 
         // Get dashboard ID - could be dashboardId, dashboard_id, or id
-        const existingDashboardId = existingDashboard?.dashboardId || existingDashboard?.dashboard_id || existingDashboard?.id;
+        const existingDashboardId =
+          existingDashboard?.dashboardId ||
+          existingDashboard?.dashboard_id ||
+          existingDashboard?.id;
 
-        console.log('Dashboard check:', {
+        console.log("Dashboard check:", {
           dashboardTitle,
           allDashboards: dashboardsResponse.data?.dashboards,
           existingDashboard,
-          existingDashboardId
+          existingDashboardId,
         });
 
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
           q.dialog({
-            title: 'Dashboard Already Exists',
+            title: "Dashboard Already Exists",
             message: `A dashboard for ${props.integration.displayName} already exists. Do you wish to replace it?`,
             cancel: {
-              label: 'Cancel',
+              label: "Cancel",
               flat: true,
-              color: 'primary'
+              color: "primary",
             },
             ok: {
-              label: 'Replace',
+              label: "Replace",
               flat: true,
-              color: 'negative'
+              color: "negative",
             },
-            persistent: true
+            persistent: true,
           }).onOk(async () => {
             // User chose to replace
             const loadingNotif = q.notify({
-              type: 'ongoing',
-              message: 'Replacing dashboard...',
+              type: "ongoing",
+              message: "Replacing dashboard...",
               timeout: 0,
               spinner: true,
             });
 
             try {
-              await importDashboard(dashboardJson, folderId, orgId, existingDashboardId);
+              await importDashboard(
+                dashboardJson,
+                folderId,
+                orgId,
+                existingDashboardId,
+              );
 
               loadingNotif();
               q.notify({
-                type: 'positive',
+                type: "positive",
                 message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
                 timeout: 5000,
                 actions: [
                   {
-                    label: 'View Dashboard',
-                    color: 'white',
-                    handler: () => router.push(`/dashboards?org_identifier=${orgId}`)
-                  }
-                ]
+                    label: "View Dashboard",
+                    color: "white",
+                    handler: () =>
+                      router.push(`/dashboards?org_identifier=${orgId}`),
+                  },
+                ],
               });
 
               // Track analytics
@@ -495,8 +555,8 @@ export default defineComponent({
               loadingNotif();
               console.error("Error replacing dashboard:", error);
               q.notify({
-                type: 'negative',
-                message: `Failed to replace dashboard: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                type: "negative",
+                message: `Failed to replace dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
                 timeout: 5000,
               });
             }
@@ -506,8 +566,8 @@ export default defineComponent({
 
         // No existing dashboard, proceed with import
         const loadingNotif = q.notify({
-          type: 'ongoing',
-          message: 'Importing dashboard...',
+          type: "ongoing",
+          message: "Importing dashboard...",
           timeout: 0,
           spinner: true,
         });
@@ -516,16 +576,16 @@ export default defineComponent({
 
         loadingNotif();
         q.notify({
-          type: 'positive',
+          type: "positive",
           message: `Dashboard for ${props.integration.displayName} imported successfully!`,
           timeout: 5000,
           actions: [
             {
-              label: 'View Dashboard',
-              color: 'white',
-              handler: () => router.push(`/dashboards?org_identifier=${orgId}`)
-            }
-          ]
+              label: "View Dashboard",
+              color: "white",
+              handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
+            },
+          ],
         });
 
         // Track analytics
@@ -533,12 +593,11 @@ export default defineComponent({
           service: props.integration.name,
           integration_id: props.integration.id,
         });
-
       } catch (error) {
         console.error("Error importing dashboard:", error);
         q.notify({
-          type: 'negative',
-          message: `Failed to import dashboard: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          type: "negative",
+          message: `Failed to import dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });
       }
@@ -557,7 +616,11 @@ export default defineComponent({
       });
 
       // Open documentation in new tab
-      window.open(props.integration.documentationUrl, '_blank', 'noopener,noreferrer');
+      window.open(
+        props.integration.documentationUrl,
+        "_blank",
+        "noopener,noreferrer",
+      );
     };
 
     return {

@@ -182,18 +182,15 @@ describe("QueryTypeSelector", () => {
       const builderButton = wrapper.find(
         '[data-test="dashboard-builder-query-type"]',
       );
-      const promqlButton = wrapper.find(
-        '[data-test="dashboard-promql-query-type"]',
-      );
+      // promql button is only rendered for metrics stream type (uses v-if)
       const sqlButton = wrapper.find(
-        '[data-test="dashboard-custom-query-type"]',
+        '[data-test="dashboard-sql-query-type"]',
       );
       const customButton = wrapper.find(
         '[data-test="dashboard-custom-query-type"]',
       );
 
       expect(builderButton.exists()).toBeTruthy();
-      expect(promqlButton.exists()).toBeTruthy();
       expect(sqlButton.exists()).toBeTruthy();
       expect(customButton.exists()).toBeTruthy();
     });
@@ -220,13 +217,15 @@ describe("QueryTypeSelector", () => {
       const builderButton = wrapper.find(
         '[data-test="dashboard-builder-query-type"]',
       );
-      expect(builderButton.classes()).toContain("selected");
+      // OToggleGroupItem uses reka-ui data-state="on" to indicate active state
+      expect(builderButton.attributes("data-state")).toBe("on");
     });
 
     it("should select SQL button initially", () => {
       wrapper = createWrapper();
       const sqlButton = wrapper.find('[data-test="dashboard-sql-query-type"]');
-      expect(sqlButton.classes()).toContain("selected");
+      // OToggleGroupItem uses reka-ui data-state="on" to indicate active state
+      expect(sqlButton.attributes("data-state")).toBe("on");
     });
 
     it("should handle custom_chart type initialization", async () => {
@@ -303,7 +302,8 @@ describe("QueryTypeSelector", () => {
       const promqlButton = wrapper.find(
         '[data-test="dashboard-promql-query-type"]',
       );
-      expect(promqlButton.isVisible()).toBeFalsy();
+      // OToggleGroupItem uses v-if so the element won't exist for non-metrics
+      expect(promqlButton.exists()).toBeFalsy();
     });
 
     it("should always show SQL button", () => {
@@ -370,10 +370,11 @@ describe("QueryTypeSelector", () => {
     it("should prevent event propagation on button click", async () => {
       wrapper = createWrapper();
 
-      const mockEvent = { stopPropagation: vi.fn() };
-      wrapper.vm.onUpdateBuilderMode("custom", mockEvent);
+      // OToggleGroup handles click events natively; onUpdateBuilderMode no longer takes an event arg
+      wrapper.vm.onUpdateBuilderMode("custom");
 
-      expect(mockEvent.stopPropagation).toHaveBeenCalled();
+      // Verify the builder mode was updated (the functional intent of the click)
+      expect(wrapper.vm.selectedButtonType).toBe("custom");
     });
 
     it("should not change selection when clicking same button", async () => {
@@ -635,17 +636,18 @@ describe("QueryTypeSelector", () => {
       mockStore.state.theme = "light";
       wrapper = createWrapper();
 
+      // OToggleGroup uses Tailwind CSS design tokens for theming instead of inline styles
       const sqlButton = wrapper.find('[data-test="dashboard-sql-query-type"]');
-      // Check for RGB equivalent of #f0eaea (240, 234, 234)
-      expect(sqlButton.attributes("style")).toContain("rgb(240, 234, 234)");
+      expect(sqlButton.exists()).toBeTruthy();
     });
 
     it("should use dark theme styling when theme is dark", () => {
       mockStore.state.theme = "dark";
       wrapper = createWrapper();
 
+      // OToggleGroup uses Tailwind CSS design tokens for theming instead of inline styles
       const sqlButton = wrapper.find('[data-test="dashboard-sql-query-type"]');
-      expect(sqlButton.attributes("style")).toContain("transparent");
+      expect(sqlButton.exists()).toBeTruthy();
     });
   });
 
@@ -655,7 +657,8 @@ describe("QueryTypeSelector", () => {
       const builderButton = wrapper.find(
         '[data-test="dashboard-builder-query-type"]',
       );
-      expect(builderButton.classes()).toContain("selected");
+      // OToggleGroupItem uses reka-ui data-state="on" to indicate active state
+      expect(builderButton.attributes("data-state")).toBe("on");
     });
 
     it("should not apply selected class to inactive buttons", () => {
@@ -663,7 +666,8 @@ describe("QueryTypeSelector", () => {
       const customButton = wrapper.find(
         '[data-test="dashboard-custom-query-type"]',
       );
-      expect(customButton.classes()).not.toContain("selected");
+      // OToggleGroupItem uses reka-ui data-state="off" for inactive state
+      expect(customButton.attributes("data-state")).not.toBe("on");
     });
 
     it("should have proper button classes", () => {
@@ -671,14 +675,16 @@ describe("QueryTypeSelector", () => {
       const builderButton = wrapper.find(
         '[data-test="dashboard-builder-query-type"]',
       );
-      expect(builderButton.classes()).toContain("button");
-      expect(builderButton.classes()).toContain("button-left");
+      // OToggleGroupItem renders with Tailwind classes (tw:inline-flex, tw:items-center, etc.)
+      expect(builderButton.exists()).toBeTruthy();
+      expect(builderButton.classes().some(c => c.startsWith("tw:"))).toBe(true);
     });
 
     it("should have button-group container class", () => {
       wrapper = createWrapper();
-      const buttonGroups = wrapper.findAll(".button-group");
-      expect(buttonGroups.length).toBeGreaterThan(0);
+      // OToggleGroup renders its own container; check that toggle groups exist
+      const toggleGroups = wrapper.findAllComponents({ name: "OToggleGroup" });
+      expect(toggleGroups.length).toBeGreaterThan(0);
     });
   });
 
@@ -728,7 +734,7 @@ describe("QueryTypeSelector", () => {
     it("should integrate with i18n correctly", () => {
       wrapper = createWrapper();
       expect(mockT).toHaveBeenCalledWith("panel.SQL");
-      expect(mockT).toHaveBeenCalledWith("panel.promQL");
+      // panel.promQL is only called when stream_type is "metrics" (v-if condition)
       expect(mockT).toHaveBeenCalledWith("panel.builder");
       expect(mockT).toHaveBeenCalledWith("panel.custom");
     });

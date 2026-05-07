@@ -146,15 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="expand-indicator q-mt-sm">
-          <q-btn
-            flat
-            dense
-            color="primary"
+          <OButton
+            variant="ghost-primary"
             size="sm"
             @click="isExpanded = true"
           >
             ...expand ({{ contentStats.remainingChars }} more characters)
-          </q-btn>
+          </OButton>
         </div>
       </div>
 
@@ -248,15 +246,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-if="contentStats.shouldTruncate" class="collapse-btn q-mt-sm">
-          <q-btn
-            flat
-            dense
-            color="primary"
+          <OButton
+            variant="ghost-primary"
             size="sm"
             @click="isExpanded = false"
           >
             Collapse
-          </q-btn>
+          </OButton>
         </div>
       </div>
     </div>
@@ -271,6 +267,7 @@ import { marked } from "marked";
 const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
+import OButton from '@/lib/core/Button/OButton.vue';
 
 const INITIAL_LINE_LIMIT = 15;
 

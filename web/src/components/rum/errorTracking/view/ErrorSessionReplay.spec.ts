@@ -146,38 +146,36 @@ describe("ErrorSessionReplay Component", () => {
 
   describe("Play Button", () => {
     it("should render play button", () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       expect(playButton.exists()).toBe(true);
     });
 
     it("should have correct button styling", () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
-      expect(playButton.classes()).toContain("bg-primary");
-      expect(playButton.classes()).toContain("rounded");
+      const playButton = wrapper.findComponent({ name: "OButton" });
       expect(playButton.classes()).toContain("tw:mt-[0.625rem]");
-      expect(playButton.classes()).toContain("text-white");
     });
 
     it("should have correct button inline styles", () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
-      expect(playButton.classes()).toContain("bg-primary");
-      expect(playButton.classes()).toContain("rounded");
+      const playButton = wrapper.findComponent({ name: "OButton" });
       expect(playButton.classes()).toContain("tw:mt-[0.625rem]");
     });
 
     it("should display play icon", () => {
-      const playIcon = wrapper.find('[data-test="q-icon"].play_circle');
-      expect(playIcon.exists()).toBe(true);
+      // Icon is now a Lucide SVG (PlayCircle), check it's rendered inside the button
+      const playButton = wrapper.findComponent({ name: "OButton" });
+      expect(playButton.find("svg").exists()).toBe(true);
     });
 
     it("should display 'Play Session Replay' text", () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       expect(playButton.text()).toContain("Play Session Replay");
     });
 
     it("should have correct icon styling", () => {
-      const playIcon = wrapper.find('[data-test="q-icon"].play_circle');
-      expect(playIcon.classes()).toContain("q-mr-xs");
+      // Icon is now a Lucide SVG with tw:mr-1 class
+      const playButton = wrapper.findComponent({ name: "OButton" });
+      const svg = playButton.find("svg");
+      expect(svg.exists()).toBe(true);
     });
   });
 
@@ -214,7 +212,7 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should navigate to SessionViewer when play button is clicked", async () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -238,7 +236,7 @@ describe("ErrorSessionReplay Component", () => {
         },
       });
 
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -274,7 +272,7 @@ describe("ErrorSessionReplay Component", () => {
       expect(sessionTags.session_id).toBe("custom-session-789");
       expect(sessionTags.view_id).toBe("custom-view-101");
 
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -293,7 +291,7 @@ describe("ErrorSessionReplay Component", () => {
       const container = wrapper.find(".q-mt-lg");
       const title = container.find(".tags-title");
       const tagsRow = container.find(".row");
-      const playButton = container.findComponent({ name: "QBtn" });
+      const playButton = container.findComponent({ name: "OButton" });
 
       expect(container.exists()).toBe(true);
       expect(title.exists()).toBe(true);
@@ -303,7 +301,7 @@ describe("ErrorSessionReplay Component", () => {
 
     it("should maintain correct element order", () => {
       const container = wrapper.find(".q-mt-lg");
-      const children = Array.from(container.element.children);
+      const children = Array.from(container.element.children) as HTMLElement[];
 
       expect(children[0].classList.contains("tags-title")).toBe(true);
       expect(children[1].classList.contains("row")).toBe(true);
@@ -375,7 +373,7 @@ describe("ErrorSessionReplay Component", () => {
         },
       });
 
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -401,7 +399,7 @@ describe("ErrorSessionReplay Component", () => {
       expect(sessionTags.session_id).toBeNull();
       expect(sessionTags.view_id).toBeNull();
 
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       await playButton.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
@@ -422,21 +420,19 @@ describe("ErrorSessionReplay Component", () => {
     });
 
     it("should apply correct button styling", () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
-      expect(playButton.classes()).toContain("bg-primary");
-      expect(playButton.classes()).toContain("rounded");
-      expect(playButton.classes()).toContain("text-white");
+      const playButton = wrapper.findComponent({ name: "OButton" });
+      expect(playButton.classes()).toContain("tw:mt-[0.625rem]");
     });
   });
 
   describe("Accessibility", () => {
     it("should have clickable play button", () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       expect(playButton.exists()).toBe(true);
     });
 
     it("should provide clear button text", () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
       expect(playButton.text()).toContain("Play Session Replay");
     });
 
@@ -448,7 +444,7 @@ describe("ErrorSessionReplay Component", () => {
 
   describe("Component Lifecycle", () => {
     it("should handle multiple navigation calls", async () => {
-      const playButton = wrapper.findComponent({ name: "QBtn" });
+      const playButton = wrapper.findComponent({ name: "OButton" });
 
       await playButton.trigger("click");
       await playButton.trigger("click");

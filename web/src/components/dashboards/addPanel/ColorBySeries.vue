@@ -16,17 +16,17 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600; display: flex; align-items: center">
+    <div
+      class="q-mb-sm"
+      style="font-weight: 600; display: flex; align-items: center"
+    >
       <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        class=""
-        size="sm"
-        flat
-        icon="info_outline"
+      <OButton
+        variant="ghost"
+        size="icon"
         data-test="dashboard-addpanel-config-color-by-series"
       >
+        <template #icon-left><q-icon name="info_outline" /></template>
         <q-tooltip
           class="bg-grey-8"
           anchor="bottom middle"
@@ -35,20 +35,20 @@
         >
           {{ t("dashboard.colorBySeriesTooltip") }}
         </q-tooltip>
-      </q-btn>
+      </OButton>
     </div>
-    <q-btn
+    <OButton
+      variant="outline"
+      size="sm"
       @click="openColorBySeriesPopUp"
-      style="cursor: pointer; padding: 0px 5px"
-      :label="
-        dashboardPanelData?.data?.config?.color?.colorBySeries?.length
-          ? t('dashboard.editColorBySeries')
-          : t('dashboard.applyColorBySeries')
-      "
-      no-caps
       data-test="dashboard-addpanel-config-colorBySeries-add-btn"
-      class="el-border"
-    />
+    >
+      {{
+        dashboardPanelData?.data?.config?.color?.colorBySeries?.length
+          ? t("dashboard.editColorBySeries")
+          : t("dashboard.applyColorBySeries")
+      }}
+    </OButton>
     <q-dialog v-model="showColorBySeriesPopUp">
       <ColorBySeriesPopUp
         :seriesOptions="seriesOptions?.series"
@@ -69,9 +69,10 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 export default defineComponent({
   name: "ColorBySeries",
-  components: { ColorBySeriesPopUp },
+  components: { ColorBySeriesPopUp, OButton },
   props: {
     colorBySeriesData: {
       type: Object,

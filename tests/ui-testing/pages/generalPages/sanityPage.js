@@ -175,16 +175,16 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click();
         await searchPromise;
 
-        await expect(this.page.getByText("Showing 1 to 50")).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="logs-search-result-title"]')).toContainText(/Showing 1 to/, { timeout: 15000 });
         await this.page.waitForTimeout(1000);
 
         try {
-            await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+            await expect(this.page.locator('[data-test="logs-search-result-pagination"]')).toBeVisible({ timeout: 10000 });
         } catch (error) {
             testLogger.warn('Pagination element not found, retrying with refresh button click');
             await this.page.locator(this.refreshButton).click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+            await expect(this.page.locator('[data-test="logs-search-result-pagination"]')).toBeVisible({ timeout: 10000 });
         }
     }
 
@@ -196,7 +196,7 @@ export class SanityPage {
 
     async toggleHistogramOffAndOn() {
         await this.clickHistogramToggle();
-        await this.page.getByText("Showing 1").click();
+        await this.page.locator('[data-test="logs-search-result-title"]').click();
         expect(
             await this.page.locator('[data-test="logs-search-result-bar-chart"]').isVisible()
         ).toBe(false);
@@ -285,8 +285,8 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click();
         await initialSearchPromise;
         
-        await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').nth(2).click();
-        
+        await this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click();
+
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 10000 });
 
@@ -300,7 +300,7 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click({ force: true });
         await limitSearchPromise;
 
-        await expect(this.page.getByText(/Showing 1 to 5/)).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="logs-search-result-title"]')).toContainText(/Showing 1 to 5/, { timeout: 15000 });
 
         // Reset filters button is now directly on the toolbar
         await this.page.locator(this.resetFiltersButton).click();
@@ -629,12 +629,12 @@ export class SanityPage {
         await this.page.locator(this.closeDialog).click();
         await this.page.waitForTimeout(2000);
 
-        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after clicking result summary and retrying run query');
             }
@@ -876,12 +876,12 @@ export class SanityPage {
         await this.page.waitForTimeout(2000);
 
         // Check if pagination is visible, if not click run query again
-        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after histogram off and retrying run query');
             }
@@ -894,7 +894,7 @@ export class SanityPage {
         await this.page.waitForTimeout(1000);
 
         // Enable SQL mode
-        await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+        await this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click();
         await this.page.waitForTimeout(1000);
 
         // Click run query button
@@ -913,12 +913,12 @@ export class SanityPage {
         await this.page.waitForTimeout(2000);
 
         // Check if pagination is visible, if not click run query again
-        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after SQL mode on and retrying run query');
             }
@@ -961,9 +961,9 @@ export class SanityPage {
         }
         
         // Enable SQL mode with error handling
-        const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
+        const sqlModeSwitch = this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
         await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
-        
+
         try {
             await sqlModeSwitch.click({ timeout: 10000 });
         } catch (error) {
@@ -971,7 +971,7 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await sqlModeSwitch.click({ timeout: 10000 });
         }
-        
+
         // Click refresh button with waits
         const refreshButton = this.page.locator(this.refreshButton);
         await expect(refreshButton).toBeVisible({ timeout: 15000 });
@@ -1059,16 +1059,16 @@ export class SanityPage {
         }
         
         // Enable SQL mode with error handling
-        const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
-        await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
+        const sqlModeSwitch2 = this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+        await expect(sqlModeSwitch2).toBeVisible({ timeout: 15000 });
 
         try {
-            await sqlModeSwitch.click({ timeout: 10000 });
+            await sqlModeSwitch2.click({ timeout: 10000 });
             await this.page.waitForTimeout(1000); // Brief wait for mode switch
         } catch (error) {
             console.warn('SQL mode switch click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
-            await sqlModeSwitch.click({ timeout: 10000 });
+            await sqlModeSwitch2.click({ timeout: 10000 });
         }
 
         // Wait for query editor to be ready

@@ -51,7 +51,7 @@ export class SearchJobInspectorPage {
     this.viewQueryBtnText = 'text=View Query';
     this.noEventsText = 'text=No data';
     // Exclude the search bar inspect button (data-test="logs-inspect-button")
-    this.inspectBtnText = 'button.q-btn:has-text("Inspect"):not([data-test="logs-inspect-button"])';
+    this.inspectBtnText = 'button[data-o2-btn]:has-text("Inspect"):not([data-test="logs-inspect-button"])';
 
     // ===== SEARCH RESULTS (Index.vue) =====
     this.searchResultText = '[data-test="logs-search-search-result"]';

@@ -64,20 +64,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Actions Column: Delete -->
       <div class="actions-column">
         <div class="flex justify-end">
-          <q-btn
+          <OButton
             data-test="semantic-group-remove-group-btn"
-            flat
-            round
-            dense
-            :color="isProtected ? 'grey-5' : 'negative'"
-            icon="delete"
-            :disable="isProtected"
+            :variant="isProtected ? 'ghost-muted' : 'ghost-destructive'"
+            size="icon-circle-sm"
+            :disabled="isProtected"
             @click="!isProtected && emit('delete')"
           >
+            <q-icon name="delete" />
             <q-tooltip>
               {{ isProtected ? t("correlation.serviceGroupProtected") : t("correlation.removeSemanticGroup") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </div>
     </div>
@@ -87,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import OButton from '@/lib/core/Button/OButton.vue';
 import TagInput from "./TagInput.vue";
 
 const { t } = useI18n();

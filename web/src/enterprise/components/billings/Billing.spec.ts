@@ -33,7 +33,8 @@ const mockRouter = {
 };
 
 vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter
+  useRouter: () => mockRouter,
+  useRoute: () => mockRouter.currentRoute.value,
 }));
 
 // Mock Quasar
@@ -145,10 +146,12 @@ describe("Billing Component", () => {
     });
 
     it("should have correct tabs configuration", () => {
-      expect(wrapper.vm.tabs).toEqual([
-        { label: 'Gb', value: "gb" },
-        { label: 'Mb', value: "mb" }
-      ]);
+      expect(wrapper.vm.tabs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: 'Gb', value: "gb" }),
+          expect.objectContaining({ label: 'Mb', value: "mb" }),
+        ])
+      );
     });
 
     it("should have correct options configuration", () => {

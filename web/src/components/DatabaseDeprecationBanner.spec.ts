@@ -136,9 +136,8 @@ describe("DatabaseDeprecationBanner", () => {
 
     await wrapper.vm.$nextTick();
 
-    const closeButton = wrapper.findComponent({ name: "QBtn" });
+    const closeButton = wrapper.findComponent({ name: "OButton" });
     expect(closeButton.exists()).toBe(true);
-    expect(closeButton.props("icon")).toBe("close");
   });
 
   it("should hide banner when close button is clicked", async () => {
@@ -161,7 +160,7 @@ describe("DatabaseDeprecationBanner", () => {
 
     expect(wrapper.find(".deprecation-message").exists()).toBe(true);
 
-    const closeButton = wrapper.findComponent({ name: "QBtn" });
+    const closeButton = wrapper.findComponent({ name: "OButton" });
     await closeButton.trigger("click");
 
     expect(wrapper.vm.showDeprecationWarning).toBe(false);
@@ -185,7 +184,7 @@ describe("DatabaseDeprecationBanner", () => {
 
     await wrapper.vm.$nextTick();
 
-    const closeButton = wrapper.findComponent({ name: "QBtn" });
+    const closeButton = wrapper.findComponent({ name: "OButton" });
     await closeButton.trigger("click");
 
     const dismissData = localStorage.getItem(DISMISS_KEY);
