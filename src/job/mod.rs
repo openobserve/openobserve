@@ -891,6 +891,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(cipher::run());
         tokio::task::spawn(db::keys::watch());
         tokio::task::spawn(org_storage::run());
+        tokio::task::spawn(db::org_storage_providers::watch());
     }
 
     #[cfg(feature = "vectorscan")]
