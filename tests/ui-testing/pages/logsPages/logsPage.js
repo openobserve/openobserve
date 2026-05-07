@@ -1723,13 +1723,14 @@ export class LogsPage {
         } catch (e) {
             const editorText = await editor.textContent().catch(() => '');
             if (editorText && editorText.includes(field)) return;
-            // Don't re-click — the star icon is a toggle. If the first click
-            // turned it on but the editor hadn't refreshed yet, re-clicking
-            // would remove it. Instead, give the editor more time and re-check.
             await this.page.waitForTimeout(3000);
             const retryText = await editor.textContent().catch(() => '');
             if (retryText && retryText.includes(field)) return;
-            throw new Error(`clickInterestingFields: field "${field}" not in editor after retry — toggle re-click is unsafe`);
+            // Field still not in editor — the first click likely didn't register.
+            // Re-clicking is safe because we've verified the field is NOT present
+            // (so the toggle couldn't have been turned on by the first click).
+            await this.clickInterestingFieldButton(field);
+            await expect(editor).toContainText(field, { timeout: 15000 });
         }
     }
 
