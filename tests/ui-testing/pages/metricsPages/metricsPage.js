@@ -1011,12 +1011,16 @@ export class MetricsPage {
     // ===== NOTIFICATION METHODS =====
 
     async isErrorNotificationVisible() {
-        const errorNotification = this.page.locator('.q-notification__message:has-text("Error")');
+        const errorNotification = this.page.locator(
+            '.q-notification--negative .q-notification__message, .q-notification.bg-negative .q-notification__message'
+        ).first();
         return await errorNotification.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
     async getErrorNotificationText() {
-        const errorNotification = this.page.locator('.q-notification__message:has-text("Error")');
+        const errorNotification = this.page.locator(
+            '.q-notification--negative .q-notification__message, .q-notification.bg-negative .q-notification__message'
+        ).first();
         if (await errorNotification.isVisible({ timeout: 3000 }).catch(() => false)) {
             return await errorNotification.textContent();
         }
