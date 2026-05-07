@@ -2695,6 +2695,18 @@ export class LogsPage {
         ).toBeVisible({ timeout: 15000 });
     }
 
+    watchForNotification(timeout = 15000) {
+        return this.page.locator(this.notificationMessage).first().waitFor({ state: 'attached', timeout });
+    }
+
+    async expectNotificationContainsText(text) {
+        await expect(this.page.locator(this.notificationMessage).first()).toContainText(text, { timeout: 10000 });
+    }
+
+    async waitForNotificationWithText(text, timeout = 3000) {
+        await this.page.locator(this.notificationMessage).filter({ hasText: text }).first().waitFor({ state: 'visible', timeout });
+    }
+
     async expectIndexFieldSearchInputVisible() {
         return await expect(this.page.locator(this.indexFieldSearchInput)).toBeVisible();
     }

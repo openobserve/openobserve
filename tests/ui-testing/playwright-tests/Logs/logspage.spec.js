@@ -149,10 +149,10 @@ test.describe("Logs Page testcases", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     // Start watching for the notification BEFORE clicking save — the
     // notification has timeout=1000ms and disappears almost immediately.
-    const notificationPromise = page.waitForSelector('.q-notification__message', { state: 'attached', timeout: 15000 });
+    const notificationPromise = pm.logsPage.watchForNotification(15000);
     await pm.logsPage.clickSavedViewDialogSave();
     await notificationPromise;
-    await expect(page.locator('.q-notification__message').first()).toContainText("Please provide valid view name");
+    await pm.logsPage.expectNotificationContainsText("Please provide valid view name");
 
     testLogger.info('Saved views special characters validation test completed');
   });
@@ -444,12 +444,8 @@ test.describe("Logs Page testcases", () => {
 
     // Ensure histogram is ON — alpha1 may default to OFF. Without this the canvas
     // never renders and clickBarChartCanvas times out.
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    const isChecked = await histogramToggle.getAttribute('aria-checked').catch(() => 'false');
-    if (isChecked !== 'true') {
-      await histogramToggle.click();
-      await page.waitForTimeout(300);
-    }
+    await pm.logsPage.ensureHistogramState(true);
+    await page.waitForTimeout(300);
 
     await pm.logsPage.clickLogSearchIndexListFieldSearchInput();
     await pm.logsPage.fillLogSearchIndexListFieldSearchInput('code');

@@ -106,7 +106,7 @@ test.describe("Logs Queries testcases", () => {
     
     // Wait for the success toast message to appear briefly after save
     try {
-      await pm.logsPage.page.waitForSelector('.q-notification__message:has-text("View created successfully")', { timeout: 3000 });
+      await pm.logsPage.waitForNotificationWithText('View created successfully', 3000);
       testLogger.info('Success toast validated: View created successfully');
     } catch (error) {
       testLogger.info('View creation toast may have appeared and disappeared quickly - continuing with test');

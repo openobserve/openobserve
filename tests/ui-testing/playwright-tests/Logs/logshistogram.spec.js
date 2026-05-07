@@ -54,7 +54,7 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify error handling and no results found with histogram", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing error handling and no results found with histogram');
 
@@ -95,7 +95,7 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify error handling with histogram toggle off and on", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing error handling with histogram toggle off and on');
 
@@ -139,7 +139,7 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify histogram toggle persistence after multiple queries", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async () => {
     testLogger.info('Testing histogram toggle persistence after multiple queries');
     
@@ -180,7 +180,7 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify histogram toggle with empty query", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async () => {
     testLogger.info('Testing histogram toggle with empty query');
     
@@ -210,7 +210,7 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify histogram toggle with complex query", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async () => {
     testLogger.info('Testing histogram toggle with complex query');
     
