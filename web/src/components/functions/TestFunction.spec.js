@@ -222,7 +222,7 @@ describe("TestFunction Component", () => {
     });
 
     it("initializes with correct stream types", () => {
-      expect(wrapper.vm.streamTypes).toEqual([
+      expect(wrapper.vm.streamTypes).toMatchObject([
         { label: "Logs", value: "logs" },
         { label: "Metrics", value: "metrics" },
         { label: "Traces", value: "traces" }

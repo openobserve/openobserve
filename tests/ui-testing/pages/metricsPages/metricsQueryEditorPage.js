@@ -37,8 +37,11 @@ export class MetricsQueryEditorPage {
     /**
      * Switch to PromQL Custom mode
      *
-     * In the metrics page, there are mode buttons: SQL, PromQL, Builder, Custom
-     * This function clicks the "Custom" button to enable free-form PromQL query typing.
+     * In the metrics page, there are two toggle groups:
+     *   - Query type: SQL / PromQL  (data-test="dashboard-sql-query-type" / "dashboard-promql-query-type")
+     *   - Builder mode: Builder / Custom  (data-test="dashboard-builder-query-type" / "dashboard-custom-query-type")
+     *
+     * OToggleGroupItem (Reka UI) signals the active item via data-state="on", not a CSS class.
      *
      * @returns {Promise<boolean>} - True if successfully switched
      */
@@ -49,25 +52,44 @@ export class MetricsQueryEditorPage {
         await this.page.keyboard.press('Escape');
         await this.page.waitForTimeout(300);
 
-        // First ensure we're in PromQL mode (not SQL) - required for tabs to appear
-        const promqlBtn = this.page.locator('[data-test="dashboard-promql-query-type"]');
-        if (await promqlBtn.isVisible({ timeout: 3000 })) {
-            await promqlBtn.click();
-            await this.page.waitForTimeout(1000);
-            this.testLogger.info('Switched to PromQL mode');
+        // Look for the "Custom" button - try multiple selector strategies
+        const customButtonSelectors = [
+            'button:has-text("Custom")',
+            '.q-btn:has-text("Custom")',
+            '[data-test*="custom"]',
+            'button[class*="custom"]'
+        ];
+
+        for (const selector of customButtonSelectors) {
+            const customButton = this.page.locator(selector).first();
+
+            if (await customButton.isVisible({ timeout: 2000 })) {
+                // Check if already active
+                const classes = await customButton.getAttribute('class');
+                const isActive = classes.includes('active') || classes.includes('text-primary');
+
+                if (!isActive) {
+                    await customButton.click();
+                    await this.page.waitForTimeout(1000);
+                    this.testLogger.info('✓ Switched to PromQL Custom mode');
+                } else {
+                    this.testLogger.info('✓ Already in PromQL Custom mode');
+                }
+
+                return true;
+            }
         }
 
-        // Now click the Custom sub-mode button
-        const customButton = this.page.locator('[data-test="dashboard-custom-query-type"]');
-
-        if (await customButton.isVisible({ timeout: 3000 })) {
-            await customButton.click();
+        // Fallback: Try to find by exact text match
+        const exactCustomButton = this.page.getByRole('button', { name: 'Custom', exact: true });
+        if (await exactCustomButton.isVisible({ timeout: 2000 })) {
+            await exactCustomButton.click();
             await this.page.waitForTimeout(1000);
-            this.testLogger.info('✓ Switched to PromQL Custom mode');
+            this.testLogger.info('✓ Switched to PromQL Custom mode (via exact match)');
             return true;
         }
 
-        this.testLogger.warn('Could not find Custom mode button');
+        this.testLogger.warn('Could not find Custom mode button - assuming already in custom mode');
         return false;
     }
 
@@ -260,7 +282,11 @@ export class MetricsQueryEditorPage {
     }
 
     /**
-     * Switch to a specific query tab
+     * Switch to a specific query tab (1-based)
+     *
+     * Tabs in DashboardQueryEditor.vue are rendered as OTab (Reka UI TabsTrigger)
+     * with data-test="dashboard-panel-query-tab-{0-based-index}" and
+     * data-state="active" when selected.
      *
      * @param {number} tabNumber - The tab number to switch to (1-based)
      * @returns {Promise<boolean>} - True if successfully switched
@@ -272,15 +298,54 @@ export class MetricsQueryEditorPage {
 
         this.testLogger.info(`Attempting to switch to tab ${tabNumber}`);
 
-        // Use exact data-test attribute for the tab (0-based index)
-        const tabIndex = tabNumber - 1;
-        const tab = this.page.locator(`[data-test="dashboard-panel-query-tab-${tabIndex}"]`);
+        // First, try to find tab by text (Query 1, Query 2, etc.)
+        const tabSelector = this.page.locator(this.tabSelector).filter({
+            hasText: new RegExp(`Query ${tabNumber}|Tab ${tabNumber}`, 'i')
+        }).first();
 
-        if (await tab.isVisible({ timeout: 5000 })) {
-            await tab.click({ force: true });
+        if (await tabSelector.isVisible({ timeout: 3000 })) {
+            await tabSelector.click({ force: true });
+            await this.page.waitForTimeout(1500); // Increased wait for UI to update
+
+            // Verify we're on the right tab by checking active state
+            const isActive = await tabSelector.evaluate(el => {
+                return el.classList.contains('q-tab--active') ||
+                       el.getAttribute('aria-selected') === 'true';
+            });
+
+            if (isActive) {
+                this.testLogger.info(`✓ Switched to tab ${tabNumber} (verified active)`);
+                return true;
+            } else {
+                this.testLogger.warn(`Tab ${tabNumber} clicked but not active`);
+            }
+        }
+
+        // Alternative: try nth-child approach
+        // Note: tabs might start at index 0 or have other tabs before query tabs
+        const allTabs = this.page.locator(this.tabSelector);
+        const tabCount = await allTabs.count();
+        this.testLogger.info(`Found ${tabCount} total tabs`);
+
+        // Try to click the specific index (adjusting for 0-based indexing)
+        if (tabNumber <= tabCount) {
+            const nthTab = allTabs.nth(tabNumber - 1);
+            const tabText = await nthTab.textContent();
+            this.testLogger.info(`Clicking tab at index ${tabNumber - 1}: "${tabText}"`);
+
+            await nthTab.click({ force: true });
             await this.page.waitForTimeout(1500);
-            this.testLogger.info(`✓ Switched to tab ${tabNumber}`);
-            return true;
+
+            // Verify active
+            const isActive = await nthTab.evaluate(el => {
+                return el.classList.contains('q-tab--active') ||
+                       el.getAttribute('aria-selected') === 'true';
+            });
+
+            if (isActive) {
+                this.testLogger.info(`✓ Switched to tab ${tabNumber} via nth (verified active)`);
+                return true;
+            }
         }
 
         this.testLogger.error(`Failed to switch to tab ${tabNumber}`);
@@ -299,18 +364,60 @@ export class MetricsQueryEditorPage {
 
         this.testLogger.info('Looking for Add Query button...');
 
-        // Use exact data-test attribute for the add tab button
-        const addButton = this.page.locator('[data-test="dashboard-panel-query-tab-add"]');
+        // Try multiple selectors for the add query button
+        // Note: on cloud, the data-test attribute contains literal backticks
+        // e.g. `dashboard-panel-query-tab-add` — use contains-match to handle both
+        const selectors = [
+            '[data-test*="dashboard-panel-query-tab-add"]',   // Contains match (handles backtick variant)
+            '[data-test="dashboard-panel-query-tab-add"]',    // Exact data-test attribute
+            'button[data-test*="panel-query-tab-add"]',       // Partial match
+            'button.q-btn[icon="add"]',                        // Button with add icon
+            'button.q-btn.q-btn--round.q-btn--flat',          // Round flat button (likely the add button)
+            '.q-tab__content + button[icon="add"]',           // Add button next to tabs
+            'button.q-btn:has(.q-icon[name="add"])',          // Button containing add icon
+        ];
 
-        if (await addButton.isVisible({ timeout: 5000 })) {
-            this.testLogger.info('✓ Found add tab button');
-            await addButton.click({ force: true });
-            await this.page.waitForTimeout(1500);
-            this.testLogger.info('✓ Added new query tab successfully');
-            return true;
+        for (const selector of selectors) {
+            this.testLogger.info(`Trying selector: ${selector}`);
+            const addButton = this.page.locator(selector).first();
+
+            if (await addButton.isVisible({ timeout: 2000 })) {
+                this.testLogger.info(`✓ Found add button with selector: ${selector}`);
+                await addButton.click({ force: true });
+                await this.page.waitForTimeout(1500);
+
+                // Verify a new tab was created by counting tabs
+                const tabs = this.page.locator(this.tabSelector);
+                const tabCount = await tabs.count();
+                this.testLogger.info(`✓ Tab count after add: ${tabCount}`);
+
+                this.testLogger.info('✓ Added new query tab successfully');
+                return true;
+            }
         }
 
-        this.testLogger.error('❌ Add query tab button not found');
+        // If specific selectors don't work, try finding any round button with add icon
+        const roundButtons = this.page.locator('button.q-btn--round');
+        const buttonCount = await roundButtons.count();
+        this.testLogger.info(`Found ${buttonCount} round buttons`);
+
+        for (let i = 0; i < buttonCount; i++) {
+            const btn = roundButtons.nth(i);
+            const hasAddIcon = await btn.locator('.q-icon').first().evaluate(icon => {
+                return icon.textContent === 'add' || icon.getAttribute('aria-label')?.includes('add');
+            }).catch(() => false);
+
+            if (hasAddIcon && await btn.isVisible()) {
+                this.testLogger.info(`Found add button at index ${i}`);
+                await btn.click({ force: true });
+                await this.page.waitForTimeout(1500);
+                this.testLogger.info('✓ Added new query tab successfully');
+                return true;
+            }
+        }
+
+        this.testLogger.error('❌ Add query button not found with any selector');
+        await this.page.screenshot({ path: `test-results/add-button-not-found-${Date.now()}.png` });
         return false;
     }
 

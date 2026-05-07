@@ -692,7 +692,9 @@ export default class DashboardVariablesScoped {
     await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
     await operatorSelector.click();
 
-    const operatorOption = this.page.getByRole("option", { name: operator, exact: true }).locator("div").nth(2);
+    // Use .first() instead of .locator("div").nth(2) — Quasar may or may not include
+    // a q-focus-helper div making the nth(2) index unstable across renders.
+    const operatorOption = this.page.getByRole("option", { name: operator, exact: true }).first();
     await operatorOption.waitFor({ state: "visible", timeout: 10000 });
     await operatorOption.click();
 
@@ -813,7 +815,7 @@ export default class DashboardVariablesScoped {
     await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
     await operatorSelector.click();
 
-    const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).locator("div").nth(2);
+    const operatorOption = this.page.getByRole("option", { name: filterConfig.operator, exact: true }).first();
     await operatorOption.waitFor({ state: "visible", timeout: 10000 });
     await operatorOption.click();
 
@@ -1332,10 +1334,17 @@ export default class DashboardVariablesScoped {
         const valueValue = typeof value === 'string' ? value : value.value;
         const isDefault = typeof value === 'object' && value.selected === true;
 
-        // If this is not the first item, add a new option
+        // If this is not the first item, add a new option and wait for it to appear.
+        // The q-field__bottom Quasar validation div permanently intercepts pointer events over
+        // the button, blocking both regular and force clicks. Use evaluate() to call the DOM
+        // native click() which fires the full event sequence and bypasses CSS pointer-events.
         if (i > 0) {
-          await this.page.locator('button:has-text("Add Option")').click();
-          await this.page.waitForTimeout(300);
+          const addOptionBtn = this.page.locator('[data-test="dashboard-add-option-btn"]');
+          await addOptionBtn.waitFor({ state: "visible", timeout: 10000 });
+          await addOptionBtn.scrollIntoViewIfNeeded();
+          await addOptionBtn.evaluate(btn => btn.click());
+          // Wait for the new option row to appear in the DOM before proceeding
+          await this.page.locator(`[data-test="dashboard-custom-variable-${i}-label"]`).waitFor({ state: "visible", timeout: 10000 });
         }
 
         // Fill label and value for this option

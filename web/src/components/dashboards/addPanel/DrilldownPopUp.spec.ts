@@ -279,11 +279,12 @@ describe("DrilldownPopUp", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.drilldownData.type).toBe("byDashboard");
+      // OButton uses :active prop which applies activeClasses (tw:bg-button-primary) instead of CSS "selected"
       expect(
         wrapper
           .find('[data-test="dashboard-drilldown-by-dashboard-btn"]')
           .classes(),
-      ).toContain("selected");
+      ).toContain("tw:bg-button-primary");
     });
 
     it("should change to byUrl type when clicked", async () => {
@@ -381,9 +382,9 @@ describe("DrilldownPopUp", () => {
 
     it("should switch to custom logs mode", async () => {
       const customBtn = wrapper
-        .findAll(".q-btn")
+        .findAll("button")
         .find((btn) => btn.text() === "Custom");
-      await customBtn.trigger("click");
+      await customBtn?.trigger("click");
 
       expect(wrapper.vm.drilldownData.data.logsMode).toBe("custom");
     });
@@ -838,7 +839,8 @@ describe("DrilldownPopUp", () => {
       const dashboardBtn = wrapper.find(
         '[data-test="dashboard-drilldown-by-dashboard-btn"]',
       );
-      expect(dashboardBtn.classes()).toContain("selected");
+      // OButton uses :active prop which applies activeClasses (tw:bg-button-primary) instead of CSS "selected"
+      expect(dashboardBtn.classes()).toContain("tw:bg-button-primary");
     });
   });
 });

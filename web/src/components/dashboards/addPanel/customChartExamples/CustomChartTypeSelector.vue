@@ -46,17 +46,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="search" />
           </template>
         </q-input>
-        <q-btn
-          icon="close"
-          class="q-ml-xs"
-          unelevated
-          size="sm"
-          round
-          flat
+        <OButton
+          variant="ghost"
+          size="icon"
           :title="t('dashboard.cancel')"
           @click.stop="closeDialog"
           data-test="custom-chart-type-selector-close"
-        />
+        >
+          <template #icon-left><q-icon name="close" /></template>
+        </OButton>
       </div>
     </q-card-section>
 
@@ -193,11 +191,13 @@ import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
     CustomChartConfirmDialog,
+    OButton,
   },
   emits: ["close", "select"],
   setup(props, { emit }) {

@@ -27,15 +27,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else class="sidebar-header-expanded">
       <div class="expanded-title">{{ title }}</div>
-      <q-btn
-        square
-        icon="unfold_less"
-        class="collapse-button rotate-90 el-border"
+      <OButton
+        variant="outline"
+        size="icon-xs-sq"
+        class="tw:rotate-90"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
-      />
+      >
+        <template #icon-left><q-icon name="unfold_less" /></template>
+      </OButton>
     </div>
-    <q-separator style="margin-top: -1px; flex-shrink: 0;" />
+    <q-separator style="margin-top: -1px; flex-shrink: 0" />
     <div class="sidebar-content scroll" v-if="isOpen">
       <slot></slot>
     </div>
@@ -44,8 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
+  components: { OButton },
   props: {
     title: {
       type: String,
@@ -69,7 +73,7 @@ export default defineComponent({
       () => props.modelValue,
       (value) => {
         isOpen.value = value;
-      }
+      },
     );
 
     return {

@@ -2442,7 +2442,7 @@ describe("ConfigPanel", () => {
     it("should render the expand/collapse toggle button", () => {
       wrapper = createWrapper();
       // The toggle-all button appears inside config-search-wrapper
-      const btn = wrapper.find(".config-search-wrapper .q-btn");
+      const btn = wrapper.find(".config-search-wrapper button");
       expect(btn.exists()).toBe(true);
     });
   });

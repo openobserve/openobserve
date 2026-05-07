@@ -25,13 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="col-auto">
-        <q-btn
+        <OButton
           data-test="add-stream-close-btn"
           v-close-popup="true"
-          round
-          flat
-          icon="cancel"
-        />
+          variant="ghost"
+          size="icon-sm"
+        >
+          <X :size="14" />
+        </OButton>
       </div>
     </div>
     <q-separator />
@@ -88,25 +89,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove="removeField"
         />
 
-        <div class="flex justify-start q-mt-md">
-          <q-btn
+        <div class="flex justify-start q-mt-md tw:gap-2">
+          <OButton
             v-close-popup="true"
             data-test="add-stream-cancel-btn"
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('logStream.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          />
-          <q-btn
+            variant="outline"
+            size="sm-action"
+          >
+            {{ t('logStream.cancel') }}
+          </OButton>
+          <OButton
             data-test="save-stream-btn"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('common.save')"
+            variant="primary"
+            size="sm-action"
             type="submit"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          />
+          >
+            {{ t('common.save') }}
+          </OButton>
         </div>
       </q-form>
     </div>
@@ -123,6 +122,8 @@ import { useStore } from "vuex";
 import { computed } from "vue";
 import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { X } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();

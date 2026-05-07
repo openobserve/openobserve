@@ -60,16 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="tw:flex tw:items-center">
-            <q-btn
-              flat
-              dense
-              round
-              icon="cancel"
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               @click="goBack"
               data-test="inspector-close-button"
             >
+              <X :size="16" />
               <q-tooltip>Close</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
         </div>
       </div>
@@ -364,19 +363,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none tw:justify-between tw:mb-2">
           <div class="text-h6">SQL Query</div>
           <div class="tw:flex tw:items-center tw:gap-1">
-            <q-btn
+            <OButton
               v-if="profileData?.sql"
-              flat
-              dense
-              size="sm"
-              :icon="copiedSql ? 'check' : 'content_copy'"
-              :color="copiedSql ? 'positive' : 'default'"
+              variant="ghost"
+              size="icon-sm"
+              :class="copiedSql ? 'tw:text-green-600' : ''"
               @click="copySql"
               data-test="inspector-copy-sql-btn"
             >
+              <component :is="copiedSql ? Check : Copy" :size="14" />
               <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
-            </q-btn>
-            <q-btn icon="cancel" flat round dense v-close-popup />
+            </OButton>
+            <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>
           </div>
         </q-card-section>
 
@@ -395,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">Full Trace ID</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>
         </q-card-section>
 
         <q-card-section>
@@ -404,13 +402,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">
               {{ traceId }}
             </div>
-            <q-btn
-              flat
-              color="primary"
-              icon="content_copy"
-              label="Copy"
+            <OButton
+              variant="primary"
+              size="sm-action"
               @click="copyTraceId"
-            />
+            ><Copy :size="14" class="tw:mr-1" />Copy</OButton>
           </div>
         </q-card-section>
       </q-card>
@@ -425,6 +421,8 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { X, Copy, Check } from "lucide-vue-next";
 
 interface ProfileEvent {
   timestamp: string;
@@ -463,6 +461,10 @@ export default defineComponent({
   name: "SearchJobInspector",
   components: {
     NoData,
+    OButton,
+    X,
+    Copy,
+    Check,
   },
   setup() {
     const router = useRouter();

@@ -112,6 +112,8 @@ function mountComponent() {
       stubs: {
         "q-tabs": { template: '<div class="q-tabs"><slot /></div>', props: ["modelValue"], emits: ["update:modelValue"] },
         "q-tab": { template: '<div class="q-tab" :data-test="`tab-${name}`" :data-name="name"><slot /></div>', props: ["name", "label", "noCaps"] },
+        OTabs: { template: '<div class="o-tabs"><slot /></div>', props: ["modelValue", "dense"], emits: ["update:modelValue"] },
+        OTab: { template: '<div class="o-tab" :data-test="`tab-${name}`" :data-name="name"><slot /></div>', props: ["name", "label", "noCaps", "icon"] },
       },
     },
   });

@@ -24,17 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>Start by adding your first dashboard panel</span>
     </div>
     <div class="flex justify-center" v-if="!viewOnly">
-      <q-btn
-        :label="t('panel.add')"
-        stack
-        padding="md"
-        outline
-        icon="insert_drive_file"
+      <OButton
+        variant="outline"
+        size="sm-action"
+        style="font-size: 1rem"
         @click="$emit('update:Panel')"
         data-test="dashboard-if-no-panel-add-panel-btn"
-        class="el-border"
       >
-      </q-btn>
+        <q-icon name="insert_drive_file" size="16px" class="q-mr-xs" />
+        {{ t('panel.add') }}
+      </OButton>
     </div>
   </div>
 </template>
@@ -42,11 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../../utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "NoPanel",
   props: ["Panel", "viewOnly"],
   emits: ["update:Panel"],
+  components: { OButton },
 
   setup() {
     const { t } = useI18n();
