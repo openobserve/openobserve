@@ -32,7 +32,7 @@ use crate::{
 static CACHE: Lazy<RwLock<HashMap<String, Option<OrgStorageProvider>>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub enum ProviderType {
     AwsCredentials,
     AwsRoleArn,
