@@ -17,11 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="column full-height">
-      <DashboardHeader :title="title" backButton @back="close">
+      <DashboardHeader :title="title"
+backButton
+@back="close">
       </DashboardHeader>
 
       <div class="scrollable-content">
-        <q-form greedy ref="addVariableForm" @submit="onSubmit">
+        <q-form greedy
+ref="addVariableForm"
+@submit="onSubmit">
           <div class="q-mt-md">
             <div class="q-mb-md">
               <q-select
@@ -87,7 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-item-section>{{ opt.label }}</q-item-section>
                   </q-item>
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                  <q-item v-else
+v-ripple
+clickable
+@click="toggleOption(opt)">
                     <q-item-section side>
                       <q-checkbox
                         :model-value="selected"
@@ -149,7 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-section>{{ opt.label }}</q-item-section>
                   </q-item>
                   <!-- Panel options (including Current Panel) -->
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                  <q-item v-else
+v-ripple
+clickable
+@click="toggleOption(opt)">
                     <q-item-section side>
                       <q-checkbox
                         :model-value="selected"

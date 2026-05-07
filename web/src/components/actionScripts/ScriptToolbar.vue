@@ -75,7 +75,9 @@
         variant="outline"
         size="sm"
         @click="handleFullScreen"
-        ><q-icon name="fullscreen" size="18px" class="tw:mr-1" />{{
+        ><q-icon name="fullscreen"
+size="18px"
+class="tw:mr-1" />{{
           t("common.fullscreen")
         }}</OButton
       >

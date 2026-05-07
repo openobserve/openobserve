@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog data-test="custom-confirm-dialog" v-model="isVisible" persistent>
+  <q-dialog data-test="custom-confirm-dialog"
+v-model="isVisible"
+persistent>
     <q-card
       data-test="custom-confirm-card"
       class="custom-confirm-dialog"

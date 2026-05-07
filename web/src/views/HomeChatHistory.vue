@@ -114,8 +114,14 @@ function formatTime(ts: string): string {
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
+          <line x1="12"
+y1="5"
+x2="12"
+y2="19" />
+          <line x1="5"
+y1="12"
+x2="19"
+y2="12" />
         </svg>
       </OButton>
     </div>
@@ -134,8 +140,13 @@ function formatTime(ts: string): string {
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          <circle cx="11"
+cy="11"
+r="8" />
+          <line x1="21"
+y1="21"
+x2="16.65"
+y2="16.65" />
         </svg>
         <input
           v-model="searchTerm"
@@ -158,8 +169,14 @@ function formatTime(ts: string): string {
             stroke-width="2.5"
             stroke-linecap="round"
           >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
+            <line x1="18"
+y1="6"
+x2="6"
+y2="18" />
+            <line x1="6"
+y1="6"
+x2="18"
+y2="18" />
           </svg>
         </OButton>
       </div>
@@ -214,7 +231,9 @@ function formatTime(ts: string): string {
 
     <!-- Clear all -->
     <div v-if="history.length > 0" class="hch-footer">
-      <OButton variant="ghost-subtle" :block="true" @click="clearAll">
+      <OButton variant="ghost-subtle"
+:block="true"
+@click="clearAll">
         <svg
           width="0.875em"
           height="0.875em"

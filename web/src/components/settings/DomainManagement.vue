@@ -150,7 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="error-item q-pa-sm q-mb-xs"
                 >
                   <div class="row items-start q-mb-xs">
-                    <q-icon name="error" color="negative" size="xs" class="q-mr-xs q-mt-xs" />
+                    <q-icon name="error"
+color="negative"
+size="xs"
+class="q-mr-xs q-mt-xs" />
                     <div class="col">
                       <div class="text-caption text-weight-medium">{{ error.error_type }}</div>
                       <div class="text-caption text-grey-7">{{ formatTimestamp(error._timestamp) }}</div>

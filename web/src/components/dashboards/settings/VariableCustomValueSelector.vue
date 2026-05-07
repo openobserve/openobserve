@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
-     borderless hide-bottom-space>
+     borderless
+hide-bottom-space>
       <template v-slot:no-option>
         <q-item>
           <q-item-section class="text-italic text-grey">

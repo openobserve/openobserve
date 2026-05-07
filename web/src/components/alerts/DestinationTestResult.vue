@@ -52,7 +52,9 @@ limitations under the License. -->
         <div data-test="test-failure-message" class="result-title">
           {{ getFailureMessage(result) }}
         </div>
-        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="result-meta">
+        <div v-if="result.timestamp"
+data-test="test-failure-timestamp"
+class="result-meta">
           {{ formatTimestamp(result.timestamp) }}
           <span v-if="result.statusCode" class="status-badge error-badge">
             {{ result.statusCode }}
@@ -78,23 +80,31 @@ limitations under the License. -->
         >
           <template #header>
             <div class="expansion-header">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
+              <q-icon name="info"
+size="14px"
+class="q-mr-xs" />
               <span class="text-caption">{{ t('alerts.viewDetails') }}</span>
             </div>
           </template>
 
           <div data-test="test-failure-details" class="error-details-content">
-            <div v-if="result.error" data-test="test-error-message" class="error-item">
+            <div v-if="result.error"
+data-test="test-error-message"
+class="error-item">
               <div class="error-label">{{ t('alerts.error') }}</div>
               <div class="error-value">{{ result.error }}</div>
             </div>
 
-            <div v-if="result.statusCode" data-test="test-http-status" class="error-item">
+            <div v-if="result.statusCode"
+data-test="test-http-status"
+class="error-item">
               <div class="error-label">{{ t('alerts.httpStatus') }}</div>
               <div class="error-value">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
             </div>
 
-            <div v-if="result.responseBody" data-test="test-response-body" class="error-item">
+            <div v-if="result.responseBody"
+data-test="test-response-body"
+class="error-item">
               <div class="error-label">{{ t('alerts.responseBody') }}</div>
               <pre class="error-code">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>

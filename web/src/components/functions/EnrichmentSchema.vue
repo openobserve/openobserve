@@ -34,7 +34,9 @@
             </div>
             </div>
             <div class="col-auto">
-            <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+            <OButton variant="ghost"
+size="icon-sm"
+v-close-popup="true">
               <X :size="14" />
             </OButton>
             </div>
@@ -49,7 +51,9 @@
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div v-else class="indexDetailsContainer" style="height: 100vh">
+        <div v-else
+class="indexDetailsContainer"
+style="height: 100vh">
           <div
             class="titleContainer tw:flex tw:flex-col tw:items-flex-start tw:gap-5"
           >
@@ -200,7 +204,7 @@
     export default defineComponent({
     name: "SchemaEnrichment",
     props: {
-        // eslint-disable-next-line vue/require-default-prop
+         
         selectedEnrichmentTable: {
         type: String,
         default: '',

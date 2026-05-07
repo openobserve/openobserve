@@ -77,7 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
             </q-toggle>
-            <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
+            <q-tooltip class="q-mt-lg"
+anchor="top middle"
+self="bottom middle">
               {{
                 searchAcrossFolders
                   ? t("dashboard.searchSelf")
@@ -88,7 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
-              <OButton variant="outline" size="sm" class="q-ml-sm" data-test="dashboard-import">
+              <OButton variant="outline"
+size="sm"
+class="q-ml-sm"
+data-test="dashboard-import">
                 {{ t(`dashboard.import`) }}
                 <template #icon-right>
                   <q-icon name="expand_more" size="xs" />

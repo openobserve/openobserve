@@ -510,7 +510,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <router-view v-else />
 
-  <q-dialog v-model="showCreatePipeline" position="right" full-height maximized>
+  <q-dialog v-model="showCreatePipeline"
+position="right"
+full-height
+maximized>
     <stream-selection @save="savePipeline" />
   </q-dialog>
 
@@ -555,12 +558,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="tw:flex-1">
           <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-            <q-icon name="error" size="24px" class="error-icon" />
+            <q-icon name="error"
+size="24px"
+class="error-icon" />
             <span class="pipeline-name">{{ errorDialog.data?.name }}</span>
           </div>
           <div class="error-timestamp">
             <span class="tw:mr-2">{{ t("pipeline_list.last_error") }}:</span>
-            <q-icon name="schedule" size="14px" class="tw:mr-1" />
+            <q-icon name="schedule"
+size="14px"
+class="tw:mr-1" />
             {{
               errorDialog.data &&
               new Date(
@@ -638,7 +645,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions class="pipeline-error-actions">
-        <OButton variant="outline" size="sm-action" @click="closeErrorDialog">
+        <OButton variant="outline"
+size="sm-action"
+@click="closeErrorDialog">
           {{ t("pipeline_list.close") }}
         </OButton>
       </q-card-actions>

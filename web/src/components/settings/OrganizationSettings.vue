@@ -62,7 +62,9 @@
       </q-input>
     </div>
 
-    <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
+    <div v-if="config.isCloud !== 'true'"
+data-test="add-toggle-ingestion"
+class="span-id-field-name o2-input">
       <q-toggle
         data-test="add-toggle-ingestion-btn"
         v-model="toggleIngestionLogs"

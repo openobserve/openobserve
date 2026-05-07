@@ -26,7 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("organization.updateOrganization") }}
           </div>
-          <div v-else style="font-size: 18px" data-test="create-org">
+          <div v-else
+style="font-size: 18px"
+data-test="create-org">
             {{ t("organization.createOrganization") }}
           </div>
         </div>

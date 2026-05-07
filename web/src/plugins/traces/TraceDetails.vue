@@ -167,7 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openFilterPopover"
             >
               <template #icon-left
-                ><q-icon name="filter_alt" size="14px"
+                ><q-icon name="filter_alt"
+size="14px"
               /></template>
               <span class="tw:text-[0.75rem]">{{
                 t("traces.viewFilters")
@@ -245,7 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 /></template>
                 Trace Graph
               </OToggleGroupItem>
-              <OToggleGroupItem v-if="hasLLMSpans" value="dag" size="sm">
+              <OToggleGroupItem v-if="hasLLMSpans"
+value="dag"
+size="sm">
                 <template #icon-left
                   ><GitBranch class="tw:size-3.5 tw:shrink-0"
                 /></template>
@@ -403,7 +406,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="redirectToLogs"
                 >
                   <template #icon-left
-                    ><q-icon name="search" size="14px"
+                    ><q-icon name="search"
+size="14px"
                   /></template>
                   {{
                     searchObj.meta.redirectedFromLogs
@@ -421,7 +425,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="redirectToSessionReplay"
               >
                 <template #icon-left
-                  ><q-icon :name="outlinedPlayCircle" size="14px"
+                  ><q-icon :name="outlinedPlayCircle"
+size="14px"
                 /></template>
                 {{ t("rum.playSessionReplay") }}
               </OButton>
@@ -730,7 +735,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("traces.traceFilters") }}
           </div>
-          <OButton variant="ghost-muted" size="icon" v-close-popup>
+          <OButton variant="ghost-muted"
+size="icon"
+v-close-popup>
             <q-icon name="close" size="16px" />
           </OButton>
         </q-card-section>
@@ -752,7 +759,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
         >
           <div class="tw:flex tw:gap-2">
-            <OButton variant="outline" size="sm-action" v-close-popup>
+            <OButton variant="outline"
+size="sm-action"
+v-close-popup>
               {{ t("common.cancel") }}
             </OButton>
             <OButton

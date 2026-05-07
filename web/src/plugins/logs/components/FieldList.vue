@@ -38,7 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="props.row.name === 'no-fields-found'"
         class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
       >
-        <q-icon name="info" color="primary" size="xs" />
+        <q-icon name="info"
+color="primary"
+size="xs" />
         <span class="tw:pl-[0.375rem]">No matching fields found.</span>
       </q-tr>
 
@@ -183,11 +185,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="indexlist-search-input tw:mb-[0.25rem]"
         >
           <template #prepend>
-            <q-icon name="search" size="1.25rem" class="o2-search-input-icon" />
+            <q-icon name="search"
+size="1.25rem"
+class="o2-search-input-icon" />
           </template>
         </q-input>
         <q-tr v-if="loadingStream == true">
-          <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
+          <q-td colspan="100%"
+class="text-bold"
+style="opacity: 0.7">
             <div class="text-subtitle2 text-weight-bold">
               <q-spinner-hourglass size="1.25rem" />
               {{ t("confirmDialog.loading") }}

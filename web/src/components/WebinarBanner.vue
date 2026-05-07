@@ -92,7 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="webinar-home-register-btn"
       >
         {{ webinarData.primaryButton.text }}
-        <q-icon name="arrow_forward" class="q-ml-sm" size="1rem" />
+        <q-icon name="arrow_forward"
+class="q-ml-sm"
+size="1rem" />
       </OButton>
     </div>
   </div>

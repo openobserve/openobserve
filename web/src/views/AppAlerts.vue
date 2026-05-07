@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="alerts-page" class="q-pa-none" style="min-height: inherit">
+  <q-page data-test="alerts-page"
+class="q-pa-none"
+style="min-height: inherit">
     <RouterView
       :templates="templates"
       :destinations="destinations"

@@ -48,8 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="severityRowClass(item.severity)"
         >
           <span class="ov-row-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg width="16"
+height="16"
+viewBox="0 0 24 24"
+fill="none">
+              <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+stroke="currentColor"
+stroke-width="2"
+stroke-linecap="round"
+stroke-linejoin="round"/>
             </svg>
           </span>
           <div class="ov-row-body">
@@ -83,9 +90,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="incidentRowClass(inc.severity)"
         >
           <span class="ov-row-icon ov-icon-incident">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-              <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <svg width="16"
+height="16"
+viewBox="0 0 24 24"
+fill="none">
+              <circle cx="12"
+cy="12"
+r="10"
+stroke="currentColor"
+stroke-width="2"/>
+              <path d="M12 8v4m0 4h.01"
+stroke="currentColor"
+stroke-width="2"
+stroke-linecap="round"/>
             </svg>
           </span>
           <div class="ov-row-body">
@@ -143,18 +160,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('overview.viewLatencyCharts')"
                 @click="openServicePanel(svc, $event)"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                  <path d="M12 16v-4m0-4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <svg width="13"
+height="13"
+viewBox="0 0 24 24"
+fill="none">
+                  <circle cx="12"
+cy="12"
+r="10"
+stroke="currentColor"
+stroke-width="2"/>
+                  <path d="M12 16v-4m0-4h.01"
+stroke="currentColor"
+stroke-width="2"
+stroke-linecap="round"/>
                 </svg>
               </OButton>
             </span>
           </div>
           <div class="ov-svc-flags">
-            <span v-if="svc.errorFlag" class="ov-svc-flag ov-flag-error" :title="t('overview.elevatedErrorRate')">
+            <span v-if="svc.errorFlag"
+class="ov-svc-flag ov-flag-error"
+:title="t('overview.elevatedErrorRate')">
               Error Rate {{ svc.error_rate.toFixed(1) }}%
             </span>
-            <span v-if="svc.latencyFlag" class="ov-svc-flag ov-flag-latency" :title="`Latency elevated vs baseline (${svc.latencyMultiplier}x)`">
+            <span v-if="svc.latencyFlag"
+class="ov-svc-flag ov-flag-latency"
+:title="`Latency elevated vs baseline (${svc.latencyMultiplier}x)`">
               Latency {{ svc.latencyMultiplier }}x
             </span>
           </div>
@@ -198,7 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <span class="ov-event-service">{{ ev.service }}</span>
           <span class="ov-event-desc">{{ ev.description }}</span>
-          <span v-if="ev.failCount > 1" class="ov-fail-count" :title="`Failed ${ev.failCount} times in this window`">
+          <span v-if="ev.failCount > 1"
+class="ov-fail-count"
+:title="`Failed ${ev.failCount} times in this window`">
             ×{{ ev.failCount }}
           </span>
           <span class="ov-event-time">{{ ev.timeAgo }}</span>
@@ -211,8 +244,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!isLoading && anomalies.length === 0 && incidents.length === 0 && services.length === 0 && recentEvents.length === 0"
       class="ov-empty"
     >
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" class="ov-empty-icon">
-        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg width="40"
+height="40"
+viewBox="0 0 24 24"
+fill="none"
+class="ov-empty-icon">
+        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+stroke="currentColor"
+stroke-width="1.5"
+stroke-linecap="round"
+stroke-linejoin="round"/>
       </svg>
       <div class="ov-empty-title">{{ t('overview.allClear') }}</div>
       <div class="ov-empty-desc">{{ t('overview.allClearDesc') }}</div>
@@ -220,7 +261,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading skeleton -->
     <div v-if="isLoading" class="ov-skeleton-wrap">
-      <div v-for="i in 3" :key="i" class="ov-skeleton-row"></div>
+      <div v-for="i in 3"
+:key="i"
+class="ov-skeleton-row"></div>
     </div>
   </div>
 </template>

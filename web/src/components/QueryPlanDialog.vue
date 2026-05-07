@@ -15,12 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onClose" maximized>
+  <q-dialog v-model="showDialog"
+@hide="onClose"
+maximized>
     <q-card class="query-plan-dialog full-height">
       <q-card-section class="row items-center q-pb-sm q-pt-sm">
         <div class="text-h6">{{ t("search.queryPlan") }}</div>
         <q-space />
-        <OButton variant="ghost" size="icon" @click="onClose">
+        <OButton variant="ghost"
+size="icon"
+@click="onClose">
           <q-icon name="close" size="14px" />
           <q-tooltip>Close (ESC)</q-tooltip>
         </OButton>
@@ -41,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'pane-header-light'
                 "
               >
-                <q-icon name="code" size="20px" class="q-mr-sm" />
+                <q-icon name="code"
+size="20px"
+class="q-mr-sm" />
                 <div class="text-subtitle1 text-weight-medium">SQL Query</div>
               </div>
               <q-separator />
@@ -127,7 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
 
                 <!-- Execution Plan Tree -->
-                <q-card flat bordered class="plan-card">
+                <q-card flat
+bordered
+class="plan-card">
                   <q-card-section class="q-pa-none">
                     <div class="plan-scroll-area">
                       <QueryPlanTree
@@ -145,7 +153,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- EXPLAIN view (tabs for logical/physical) -->
               <div v-else class="plan-container q-pa-md">
-                <q-card flat bordered class="plan-card">
+                <q-card flat
+bordered
+class="plan-card">
                   <OTabs
                     v-model="activeTab"
                     dense

@@ -1,7 +1,9 @@
 ﻿<template>
-    <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
+    <q-page class="q-pa-none"
+style="min-height: inherit; height: calc(100vh - 88px);" 
     >
-    <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+    <div v-if="!showImportRegexPatternDialog"
+class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
       <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
             {{ t("regex_patterns.title") }}
@@ -48,19 +50,29 @@
             : 'width: 100%'"
         >
         <template #no-data>
-          <div v-if="!listLoading && filterQuery == ''" class="full-width column flex-center q-mt-xs full-height" style="font-size: 1.5rem">
+          <div v-if="!listLoading && filterQuery == ''"
+class="full-width column flex-center q-mt-xs full-height"
+style="font-size: 1.5rem">
           <NoRegexPatterns  @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
           </div>
-          <div v-else-if="!listLoading && filterQuery != ''" class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
+          <div v-else-if="!listLoading && filterQuery != ''"
+class="full-width column flex-center q-mt-xs"
+style="font-size: 1.5rem">
             <NoData />
           </div>
-          <div v-else class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
-            <q-spinner-hourglass size="50px" color="primary" style="margin-top: 20vh" />
+          <div v-else
+class="full-width column flex-center q-mt-xs"
+style="font-size: 1.5rem">
+            <q-spinner-hourglass size="50px"
+color="primary"
+style="margin-top: 20vh" />
 
           </div>
         </template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <q-checkbox v-model="scope.selected"
+size="sm"
+class="o2-table-checkbox" />
         </template>
         <template v-slot:header="props">
          <q-tr :props="props">
@@ -90,11 +102,16 @@
           <q-tr :props="props">
           <!-- render checkbox column -->
           <q-td auto-width>
-            <q-checkbox v-model="props.selected" size="sm" class="o2-table-checkbox" />
+            <q-checkbox v-model="props.selected"
+size="sm"
+class="o2-table-checkbox" />
           </q-td>
 
           <!-- render the body of the columns -->
-          <q-td v-for="col in columns" :key="col.name " :props="props" :style="col.style">
+          <q-td v-for="col in columns"
+:key="col.name "
+:props="props"
+:style="col.style">
             <template v-if="col.name  !== 'actions'">
               <div class="o2-table-cell-content">
                 {{ props.row[col.field] }}
@@ -181,8 +198,14 @@
           @update:cancel="confirmBulkDelete = false"
           v-model="confirmBulkDelete"
         />
-        <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
-          <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
+        <q-dialog v-model="showAddRegexPatternDialog.show"
+position="right"
+full-height
+maximized>
+          <AddRegexPattern :data="showAddRegexPatternDialog.data"
+:is-edit="showAddRegexPatternDialog.isEdit"
+@update:list="getRegexPatterns"
+@close="closeAddRegexPatternDialog" />
         </q-dialog>
       </q-page>
   </template>

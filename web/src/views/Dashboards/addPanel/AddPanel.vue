@@ -62,7 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-panel-data-view-query-inspector-btn"
           >
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip anchor="center left" self="center right"
+            <q-tooltip anchor="center left"
+self="center right"
               >Query Inspector</q-tooltip
             >
           </OButton>

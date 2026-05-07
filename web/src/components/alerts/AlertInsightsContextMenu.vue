@@ -35,7 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
-          <q-icon name="tune" size="18px" class="q-mr-sm" />
+          <q-icon name="tune"
+size="18px"
+class="q-mr-sm" />
           <span>Configure Dedup</span>
         </div>
         <div
@@ -43,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
-          <q-icon name="edit" size="18px" class="q-mr-sm" />
+          <q-icon name="edit"
+size="18px"
+class="q-mr-sm" />
           <span>Edit Alert</span>
         </div>
         <div
@@ -51,7 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
-          <q-icon name="history" size="18px" class="q-mr-sm" />
+          <q-icon name="history"
+size="18px"
+class="q-mr-sm" />
           <span>View Alert History</span>
         </div>
       </div>
@@ -62,7 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
-          <q-icon name="close" size="18px" class="q-mr-sm" />
+          <q-icon name="close"
+size="18px"
+class="q-mr-sm" />
           <span>Cancel</span>
         </div>
       </div>

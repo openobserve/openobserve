@@ -44,14 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="row items-center q-gutter-sm text-grey-7">
             <div class="row items-center">
-              <q-icon name="schedule" size="sm" class="q-mr-xs" />
+              <q-icon name="schedule"
+size="sm"
+class="q-mr-xs" />
               <span>{{
                 formatTimestamp(resource[store.state.zoConfig.timestamp_column])
               }}</span>
             </div>
             <q-separator vertical />
             <div class="row items-center">
-              <q-icon name="access_time" size="sm" class="q-mr-xs" />
+              <q-icon name="access_time"
+size="sm"
+class="q-mr-xs" />
               <span>{{ formatDuration(resource.resource_duration) }}</span>
             </div>
             <q-separator vertical />
@@ -127,7 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="q-pa-md text-center tw:bg-[var(--o2-hover-accent)] tw:rounded"
         >
-          <q-icon name="info" color="info" size="md" class="q-mb-sm" />
+          <q-icon name="info"
+color="info"
+size="md"
+class="q-mb-sm" />
           <div class="text-grey-7">
             No trace information available for this resource.
           </div>

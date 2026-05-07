@@ -26,23 +26,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="arrow_back_ios_new" size="0.875rem" />
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="language" size="0.875rem" class="q-pr-xs" />
+          <q-icon name="language"
+size="0.875rem"
+class="q-pr-xs" />
           {{ sessionDetails.ip }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="calendar_month" size="0.875rem" class="q-pr-xs" />
+          <q-icon name="calendar_month"
+size="0.875rem"
+class="q-pr-xs" />
           {{ sessionDetails.date }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="person" size="0.875rem" class="q-pr-xs" />
+          <q-icon name="person"
+size="0.875rem"
+class="q-pr-xs" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="location_on" size="0.875rem" class="q-pr-xs" />
+          <q-icon name="location_on"
+size="0.875rem"
+class="q-pr-xs" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="settings" size="0.875rem" class="q-pr-xs" />
+          <q-icon name="settings"
+size="0.875rem"
+class="q-pr-xs" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div
@@ -226,12 +236,12 @@ watch(
     ) {
       // Clear any existing timer
       if (seekTimer !== null) {
-        // eslint-disable-next-line no-undef
+         
         clearTimeout(seekTimer);
       }
 
       // Use setTimeout to give video player time to fully initialize
-      // eslint-disable-next-line no-undef
+       
       seekTimer = setTimeout(() => {
         if (videoPlayerRef.value) {
           try {

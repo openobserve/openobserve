@@ -60,7 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       
       :data-test="`${type}-folder-move-dialog`"
     >
-      <AddFolder style="width: 30vw;" :type="type" @update:modelValue="updateFolderList" :edit-mode="false" />
+      <AddFolder style="width: 30vw;"
+:type="type"
+@update:modelValue="updateFolderList"
+:edit-mode="false" />
     </q-dialog>
   </template>
 

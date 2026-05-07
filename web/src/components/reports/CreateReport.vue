@@ -42,7 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("reports.update") }}
           </div>
-          <div v-else class="text-h6" data-test="add-report-title">
+          <div v-else
+class="text-h6"
+data-test="add-report-title">
             {{ t("reports.add") }}
           </div>
         </div>

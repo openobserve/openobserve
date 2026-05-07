@@ -91,7 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 180px"
             >
               <template v-slot:append>
-                <q-icon name="info" size="xs" class="cursor-pointer">
+                <q-icon name="info"
+size="xs"
+class="cursor-pointer">
                   <q-tooltip max-width="300px">
                     {{ t("settings.maxSeriesPerQueryTooltip") }}
                   </q-tooltip>
@@ -470,7 +472,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
       </q-card-section>
       <q-card-actions align="right">
-        <OButton variant="outline" size="sm-action" v-close-popup>
+        <OButton variant="outline"
+size="sm-action"
+v-close-popup>
           {{ t("settings.close") }}
         </OButton>
       </q-card-actions>

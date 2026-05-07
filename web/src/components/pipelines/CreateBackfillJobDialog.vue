@@ -123,7 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="chunk-period-input"
                   >
                     <template v-slot:append>
-                      <q-icon name="info_outline" size="18px" color="grey-6">
+                      <q-icon name="info_outline"
+size="18px"
+color="grey-6">
                         <q-tooltip class="tw:text-xs">
                           Default: {{ scheduleFrequency || 60 }} minutes
                         </q-tooltip>
@@ -154,7 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="delay-between-chunks-input"
                   >
                     <template v-slot:append>
-                      <q-icon name="info_outline" size="18px" color="grey-6">
+                      <q-icon name="info_outline"
+size="18px"
+color="grey-6">
                         <q-tooltip class="tw:text-xs">
                           Default: 5 seconds
                         </q-tooltip>
@@ -182,7 +186,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >
                   <div class="tw:flex tw:items-start tw:gap-3">
-                    <q-icon name="warning" :color="$q.dark.isActive ? 'orange-4' : 'orange'" size="20px" class="tw:mt-0.5" />
+                    <q-icon name="warning"
+:color="$q.dark.isActive ? 'orange-4' : 'orange'"
+size="20px"
+class="tw:mt-0.5" />
                     <div>
                       <div :class="['tw:font-semibold tw:mb-2', $q.dark.isActive ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
                       <div :class="['text-caption tw:mb-3', $q.dark.isActive ? 'tw:text-orange-300' : 'tw:text-orange-800']">

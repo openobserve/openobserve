@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="col-auto">
-        <OButton variant="ghost" size="icon-circle" v-close-popup="true">
+        <OButton variant="ghost"
+size="icon-circle"
+v-close-popup="true">
           <template #icon-left
             ><img
               :src="getImageURL('images/common/close_icon.svg')"

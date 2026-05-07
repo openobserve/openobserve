@@ -11,7 +11,11 @@
       stroke="currentColor"
       stroke-dasharray="2 2"
     />
-    <ellipse cx="50.8195" cy="2" rx="1.99663" ry="2" fill="currentColor" />
+    <ellipse cx="50.8195"
+cy="2"
+rx="1.99663"
+ry="2"
+fill="currentColor" />
   </svg>
 </template>
 

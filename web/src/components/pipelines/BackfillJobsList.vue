@@ -330,11 +330,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card class="backfill-error-dialog" style="min-width: 500px">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">
-            <q-icon name="error" color="negative" size="24px" class="q-mr-sm" />
+            <q-icon name="error"
+color="negative"
+size="24px"
+class="q-mr-sm" />
             Backfill Job Error
           </div>
           <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
+          <OButton variant="ghost"
+size="icon"
+v-close-popup>
             <q-icon name="close" size="14px" />
           </OButton>
         </q-card-section>
@@ -365,7 +370,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
+          <OButton variant="outline"
+size="sm-action"
+v-close-popup>
             Close
           </OButton>
         </q-card-actions>

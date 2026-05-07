@@ -41,7 +41,9 @@
           <div
             class="warning-text flex items-center q-px-sm q-mr-md tw:h-[36px] tw:rounded-md"
           >
-            <q-icon name="info" class="q-mr-xs" size="16px" />
+            <q-icon name="info"
+class="q-mr-xs"
+size="16px" />
             <div>
               {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
             </div>

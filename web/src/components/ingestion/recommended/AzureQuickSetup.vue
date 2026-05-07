@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-4">
         <div class="tw:flex tw:items-start tw:gap-4">
           <div class="tw:flex-shrink-0">
-            <q-icon name="cloud" size="2.5rem" color="primary" />
+            <q-icon name="cloud"
+size="2.5rem"
+color="primary" />
           </div>
           <div class="tw:flex-1">
             <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-2 title">
@@ -39,7 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="azure-quick-setup-deploy-btn"
               >
                 <template #icon-left
-                  ><q-icon name="open_in_new" size="sm"
+                  ><q-icon name="open_in_new"
+size="sm"
                 /></template>
                 View Setup Guide
               </OButton>
@@ -51,7 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="azure-quick-setup-add-dashboard-btn"
               >
                 <template #icon-left
-                  ><q-icon name="dashboard" size="sm"
+                  ><q-icon name="dashboard"
+size="sm"
                 /></template>
                 Add Dashboard
               </OButton>

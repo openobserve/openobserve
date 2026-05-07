@@ -1,7 +1,10 @@
 <template>
-  <div class="chat-container" :class="[{ 'chat-open': isOpen }, store.state.theme == 'dark' ? 'dark-mode' : 'light-mode']" 
+  <div class="chat-container"
+:class="[{ 'chat-open': isOpen }, store.state.theme == 'dark' ? 'dark-mode' : 'light-mode']" 
   >
-    <div v-if="isOpen" class="chat-content-wrapper" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+    <div v-if="isOpen"
+class="chat-content-wrapper"
+:class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
       <div class="chat-header" :style="{ height:  headerHeight ? headerHeight + 'px' : '' }">
         <div class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full">
 
@@ -144,7 +147,9 @@
               <q-icon name="edit" size="1rem" />
               <q-tooltip :delay="500">Edit title</q-tooltip>
             </OButton>
-            <OButton variant="ghost" size="icon-sm" @click="addNewChat">
+            <OButton variant="ghost"
+size="icon-sm"
+@click="addNewChat">
               <q-icon name="add" size="1rem" />
             </OButton>
             <OButton
@@ -167,7 +172,9 @@
                 }}B)</q-tooltip
               >
             </OButton>
-            <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
+            <OButton variant="ghost"
+size="icon-sm"
+@click="$emit('close')">
               <q-icon name="close" size="1rem" />
             </OButton>
           </div>
@@ -233,10 +240,14 @@
           </q-card-section>
 
           <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
-            <OButton variant="outline" size="sm-action" @click="showEditTitleDialog = false"
+            <OButton variant="outline"
+size="sm-action"
+@click="showEditTitleDialog = false"
               >Cancel</OButton
             >
-            <OButton variant="primary" size="sm-action" @click="saveEditedTitle"
+            <OButton variant="primary"
+size="sm-action"
+@click="saveEditedTitle"
               >Save</OButton
             >
           </q-card-actions>
@@ -268,7 +279,9 @@
           <q-card-section class="row items-center q-pb-none">
             <div class="text-subtitle1">{{ previewImage?.filename }}</div>
             <q-space />
-            <OButton variant="ghost" size="icon-sm" @click="closeImagePreview">
+            <OButton variant="ghost"
+size="icon-sm"
+@click="closeImagePreview">
               <q-icon name="close" size="1rem" />
             </OButton>
           </q-card-section>
@@ -302,10 +315,14 @@
           </q-card-section>
 
           <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
-            <OButton variant="outline" size="sm-action" @click="showEditTitleDialog = false"
+            <OButton variant="outline"
+size="sm-action"
+@click="showEditTitleDialog = false"
               >Cancel</OButton
             >
-            <OButton variant="primary" size="sm-action" @click="saveEditedTitle"
+            <OButton variant="primary"
+size="sm-action"
+@click="saveEditedTitle"
               >Save</OButton
             >
           </q-card-actions>
@@ -340,7 +357,9 @@
           <q-card-section class="row items-center q-pb-none">
             <div class="text-subtitle1">{{ previewImage?.filename }}</div>
             <q-space />
-            <OButton variant="ghost" size="icon-sm" @click="closeImagePreview">
+            <OButton variant="ghost"
+size="icon-sm"
+@click="closeImagePreview">
               <q-icon name="close" size="1rem" />
             </OButton>
           </q-card-section>
@@ -359,8 +378,12 @@
 
 
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-        <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
-          <div v-if="chatMessages.length === 0" class="welcome-section" :class="{ 'welcome-section--centered': centeredStart }">
+        <div class="messages-container "
+ref="messagesContainer"
+@scroll="checkIfShouldAutoScroll">
+          <div v-if="chatMessages.length === 0"
+class="welcome-section"
+:class="{ 'welcome-section--centered': centeredStart }">
             <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full" :class="{ 'tw:relative': centeredStart }">
               <div
                 class="tw:flex tw:flex-col tw:items-center"
@@ -420,8 +443,12 @@
               { 'error-message': message.content.startsWith('Error:') }
             ]">
             <div class="message-content" >
-              <q-avatar v-if="message.role === 'user'" size="24px" :class="store.state.theme == 'dark' ? 'dark-user-avatar' : 'light-user-avatar'">
-                <q-icon size="16px" name="person" :color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
+              <q-avatar v-if="message.role === 'user'"
+size="24px"
+:class="store.state.theme == 'dark' ? 'dark-user-avatar' : 'light-user-avatar'">
+                <q-icon size="16px"
+name="person"
+:color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
               </q-avatar>
               <div
                 class="message-blocks"
@@ -937,7 +964,9 @@
                     @click="toggleLogEntryExpanded(index, blockIndex)"
                   >
                     <div class="log-entry-header">
-                      <q-icon name="description" size="14px" color="primary" />
+                      <q-icon name="description"
+size="14px"
+color="primary" />
                       <span class="log-entry-info">
                         {{ block.preview }}
                       </span>
@@ -983,7 +1012,9 @@
                     "
                   >
                     <div class="stream-error-header">
-                      <q-icon name="warning" size="16px" color="negative" />
+                      <q-icon name="warning"
+size="16px"
+color="negative" />
                       <span class="stream-error-message">{{
                         block.message
                       }}</span>

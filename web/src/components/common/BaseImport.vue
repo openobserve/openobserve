@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full" :class="containerClass" :style="containerStyle">
+  <div class="tw:w-full"
+:class="containerClass"
+:style="containerStyle">
     <!-- Header Section -->
     <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]" :class="headerClass">
@@ -91,7 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-form class="tw:mx-2 tw:pb-2" @submit.prevent>
                   <!-- Slot for custom URL input section -->
-                  <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
+                  <slot name="url-input-section"
+:url="url"
+:updateUrl="updateUrl">
                     <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
                       <div style="width: 100%" class="q-pr-sm">
                         <q-input
@@ -132,7 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit.prevent>
                   <!-- Slot for custom file input section -->
-                  <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
+                  <slot name="file-input-section"
+:jsonFiles="jsonFiles"
+:updateFiles="updateFiles">
                     <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
                       <div style="width: 100%" class="q-pr-sm">
                         <q-file

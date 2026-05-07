@@ -154,7 +154,7 @@ export const useHistogram = () => {
 
       // hasAggregationFlag is set here but consumed by commented-out code below;
       // kept in place so it's ready if that code is re-enabled.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       let hasAggregationFlag = false;
       const parsedSQL: any = fnParsedSQL();
       if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {

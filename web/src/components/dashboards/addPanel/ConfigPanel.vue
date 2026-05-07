@@ -34,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Search bar -->
     <div class="config-search-wrapper tw:sticky">
       <div class="row no-wrap items-center" style="gap: 4px">
-        <OButton variant="ghost" size="icon" @click="toggleAllSections">
+        <OButton variant="ghost"
+size="icon"
+@click="toggleAllSections">
           <template #icon-left
             ><q-icon
               :name="allSectionsExpanded ? 'unfold_less' : 'unfold_more'"
@@ -49,7 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="searchQuery && !anySectionVisible"
       class="config-no-results column items-center q-py-lg"
     >
-      <q-icon name="search_off" size="24px" class="q-mb-xs text-grey-5" />
+      <q-icon name="search_off"
+size="24px"
+class="q-mb-xs text-grey-5" />
       <div class="text-grey-6 text-caption">
         {{ t("dashboard.configPanelNoResultsFound", { query: searchQuery }) }}
       </div>
@@ -150,7 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'o2-toggle-button-lg-light'
               "
             />
-            <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop>
+            <OButton variant="ghost"
+size="icon"
+class="tw:mt-1"
+@click.stop>
               <template #icon-left><q-icon name="info_outline" /></template>
               <q-tooltip
                 anchor="bottom middle"
@@ -1474,7 +1481,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
+          <OButton variant="ghost"
+size="icon"
+@click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
@@ -1507,7 +1516,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
+          <OButton variant="ghost"
+size="icon"
+@click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
@@ -1534,7 +1545,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
+          <OButton variant="ghost"
+size="icon"
+@click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
@@ -1567,7 +1580,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
+          <OButton variant="ghost"
+size="icon"
+@click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
@@ -1601,7 +1616,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionValueTransformations") }}
-          <OButton variant="ghost" size="icon" @click.stop>
+          <OButton variant="ghost"
+size="icon"
+@click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
@@ -1638,7 +1655,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionFieldOverrides") }}
-          <OButton variant="ghost" size="icon" @click.stop>
+          <OButton variant="ghost"
+size="icon"
+@click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
@@ -1696,7 +1715,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.mapsMapType") }}
-              <q-icon class="q-ml-xs" size="20px" name="info" />
+              <q-icon class="q-ml-xs"
+size="20px"
+name="info" />
               <q-tooltip class="bg-grey-8" max-width="250px">
                 {{ t("dashboard.mapsMapTypeTooltip") }}
               </q-tooltip>

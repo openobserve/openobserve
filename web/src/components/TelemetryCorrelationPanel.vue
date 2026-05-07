@@ -23,13 +23,17 @@
 
       <!-- Error State -->
       <div v-else-if="error" class="correlation-error">
-        <q-icon name="error_outline" color="negative" size="md" />
+        <q-icon name="error_outline"
+color="negative"
+size="md" />
         <span class="error-text">{{ error }}</span>
       </div>
 
       <!-- No Correlation Available -->
       <div v-else-if="!correlationResult" class="correlation-empty">
-        <q-icon name="info_outline" color="grey-6" size="md" />
+        <q-icon name="info_outline"
+color="grey-6"
+size="md" />
         <span class="empty-text">No related telemetry found</span>
       </div>
 
@@ -49,7 +53,9 @@
             class="dimension-section"
           >
             <div class="dimension-section-header">
-              <q-icon name="link" size="xs" color="positive" />
+              <q-icon name="link"
+size="xs"
+color="positive" />
               <span class="dimension-section-title">Matched Dimensions</span>
               <q-tooltip>These stable dimensions were used to find related telemetry</q-tooltip>
             </div>
@@ -76,7 +82,9 @@
             class="dimension-section"
           >
             <div class="dimension-section-header">
-              <q-icon name="tune" size="xs" color="grey-7" />
+              <q-icon name="tune"
+size="xs"
+color="grey-7" />
               <span class="dimension-section-title">Additional Filters Available</span>
               <q-tooltip>These additional dimensions can be used for more specific filtering</q-tooltip>
             </div>

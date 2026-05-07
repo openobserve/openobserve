@@ -168,7 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="!shouldWrapValues ? 'ellipsis' : ''"
               >
                 <div class="tw:flex tw:items-start tw:gap-2">
-                  <ODropdown v-model:open="tableDropdownOpenMap[props.row.field]" side="bottom" align="start">
+                  <ODropdown v-model:open="tableDropdownOpenMap[props.row.field]"
+side="bottom"
+align="start">
                     <template #trigger>
                       <OButton
                         :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
@@ -330,7 +332,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <q-spinner-hourglass v-if="correlationLoading"
+color="primary"
+size="3rem"
+class="tw:mb-4" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
@@ -360,7 +365,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <q-spinner-hourglass v-if="correlationLoading"
+color="primary"
+size="3rem"
+class="tw:mb-4" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>

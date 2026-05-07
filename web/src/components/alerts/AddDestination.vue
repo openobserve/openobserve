@@ -288,7 +288,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-subtitle2 q-mr-sm">
               It looks like you haven't created any Email Templates yet.
             </div>
-            <OButton variant="outline" size="sm" @click="createEmailTemplate"
+            <OButton variant="outline"
+size="sm"
+@click="createEmailTemplate"
               >Create Email Template</OButton
             >
           </div>

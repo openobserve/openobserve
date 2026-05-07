@@ -23,10 +23,14 @@
     <div
       class="tw:w-[36px] tw:flex tw:items-center tw:space-x-2 tw:ml-auto file-actions"
     >
-      <OButton variant="ghost" size="icon-xs-sq" @click.stop="editFile">
+      <OButton variant="ghost"
+size="icon-xs-sq"
+@click.stop="editFile">
         <q-icon name="edit" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
       </OButton>
-      <OButton variant="ghost" size="icon-xs-sq" @click.stop="deleteFile">
+      <OButton variant="ghost"
+size="icon-xs-sq"
+@click.stop="deleteFile">
         <q-icon name="delete" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
       </OButton>
     </div>

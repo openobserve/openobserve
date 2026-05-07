@@ -41,7 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-8 text-left q-pl-lg warning flex items-center" data-test="logs-search-result-title">
+        <div v-else
+class="col-8 text-left q-pl-lg warning flex items-center"
+data-test="logs-search-result-title">
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText
@@ -77,7 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info" color="warning" size="sm"> </q-icon>
+            <q-icon name="info"
+color="warning"
+size="sm"> </q-icon>
             <q-tooltip position="top" class="tw:text-sm tw:font-semi-bold">
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
@@ -250,7 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <h6 class="text-center">
               <span class="histogram-empty__message">
-                <q-icon name="warning" color="warning" size="xs"></q-icon> No
+                <q-icon name="warning"
+color="warning"
+size="xs"></q-icon> No
                 data found for histogram.</span
               >
             </h6>
@@ -264,7 +270,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <h5 class="text-center">
-              <span class="histogram-empty__message" style="color: transparent"
+              <span class="histogram-empty__message"
+style="color: transparent"
                 >.</span
               >
             </h5>
@@ -299,7 +306,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data.histogram.errorCode != -1
             "
           >
-            <q-icon name="warning" color="warning" size="xs"></q-icon> Error
+            <q-icon name="warning"
+color="warning"
+size="xs"></q-icon> Error
             while fetching histogram data.
             <OButton
               variant="secondary"
@@ -1145,7 +1154,7 @@ export default defineComponent({
 
     const reDrawChart = () => {
       if (
-        // eslint-disable-next-line no-prototype-builtins
+         
         searchObj.data.histogram.hasOwnProperty("xData") &&
         searchObj.data.histogram.xData.length > 0
       ) {

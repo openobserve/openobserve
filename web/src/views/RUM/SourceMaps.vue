@@ -147,7 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-slot:body="props">
             <q-tr :props="props">
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
+              <q-td v-for="col in props.cols"
+:key="col.name"
+:props="props">
                 <template v-if="col.name === 'expand'">
                   <div class="cursor-pointer" @click="toggleExpand(props.row)">
                     <OButton
@@ -186,7 +188,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-subtitle2 text-weight-bold q-mb-sm">
                     Source Map Files ({{ props.row.files.length }})
                   </div>
-                  <q-list bordered separator class="rounded-borders" style="max-height: 400px; overflow-y: auto;">
+                  <q-list bordered
+separator
+class="rounded-borders"
+style="max-height: 400px; overflow-y: auto;">
                     <q-item v-for="(file, index) in props.row.files" :key="index">
                       <q-item-section>
                         <q-item-label caption>Source File</q-item-label>
@@ -218,7 +223,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty State -->
       <template v-else>
         <div class="q-pa-xl text-center text-grey-7">
-          <q-icon name="code" size="4rem" color="grey-5" class="q-mb-md" />
+          <q-icon name="code"
+size="4rem"
+color="grey-5"
+class="q-mb-md" />
           <div class="text-h6 q-mb-sm">No Source Maps Found</div>
           <div class="text-body2">
             Upload source maps to enable stack trace translation

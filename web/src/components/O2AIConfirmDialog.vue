@@ -7,7 +7,9 @@
       @click="handleDialogClick"
     >
       <div class="confirmation-header">
-        <q-icon name="help_outline" size="20px" class="confirmation-icon" />
+        <q-icon name="help_outline"
+size="20px"
+class="confirmation-icon" />
         <span class="confirmation-title">{{ formattedMessage }}</span>
       </div>
 

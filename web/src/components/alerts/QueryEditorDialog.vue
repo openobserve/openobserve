@@ -51,7 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Stream Type + Stream Name -->
               <div class="tw:flex tw:items-center tw:gap-2">
-                <div v-if="streamType" class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--type-dark' : 'topbar-info-chip--type-light'">
+                <div v-if="streamType"
+class="topbar-info-chip"
+:class="store.state.theme === 'dark' ? 'topbar-info-chip--type-dark' : 'topbar-info-chip--type-light'">
                   <span class="topbar-info-chip__label">Stream Type</span>
                   <span class="topbar-info-chip__sep">:</span>
                   <span class="topbar-info-chip__value">{{ streamType }}</span>
@@ -173,7 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="sql-status-bar" :class="[sqlStatusState, store.state.theme === 'dark' ? 'sql-status-bar--dark' : 'sql-status-bar--light']">
                     <div class="sql-status-bar__inner">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
-                        <q-icon name="error_outline" size="12px" style="flex-shrink:0;" />
+                        <q-icon name="error_outline"
+size="12px"
+style="flex-shrink:0;" />
                         <span class="sql-status-bar__msg">{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
@@ -181,25 +185,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span>Fetching results...</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
-                        <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                        <q-icon name="edit"
+size="11px"
+style="flex-shrink:0;opacity:0.6;" />
                         <span>Write a query to get started</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
-                        <q-icon name="play_arrow" size="12px" style="flex-shrink:0;opacity:0.7;" />
+                        <q-icon name="play_arrow"
+size="12px"
+style="flex-shrink:0;opacity:0.7;" />
                         <span>Press Run Query to see results</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--empty'">
-                        <q-icon name="search_off" size="12px" style="flex-shrink:0;" />
+                        <q-icon name="search_off"
+size="12px"
+style="flex-shrink:0;" />
                         <span>Query ran successfully — no matching events</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--success'">
-                        <q-icon name="check_circle" size="12px" style="flex-shrink:0;" />
+                        <q-icon name="check_circle"
+size="12px"
+style="flex-shrink:0;" />
                         <span>{{ sqlResultCount }} event{{ sqlResultCount === 1 ? '' : 's' }} found</span>
                       </template>
                     </div>
                     <q-tooltip
                       v-if="sqlStatusState === 'sql-status-bar--error'"
-                      anchor="top middle" self="bottom middle" max-width="520px"
+                      anchor="top middle"
+self="bottom middle"
+max-width="520px"
                       style="font-size:11px;white-space:pre-wrap;word-break:break-word;"
                     >{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</q-tooltip>
                   </div>
@@ -329,14 +343,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Idle: not yet run -->
                   <div v-if="!tempRunQuery && outputEvents == ''" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon name="table_chart" size="48px" class="empty-state-icon" />
+                      <q-icon name="table_chart"
+size="48px"
+class="empty-state-icon" />
                       <span class="empty-state-text">{{ t('alerts.runQueryForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results after run -->
                   <div v-else-if="outputEvents == '' && !runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon :name="outlinedWarning" size="40px" class="tw:text-orange-400 tw:opacity-60" />
+                      <q-icon :name="outlinedWarning"
+size="40px"
+class="tw:text-orange-400 tw:opacity-60" />
                       <span class="empty-state-text">{{ runPromqlError ? runPromqlError : t('search.noResultsFound') }}</span>
                     </div>
                   </div>
@@ -385,14 +403,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Idle -->
                   <div v-if="!tempTestFunction && !runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon name="data_object" size="48px" class="empty-state-icon" />
+                      <q-icon name="data_object"
+size="48px"
+class="empty-state-icon" />
                       <span class="empty-state-text">{{ t('alerts.applyVRLForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results -->
                   <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon :name="outlinedWarning" size="40px" class="tw:text-orange-400 tw:opacity-60" />
+                      <q-icon :name="outlinedWarning"
+size="40px"
+class="tw:text-orange-400 tw:opacity-60" />
                       <span class="empty-state-text">{{ t('search.noResultsFound') }}</span>
                     </div>
                   </div>

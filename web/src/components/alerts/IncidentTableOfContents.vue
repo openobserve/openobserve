@@ -30,8 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'tw:border-gray-200'
         ]"
       >
-        <q-icon data-test="toc-header-icon" name="format_list_bulleted" size="16px" class="tw:opacity-80" />
-        <span data-test="toc-header-title" :class="isDarkMode ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
+        <q-icon data-test="toc-header-icon"
+name="format_list_bulleted"
+size="16px"
+class="tw:opacity-80" />
+        <span data-test="toc-header-title"
+:class="isDarkMode ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+class="tw:text-xs tw:font-semibold">
           Table of Contents
         </span>
       </div>
@@ -39,7 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Content -->
       <div data-test="toc-content" class="tw:p-3 tw:flex-1 tw:overflow-auto">
         <!-- Table of Contents -->
-        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-xs tw:italic">
+        <div v-if="tableOfContents.length === 0"
+data-test="toc-empty-state"
+:class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+class="tw:text-xs tw:italic">
           No sections available
         </div>
         <div v-else class="tw:space-y-1">
@@ -89,7 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Level 2 Children -->
-              <div v-if="expandedSections[item.id] && item.children.length > 0" :data-test="`toc-level2-container-${item.id}`" class="tw:ml-4 tw:space-y-1 tw:mt-1">
+              <div v-if="expandedSections[item.id] && item.children.length > 0"
+:data-test="`toc-level2-container-${item.id}`"
+class="tw:ml-4 tw:space-y-1 tw:mt-1">
                 <template v-for="child in item.children" :key="child.id">
                   <div :data-test="`toc-level2-item-${child.id}`">
                     <!-- Level 2 Item -->
@@ -135,7 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Level 3 Children -->
-                    <div v-if="expandedSections[child.id] && child.children.length > 0" :data-test="`toc-level3-container-${child.id}`" class="tw:ml-4 tw:space-y-1 tw:mt-1">
+                    <div v-if="expandedSections[child.id] && child.children.length > 0"
+:data-test="`toc-level3-container-${child.id}`"
+class="tw:ml-4 tw:space-y-1 tw:mt-1">
                       <div
                         v-for="grandchild in child.children"
                         :key="grandchild.id"
@@ -148,7 +160,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'hover:tw:bg-blue-50 tw:text-gray-600'
                         ]"
                       >
-                        <q-icon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber_manual_record" size="8px" class="tw:opacity-60" />
+                        <q-icon :data-test="`toc-level3-icon-${grandchild.id}`"
+name="fiber_manual_record"
+size="8px"
+class="tw:opacity-60" />
                         <span :data-test="`toc-level3-text-${grandchild.id}`" class="tw:text-[11px] tw:truncate">{{ grandchild.text }}</span>
                       </div>
                     </div>

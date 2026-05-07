@@ -47,21 +47,41 @@ const panelClasses = computed<string[]>(() => {
   -->
   <template v-if="keepAlive">
     <Transition v-if="animated" name="o-tab-panel">
-      <div v-show="isActive" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+      <div v-show="isActive"
+role="tabpanel"
+:id="`tab-panel-${props.name}`"
+:aria-labelledby="`tab-${props.name}`"
+tabindex="0"
+:class="panelClasses">
         <slot />
       </div>
     </Transition>
-    <div v-else v-show="isActive" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+    <div v-else
+v-show="isActive"
+role="tabpanel"
+:id="`tab-panel-${props.name}`"
+:aria-labelledby="`tab-${props.name}`"
+tabindex="0"
+:class="panelClasses">
       <slot />
     </div>
   </template>
   <template v-else>
     <Transition v-if="animated && isActive" name="o-tab-panel">
-      <div role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+      <div role="tabpanel"
+:id="`tab-panel-${props.name}`"
+:aria-labelledby="`tab-${props.name}`"
+tabindex="0"
+:class="panelClasses">
         <slot />
       </div>
     </Transition>
-    <div v-else-if="isActive" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+    <div v-else-if="isActive"
+role="tabpanel"
+:id="`tab-panel-${props.name}`"
+:aria-labelledby="`tab-${props.name}`"
+tabindex="0"
+:class="panelClasses">
       <slot />
     </div>
   </template>

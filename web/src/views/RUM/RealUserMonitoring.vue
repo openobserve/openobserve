@@ -35,7 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
       <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem]">
         <div class="card-container tw:px-4 tw:pt-2">
-          <OTabs v-model="activeTab" align="left" dense @change="changeTab">
+          <OTabs v-model="activeTab"
+align="left"
+dense
+@change="changeTab">
             <OTab
               v-for="tab in tabs"
               :key="tab.value"
@@ -91,7 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
-            <q-icon name="arrow_forward" size="1.25rem" class="q-ml-xs" />
+            <q-icon name="arrow_forward"
+size="1.25rem"
+class="q-ml-xs" />
           </OButton>
         </div>
       </div>

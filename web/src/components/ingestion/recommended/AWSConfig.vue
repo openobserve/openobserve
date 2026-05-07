@@ -30,8 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="aws-tabs"
         align="left"
       >
-        <OTab name="quick-setup" label="Quick Setup" data-test="aws-quick-setup-tab" />
-        <OTab name="individual-services" label="Individual Services" data-test="aws-individual-services-tab" />
+        <OTab name="quick-setup"
+label="Quick Setup"
+data-test="aws-quick-setup-tab" />
+        <OTab name="individual-services"
+label="Individual Services"
+data-test="aws-individual-services-tab" />
       </OTabs>
     </div>
 

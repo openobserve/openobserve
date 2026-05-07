@@ -42,15 +42,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="pricingError && !features?.length"
         class="row items-center q-mb-sm text-negative"
       >
-        <q-icon name="warning" size="16px" class="q-mr-sm" />
+        <q-icon name="warning"
+size="16px"
+class="q-mr-sm" />
         <span class="o2-page-subtitle3"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
-      <div v-for="(feature, index) in features" :key="index" class="row items-center justify-between q-mb-sm">
+      <div v-for="(feature, index) in features"
+:key="index"
+class="row items-center justify-between q-mb-sm">
         <div class="row items-center">
-          <q-icon v-if="feature.is_parent" name="check_circle" color="green" size="16px" class="q-mr-sm" />
-          <q-icon v-else name="" color="green" size="16px" class="q-mr-sm" />
+          <q-icon v-if="feature.is_parent"
+name="check_circle"
+color="green"
+size="16px"
+class="q-mr-sm" />
+          <q-icon v-else
+name=""
+color="green"
+size="16px"
+class="q-mr-sm" />
           <div class="o2-page-subtitle3">{{ feature.name }}</div>
         </div>
         <div

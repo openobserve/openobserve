@@ -5,7 +5,9 @@
 
     <div style="display: flex; justify-content: start; align-items: end; height: 100%;">
     <div style="margin-bottom: 34px; margin-left: 32px;">
-     <span style=" margin-bottom: 12px;"> <img style="height: 40px; margin-left: -1px;" src="@/assets/images/common/openobserve_logo_light.svg" alt="OpenObserve Logo" />
+     <span style=" margin-bottom: 12px;"> <img style="height: 40px; margin-left: -1px;"
+src="@/assets/images/common/openobserve_logo_light.svg"
+alt="OpenObserve Logo" />
       </span>
       <div style="font-size: 24px; color: white; font-weight: 600; line-height:33px; margin-top: 5px; ">
         Try OpenObserve today for more efficient and performant observability.
@@ -17,11 +19,14 @@
   <!-- Right Form Section -->
   <div :class="[
     store.state.theme == 'dark' ? 'tw:bg-black' : 'tw:bg-white'
-  ]" class="tw:w-full lg:tw:w-[60%]  tw:h-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:relative">
+  ]"
+class="tw:w-full lg:tw:w-[60%]  tw:h-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:relative">
 
     <!-- Top Section: Logo and Heading -->
     <div class="tw:flex tw:flex-col tw:items-center tw:mb-4">
-      <img style="height: 64px;" src="@/assets/images/common/o2_logo.svg" alt="Get Started Banner" />
+      <img style="height: 64px;"
+src="@/assets/images/common/o2_logo.svg"
+alt="Get Started Banner" />
       <div class="tw:text-[24px] md:tw:text-[32px] tw:font-semibold  tw:text-center" 
       :class="[
         store.state.theme == 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#525252]'

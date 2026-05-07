@@ -29,7 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="searchObj.meta.logsVisualizeToggle"
           @update:model-value="onLogsVisualizeToggleUpdate($event)"
         >
-          <OToggleGroupItem data-test="logs-logs-toggle" value="logs" size="sm">
+          <OToggleGroupItem data-test="logs-logs-toggle"
+value="logs"
+size="sm">
             <template #icon-left>
               <ScanSearch class="tw:size-3.5 tw:shrink-0" />
             </template>
@@ -111,7 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-toggle-button-xs-light'
             "
           >
-            <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
+            <img :src="sqlIcon"
+alt="SQL Mode"
+class="toolbar-icon" />
             <q-tooltip v-if="isSqlModeDisabled">
               {{ t("search.sqlModeDisabledForVisualization") }}
             </q-tooltip>
@@ -153,7 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-toolbar"
               >
                 <q-icon name="saved_search" size="16px" />
-                <q-icon name="arrow_drop_down" size="18px" class="tw:-ms-1" />
+                <q-icon name="arrow_drop_down"
+size="18px"
+class="tw:-ms-1" />
                 <q-tooltip>{{ t("search.listSavedViews") }}</q-tooltip>
               </OButton>
             </template>
@@ -233,7 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-tr>
                       </template>
                       <template v-slot:body-cell-view_name="props">
-                        <q-td :props="props" class="field_list" no-hover>
+                        <q-td :props="props"
+class="field_list"
+no-hover>
                           <q-item
                             class="q-pa-xs saved-view-item"
                             clickable
@@ -1060,7 +1068,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="handleRunQueryFn(true)"
                   >
                     <template #icon-left
-                      ><q-icon name="refresh" size="16px"
+                      ><q-icon name="refresh"
+size="16px"
                     /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
@@ -1161,7 +1170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="handleRunQueryFn(true)"
                   >
                     <template #icon-left
-                      ><q-icon name="refresh" size="16px"
+                      ><q-icon name="refresh"
+size="16px"
                     /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
@@ -1314,7 +1324,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="handleRunQueryFn(true)"
                 >
                   <template #icon-left
-                    ><q-icon name="refresh" size="16px"
+                    ><q-icon name="refresh"
+size="16px"
                   /></template>
                   {{ t("search.refreshCacheAndRunQuery") }}
                 </ODropdownItem>
@@ -1897,7 +1908,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="text-left q-mb-xs">
               {{ t("search.noOfRecords") }}:
-              <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <q-icon name="info"
+size="17px"
+class="q-ml-xs cursor-pointer">
                 <q-tooltip
                   anchor="center right"
                   self="center left"
@@ -1931,7 +1944,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.8"
             class="text-left mapping-warning-msg q-mt-md"
           >
-            <q-icon name="warning" color="red" class="q-mr-sm" />
+            <q-icon name="warning"
+color="red"
+class="q-mr-sm" />
             <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
           </div>
         </q-card-section>
@@ -2043,7 +2058,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none q-pa-md">
           <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
           <q-space />
-          <OButton variant="ghost" size="icon-circle" v-close-popup>
+          <OButton variant="ghost"
+size="icon-circle"
+v-close-popup>
             <q-icon name="cancel" />
           </OButton>
         </q-card-section>
@@ -2116,7 +2133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                   <template v-slot:body-cell-view_name="props">
-                    <q-td :props="props" class="field_list" no-hover>
+                    <q-td :props="props"
+class="field_list"
+no-hover>
                       <q-item class="q-pa-xs saved-view-item" clickable>
                         <q-item-section
                           @click.stop="

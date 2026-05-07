@@ -72,7 +72,9 @@
             <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
           </div>
           <!-- JavaScript option only shown in _meta organization -->
-          <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
+          <div v-if="transformTypeOptions[1]"
+class="tw:flex tw:items-center tw:gap-1"
+data-test="function-transform-type-js-radio">
             <q-radio
               v-model="selectedTransType"
               val="1"

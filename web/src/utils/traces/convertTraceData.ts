@@ -969,7 +969,7 @@ export function getSpanTechIconDataUrl(
     matched.svg +
     `</svg>`;
 
-  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`; // eslint-disable-line no-undef
+  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`;  
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -86,8 +86,12 @@
     </div>
     <!-- o2aichat enableddd -->
 
-    <div  class="q-ml-sm tw:w-[25vw] tw:h-[calc(100vh - 65px)]" v-if="store.state.isAiChatEnabled " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-            <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
+    <div  class="q-ml-sm tw:w-[25vw] tw:h-[calc(100vh - 65px)]"
+v-if="store.state.isAiChatEnabled "
+:class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+            <O2AIChat style="height: calc(100vh - 70px) !important;"
+:is-open="store.state.isAiChatEnabled"
+@close="store.state.isAiChatEnabled = false" />
           </div>
     </div>
 

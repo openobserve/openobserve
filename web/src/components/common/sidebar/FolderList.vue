@@ -49,7 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+              <q-icon class="o2-search-input-icon"
+:class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'"
+name="search" />
             </template>
           </q-input>
         </div>

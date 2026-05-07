@@ -71,7 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:body="props">
           <q-tr :props="props">
-            <q-td key="name" :props="props" class="feature-name-cell">
+            <q-td key="name"
+:props="props"
+class="feature-name-cell">
               {{ props.row.name }}
             </q-td>
             <q-td
@@ -112,7 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ props.row.values.enterprise }}
               </span>
             </q-td>
-            <q-td key="cloud" :props="props" class="feature-value-cell">
+            <q-td key="cloud"
+:props="props"
+class="feature-value-cell">
               <span v-if="props.row.values.cloud === true" class="status-icon status-available">
                 ✅
               </span>

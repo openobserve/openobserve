@@ -25,7 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
         </div>
         <div class="col-auto">
-          <OButton v-close-popup="true" variant="ghost" size="icon-circle-sm">
+          <OButton v-close-popup="true"
+variant="ghost"
+size="icon-circle-sm">
             <q-icon name="cancel" />
           </OButton>
         </div>

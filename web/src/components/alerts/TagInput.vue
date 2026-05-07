@@ -16,8 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="tag-input-container" class="tag-input-container">
-    <div data-test="tag-input-wrapper" class="tag-input-wrapper" :class="{ 'has-content': hasContent }">
-      <label v-if="label" data-test="tag-input-label" class="tag-input-label">{{ label }}</label>
+    <div data-test="tag-input-wrapper"
+class="tag-input-wrapper"
+:class="{ 'has-content': hasContent }">
+      <label v-if="label"
+data-test="tag-input-label"
+class="tag-input-label">{{ label }}</label>
       <div data-test="tags-and-input" class="tags-and-input">
         <q-chip
           v-for="(tag, index) in modelValue"

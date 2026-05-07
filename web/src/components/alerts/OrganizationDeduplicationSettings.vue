@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable content area -->
     <div class="tw:flex-1 tw:overflow-y-auto tw:pr-2">
       <div class="tw:mb-6">
-        <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
+        <GroupHeader :title="t('alerts.correlation.title')"
+:showIcon="false"
+class="tw:mb-2" />
         <div class="text-body2 text-grey-7">
           {{ t('alerts.correlation.description') }}
         </div>
@@ -151,7 +153,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Sticky footer with buttons -->
     <div class="tw:flex tw:justify-end tw:gap-3 tw:pt-4 tw:pb-2 tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:bg-inherit tw:sticky tw:bottom-0">
-      <OButton variant="outline" size="sm-action" @click="$emit('cancel')">{{ t('alerts.correlation.cancelButton') }}</OButton>
+      <OButton variant="outline"
+size="sm-action"
+@click="$emit('cancel')">{{ t('alerts.correlation.cancelButton') }}</OButton>
       <OButton
         variant="primary"
         size="sm-action"

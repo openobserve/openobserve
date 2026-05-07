@@ -15,8 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton variant="ghost" size="icon-circle-sm" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
-    <q-icon :name="DarkModeIcon" size="20px" class="header-icon"></q-icon>
+  <OButton variant="ghost"
+size="icon-circle-sm"
+data-test="navbar-theme-toggle-btn"
+@click="toggleDarkMode">
+    <q-icon :name="DarkModeIcon"
+size="20px"
+class="header-icon"></q-icon>
     <q-tooltip anchor="top middle" self="bottom middle">
       {{ tooltipText }}
     </q-tooltip>

@@ -67,7 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <slot :name="col.slotName" :column="props" />
               </template>
               <template v-else-if="col.type === 'action'">
-                <q-icon :name="col.icon" size="1.5rem" class="cursor-pointer tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]" />
+                <q-icon :name="col.icon"
+size="1.5rem"
+class="cursor-pointer tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]" />
               </template>
               <template v-else>
                 {{ col.value }}

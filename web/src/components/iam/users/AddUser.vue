@@ -282,7 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="logout_confirm" persistent>
     <q-card>
       <q-card-section class="row items-center">
-        <q-avatar icon="info" color="primary" text-color="white" />
+        <q-avatar icon="info"
+color="primary"
+text-color="white" />
         <span class="q-ml-sm"
           >As you've chosen to change your password, you'll be automatically
           logged out.</span

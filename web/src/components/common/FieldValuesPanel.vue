@@ -183,7 +183,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
-        <q-spinner-dots v-if="isLoadingMore" color="primary" size="1em" />
+        <q-spinner-dots v-if="isLoadingMore"
+color="primary"
+size="1em" />
         <span v-else>View more values</span>
       </OButton>
     </div>

@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="events.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-16 tw:text-gray-500"
     >
-      <q-icon name="forum" size="56px" class="tw:mb-3 tw:opacity-40" />
+      <q-icon name="forum"
+size="56px"
+class="tw:mb-3 tw:opacity-40" />
       <div class="tw:text-base tw:font-medium tw:mb-1">No activity yet</div>
       <div class="tw:text-sm tw:text-gray-400">Events and comments will appear here</div>
     </div>
@@ -146,7 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }"
                         >
                           AI SRE
-                          <q-tooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" class="tw:max-w-sm" anchor="bottom left" self="top left">
+                          <q-tooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)"
+:delay="300"
+class="tw:max-w-sm"
+anchor="bottom left"
+self="top left">
                             {{ getFailureTooltip(event) }}
                           </q-tooltip>
                         </span>

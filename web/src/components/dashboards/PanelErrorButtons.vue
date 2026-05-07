@@ -18,7 +18,9 @@
       data-test="panel-error-data"
     >
       <template #icon-left><q-icon :name="outlinedWarning" /></template>
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+      <q-tooltip anchor="bottom right"
+self="top right"
+max-width="220px">
         <div style="white-space: pre-wrap">
           {{ error }}
         </div>
@@ -31,7 +33,9 @@
       data-test="panel-max-duration-warning"
     >
       <template #icon-left><q-icon :name="outlinedWarning" /></template>
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+      <q-tooltip anchor="bottom right"
+self="top right"
+max-width="220px">
         <div style="white-space: pre-wrap">
           {{ maxQueryRangeWarning }}
         </div>

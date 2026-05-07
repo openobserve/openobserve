@@ -17,14 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div data-test="pipeline-flow-container" class="container">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="warning-text flex  items-center q-px-sm q-mr-md ">
-      <q-icon name="info" class="q-mr-xs " size="16px" />
+     <div data-test="pipeline-flow-unsaved-changes-warning-text"
+v-show="pipelineObj.dirtyFlag"
+class="warning-text flex  items-center q-px-sm q-mr-md ">
+      <q-icon name="info"
+class="q-mr-xs "
+size="16px" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
    
    <!-- Edge deletion help notification -->
    <div v-if="showEdgeHelpNotification" class="edge-help-notification">
-     <q-icon name="info" class="q-mr-xs" size="16px" />
+     <q-icon name="info"
+class="q-mr-xs"
+size="16px" />
      Press Backspace/Delete to remove the edge
    </div>
    
@@ -86,13 +92,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p v-if="isDragOver">Drop here</p>
       </DropzoneBackground>
       <template #node-input="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="input" />
+        <CustomNode :id="id"
+:data="data"
+io_type="input" />
       </template>
       <template #node-output="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="output" />
+        <CustomNode :id="id"
+:data="data"
+io_type="output" />
       </template>
       <template #node-default="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="default" />
+        <CustomNode :id="id"
+:data="data"
+io_type="default" />
       </template>
       <Controls 
       :showInteractive=false

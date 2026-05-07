@@ -73,7 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align="left"
           data-test="alert-insights-tabs"
         >
-          <OTab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
+          <OTab name="overview"
+:label="t('alerts.insights.tabs.overview')"
+data-test="tab-overview" />
           <OTab
             v-if="isEnterprise"
             name="frequency"
@@ -86,7 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.insights.tabs.correlation')"
             data-test="tab-correlation"
           />
-          <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
+          <OTab name="quality"
+:label="t('alerts.insights.tabs.quality')"
+data-test="tab-quality" />
         </OTabs>
 
         <!-- Filters Section -->
@@ -174,7 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="action-buttons-row tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center"
       data-test="action-buttons-row"
     >
-      <q-icon name="campaign" color="primary" size="sm" />
+      <q-icon name="campaign"
+color="primary"
+size="sm" />
       <span class="tw:text-sm tw:font-medium"
         >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
       >

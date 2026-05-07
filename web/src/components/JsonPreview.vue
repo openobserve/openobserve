@@ -40,7 +40,9 @@
           </OButton>
         </template>
         <div class="logs-table-list tw:min-w-[180px]">
-          <slot name="field-dropdown" :field="key" :value="value[key]" />
+          <slot name="field-dropdown"
+:field="key"
+:value="value[key]" />
         </div>
       </ODropdown>
 

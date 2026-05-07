@@ -41,7 +41,9 @@
           clearable
         >
           <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+            <q-icon class="o2-search-input-icon"
+size="1rem"
+name="search" />
           </template>
         </q-input>
       </div>
@@ -167,7 +169,9 @@
       class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0 card-container service-graph-container"
     >
       <!-- Graph Visualization -->
-      <q-card flat bordered class="graph-card tw:h-full">
+      <q-card flat
+bordered
+class="graph-card tw:h-full">
         <q-card-section class="q-pa-none tw:h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
@@ -187,7 +191,9 @@
               class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
               <div>
-                <q-icon name="error_outline" size="4em" color="negative" />
+                <q-icon name="error_outline"
+size="4em"
+color="negative" />
                 <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
@@ -207,7 +213,9 @@
               class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
               <div>
-                <q-icon name="hub" size="5em" color="grey-4" />
+                <q-icon name="hub"
+size="5em"
+color="grey-4" />
                 <div class="text-h6 q-mt-md text-grey-7">
                   No Service Graph Data
                 </div>
@@ -270,10 +278,14 @@
       <q-separator />
       <q-card-actions align="right">
         <div class="tw:flex tw:gap-2">
-          <OButton variant="outline" size="sm-action" v-close-popup>
+          <OButton variant="outline"
+size="sm-action"
+v-close-popup>
             Close
           </OButton>
-          <OButton variant="primary" size="sm-action" @click="resetSettings">
+          <OButton variant="primary"
+size="sm-action"
+@click="resetSettings">
             Reset
           </OButton>
         </div>

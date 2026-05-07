@@ -118,8 +118,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Show existing URLs (only when updating URL-based tables) -->
             <div v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0" class="col-12 q-py-md">
               <div class="text-grey-8 text-bold q-mb-sm" style="font-size: 13px;">Existing URLs ({{ formData.urlJobs.length }})</div>
-              <q-card flat bordered class="q-pa-sm" style="background-color: #fafafa;">
-                <div v-for="(job, index) in formData.urlJobs" :key="job.id" class="q-mb-xs">
+              <q-card flat
+bordered
+class="q-pa-sm"
+style="background-color: #fafafa;">
+                <div v-for="(job, index) in formData.urlJobs"
+:key="job.id"
+class="q-mb-xs">
                   <div class="row items-center q-gutter-x-xs">
                     <div class="col-auto">
                       <span class="text-weight-medium text-grey-7" style="font-size: 12px;">{{ Number(index) + 1 }}.</span>
@@ -143,7 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Mode explanation (always show for URL-based tables in edit mode) -->
             <div v-if="isUpdating && formData.source === 'url'" class="col-12">
-              <div class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:p-3 tw:rounded-lg" :class="{
+              <div class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:p-3 tw:rounded-lg"
+:class="{
                 'tw:bg-blue-50': formData.updateMode === 'reload',
                 'tw:bg-green-50': formData.updateMode === 'append',
                 'tw:bg-yellow-50': formData.updateMode === 'replace_failed',

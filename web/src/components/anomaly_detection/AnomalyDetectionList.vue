@@ -180,7 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           This will also delete the trained model.
         </q-card-section>
         <q-card-actions align="right" class="tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showDeleteDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton variant="outline"
+size="sm-action"
+@click="showDeleteDialog = false">{{ t('alerts.cancel') }}</OButton>
           <OButton
             variant="destructive"
             size="sm-action"
@@ -204,7 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           The model will not be updated. You can retrigger training afterwards.
         </q-card-section>
         <q-card-actions align="right" class="tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showCancelTrainingDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton variant="outline"
+size="sm-action"
+@click="showCancelTrainingDialog = false">{{ t('alerts.cancel') }}</OButton>
           <OButton
             variant="ghost-warning"
             size="sm-action"
@@ -250,7 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-card-section>
         <q-card-actions align="right" class="tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showRetrainDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton variant="outline"
+size="sm-action"
+@click="showRetrainDialog = false">{{ t('alerts.cancel') }}</OButton>
           <OButton
             :variant="pendingRetrainRow?.status === 'failed' ? 'destructive' : 'primary'"
             size="sm-action"

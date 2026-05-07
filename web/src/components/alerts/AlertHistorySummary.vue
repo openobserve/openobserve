@@ -57,7 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #no-data>
         <div class="tw:w-full tw:text-center tw:py-8">
-          <q-icon name="history" size="48px" class="tw:text-gray-400" />
+          <q-icon name="history"
+size="48px"
+class="tw:text-gray-400" />
           <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
             {{ t("alerts.noHistoryData") }}
           </div>

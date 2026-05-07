@@ -646,11 +646,11 @@ describe('LogstashDatasource.vue Component Logic', () => {
     
     // Check indentation consistency
     expect(setup.content).toMatch(/^output \{$/m);
-    expect(setup.content).toMatch(/^  http \{$/m);
-    expect(setup.content).toMatch(/^    url =>/m);
-    expect(setup.content).toMatch(/^    http_method =>/m);
-    expect(setup.content).toMatch(/^    format =>/m);
-    expect(setup.content).toMatch(/^    headers =>/m);
+    expect(setup.content).toMatch(/^ {2}http \{$/m);
+    expect(setup.content).toMatch(/^ {4}url =>/m);
+    expect(setup.content).toMatch(/^ {4}http_method =>/m);
+    expect(setup.content).toMatch(/^ {4}format =>/m);
+    expect(setup.content).toMatch(/^ {4}headers =>/m);
   });
 
   // Test 53: Component handles store with missing properties gracefully
@@ -758,7 +758,7 @@ describe('LogstashDatasource.vue Component Logic', () => {
   // Test 61: Content URL structure validation
   it('should have valid URL structure in content', () => {
     const setup = createComponentSetup();
-    const urlMatch = setup.content.match(/url => "([^"]+)"/); // eslint-disable-line
+    const urlMatch = setup.content.match(/url => "([^"]+)"/);  
     
     expect(urlMatch).toBeTruthy();
     expect(urlMatch?.[1]).toContain('http');

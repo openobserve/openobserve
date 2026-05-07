@@ -16,10 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="alert-summary">
-    <div class="summary-content" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
-      <p v-if="summaryText" class="summary-text" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
+    <div class="summary-content"
+ref="summaryContainer"
+@scroll="checkIfShouldShowScrollButton">
+      <p v-if="summaryText"
+class="summary-text"
+v-html="DOMPurify.sanitize(summaryText)"
+@click="handleSummaryClick"></p>
       <div v-else class="summary-empty-state">
-        <q-icon name="article" size="36px" class="summary-empty-icon" />
+        <q-icon name="article"
+size="36px"
+class="summary-empty-icon" />
         <span class="summary-empty-text">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
       </div>
     </div>

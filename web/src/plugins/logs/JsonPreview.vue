@@ -107,7 +107,9 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+      <q-spinner-hourglass v-if="loading"
+size="lg"
+color="primary" />
       <div v-if="!loading">
         <code-query-editor
           v-model:query="unflattendData"
@@ -197,7 +199,9 @@
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
             <template #icon-left>
-              <q-img height="14px" width="14px" :src="getBtnLogo" />
+              <q-img height="14px"
+width="14px"
+:src="getBtnLogo" />
             </template>
             Send to AI Chat
           </ODropdownItem>
@@ -207,7 +211,9 @@
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
             <template #icon-left>
-              <q-img height="14px" width="14px" :src="regexIcon" />
+              <q-img height="14px"
+width="14px"
+:src="regexIcon" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
           </ODropdownItem>
@@ -251,7 +257,9 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          <q-icon name="content_copy"
+size="xs"
+class="q-mr-sm" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">

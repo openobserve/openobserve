@@ -138,7 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="display: inline"
       >
         <q-icon name="warning"
-size="xs" class="warning" />{{
+size="xs"
+class="warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
       </div>
@@ -338,15 +339,21 @@ size="xs" class="warning" />{{
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" size="20px" class="header-icon" />
+        <component :is="slackIcon"
+size="20px"
+class="header-icon" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.slack") }}
         </q-tooltip>
       </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
-      <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
-        <q-icon name="help_outline" size="20px" class="header-icon" />
+      <OButton variant="ghost"
+size="icon-circle-sm"
+data-test="menu-link-help-item">
+        <q-icon name="help_outline"
+size="20px"
+class="header-icon" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.help") }}
         </q-tooltip>
@@ -412,7 +419,9 @@ size="xs" class="warning" />{{
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
-        <q-icon :name="outlinedSettings" size="20px" class="header-icon" />
+        <q-icon :name="outlinedSettings"
+size="20px"
+class="header-icon" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.settings") }}
         </q-tooltip>
@@ -472,7 +481,8 @@ size="xs" class="warning" />{{
             <q-item clickable>
               <q-item-section avatar>
                 <q-icon size="xs"
-name="language" class="padding-none" />
+name="language"
+class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label class="tw:w-[180px]">{{
@@ -546,7 +556,8 @@ name="language" class="padding-none" />
             >
               <q-item-section avatar>
                 <q-icon size="xs"
-name="color_lens" class="padding-none" />
+name="color_lens"
+class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ t("common.manageTheme") }}</q-item-label>
@@ -564,7 +575,8 @@ name="color_lens" class="padding-none" />
             >
               <q-item-section avatar>
                 <q-icon size="xs"
-name="exit_to_app" class="padding-none" />
+name="exit_to_app"
+class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ t("menu.signOut") }}</q-item-label>

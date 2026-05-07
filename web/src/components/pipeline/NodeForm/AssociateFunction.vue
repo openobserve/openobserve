@@ -25,7 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("pipeline.associateFunction") }}
       <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
+        <OButton variant="ghost"
+size="icon"
+v-close-popup>
           <q-icon name="cancel" size="14px" />
         </OButton>
       </div>
@@ -167,16 +169,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-card class="note-container">
             <q-card-section class="q-pa-sm">
               <div class="note-heading">Function Execution Guidelines:</div>
-              <q-banner inline dense class="note-info">
+              <q-banner inline
+dense
+class="note-info">
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <q-icon name="info"
+color="orange"
+class="q-mr-sm" />
                   <span
                     ><span class="highlight">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened</span
                   >
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <q-icon name="info"
+color="orange"
+class="q-mr-sm" />
                   <span
                     ><span class="highlight">RAF (Run After Flattening):</span>
                     Function executes after data structure is flattened</span

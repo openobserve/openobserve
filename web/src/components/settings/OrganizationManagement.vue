@@ -125,14 +125,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card class="q-pa-sm" style="min-width: 450px">
         <q-toolbar>
           <q-toolbar-title>
-            <span class="text-weight-bold" :title="extendTrialDataRow.name"
+            <span class="text-weight-bold"
+:title="extendTrialDataRow.name"
               >Extend Trial for {{ extendTrialDataRow.name }}</span
             >
             <span class="text-subtitle2 flex"
               >Set the new trial extension period.</span
             >
           </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
+          <OButton variant="ghost"
+size="icon"
+v-close-popup>
             <q-icon name="close" size="14px" />
           </OButton>
         </q-toolbar>
@@ -187,7 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Contract for {{ contractDataRow.name }}
             </span>
           </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
+          <OButton variant="ghost"
+size="icon"
+v-close-popup>
             <q-icon name="close" size="14px" />
           </OButton>
         </q-toolbar>

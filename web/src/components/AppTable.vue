@@ -127,7 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template v-else-if="col.type === 'action'">
-              <q-icon :name="col.icon" size="24px" class="cursor-pointer" />
+              <q-icon :name="col.icon"
+size="24px"
+class="cursor-pointer" />
             </template>
             <template v-else>
               {{ col.value }}

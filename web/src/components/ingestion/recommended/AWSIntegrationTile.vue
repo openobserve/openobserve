@@ -136,7 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup
+          <OButton variant="outline"
+size="sm-action"
+v-close-popup
             >Cancel</OButton
           >
         </q-card-actions>
@@ -149,7 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">{{ selectedComponentTitle }}</div>
           <q-space />
-          <OButton variant="ghost" size="icon-circle-sm" v-close-popup>
+          <OButton variant="ghost"
+size="icon-circle-sm"
+v-close-popup>
             <q-icon name="close" />
           </OButton>
         </q-card-section>

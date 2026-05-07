@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="incident-detail-page" class="q-pa-none" style="height: calc(100vh - 50px); overflow: hidden;">
+  <q-page data-test="incident-detail-page"
+class="q-pa-none"
+style="height: calc(100vh - 50px); overflow: hidden;">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
     <!-- Header -->
     <div class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[68px] tw:px-[0.675rem] tw:mb-[0.675rem]">
@@ -162,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :loading="updating"
           @click="reopenIncident"
-        ><q-icon name="refresh" size="16px" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<q-tooltip :delay="500">{{ t("alerts.incidents.reopenIncidentTooltip") }}</q-tooltip></OButton>
+        ><q-icon name="refresh"
+size="16px"
+class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<q-tooltip :delay="500">{{ t("alerts.incidents.reopenIncidentTooltip") }}</q-tooltip></OButton>
 
         <!-- Edit Title Button -->
         <OButton
@@ -174,7 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:flex-col tw:overflow-hidden" style="height: calc(100vh - 130px);">
+    <div v-if="!loading && incidentDetails"
+class="card-container tw:flex tw:flex-col tw:overflow-hidden"
+style="height: calc(100vh - 130px);">
       <!-- Tabs (moved to top level) -->
       <div class="tw:flex-shrink-0 tw:px-4 tw:pt-3">
         <OTabs
@@ -239,7 +245,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tab Content Container -->
       <div class="tw:flex tw:flex-1 tw:overflow-hidden">
       <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
-      <div v-if="activeTab === 'incidentAnalysis'" class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:h-full" style="order: 1;">
+      <div v-if="activeTab === 'incidentAnalysis'"
+class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:h-full"
+style="order: 1;">
 
         <!-- Table of Contents (only on Incident Analysis) -->
         <IncidentTableOfContents
@@ -270,7 +278,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Total Alerts
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-amber-500/10' : 'tw:bg-amber-50'">
-                  <q-icon name="bolt" :class="store.state.theme === 'dark' ? 'tw:text-amber-400' : 'tw:text-amber-600'" style="font-size: 20px;" />
+                  <q-icon name="bolt"
+:class="store.state.theme === 'dark' ? 'tw:text-amber-400' : 'tw:text-amber-600'"
+style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -290,7 +300,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.incidents.uniqueAlerts') }}
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-blue-500/10' : 'tw:bg-blue-50'">
-                  <q-icon name="notifications_active" :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'" style="font-size: 20px;" />
+                  <q-icon name="notifications_active"
+:class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'"
+style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -310,7 +322,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Affected Services
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-purple-500/10' : 'tw:bg-purple-50'">
-                  <q-icon name="dns" :class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'" style="font-size: 20px;" />
+                  <q-icon name="dns"
+:class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'"
+style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -330,7 +344,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Active Duration
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-green-500/10' : 'tw:bg-green-50'">
-                  <q-icon name="schedule" :class="store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'" style="font-size: 20px;" />
+                  <q-icon name="schedule"
+:class="store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'"
+style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -352,7 +368,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Alert Frequency
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-rose-500/10' : 'tw:bg-rose-50'">
-                  <q-icon name="show_chart" :class="store.state.theme === 'dark' ? 'tw:text-rose-400' : 'tw:text-rose-600'" style="font-size: 20px;" />
+                  <q-icon name="show_chart"
+:class="store.state.theme === 'dark' ? 'tw:text-rose-400' : 'tw:text-rose-600'"
+style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -889,7 +907,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:border-gray-200'
                 ]"
               >
-                <q-icon name="info" size="16px" class="tw:opacity-80" />
+                <q-icon name="info"
+size="16px"
+class="tw:opacity-80" />
                 <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
                   Alert Details
                 </span>
@@ -897,12 +917,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Content -->
               <div class="tw:p-3 tw:flex-1 tw:overflow-auto">
                 <!-- No alerts available -->
-                <div v-if="!alerts || alerts.length === 0" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm tw:italic">
+                <div v-if="!alerts || alerts.length === 0"
+:class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+class="tw:text-sm tw:italic">
                   {{ t('alerts.incidents.noAlertDetailsAvailable') }}
                 </div>
 
                 <!-- No trigger selected -->
-                <div v-else-if="selectedAlertIndex === -1" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm tw:italic tw:text-center tw:mt-8">
+                <div v-else-if="selectedAlertIndex === -1"
+:class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+class="tw:text-sm tw:italic tw:text-center tw:mt-8">
                   {{ t('alerts.incidents.clickOnTriggerToViewDetails') }}
                 </div>
 
@@ -926,7 +950,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Type
                           </span>
-                          <q-badge :color="alerts[selectedAlertIndex]?.stream_type === 'logs' ? 'blue' : alerts[selectedAlertIndex]?.stream_type === 'metrics' ? 'purple' : 'teal'" outline class="tw:w-fit">
+                          <q-badge :color="alerts[selectedAlertIndex]?.stream_type === 'logs' ? 'blue' : alerts[selectedAlertIndex]?.stream_type === 'metrics' ? 'purple' : 'teal'"
+outline
+class="tw:w-fit">
                             <span class="tw:text-[10px]">{{ alerts[selectedAlertIndex]?.stream_type || 'N/A' }}</span>
                           </q-badge>
                         </div>
@@ -982,7 +1008,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Alert Conditions Section -->
-                  <div :class="['tw:rounded tw:border tw:flex tw:flex-col section-container',]" class="tw:overflow-hidden" style="height: 392px;">
+                  <div :class="['tw:rounded tw:border tw:flex tw:flex-col section-container',]"
+class="tw:overflow-hidden"
+style="height: 392px;">
                     <div :class="['section-header-bg tw:px-2.5 tw:py-1.5 tw:border-b tw:flex tw:items-center tw:justify-between tw:flex-shrink-0', store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200']">
                       <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wide">
                         {{ alerts[selectedAlertIndex]?.query_condition?.type === 'sql' ? 'SQL Query' : alerts[selectedAlertIndex]?.query_condition?.type === 'promql' ? 'PromQL Query' : 'Conditions' }}
@@ -1005,7 +1033,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- No conditions -->
-                      <div v-else :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm tw:italic">
+                      <div v-else
+:class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+class="tw:text-sm tw:italic">
                         No conditions defined
                       </div>
                     </div>
@@ -1020,11 +1050,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <q-spinner-hourglass color="primary"
+size="3rem"
+class="tw-mb-4" />
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
+class="full-width column flex-center q-gutter-sm justify-center"
+style="margin: 15vh auto 2rem;">
             <q-icon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
@@ -1033,7 +1067,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated logs found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')"
+class="text-body2 text-grey-7 q-mt-sm"
+style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1042,7 +1078,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+            ><q-icon name="refresh"
+size="18px"
+class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - CorrelatedLogsTable -->
@@ -1070,12 +1108,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <q-spinner-hourglass color="primary"
+size="3rem"
+class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
+class="full-width column flex-center q-gutter-sm justify-center"
+style="margin: 15vh auto 2rem;">
             <q-icon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
@@ -1084,7 +1126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')"
+class="text-body2 text-grey-7 q-mt-sm"
+style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1093,7 +1137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+            ><q-icon name="refresh"
+size="18px"
+class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1128,12 +1174,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <q-spinner-hourglass color="primary"
+size="3rem"
+class="tw-mb-4" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
 
           <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
+          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
+class="full-width column flex-center q-gutter-sm justify-center"
+style="margin: 15vh auto 2rem;">
             <q-icon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
@@ -1142,7 +1192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-h6 q-mt-md">
               {{ correlationError || 'No correlated traces found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')"
+class="text-body2 text-grey-7 q-mt-sm"
+style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1151,7 +1203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+            ><q-icon name="refresh"
+size="18px"
+class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->

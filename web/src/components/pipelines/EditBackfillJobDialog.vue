@@ -72,12 +72,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Advanced Options"
             data-test="advanced-options-expansion"
           >
-            <q-card flat bordered class="q-pa-md tw-space-y-4">
+            <q-card flat
+bordered
+class="q-pa-md tw-space-y-4">
               <!-- Chunk Period -->
               <div>
                 <div class="text-caption q-mb-xs">
                   Chunk Period (minutes)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
+                  <q-icon name="info_outline"
+size="16px"
+color="grey-6">
                     <q-tooltip>
                       Size of each processing chunk in minutes. Default: 60
                     </q-tooltip>
@@ -98,7 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <div class="text-caption q-mb-xs">
                   Delay Between Chunks (seconds)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
+                  <q-icon name="info_outline"
+size="16px"
+color="grey-6">
                     <q-tooltip>
                       Delay between processing chunks in seconds. Default: 5
                     </q-tooltip>
@@ -127,7 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
                   <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm tw-mt-0.5" />
+                    <q-icon name="warning"
+color="orange"
+class="q-mr-sm tw-mt-0.5" />
                     <div class="text-caption text-orange-800">
                       <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
                       <div class="tw-mb-2">

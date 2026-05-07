@@ -87,7 +87,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Progress -->
           <div class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Progress</div>
-            <q-card flat bordered class="q-pa-md">
+            <q-card flat
+bordered
+class="q-pa-md">
               <div class="flex items-center justify-between q-mb-sm">
                 <div class="tw-font-medium">Overall Progress</div>
                 <div class="text-h6">{{ job.progress_percent }}%</div>
@@ -124,7 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Deletion Details (if applicable) -->
           <div v-if="job.delete_before_backfill || job.deletion_status" class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Deletion Details</div>
-            <q-card flat bordered class="q-pa-md">
+            <q-card flat
+bordered
+class="q-pa-md">
               <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
                 <div>
                   <div class="text-caption text-grey-6">Status</div>
@@ -137,7 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
                   <div class="text-caption text-grey-6">Deletion Job IDs ({{ job.deletion_job_ids.length }})</div>
-                  <div v-for="(jobId, idx) in job.deletion_job_ids" :key="idx" class="tw-font-mono text-xs">
+                  <div v-for="(jobId, idx) in job.deletion_job_ids"
+:key="idx"
+class="tw-font-mono text-xs">
                     {{ jobId }}
                   </div>
                 </div>
@@ -152,9 +158,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error Details (if present) -->
           <div v-if="job.error" class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Error Details</div>
-            <q-card flat bordered class="q-pa-md tw-bg-red-50 tw-border-red-200">
+            <q-card flat
+bordered
+class="q-pa-md tw-bg-red-50 tw-border-red-200">
               <div class="flex items-start">
-                <q-icon name="error" color="negative" size="24px" class="q-mr-sm tw-mt-1" />
+                <q-icon name="error"
+color="negative"
+size="24px"
+class="q-mr-sm tw-mt-1" />
                 <div class="tw-flex-1">
                   <div class="text-caption text-grey-6 q-mb-xs">Error Message</div>
                   <div class="text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words">
@@ -220,7 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-else class="flex flex-column items-center justify-center q-pa-lg">
-          <q-icon name="error_outline" size="64px" color="grey-5" />
+          <q-icon name="error_outline"
+size="64px"
+color="grey-5" />
           <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
         </div>
       </q-card-section>

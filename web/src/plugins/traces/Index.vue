@@ -237,7 +237,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info"
+color="primary"
+size="md" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </div>
                   </div>
@@ -250,7 +252,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <q-icon name="info"
+color="primary"
+size="md" />
                     {{ t("search.applySearch") }}
                   </div>
                   <div

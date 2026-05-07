@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="rca-analysis-container" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
     <!-- Trigger button when no analysis exists and not loading and not in-flight -->
-    <div v-if="!hasExistingRca && !rcaLoading && !analysisInFlight" data-test="rca-trigger-section" class="tw:mb-2 tw:flex-shrink-0">
+    <div v-if="!hasExistingRca && !rcaLoading && !analysisInFlight"
+data-test="rca-trigger-section"
+class="tw:mb-2 tw:flex-shrink-0">
       <OButton
         data-test="trigger-rca-btn"
         variant="outline"
@@ -68,7 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Existing analysis content -->
-    <div v-else-if="hasExistingRca && !rcaLoading" data-test="rca-existing-container" class="rca-container tw:rounded tw:p-3 tw:flex-1 tw:overflow-auto tw:border" :class="isDarkMode ? ' tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'">
+    <div v-else-if="hasExistingRca && !rcaLoading"
+data-test="rca-existing-container"
+class="rca-container tw:rounded tw:p-3 tw:flex-1 tw:overflow-auto tw:border"
+:class="isDarkMode ? ' tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'">
       <div
         data-test="rca-existing-content"
         class="tw:text-sm tw:whitespace-pre-wrap rca-content"

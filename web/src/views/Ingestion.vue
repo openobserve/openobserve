@@ -29,7 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="float-right q-ml-md q-mb-xs"
           >
-            <OButton variant="primary" size="sm" @click="showRUMUpdateDialogFn">
+            <OButton variant="primary"
+size="sm"
+@click="showRUMUpdateDialogFn">
               {{ t(`ingestion.resetRUMTokenLabel`) }}
             </OButton>
           </span>
@@ -40,12 +42,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="float-right q-ml-md q-mb-xs"
           >
-            <OButton variant="primary" size="sm" @click="generateRUMToken">
+            <OButton variant="primary"
+size="sm"
+@click="generateRUMToken">
               {{ t(`ingestion.generateRUMTokenLabel`) }}
             </OButton>
           </span>
           <span v-else class="float-right q-ml-md q-mb-xs">
-            <OButton variant="primary" size="sm" @click="showUpdateDialogFn">
+            <OButton variant="primary"
+size="sm"
+@click="showUpdateDialogFn">
               {{ t(`ingestion.resetTokenBtnLabel`) }}
             </OButton>
           </span>
@@ -91,7 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="q-ml-md">
-          <OTabs v-model="ingestTabType" horizontal align="left">
+          <OTabs v-model="ingestTabType"
+horizontal
+align="left">
             <ORouteTab
               name="recommended"
               :to="{

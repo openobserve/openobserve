@@ -60,10 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
+      <q-icon name="error"
+size="50px"
+color="negative" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
-        <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
+        <OButton variant="ghost-primary"
+size="sm"
+@click="fetchModels()">
           {{ t("modelPricing.tryAgain") }}
         </OButton>
       </span>
@@ -160,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #no-data>
           <div class="full-width column flex-center q-pa-xl">
-            <q-icon name="search_off" size="50px" color="grey-5" />
+            <q-icon name="search_off"
+size="50px"
+color="grey-5" />
             <div class="q-mt-md text-grey-6">
               {{ t("modelPricing.noModelsFound") }}
             </div>

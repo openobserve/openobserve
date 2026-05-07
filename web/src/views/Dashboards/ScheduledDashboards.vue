@@ -86,7 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
 
             <div class="q-ml-sm">
-              <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+              <OButton variant="ghost"
+size="icon-sm"
+v-close-popup="true">
                 <template #icon-left><q-icon name="close" /></template>
               </OButton>
             </div>

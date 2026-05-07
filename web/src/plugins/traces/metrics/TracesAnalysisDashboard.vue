@@ -30,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-[0.675rem]"
       >
         <div class="tw:flex tw:items-center tw:gap-1 tw:flex-wrap">
-          <q-icon name="timeline" size="1.5rem" color="primary" />
+          <q-icon name="timeline"
+size="1.5rem"
+color="primary" />
           <span
             class="tw:text-[var(--o2-text-4)]! tw:text-lg tw:font-semibold tw:whitespace-nowrap"
           >

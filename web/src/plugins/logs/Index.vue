@@ -211,7 +211,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-no-stream-selected-text"
                         class="text-center col-10 q-mx-none tw:mt-none! tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
+                        <q-icon name="info"
+color="primary"
 size="md" />
                         {{ t("search.noStreamSelectedMessage") }}
                       </h6>
@@ -230,7 +231,8 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
+                        <q-icon name="info"
+color="primary"
 size="md" />
                         {{ t("search.noRecordFound") }}
                         <OButton
@@ -260,7 +262,8 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
+                        <q-icon name="info"
+color="primary"
 size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
@@ -278,7 +281,8 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
+                        <q-icon name="info"
+color="primary"
 size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
@@ -394,7 +398,8 @@ size="md" />
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon name="info" class="q-mr-xs"
+              <q-icon name="info"
+class="q-mr-xs"
 size="20px" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage

@@ -531,7 +531,12 @@ function getIcon(data, ioType) {
         </q-tooltip>
       </div>
 
-      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+      <div v-show="showButtons"
+class="node-action-buttons"
+:data-test="`pipeline-node-${io_type}-actions`"
+:style="{ '--node-color': getNodeColor(io_type) }"
+@mouseenter="handleActionButtonsEnter"
+@mouseleave="handleActionButtonsLeave">
 
         <OButton
           variant="ghost"
@@ -544,7 +549,9 @@ function getIcon(data, ioType) {
         >
           <q-icon name="delete" />
         </OButton>
-        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+        <div v-if="showDeleteTooltip"
+class="custom-tooltip delete-tooltip"
+style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
         </div>
@@ -610,7 +617,12 @@ function getIcon(data, ioType) {
           {{ data.stream_type }} - {{    data.stream_name }}
         </div>
       </div>
-      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+      <div v-show="showButtons"
+class="node-action-buttons"
+:data-test="`pipeline-node-${io_type}-actions`"
+:style="{ '--node-color': getNodeColor(io_type) }"
+@mouseenter="handleActionButtonsEnter"
+@mouseleave="handleActionButtonsLeave">
         
         <OButton
           variant="ghost"
@@ -623,7 +635,9 @@ function getIcon(data, ioType) {
         >
           <q-icon name="delete" />
         </OButton>
-        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+        <div v-if="showDeleteTooltip"
+class="custom-tooltip delete-tooltip"
+style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
         </div>
@@ -675,7 +689,12 @@ function getIcon(data, ioType) {
           {{ data.destination_name }}
         </div>
       </div>
-      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+      <div v-show="showButtons"
+class="node-action-buttons"
+:data-test="`pipeline-node-${io_type}-actions`"
+:style="{ '--node-color': getNodeColor(io_type) }"
+@mouseenter="handleActionButtonsEnter"
+@mouseleave="handleActionButtonsLeave">
         
         <OButton
           variant="ghost"
@@ -688,7 +707,9 @@ function getIcon(data, ioType) {
         >
           <q-icon name="delete" />
         </OButton>
-        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+        <div v-if="showDeleteTooltip"
+class="custom-tooltip delete-tooltip"
+style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
         </div>
@@ -741,7 +762,12 @@ function getIcon(data, ioType) {
         </div>
       </div>
 
-      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+      <div v-show="showButtons"
+class="node-action-buttons"
+:data-test="`pipeline-node-${io_type}-actions`"
+:style="{ '--node-color': getNodeColor(io_type) }"
+@mouseenter="handleActionButtonsEnter"
+@mouseleave="handleActionButtonsLeave">
         
         <OButton
           variant="ghost"
@@ -754,7 +780,9 @@ function getIcon(data, ioType) {
         >
           <q-icon name="delete" />
         </OButton>
-        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+        <div v-if="showDeleteTooltip"
+class="custom-tooltip delete-tooltip"
+style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
         </div>
@@ -805,7 +833,12 @@ function getIcon(data, ioType) {
   </div>
       </div>
 
-      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+      <div v-show="showButtons"
+class="node-action-buttons"
+:data-test="`pipeline-node-${io_type}-actions`"
+:style="{ '--node-color': getNodeColor(io_type) }"
+@mouseenter="handleActionButtonsEnter"
+@mouseleave="handleActionButtonsLeave">
         
         <OButton
           variant="ghost"
@@ -818,7 +851,9 @@ function getIcon(data, ioType) {
         >
           <q-icon name="delete" />
         </OButton>
-        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+        <div v-if="showDeleteTooltip"
+class="custom-tooltip delete-tooltip"
+style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
         </div>
@@ -892,7 +927,12 @@ function getIcon(data, ioType) {
         </div>
       </div>
 
-      <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
+      <div v-show="showButtons"
+class="node-action-buttons"
+:data-test="`pipeline-node-${io_type}-actions`"
+:style="{ '--node-color': getNodeColor(io_type) }"
+@mouseenter="handleActionButtonsEnter"
+@mouseleave="handleActionButtonsLeave">
         <OButton
           variant="ghost"
           size="icon"
@@ -904,7 +944,9 @@ function getIcon(data, ioType) {
         >
           <q-icon name="delete" />
         </OButton>
-        <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
+        <div v-if="showDeleteTooltip"
+class="custom-tooltip delete-tooltip"
+style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
         </div>

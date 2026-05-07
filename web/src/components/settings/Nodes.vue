@@ -108,7 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-slot:no-data>
                         <div class="full-width text-center q-pa-md">
-                          <q-icon name="warning" color="grey" size="md" />
+                          <q-icon name="warning"
+color="grey"
+size="md" />
                           <span class="q-ml-sm">No data available</span>
                         </div>
                       </template>
@@ -184,7 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-slot:no-data>
                         <div class="full-width text-center q-pa-md">
-                          <q-icon name="warning" color="grey" size="md" />
+                          <q-icon name="warning"
+color="grey"
+size="md" />
                           <span class="q-ml-sm">No data available</span>
                         </div>
                       </template>

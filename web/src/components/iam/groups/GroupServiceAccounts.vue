@@ -70,7 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
+      <div data-test="iam-service-accounts-selection-table"
+style="height: calc(100vh - 250px); overflow-y: auto;"
+class="card-container">
         <template v-if="rows.length">
           <app-table
             :rows="visibleRows"

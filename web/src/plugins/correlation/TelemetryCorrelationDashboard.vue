@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="correlation-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
       >
         <div class="tw:flex tw:items-center tw:gap-3">
-          <q-icon name="link" size="md" color="primary" />
+          <q-icon name="link"
+size="md"
+color="primary" />
           <div class="tw:flex tw:flex-col tw:gap-0">
             <span class="tw:text-lg tw:font-semibold">
               Correlated Streams - {{ serviceName }}
@@ -518,7 +520,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
-                <q-icon name="hub" color="primary" size="1.25rem" />
+                <q-icon name="hub"
+color="primary"
+size="1.25rem" />
                 <div class="tw:flex tw:flex-col">
                   <span class="tw:text-sm tw:font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
@@ -541,7 +545,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("correlation.viewInTraces") }}
                     </q-tooltip>
                   </OButton>
-                  <q-chip dense color="primary" text-color="white">
+                  <q-chip dense
+color="primary"
+text-color="white">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
                   </q-chip>
                 </div>
@@ -941,7 +947,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="tracesLoading"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-272px)] tw:py-20"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+          <q-spinner-hourglass color="primary"
+size="3.75rem"
+class="tw:mb-4" />
           <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
         </div>
 
@@ -1014,7 +1022,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
-              <q-icon name="hub" color="primary" size="1.25rem" />
+              <q-icon name="hub"
+color="primary"
+size="1.25rem" />
               <div class="tw:flex tw:flex-col">
                 <span class="tw:text-sm tw:font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
@@ -1023,7 +1033,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <q-chip dense color="primary" text-color="white">
+              <q-chip dense
+color="primary"
+text-color="white">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </q-chip>
               <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
@@ -1103,7 +1115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:text-base tw:font-semibold">
             {{ t("correlation.selectMetrics") }}
           </div>
-          <OButton variant="ghost" size="icon-sm" v-close-popup>
+          <OButton variant="ghost"
+size="icon-sm"
+v-close-popup>
             <X :size="14" />
           </OButton>
         </div>

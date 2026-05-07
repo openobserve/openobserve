@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="azure-integration-tile" flat bordered>
+  <q-card class="azure-integration-tile"
+flat
+bordered>
     <q-card-section class="tw:pb-2">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
         <div class="tile-name tw:font-semibold tw:text-base">

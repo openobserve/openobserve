@@ -9,7 +9,9 @@
             {{ t("modelPricing.testMatchSubtitle") }}
           </div>
         </div>
-        <OButton variant="ghost" size="icon" v-close-popup>
+        <OButton variant="ghost"
+size="icon"
+v-close-popup>
           <q-icon name="cancel" size="14px" />
         </OButton>
       </div>
@@ -39,7 +41,9 @@
               data-test="test-match-model-input"
             >
               <template #prepend>
-                <q-icon name="smart_toy" size="18px" class="tmm-search-icon" />
+                <q-icon name="smart_toy"
+size="18px"
+class="tmm-search-icon" />
               </template>
               <template #append>
                 <OButton
@@ -70,7 +74,9 @@
               class="tmm-empty-state"
               data-test="test-match-empty"
             >
-              <q-icon name="manage_search" size="40px" class="tmm-empty-icon" />
+              <q-icon name="manage_search"
+size="40px"
+class="tmm-empty-icon" />
               <div class="tmm-empty-text">
                 {{ t("modelPricing.enterModelName") }}
               </div>
@@ -83,7 +89,9 @@
               class="tmm-empty-state"
               data-test="test-match-waiting"
             >
-              <q-icon name="ads_click" size="40px" class="tmm-empty-icon" />
+              <q-icon name="ads_click"
+size="40px"
+class="tmm-empty-icon" />
               <div class="tmm-empty-text">
                 {{ t("modelPricing.clickToTest") }}
               </div>
@@ -166,7 +174,9 @@
                     :key="step.key"
                   >
                     <div class="tmm-flow-arrow" v-if="sIdx > 0">
-                      <q-icon name="arrow_forward" size="13px" color="grey-5" />
+                      <q-icon name="arrow_forward"
+size="13px"
+color="grey-5" />
                     </div>
                     <div
                       class="tmm-flow-step"

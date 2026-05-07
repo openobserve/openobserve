@@ -79,7 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <NoData />
               </template>
               <template v-slot:body-selection="scope">
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                <q-checkbox v-model="scope.selected"
+size="sm"
+class="o2-table-checkbox" />
               </template>
               <template v-slot:body-cell-type="props">
                 <q-td :props="props">
@@ -318,13 +320,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
           <q-space />
-          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="14" /></OButton>
+          <OButton variant="ghost"
+size="icon-sm"
+v-close-popup><X :size="14" /></OButton>
         </q-card-section>
 
         <q-card-section>
           <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
             <q-list separator>
-              <q-item v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" class="q-pa-md">
+              <q-item v-for="(job, index) in selectedTableForUrlJobs.urlJobs"
+:key="job.id"
+class="q-pa-md">
                 <q-item-section>
                   <q-item-label class="text-weight-bold">Job {{ index + 1 }}</q-item-label>
                   <q-item-label caption>{{ job.url }}</q-item-label>
@@ -333,11 +339,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ job.status }}
                     </q-badge>
                   </q-item-label>
-                  <q-item-label caption v-if="job.status === 'completed'" class="q-mt-sm">
+                  <q-item-label caption
+v-if="job.status === 'completed'"
+class="q-mt-sm">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
                     Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
                   </q-item-label>
-                  <q-item-label caption v-if="job.status === 'failed'" class="q-mt-sm text-negative">
+                  <q-item-label caption
+v-if="job.status === 'failed'"
+class="q-mt-sm text-negative">
                     Error: {{ job.error_message }}
                   </q-item-label>
                 </q-item-section>

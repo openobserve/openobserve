@@ -36,7 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:header="props">
         <q-tr :props="props">
           <q-th auto-width />
-          <q-th v-for="col in props.cols" :key="col.name" :props="props">
+          <q-th v-for="col in props.cols"
+:key="col.name"
+:props="props">
             {{ col.label }}
           </q-th>
         </q-tr>
@@ -57,7 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ChevronUp v-else :size="14" />
             </OButton>
           </q-td>
-          <q-td v-for="col in props.cols" :key="col.name" :props="props">
+          <q-td v-for="col in props.cols"
+:key="col.name"
+:props="props">
             {{ col.value }}
           </q-td>
         </q-tr>

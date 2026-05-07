@@ -67,7 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #icon-left><q-icon name="add" /></template>
       <q-tooltip>Add Tab</q-tooltip>
     </OButton>
-    <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
+    <q-dialog v-model="showAddTabDialog"
+position="right"
+full-height
+maximized>
       <AddTab
         :dashboard-id="dashboardData?.dashboardId"
         @refresh="refreshDashboard"

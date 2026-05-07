@@ -58,7 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="no-border tw:w-[14rem]! tw:h-[36px] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
         >
           <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+            <q-icon class="o2-search-input-icon"
+size="1rem"
+name="search" />
           </template>
         </q-input>
       </div>
@@ -231,7 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)]"
       data-test="services-catalog-empty"
     >
-      <q-icon name="layers" size="3rem" class="tw:mb-3 tw:opacity-40" />
+      <q-icon name="layers"
+size="3rem"
+class="tw:mb-3 tw:opacity-40" />
       <p class="tw:text-[0.9rem]">
         {{ t("traces.servicesCatalog.noServicesFound") }}
       </p>

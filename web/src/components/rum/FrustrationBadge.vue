@@ -34,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ tooltipText }}
       </q-tooltip>
     </q-badge>
-    <span v-else class="text-grey-6" data-test="frustration-badge-none">—</span>
+    <span v-else
+class="text-grey-6"
+data-test="frustration-badge-none">—</span>
   </div>
 </template>
 

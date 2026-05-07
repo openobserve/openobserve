@@ -31,7 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="{ 'hovered': hoveredItem === 'gte' }"
       data-test="context-menu-gte"
     >
-      <q-icon name="arrow_upward" size="xs" class="q-mr-sm" />
+      <q-icon name="arrow_upward"
+size="xs"
+class="q-mr-sm" />
       <span>{{ fieldName }} >= {{ formattedValue }}</span>
     </div>
     <div
@@ -42,7 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="{ 'hovered': hoveredItem === 'lte' }"
       data-test="context-menu-lte"
     >
-      <q-icon name="arrow_downward" size="xs" class="q-mr-sm" />
+      <q-icon name="arrow_downward"
+size="xs"
+class="q-mr-sm" />
       <span>{{ fieldName }} &lt;= {{ formattedValue }}</span>
     </div>
   </div>

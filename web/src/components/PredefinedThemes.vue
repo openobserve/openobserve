@@ -36,13 +36,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left><q-icon name="refresh" size="14px" /></template>
           Reset
         </OButton>
-        <OButton variant="ghost" size="icon" v-close-popup data-test="predefined-themes-close-btn">
+        <OButton variant="ghost"
+size="icon"
+v-close-popup
+data-test="predefined-themes-close-btn">
           <q-icon name="close" size="14px" />
         </OButton>
       </q-card-section>
 
       <q-card-section class="q-pt-none">
-        <OTabs v-model="activeTab" dense class="text-grey" align="justify">
+        <OTabs v-model="activeTab"
+dense
+class="text-grey"
+align="justify">
           <OTab name="light" label="Light Mode" />
           <OTab name="dark" label="Dark Mode" />
         </OTabs>
@@ -208,7 +214,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs"
         >
-          <q-icon name="info_outline" size="14px" class="q-mt-xs" />
+          <q-icon name="info_outline"
+size="14px"
+class="q-mt-xs" />
           <span
             >Theme preferences are stored locally on this device and will not
             sync across different browsers or devices.</span
@@ -230,7 +238,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-card-section>
         <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup data-test="color-picker-close-btn">
+          <OButton variant="outline"
+size="sm-action"
+v-close-popup
+data-test="color-picker-close-btn">
             Close
           </OButton>
         </q-card-actions>

@@ -81,19 +81,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="summary-bar q-mb-md">
           <div class="row q-col-gutter-sm items-center">
             <div class="col-auto">
-              <q-chip dense color="positive" text-color="white">
+              <q-chip dense
+color="positive"
+text-color="white">
                 <strong>{{ diffData.additions.length }}</strong
                 >&nbsp;New
               </q-chip>
             </div>
             <div class="col-auto">
-              <q-chip dense color="warning" text-color="white">
+              <q-chip dense
+color="warning"
+text-color="white">
                 <strong>{{ diffData.modifications.length }}</strong
                 >&nbsp;Modified
               </q-chip>
             </div>
             <div class="col-auto">
-              <q-chip dense color="grey-6" text-color="white">
+              <q-chip dense
+color="grey-6"
+text-color="white">
                 {{ diffData.unchanged.length }} Unchanged
               </q-chip>
             </div>
@@ -302,7 +308,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
+        <OButton variant="ghost-primary"
+size="sm"
+v-close-popup>Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -364,7 +372,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
+        <OButton variant="ghost-primary"
+size="sm"
+v-close-popup>Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>

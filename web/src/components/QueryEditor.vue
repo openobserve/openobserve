@@ -12,7 +12,9 @@
     >
       <!-- Show streaming status with spinner + stop button -->
       <div v-if="isGenerating" :class="aiBarStreamingClass">
-        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+        <img :src="nlpIcon"
+alt="AI"
+class="tw:w-[20px] tw:h-[20px]" />
         <q-spinner-dots color="primary" size="1.2em" />
         <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
@@ -38,7 +40,9 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template v-slot:prepend>
-            <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+            <img :src="nlpIcon"
+alt="AI"
+class="tw:w-[20px] tw:h-[20px]" />
           </template>
         </q-input>
         <!-- Send Button -->
@@ -106,7 +110,9 @@
         @click="nlpMode = true"
         class="ai-floating-button"
       >
-        <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
+        <img :src="nlpIcon"
+alt="AI Mode"
+class="tw:w-[18px] tw:h-[18px] ai-icon" />
         <q-tooltip>{{ props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle') }}</q-tooltip>
       </OButton>
     </div>

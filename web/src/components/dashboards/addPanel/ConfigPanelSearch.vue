@@ -26,7 +26,9 @@ const emit = defineEmits<{
     autofocus
   >
     <template #prepend>
-      <q-icon name="search" size="xs" class="q-ml-xs text-grey-6" />
+      <q-icon name="search"
+size="xs"
+class="q-ml-xs text-grey-6" />
     </template>
   </q-input>
 </template>

@@ -128,7 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="onResourceChange"
                 >
                   <template #prepend>
-                    <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                    <q-icon name="search"
+class="cursor-pointer o2-search-input-icon"
+:class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                   </template>
                 </q-input>
               </div>
@@ -228,7 +230,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: calc(100vh - 295px)"
                   />
                 </div>
-                <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
+                <div v-if="isHelpOpen"
+style="width: 350px"
+class="q-pa-sm">
                   <div class="flex justify-between items-center q-px-sm">
                     <div style="font-size: 16px">Quick Reference</div>
                     <q-icon

@@ -1,6 +1,8 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="text-bold">
+    <div v-if="showHeader"
+data-test="alert-conditions-text"
+class="text-bold">
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!fields.length">

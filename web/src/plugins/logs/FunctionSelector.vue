@@ -36,15 +36,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tooltip>
       </q-toggle>
     </div>
-    <ODropdown v-model:open="functionModel" side="bottom" align="start">
+    <ODropdown v-model:open="functionModel"
+side="bottom"
+align="start">
       <template #trigger>
         <OButton
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
           size="icon-toolbar"
         >
-          <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
-          <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
+          <img :src="functionIconUrl"
+alt="Function"
+class="tw:size-4" />
+          <q-icon name="arrow_drop_down"
+size="14px"
+class="tw:-ms-1" />
           <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
             selectedFunctionTooltip
           }}</q-tooltip>

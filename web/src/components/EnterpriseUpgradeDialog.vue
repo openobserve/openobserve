@@ -66,7 +66,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loaded State: Show actual data -->
               <template v-else>
                 <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
-                  <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
+                  <q-icon v-if="!dialogConfig.showUsageIndicator"
+:name="dialogConfig.badgeIcon"
+size="20px"
+class="q-mr-xs" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
@@ -93,7 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data="chartData"
                     />
                   </div>
-                  <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
+                  <div v-if="isIngestionUnlimited"
+class="text-caption"
+style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
                     {{ t('about.usage_shows_zero_unlimited') }}
                   </div>
                 </div>
@@ -102,7 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- License Limit Note (only for Enterprise without license) -->
             <div v-if="dialogConfig.showLicenseNote" class="license-note">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
+              <q-icon name="info"
+size="14px"
+class="q-mr-xs" />
               <span>{{ dialogConfig.licenseNoteText }}</span>
             </div>
 
@@ -164,7 +171,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <q-icon v-if="feature.link"
+name="open_in_new"
+size="12px"
+class="external-link-icon" />
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -185,7 +195,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <q-icon v-if="feature.link"
+name="open_in_new"
+size="12px"
+class="external-link-icon" />
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
@@ -208,11 +221,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <q-icon v-if="feature.link"
+name="open_in_new"
+size="12px"
+class="external-link-icon" />
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
-                    <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
+                    <q-tooltip anchor="top middle"
+self="bottom middle"
+:offset="[0, 8]">
                       {{ t('about.enterprise_offer.tooltip.high_availability_mode_only') }}
                     </q-tooltip>
                   </span>

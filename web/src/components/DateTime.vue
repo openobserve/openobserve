@@ -32,7 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #icon-left><q-icon name="schedule" /></template>
       <span class="date-time-label">{{ getDisplayValue }}</span>
       <template #icon-right
-        ><q-icon name="arrow_drop_down" class="date-time-arrow"
+        ><q-icon name="arrow_drop_down"
+class="date-time-arrow"
       /></template>
       <q-menu
         id="date-time-menu"
@@ -68,7 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-separator />
         <OTabPanels v-model="selectedType" animated>
-          <OTabPanel v-if="!disableRelative" name="relative" class="q-pa-none">
+          <OTabPanel v-if="!disableRelative"
+name="relative"
+class="q-pa-none">
             <div class="date-time-table relative column">
               <div
                 class="relative-row q-pl-md q-py-sm"

@@ -51,13 +51,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             @update:model-value="onTemplateChange"
           >
             <template v-slot:prepend>
-              <q-icon name="assignment" size="14px" color="primary" />
+              <q-icon name="assignment"
+size="14px"
+color="primary" />
             </template>
           </q-select>
         </div>
       </div>
 
-      <div v-for="(record, idx) in evalData" :key="idx" class="eval-record-v2">
+      <div v-for="(record, idx) in evalData"
+:key="idx"
+class="eval-record-v2">
         <!-- SECTION 1: Hero Metrics (Top Row) -->
         <div class="tw:flex tw:gap-3 tw:mb-4 eval-hero-row">
           <!-- 1. Quality Score Card -->
@@ -160,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <!-- 2.1A: Issues & Analysis Card -->
             <div class="el-border el-border-radius o2-incident-card-bg tw:p-4">
               <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
-                <q-icon name="rule" color="primary" size="sm" />
+                <q-icon name="rule"
+color="primary"
+size="sm" />
                 <div class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-primary)]">{{ $t("traces.evaluations.issuesAnalysis") }}</div>
               </div>
 
@@ -207,9 +213,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <div v-if="getFixSuggestions(record).length > 0" class="tw:mb-4">
                 <div class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)] tw:uppercase tw:mb-2 text-primary">{{ $t("traces.evaluations.recommendedFixes") }}</div>
                 <div class="tw:space-y-2">
-                  <div v-for="(fix, i) in getFixSuggestions(record)" :key="i"
+                  <div v-for="(fix, i) in getFixSuggestions(record)"
+:key="i"
                        class="tw:flex tw:items-start tw:gap-2 tw:p-3 tw:bg-blue-500/5 tw:border tw:border-blue-500/20 tw:rounded-lg tw:border-dashed">
-                    <q-icon name="lightbulb" color="primary" size="18px" class="tw:mt-1" />
+                    <q-icon name="lightbulb"
+color="primary"
+size="18px"
+class="tw:mt-1" />
                     <div class="tw:text-xs tw:text-[var(--o2-text-primary)] tw:flex-1 tw:leading-relaxed">
                       <strong>{{ $t("traces.evaluations.fixSuggestion") }}</strong> {{ fix }}
                     </div>
@@ -219,9 +229,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
               <div v-if="getWeakestDimension(record)" class="tw:mb-4">
                 <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                  <q-icon name="trending_down" color="negative" size="xs" />
+                  <q-icon name="trending_down"
+color="negative"
+size="xs" />
                   <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
-                  <q-badge color="warning" text-color="dark" :label="formatDimLabel(getWeakestDimension(record)!.dimension)" />
+                  <q-badge color="warning"
+text-color="dark"
+:label="formatDimLabel(getWeakestDimension(record)!.dimension)" />
                 </div>
                 <div v-if="getWeakestDimension(record)!.reasoning" class="tw:text-sm tw:bg-[var(--o2-border-color)] tw:p-3 tw:rounded-md tw:leading-relaxed">
                   {{ getWeakestDimension(record)!.reasoning }}
@@ -232,7 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <!-- 2.1B: Score Reasoning Card -->
             <div class="el-border el-border-radius o2-incident-card-bg tw:p-4">
               <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
-                <q-icon name="psychology" color="primary" size="sm" />
+                <q-icon name="psychology"
+color="primary"
+size="sm" />
                 <div class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-primary)]">{{ $t("traces.evaluations.dimensionReasoning") }}</div>
               </div>
               <div class="tw:grid tw:grid-cols-2 tw:gap-3">
@@ -268,7 +284,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <div class="el-border el-border-radius o2-incident-card-bg tw:overflow-hidden">
               <div class="tw:px-4 tw:py-3 tw:border-b tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-border-color)]/30">
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <q-icon name="code" color="primary" size="sm" />
+                  <q-icon name="code"
+color="primary"
+size="sm" />
                   <div class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-primary)]">{{ $t("traces.evaluations.queryResponse") }}</div>
                 </div>
               </div>
@@ -333,13 +351,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <div class="el-border el-border-radius o2-incident-card-bg tw:p-4 tw:flex tw:flex-col tw:gap-4">
               <div class="tw:flex tw:items-center tw:justify-between">
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <q-icon name="analytics" color="primary" size="sm" />
+                  <q-icon name="analytics"
+color="primary"
+size="sm" />
                   <div class="tw:text-sm tw:font-semibold tw:text-[var(--o2-text-primary)]">{{ $t("traces.evaluations.dimensions") }}</div>
                 </div>
                 <!-- Threshold explainer shown only when template dimensions are present -->
                 <div v-if="selectedTemplateData?.dimensions?.length" class="tw:flex tw:items-center tw:gap-1">
                   <span class="tw:text-[10px] tw:text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.passThreshold") }}</span>
-                  <q-icon name="info_outline" size="12px" color="grey-6">
+                  <q-icon name="info_outline"
+size="12px"
+color="grey-6">
                     <q-tooltip class="tw:text-xs" max-width="220px">
                       {{ $t("traces.evaluations.passThresholdTooltip") }}
                     </q-tooltip>
@@ -349,7 +371,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
               <!-- Template aspects legend (shown when a template is active) -->
               <div v-if="selectedTemplateData?.dimensions?.length" class="tw:flex tw:items-center tw:gap-1.5 tw:text-[10px] tw:text-[var(--o2-text-secondary)]">
-                <q-icon name="assignment" size="12px" color="primary" />
+                <q-icon name="assignment"
+size="12px"
+color="primary" />
                 <span>{{ $t("traces.evaluations.templateAspectsFrom", { template: selectedTemplateData.name }) }}</span>
               </div>
 
@@ -358,7 +382,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 v-if="isTemplateMismatch(record)"
                 class="tw:flex tw:items-start tw:gap-2 tw:p-2 tw:rounded-md tw:bg-amber-500/10 tw:border tw:border-amber-500/25 tw:text-[10px] tw:text-amber-700 dark:tw:text-amber-400"
               >
-                <q-icon name="warning" size="14px" class="tw:mt-px tw:shrink-0" />
+                <q-icon name="warning"
+size="14px"
+class="tw:mt-px tw:shrink-0" />
                 <span>{{ $t("traces.evaluations.templateMismatchWarning", { selected: selectedTemplateData?.name, evaluated: evaluatedTemplateName(record) }) }}</span>
               </div>
 
@@ -371,7 +397,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 >
                   <div class="tw:flex tw:justify-between tw:items-center">
                     <div class="tw:flex tw:items-center tw:gap-2">
-                      <q-icon :name="getDimIcon(dim.dimension)" :color="getDimColor(dim.dimension)" size="14px" />
+                      <q-icon :name="getDimIcon(dim.dimension)"
+:color="getDimColor(dim.dimension)"
+size="14px" />
                       <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-primary)]">{{ formatDimLabel(dim.dimension) }}</span>
                       <!-- Template aspect badge -->
                       <q-badge
@@ -404,7 +432,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       }"
                     ></div>
                   </div>
-                  <q-tooltip v-if="dim.reasoning" class="tw:text-xs" max-width="250px">
+                  <q-tooltip v-if="dim.reasoning"
+class="tw:text-xs"
+max-width="250px">
                     {{ dim.reasoning }}
                   </q-tooltip>
                 </div>
@@ -414,7 +444,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             <!-- 2.2B: Metadata Details Card -->
             <div class="el-border el-border-radius o2-incident-card-bg tw:p-4">
               <div class="tw:flex tw:items-center tw:gap-2 tw:mb-4">
-                <q-icon name="info" color="primary" size="sm" />
+                <q-icon name="info"
+color="primary"
+size="sm" />
                 <div class="tw:text-sm tw:font-semibold">{{ $t("traces.evaluations.technicalDetails") }}</div>
               </div>
 

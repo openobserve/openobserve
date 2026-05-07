@@ -29,11 +29,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="tw:p-4">
         <div class="tw:flex tw:items-center tw:gap-2">
           <div data-test="alerts-with-dedup-value" class="tw:text-2xl tw:font-semibold">{{ summary.alerts_with_dedup }}</div>
-          <q-icon data-test="dedup-filter-icon" name="filter_alt" size="sm" color="primary" />
+          <q-icon data-test="dedup-filter-icon"
+name="filter_alt"
+size="sm"
+color="primary" />
         </div>
         <div data-test="alerts-with-dedup-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Using Deduplication
-          <q-icon data-test="dedup-info-icon" name="info_outline" size="xs" class="tw:cursor-pointer">
+          <q-icon data-test="dedup-info-icon"
+name="info_outline"
+size="xs"
+class="tw:cursor-pointer">
             <q-tooltip data-test="dedup-info-tooltip" class="bg-grey-8">
               Alerts with deduplication configured
             </q-tooltip>
@@ -52,7 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <q-card-section class="tw:p-4">
-        <div data-test="suppression-rate-value" class="tw:text-2xl tw:font-semibold" :class="{
+        <div data-test="suppression-rate-value"
+class="tw:text-2xl tw:font-semibold"
+:class="{
           'tw:text-green-700': summary.suppression_rate > 0.5,
           'tw:text-yellow-700': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
         }">
@@ -60,7 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div data-test="suppression-rate-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Suppression Rate (24h)
-          <q-icon data-test="suppression-info-icon" name="info_outline" size="xs" class="tw:cursor-pointer">
+          <q-icon data-test="suppression-info-icon"
+name="info_outline"
+size="xs"
+class="tw:cursor-pointer">
             <q-tooltip data-test="suppression-info-tooltip" class="bg-grey-8">
               {{ summary.suppressions_total }} suppressed /
               {{ summary.suppressions_total + summary.passed_total }} total
@@ -78,11 +89,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="tw:p-4">
         <div class="tw:flex tw:items-center tw:gap-2">
           <div data-test="pending-batches-value" class="tw:text-2xl tw:font-semibold">{{ summary.pending_batches }}</div>
-          <q-icon data-test="pending-batches-icon" name="group_work" size="sm" color="amber" />
+          <q-icon data-test="pending-batches-icon"
+name="group_work"
+size="sm"
+color="amber" />
         </div>
         <div data-test="pending-batches-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Pending Batches
-          <q-icon data-test="pending-batches-info-icon" name="info_outline" size="xs" class="tw:cursor-pointer">
+          <q-icon data-test="pending-batches-info-icon"
+name="info_outline"
+size="xs"
+class="tw:cursor-pointer">
             <q-tooltip data-test="pending-batches-info-tooltip" class="bg-grey-8">
               Alerts waiting to be grouped together
             </q-tooltip>

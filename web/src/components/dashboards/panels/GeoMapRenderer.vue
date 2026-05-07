@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="padding: 5px; height: 100%; width: 100%">
-    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
+    <div ref="chartRef"
+id="chart-map"
+style="height: 100%; width: 100%"></div>
   </div>
 </template>
 
@@ -180,12 +182,12 @@ export default defineComponent({
       // Get Leaflet extension component
       // getModel and getComponent do not seem to be exported in echarts typescript
       // add the following two comments to circumvent this
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+       
       // @ts-ignore
       lmapComponent = chart?.getModel()?.getComponent("lmap");
 
       // Get the instance of Leaflet
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+       
       // @ts-ignore
       lmap = lmapComponent?.getLeaflet();
 
@@ -229,12 +231,12 @@ export default defineComponent({
         // Get Leaflet extension component
         // getModel and getComponent do not seem to be exported in echarts typescript
         // add the following two comments to circumvent this
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+         
         // @ts-ignore
         lmapComponent = chart?.getModel().getComponent("lmap");
 
         // Get the instance of Leaflet
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+         
         // @ts-ignore
         lmap = lmapComponent?.getLeaflet();
 

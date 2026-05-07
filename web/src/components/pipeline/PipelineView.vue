@@ -32,13 +32,19 @@
       />
     </template>
        <template #node-input="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="input" />
+        <CustomNode :id="id"
+:data="data"
+io_type="input" />
       </template>
       <template #node-output="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="output" />
+        <CustomNode :id="id"
+:data="data"
+io_type="output" />
       </template>
       <template #node-default="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="default" />
+        <CustomNode :id="id"
+:data="data"
+io_type="default" />
       </template>
       </VueFlow>
     </div>

@@ -31,7 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex items-center justify-center column q-pa-xl empty-container">
-      <q-icon name="info" size="48px" color="grey-5" />
+      <q-icon name="info"
+size="48px"
+color="grey-5" />
       <div class="q-mt-md text-grey-7">No DAG data available</div>
     </div>
 
@@ -50,7 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <Controls />
 
         <template #node-custom="{ data }">
-          <Handle v-if="data.hasIncoming" type="target" :position="Position.Top" class="dag-handle" />
+          <Handle v-if="data.hasIncoming"
+type="target"
+:position="Position.Top"
+class="dag-handle" />
           <div
             class="custom-node"
             :class="[
@@ -74,7 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ERR
             </q-chip>
           </div>
-          <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom" class="dag-handle" />
+          <Handle v-if="data.hasOutgoing"
+type="source"
+:position="Position.Bottom"
+class="dag-handle" />
         </template>
       </VueFlow>
     </div>

@@ -29,7 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section>
       <div class="flex justify-between items-center q-pa-none">
         <div class="flex items-center q-table__title">
-          <q-icon name="bar_chart" size="sm" class="q-mr-sm" />
+          <q-icon name="bar_chart"
+size="sm"
+class="q-mr-sm" />
           <span class="text-h6">Example of custom charts</span>
         </div>
         <q-space />
@@ -108,7 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%"
           >
             <div class="text-center">
-              <q-icon name="search_off" size="4rem" color="grey-5" />
+              <q-icon name="search_off"
+size="4rem"
+color="grey-5" />
               <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
               <div class="text-body2 text-grey-6 q-mt-sm">
                 Try searching with different keywords

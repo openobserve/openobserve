@@ -50,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right"
+max-width="220px">
             <div style="white-space: pre-wrap">
               {{ props.data.description }}
             </div>
@@ -74,7 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
         >
           <template #icon-left><q-icon :name="outlinedWarning" /></template>
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+          <q-tooltip anchor="bottom right"
+self="top right"
+max-width="220px">
             Some dynamic variables are not applied because the field is not
             present in the query's stream. Open Query Inspector to see all the
             details of the variables and queries executed to render this panel
@@ -144,7 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('EditPanel')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedEdit" size="16px"
+              ><q-icon :name="outlinedEdit"
+size="16px"
             /></template>
             {{ t("panel.editPanel") }}
           </ODropdownItem>
@@ -154,7 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('EditLayout')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedDashboardCustomize" size="16px"
+              ><q-icon :name="outlinedDashboardCustomize"
+size="16px"
             /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
@@ -164,7 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DuplicatePanel')"
           >
             <template #icon-left
-              ><q-icon name="content_copy" size="16px"
+              ><q-icon name="content_copy"
+size="16px"
             /></template>
             {{ t("panel.duplicate") }}
           </ODropdownItem>
@@ -173,7 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DeletePanel')"
           >
             <template #icon-left
-              ><q-icon name="delete_outline" size="16px"
+              ><q-icon name="delete_outline"
+size="16px"
             /></template>
             {{ t("panel.deletePanel") }}
           </ODropdownItem>
@@ -185,7 +193,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="showViewPanel = true"
           >
             <template #icon-left
-              ><q-icon name="manage_search" size="16px"
+              ><q-icon name="manage_search"
+size="16px"
             /></template>
             {{ t("panel.queryInspector") }}
           </ODropdownItem>
@@ -199,7 +208,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #icon-left
-              ><q-icon :name="outlinedFileDownload" size="16px"
+              ><q-icon :name="outlinedFileDownload"
+size="16px"
             /></template>
             {{ t("panel.downloadAsCSV") }}
           </ODropdownItem>
@@ -213,7 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #icon-left
-              ><q-icon name="data_object" size="16px"
+              ><q-icon name="data_object"
+size="16px"
             /></template>
             {{ t("panel.downloadAsJSON") }}
           </ODropdownItem>
@@ -242,7 +253,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('MovePanel')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedDriveFileMove" size="16px"
+              ><q-icon :name="outlinedDriveFileMove"
+size="16px"
             /></template>
             {{ t("panel.moveToAnotherTab") }}
           </ODropdownItem>
@@ -254,7 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('CreateAlert')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedReportProblem" size="16px"
+              ><q-icon :name="outlinedReportProblem"
+size="16px"
             /></template>
             {{ t("panel.createAlert") }}
           </ODropdownItem>

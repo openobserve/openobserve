@@ -189,7 +189,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="full-width column flex-center"
             style="height: calc(100vh - 220px); gap: 8px"
           >
-            <q-icon name="monetization_on" size="48px" color="grey-4" />
+            <q-icon name="monetization_on"
+size="48px"
+color="grey-4" />
             <div class="text-subtitle1 text-grey-7 q-mt-sm">
               {{ t("modelPricing.noModels") }}
             </div>
@@ -751,7 +753,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="exportSelected"
             >
               <template #icon-left
-                ><q-icon name="download" size="14px"
+                ><q-icon name="download"
+size="14px"
               /></template>
               {{ t("modelPricing.exportSelected", { count: selectedCount }) }}
             </OButton>
@@ -763,7 +766,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="confirmDeleteSelected"
             >
               <template #icon-left
-                ><q-icon :name="outlinedDelete" size="14px"
+                ><q-icon :name="outlinedDelete"
+size="14px"
               /></template>
               {{ t("modelPricing.deleteSelected", { count: selectedCount }) }}
             </OButton>
@@ -781,7 +785,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
-    <q-dialog v-model="showPricingDialog" position="right" maximized>
+    <q-dialog v-model="showPricingDialog"
+position="right"
+maximized>
       <div
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         class="pricing-dialog-panel"
@@ -855,7 +861,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="col-auto">
-            <OButton variant="ghost" size="icon" v-close-popup>
+            <OButton variant="ghost"
+size="icon"
+v-close-popup>
               <q-icon name="cancel" size="14px" />
             </OButton>
           </div>

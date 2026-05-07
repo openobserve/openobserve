@@ -53,7 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <q-separator />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+        <div v-for="(items, i) in refreshTimes"
+:key="'row_' + i"
+class="row">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
@@ -133,7 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <ODropdownSeparator />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
+        <div v-for="(items, i) in refreshTimes"
+:key="'row_' + i"
+class="row">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"

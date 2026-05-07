@@ -57,7 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-refresh-btn"
           >
             <template #icon-left
-              ><q-icon name="refresh" size="14px"
+              ><q-icon name="refresh"
+size="14px"
             /></template>
             {{ t("regex_patterns.refresh") }}
           </OButton>
@@ -73,10 +74,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
+      <q-icon name="error"
+size="50px"
+color="negative" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
-        <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
+        <OButton variant="ghost-primary"
+size="sm"
+@click="fetchPatterns">
           {{ t("regex_patterns.try_again") }}
         </OButton>
       </span>
@@ -125,7 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ tag }}
                   </q-chip>
-                  <q-chip v-if="pattern.tags.length > 3" size="sm" dense>
+                  <q-chip v-if="pattern.tags.length > 3"
+size="sm"
+dense>
                     +{{ pattern.tags.length - 3 }}
                   </q-chip>
                 </div>
@@ -258,7 +265,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-card-actions align="right">
           <div class="tw:flex tw:gap-2">
-            <OButton variant="outline" size="sm-action" v-close-popup>
+            <OButton variant="outline"
+size="sm-action"
+v-close-popup>
               {{ t("regex_patterns.close") }}
             </OButton>
             <OButton

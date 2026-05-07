@@ -41,19 +41,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
               class="q-mr-sm"
             >
-              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+              <OToggleGroupItem value="all"
+size="sm"
+data-test="tab-all">
                 <template #icon-left><List class="tw:size-3.5 tw:shrink-0" /></template>
                 {{ t("alerts.all") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+              <OToggleGroupItem value="scheduled"
+size="sm"
+data-test="tab-scheduled">
                 <template #icon-left><q-icon name="schedule" size="14px" /></template>
                 {{ t("alerts.scheduled") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
+              <OToggleGroupItem value="realTime"
+size="sm"
+data-test="tab-realTime">
                 <template #icon-left><q-icon name="bolt" size="14px" /></template>
                 {{ t("alerts.realTime") }}
               </OToggleGroupItem>
-              <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
+              <OToggleGroupItem v-if="isAnomalyDetectionEnabled"
+value="anomalyDetection"
+size="sm"
+data-test="tab-anomalyDetection">
                 <template #icon-left><q-icon name="query_stats" size="14px" /></template>
                 {{ t("alerts.anomalyDetection") }}
               </OToggleGroupItem>
@@ -263,7 +272,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </q-td>
 
-                    <q-td v-for="col in columns" :key="col.name"
+                    <q-td v-for="col in columns"
+:key="col.name"
 :props="props">
                       <template v-if="col.name === 'name'">
                         <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -738,7 +748,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template>
-      <q-dialog class="q-pa-md" v-model="showForm"
+      <q-dialog class="q-pa-md"
+v-model="showForm"
 persistent>
         <q-card class="clone-alert-popup tw:pt-2">
           <div class="row items-center no-wrap q-mx-md q-my-sm">

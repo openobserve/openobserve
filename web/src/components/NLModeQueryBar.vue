@@ -38,7 +38,9 @@
                 : 'o2-toggle-button-xs-light'
             "
           />
-          <img :src="nlpIcon" alt="NL Mode" class="toolbar-icon" />
+          <img :src="nlpIcon"
+alt="NL Mode"
+class="toolbar-icon" />
           <q-tooltip>{{ t('nlMode.toggle') }}</q-tooltip>
         </div>
 
@@ -111,7 +113,9 @@
         >
           <!-- Show streaming status with spinner -->
           <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
-            <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+            <img :src="nlpIcon"
+alt="AI"
+class="tw:w-[20px] tw:h-[20px]" />
             <q-spinner-dots color="primary" size="1.2em" />
             <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
@@ -127,7 +131,9 @@
             @keydown.enter="handleAIInputEnter"
           >
             <template v-slot:prepend>
-              <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+              <img :src="nlpIcon"
+alt="AI"
+class="tw:w-[20px] tw:h-[20px]" />
             </template>
           </q-input>
         </div>

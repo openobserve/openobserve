@@ -62,7 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="azure-activity-logs-deploy-btn"
           >
             <template #icon-left
-              ><q-icon name="rocket_launch" size="sm"
+              ><q-icon name="rocket_launch"
+size="sm"
             /></template>
             Deploy to Azure
           </OButton>

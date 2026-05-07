@@ -38,7 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #body-cell-alert_name="props">
         <q-td :props="props" data-test="alert-name-cell">
-          <span data-test="alert-name-text" :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
+          <span data-test="alert-name-text"
+:class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'"
+class="tw:text-xs tw:font-medium">
             {{ props.row.alert_name }}
           </span>
         </q-td>
@@ -53,7 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #body-cell-correlation_reason="props">
-        <q-td :props="props" class="tw:text-right" data-test="correlation-reason-cell">
+        <q-td :props="props"
+class="tw:text-right"
+data-test="correlation-reason-cell">
           <q-badge
             data-test="correlation-reason-badge"
             :color="getReasonColor(props.row.correlation_reason)"

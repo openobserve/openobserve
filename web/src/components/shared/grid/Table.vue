@@ -42,13 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         @click="addTicket"
       >
-        <q-icon name="add" size="14px" class="q-mr-xs" />
+        <q-icon name="add"
+size="14px"
+class="q-mr-xs" />
         {{ t(`ticket.add`) }}
       </OButton>
     </template>
 
     <template v-slot:body-cell-#="props">
-      <q-td :props="props" width="80" @click="editTicket(props)">
+      <q-td :props="props"
+width="80"
+@click="editTicket(props)">
         {{ props.value }}
       </q-td>
     </template>

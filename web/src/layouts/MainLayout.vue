@@ -112,7 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <q-dialog v-model="showGetStarted"
-maximized full-height>
+maximized
+full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
     <PredefinedThemes />

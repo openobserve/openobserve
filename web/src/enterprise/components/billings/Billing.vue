@@ -35,13 +35,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-pa-none q-mx-none tw:h-[40px] q-mt-xs"
           >
           <template v-slot:prepend>
-            <q-icon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
+            <q-icon name="schedule"
+size="xs"
+class="tw:mr-2 tw:mt-1"
+@click.stop.prevent />
           </template>
           </q-select>
         </div>
         <div class="tw:flex tw:items-center ">
           <div class="app-tabs-container tw:h-[36px] ">
-              <AppTabs class=" tabs-selection-container"  :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
+              <AppTabs class=" tabs-selection-container"
+:tabs="tabs"
+:activeTab="usageDataType"
+@update:activeTab="(value: any) => updateActiveTab(value)" />
 
           </div>
         </div>

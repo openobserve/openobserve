@@ -186,7 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon-sm"
                       @click="editFileToUpload"
-                      ><q-icon name="edit" size="16px"
+                      ><q-icon name="edit"
+size="16px"
                     /></OButton>
                   </div>
                   <div
@@ -496,7 +497,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-circle-sm"
                       :title="t('alert_templates.delete')"
                       @click="deleteApiHeader(header)"
-                      ><q-icon name="delete" size="16px"
+                      ><q-icon name="delete"
+size="16px"
                     /></OButton>
                     <OButton
                       data-test="add-action-script-add-header-btn"
@@ -505,7 +507,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
                       @click="addApiHeader()"
-                      ><q-icon name="add" size="16px"
+                      ><q-icon name="add"
+size="16px"
                     /></OButton>
                   </div>
                 </div>

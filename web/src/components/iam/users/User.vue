@@ -109,7 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-th v-for="col in props.cols"
               :class="col.classes"
               :style="col.style"
-              :key="col.name" :props="props">
+              :key="col.name"
+:props="props">
                 <span>{{ col.label }}</span>
               </q-th>
             </q-tr>
@@ -220,7 +221,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
+          <OButton v-close-popup="true"
+variant="outline"
+size="sm-action">
             {{ t("user.cancel") }}
           </OButton>
           <OButton
@@ -243,7 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
+          <OButton v-close-popup="true"
+variant="outline"
+size="sm-action">
             {{ t("user.cancel") }}
           </OButton>
           <OButton
@@ -266,7 +271,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
+          <OButton v-close-popup="true"
+variant="outline"
+size="sm-action">
             Cancel
           </OButton>
           <OButton

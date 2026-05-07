@@ -7,7 +7,9 @@
       data-test="dashboard-drilldown-help-btn"
     >
       <template #icon-left><q-icon name="help_outline" /></template>
-      <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
+      <q-tooltip class="bg-grey-8"
+anchor="bottom middle"
+self="top middle">
         User Guide
       </q-tooltip>
     </OButton>

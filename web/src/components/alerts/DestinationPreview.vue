@@ -35,7 +35,9 @@ limitations under the License.
 
       <q-card-section class="preview-container">
         <!-- Slack Preview -->
-        <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message">
+        <div v-if="type === 'slack'"
+data-test="slack-preview"
+class="slack-message">
           <div class="slack-message-container">
             <div class="slack-avatar">
               <div class="avatar-circle">OO</div>
@@ -77,7 +79,9 @@ limitations under the License.
         </div>
 
         <!-- MS Teams Preview -->
-        <div v-if="type === 'msteams'" data-test="msteams-preview" class="teams-card">
+        <div v-if="type === 'msteams'"
+data-test="msteams-preview"
+class="teams-card">
           <div data-test="msteams-card-content" class="teams-card-content">
             <div class="teams-header">
               <div class="teams-title">🚨 Alert: High CPU Usage</div>
@@ -116,7 +120,9 @@ limitations under the License.
         </div>
 
         <!-- Email Preview -->
-        <div v-if="type === 'email'" data-test="email-preview" class="email-client">
+        <div v-if="type === 'email'"
+data-test="email-preview"
+class="email-client">
           <div class="email-header">
             <div data-test="email-subject" class="email-subject">
               Subject: 🚨 OpenObserve Alert Notification
@@ -166,7 +172,9 @@ limitations under the License.
         </div>
 
         <!-- PagerDuty Preview -->
-        <div v-if="type === 'pagerduty'" data-test="pagerduty-preview" class="pagerduty-incident">
+        <div v-if="type === 'pagerduty'"
+data-test="pagerduty-preview"
+class="pagerduty-incident">
           <div class="pagerduty-header">
             <div class="pagerduty-title">PagerDuty Incident</div>
             <div class="pagerduty-status">Triggered</div>
@@ -194,7 +202,9 @@ limitations under the License.
         </div>
 
         <!-- ServiceNow Preview -->
-        <div v-if="type === 'servicenow'" data-test="servicenow-preview" class="servicenow-incident">
+        <div v-if="type === 'servicenow'"
+data-test="servicenow-preview"
+class="servicenow-incident">
           <div class="servicenow-header">
             <div class="servicenow-title">ServiceNow Incident</div>
             <div class="servicenow-number">INC0000123</div>
@@ -226,7 +236,9 @@ limitations under the License.
         </div>
 
         <!-- Opsgenie Preview -->
-        <div v-if="type === 'opsgenie'" data-test="opsgenie-preview" class="opsgenie-alert">
+        <div v-if="type === 'opsgenie'"
+data-test="opsgenie-preview"
+class="opsgenie-alert">
           <div class="opsgenie-header">
             <div class="opsgenie-title">Opsgenie Alert</div>
             <div class="opsgenie-priority">P3</div>

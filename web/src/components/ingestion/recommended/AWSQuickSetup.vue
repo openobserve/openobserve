@@ -73,16 +73,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
             />
             <div class="step-label">Select services to monitor</div>
-            <q-chip dense color="primary" text-color="white" size="sm">
+            <q-chip dense
+color="primary"
+text-color="white"
+size="sm">
               {{ enabledServices.length }} /
               {{ QUICK_SETUP_SERVICES.length }} selected
             </q-chip>
           </div>
           <div class="tw:flex tw:gap-2" @click.stop>
-            <OButton variant="ghost-primary" size="xs" @click="selectAll"
+            <OButton variant="ghost-primary"
+size="xs"
+@click="selectAll"
               >Select all</OButton
             >
-            <OButton variant="ghost-primary" size="xs" @click="deselectAll"
+            <OButton variant="ghost-primary"
+size="xs"
+@click="deselectAll"
               >Deselect all</OButton
             >
           </div>
@@ -254,7 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template #icon-left
-            ><q-icon name="cloud_upload" size="sm"
+            ><q-icon name="cloud_upload"
+size="sm"
           /></template>
           {{
             deploymentMode === "single"

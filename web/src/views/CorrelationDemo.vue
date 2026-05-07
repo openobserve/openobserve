@@ -107,7 +107,9 @@
         <!-- Fallback when panel is closed -->
         <q-card v-if="!showCorrelation">
           <q-card-section class="text-center q-pa-lg">
-            <q-icon name="info" size="lg" color="grey-5" />
+            <q-icon name="info"
+size="lg"
+color="grey-5" />
             <div class="text-grey-6 q-mt-md">
               Click a log line to see related telemetry
             </div>
@@ -122,7 +124,9 @@
         <q-card-section class="row items-center">
           <div class="text-h6">Generated Query</div>
           <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
+          <OButton variant="ghost"
+size="icon"
+v-close-popup>
             <q-icon name="close" size="14px" />
           </OButton>
         </q-card-section>
@@ -138,7 +142,9 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
+          <OButton variant="outline"
+size="sm-action"
+v-close-popup>
             Close
           </OButton>
         </q-card-actions>

@@ -8,7 +8,9 @@
       data-test="cross-link-help-btn"
     >
       <HelpCircle class="tw:size-4" />
-      <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
+      <q-tooltip class="bg-grey-8"
+anchor="bottom middle"
+self="top middle">
         {{ t("crossLinks.userGuide") }}
       </q-tooltip>
     </OButton>

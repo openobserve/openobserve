@@ -23,7 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     style="min-height: inherit"
   >
-    <div :style="{ marginTop: 0 }" class="app-table-container" style="height: calc(100vh - var(--navbar-height) - 15px)">
+    <div :style="{ marginTop: 0 }"
+class="app-table-container"
+style="height: calc(100vh - var(--navbar-height) - 15px)">
       <div class="card-container tw:mb-[0.625rem]">
         <div class="q-px-md q-py-sm">
           <div
@@ -102,7 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               >
                 <template #prepend>
-                  <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                  <q-icon name="search"
+class="cursor-pointer o2-search-input-icon"
+:class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                 </template>
               </q-input>
               <q-select
@@ -348,7 +352,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="expandedRow === props.row.uuid"
             :props="props"
           >
-            <q-td v-for="col in props.cols" :key="col.name" :props="props">
+            <q-td v-for="col in props.cols"
+:key="col.name"
+:props="props">
               <template v-if="col.name == 'role_name'">
                 <div style="padding-left: 20px">
                   {{ row["module_name"] }}

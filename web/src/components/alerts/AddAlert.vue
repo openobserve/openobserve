@@ -55,7 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ anomalyConfig.name }}
                 <q-tooltip v-if="anomalyConfig.name?.length > 24" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
               </span>
-              <q-badge v-if="anomalyConfig.status" :color="anomalyStatusColor" :label="anomalyConfig.status" class="text-caption" />
+              <q-badge v-if="anomalyConfig.status"
+:color="anomalyStatusColor"
+:label="anomalyConfig.status"
+class="text-caption" />
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="tw:text-[11px] tw:whitespace-nowrap"
@@ -63,7 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
               </span>
-              <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain">
+              <OButton v-if="anomalyConfig.status === 'failed'"
+variant="ghost-destructive"
+size="xs"
+:loading="anomalyRetraining"
+@click="anomalyTriggerRetrain">
                   <template #icon-left><q-icon name="replay" /></template>
                   {{ t('alerts.retry') }}
                 </OButton>
@@ -226,7 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
 
         <!-- Tab Content -->
-        <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
+        <q-form ref="addAlertForm"
+class="tw:flex-1 tw:overflow-auto"
+@submit="onSubmit">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
           <div v-show="activeTab === 'condition'" class="tw:flex tw:flex-col tw:gap-4">
             <div>
@@ -380,7 +389,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
-              <q-icon :name="activeEvaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="16px" />
+              <q-icon :name="activeEvaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
+:color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'"
+size="16px" />
               <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
@@ -389,11 +400,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw:flex-1 tw:min-h-0" style="overflow: hidden;">
             <template v-if="isAnomalyMode">
-              <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" style="height: 100%" />
+              <QueryEditor editor-id="anomaly-sql-preview"
+language="sql"
+:read-only="true"
+:show-auto-complete="false"
+:hide-nl-toggle="true"
+:query="anomalyPreviewSql"
+style="height: 100%" />
             </template>
             <template v-else>
               <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
-                <q-icon name="query_stats" size="36px" class="tw:opacity-20" />
+                <q-icon name="query_stats"
+size="36px"
+class="tw:opacity-20" />
                 <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
                   {{ t('alerts.previewEmptyState') }}
                 </span>

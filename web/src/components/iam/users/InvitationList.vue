@@ -110,7 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
+          <OButton v-close-popup="true"
+variant="outline"
+size="sm-action">
             {{ t("invitation.cancel") }}
           </OButton>
           <OButton
@@ -139,7 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
+          <OButton v-close-popup="true"
+variant="outline"
+size="sm-action">
             {{ t("invitation.cancel") }}
           </OButton>
           <OButton

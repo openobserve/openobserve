@@ -51,9 +51,13 @@
 
       <!-- Group content -->
 
-      <div v-if="isOpen" class="tw:overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
+      <div v-if="isOpen"
+class="tw:overflow-x-auto group-container"
+:class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
         <!-- Items in group (V2 uses 'conditions' array) -->
-        <div class="tw:ml-2 tw:whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
+        <div class="tw:ml-2 tw:whitespace-nowrap "
+v-for="(item, index) in props.group.conditions"
+:key="index">
           <FilterGroup
             v-if="isGroup(item)"
             :group="item"
@@ -85,7 +89,10 @@
                 :allow-custom-columns="props.allowCustomColumns"
                 :module="props.module"
             />
-                <OButton data-test="alert-conditions-delete-condition-btn" size="icon-xs-circle" variant="ghost" @click="removeCondition(item.id)">
+                <OButton data-test="alert-conditions-delete-condition-btn"
+size="icon-xs-circle"
+variant="ghost"
+@click="removeCondition(item.id)">
                   <q-icon name="close" />
                 </OButton>
                 </div>
@@ -101,7 +108,11 @@
             variant="ghost-primary"
             @click="addCondition(props.group.groupId)"
             >
-            <q-icon color="primary" class="q-mr-xs text-bold" size="10px" style="border-radius: 50%;  border: 1px solid;" name="add" />
+            <q-icon color="primary"
+class="q-mr-xs text-bold"
+size="10px"
+style="border-radius: 50%;  border: 1px solid;"
+name="add" />
             <span class="tw:text-[12px]">Condition</span>
             <q-tooltip :delay="300">
               {{ t('alerts.conditions.addConditionTooltip') }}
@@ -115,7 +126,11 @@
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             >
-            <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
+            <q-icon color="primary"
+class="q-mr-xs text-bold"
+size="12px"
+style="border-radius: 50%;  border: 1px solid;"
+name="add" />
             <span class="text-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <q-tooltip v-if="depth < 2" :delay="300">
               {{ t('alerts.conditions.addConditionGroupTooltip') }}
@@ -131,7 +146,10 @@
             variant="ghost-primary"
             @click="reorderItems()"
             >
-            <q-icon color="primary" class="q-mr-xs text-bold" size="12px" name="swap_vert" />
+            <q-icon color="primary"
+class="q-mr-xs text-bold"
+size="12px"
+name="swap_vert" />
             <span class="text-bold">Reorder</span>
             <q-tooltip :delay="300">
               Reorder items: Conditions first, then Groups

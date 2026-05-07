@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="running-queries-page q-pt-md q-px-md" v-if="isMetaOrg" style="min-height: 95vh;">
+  <div class="running-queries-page q-pt-md q-px-md"
+v-if="isMetaOrg"
+style="min-height: 95vh;">
     <div class="flex justify-between items-center full-width">
       <div class="text-h6 q-my-xs" data-test="log-stream-title-text">
         {{ t("queries.runningQueries") }}
@@ -66,7 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="running-queries-search-input"
           >
             <template #prepend>
-              <q-icon name="search" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+              <q-icon name="search"
+class="o2-search-input-icon"
+:class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
             </template>
           </q-input>
           <div v-else class=" o2-select-input o2-input ">

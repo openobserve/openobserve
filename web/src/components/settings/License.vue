@@ -80,7 +80,10 @@
           <q-card>
             <q-card-section>
               <div class="text-h6 q-mb-md">{{ t("about.license_info") }}</div>
-              <q-markup-table flat bordered dense class="compact-table">
+              <q-markup-table flat
+bordered
+dense
+class="compact-table">
                 <tbody>
                   <tr>
                     <td class="text-weight-bold">
@@ -254,7 +257,9 @@
                 <div class="summary-text-compact text-body2">
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                    <q-icon name="info" size="18px" class="tw:flex-shrink-0" />
+                    <q-icon name="info"
+size="18px"
+class="tw:flex-shrink-0" />
                     <span
                       v-html="
                         DOMPurify.sanitize(
@@ -405,7 +410,9 @@
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">{{ t("about.license_key") }}</div>
           <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
+          <OButton variant="ghost"
+size="icon"
+v-close-popup>
             <q-icon name="close" size="14px" />
           </OButton>
         </q-card-section>

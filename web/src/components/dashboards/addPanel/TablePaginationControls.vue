@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="row items-center" data-test="dashboard-table-pagination-controls">
     <!-- Records per page dropdown: only when pagination is enabled -->
     <div v-if="showPagination" class="row items-center q-gutter-sm">
-      <span class="text-caption" data-test="dashboard-table-rows-per-page-label"
+      <span class="text-caption"
+data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
       <q-select

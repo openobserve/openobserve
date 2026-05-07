@@ -40,7 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-toggle>
       </div>
-      <ODropdown v-model:open="functionModel" side="bottom" align="start">
+      <ODropdown v-model:open="functionModel"
+side="bottom"
+align="start">
         <template #trigger>
           <OButton
             data-test="logs-search-bar-function-dropdown"
@@ -53,8 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               alt="Transform"
               class="tw:size-4"
             />
-            <q-icon v-else :name="transformIcon" size="16px" />
-            <q-icon name="arrow_drop_down" size="18px" class="tw:ms-0.5" />
+            <q-icon v-else
+:name="transformIcon"
+size="16px" />
+            <q-icon name="arrow_drop_down"
+size="18px"
+class="tw:ms-0.5" />
             <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
               transformsLabel
             }}</q-tooltip>

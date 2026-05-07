@@ -163,7 +163,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="delete" size="14px" />
             </OButton>
           </div>
-          <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addHeader">
+          <OButton variant="ghost"
+size="sm"
+class="tw:mb-4"
+@click="addHeader">
             <template #icon-left><q-icon name="add" size="14px" /></template>
             {{ t("aiToolset.addHeader") }}
           </OButton>
@@ -292,7 +295,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="delete" size="14px" />
             </OButton>
           </div>
-          <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addEnvVar">
+          <OButton variant="ghost"
+size="sm"
+class="tw:mb-4"
+@click="addEnvVar">
             <template #icon-left><q-icon name="add" size="14px" /></template>
             {{ t("aiToolset.addEnvVar") }}
           </OButton>

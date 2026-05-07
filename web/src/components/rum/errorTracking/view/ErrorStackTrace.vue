@@ -60,7 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pretty formatted view -->
         <OTabPanel name="pretty">
-          <PrettyStackTrace v-if="activeTab === 'pretty'" :error_stack="error_stack" :error="error" />
+          <PrettyStackTrace v-if="activeTab === 'pretty'"
+:error_stack="error_stack"
+:error="error" />
         </OTabPanel>
       </OTabPanels>
     </div>

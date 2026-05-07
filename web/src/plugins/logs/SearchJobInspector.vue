@@ -33,9 +33,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-gray-50 tw:border-gray-200'
               ]"
             >
-              <svg class="tw:w-[14px] tw:h-[14px] tw:opacity-70" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="6" width="18" height="14" rx="2" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2"/>
-                <path d="M3 10h18M8 3v4M16 3v4" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2" stroke-linecap="round"/>
+              <svg class="tw:w-[14px] tw:h-[14px] tw:opacity-70"
+viewBox="0 0 24 24"
+fill="none"
+xmlns="http://www.w3.org/2000/svg">
+                <rect x="3"
+y="6"
+width="18"
+height="14"
+rx="2"
+:stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'"
+stroke-width="2"/>
+                <path d="M3 10h18M8 3v4M16 3v4"
+:stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'"
+stroke-width="2"
+stroke-linecap="round"/>
               </svg>
               <div class="tw:flex tw:items-center tw:gap-1.5">
                 <span
@@ -93,7 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
                   style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
                 >
-                  <img src="@/assets/images/home/records.svg" alt="Results Icon" class="tw:h-6 tw:w-6" />
+                  <img src="@/assets/images/home/records.svg"
+alt="Results Icon"
+class="tw:h-6 tw:w-6" />
                 </div>
               </div>
               <div class="tw:flex tw:flex-col tw:gap-1">
@@ -130,7 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
                   style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
                 >
-                  <img src="@/assets/images/home/streams.svg" alt="Events Icon" class="tw:h-6 tw:w-6" />
+                  <img src="@/assets/images/home/streams.svg"
+alt="Events Icon"
+class="tw:h-6 tw:w-6" />
                 </div>
               </div>
               <div class="tw:flex tw:flex-col tw:gap-1">
@@ -167,9 +183,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
                   style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35);"
                 >
-                  <svg class="tw:h-6 tw:w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="9" :stroke="store.state.theme === 'dark' ? '#10B981' : '#059669'" stroke-width="2"/>
-                    <path d="M12 6v6l4 2" :stroke="store.state.theme === 'dark' ? '#10B981' : '#059669'" stroke-width="2" stroke-linecap="round"/>
+                  <svg class="tw:h-6 tw:w-6"
+viewBox="0 0 24 24"
+fill="none"
+xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12"
+cy="12"
+r="9"
+:stroke="store.state.theme === 'dark' ? '#10B981' : '#059669'"
+stroke-width="2"/>
+                    <path d="M12 6v6l4 2"
+:stroke="store.state.theme === 'dark' ? '#10B981' : '#059669'"
+stroke-width="2"
+stroke-linecap="round"/>
                   </svg>
                 </div>
               </div>
@@ -207,9 +233,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
                   style="background: rgba(242, 220, 245, 0.25); border-color: rgba(242, 220, 245, 0.45);"
                 >
-                  <svg class="tw:h-6 tw:w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7 8h10M7 12h10M7 16h6" :stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'" stroke-width="2" stroke-linecap="round"/>
-                    <rect x="3" y="4" width="18" height="16" rx="2" :stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'" stroke-width="2"/>
+                  <svg class="tw:h-6 tw:w-6"
+viewBox="0 0 24 24"
+fill="none"
+xmlns="http://www.w3.org/2000/svg">
+                    <path d="M7 8h10M7 12h10M7 16h6"
+:stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'"
+stroke-width="2"
+stroke-linecap="round"/>
+                    <rect x="3"
+y="4"
+width="18"
+height="16"
+rx="2"
+:stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'"
+stroke-width="2"/>
                   </svg>
                 </div>
               </div>
@@ -239,8 +277,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border tw:mb-2"
                 style="background: rgba(245, 235, 147, 0.25); border-color: rgba(245, 235, 147, 0.45);"
               >
-                <svg class="tw:h-7 tw:w-7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" :stroke="store.state.theme === 'dark' ? '#FDE68A' : '#CA8A04'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg class="tw:h-7 tw:w-7"
+viewBox="0 0 24 24"
+fill="none"
+xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
+:stroke="store.state.theme === 'dark' ? '#FDE68A' : '#CA8A04'"
+stroke-width="2"
+stroke-linecap="round"
+stroke-linejoin="round"/>
                 </svg>
               </div>
               <div
@@ -358,7 +403,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <q-dialog v-model="showSqlDialog" position="right" full-height maximized>
+    <q-dialog v-model="showSqlDialog"
+position="right"
+full-height
+maximized>
       <q-card style="width: 600px; max-width: 80vw;">
         <q-card-section class="row items-center q-pb-none tw:justify-between tw:mb-2">
           <div class="text-h6">SQL Query</div>
@@ -374,7 +422,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <component :is="copiedSql ? Check : Copy" :size="14" />
               <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
             </OButton>
-            <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>
+            <OButton variant="ghost"
+size="icon-sm"
+v-close-popup><X :size="16" /></OButton>
           </div>
         </q-card-section>
 
@@ -393,7 +443,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">Full Trace ID</div>
           <q-space />
-          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>
+          <OButton variant="ghost"
+size="icon-sm"
+v-close-popup><X :size="16" /></OButton>
         </q-card-section>
 
         <q-card-section>

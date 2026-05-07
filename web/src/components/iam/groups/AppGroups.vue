@@ -113,7 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
     </div>
-    <q-dialog v-model="showAddGroup" position="right" full-height maximized>
+    <q-dialog v-model="showAddGroup"
+position="right"
+full-height
+maximized>
       <AddGroup
         style="width: 30vw"
         :org_identifier="store.state.selectedOrganization.identifier"

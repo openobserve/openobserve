@@ -46,7 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Empty State -->
     <div v-else-if="services.length === 0" class="tw:text-center tw:py-8">
-      <q-icon name="search_off" size="3rem" color="grey-5" class="tw:mb-4" />
+      <q-icon name="search_off"
+size="3rem"
+color="grey-5"
+class="tw:mb-4" />
       <div class="text-body1">
         {{ t("settings.correlation.noServicesYet") }}
       </div>
@@ -267,7 +270,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-else class="telemetry-slot-empty"></span>
                   </div>
                 </q-td>
-                <q-td key="last_seen" :props="props" class="td-last-seen">
+                <q-td key="last_seen"
+:props="props"
+class="td-last-seen">
                   <span class="tw:text-sm last-seen-text">{{
                     formatRelativeTime(props.row.lastSeen)
                   }}</span>
@@ -363,7 +368,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-td>
 
                   <!-- Last seen cell: right-aligned to match group header -->
-                  <q-td key="last_seen" :props="props" class="td-last-seen">
+                  <q-td key="last_seen"
+:props="props"
+class="td-last-seen">
                     <span class="tw:text-xs last-seen-text">{{
                       formatRelativeTime(instance.last_seen)
                     }}</span>
@@ -431,7 +438,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="set-id-badge">{{ selectedService?.set_id }}</span>
           </div>
           <span class="tw:shrink-0">
-            <OButton variant="ghost" size="icon" v-close-popup>
+            <OButton variant="ghost"
+size="icon"
+v-close-popup>
               <q-icon name="close" size="14px" />
             </OButton>
           </span>

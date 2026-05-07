@@ -64,7 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>&nbsp;</span>
 
           <!-- select folder or create new folder and select -->
-          <SelectFolderDropDown :type="type" @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
+          <SelectFolderDropDown :type="type"
+@folder-selected="selectedFolder = $event"
+:activeFolderId="activeFolderId"/>
 
           <div class="flex justify-center q-mt-lg tw:gap-2">
             <OButton

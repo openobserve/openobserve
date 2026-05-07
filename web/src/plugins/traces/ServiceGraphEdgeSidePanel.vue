@@ -26,7 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="panel-title">
           <h2 class="edge-name" data-test="service-graph-edge-side-panel-route">
             <span class="from-service">{{ selectedEdge?.from }}</span>
-            <q-icon name="arrow_forward" size="14px" class="edge-arrow" />
+            <q-icon name="arrow_forward"
+size="14px"
+class="edge-arrow" />
             <span class="to-service">{{ selectedEdge?.to }}</span>
             <span class="health-badge" :class="edgeHealth.status">
               {{ edgeHealth.text }}
@@ -201,7 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Empty -->
           <div v-else-if="!trendData || !trendDataPoints.length" class="trend-state trend-empty">
-            <q-icon name="show_chart" size="24px" class="trend-empty-icon" />
+            <q-icon name="show_chart"
+size="24px"
+class="trend-empty-icon" />
             <span>No data available</span>
           </div>
 

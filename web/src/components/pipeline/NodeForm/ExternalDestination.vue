@@ -30,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 External Destination
                 <div>
-                  <OButton variant="ghost" size="icon" v-close-popup>
+                  <OButton variant="ghost"
+size="icon"
+v-close-popup>
                     <q-icon name="cancel" size="14px" />
                   </OButton>
                 </div>

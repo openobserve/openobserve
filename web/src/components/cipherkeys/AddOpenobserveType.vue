@@ -31,14 +31,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         :rules="[(val: any) => !!val || 'Secret is required']"
       />
-      <OButton data-test="add-cipher-key-openobserve-secret-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false">{{ t('common.cancel') }}</OButton>
+      <OButton data-test="add-cipher-key-openobserve-secret-input-cancel"
+variant="outline"
+size="sm-action"
+class="q-mt-sm"
+v-if="formData.isUpdate && formData.key.store.local != ''"
+@click="isUpdate = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
       <label class="row q-field q-mb-md">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
       <pre class="pre-text">{{ formData.key.store.local }}</pre>
-      <OButton data-test="add-cipher-key-openobserve-secret-input-update" variant="primary" size="sm-action" @click="isUpdate = true">{{ t('common.update') }}</OButton>
+      <OButton data-test="add-cipher-key-openobserve-secret-input-update"
+variant="primary"
+size="sm-action"
+@click="isUpdate = true">{{ t('common.update') }}</OButton>
     </div>
   </div>
 </template>

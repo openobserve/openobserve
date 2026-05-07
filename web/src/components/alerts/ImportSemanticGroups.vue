@@ -80,17 +80,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container q-pa-sm q-mb-sm">
             <div class="row items-center q-col-gutter-sm">
               <div class="col-auto">
-                <q-chip dense color="positive" text-color="white" class="summary-chip">
+                <q-chip dense
+color="positive"
+text-color="white"
+class="summary-chip">
                   <strong>{{ diffData.additions.length }}</strong>&nbsp;New
                 </q-chip>
               </div>
               <div class="col-auto">
-                <q-chip dense color="warning" text-color="white" class="summary-chip">
+                <q-chip dense
+color="warning"
+text-color="white"
+class="summary-chip">
                   <strong>{{ diffData.modifications.length }}</strong>&nbsp;Modified
                 </q-chip>
               </div>
               <div class="col-auto">
-                <q-chip dense color="grey-6" text-color="white" class="summary-chip">
+                <q-chip dense
+color="grey-6"
+text-color="white"
+class="summary-chip">
                   {{ diffData.unchanged.length }} Unchanged
                 </q-chip>
               </div>
@@ -124,7 +133,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="add_circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
               </div>
-              <q-list dense bordered separator class="compact-list">
+              <q-list dense
+bordered
+separator
+class="compact-list">
                 <q-item
                   v-for="group in diffData.additions"
                   :key="group.id"
@@ -146,7 +158,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-label class="text-weight-medium">{{ group.display }}</q-item-label>
                     <q-item-label caption lines="1">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <q-badge v-if="group.normalize" color="blue" label="norm" class="q-ml-xs" />
+                      <q-badge v-if="group.normalize"
+color="blue"
+label="norm"
+class="q-ml-xs" />
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
@@ -168,7 +183,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
               </div>
-              <q-list dense bordered separator class="compact-list">
+              <q-list dense
+bordered
+separator
+class="compact-list">
                 <q-item
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
@@ -213,7 +231,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="check_circle"
                 header-class="text-grey-7 q-pa-xs"
               >
-                <q-list dense bordered separator class="compact-list">
+                <q-list dense
+bordered
+separator
+class="compact-list">
                   <q-item
                     v-for="group in diffData.unchanged"
                     :key="group.id"
@@ -233,7 +254,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- No Diff State -->
         <div v-else-if="!isImporting && !diffData" class="card-container q-pa-lg text-center">
-          <q-icon name="cloud_upload" size="64px" color="grey-5" class="q-mb-md" />
+          <q-icon name="cloud_upload"
+size="64px"
+color="grey-5"
+class="q-mb-md" />
           <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file to get started</div>
           <div class="text-body2 text-grey-6">
             The system will analyze the file and show you what will change
@@ -266,13 +290,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ field }}
         </q-chip>
         <div class="q-mt-md">
-          <q-badge v-if="selectedGroup?.normalize" color="blue" label="Normalized" />
-          <q-badge v-else color="grey" label="Not Normalized" />
+          <q-badge v-if="selectedGroup?.normalize"
+color="blue"
+label="Normalized" />
+          <q-badge v-else
+color="grey"
+label="Not Normalized" />
         </div>
       </q-card-section>
 
       <q-card-actions align="right">
-        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
+        <OButton variant="ghost-primary"
+size="sm"
+v-close-popup>Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -319,7 +349,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ma-xs"
               >
                 {{ field }}
-                <q-icon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
+                <q-icon v-if="isNewField(field)"
+name="add"
+size="xs"
+class="q-ml-xs" />
               </q-chip>
             </div>
           </div>
@@ -327,7 +360,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
+        <OButton variant="ghost-primary"
+size="sm"
+v-close-popup>Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>

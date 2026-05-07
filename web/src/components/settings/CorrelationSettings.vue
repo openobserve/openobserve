@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw:px-4 tw:flex tw:justify-start">
-        <OTabs v-model="activeTab" dense @update:model-value="onTabChange">
+        <OTabs v-model="activeTab"
+dense
+@update:model-value="onTabChange">
           <OTab
             name="services"
             :label="t('settings.correlation.discoveredServicesTab')"

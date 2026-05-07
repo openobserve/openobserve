@@ -44,12 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="stats-grid">
               <div class="stat-card stat-card-commit" :class="store.state.theme === 'dark' ? 'stat-card-commit-dark' : 'stat-card-commit-light'">
-                <q-icon name="code" size="32px" class="stat-icon" />
+                <q-icon name="code"
+size="32px"
+class="stat-icon" />
                 <div class="stat-label">{{ t("about.commit_lbl") }}</div>
                 <div class="stat-value tw:font-mono">{{ store.state.zoConfig.commit_hash }}</div>
               </div>
               <div class="stat-card stat-card-built" :class="store.state.theme === 'dark' ? 'stat-card-built-dark' : 'stat-card-built-light'">
-                <q-icon name="event" size="32px" class="stat-icon" />
+                <q-icon name="event"
+size="32px"
+class="stat-icon" />
                 <div class="stat-label">{{ t("about.build_lbl") }}</div>
                 <div class="stat-value">{{ formatDate(store.state.zoConfig.build_date) }}</div>
               </div>
@@ -78,7 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 target="_blank"
                 class="link-badge"
               >
-                <q-icon name="settings" size="16px" class="tw:mr-1" />
+                <q-icon name="settings"
+size="16px"
+class="tw:mr-1" />
                 Cargo.toml
               </a>
               <a
@@ -89,12 +95,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="backpack" class="tw:mr-1" />
                 package.json
               </a>
-              <a href="https://npmjs.com" target="_blank" class="link-badge">
-                <q-icon name="javascript" size="16px" class="tw:mr-1" />
+              <a href="https://npmjs.com"
+target="_blank"
+class="link-badge">
+                <q-icon name="javascript"
+size="16px"
+class="tw:mr-1" />
                 npmjs.com
               </a>
-              <a href="https://crates.io" target="_blank" class="link-badge">
-                <q-icon name="inventory_2" size="16px" class="tw:mr-1" />
+              <a href="https://crates.io"
+target="_blank"
+class="link-badge">
+                <q-icon name="inventory_2"
+size="16px"
+class="tw:mr-1" />
                 crates.io
               </a>
             </div>
@@ -125,7 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:mt-4 tw:p-3 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-blue-400' : 'tw:bg-blue-500'">
               <p class="tw:text-sm tw:mb-0">
-                <q-icon name="info" size="16px" class="tw:mr-1" />
+                <q-icon name="info"
+size="16px"
+class="tw:mr-1" />
                 {{ t("about.license_info_note") }}
               </p>
             </div>
@@ -148,12 +164,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </p>
             </div>
             <div class="tw:flex tw:flex-wrap tw:gap-2">
-              <a href="https://github.com/openobserve/openobserve" target="_blank" class="link-badge">
-                <q-icon name="code" size="16px" class="tw:mr-1" />
+              <a href="https://github.com/openobserve/openobserve"
+target="_blank"
+class="link-badge">
+                <q-icon name="code"
+size="16px"
+class="tw:mr-1" />
                 GitHub
               </a>
-              <a href="https://openobserve.ai" target="_blank" class="link-badge">
-                <q-icon name="language" size="16px" class="tw:mr-1" />
+              <a href="https://openobserve.ai"
+target="_blank"
+class="link-badge">
+                <q-icon name="language"
+size="16px"
+class="tw:mr-1" />
                 Website
               </a>
             </div>
@@ -184,7 +208,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div v-else-if="!licenseData || !licenseData.license" class="tw:py-4">
               <div class="tw:flex tw:items-start tw:gap-3 tw:p-4 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-yellow-400' : 'tw:bg-yellow-500'">
-                <q-icon name="warning" size="24px" class="tw:text-yellow-500" />
+                <q-icon name="warning"
+size="24px"
+class="tw:text-yellow-500" />
                 <div>
                   <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
                   <p class="tw:text-sm tw:mb-2 tw:opacity-80">
@@ -200,7 +226,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else>
               <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
                 <div>
-                  <q-markup-table flat bordered dense class="compact-table">
+                  <q-markup-table flat
+bordered
+dense
+class="compact-table">
                     <tbody>
                       <tr>
                         <td class="tw:font-semibold">{{ t("about.lincese_id_lbl") }}</td>
@@ -231,7 +260,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div>
-                  <q-markup-table flat bordered dense class="compact-table">
+                  <q-markup-table flat
+bordered
+dense
+class="compact-table">
                     <thead>
                       <tr>
                         <th colspan="2" class="tw:text-center tw:font-semibold">{{ t("about.usage_limits") }}</th>

@@ -109,7 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-circle-sm"
                   :title="t('alerts.edit')"
                   @click="showAddUpdateFn(props)"
-                  ><q-icon name="edit" size="16px"
+                  ><q-icon name="edit"
+size="16px"
                 /></OButton>
                 <OButton
                   :data-test="`alert-list-${props.row.name}-delete-alert`"
@@ -117,7 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-circle-sm"
                   :title="t('alerts.delete')"
                   @click="showDeleteDialogFn(props)"
-                  ><q-icon :name="outlinedDelete" size="16px"
+                  ><q-icon :name="outlinedDelete"
+size="16px"
                 /></OButton>
               </q-td>
             </template>
@@ -220,7 +222,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
     <template>
-      <q-dialog class="q-pa-md" v-model="showForm" persistent>
+      <q-dialog class="q-pa-md"
+v-model="showForm"
+persistent>
         <q-card class="clone-alert-popup">
           <div class="row items-center no-wrap q-mx-md q-my-sm">
             <div class="flex items-center">

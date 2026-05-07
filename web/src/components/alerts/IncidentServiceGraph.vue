@@ -67,7 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
       class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3 tw-h-full"
     >
-      <q-icon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
+      <q-icon name="hub"
+size="48px"
+:class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
       <div class="tw-text-center">
         <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
           Service Graph Unavailable

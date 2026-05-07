@@ -114,7 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   </div>
   </div>
-  <q-dialog v-model="showAddGroup" position="right" full-height maximized>
+  <q-dialog v-model="showAddGroup"
+position="right"
+full-height
+maximized>
     <AddRole
       style="width: 30vw"
       @cancel:hideform="hideForm"

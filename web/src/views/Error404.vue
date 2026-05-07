@@ -25,7 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <circle cx="100" cy="100" r="90" class="error-404-circle" />
+          <circle cx="100"
+cy="100"
+r="90"
+class="error-404-circle" />
           <text
             x="100"
             y="115"

@@ -121,7 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw-rounded tw-border tw-border-solid tw-border-negative tw-px-3 tw-py-2 tw-flex tw-gap-3 tw-items-start"
               :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'"
             >
-              <q-icon name="warning" color="negative" size="sm" class="tw-mt-[2px] tw-flex-shrink-0" />
+              <q-icon name="warning"
+color="negative"
+size="sm"
+class="tw-mt-[2px] tw-flex-shrink-0" />
               <div>
                 <div class="text-weight-bold text-negative">{{ t("search.patternAnomalyDetected") }}</div>
                 <div

@@ -117,7 +117,9 @@
               style="width: 120px"
             >
               <template v-slot:append>
-                <q-icon name="info" size="16px" class="cursor-pointer">
+                <q-icon name="info"
+size="16px"
+class="cursor-pointer">
                   <q-tooltip
                     class="bg-grey-8"
                     anchor="top middle"

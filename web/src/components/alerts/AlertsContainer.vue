@@ -1,6 +1,8 @@
 <template>
     <div data-test="alerts-container">
-      <div data-test="alerts-container-header" class="tw:flex tw:justify-between cursor-pointer" @click="expanded = !expanded">
+      <div data-test="alerts-container-header"
+class="tw:flex tw:justify-between cursor-pointer"
+@click="expanded = !expanded">
         <div class="tw:flex tw:items-start tw:justify-between full-width ">
 
           <div
@@ -34,7 +36,8 @@
           />
           <div data-test="container-label-wrapper" class="tw:flex tw:flex-col tw:items-start tw:justify-start">
            <span data-test="container-label"> {{ label }}</span>
-            <div data-test="container-sublabel" class="tw:text-[13px] tw:h-[20px]"
+            <div data-test="container-sublabel"
+class="tw:text-[13px] tw:h-[20px]"
             :class="[
               store.state.theme === 'dark'
                 ? 'tw:text-[#c6c6c6]'

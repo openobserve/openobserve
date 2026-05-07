@@ -17,7 +17,9 @@
         </OButton>
       </template>
       <div class="logs-table-list tw:min-w-[180px]">
-        <slot name="dropdown" :field="field" :value="value" />
+        <slot name="dropdown"
+:field="field"
+:value="value" />
       </div>
     </ODropdown>
     <span class="q-pl-xs tw:truncate">{{ value }}</span>

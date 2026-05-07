@@ -58,7 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Range Support Warning -->
             <div v-if="!supportsRange" class="warning-banner">
-              <q-icon name="warning" size="20px" class="warning-icon" />
+              <q-icon name="warning"
+size="20px"
+class="warning-icon" />
               <div class="warning-text">
                 <strong>Range requests not supported</strong>
                 <p>
@@ -83,7 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div class="option-content">
                     <div class="option-header">
-                      <q-icon name="refresh" size="20px" class="option-icon" />
+                      <q-icon name="refresh"
+size="20px"
+class="option-icon" />
                       <span class="option-name">Start from Beginning</span>
                     </div>
                     <p class="option-description">
@@ -104,7 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div class="option-content">
                     <div class="option-header">
-                      <q-icon name="play_arrow" size="20px" class="option-icon" />
+                      <q-icon name="play_arrow"
+size="20px"
+class="option-icon" />
                       <span class="option-name">Resume from Last Position</span>
                       <span class="recommended-badge">Recommended</span>
                     </div>

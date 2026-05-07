@@ -319,7 +319,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-xs bg-primary text-white">
           <div class="text-h6">Alert Execution Details</div>
           <q-space />
-          <OButton variant="ghost" size="icon-circle-sm" v-close-popup>
+          <OButton variant="ghost"
+size="icon-circle-sm"
+v-close-popup>
             <q-icon name="close" />
           </OButton>
         </q-card-section>
@@ -478,7 +480,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Error Details
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-negative-1 q-mt-xs">
+                <q-card flat
+bordered
+class="q-pa-sm bg-negative-1 q-mt-xs">
                   <pre
                     class="text-body2"
                     style="
@@ -507,7 +511,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Response
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-positive-1 q-mt-xs">
+                <q-card flat
+bordered
+class="q-pa-sm bg-positive-1 q-mt-xs">
                   <pre
                     class="text-body2"
                     style="
@@ -528,7 +534,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="right" class="q-pa-md">
-          <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
+          <OButton variant="ghost-primary"
+size="sm"
+v-close-popup>Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -539,12 +547,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="pipeline-error-header row items-center q-pb-none">
           <div class="tw:flex-1">
             <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-              <q-icon name="error" size="24px" class="error-icon" />
+              <q-icon name="error"
+size="24px"
+class="error-icon" />
               <span class="pipeline-name">{{ errorMessage.alert_name }}</span>
             </div>
             <div class="error-timestamp">
               <span class="tw:ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw:mr-1" />
+              <q-icon name="schedule"
+size="14px"
+class="tw:mr-1" />
               {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
             </div>
           </div>

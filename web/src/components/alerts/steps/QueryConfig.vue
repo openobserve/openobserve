@@ -91,7 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label>{{ opt.label }}</q-item-label>
                         </q-item-section>
-                        <q-tooltip v-if="opt.tooltip" anchor="center right" self="center left" :delay="300">
+                        <q-tooltip v-if="opt.tooltip"
+anchor="center right"
+self="center left"
+:delay="300">
                           {{ opt.tooltip }}
                         </q-tooltip>
                       </q-item>
@@ -182,7 +185,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.groupBy') }}
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  <q-tooltip anchor="top middle"
+self="bottom middle"
+:delay="300">
                     {{ t('alerts.queryConfig.groupByTooltip') }}
                   </q-tooltip>
                 </span>
@@ -234,7 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.queryConfig.havingGroups') }}
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  <q-tooltip anchor="top middle"
+self="bottom middle"
+:delay="300">
                     {{ t('alerts.queryConfig.havingGroupsTooltip') }}
                   </q-tooltip>
                 </span>
@@ -242,7 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-select
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
+                    dense
+borderless
+hide-bottom-space
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
@@ -250,7 +259,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
+                    dense
+borderless
+hide-bottom-space
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
@@ -287,7 +298,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label>{{ opt.label }}</q-item-label>
                         </q-item-section>
-                        <q-tooltip v-if="opt.tooltip" anchor="center right" self="center left" :delay="300">
+                        <q-tooltip v-if="opt.tooltip"
+anchor="center right"
+self="center left"
+:delay="300">
                           {{ opt.tooltip }}
                         </q-tooltip>
                       </q-item>
@@ -317,7 +331,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="columnSelectError ? 'column-select-error' : ''"
                         style="min-width: 140px; max-width: 200px;"
                       />
-                      <q-tooltip v-if="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" anchor="bottom middle" self="top middle" :delay="300">
+                      <q-tooltip v-if="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
+anchor="bottom middle"
+self="top middle"
+:delay="300">
                         Metrics streams store their measurement in the "value" field by default
                       </q-tooltip>
                     </div>
@@ -384,7 +401,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.groupBy') }}
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  <q-tooltip anchor="top middle"
+self="bottom middle"
+:delay="300">
                     {{ t('alerts.queryConfig.groupByTooltip') }}
                   </q-tooltip>
                 </span>
@@ -436,7 +455,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.queryConfig.havingGroups') }}
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  <q-tooltip anchor="top middle"
+self="bottom middle"
+:delay="300">
                     {{ t('alerts.queryConfig.havingGroupsTooltip') }}
                   </q-tooltip>
                 </span>
@@ -444,7 +465,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-select
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
+                    dense
+borderless
+hide-bottom-space
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
@@ -452,7 +475,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
+                    dense
+borderless
+hide-bottom-space
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
@@ -467,7 +492,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="alert-condition-row tw:!items-start">
               <span class="condition-label" style="line-height: 28px;">
                 Check every *
-                <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                <q-tooltip anchor="top middle"
+self="bottom middle"
+:delay="300">
                   How often to check this alert condition
                 </q-tooltip>
               </span>
@@ -538,7 +565,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @filter="timezoneFilterFn"
                       @update:model-value="onCronTimezoneChange"
                     >
-                    <q-tooltip v-if="cronTimezone" :delay="300" anchor="bottom middle" self="top middle">{{ cronTimezone }}</q-tooltip>
+                    <q-tooltip v-if="cronTimezone"
+:delay="300"
+anchor="bottom middle"
+self="top middle">{{ cronTimezone }}</q-tooltip>
                   </q-select>
                   </template>
 
@@ -592,7 +622,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Cron description + error -->
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:ml-0 tw:italic"
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError"
+class="tw:text-[11px] tw:ml-0 tw:italic"
                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
                   {{ cronDescription }}
                 </div>
@@ -604,7 +635,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Filters section — scheduled -->
-          <div v-if="isRealTime === 'false'" ref="filtersSectionRef" class="tw:mt-1 tw:px-3">
+          <div v-if="isRealTime === 'false'"
+ref="filtersSectionRef"
+class="tw:mt-1 tw:px-3">
             <div v-show="showFilters" ref="customPreviewRef">
               <FilterGroup
                 :stream-fields="columns"
@@ -758,7 +791,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="functionsList"
                       option-label="name"
                       option-value="name"
-                      borderless dense use-input hide-selected fill-input
+                      borderless
+dense
+use-input
+hide-selected
+fill-input
                       input-debounce="0"
                       behavior="menu"
                       clearable
@@ -812,21 +849,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="sql-status-bar__inner">
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
-                <q-icon name="error_outline" size="12px" style="flex-shrink:0;" />
+                <q-icon name="error_outline"
+size="12px"
+style="flex-shrink:0;" />
                 <span class="sql-status-bar__msg">{{ sqlQueryErrorMsg }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
-                <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                <q-icon name="edit"
+size="11px"
+style="flex-shrink:0;opacity:0.6;" />
                 <span>{{ t('alerts.queryConfig.writeQueryHint') }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
-                <q-icon name="check_circle_outline" size="12px" style="flex-shrink:0;opacity:0.7;" />
+                <q-icon name="check_circle_outline"
+size="12px"
+style="flex-shrink:0;opacity:0.7;" />
                 <span>{{ t('alerts.queryConfig.sqlEditorHint') }}</span>
               </template>
             </div>
             <q-tooltip
               v-if="inlineStatusState === 'sql-status-bar--error'"
-              anchor="top middle" self="bottom middle" max-width="520px"
+              anchor="top middle"
+self="bottom middle"
+max-width="520px"
               style="font-size:11px;white-space:pre-wrap;word-break:break-word;"
             >{{ sqlQueryErrorMsg }}</q-tooltip>
           </div>
@@ -838,7 +883,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="alert-condition-row tw:!items-start">
               <span class="condition-label sql-promql-label" style="line-height: 28px;">
                 Check every *
-                <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                <q-tooltip anchor="top middle"
+self="bottom middle"
+:delay="300">
                   How often to check this alert condition
                 </q-tooltip>
               </span>
@@ -848,7 +895,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-input
                       v-model="checkEveryFrequency"
                       type="number"
-                      dense borderless hide-bottom-space
+                      dense
+borderless
+hide-bottom-space
                       no-error-icon
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
@@ -861,7 +910,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <q-input
                       v-model="cronExpression"
-                      dense borderless hide-bottom-space
+                      dense
+borderless
+hide-bottom-space
                       class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
@@ -871,8 +922,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-select
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
-                    dense borderless hide-bottom-space
-                    emit-value map-options
+                    dense
+borderless
+hide-bottom-space
+                    emit-value
+map-options
                     class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
@@ -881,8 +935,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-select
                       v-model="cronTimezone"
                       :options="filteredTimezones"
-                      dense borderless hide-bottom-space
-                      use-input emit-value fill-input hide-selected
+                      dense
+borderless
+hide-bottom-space
+                      use-input
+emit-value
+fill-input
+hide-selected
                       :input-debounce="0"
                       class="alert-v3-select"
                       placeholder="timezone"
@@ -891,11 +950,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @filter="timezoneFilterFn"
                       @update:model-value="onCronTimezoneChange"
                     >
-                      <q-tooltip v-if="cronTimezone" :delay="300" anchor="bottom middle" self="top middle">{{ cronTimezone }}</q-tooltip>
+                      <q-tooltip v-if="cronTimezone"
+:delay="300"
+anchor="bottom middle"
+self="top middle">{{ cronTimezone }}</q-tooltip>
                     </q-select>
                   </template>
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic"
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError"
+class="tw:text-[11px] tw:italic"
                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
                   {{ cronDescription }}
                 </div>
@@ -912,7 +975,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-select
                   v-model="triggerOperator"
                   :options="numericOperators"
-                  dense borderless hide-bottom-space
+                  dense
+borderless
+hide-bottom-space
                   class="alert-v3-select"
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
@@ -920,7 +985,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-input
                   v-model="triggerThreshold"
                   type="number"
-                  dense borderless hide-bottom-space
+                  dense
+borderless
+hide-bottom-space
                   class="alert-v3-input"
                   style="min-width: 60px; max-width: 80px;"
                   min="1"
@@ -934,7 +1001,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="localTab === 'promql' && promqlCondition">
               <div class="alert-condition-row">
                 <span class="condition-label sql-promql-label">Alert if the value is *
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  <q-tooltip anchor="top middle"
+self="bottom middle"
+:delay="300">
                     Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more.
                   </q-tooltip>
                 </span>
@@ -942,7 +1011,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-select
                     v-model="promqlCondition.operator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
+                    dense
+borderless
+hide-bottom-space
                     no-error-icon
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
@@ -952,7 +1023,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     v-model.number="promqlCondition.value"
                     type="number"
-                    dense borderless hide-bottom-space
+                    dense
+borderless
+hide-bottom-space
                     no-error-icon
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 120px;"
@@ -964,7 +1037,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="alert-condition-row">
                 <span class="condition-label sql-promql-label">Having series *
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  <q-tooltip anchor="top middle"
+self="bottom middle"
+:delay="300">
                     Minimum number of time series that must satisfy the condition above to trigger the alert.
                   </q-tooltip>
                 </span>
@@ -972,7 +1047,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-select
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
+                    dense
+borderless
+hide-bottom-space
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
@@ -980,7 +1057,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
+                    dense
+borderless
+hide-bottom-space
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"

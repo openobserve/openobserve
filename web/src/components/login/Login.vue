@@ -82,7 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="autoRedirectDexLogin">
         <p>
           Redirecting to SSO login page. If you are not redirected, please
-          <a href="#" @click="loginWithSSo" class="cursor-pointer tw:underline">click here</a>.
+          <a href="#"
+@click="loginWithSSo"
+class="cursor-pointer tw:underline">click here</a>.
         </p>
       </div>
 
@@ -126,7 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-input login-inputs"
         >
           <q-form ref="loginform"
-  class="q-gutter-md" @submit.prevent="">
+  class="q-gutter-md"
+@submit.prevent="">
             <q-input
               v-model="name"
               data-cy="login-user-id"

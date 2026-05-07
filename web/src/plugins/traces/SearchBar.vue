@@ -39,7 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><q-icon :name="outlinedAccountTree" class="tw:text-[14px] tw:shrink-0"
+              ><q-icon :name="outlinedAccountTree"
+class="tw:text-[14px] tw:shrink-0"
             /></template>
             Traces
           </OToggleGroupItem>

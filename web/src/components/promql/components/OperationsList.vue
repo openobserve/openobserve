@@ -204,7 +204,9 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
+          <OButton variant="outline"
+size="sm-action"
+v-close-popup>
             Close
           </OButton>
         </q-card-actions>

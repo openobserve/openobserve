@@ -54,10 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="usage-data-to-display row items-end">
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
-          <div v-if="aiUsage.mode === 'exhausted'" class="text-negative q-mt-sm" style="font-size: 13px;">
+          <div v-if="aiUsage.mode === 'exhausted'"
+class="text-negative q-mt-sm"
+style="font-size: 13px;">
             {{ t("billing.aiExhaustedMessage") }}
           </div>
-          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info q-mt-sm" style="font-size: 13px;">
+          <div v-else-if="aiUsage.mode === 'pay_as_you_go'"
+class="text-info q-mt-sm"
+style="font-size: 13px;">
             {{ t("billing.aiPaygMessage") }}
           </div>
         </div>

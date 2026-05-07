@@ -200,7 +200,8 @@
                       >
                     </div>
                   </template>
-                  <span v-else class="tw:text-xs tw:text-[var(--o2-text-muted)]"
+                  <span v-else
+class="tw:text-xs tw:text-[var(--o2-text-muted)]"
                     >-</span
                   >
                 </div>
@@ -229,7 +230,8 @@
                       >
                     </div>
                   </template>
-                  <span v-else class="tw:text-xs tw:text-[var(--o2-text-muted)]"
+                  <span v-else
+class="tw:text-xs tw:text-[var(--o2-text-muted)]"
                     >-</span
                   >
                 </div>
@@ -262,7 +264,8 @@
                       >
                     </div>
                   </template>
-                  <span v-else class="tw:text-xs tw:text-[var(--o2-text-muted)]"
+                  <span v-else
+class="tw:text-xs tw:text-[var(--o2-text-muted)]"
                     >-</span
                   >
                 </div>

@@ -224,7 +224,7 @@ describe("ServiceIdentitySetup", () => {
       await flushPromises();
 
       // Directly set warnings via vm — no public API exists to reach this state
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (wrapper.vm as any).warnings = ["Service name field not configured"];
       await wrapper.vm.$nextTick();
 
@@ -238,7 +238,7 @@ describe("ServiceIdentitySetup", () => {
       await flushPromises();
 
       const warningText = "Ambiguous service names detected";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (wrapper.vm as any).warnings = [warningText];
       await wrapper.vm.$nextTick();
 

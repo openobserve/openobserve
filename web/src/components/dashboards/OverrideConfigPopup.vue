@@ -124,7 +124,9 @@
     >
 
     <q-card-actions align="right">
-      <OButton variant="primary" size="sm-action" @click="saveOverrides">{{
+      <OButton variant="primary"
+size="sm-action"
+@click="saveOverrides">{{
         t("dashboard.overrideConfigSave")
       }}</OButton>
     </q-card-actions>

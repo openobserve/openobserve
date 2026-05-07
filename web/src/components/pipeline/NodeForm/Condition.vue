@@ -25,7 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("pipeline.conditionTitle") }}
       <div>
-        <OButton variant="ghost" size="icon" @click="openCancelDialog">
+        <OButton variant="ghost"
+size="icon"
+@click="openCancelDialog">
           <q-icon name="cancel" size="14px" />
         </OButton>
       </div>
@@ -63,9 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-card class="note-container">
             <q-card-section class="q-pa-sm">
               <div class="note-heading">Condition value Guidelines:</div>
-              <q-banner inline dense class="note-info">
+              <q-banner inline
+dense
+class="note-info">
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <q-icon name="info"
+color="orange"
+class="q-mr-sm" />
                   <span
                     >To check for an empty value, use
                     <span class="highlight">""</span>. Example:
@@ -73,7 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <q-icon name="info"
+color="orange"
+class="q-mr-sm" />
                   <span
                     >To check for an Null value, use
                     <span class="highlight">null</span>. Example:
@@ -81,21 +89,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <q-icon name="info"
+color="orange"
+class="q-mr-sm" />
                   <span
                     >To add a custom column, type column name and press
                     <span class="highlight">Enter</span>.</span
                   >
                 </div>
                 <div>
-                  <q-icon name="warning" color="red" class="q-mr-sm" />
+                  <q-icon name="warning"
+color="red"
+class="q-mr-sm" />
                   <span
                     >If conditions are not met, the record will be
                     dropped.</span
                   >
                 </div>
                 <div>
-                  <q-icon name="warning" color="red" class="q-mr-sm" />
+                  <q-icon name="warning"
+color="red"
+class="q-mr-sm" />
                   <span
                     >If the record does not have the specified field, it will be
                     dropped.</span

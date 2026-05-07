@@ -49,7 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-gray-50 tw:flex tw:items-center tw:gap-2"
           >
-            <q-icon name="schedule" size="sm" color="primary" />
+            <q-icon name="schedule"
+size="sm"
+color="primary" />
             <span class="tw:font-mono tw:text-sm">{{ formatTimestamp(sourceTimestamp) }}</span>
           </div>
         </div>

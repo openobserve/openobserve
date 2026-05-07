@@ -38,7 +38,8 @@
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
             >
               <template #icon-left
-                ><q-icon name="close" size="18px"
+                ><q-icon name="close"
+size="18px"
               /></template>
             </OButton>
           </div>

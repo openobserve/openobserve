@@ -63,7 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #no-data><NoData /></template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <q-checkbox v-model="scope.selected"
+size="sm"
+class="o2-table-checkbox" />
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">

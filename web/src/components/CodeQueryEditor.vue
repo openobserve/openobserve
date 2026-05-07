@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="query-editor-ai-icon-btn"
     >
       <q-icon size="20px">
-        <img :src="aiIcon" alt="AI" class="ai-icon-img" />
+        <img :src="aiIcon"
+alt="AI"
+class="ai-icon-img" />
       </q-icon>
       <q-tooltip>
         {{

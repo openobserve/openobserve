@@ -32,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'hovered': hoveredItem === 'above' }"
         data-test="alert-context-menu-above"
       >
-        <q-icon name="arrow_upward" size="xs" class="q-mr-sm" />
+        <q-icon name="arrow_upward"
+size="xs"
+class="q-mr-sm" />
         <span>Create Alert with threshold above {{ formattedValue }}</span>
       </div>
       <div
@@ -43,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'hovered': hoveredItem === 'below' }"
         data-test="alert-context-menu-below"
       >
-        <q-icon name="arrow_downward" size="xs" class="q-mr-sm" />
+        <q-icon name="arrow_downward"
+size="xs"
+class="q-mr-sm" />
         <span>Create Alert with threshold below {{ formattedValue }}</span>
       </div>
     </div>

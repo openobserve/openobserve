@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sidebar" :class="{ open: isOpen }">
-    <div v-if="!isOpen" class="sidebar-header-collapsed" @click="toggleSidebar">
+    <div v-if="!isOpen"
+class="sidebar-header-collapsed"
+@click="toggleSidebar">
       <!-- <div class="collapsed-icon">+</div> -->
       <q-icon
         name="expand_all"

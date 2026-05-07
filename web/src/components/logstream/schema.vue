@@ -50,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-gray-50 tw:border-gray-200'
               ]"
             >
-              <img :src="getTimelineIcon" alt="Timeline Icon" class="tw:w-[14px] tw:h-[14px] tw:opacity-70" />
+              <img :src="getTimelineIcon"
+alt="Timeline Icon"
+class="tw:w-[14px] tw:h-[14px] tw:opacity-70" />
               <div class="tw:flex tw:items-center tw:gap-1.5">
                 <span 
                   :class="[
@@ -75,7 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+          <OButton variant="ghost"
+size="icon-sm"
+v-close-popup="true">
             <X :size="14" />
           </OButton>
         </div>
@@ -94,7 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
         <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
-        <div v-else class="indexDetailsContainer" style="height: calc(100vh - 120px)">
+        <div v-else
+class="indexDetailsContainer"
+style="height: calc(100vh - 120px)">
           <!-- this the grid section the tiles section -->
           <div class="stats-grid tw:grid tw:grid-cols-4 tw:gap-2 tw:mb-2">
               <!-- Docs Count Tile -->
@@ -115,7 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Events
                     </div>
                     <div class="tile-icon tw:opacity-80">
-                      <img src="@/assets/images/home/records.svg" alt="Records Icon" class="tw:h-6 tw:w-6" />
+                      <img src="@/assets/images/home/records.svg"
+alt="Records Icon"
+class="tw:h-6 tw:w-6" />
                     </div>
                   </div>
                   <div 
@@ -140,7 +148,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("logStream.storageSize") }}
                     </div>
                     <div class="tile-icon tw:opacity-80">
-                      <img src="@/assets/images/home/ingested_size.svg" alt="Ingested Size Icon" class="tw:h-6 tw:w-6" />
+                      <img src="@/assets/images/home/ingested_size.svg"
+alt="Ingested Size Icon"
+class="tw:h-6 tw:w-6" />
                     </div>
                   </div>
                   <div 
@@ -169,7 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("logStream.compressedSize") }}
                     </div>
                     <div class="tile-icon tw:opacity-80">
-                      <img src="@/assets/images/home/compressed_size.svg" alt="Compressed Size Icon" class="tw:h-6 tw:w-6" />
+                      <img src="@/assets/images/home/compressed_size.svg"
+alt="Compressed Size Icon"
+class="tw:h-6 tw:w-6" />
                     </div>
                   </div>
                   <div 
@@ -198,7 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("logStream.indexSize") }}
                     </div>
                     <div class="tile-icon tw:opacity-80">
-                      <img src="@/assets/images/home/index_size.svg" alt="Index Size Icon" class="tw:h-6 tw:w-6" />
+                      <img src="@/assets/images/home/index_size.svg"
+alt="Index Size Icon"
+class="tw:h-6 tw:w-6" />
                     </div>
                   </div>
                   <div 
@@ -267,7 +281,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex tw:justify-between tw:items-center"
                 data-test="schema-log-stream-mapping-title-text"
               >
-                <div  v-if="indexData.defaultFts" style="font-weight: 400" class="tw:mt-[12px]">
+                <div  v-if="indexData.defaultFts"
+style="font-weight: 400"
+class="tw:mt-[12px]">
                   <label
                     style="font-weight: 600"
                     class="mapping-warning-msg"
@@ -329,7 +345,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                     >
                       <template #prepend>
-                        <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                        <q-icon class="o2-search-input-icon"
+:class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'"
+name="search" />
                       </template>
                     </q-input>
                     <OButton
@@ -421,7 +439,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-slot:header="props">
                     <q-tr :props="props">
                       <q-th>
-                        <q-checkbox size="xs" v-model="props.selected" color="primary" />
+                        <q-checkbox size="xs"
+v-model="props.selected"
+color="primary" />
                       </q-th>
                       <q-th
                         v-for="col in props.cols"
@@ -434,7 +454,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="tw:pl-7" v-else-if="col.name === 'patterns'">
                           {{ col.label }}
-                          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+                          <q-tooltip class="bg-grey-8"
+anchor="top middle"
+self="bottom middle">
                             {{ t('logStream.sdr') }}
                           </q-tooltip>
                         </span>
@@ -566,7 +588,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </template>
                       <template v-slot:option="scope">
-                        <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(props.row, scope.opt)">
+                        <q-item style="margin: 0px !important; border-radius: 0px !important;"
+v-bind="scope.itemProps"
+:disable="disableOptions(props.row, scope.opt)">
                           <q-item-section>
                             <q-item-label>
                               {{ scope.opt.label }}
@@ -588,7 +612,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <!-- here we will render the number of regex patterns associated with the specific field -->
                   <template v-slot:body-cell-patterns="props">
-                    <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw:text-[#5960B2] tw:cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
+                    <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')"
+class="field-name text-left tw:text-[#5960B2] tw:cursor-pointer "
+style="padding-left: 12px !important;"
+@click="openPatternAssociationDialog(props.row.name)">
                       {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
                       <span>
                         <q-icon name="arrow_forward" size="xs" />
@@ -813,7 +840,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: fit-content"
               >
                 <span style="font-weight: 600">
-                  <q-icon name="info" class="q-mr-xs" size="16px" />
+                  <q-icon name="info"
+class="q-mr-xs"
+size="16px" />
 
                   Additional
                   {{ store.state.zoConfig.extended_data_retention_days }} days of
@@ -1027,8 +1056,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
   </q-card>
-  <q-dialog v-model="patternAssociationDialog.show" position="right" full-height maximized>
-    <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
+  <q-dialog v-model="patternAssociationDialog.show"
+position="right"
+full-height
+maximized>
+    <AssociatedRegexPatterns :data="patternAssociationDialog.data"
+:fieldName="patternAssociationDialog.fieldName"
+@closeDialog="patternAssociationDialog.show = false"
+@addPattern="handleAddPattern"
+@removePattern="handleRemovePattern"
+@updateSettings="onSubmit"
+@updateAppliedPattern="handleUpdateAppliedPattern" />
   </q-dialog>
 
   <ConfirmDialog
@@ -1116,7 +1154,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SchemaIndex",
   props: {
-    // eslint-disable-next-line vue/require-default-prop
+     
     modelValue: {
       type: Object,
       default: () => defaultValue(),

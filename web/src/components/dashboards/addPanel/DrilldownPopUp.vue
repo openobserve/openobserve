@@ -25,7 +25,8 @@
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
-        <span data-test="dashboard-drilldown-title" v-if="isEditMode"
+        <span data-test="dashboard-drilldown-title"
+v-if="isEditMode"
           >{{ t("dashboard.editDrilldown") }}
         </span>
         <span data-test="dashboard-drilldown-title" v-else>{{

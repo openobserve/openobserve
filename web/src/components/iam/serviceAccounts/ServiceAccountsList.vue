@@ -73,7 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:body-selection="scope">
               <q-td auto-width>
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" :disable="scope.row.is_system" />
+                <q-checkbox v-model="scope.selected"
+size="sm"
+class="o2-table-checkbox"
+:disable="scope.row.is_system" />
               </q-td>
             </template>
 
@@ -81,7 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td :props="props">
                 <template v-if="props.row.is_system">
                   <span class="text-weight-medium">AI SRE Agent</span>
-                  <q-badge color="blue-2" text-color="blue-8" label="system" class="q-ml-sm q-px-xs" style="font-size: 10px;" />
+                  <q-badge color="blue-2"
+text-color="blue-8"
+label="system"
+class="q-ml-sm q-px-xs"
+style="font-size: 10px;" />
                 </template>
                 <template v-else>{{ props.row.email }}</template>
               </q-td>
@@ -103,7 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #body-cell-actions="props">
               <q-td :props="props" side>
                 <template v-if="props.row.is_system">
-                  <q-badge color="grey-6" :label="t('serviceAccounts.systemManaged', 'System Managed')" class="q-px-sm q-py-xs">
+                  <q-badge color="grey-6"
+:label="t('serviceAccounts.systemManaged', 'System Managed')"
+class="q-px-sm q-py-xs">
                     <q-tooltip v-if="props.row.description">{{ props.row.description }}</q-tooltip>
                   </q-badge>
                 </template>
@@ -243,7 +252,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action" data-test="cancel-button">
+          <OButton v-close-popup="true"
+variant="outline"
+size="sm-action"
+data-test="cancel-button">
             {{ t("user.cancel") }}
           </OButton>
           <OButton
@@ -267,7 +279,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
+          <OButton v-close-popup="true"
+variant="outline"
+size="sm-action">
             Cancel
           </OButton>
           <OButton
@@ -286,7 +300,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
     <q-card-section  class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center" >
       <div>Service Account Token </div>
-          <OButton data-test="sa-cancel-button" variant="ghost" size="icon-circle-sm" @click="isShowToken = false">
+          <OButton data-test="sa-cancel-button"
+variant="ghost"
+size="icon-circle-sm"
+@click="isShowToken = false">
             <q-icon name="cancel" />
           </OButton>
     </q-card-section>
@@ -325,7 +342,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </div>
 
     <div class="q-pt-md flex items-center warning-text">
-      <q-icon name="info" class="q-mr-xs " size="16px" />
+      <q-icon name="info"
+class="q-mr-xs "
+size="16px" />
       <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.
       </span>
     </div>

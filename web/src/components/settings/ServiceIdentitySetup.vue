@@ -21,8 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="tw:flex tw:flex-col tw:gap-4 tw:py-4">
-      <q-skeleton type="rect" height="56px" class="tw:rounded-lg" />
-      <q-skeleton type="rect" height="56px" class="tw:rounded-lg" />
+      <q-skeleton type="rect"
+height="56px"
+class="tw:rounded-lg" />
+      <q-skeleton type="rect"
+height="56px"
+class="tw:rounded-lg" />
       <q-skeleton
         type="rect"
         height="40px"
@@ -252,7 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("settings.correlation.fieldMappingDialogHelp") }}
                   </div>
                 </div>
-                <OButton variant="ghost" size="icon" v-close-popup>
+                <OButton variant="ghost"
+size="icon"
+v-close-popup>
                   <q-icon name="close" size="14px" />
                 </OButton>
               </q-card-section>
@@ -274,7 +280,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-card-actions align="right" class="tw:px-4 tw:py-3">
                 <div class="tw:flex tw:gap-2">
-                  <OButton variant="outline" size="sm-action" v-close-popup>
+                  <OButton variant="outline"
+size="sm-action"
+v-close-popup>
                     {{ t("common.cancel") }}
                   </OButton>
                   <OButton
@@ -319,7 +327,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:border-grey-4 tw:bg-grey-1'
               "
             >
-              <q-icon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
+              <q-icon name="tune"
+size="28px"
+class="tw:text-grey-5 tw:mb-1" />
               <span
                 class="tw:text-sm tw:font-medium"
                 :class="
@@ -338,7 +348,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="addingToEnv = activeEnvironment"
               >
                 <template #icon-left
-                  ><q-icon name="add" size="14px"
+                  ><q-icon name="add"
+size="14px"
                 /></template>
                 {{ t("settings.correlation.addField") }}
               </OButton>
@@ -640,7 +651,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:px-4 tw:py-3 tw:flex tw:items-center tw:gap-2"
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
-          <q-icon name="radar" size="18px" class="tw:text-teal-6" />
+          <q-icon name="radar"
+size="18px"
+class="tw:text-teal-6" />
           <span class="tw:font-bold tw:text-sm">Workload Detection</span>
         </div>
 
@@ -657,7 +670,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
             @click="trackedAliasExpanded = !trackedAliasExpanded"
           >
-            <q-icon name="check_circle" size="18px" color="positive" />
+            <q-icon name="check_circle"
+size="18px"
+color="positive" />
             <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
               Workload detected using fields
               <span class="tw:text-xs tw:opacity-60"
@@ -855,7 +870,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
               <!-- Plus connector between cards -->
               <div v-if="idx > 0" class="tw:flex tw:items-center tw:shrink-0">
-                <q-icon name="add" size="16px" class="tw:text-grey-5" />
+                <q-icon name="add"
+size="16px"
+class="tw:text-grey-5" />
               </div>
 
               <!-- Dim card -->
@@ -1051,7 +1068,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             — covers {{ activeEnvCoverage ?? "–" }}% of your telemetry.
           </div>
           <div class="tw:shrink-0 tw:flex tw:items-center tw:gap-1">
-            <OButton variant="outline" size="sm" @click="applySuggestion">
+            <OButton variant="outline"
+size="sm"
+@click="applySuggestion">
               Apply
             </OButton>
             <OButton
@@ -1136,7 +1155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
               </div>
-              <OButton variant="ghost" size="icon" v-close-popup>
+              <OButton variant="ghost"
+size="icon"
+v-close-popup>
                 <q-icon name="cancel" size="14px" />
               </OButton>
             </q-card-section>
@@ -1388,7 +1409,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="warning" color="warning" />
           </template>
           <div class="tw:flex tw:flex-col tw:gap-1">
-            <div v-for="(warn, idx) in warnings" :key="idx" class="tw:text-sm">
+            <div v-for="(warn, idx) in warnings"
+:key="idx"
+class="tw:text-sm">
               {{ warn }}
             </div>
           </div>
@@ -1408,12 +1431,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-card-section class="row items-center q-pb-none">
             <div class="text-h6 tw:flex tw:items-center tw:gap-2">
               {{ primaryDim?.display }}
-              <span v-if="popupPrimaryValue" class="text-subtitle2 text-grey"
+              <span v-if="popupPrimaryValue"
+class="text-subtitle2 text-grey"
                 >: {{ popupPrimaryValue }}</span
               >
             </div>
             <q-space />
-            <OButton variant="ghost" size="icon" v-close-popup>
+            <OButton variant="ghost"
+size="icon"
+v-close-popup>
               <q-icon name="close" size="14px" />
             </OButton>
           </q-card-section>

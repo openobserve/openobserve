@@ -37,7 +37,9 @@
       <!-- Generated Query Display -->
       <q-card-section>
         <div class="text-subtitle1 q-mb-sm">Generated PromQL Query:</div>
-        <q-card flat bordered class="bg-grey-1">
+        <q-card flat
+bordered
+class="bg-grey-1">
           <q-card-section>
             <pre class="query-output">{{ generatedQuery || "No query built yet" }}</pre>
           </q-card-section>
@@ -50,7 +52,9 @@
             @click="copyQuery"
             :disabled="!generatedQuery"
           >
-            <q-icon name="content_copy" size="14px" class="q-mr-xs" />
+            <q-icon name="content_copy"
+size="14px"
+class="q-mr-xs" />
             Copy Query
           </OButton>
           <OButton
@@ -58,7 +62,9 @@
             size="sm-action"
             @click="clearQuery"
           >
-            <q-icon name="clear" size="14px" class="q-mr-xs" />
+            <q-icon name="clear"
+size="14px"
+class="q-mr-xs" />
             Clear All
           </OButton>
           <OButton
@@ -67,7 +73,9 @@
             @click="testQuery"
             :disabled="!generatedQuery"
           >
-            <q-icon name="play_arrow" size="14px" class="q-mr-xs" />
+            <q-icon name="play_arrow"
+size="14px"
+class="q-mr-xs" />
             Test Query
           </OButton>
         </div>
@@ -76,7 +84,9 @@
       <!-- Query Result Preview -->
       <q-card-section v-if="queryResult">
         <div class="text-subtitle1 q-mb-sm">Query Result Preview:</div>
-        <q-card flat bordered class="bg-grey-1">
+        <q-card flat
+bordered
+class="bg-grey-1">
           <q-card-section>
             <pre class="result-output">{{ queryResult }}</pre>
           </q-card-section>

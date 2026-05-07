@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" persistent>
+  <q-dialog :model-value="modelValue"
+@update:model-value="$emit('update:modelValue', $event)"
+persistent>
     <q-card style="min-width: 500px; max-width: 650px">
       <q-card-section class="row items-center q-pb-sm q-pt-md q-px-md">
         <div class="text-subtitle1 text-weight-medium">Index Fields Detected</div>
@@ -71,10 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right" class="q-pt-none q-pb-md q-px-md tw:gap-2">
-        <OButton variant="outline" size="sm-action" @click="$emit('skip')">
+        <OButton variant="outline"
+size="sm-action"
+@click="$emit('skip')">
           Skip
         </OButton>
-        <OButton variant="primary" size="sm-action" @click="$emit('add-fields')">
+        <OButton variant="primary"
+size="sm-action"
+@click="$emit('add-fields')">
           Add Fields
         </OButton>
       </q-card-actions>

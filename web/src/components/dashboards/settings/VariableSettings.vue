@@ -193,7 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-toolbar>
               <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
-              <OButton variant="ghost" size="icon" v-close-popup="true">
+              <OButton variant="ghost"
+size="icon"
+v-close-popup="true">
                 <template #icon-left><q-icon name="close" /></template>
               </OButton>
             </q-toolbar>

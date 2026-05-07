@@ -4,7 +4,9 @@
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">
-        <q-icon name="rocket_launch" size="md" color="primary" />
+        <q-icon name="rocket_launch"
+size="md"
+color="primary" />
         <div class="tw:flex-1">
           <h6 class="tw:text-base tw:font-bold tw:m-0 tw:mb-2">Quick Install (Recommended)</h6>
           <p class="tw:text-sm tw:m-0 tw:mb-3" :class="descriptionClass">
@@ -36,10 +38,14 @@
             </OTabs>
           </div>
 
-          <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
+          <ContentCopy class="tw:mt-3"
+:content="quickInstallCmd"
+:key="`${clusterName}-${installType}`" />
 
           <div class="tw:mt-2 tw:text-xs" :class="hintClass">
-            <q-icon name="info" size="xs" class="tw:mr-1" />
+            <q-icon name="info"
+size="xs"
+class="tw:mr-1" />
             This installs cert-manager, OpenTelemetry operator, and OpenObserve collector automatically
           </div>
         </div>

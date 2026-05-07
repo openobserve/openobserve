@@ -44,7 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.templateName") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
+            <q-icon name="info"
+size="14px"
+class="field-info-icon">
               <q-tooltip>{{ t("evalTemplate.tooltipName") }}</q-tooltip>
             </q-icon>
           </div>
@@ -60,12 +62,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("common.description") }}</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
+            <q-icon name="info"
+size="14px"
+class="field-info-icon">
               <q-tooltip>{{ t("evalTemplate.tooltipDescription") }}</q-tooltip>
             </q-icon>
           </div>
           <div class="o2-input">
-            <q-input v-model="form.description" borderless dense />
+            <q-input v-model="form.description"
+borderless
+dense />
           </div>
         </div>
       </div>
@@ -75,7 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 0 0 200px; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.responseType") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
+            <q-icon name="info"
+size="14px"
+class="field-info-icon">
               <q-tooltip>{{ t("evalTemplate.tooltipResponseType") }}</q-tooltip>
             </q-icon>
           </div>
@@ -94,7 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.dimensions") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
+            <q-icon name="info"
+size="14px"
+class="field-info-icon">
               <q-tooltip>{{ t("evalTemplate.tooltipDimensions") }}</q-tooltip>
             </q-icon>
           </div>
@@ -118,7 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (val && val.length > 0) || t('evalTemplate.dimensionRequired'),
             ]"
           >
-            <q-tooltip v-if="dimensionsInput.length >= 5" anchor="top middle" self="bottom middle">
+            <q-tooltip v-if="dimensionsInput.length >= 5"
+anchor="top middle"
+self="bottom middle">
               {{ dimensionsInput.join(", ") }}
             </q-tooltip>
           </q-select>
@@ -129,7 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="display: flex; flex-direction: column; flex: 1; min-height: 0">
         <div class="field-label-row">
           <label class="textarea-label">{{ t("evalTemplate.promptTemplate") }} *</label>
-          <q-icon name="info" size="14px" class="field-info-icon">
+          <q-icon name="info"
+size="14px"
+class="field-info-icon">
             <q-tooltip>{{ t("evalTemplate.tooltipPromptTemplate") }}</q-tooltip>
           </q-icon>
         </div>

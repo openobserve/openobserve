@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="multiWindowContainerRef" class="step-compare-with-past" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div ref="multiWindowContainerRef"
+class="step-compare-with-past"
+:class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
       <div class="section-header">
         <div class="section-header-accent" />
@@ -44,7 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
+                <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px">
                   {{ t('alerts.compareWithPast.cycleTooltip') }}
                 </q-tooltip>
               </q-icon>
@@ -105,7 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
+                <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px">
                   {{ t('alerts.compareWithPast.timeFrameTooltip') }}
                 </q-tooltip>
               </q-icon>
@@ -133,7 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
+                <q-tooltip anchor="center right"
+self="center left"
+max-width="300px"
+style="font-size: 12px">
                   {{ t('alerts.compareWithPast.cycleTooltip') }}
                 </q-tooltip>
               </q-icon>

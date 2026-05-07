@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- No source maps available message -->
     <div v-else-if="allSourceInfoNull" class="no-source-maps-container q-pa-md text-center">
-      <q-icon name="code_off" size="2em" color="grey-6" class="q-mb-sm" />
+      <q-icon name="code_off"
+size="2em"
+color="grey-6"
+class="q-mb-sm" />
       <div class="text-subtitle1 text-grey-8 q-mb-xs" style="font-weight: 500;">
         Source Maps Not Available
       </div>

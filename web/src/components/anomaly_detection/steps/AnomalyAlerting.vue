@@ -172,7 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:items-start tw:gap-2 text-caption tw:mt-2"
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
       >
-        <q-icon name="info" size="16px"
+        <q-icon name="info"
+size="16px"
 class="tw:mt-px tw:flex-shrink-0" />
         <span>{{ t('alerts.anomaly.disabledNotificationsInfo') }}</span>
       </div>

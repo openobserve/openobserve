@@ -48,14 +48,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /^[a-zA-Z0-9-]*$/.test(val) || 'Access ID should be alphanumeric',
         ]"
       />
-      <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
+      <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel"
+variant="outline"
+size="sm-action"
+class="q-mt-sm"
+v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''"
+@click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
       <label class="row q-field q-mb-md">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
       <pre class="pre-text">{{ formData.key.store.akeyless.access_id }}</pre>
-      <OButton data-test="add-cipher-key-akeyless-access-id-input-update" variant="primary" size="sm-action" @click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
+      <OButton data-test="add-cipher-key-akeyless-access-id-input-update"
+variant="primary"
+size="sm-action"
+@click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
     </div>
     <q-select
       data-test="add-cipher-key-auth-method-input"
@@ -93,14 +101,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             :rules="[(val: any) => !!val || 'Access Key is required']"
           />
-          <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel"
+variant="outline"
+size="sm-action"
+class="q-mt-sm"
+v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''"
+@click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.access_key }}</pre>
-          <OButton data-test="add-cipher-key-akeyless-access-key-input-update" variant="primary" size="sm-action" @click="isUpdateAccessKey = true">{{ t('common.update') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-access-key-input-update"
+variant="primary"
+size="sm-action"
+@click="isUpdateAccessKey = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
       <div v-if="formData.key.store.akeyless.auth.type === 'ldap'">
@@ -118,14 +134,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (val: any) => /^[a-zA-Z0-9._-]+$/.test(val) || 'Username can only contain alphanumeric characters, dots, underscores, and hyphens',
             ]"
           />
-          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel"
+variant="outline"
+size="sm-action"
+class="q-mt-sm"
+v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''"
+@click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.username }}</pre>
-          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update"
+variant="primary"
+size="sm-action"
+@click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
         </div>
         <div v-if="!formData.isUpdate || isUpdateLDAPPass || formData.key.store.akeyless.auth.ldap.password == ''">
           <q-input
@@ -140,14 +164,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             autocomplete="new-password"
             :rules="[(val: any) => !!val || 'LDAP Password is required']"
           />
-          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel"
+variant="outline"
+size="sm-action"
+class="q-mt-sm"
+v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''"
+@click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.password }}</pre>
-          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPPass = true">{{ t('common.update') }}</OButton>
+          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-update"
+variant="primary"
+size="sm-action"
+@click="isUpdateLDAPPass = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
     </fieldset>

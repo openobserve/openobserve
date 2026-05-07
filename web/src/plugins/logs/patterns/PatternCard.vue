@@ -77,7 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
-        <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
+        <q-tooltip anchor="bottom middle"
+self="top middle"
+class="anomaly-tooltip">
           <div class="tw:text-xs tw:max-w-[22rem]">{{ anomalyExplanationText }}</div>
         </q-tooltip>
       </span>

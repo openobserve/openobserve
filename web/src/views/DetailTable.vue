@@ -24,14 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <OButton variant="ghost" size="icon" v-close-popup>
+          <OButton variant="ghost"
+size="icon"
+v-close-popup>
             <q-icon name="cancel" size="14px" />
           </OButton>
         </div>
       </div>
     </q-card-section>
     <q-separator />
-    <OTabs v-model="tab" dense class="text-grey" align="justify">
+    <OTabs v-model="tab"
+dense
+class="text-grey"
+align="justify">
       <OTab name="table" :label="t('common.table')" />
       <OTab name="json" :label="t('common.json')" />
     </OTabs>

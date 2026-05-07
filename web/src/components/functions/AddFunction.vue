@@ -103,7 +103,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'bg-grey-2'
                         "
                       >
-                        <pre class="q-my-none tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
+                        <pre class="q-my-none tw:text-red-700"
+:class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'"
+style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
                           vrlFunctionError
                         }}</pre>
                       </div>
@@ -126,10 +128,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
       </div>
-      <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+      <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
+style="width: 25%; max-width: 100%; min-width: 75px;   "
+:class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
         <O2AIChat :style="{
           height: `calc(100vh - (112px + ${heightOffset}px))`
-        }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
+        }"
+:is-open="store.state.isAiChatEnabled"
+@close="store.state.isAiChatEnabled = false"
+:aiChatInputContext="aiChatInputContext" />
       </div>
     </div>
   </div>  

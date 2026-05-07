@@ -4,7 +4,9 @@
     <div class="tw:flex tw:justify-between tw:items-center q-mb-md">
       <div>
         <div class="text-body1 text-bold">{{ title }}</div>
-        <div v-if="subtitle" class="text-caption" style="color: var(--o2-text-muted)">
+        <div v-if="subtitle"
+class="text-caption"
+style="color: var(--o2-text-muted)">
           {{ subtitle }}
         </div>
       </div>
@@ -21,7 +23,9 @@
     </div>
 
     <!-- Links List -->
-    <div v-if="links.length > 0" class="cross-link-list" data-test="cross-link-list">
+    <div v-if="links.length > 0"
+class="cross-link-list"
+data-test="cross-link-list">
       <div
         v-for="(link, idx) in links"
         :key="link.name"
@@ -31,7 +35,9 @@
         <div class="tw:flex tw:justify-between tw:items-start">
           <div class="tw:flex-1 tw:min-w-0">
             <!-- Name -->
-            <div class="text-subtitle2 text-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
+            <div class="text-subtitle2 text-bold tw:truncate"
+:title="link.name"
+style="color: var(--o2-text-primary)">
               {{ link.name }}
               <q-badge
                 v-if="link._source"
@@ -41,7 +47,9 @@
               />
             </div>
             <!-- URL -->
-            <div class="text-caption tw:truncate q-mt-xs" :title="link.url" style="color: var(--o2-text-muted)">
+            <div class="text-caption tw:truncate q-mt-xs"
+:title="link.url"
+style="color: var(--o2-text-muted)">
               {{ link.url }}
             </div>
             <!-- Fields -->

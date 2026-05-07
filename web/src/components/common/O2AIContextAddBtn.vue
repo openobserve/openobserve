@@ -13,7 +13,10 @@
         style="border-radius: 100%;"
         >
         <div class="row items-center no-wrap">
-            <img :height="props.imageHeight" :width="props.imageWidth"  :src="getBtnLogo" class="header-icon ai-icon" />
+            <img :height="props.imageHeight"
+:width="props.imageWidth"
+:src="getBtnLogo"
+class="header-icon ai-icon" />
         </div>
     </OButton>
 </template>

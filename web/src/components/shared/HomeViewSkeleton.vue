@@ -7,10 +7,14 @@
         <!-- Header -->
         <div class="row justify-between items-center streams-header">
           <div class="row tw:items-center tw:gap-2">
-            <SkeletonBox variant="avatar" width="40px" height="40px" />
+            <SkeletonBox variant="avatar"
+width="40px"
+height="40px" />
             <SkeletonBox variant="title" width="100px" />
           </div>
-          <SkeletonBox variant="button" width="40px" height="40px" />
+          <SkeletonBox variant="button"
+width="40px"
+height="40px" />
         </div>
 
         <!-- Tiles using same grid as HomeView -->
@@ -26,14 +30,20 @@
               <div class="column justify-between">
                 <!-- Title row -->
                 <div class="row justify-between">
-                  <SkeletonBox variant="text" width="100px" height="20px" />
-                  <SkeletonBox variant="avatar" width="40px" height="40px" />
+                  <SkeletonBox variant="text"
+width="100px"
+height="20px" />
+                  <SkeletonBox variant="avatar"
+width="40px"
+height="40px" />
                 </div>
               </div>
 
               <!-- Bottom Section (40%) -->
               <div class="data-to-display row items-end">
-                <SkeletonBox variant="title" width="80px" height="32px" />
+                <SkeletonBox variant="title"
+width="80px"
+height="32px" />
               </div>
             </div>
           </div>
@@ -50,13 +60,21 @@
                  :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
               <div class="column justify-between">
                 <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
-                  <SkeletonBox variant="avatar" width="40px" height="40px" />
-                  <SkeletonBox variant="text" width="100px" height="20px" />
-                  <SkeletonBox variant="button" width="40px" height="40px" />
+                  <SkeletonBox variant="avatar"
+width="40px"
+height="40px" />
+                  <SkeletonBox variant="text"
+width="100px"
+height="20px" />
+                  <SkeletonBox variant="button"
+width="40px"
+height="40px" />
                 </div>
               </div>
               <div class="data-to-display row items-end">
-                <SkeletonBox variant="title" width="60px" height="32px" />
+                <SkeletonBox variant="title"
+width="60px"
+height="32px" />
               </div>
             </div>
           </div>
@@ -67,13 +85,21 @@
                  :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
               <div class="column justify-between">
                 <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
-                  <SkeletonBox variant="avatar" width="40px" height="40px" />
-                  <SkeletonBox variant="text" width="100px" height="20px" />
-                  <SkeletonBox variant="button" width="40px" height="40px" />
+                  <SkeletonBox variant="avatar"
+width="40px"
+height="40px" />
+                  <SkeletonBox variant="text"
+width="100px"
+height="20px" />
+                  <SkeletonBox variant="button"
+width="40px"
+height="40px" />
                 </div>
               </div>
               <div class="data-to-display row items-end">
-                <SkeletonBox variant="title" width="60px" height="32px" />
+                <SkeletonBox variant="title"
+width="60px"
+height="32px" />
               </div>
             </div>
           </div>
@@ -86,21 +112,37 @@
             <!-- Header -->
             <div class="row justify-between items-center">
               <span class="text-title tw:flex tw:items-center tw:gap-2">
-                <SkeletonBox variant="avatar" width="40px" height="40px" />
-                <SkeletonBox variant="text" width="120px" height="20px" />
+                <SkeletonBox variant="avatar"
+width="40px"
+height="40px" />
+                <SkeletonBox variant="text"
+width="120px"
+height="20px" />
               </span>
-              <SkeletonBox variant="button" width="40px" height="40px" />
+              <SkeletonBox variant="button"
+width="40px"
+height="40px" />
             </div>
             <!-- Stats row -->
             <div class="row q-pt-sm" style="gap: 16px;">
               <div class="column">
-                <SkeletonBox variant="text" width="100px" height="14px" class="q-mb-xs" />
-                <SkeletonBox variant="text" width="40px" height="20px" />
+                <SkeletonBox variant="text"
+width="100px"
+height="14px"
+class="q-mb-xs" />
+                <SkeletonBox variant="text"
+width="40px"
+height="20px" />
               </div>
               <q-separator vertical />
               <div class="column">
-                <SkeletonBox variant="text" width="80px" height="14px" class="q-mb-xs" />
-                <SkeletonBox variant="text" width="40px" height="20px" />
+                <SkeletonBox variant="text"
+width="80px"
+height="14px"
+class="q-mb-xs" />
+                <SkeletonBox variant="text"
+width="40px"
+height="20px" />
               </div>
             </div>
           </div>
@@ -117,21 +159,37 @@
             <!-- Header -->
             <div class="row justify-between items-center">
               <span class="text-title tw:flex tw:items-center tw:gap-2">
-                <SkeletonBox variant="avatar" width="40px" height="40px" />
-                <SkeletonBox variant="text" width="140px" height="20px" />
+                <SkeletonBox variant="avatar"
+width="40px"
+height="40px" />
+                <SkeletonBox variant="text"
+width="140px"
+height="20px" />
               </span>
-              <SkeletonBox variant="button" width="40px" height="40px" />
+              <SkeletonBox variant="button"
+width="40px"
+height="40px" />
             </div>
             <!-- Stats row -->
             <div class="row q-pt-sm" style="gap: 16px;">
               <div class="column">
-                <SkeletonBox variant="text" width="120px" height="14px" class="q-mb-xs" />
-                <SkeletonBox variant="text" width="40px" height="20px" />
+                <SkeletonBox variant="text"
+width="120px"
+height="14px"
+class="q-mb-xs" />
+                <SkeletonBox variant="text"
+width="40px"
+height="20px" />
               </div>
               <q-separator vertical />
               <div class="column">
-                <SkeletonBox variant="text" width="100px" height="14px" class="q-mb-xs" />
-                <SkeletonBox variant="text" width="40px" height="20px" />
+                <SkeletonBox variant="text"
+width="100px"
+height="14px"
+class="q-mb-xs" />
+                <SkeletonBox variant="text"
+width="40px"
+height="20px" />
               </div>
             </div>
           </div>

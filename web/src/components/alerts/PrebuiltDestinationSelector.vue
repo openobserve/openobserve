@@ -57,7 +57,9 @@ limitations under the License. -->
             v-if="selectedType === type.id"
             class="check-icon"
           >
-            <q-icon name="check_circle" size="1.25rem" color="positive" />
+            <q-icon name="check_circle"
+size="1.25rem"
+color="positive" />
           </div>
         </div>
       </div>
@@ -84,7 +86,9 @@ limitations under the License. -->
             v-if="selectedType === 'custom'"
             class="check-icon"
           >
-            <q-icon name="check_circle" size="1.25rem" color="positive" />
+            <q-icon name="check_circle"
+size="1.25rem"
+color="positive" />
           </div>
         </div>
       </div>

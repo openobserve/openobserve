@@ -36,7 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
-              <q-icon name="info" size="18px" color="grey-6">
+              <q-icon name="info"
+size="18px"
+color="grey-6">
                 <q-tooltip>
                   History is only available for scheduled and manually triggered
                   pipelines. Real-time pipelines do not generate history
@@ -303,7 +305,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-xs bg-primary text-white">
           <div class="text-h6">Pipeline Execution Details</div>
           <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
+          <OButton variant="ghost"
+size="icon"
+v-close-popup>
             <q-icon name="close" size="14px" />
           </OButton>
         </q-card-section>
@@ -495,7 +499,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Error Details
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-negative-1 q-mt-xs">
+                <q-card flat
+bordered
+class="q-pa-sm bg-negative-1 q-mt-xs">
                   <pre
                     class="text-body2"
                     style="
@@ -524,7 +530,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Response
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-positive-1 q-mt-xs">
+                <q-card flat
+bordered
+class="q-pa-sm bg-positive-1 q-mt-xs">
                   <pre
                     class="text-body2"
                     style="
@@ -545,7 +553,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="right" class="q-pa-md">
-          <OButton variant="outline" size="sm-action" v-close-popup>
+          <OButton variant="outline"
+size="sm-action"
+v-close-popup>
             Close
           </OButton>
         </q-card-actions>
@@ -560,14 +570,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:flex-1">
             <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-              <q-icon name="error" size="24px" class="error-icon" />
+              <q-icon name="error"
+size="24px"
+class="error-icon" />
               <span class="pipeline-name">{{
                 errorMessage.pipeline_name
               }}</span>
             </div>
             <div class="error-timestamp">
               <span class="tw:ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw:mr-1" />
+              <q-icon name="schedule"
+size="14px"
+class="tw:mr-1" />
               {{
                 errorMessage.last_error_timestamp &&
                 new Date(
