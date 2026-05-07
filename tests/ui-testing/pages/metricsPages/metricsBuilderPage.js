@@ -592,17 +592,14 @@ export class MetricsBuilderPage {
      */
     async fillPanelTitle(title) {
         const titleInput = this.page.locator(this.dashboardPanelTitleInput);
-        if (await titleInput.isVisible({ timeout: 3000 })) {
-            // data-test may be directly on the <input> element
-            const tagName = await titleInput.evaluate(el => el.tagName).catch(() => '');
-            if (tagName === 'INPUT') {
-                await titleInput.click();
-                await titleInput.fill(title);
-            } else {
-                const input = titleInput.locator('input').first();
-                await input.click();
-                await input.fill(title);
-            }
+        if (await titleInput.isVisible({ timeout: 5000 })) {
+            // Find the actual input element — could be the element itself or a child
+            const input = await titleInput.evaluate(el => el.tagName) === 'INPUT'
+                ? titleInput
+                : titleInput.locator('input').first();
+            await input.waitFor({ state: 'visible', timeout: 5000 });
+            await input.click({ force: true });
+            await input.fill(title);
             return true;
         }
         return false;
