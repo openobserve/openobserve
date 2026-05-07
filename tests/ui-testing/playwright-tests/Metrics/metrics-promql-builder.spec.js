@@ -351,6 +351,33 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
+    // Page now defaults to SQL mode — switch to PromQL so builder Options
+    // (legend, step value, query type) become visible.
+    await builder.switchToPromQLMode();
+    await page.waitForTimeout(1000);
+
+    // Explicitly pick a metric so the builder forms a valid PromQL query
+    // (after the SQL-default refactor, the pre-selected stream label does
+    // not auto-populate the query expression).
+    const streamSelector = page.locator(builder.streamSelector);
+    await expect(streamSelector).toBeVisible({ timeout: 5000 });
+    await streamSelector.click();
+    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    await streamSelector.clear();
+    await streamSelector.fill('cpu');
+    await page.waitForTimeout(1000);
+    const cpuOptions = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    if (await cpuOptions.count() > 0) {
+      await cpuOptions.first().click();
+    } else {
+      // Fallback: clear search and pick any available metric
+      await streamSelector.clear();
+      await page.waitForTimeout(500);
+      await page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').first().click();
+    }
+    await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+
     // 1. Set legend
     const legendField = page.locator(builder.legendInput);
     await expect(legendField).toBeVisible({ timeout: 5000 });
