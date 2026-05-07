@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <WildcardValuePopover
       :visible="!!hoveredToken"
       :token="hoveredToken?.token ?? ''"
-      :displayValues="hoveredToken?.displayValues ?? []"
+      :topValues="hoveredToken?.topValues ?? []"
       :anchorEl="hoveredToken?.anchorEl ?? null"
       @popoverEnter="onPopoverEnter"
       @popoverLeave="onPopoverLeave"
