@@ -2449,8 +2449,14 @@ export default defineComponent({
     };
 
     const sessionId = computed<string>(() => {
-      const s = spanList.value?.[0];
-      return s?.session_id ? String(s.session_id) : "";
+      // Prefer the new OTEL gen_ai semantic-convention field, fall back to
+      // the legacy session_id so older traces still surface a Session ID.
+      const s: any = spanList.value?.find(
+        (sp: any) => sp?.gen_ai_conversation_id || sp?.session_id,
+      );
+      return s
+        ? String(s.gen_ai_conversation_id || s.session_id || "")
+        : "";
     });
 
     const copySessionId = () => {

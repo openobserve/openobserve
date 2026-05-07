@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="availableStreams.length === 0"
         >
           <q-tooltip v-if="availableStreams.length === 0">
-            No trace streams available.
+            No LLM streams available.
           </q-tooltip>
         </q-select>
       </div>
@@ -187,10 +187,17 @@ async function loadTraceStreams() {
   try {
     const res = await getStreams("traces", false, false);
     if (res?.list?.length > 0) {
-      availableStreams.value = res.list.map((stream: any) => stream.name);
+      // Show every stream unless the backend has explicitly marked it as
+      // *not* an LLM stream. Legacy streams that pre-date `is_llm_stream`
+      // (field undefined) are still included — only an explicit `false`
+      // hides a stream from the LLM Insights selector.
+      const llmStreams = res.list.filter(
+        (stream: any) => stream?.settings?.is_llm_stream !== false,
+      );
+      availableStreams.value = llmStreams.map((stream: any) => stream.name);
       // If the persisted/prop stream isn't in the list, fall back to the first one.
       if (!availableStreams.value.includes(activeStream.value)) {
-        activeStream.value = availableStreams.value[0];
+        activeStream.value = availableStreams.value[0] || "";
       }
     }
   } catch (e) {

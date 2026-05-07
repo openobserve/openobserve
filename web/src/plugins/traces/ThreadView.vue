@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="thread-tool-body__section">
                   <div class="thread-tool-body__label">Arguments</div>
                   <pre class="thread-tool-body__pre">{{
-                    formatToolPayload(t.llm_input || t.tool_args)
+                    formatToolPayload(getInputRaw(t) || t.tool_args)
                   }}</pre>
                 </div>
                 <div class="thread-tool-body__section">
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <pre class="thread-tool-body__pre">{{
-                    formatToolPayload(t.llm_output) ||
+                    formatToolPayload(getOutputRaw(t)) ||
                     t.status_message ||
                     "(empty)"
                   }}</pre>
@@ -283,9 +283,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="schedule" size="11px" />
               {{ formatTime(turn.span.start_time) }}
             </span>
-            <span class="thread-metric thread-metric--model" :title="turn.span.gen_ai_request_model">
+            <span class="thread-metric thread-metric--model" :title="getModel(turn.span)">
               <q-icon name="bolt" size="11px" />
-              {{ turn.span.gen_ai_request_model || "unknown" }}
+              {{ getModel(turn.span) || "unknown" }}
             </span>
             <span class="thread-metric" title="Duration">
               <q-icon name="timer" size="11px" />
@@ -293,11 +293,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="thread-metric" title="Tokens">
               <q-icon name="data_usage" size="11px" />
-              {{ formatNumber(Number(turn.span.llm_usage_tokens_total) || 0) }} tokens
+              {{ formatNumber(getTokens(turn.span)) }} tokens
             </span>
             <span class="thread-metric" title="Cost">
               <q-icon name="payments" size="11px" />
-              {{ formatCost(Number(turn.span.llm_usage_cost_total) || 0) }}
+              {{ formatCost(getCost(turn.span)) }}
             </span>
             <span
               v-if="turn.span.span_status === 'ERROR'"
@@ -339,18 +339,54 @@ const store = useStore();
 
 const isDark = computed(() => store.state.theme === "dark");
 
+/* ─── field resolvers ─────────────────────────────────────────────────── */
+// The backend has migrated from custom `llm_*` fields to OpenTelemetry's
+// standard `gen_ai_*` semantic-convention fields. These helpers read the
+// new field name first and fall back to the legacy one so historical traces
+// still render. Centralised so any future field rename only touches one place.
+function getOp(span: any): string {
+  return String(
+    span?.gen_ai_operation_name || span?.llm_observation_type || "",
+  ).toUpperCase();
+}
+function getModel(span: any): string {
+  return String(
+    span?.gen_ai_response_model || span?.gen_ai_request_model || "",
+  );
+}
+function getInputRaw(span: any): unknown {
+  return span?.gen_ai_input_messages ?? span?.llm_input;
+}
+function getOutputRaw(span: any): unknown {
+  return span?.gen_ai_output_messages ?? span?.llm_output;
+}
+function getCost(span: any): number {
+  return (
+    Number(span?.gen_ai_usage_cost) ||
+    Number(span?.llm_usage_cost_total) ||
+    0
+  );
+}
+function getTokens(span: any): number {
+  return (
+    Number(span?.gen_ai_usage_total_tokens) ||
+    Number(span?.llm_usage_tokens_total) ||
+    0
+  );
+}
+
 /* ─── classifier ──────────────────────────────────────────────────────── */
 type SpanKind = "llm_turn" | "tool_call" | "agent" | "root" | "other";
 
 function hasLLMPayload(span: any): boolean {
-  const inp = span?.llm_input;
+  const inp = getInputRaw(span);
   if (typeof inp === "string") return inp.length > 2; // skip "{}" / "[]"
   if (inp && typeof inp === "object") return Object.keys(inp).length > 0;
   return false;
 }
 
 function classify(span: any): SpanKind {
-  const obs = String(span?.llm_observation_type || "").toUpperCase();
+  const obs = getOp(span);
   // "GENERATION" alone over-counts because Vertex/ADK and similar SDKs tag
   // wrapper spans (e.g. `generate_content`, `invoke_agent`) with the same
   // observation type. The actual model call is the inner span that carries
@@ -407,6 +443,10 @@ function extractContent(content: unknown): string {
         if (typeof part === "string") return part;
         if (part?.text) return String(part.text);
         if (part?.type === "text") return String(part.content ?? "");
+        // Vertex/ADK function_response part — surface only the textual body.
+        if (part?.function_response?.response?.content) {
+          return extractContent(part.function_response.response.content);
+        }
         return ""; // skip non-text parts (tool calls show up via spans)
       })
       .filter(Boolean)
@@ -423,28 +463,69 @@ function extractContent(content: unknown): string {
   return String(content);
 }
 
+/**
+ * Resolve the array of conversation turns from whatever shape the SDK chose.
+ *
+ * Supports:
+ *   1. Flat OTEL array:        [{role, content}, ...]
+ *   2. Wrapped messages key:   {messages: [...]}
+ *   3. Vertex/ADK request:     {model, config, contents: [{role, parts: [...]}]}
+ *      (parts may contain {text}, {function_call}, {function_response})
+ */
+function resolveMessageArray(parsed: any): any[] {
+  if (!parsed) return [];
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed.messages)) return parsed.messages;
+  if (Array.isArray(parsed.contents)) return parsed.contents;
+  return [];
+}
+
 function messagesFromInput(raw: unknown): Message[] {
   const parsed = safeParseJSON(raw);
   if (!parsed) return [];
 
-  // Most common shape from OTEL gen_ai: top-level array of messages.
-  const arr = Array.isArray(parsed)
-    ? parsed
-    : Array.isArray((parsed as any).messages)
-      ? (parsed as any).messages
-      : [];
-  if (!arr.length) return [];
+  const arr = resolveMessageArray(parsed);
 
-  return arr.map((m: any) => {
+  // Vertex/ADK input also carries the system prompt in `config.system_instruction`
+  // rather than as a message — surface it as a synthetic system entry so the
+  // ThreadHead system-prompt panel still resolves.
+  const messages: Message[] = [];
+  const sysInstruction = (parsed as any)?.config?.system_instruction;
+  if (typeof sysInstruction === "string" && sysInstruction.trim()) {
+    messages.push({
+      role: "system",
+      content: sysInstruction,
+      sig: `system::${sysInstruction}`,
+    });
+  }
+
+  if (!arr.length) return messages;
+
+  for (const m of arr) {
     const role = normalizeRole(m?.role);
     const content = extractContent(m?.content ?? m?.text ?? m?.parts);
-    return { role, content, sig: `${role}::${content}` };
-  });
+    messages.push({ role, content, sig: `${role}::${content}` });
+  }
+  return messages;
 }
 
 function messagesFromOutput(raw: unknown): Message[] {
   const parsed = safeParseJSON(raw);
   if (!parsed) return [];
+
+  // Vertex/ADK response shape: { content: { role, parts: [...] }, ... }
+  // — promote the inner content object into the standard message envelope.
+  if (
+    !Array.isArray(parsed) &&
+    (parsed as any).content &&
+    typeof (parsed as any).content === "object"
+  ) {
+    const inner = (parsed as any).content;
+    const role = normalizeRole(inner?.role || "assistant");
+    const content = extractContent(inner?.parts ?? inner?.content ?? inner);
+    if (!content) return [];
+    return [{ role, content, sig: `${role}::${content}` }];
+  }
 
   // Output is usually an array of one assistant message, but be defensive.
   const arr = Array.isArray(parsed) ? parsed : [parsed];
@@ -545,7 +626,7 @@ function buildTraceGroup(spans: any[]): TraceGroup | null {
   }
 
   // Resolve the head (system + canonical user query for this trace).
-  const inp0 = messagesFromInput(llmTurns[0].llm_input);
+  const inp0 = messagesFromInput(getInputRaw(llmTurns[0]));
   const sys = inp0.find((m) => m.role === "system");
 
   const rootSpan = spans.find(
@@ -589,7 +670,7 @@ function buildTraceGroup(spans: any[]): TraceGroup | null {
       });
     }
 
-    const inputMessages = messagesFromInput(turnSpan.llm_input);
+    const inputMessages = messagesFromInput(getInputRaw(turnSpan));
     const followupUsers: Message[] = [];
     for (const m of inputMessages) {
       if (m.role !== "user") continue;
@@ -605,14 +686,14 @@ function buildTraceGroup(spans: any[]): TraceGroup | null {
       toolCalls: attached.sort(
         (a, b) => Number(a.start_time) - Number(b.start_time),
       ),
-      assistant: messagesFromOutput(turnSpan.llm_output),
+      assistant: messagesFromOutput(getOutputRaw(turnSpan)),
       followupUsers,
     };
   });
 
   // Aggregates for the per-trace footer.
   const totalCost = turns.reduce(
-    (s, t) => s + (Number(t.span.llm_usage_cost_total) || 0),
+    (s, t) => s + getCost(t.span),
     0,
   );
   const startNs = Math.min(
@@ -775,7 +856,7 @@ const summary = computed(() => {
   const toolCount = all.filter((s) => classify(s) === "tool_call").length;
 
   let totalCost = 0;
-  for (const t of allTurnSpans) totalCost += Number(t.llm_usage_cost_total) || 0;
+  for (const t of allTurnSpans) totalCost += getCost(t);
 
   const starts = all.map((s) => Number(s.start_time)).filter(Number.isFinite);
   const ends = all.map((s) => Number(s.end_time)).filter(Number.isFinite);
@@ -784,7 +865,7 @@ const summary = computed(() => {
 
   const modelCount: Record<string, number> = {};
   for (const t of allTurnSpans) {
-    const m = String(t.gen_ai_request_model || "");
+    const m = getModel(t);
     if (!m) continue;
     modelCount[m] = (modelCount[m] || 0) + 1;
   }

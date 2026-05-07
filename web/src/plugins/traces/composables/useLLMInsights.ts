@@ -154,21 +154,21 @@ export function useLLMInsights() {
     startTime: number,
     endTime: number,
   ): Promise<void> {
-    // Cost comes from the span field llm_usage_cost_total — same source the
-    // Traces tab uses (see src/service/traces/otel/extractors/usage.rs which
-    // extracts gen_ai.usage.cost / Langfuse cost_details from the OTEL
-    // attributes at ingest time).
+    // Reads only the new OTEL gen_ai_* semantic-convention fields. DataFusion
+    // validates column references at parse time, so referencing a legacy
+    // column that doesn't exist on the stream's schema fails the query — the
+    // safe path forward is to use the standard fields exclusively.
     const sql = `
       SELECT
         COUNT(*) as request_count,
         approx_distinct(trace_id) as trace_count,
         COUNT(*) FILTER (WHERE span_status = 'ERROR') as error_count,
-        COALESCE(SUM(llm_usage_tokens_total), 0) as total_tokens,
-        COALESCE(SUM(llm_usage_cost_total), 0) as total_cost,
+        COALESCE(SUM(gen_ai_usage_total_tokens), 0) as total_tokens,
+        COALESCE(SUM(gen_ai_usage_cost), 0) as total_cost,
         COALESCE(AVG(duration), 0) as avg_duration,
         COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
       FROM "${streamName}"
-      WHERE gen_ai_system IS NOT NULL
+      WHERE gen_ai_operation_name IS NOT NULL
     `;
 
     target.value = { ...EMPTY_KPI };
@@ -206,20 +206,19 @@ export function useLLMInsights() {
   ): Promise<void> {
     const interval = bucketInterval(endTime - startTime);
 
-    // Single query produces all 5 sparkline series (cost included via the
-    // backend-stored llm_usage_cost_total field — same source the Traces tab
-    // uses, no client-side pricing map).
+    // Single query produces all 5 sparkline series, using only the new
+    // OTEL gen_ai_* fields (see fetchKPIInto for the rationale).
     const mainSql = `
       SELECT
         histogram(_timestamp, '${interval}') as ts,
         COUNT(*) as request_count,
         approx_distinct(trace_id) as trace_count,
         COUNT(*) FILTER (WHERE span_status = 'ERROR') as error_count,
-        COALESCE(SUM(llm_usage_tokens_total), 0) as total_tokens,
-        COALESCE(SUM(llm_usage_cost_total), 0) as total_cost,
+        COALESCE(SUM(gen_ai_usage_total_tokens), 0) as total_tokens,
+        COALESCE(SUM(gen_ai_usage_cost), 0) as total_cost,
         COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
       FROM "${streamName}"
-      WHERE gen_ai_system IS NOT NULL
+      WHERE gen_ai_operation_name IS NOT NULL
       GROUP BY ts
       ORDER BY ts
     `;

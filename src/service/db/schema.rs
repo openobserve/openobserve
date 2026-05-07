@@ -280,7 +280,13 @@ async fn list_stream_schemas(
                     schema: if fetch_schema {
                         val.schema().as_ref().clone()
                     } else {
+                        // Even when the caller did not ask for the full schema,
+                        // preserve the metadata (which carries `settings`,
+                        // `created_at`, etc.) so downstream consumers can read
+                        // properties like `is_llm_stream` from the cached
+                        // schema. The fields list itself is omitted.
                         Schema::empty()
+                            .with_metadata(val.schema().metadata().clone())
                     },
                 }
             })
@@ -332,29 +338,31 @@ pub async fn list(
     }
     Ok(schemas
         .into_iter()
-        .map(|((stream_name, stream_type), versions)| StreamSchema {
-            stream_name,
-            stream_type,
-            schema: if fetch_schema {
-                versions
-                    .iter()
-                    .max_by_key(|(_, start_dt)| *start_dt)
-                    .map(|(val, _)| {
-                        if fetch_schema {
-                            let mut schema: Vec<Schema> = json::from_slice(val).unwrap();
-                            if !schema.is_empty() {
-                                schema.remove(schema.len() - 1)
-                            } else {
-                                Schema::empty()
-                            }
-                        } else {
-                            Schema::empty()
-                        }
-                    })
-                    .unwrap()
+        .map(|((stream_name, stream_type), versions)| {
+            let latest = versions
+                .iter()
+                .max_by_key(|(_, start_dt)| *start_dt)
+                .map(|(val, _)| {
+                    let mut schema: Vec<Schema> = json::from_slice(val).unwrap();
+                    if !schema.is_empty() {
+                        schema.remove(schema.len() - 1)
+                    } else {
+                        Schema::empty()
+                    }
+                })
+                .unwrap_or_else(Schema::empty);
+            // When the caller didn't request full schema, drop the field list
+            // but keep the metadata so settings (e.g. `is_llm_stream`) survive.
+            let schema = if fetch_schema {
+                latest
             } else {
-                Schema::empty()
-            },
+                Schema::empty().with_metadata(latest.metadata().clone())
+            };
+            StreamSchema {
+                stream_name,
+                stream_type,
+                schema,
+            }
         })
         .collect())
 }

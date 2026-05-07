@@ -109,7 +109,18 @@ export interface LLMPanelDef {
 
 // Time-range pruning is handled by the search engine via the start_time /
 // end_time fields on the request payload — no need to repeat it in WHERE.
-const baseFilter = `gen_ai_system IS NOT NULL`;
+//
+// LLM Insights panels reference only the new OTEL gen_ai_* semantic-convention
+// fields. DataFusion validates column references at parse time, so referencing
+// a legacy column that doesn't exist on a given stream's schema would fail
+// the entire query — staying on the standard fields keeps panels portable.
+const baseFilter = `gen_ai_operation_name IS NOT NULL`;
+
+// Centralised column names so a future rename only touches this file.
+const COST_FIELD = `gen_ai_usage_cost`;
+const TOKENS_FIELD = `gen_ai_usage_total_tokens`;
+const MODEL_FIELD = `gen_ai_response_model`;
+const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 
 export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   {
@@ -121,16 +132,16 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       // Cost field populated by the backend extractor from
       // gen_ai.usage.cost / Langfuse cost_details — same source the Traces
-      // tab uses.
+      // tab uses. Falls back to the legacy llm_usage_cost_total column.
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
-          gen_ai_request_model as model,
-          COALESCE(SUM(llm_usage_cost_total), 0) as cost
+          ${MODEL_FIELD} as model,
+          COALESCE(SUM(${COST_FIELD}), 0) as cost
         FROM {{stream}}
         WHERE ${baseFilter}
-          AND gen_ai_request_model IS NOT NULL
-        GROUP BY ts, gen_ai_request_model
+          AND ${MODEL_FIELD} IS NOT NULL
+        GROUP BY ts, ${MODEL_FIELD}
         ORDER BY ts
       `,
       timeField: "ts",
@@ -149,12 +160,12 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
-          gen_ai_request_model as model,
-          COALESCE(SUM(llm_usage_tokens_total), 0) as tokens
+          ${MODEL_FIELD} as model,
+          COALESCE(SUM(${TOKENS_FIELD}), 0) as tokens
         FROM {{stream}}
         WHERE ${baseFilter}
-          AND gen_ai_request_model IS NOT NULL
-        GROUP BY ts, gen_ai_request_model
+          AND ${MODEL_FIELD} IS NOT NULL
+        GROUP BY ts, ${MODEL_FIELD}
         ORDER BY ts
       `,
       timeField: "ts",
@@ -172,7 +183,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
-          LOWER(COALESCE(llm_observation_type, 'span')) as kind,
+          LOWER(COALESCE(${OBSERVATION_TYPE_FIELD}, 'span')) as kind,
           COUNT(*) as count
         FROM {{stream}}
         WHERE ${baseFilter}
@@ -275,11 +286,11 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       sql: `
         SELECT
-          COALESCE(gen_ai_request_model, 'unknown') as model,
+          COALESCE(${MODEL_FIELD}, 'unknown') as model,
           COUNT(*) as count
         FROM {{stream}}
         WHERE ${baseFilter}
-        GROUP BY COALESCE(gen_ai_request_model, 'unknown')
+        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
         ORDER BY count DESC
       `,
       seriesField: "model",
@@ -297,11 +308,11 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       sql: `
         SELECT
-          COALESCE(gen_ai_request_model, 'unknown') as model,
-          COALESCE(SUM(llm_usage_tokens_total), 0) as tokens
+          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          COALESCE(SUM(${TOKENS_FIELD}), 0) as tokens
         FROM {{stream}}
         WHERE ${baseFilter}
-        GROUP BY COALESCE(gen_ai_request_model, 'unknown')
+        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
         ORDER BY tokens DESC
       `,
       seriesField: "model",
@@ -321,8 +332,8 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
           _timestamp,
           COALESCE(service_name, 'unknown') as service_name,
           COALESCE(span_name, '—') as operation,
-          COALESCE(gen_ai_request_model, 'unknown') as model,
-          COALESCE(llm_usage_cost_total, 0) as cost,
+          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          COALESCE(${COST_FIELD}, 0) as cost,
           trace_id
         FROM {{stream}}
         WHERE ${baseFilter}
