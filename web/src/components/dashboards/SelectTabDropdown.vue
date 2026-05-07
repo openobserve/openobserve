@@ -56,16 +56,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showAddTabDialog"
     size="md"
     :show-close="false"
-    @close="showAddTabDialog = false"
     data-test="dashboard-tab-add-dialog"
   >
     <AddTab
+      ref="addTabRef"
       :edit-mode="false"
       :dashboard-id="dashboardId"
       :folder-id="folderId"
       @refresh="updateTabList"
       @close="showAddTabDialog = false"
     />
+    <template #footer>
+      <div class="tw:flex tw:justify-start tw:gap-2">
+        <OButton variant="outline" size="sm-action" @click="showAddTabDialog = false" data-test="dashboard-add-cancel">{{ t('dashboard.cancel') }}</OButton>
+        <OButton variant="primary" size="sm-action" data-test="dashboard-add-tab-submit" @click="addTabRef?.submit()">{{ t('dashboard.save') }}</OButton>
+      </div>
+    </template>
   </ODrawer>
 </template>
 
@@ -103,6 +109,7 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddTabDialog: any = ref(false);
+    const addTabRef: any = ref(null);
     const tabList: any = ref([]);
 
     //dropdown selected folder index
@@ -176,6 +183,7 @@ export default defineComponent({
       selectedTab,
       updateTabList,
       showAddTabDialog,
+      addTabRef,
       tabList,
       getTabList,
     };
