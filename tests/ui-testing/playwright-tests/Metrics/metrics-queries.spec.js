@@ -20,7 +20,8 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
 
     // Navigate to metrics page (defaults to SQL mode now)
     await pm.metricsPage.gotoMetricsPage();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    // Wait for initial SQL auto-query and any error notifications to auto-dismiss
+    await page.waitForTimeout(6000);
 
     // Switch to PromQL mode (page defaults to SQL)
     await pm.metricsBuilderPage.switchToPromQLMode();
@@ -38,6 +39,13 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     tag: ['@metrics', '@promql', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing multiple PromQL query types in consolidated test');
+
+    // Switch to Custom mode so we can type queries directly
+    const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
+    if (await customBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await customBtn.click();
+      await page.waitForTimeout(500);
+    }
 
     // Using actual ingested metrics: up, cpu_usage, memory_usage, request_count, request_duration (all gauges)
     const queries = [
