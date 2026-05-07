@@ -18,11 +18,15 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Navigate to metrics page
+    // Navigate to metrics page (defaults to SQL mode now)
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    testLogger.info('Test setup completed - navigated to metrics page');
+    // Switch to PromQL mode (page defaults to SQL)
+    await pm.metricsBuilderPage.switchToPromQLMode();
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Test setup completed - navigated to metrics page in PromQL mode');
   });
 
   test.afterEach(async ({ page }, testInfo) => {
@@ -291,8 +295,11 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
 
       testLogger.info(`SQL invalid query state: hasError=${hasError}, hasNoData=${sqlHasNoData}, hasVisualization=${sqlHasVisualization}`);
 
-      // Same validation logic for SQL
-      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization;
+      // SQL invalid query should be handled gracefully.
+      // Note: With SQL-default mode, a previous valid query's chart may still be visible.
+      // Accept any graceful handling: error shown, no data message, or no new visualization.
+      const sqlErrorNotification = await pm.metricsPage.isErrorNotificationVisible();
+      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization || sqlErrorNotification;
       expect(sqlHandledGracefully).toBe(true);
 
       if (hasError) {

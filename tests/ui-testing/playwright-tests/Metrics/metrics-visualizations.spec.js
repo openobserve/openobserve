@@ -17,11 +17,15 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Navigate to metrics page
+    // Navigate to metrics page (defaults to SQL mode now)
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    testLogger.info('Test setup completed - navigated to metrics page');
+    // Switch to PromQL mode (page defaults to SQL)
+    await pm.metricsBuilderPage.switchToPromQLMode();
+    await page.waitForTimeout(1000);
+
+    testLogger.info('Test setup completed - navigated to metrics page in PromQL mode');
   });
 
   test.afterEach(async ({ page }, testInfo) => {

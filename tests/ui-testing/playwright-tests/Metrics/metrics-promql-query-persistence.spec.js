@@ -39,15 +39,19 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         pm = new PageManager(page);
         queryEditor = new MetricsQueryEditorPage(page);
 
-        // Navigate to metrics page
+        // Navigate to metrics page (defaults to SQL mode now)
         await pm.metricsPage.gotoMetricsPage();
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Switch to PromQL mode first (page defaults to SQL)
+        await pm.metricsBuilderPage.switchToPromQLMode();
+        await page.waitForTimeout(1000);
 
         // Close any dialogs or modals that might be open
         await page.keyboard.press('Escape');
         await page.waitForTimeout(500);
 
-        testLogger.info('Test setup completed - navigated to metrics page');
+        testLogger.info('Test setup completed - navigated to metrics page in PromQL mode');
     });
 
     test.afterEach(async ({ page }, testInfo) => {
