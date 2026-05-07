@@ -151,6 +151,12 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
         // Test SQL mode switch
         await sqlToggle.click();
         await page.waitForTimeout(500);
+        // Switch to Custom mode so editor is editable
+        const cBtn1 = page.locator('[data-test="dashboard-custom-query-type"]');
+        if (await cBtn1.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await cBtn1.click();
+          await page.waitForTimeout(300);
+        }
 
         const sqlIndicator = await pm.metricsPage.getSqlIndicator();
         const isSqlMode = await sqlIndicator.isVisible().catch(() => false);
@@ -169,6 +175,12 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
         if (!currentlyInSqlMode) {
           await sqlToggle.click();
           await page.waitForTimeout(500);
+          // Switch to Custom mode so editor is editable
+          const cBtn2 = page.locator('[data-test="dashboard-custom-query-type"]');
+          if (await cBtn2.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await cBtn2.click();
+            await page.waitForTimeout(300);
+          }
         }
 
         // Enter and execute SQL query
