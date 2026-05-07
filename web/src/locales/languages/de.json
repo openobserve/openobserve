@@ -390,7 +390,8 @@
     "autoRunEnabled": "Automatischer Lauf aktiviert",
     "selectStreamFirst": "Wähle zuerst einen Stream",
     "traces": "Spuren",
-    "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln"
+    "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln",
+    "patternNoValuesAvailable": "Keine Werte verfügbar"
   },
   "menu": {
     "home": "Startseite",
