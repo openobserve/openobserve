@@ -1244,6 +1244,8 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should show order by default for distinct queries @bug-3131 @P2 @distinct @orderBy @regression", async ({ page }) => {
     testLogger.info('Test: Verify order by displayed for distinct queries (Bug #3131)');
 
+    const orgName = getOrgIdentifier() || 'default';
+
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
@@ -1260,24 +1262,41 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.clearAndFillQueryEditor(distinctQuery);
     await page.waitForTimeout(500);
 
+    // Intercept the _search POST to verify ORDER BY is injected into the executed SQL.
+    // Filter for the main search call (search_type=ui), not histogram or partition calls.
+    const searchRequestPromise = page.waitForRequest(
+      req => req.url().includes(`/api/${orgName}/_search`)
+        && req.method() === 'POST'
+        && !req.url().includes('search_type=histogram')
+        && !req.url().includes('_search_partition'),
+      { timeout: 15000 }
+    );
+
     // Run query
     await pm.logsPage.clickRefreshButton();
+    const searchRequest = await searchRequestPromise.catch(() => null);
+
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    // STRONG ASSERTION: Query executed successfully — logs table visible
+    if (!searchRequest) {
+      throw new Error('Bug #3131: No _search POST request captured — query may not have executed');
+    }
+
+    const postBody = searchRequest.postDataJSON();
+    const sql = postBody?.query?.sql || '';
+    testLogger.info(`Captured _search SQL: ${sql}`);
+
+    // STRONG ASSERTION: The executed SQL must contain ORDER BY (auto-injected for DISTINCT)
+    expect(sql, 'Bug #3131: ORDER BY must be auto-injected into executed SQL for DISTINCT queries')
+      .toMatch(/ORDER BY/i);
+    testLogger.info('✓ ORDER BY auto-injected in executed SQL');
+
+    // Secondary assertions: query executed successfully
     await pm.logsPage.expectLogsTableVisible();
     testLogger.info('✓ Distinct query executed, results visible');
-
-    // STRONG ASSERTION: Result pagination visible
     await pm.logsPage.expectResultPaginationVisible();
     testLogger.info('✓ Result pagination visible for distinct query');
-
-    // Bug #3131: ORDER BY is auto-injected at the SQL-execution layer for DISTINCT
-    // queries (not reflected in the editor text), so verify the query executed
-    // successfully and returned results rather than checking editor content
-    await pm.logsPage.expectTableColumnHeaderVisible('kubernetes_pod_name');
-    testLogger.info('✓ Distinct query results show expected column');
 
     testLogger.info('✓ PASSED: Order by default for distinct queries verified (Bug #3131)');
   });
