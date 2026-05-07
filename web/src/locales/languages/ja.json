@@ -3315,7 +3315,9 @@
     "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。",
     "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。",
     "serviceGroupProtected": "サービスグループは削除できません。変更できるのはマップされたフィールドだけです。",
-    "noDataFound": "データが見つかりません"
+    "noDataFound": "データが見つかりません",
+    "isWorkloadType": "サービス識別子",
+    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
