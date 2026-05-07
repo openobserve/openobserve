@@ -147,8 +147,8 @@ export class LogsPage {
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
 
         // Query type selector (Auto/Custom mode)
-        this.builderQueryType = '[data-test="logs-build-mode-builder-btn"]';
-        this.customQueryType = '[data-test="logs-build-mode-custom-btn"]';
+        this.builderQueryType = '[data-test="dashboard-builder-query-type"]';
+        this.customQueryType = '[data-test="dashboard-custom-query-type"]';
         this.sqlQueryType = '[data-test="dashboard-sql-query-type"]';
         this.promqlQueryType = '[data-test="dashboard-promql-query-type"]';
 
@@ -6345,8 +6345,8 @@ export class LogsPage {
     async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
         await expect(builderTypeBtn).toBeVisible({ timeout });
-        // Verify "Builder" button has "selected" class (active state)
-        await expect(builderTypeBtn).toHaveClass(/selected/, { timeout });
+        // Verify "Builder" button is active (OToggleGroupItem uses data-state="on")
+        await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
 

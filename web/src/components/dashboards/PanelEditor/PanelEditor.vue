@@ -126,6 +126,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="layout-panel-container col"
                   :style="layoutPanelContainerStyle"
                 >
+                  <!-- Mode selection (left) + Add To Dashboard (right) row -->
+                  <div
+                    class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-2"
+                  >
+                    <QueryTypeSelector
+                      v-if="pageType === 'build'"
+                      :showQueryType="false"
+                    />
+                    <div v-else />
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <PanelErrorButtons
+                        :error="errorMessage"
+                        :maxQueryRangeWarning="maxQueryRangeWarning"
+                        :limitNumberOfSeriesWarningMessage="
+                          limitNumberOfSeriesWarningMessage
+                        "
+                        :isCachedDataDifferWithCurrentTimeRange="
+                          isCachedDataDifferWithCurrentTimeRange
+                        "
+                        :isPartialData="isPartialData"
+                        :isPanelLoading="isPanelLoading"
+                        :lastTriggeredAt="
+                          resolvedConfig.showLastRefreshedTime
+                            ? (lastTriggeredAt as any)
+                            : null
+                        "
+                        :viewOnly="false"
+                      />
+                      <OButton
+                        v-if="resolvedConfig.showAddToDashboardButton"
+                        variant="primary"
+                        size="xs"
+                        @click="emit('addToDashboard')"
+                        :title="t('search.addToDashboard')"
+                      >
+                        {{ t("search.addToDashboard") }}
+                      </OButton>
+                    </div>
+                  </div>
+
                   <!-- Query Builder -->
                   <DashboardQueryBuilder
                     v-if="resolvedConfig.showQueryBuilder"
@@ -135,14 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   />
                   <q-separator v-if="resolvedConfig.showQueryBuilder" />
-
-                  <!-- Query Type Selector (build mode) - Auto/Custom toggle -->
-                  <div
-                    v-if="resolvedConfig.showQueryTypeSelector"
-                    class="tw:flex tw:justify-end tw:items-center tw:px-3 tw:py-2 tw:bg-gray-50 dark:tw:bg-gray-800"
-                  >
-                    <QueryTypeSelector />
-                  </div>
 
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
@@ -194,42 +226,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "Apply" button to run the query again
                       </div>
                     </div>
-                  </div>
-
-                  <!-- Warning icons and last refreshed time -->
-                  <div
-                    class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2"
-                  >
-                    <!-- Common error/warning buttons component -->
-                    <PanelErrorButtons
-                      :error="errorMessage"
-                      :maxQueryRangeWarning="maxQueryRangeWarning"
-                      :limitNumberOfSeriesWarningMessage="
-                        limitNumberOfSeriesWarningMessage
-                      "
-                      :isCachedDataDifferWithCurrentTimeRange="
-                        isCachedDataDifferWithCurrentTimeRange
-                      "
-                      :isPartialData="isPartialData"
-                      :isPanelLoading="isPanelLoading"
-                      :lastTriggeredAt="
-                        resolvedConfig.showLastRefreshedTime
-                          ? (lastTriggeredAt as any)
-                          : null
-                      "
-                      :viewOnly="false"
-                    />
-
-                    <!-- Add to Dashboard button (metrics/logs/build mode) -->
-                    <OButton
-                      v-if="resolvedConfig.showAddToDashboardButton"
-                      variant="primary"
-                      size="xs"
-                      @click="emit('addToDashboard')"
-                      :title="t('search.addToDashboard')"
-                    >
-                      {{ t("search.addToDashboard") }}
-                    </OButton>
                   </div>
 
                   <!-- Chart Area -->
@@ -867,7 +863,7 @@ const chartAreaStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return {};
   }
-  return { height: "calc(100vh - var(--navbar-height) - 464px)" };
+  return { height: "calc(100vh - var(--navbar-height) - 464px)", marginTop: '0px' };
 });
 
 // Main content area class - logs needs flat background without card styling

@@ -15,10 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-py-sm">
+  <div>
     <div class="row tw:gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
+        v-if="showQueryType"
         variant="primary"
         :model-value="selectedButtonQueryType"
         @update:model-value="onUpdateQueryMode($event as string)"
@@ -101,7 +102,12 @@ import { Database, ChartLine, Wrench, Code2 } from "lucide-vue-next";
 export default defineComponent({
   name: "QueryTypeSelector",
   component: { ConfirmDialog },
-  props: [],
+  props: {
+    showQueryType: {
+      type: Boolean,
+      default: true,
+    },
+  },
   emits: [],
   setup() {
     const router = useRouter();
