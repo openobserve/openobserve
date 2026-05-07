@@ -242,10 +242,13 @@ test.describe("Alerts Stream Switching Regression", () => {
     // avg: only numeric fields — must be a strict subset of baseline
     await pm.alertsPage.selectAggregationFunction('avg');
     await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields);
+    const avgFields = await pm.alertsPage.getAvailableFields();
 
-    // sum: same filtering
+    // sum: must produce the SAME fields as avg (both filter to numeric-only)
     await pm.alertsPage.selectAggregationFunction('sum');
     await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields);
+    const sumFields = await pm.alertsPage.getAvailableFields();
+    expect(avgFields.sort(), 'avg and sum should filter to the same numeric-only field set').toEqual(sumFields.sort());
 
     // count: all fields available (no filtering)
     await pm.alertsPage.selectAggregationFunction('count');

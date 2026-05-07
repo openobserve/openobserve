@@ -2425,10 +2425,11 @@ export class AlertsPage {
      * (both share data-test="add-alert-back-btn").
      */
     async closeEditorDialog() {
-        const dialogBackBtn = this.page.locator('.q-dialog [data-test="add-alert-back-btn"]').first();
+        const dialog = this.page.locator('.q-dialog').first();
+        const dialogBackBtn = dialog.locator('[data-test="add-alert-back-btn"]').first();
         await dialogBackBtn.waitFor({ state: 'visible', timeout: 10000 });
         await dialogBackBtn.click();
-        await this.page.waitForTimeout(1000);
+        await expect(dialog).not.toBeAttached({ timeout: 10000 });
         testLogger.info('Closed editor dialog via scoped back button');
     }
 
@@ -3326,6 +3327,11 @@ export class AlertsPage {
         const missing = allFieldsBaseline.filter(f => !fields.includes(f));
 
         expect(missing.length, `Expected some fields from baseline to be filtered out for numeric-only aggregation, but all ${allFieldsBaseline.length} baseline fields are still present`).toBeGreaterThan(0);
+
+        // Every returned field must be in the baseline (no spurious fields)
+        const spurious = fields.filter(f => !allFieldsBaseline.includes(f));
+        expect(spurious, `Fields not in baseline appeared: [${spurious.join(', ')}]`).toHaveLength(0);
+
         testLogger.info('Only numeric fields are visible', { totalFields: fields.length, filteredOut: missing.length, filteredFields: missing });
     }
 
