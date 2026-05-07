@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:max-w-[32rem]"
+                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap"
               >
                 <span>{{ formatTimestamp(traceStartTime) }}</span>
                 <div
@@ -102,6 +102,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
+
+                <!-- Session ID (LLM traces) -->
+                <template v-if="sessionId">
+                  <div
+                    class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+                  />
+                  <span class="tw:mr-[0.25rem]">
+                    Session ID:
+                    <span
+                      data-test="trace-details-session-id"
+                      class="tw:text-[var(--o2-text-primary)] tw:font-mono"
+                      :title="sessionId"
+                    >
+                      {{ sessionId }}
+                    </span>
+                  </span>
+                  <q-icon
+                    data-test="trace-details-copy-session-id-btn"
+                    name="content_copy"
+                    size="12px"
+                    class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
+                    title="Copy Session ID"
+                    @click="copySessionId"
+                  />
+                </template>
 
                 <!-- Open in new icon (embedded mode only) -->
                 <q-icon
@@ -250,6 +275,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ><GitBranch class="tw:size-3.5 tw:shrink-0"
                 /></template>
                 DAG
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                v-if="hasLLMSpans"
+                value="thread"
+                size="sm"
+                data-test="trace-details-thread-tab"
+              >
+                <template #icon-left
+                  ><MessageSquare class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                Thread
               </OToggleGroupItem>
               <OToggleGroupItem
                 v-if="hasLLMSpans && evalPipelineExists && evalData.length > 0"
@@ -617,6 +653,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
+            <!-- Thread View — chat-style projection of LLM turns -->
+            <div
+              v-if="activeTab === 'thread'"
+              style="display: flex; flex: 1; min-height: 0"
+              class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
+            >
+              <div
+                class="thread-left-panel"
+                :style="{
+                  width:
+                    isSidebarOpen && (selectedSpanId || showTraceDetails)
+                      ? '60%'
+                      : '100%',
+                  minWidth: '320px',
+                  height: '100%',
+                  overflow: 'hidden',
+                }"
+              >
+                <ThreadView
+                  :spans="effectiveSpanList"
+                  :selected-span-id="selectedSpanId"
+                  @span-selected="updateSelectedSpan"
+                />
+              </div>
+              <div
+                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                class="tw:border-l tw:border-l-solid tw:border-l-[var(--o2-border-color)]"
+                style="width: 40%; min-width: 300px; height: 100%; overflow: hidden;"
+              >
+                <trace-details-sidebar
+                  data-test="trace-details-thread-sidebar"
+                  :span="spanMap[selectedSpanId as string]"
+                  :baseTracePosition="baseTracePosition"
+                  :search-query="searchQuery"
+                  :stream-name="currentTraceStreamName"
+                  :service-streams-enabled="serviceStreamsEnabled"
+                  :parent-mode="mode"
+                  @view-logs="redirectToLogs"
+                  @close="closeSidebar"
+                  @open-trace="openTraceLink"
+                  @add-filter="addFilterFromSidebar"
+                  @apply-filter-immediately="applyFilterImmediately"
+                />
+              </div>
+            </div>
+
             <!-- Spans Table View Placeholder -->
             <div
               v-if="activeTab === 'spans'"
@@ -839,6 +921,7 @@ import {
   Network,
   GitBranch,
   ClipboardCheck,
+  MessageSquare,
 } from "lucide-vue-next";
 import pipelineService from "@/services/pipelines";
 
@@ -850,6 +933,11 @@ const FlameGraphView = defineAsyncComponent(
 // Import TraceEvaluationsView
 const TraceEvaluationsView = defineAsyncComponent(
   () => import("./TraceEvaluationsView.vue"),
+);
+
+// Import ThreadView (LLM Thread tab)
+const ThreadView = defineAsyncComponent(
+  () => import("./ThreadView.vue"),
 );
 
 export default defineComponent({
@@ -939,6 +1027,8 @@ export default defineComponent({
     Network,
     GitBranch,
     ClipboardCheck,
+    MessageSquare,
+    ThreadView,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
@@ -1258,6 +1348,30 @@ export default defineComponent({
     });
 
     // Tabs configuration matching TraceDetailsV2 — inlined into template
+    const traceTabs = computed(() => {
+      const tabs = [
+        { label: "Waterfall", value: "waterfall" },
+        { label: "Flame Graph", value: "flame-graph" },
+        { label: "Trace Graph", value: "map" },
+      ];
+      // Conditionally add DAG tab for LLM traces
+      if (hasLLMSpans.value) {
+        tabs.push({ label: "DAG", value: "dag" });
+      }
+      // Thread view — chat-style projection of LLM turns and tool calls.
+      if (hasLLMSpans.value) {
+        tabs.push({ label: "Thread", value: "thread" });
+      }
+      // Conditionally add Evaluations tab for LLM traces with evaluation data
+      if (
+        hasLLMSpans.value &&
+        evalPipelineExists.value &&
+        evalData.value.length > 0
+      ) {
+        tabs.push({ label: "Evaluations", value: "evaluations" });
+      }
+      return tabs;
+    });
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -2334,6 +2448,21 @@ export default defineComponent({
       copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
+    const sessionId = computed<string>(() => {
+      const s = spanList.value?.[0];
+      return s?.session_id ? String(s.session_id) : "";
+    });
+
+    const copySessionId = () => {
+      if (!sessionId.value) return;
+      copyToClipboard(sessionId.value);
+      $q.notify({
+        type: "positive",
+        message: "Session ID copied to clipboard",
+        timeout: 2000,
+      });
+    };
+
     /**
      * Computed property for trace details share URL
      * Uses custom time range from router query params
@@ -2705,6 +2834,8 @@ export default defineComponent({
       toggleTimeline,
       copyToClipboard,
       copyTraceId,
+      sessionId,
+      copySessionId,
       traceDetailsShareURL,
       outlinedInfo,
       outlinedPlayCircle,
