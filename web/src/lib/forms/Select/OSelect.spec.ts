@@ -1,0 +1,77 @@
+// Copyright 2026 OpenObserve Inc.
+
+import { describe, it, expect, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import OSelect from "./OSelect.vue";
+
+describe("OSelect", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("renders without errors", () => {
+    wrapper = mount(OSelect);
+    expect(wrapper.exists()).toBe(true);
+  });
+
+  it("renders a label when prop is provided", () => {
+    wrapper = mount(OSelect, { props: { label: "Country" } });
+    expect(wrapper.find("label").text()).toBe("Country");
+  });
+
+  it("renders a trigger button", () => {
+    wrapper = mount(OSelect);
+    expect(wrapper.find("button").exists()).toBe(true);
+  });
+
+  it("shows placeholder text when no value is selected", () => {
+    wrapper = mount(OSelect, {
+      props: { placeholder: "Pick one" },
+    });
+    expect(wrapper.text()).toContain("Pick one");
+  });
+
+  it("shows clear button when clearable and a value is set", () => {
+    wrapper = mount(OSelect, {
+      props: {
+        clearable: true,
+        modelValue: "a",
+        options: [{ label: "Option A", value: "a" }],
+      },
+    });
+    expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("does not show clear button when value is undefined", () => {
+    wrapper = mount(OSelect, {
+      props: { clearable: true, modelValue: undefined },
+    });
+    expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("emits clear event when clear button is clicked", async () => {
+    wrapper = mount(OSelect, {
+      props: {
+        clearable: true,
+        modelValue: "a",
+        options: [{ label: "Option A", value: "a" }],
+      },
+    });
+    await wrapper.find('button[aria-label="Clear selection"]').trigger("click");
+    expect(wrapper.emitted("clear")).toBeTruthy();
+    expect(wrapper.emitted("update:modelValue")![0][0]).toBeUndefined();
+  });
+
+  it("shows error message when provided", () => {
+    wrapper = mount(OSelect, {
+      props: { errorMessage: "Selection required" },
+    });
+    expect(wrapper.text()).toContain("Selection required");
+  });
+});
