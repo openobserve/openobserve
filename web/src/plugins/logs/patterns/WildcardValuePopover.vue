@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Body - bar chart distribution -->
     <div class="wildcard-popover-body">
       <div
-        v-for="(item, i) in topValues.slice(0, 10)"
+        v-for="(item, i) in displayValues.slice(0, 10)"
         :key="i"
         class="wildcard-value-row"
         :data-test="`wildcard-value-row-${i}`"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        v-if="topValues.length === 0"
+        v-if="displayValues.length === 0"
         class="tw:text-[0.6875rem] tw:opacity-50 tw:py-4 tw:text-center"
       >
         {{ t("search.patternNoValuesAvailable") }}
@@ -77,13 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
+import { formatCount } from "@/utils/logs/convertLogData";
 import { wildcardChipColor } from "@/composables/useLogs/useTemplateTokenizer";
-import type { WildcardTopValue } from "@/composables/useLogs/useTemplateTokenizer";
+import type { WildcardDisplayValue } from "./useWildcardHover";
 
 const props = defineProps<{
   visible: boolean;
   token: string;
-  topValues: WildcardTopValue[];
+  displayValues: WildcardDisplayValue[];
   anchorEl: HTMLElement | null;
 }>();
 
@@ -97,20 +98,24 @@ const { t } = useI18n();
 const popoverRef = ref<HTMLElement | null>(null);
 const flipUpward = ref(false);
 
-const compactFormatter = new Intl.NumberFormat("en", {
-  notation: "compact",
-  compactDisplay: "short",
-});
-
-function formatCount(count: number): string {
-  return compactFormatter.format(count);
-}
+watch(
+  () => [props.visible, props.token, props.displayValues],
+  () => {
+    console.log("[WildcardValuePopover] props updated", {
+      visible: props.visible,
+      token: props.token,
+      displayValues: props.displayValues,
+    });
+  },
+  { immediate: true },
+);
 
 const maxCount = computed(() =>
-  Math.max(...props.topValues.map((v) => v.count), 1),
+  Math.max(...props.displayValues.map((v) => v.count), 1),
 );
 
 const barWidth = (count: number): string => {
+  if (!count) return "0%";
   const pct = (count / maxCount.value) * 100;
   return `${Math.max(pct, 2)}%`;
 };
@@ -277,16 +282,14 @@ watch(
 .wildcard-value-bar-wrapper {
   position: absolute;
   inset: 0;
-  border-radius: 0;
   overflow: hidden;
   pointer-events: none;
 }
 
 .wildcard-value-bar {
   height: 100%;
-  border-radius: 0;
   opacity: 0.18;
-  min-width: 0.25rem;
+  min-width: 0;
   transition: opacity 0.1s ease;
 
   .wildcard-value-row:hover & {
