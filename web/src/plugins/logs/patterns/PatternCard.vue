@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'tw:flex-nowrap tw:overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
-        :title="pattern.template"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
           <span
