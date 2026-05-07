@@ -403,19 +403,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(qtRange).toBe(true);
     testLogger.info('Query type: Range');
 
-    // 4. Select a known metric stream, set time range, and run query
-    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
-    await streamSelector.click();
-    await page.waitForTimeout(500);
-    await streamSelector.clear();
-    await streamSelector.fill('cpu');
-    await page.waitForTimeout(1000);
-    const cpuOption = page.locator('[data-test^="index-dropdown-stream-option-"]').first();
-    if (await cpuOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await cpuOption.click();
-    }
-    await page.waitForTimeout(500);
-
+    // 4. Set time range and run query (metric already selected at the top of this test)
     await pm.metricsPage.openDatePicker();
     await pm.metricsPage.selectLast15Minutes();
     await page.waitForTimeout(1000);
