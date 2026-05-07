@@ -2937,6 +2937,9 @@ mod tests {
             streaming_aggs: false,
             streaming_id: Some("stream123".to_string()),
             is_histogram_eligible: false,
+            is_non_ts_order_by: false,
+            order_by_col: None,
+            order_by_desc: true,
         };
 
         response
