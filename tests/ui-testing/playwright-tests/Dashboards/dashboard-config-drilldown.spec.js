@@ -714,30 +714,37 @@ test.describe(
 
         await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
 
-        // Wait for URL to update (same dashboard — URL stays on /dashboards/view)
-        await page.waitForURL(/\/dashboards\/view/, { timeout: 15000 });
-        await safeWaitForNetworkIdle(page, { timeout: 3000 });
+        try {
+          // Wait for var-* param to appear — waitForURL(/\/dashboards\/view/) is a
+          // no-op for same-dashboard drilldowns (page is already on that path).
+          await page.waitForURL(
+            u => new URL(u).searchParams.has(`var-${variableName}`),
+            { timeout: 15000 }
+          );
 
-        // ── 8. Verify var-* param is in URL immediately after drilldown ───────
-        const urlAfterDrilldown = page.url();
-        testLogger.info(`URL after drilldown: ${urlAfterDrilldown}`);
-        expect(urlAfterDrilldown).toContain(`var-${variableName}=`);
-        testLogger.info(`✅ var-${variableName} present in URL after drilldown`);
+          // ── 8. Assert var-* VALUE immediately after drilldown ─────────────
+          // Asserting key+value (not just key existence) catches a clobber that
+          // rewrites to var-X=oldValue, which a .toContain("var-X=") check misses.
+          const varValueAfterDrilldown = new URL(page.url()).searchParams.get(`var-${variableName}`);
+          testLogger.info(`URL after drilldown: ${page.url()}`);
+          expect(varValueAfterDrilldown).toBeTruthy();
+          testLogger.info(`✅ var-${variableName}=${varValueAfterDrilldown} present in URL after drilldown`);
 
-        // ── 9. Regression guard: wait and verify URL is NOT clobbered ─────────
-        // Before PR #11134 fix: updateUrlWithCurrentState() would overwrite var-*
-        // with stale committed values, making the var-* param disappear or revert.
-        await page.waitForTimeout(800);
-        const urlAfterWait = page.url();
-        testLogger.info(`URL after 800ms wait: ${urlAfterWait}`);
-        expect(urlAfterWait).toContain(`var-${variableName}=`);
-        testLogger.info(
-          `✅ URL clobber guard passed — var-${variableName} persists 800ms after same-dashboard drilldown`
-        );
-
-        // ── Cleanup ───────────────────────────────────────────────────────────
-        await pm.dashboardList.menuItem("dashboards-item");
-        await deleteDashboard(page, dashboardName);
+          // ── 9. Regression guard: same value must survive 800ms ────────────
+          // Before PR #11134 fix: updateUrlWithCurrentState() would rewrite var-*
+          // back to the committed (stale) value — the value would change or vanish.
+          await page.waitForTimeout(800);
+          const varValueAfterWait = new URL(page.url()).searchParams.get(`var-${variableName}`);
+          testLogger.info(`URL after 800ms wait: ${page.url()}`);
+          expect(varValueAfterWait).toBe(varValueAfterDrilldown);
+          testLogger.info(
+            `✅ URL clobber guard passed — var-${variableName} value unchanged 800ms after same-dashboard drilldown`
+          );
+        } finally {
+          // ── Cleanup — runs even if assertions above throw ─────────────────
+          await pm.dashboardList.menuItem("dashboards-item").catch(() => {});
+          await deleteDashboard(page, dashboardName).catch(() => {});
+        }
       }
     );
 
@@ -882,25 +889,39 @@ test.describe(
         ).toContainText("PassAll Same Dash");
 
         await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
-        await page.waitForURL(/\/dashboards\/view/, { timeout: 15000 });
-        await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-        // ── 6. Verify var-* param persists after passAllVariables drilldown ───
-        const urlAfterDrilldown = page.url();
-        testLogger.info(`URL after drilldown: ${urlAfterDrilldown}`);
-        expect(urlAfterDrilldown).toContain(`var-${variableName}=`);
+        try {
+          // Wait for var-* param to appear — no-op waitForURL(/view/) replaced with
+          // a param-level wait so we don't race the async URL update.
+          await page.waitForURL(
+            u => new URL(u).searchParams.has(`var-${variableName}`),
+            { timeout: 15000 }
+          );
 
-        // Regression guard: variable value should NOT be clobbered
-        await page.waitForTimeout(800);
-        const urlAfterWait = page.url();
-        expect(urlAfterWait).toContain(`var-${variableName}=`);
-        testLogger.info(
-          `✅ passAllVariables: var-${variableName} persists 800ms after same-dashboard drilldown`
-        );
+          // ── 6. Assert var-* VALUE matches what was selected ───────────────
+          // selectedValue was captured above but previously unused — asserting it
+          // here means a clobber back to an empty/stale value will fail the test.
+          const varValueAfterDrilldown = decodeURIComponent(
+            new URL(page.url()).searchParams.get(`var-${variableName}`)
+          );
+          testLogger.info(`URL after drilldown: ${page.url()}`);
+          expect(varValueAfterDrilldown).toBe(selectedValue);
+          testLogger.info(`✅ var-${variableName}=${varValueAfterDrilldown} matches selected value`);
 
-        // ── Cleanup ───────────────────────────────────────────────────────────
-        await pm.dashboardList.menuItem("dashboards-item");
-        await deleteDashboard(page, dashboardName);
+          // Regression guard: same value must survive 800ms
+          await page.waitForTimeout(800);
+          const varValueAfterWait = decodeURIComponent(
+            new URL(page.url()).searchParams.get(`var-${variableName}`)
+          );
+          expect(varValueAfterWait).toBe(selectedValue);
+          testLogger.info(
+            `✅ passAllVariables: var-${variableName} value unchanged 800ms after same-dashboard drilldown`
+          );
+        } finally {
+          // ── Cleanup — runs even if assertions above throw ─────────────────
+          await pm.dashboardList.menuItem("dashboards-item").catch(() => {});
+          await deleteDashboard(page, dashboardName).catch(() => {});
+        }
       }
     );
 
@@ -1060,34 +1081,44 @@ test.describe(
         ).toContainText("Same Dash Tab Drilldown");
 
         await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
-        await page.waitForURL(/\/dashboards\/view/, { timeout: 15000 });
-        await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-        // ── 5. Verify URL: same dashboard ID, different tab, var-* present ───
-        const urlAfterDrilldown = page.url();
-        const urlParamsAfter = new URL(urlAfterDrilldown).searchParams;
-        testLogger.info(`URL after tab-switch drilldown: ${urlAfterDrilldown}`);
+        try {
+          // Wait for var-* param to appear — param-level wait handles the async
+          // URL update that a path-level waitForURL would resolve too early.
+          await page.waitForURL(
+            u => new URL(u).searchParams.has(`var-${variableName}`),
+            { timeout: 15000 }
+          );
 
-        // Dashboard ID should be the same
-        expect(urlParamsAfter.get("dashboard")).toBe(dashboardParam);
-        testLogger.info("✅ Dashboard ID unchanged after same-dashboard drilldown");
+          // ── 5. Assert dashboard ID, var-* VALUE, and tab all correct ────────
+          const urlParamsAfter = new URL(page.url()).searchParams;
+          testLogger.info(`URL after tab-switch drilldown: ${page.url()}`);
 
-        // var-* should be in URL
-        expect(urlAfterDrilldown).toContain(`var-${variableName}=`);
-        testLogger.info(`✅ var-${variableName} present in URL after tab-switch drilldown`);
+          // Dashboard ID must be unchanged (same dashboard, different tab)
+          expect(urlParamsAfter.get("dashboard")).toBe(dashboardParam);
+          testLogger.info("✅ Dashboard ID unchanged after same-dashboard drilldown");
 
-        // Regression guard: wait and verify no clobber
-        await page.waitForTimeout(800);
-        const urlAfterWait = page.url();
-        expect(urlAfterWait).toContain(`var-${variableName}=`);
-        expect(new URL(urlAfterWait).searchParams.get("dashboard")).toBe(dashboardParam);
-        testLogger.info(
-          "✅ URL clobber guard passed — dashboard ID and var-* both persist after tab-switch drilldown"
-        );
+          // var-* value must match what was selected — asserting value (not just
+          // key) catches a clobber that rewrites to the stale committed value.
+          const varValueAfterDrilldown = decodeURIComponent(
+            urlParamsAfter.get(`var-${variableName}`)
+          );
+          expect(varValueAfterDrilldown).toBe(selectedValue);
+          testLogger.info(`✅ var-${variableName}=${varValueAfterDrilldown} matches selected value`);
 
-        // ── Cleanup ───────────────────────────────────────────────────────────
-        await pm.dashboardList.menuItem("dashboards-item");
-        await deleteDashboard(page, dashboardName);
+          // Regression guard: both dashboard ID and var-* value must survive 800ms
+          await page.waitForTimeout(800);
+          const urlParamsAfterWait = new URL(page.url()).searchParams;
+          expect(decodeURIComponent(urlParamsAfterWait.get(`var-${variableName}`))).toBe(selectedValue);
+          expect(urlParamsAfterWait.get("dashboard")).toBe(dashboardParam);
+          testLogger.info(
+            "✅ URL clobber guard passed — dashboard ID and var-* value both unchanged after tab-switch drilldown"
+          );
+        } finally {
+          // ── Cleanup — runs even if assertions above throw ─────────────────
+          await pm.dashboardList.menuItem("dashboards-item").catch(() => {});
+          await deleteDashboard(page, dashboardName).catch(() => {});
+        }
       }
     );
   }
