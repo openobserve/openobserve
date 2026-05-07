@@ -932,39 +932,34 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should not have run query button stuck in loading state after home-logs navigation @bug-10344 @P0 @runQuery @loading @regression", async ({ page }) => {
     testLogger.info('Test: Verify run query button not stuck loading after navigation (Bug #10344)');
 
-    const orgIdentifier = getOrgIdentifier() || 'default';
-    const logsUrl = `${logData.logsUrl}?org_identifier=${orgIdentifier}`;
-    const homeUrl = `/web/?org_identifier=${orgIdentifier}`;
-
-    // Navigate between home and logs multiple times
-    for (let i = 0; i < 4; i++) {
-      testLogger.info(`Navigation cycle ${i + 1}/4: Logs → Home → Logs`);
-
-      // Go to logs page
-      await page.goto(logsUrl);
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
-
-      // Verify run query button is visible and not in loading state
-      await pm.logsPage.expectRefreshButtonVisible();
-      await pm.logsPage.expectRefreshButtonEnabled();
-      testLogger.info(`✓ Run query button not loading after logs navigation (cycle ${i + 1})`);
-
-      // Go to home page
-      await page.goto(homeUrl);
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
-      testLogger.info(`✓ Home page loaded (cycle ${i + 1})`);
-    }
-
-    // Final navigation to logs and verify button is clickable
-    await page.goto(logsUrl);
+    // Navigate to logs page via SPA menu click (not page.goto — Bug #10344 is about
+    // SPA state-leak across in-app navigation, which full reloads would reset)
+    await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(1000);
 
-    // STRONG ASSERTION: After all navigation cycles, button should be enabled
+    // Navigate between home and logs multiple times using SPA menu clicks
+    for (let i = 0; i < 4; i++) {
+      testLogger.info(`Navigation cycle ${i + 1}/4: Logs → Home → Logs`);
+
+      // Verify run query button is visible and not in loading state on logs page
+      await pm.logsPage.expectRefreshButtonVisible();
+      await pm.logsPage.expectRefreshButtonEnabled();
+      testLogger.info(`✓ Run query button not loading on logs page (cycle ${i + 1})`);
+
+      // Navigate to home page via SPA menu click
+      await pm.logsPage.navigateToHome();
+      await page.waitForTimeout(1000);
+      testLogger.info(`✓ Home page loaded via SPA (cycle ${i + 1})`);
+
+      // Navigate back to logs page via SPA menu click
+      await pm.logsPage.clickMenuLinkLogsItem();
+      await page.waitForTimeout(1000);
+    }
+
+    // STRONG ASSERTION: After all navigation cycles, button should still be enabled
     await pm.logsPage.expectRefreshButtonEnabled();
-    testLogger.info('✓ Run query button enabled after all navigation cycles');
+    testLogger.info('✓ Run query button enabled after all SPA navigation cycles');
 
     testLogger.info('✓ PASSED: Run query button not stuck in loading state (Bug #10344)');
   });
@@ -990,30 +985,24 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.clickTableExpandMenuFirst();
     await page.waitForTimeout(1000);
 
-    // Check if View Related button is available (enterprise correlation feature)
+    // Bug #11469 is about the traces correlation panel — an enterprise feature.
+    // If View Related is not available (OSS), skip rather than testing an unrelated area.
     const correlationAvailable = await pm.logsPage.isViewRelatedButtonVisible();
-    if (correlationAvailable) {
-      await pm.logsPage.clickViewRelatedButton();
-      await page.waitForTimeout(2000);
-      testLogger.info('Opened correlation / View Related panel');
-
-      // Bug assertion: hover over the correlation panel and verify no
-      // copy/include/exclude context menu appears on simple hover
-      await pm.logsPage.hoverOnCorrelationDashboard();
-      await page.waitForTimeout(500);
-      await pm.logsPage.expectNoContextMenuVisible();
-      testLogger.info('✓ No unwanted context menu on hover over correlation panel');
-    } else {
-      // Fallback: check the log detail dialog doesn't leak hover menus
-      testLogger.info('Correlation panel not available — checking detail dialog hover behavior');
-      const detailDialog = page.locator(pm.logsPage.logDetailDialog);
-      if (await detailDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await detailDialog.hover();
-        await page.waitForTimeout(500);
-        await pm.logsPage.expectNoContextMenuVisible();
-        testLogger.info('✓ No unwanted context menu on hover over detail dialog');
-      }
+    if (!correlationAvailable) {
+      test.skip(true, 'Bug #11469: View Related (correlation) not available — enterprise feature required');
+      return;
     }
+
+    await pm.logsPage.clickViewRelatedButton();
+    await page.waitForTimeout(2000);
+    testLogger.info('Opened correlation / View Related panel');
+
+    // Bug assertion: hover over the correlation panel and verify no
+    // copy/include/exclude context menu appears on simple hover
+    await pm.logsPage.hoverOnCorrelationDashboard();
+    await page.waitForTimeout(500);
+    await pm.logsPage.expectNoContextMenuVisible();
+    testLogger.info('✓ No unwanted context menu on hover over correlation panel');
 
     testLogger.info('✓ PASSED: Correlation hover behavior verified (Bug #11469)');
   });
@@ -1074,9 +1063,10 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Wait for any delayed console errors
     await page.waitForTimeout(2000);
 
-    // Filter to only errors related to the bug: non-existent alias/field, undefined, or aggregation errors
+    // Filter to only errors directly related to the bug: the specific non-existent
+    // alias we created, or "Cannot read properties of undefined" (the bug signature)
     const relevantErrors = consoleErrors.filter(e =>
-      e.includes(nonExistentAlias) || e.includes('undefined') || e.includes('aggregat') || e.includes('field')
+      e.includes(nonExistentAlias) || /Cannot read properties of undefined/.test(e)
     );
     expect(relevantErrors.length, `Bug #5010: Should have no console errors related to non-existent alias, got: ${JSON.stringify(relevantErrors)}`).toBe(0);
     testLogger.info('✓ No relevant console errors detected (filtered from ' + consoleErrors.length + ' total)');
@@ -1266,9 +1256,10 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(500);
 
-    // Run a distinct query
-    const distinctQuery = `SELECT DISTINCT kubernetes_pod_name FROM "e2e_automate" ORDER BY kubernetes_pod_name`;
-    testLogger.info(`Running distinct query: ${distinctQuery}`);
+    // Run a DISTINCT query WITHOUT explicit ORDER BY — the bug is that
+    // ORDER BY should be auto-injected for distinct queries
+    const distinctQuery = `SELECT DISTINCT kubernetes_pod_name FROM "e2e_automate"`;
+    testLogger.info(`Running distinct query (no explicit ORDER BY): ${distinctQuery}`);
     await pm.logsPage.clearAndFillQueryEditor(distinctQuery);
     await page.waitForTimeout(500);
 
@@ -1277,20 +1268,24 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    // Verify logs table is visible (query executed successfully)
+    // STRONG ASSERTION: Query executed successfully — logs table visible
     await pm.logsPage.expectLogsTableVisible();
     testLogger.info('✓ Distinct query executed, results visible');
 
-    // Verify result pagination is visible (shows result count)
+    // STRONG ASSERTION: Result pagination visible
     await pm.logsPage.expectResultPaginationVisible();
     testLogger.info('✓ Result pagination visible for distinct query');
 
+    // STRONG ASSERTION: Bug #3131 — ORDER BY should be auto-injected
+    // Check that the query editor now contains ORDER BY (auto-added by the engine)
+    const editorContent = await pm.logsPage.getQueryEditorText();
+    expect(editorContent, 'Bug #3131: ORDER BY should be auto-injected into the query editor for DISTINCT queries')
+      .toMatch(/ORDER BY/i);
+    testLogger.info(`✓ ORDER BY auto-injected in editor: ${editorContent}`);
+
     // Verify the results table has the expected column from the distinct query
-    const columnVisible = await pm.logsPage.expectTableColumnHeaderVisible('kubernetes_pod_name');
-    testLogger.info(`Distinct query result column visible: ${columnVisible}`);
-    if (columnVisible) {
-      testLogger.info('✓ Distinct query results show expected column');
-    }
+    await pm.logsPage.expectTableColumnHeaderVisible('kubernetes_pod_name');
+    testLogger.info('✓ Distinct query results show expected column');
 
     testLogger.info('✓ PASSED: Order by default for distinct queries verified (Bug #3131)');
   });
@@ -1302,6 +1297,8 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should not show blank histogram after cancelling query @bug-4315 @P2 @histogram @cancel @regression", async ({ page }) => {
     testLogger.info('Test: Verify histogram not blank after cancel (Bug #4315)');
 
+    const orgName = getOrgIdentifier() || 'default';
+
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
@@ -1311,27 +1308,47 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.enableHistogram();
     await page.waitForTimeout(500);
 
-    // Run query with histogram enabled
+    // Intercept _search POST requests to simulate a slow histogram call that gets cancelled
+    let heldRoute = null;
+    let routeResolve = null;
+    await page.route(`**/api/${orgName}/_search`, async (route) => {
+      if (route.request().method() === 'POST') {
+        if (!heldRoute) {
+          // Hold the first request to simulate slow response
+          heldRoute = route;
+          testLogger.info('Holding first _search request (simulating slow histogram)');
+          await new Promise(resolve => { routeResolve = resolve; });
+          testLogger.info('First _search request released (aborted by cancel)');
+          await route.abort('aborted');
+          heldRoute = null;
+          routeResolve = null;
+          return;
+        }
+      }
+      await route.continue();
+    });
+
+    // Run query — first _search request will be held
+    testLogger.info('Starting query (histogram request will be delayed)');
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1500);
 
-    // Toggle histogram off and back on — this triggers a fresh histogram fetch
-    // and exercises the cancel/re-fetch flow that caused blank histograms
-    await pm.logsPage.toggleHistogram();
+    // Cancel by clicking refresh again while the first histogram call is still in flight
+    testLogger.info('Cancelling in-flight histogram by clicking refresh again');
+    // Release the held route so it gets aborted, then let the new request through
+    if (routeResolve) routeResolve();
     await page.waitForTimeout(500);
-    await pm.logsPage.toggleHistogram(); // Re-enable histogram
-    await page.waitForTimeout(500);
-
-    // Click refresh to trigger a new histogram call after the toggle
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(3000);
 
-    // Bug assertion: the histogram must NOT be blank — it must have rendered content
+    // Remove route handler
+    await page.unroute(`**/api/${orgName}/_search`);
+
+    // Bug assertion: the histogram must NOT be blank after cancel — it must have rendered content
     await pm.logsPage.expectBarChartHasContent();
 
-    testLogger.info('✓ PASSED: Histogram not blank after toggle/re-query (Bug #4315)');
+    testLogger.info('✓ PASSED: Histogram not blank after cancel (Bug #4315)');
   });
 
   test.afterEach(async () => {

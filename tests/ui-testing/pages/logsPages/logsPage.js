@@ -3131,9 +3131,8 @@ export class LogsPage {
 
     async expectTableColumnHeaderVisible(columnName) {
         const columnHeader = this.page.locator(`[data-test="log-search-result-table-th-${columnName}"]`);
-        const visible = await columnHeader.isVisible({ timeout: 3000 }).catch(() => false);
-        testLogger.info(`Column header ${columnName} visible: ${visible}`);
-        return visible;
+        await expect(columnHeader, `Column header ${columnName} should be visible`).toBeVisible({ timeout: 5000 });
+        testLogger.info(`Column header ${columnName} is visible`);
     }
 
     async expectUrlContainsLogs() {
