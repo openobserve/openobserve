@@ -242,12 +242,16 @@ impl TopKHeap {
     /// dropped immediately — only k elements are retained in memory at any time.
     pub fn push_hits(&mut self, hits: Vec<Value>) {
         for hit in hits {
-            let is_numeric = self.is_numeric.get_or_insert_with(|| {
-                hit.get(&self.col)
-                    .map(|v| v.is_number())
-                    .unwrap_or(false)
-            });
-            let candidate = HeapHit::new(hit, &self.col, *is_numeric, self.is_descending);
+            // Only set is_numeric when ORDER BY column is actually present (non-null).
+            // get_or_insert_with would lock to false on null hits, causing numeric
+            // values to be compared as strings ("100" < "20").
+            if self.is_numeric.is_none() {
+                if let Some(v) = hit.get(&self.col) {
+                    self.is_numeric = Some(v.is_number());
+                }
+            }
+            let is_numeric = self.is_numeric.unwrap_or(false);
+            let candidate = HeapHit::new(hit, &self.col, is_numeric, self.is_descending);
             if self.heap.len() < self.k {
                 self.heap.push(std::cmp::Reverse(candidate));
             } else if let Some(std::cmp::Reverse(min)) = self.heap.peek()
@@ -286,7 +290,6 @@ impl TopKHeap {
         result[from..].to_vec()
     }
 }
-
 
 /// Wrapper around a JSON hit that implements `Ord` by the ORDER BY column value.
 ///
