@@ -26,6 +26,7 @@ test.describe("Alerts Stream Switching Regression", () => {
   let pm;
   const TEST_LOG_STREAM = 'e2e_automate';
   const METRICS_STREAM = 'e2e_test_cpu_usage';
+  const ORG_ID = getOrgIdentifier() || 'default';
 
   // ============================================================================
   // beforeAll - Ingest metrics data
@@ -35,9 +36,9 @@ test.describe("Alerts Stream Switching Regression", () => {
     const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
     const page = await context.newPage();
     try {
-      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${ORG_ID}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await ingestMetricsData(page);
+      await ingestMetricsData(page, ORG_ID);
       testLogger.info('Metrics data setup completed');
     } finally {
       await page.close();
@@ -54,19 +55,22 @@ test.describe("Alerts Stream Switching Regression", () => {
 
   // ============================================================================
   // Helper: Switch stream type + stream, waiting for dropdown repopulation.
-  // Replaces the fragile selectStreamType → waitForTimeout(500) → selectStreamByName
-  // pattern with an explicit wait for the target option to be attached.
+  // Clicks the stream option in a single dropdown session — no Escape+reopen
+  // that could race with async option-set repopulation.
   // ============================================================================
   async function switchStreamAndReconfirm(page, streamType, streamName) {
     await pm.alertsPage.selectStreamType(streamType);
     const streamDropdown = page.locator('[data-test="alert-stream-name-dropdown"]');
     await expect(streamDropdown).toBeVisible({ timeout: 10000 });
     await streamDropdown.click();
+    await page.waitForTimeout(300);
+    // Type to filter, then click the target option in the same dropdown opening
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type(streamName, { delay: 30 });
+    await page.waitForTimeout(800);
     const streamOption = page.locator('.q-menu:visible').getByText(streamName, { exact: true });
     await expect(streamOption).toBeAttached({ timeout: 10000 });
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
-    await pm.alertsPage.creationWizard.selectStreamByName(streamName);
+    await streamOption.click();
     await pm.alertsPage.selectScheduledAlertType();
   }
 
@@ -88,7 +92,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     tag: ['@alerts', '@regressionBugs', '@P1', '@bug-11580', '@stream-switching']
   }, async ({ page }) => {
     testLogger.info('Bug #11580: Verify PromQL editor clears when switching from metrics to logs');
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${ORG_ID}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -121,7 +125,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     tag: ['@alerts', '@regressionBugs', '@P1', '@bug-11572', '@stream-switching']
   }, async ({ page }) => {
     testLogger.info('Bug #11572: Verify no chart error when switching logs <-> metrics <-> logs');
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${ORG_ID}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -156,7 +160,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     tag: ['@alerts', '@regressionBugs', '@P1', '@bug-11571', '@stream-switching']
   }, async ({ page }) => {
     testLogger.info('Bug #11571: Verify chart renders when switching from Builder to SQL');
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${ORG_ID}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -201,7 +205,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     tag: ['@alerts', '@regressionBugs', '@P1', '@bug-11573', '@stream-switching']
   }, async ({ page }) => {
     testLogger.info('Bug #11573: Verify chart re-renders after editor open/close');
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${ORG_ID}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -232,7 +236,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     tag: ['@alerts', '@regressionBugs', '@P2', '@bug-11578', '@stream-switching']
   }, async ({ page }) => {
     testLogger.info('Bug #11578: Verify aggregation functions filter field types');
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${ORG_ID}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -280,8 +284,7 @@ test.describe("Alerts Stream Switching Regression", () => {
 // ============================================================================
 // Helper: Ingest metrics data
 // ============================================================================
-async function ingestMetricsData(page) {
-  const orgId = getOrgIdentifier();
+async function ingestMetricsData(page, orgId) {
   const streamName = 'e2e_test_cpu_usage';
   const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080';
   const ingestionUrl = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;

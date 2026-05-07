@@ -2568,24 +2568,29 @@ export class AlertsPage {
     }
 
     /**
-     * Expect the query editor textarea content does NOT contain a specific string.
+     * Expect the query editor content does NOT contain a specific string.
      * Used to verify that switching stream type clears the previous mode's query content.
+     *
+     * Monaco's <textarea> is an IME/cursor proxy — typically empty when the editor
+     * is unfocused. The actual content lives in .view-line elements. We read those
+     * instead so an unfocused editor displaying PromQL is still caught.
      * @param {string} text - Text that should NOT be present in the editor
      */
     async expectEditorContentDoesNotContain(text) {
-        // Check ALL Monaco editor textareas in the DOM (visible or hidden).
-        // A hidden textarea with stale PromQL content is still a regression.
-        const editors = this.page.locator('.monaco-editor textarea, [data-test="alert-editor-sql"] textarea, #alert-editor-promql textarea');
-        const count = await editors.count();
-        expect(count, 'Expected at least one Monaco editor textarea in the DOM — editor may not have mounted').toBeGreaterThan(0);
-        testLogger.info('Checking editor content', { textareasFound: count });
+        // Monaco renders content into .view-line spans within .view-lines containers.
+        // The <textarea> is only populated for IME composition / cursor scope.
+        const viewLines = this.page.locator('.monaco-editor .view-line, #alert-editor-sql .view-line, #alert-editor-promql .view-line');
+        const count = await viewLines.count();
+        expect(count, 'Expected at least one Monaco .view-line in the DOM — editor may not have mounted').toBeGreaterThan(0);
+        testLogger.info('Checking editor content via .view-line elements', { viewLinesFound: count });
+        const allText = [];
         for (let i = 0; i < count; i++) {
-            const content = await editors.nth(i).inputValue().catch(() => '');
-            if (content) {
-                expect(content, `Editor textarea #${i} should NOT contain "${text}", got: "${content}"`).not.toContain(text);
-            }
+            const text = await viewLines.nth(i).textContent().catch(() => '');
+            allText.push(text);
         }
-        testLogger.info('No editor contains the forbidden text', { text, textareasChecked: count });
+        const combined = allText.join('\n');
+        expect(combined, `Editor content should NOT contain "${text}"`).not.toContain(text);
+        testLogger.info('No editor contains the forbidden text', { text, viewLinesChecked: count });
     }
 
     // ==================== PROMQL CONDITION ROW METHODS ====================
