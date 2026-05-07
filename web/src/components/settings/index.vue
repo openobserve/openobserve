@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </q-route-tab>
                 <q-route-tab
-                  v-if="config.isEnterprise == 'true' && (config.isCloud != 'true' || store.state.zoConfig.org_storage_enabled === true)"
+                  v-if="config.isEnterprise == 'true' && (config.isCloud != 'true' || store.state.organizationData.organizationSettings.org_storage_enabled === true)"
                   data-test="storage-settings-tab"
                   name="storageSettings"
                   :to="{

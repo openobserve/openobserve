@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import store from "@/stores";
 
 const orgStorage = {
   get: (org_identifier: string) => {
@@ -29,7 +30,8 @@ const orgStorage = {
   },
 
   enable: (org_identifier: string) => {
-    return http().put(`/api/_meta/enable_org_storage`, {
+    const currentOrg = store.state.selectedOrganization.identifier;
+    return http().put(`/api/${currentOrg}/enable_org_storage`, {
       org_id: org_identifier,
     });
   },

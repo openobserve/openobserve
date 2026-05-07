@@ -48,6 +48,11 @@ const mockStore = {
     selectedOrganization: {
       identifier: "test-org",
     },
+    organizationData: {
+      organizationSettings: {
+        org_storage_enabled: false,
+      },
+    },
     zoConfig: {
       service_streams_enabled: true,
     },
