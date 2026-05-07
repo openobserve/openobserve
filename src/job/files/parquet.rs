@@ -920,7 +920,7 @@ async fn merge_files(
 
     // generate tantivy inverted index and write to storage
     let file_format = config::get_config().common.file_format;
-    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, &buf).await?;
+    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
         &new_file_key,
@@ -987,11 +987,11 @@ async fn queue_services_from_parquet(
         let mut batches_sent = 0u64;
 
         let file_format = config::get_config().common.file_format;
-        let reader_result = get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await;
+        let reader_result = get_recordbatch_reader_from_bytes(file_format, parquet_bytes).await;
         let (_schema, mut reader) = match reader_result {
             Ok(r) => r,
             Err(e) => {
-                log::error!("[ServiceStreams] Failed to read parquet: {}", e);
+                log::error!("[ServiceStreams] Failed to read parquet: {e}");
                 return (records_sent, records_dropped);
             }
         };
@@ -1001,7 +1001,7 @@ async fn queue_services_from_parquet(
             let batch = match batch_result {
                 Ok(b) => b,
                 Err(e) => {
-                    log::error!("[ServiceStreams] Error reading batch: {}", e);
+                    log::error!("[ServiceStreams] Error reading batch: {e}");
                     continue;
                 }
             };
@@ -1020,14 +1020,12 @@ async fn queue_services_from_parquet(
                 Err(mpsc::error::TrySendError::Full(dropped_batch)) => {
                     let dropped = dropped_batch.num_rows() as u64;
                     records_dropped += dropped;
-                    log::debug!("[ServiceStreams] Channel full, dropped {} records", dropped);
+                    log::debug!("[ServiceStreams] Channel full, dropped {dropped} records");
                 }
                 Err(mpsc::error::TrySendError::Closed(_)) => {
                     // Consumer closed, stop producing
                     log::debug!(
-                        "[ServiceStreams] Consumer closed, stopping producer (sent {} batches, {} records)",
-                        batches_sent,
-                        records_sent
+                        "[ServiceStreams] Consumer closed, stopping producer (sent {batches_sent} batches, {records_sent} records)",
                     );
                     return (records_sent, records_dropped);
                 }
@@ -1035,10 +1033,7 @@ async fn queue_services_from_parquet(
         }
 
         log::debug!(
-            "[ServiceStreams] Producer finished: sent {} batches ({} records), dropped {} records",
-            batches_sent,
-            records_sent,
-            records_dropped
+            "[ServiceStreams] Producer finished: sent {batches_sent} batches ({records_sent} records), dropped {records_dropped} records",
         );
 
         (records_sent, records_dropped)
