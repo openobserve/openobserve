@@ -428,8 +428,6 @@ mod tests {
         }
     }
 
-    use super::*;
-
     #[test]
     fn test_user_role_is_service_account() {
         assert!(UserRole::ServiceAccount.is_service_account());
