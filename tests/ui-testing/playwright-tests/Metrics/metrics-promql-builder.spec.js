@@ -1525,15 +1525,15 @@ test.describe("Metrics — Default SQL Builder Mode", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Verify X-axis has histogram(_timestamp)
-    const xAxisItems = page.locator('[data-test="dashboard-x-layout"] [data-test^="dashboard-x-item-"]');
+    const xAxisItems = page.locator('[data-test="dashboard-x-layout"] [data-test="dashboard-x-item-x_axis_1"]');
     await expect(xAxisItems.first()).toBeVisible({ timeout: 15000 });
-    const xText = await xAxisItems.first().textContent();
+    const xText = await xAxisItems.first().innerText();
     expect(xText).toContain('histogram');
 
     // Verify Y-axis has avg(value)
-    const yAxisItems = page.locator('[data-test="dashboard-y-layout"] [data-test^="dashboard-y-item-"]');
+    const yAxisItems = page.locator('[data-test="dashboard-y-layout"] [data-test="dashboard-y-item-y_axis_1"]');
     await expect(yAxisItems.first()).toBeVisible({ timeout: 15000 });
-    const yText = await yAxisItems.first().textContent();
+    const yText = await yAxisItems.first().innerText();
     expect(yText).toContain('avg');
 
     testLogger.info('Default histogram + avg fields populated - PASSED');
@@ -1593,14 +1593,14 @@ test.describe("Metrics — Default SQL Builder Mode", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Verify defaults re-applied
-    const xAxisItems = page.locator('[data-test="dashboard-x-layout"] [data-test^="dashboard-x-item-"]');
+    const xAxisItems = page.locator('[data-test="dashboard-x-layout"] [data-test="dashboard-x-item-x_axis_1"]');
     await expect(xAxisItems.first()).toBeVisible({ timeout: 15000 });
-    const xText = await xAxisItems.first().textContent();
+    const xText = await xAxisItems.first().innerText();
     expect(xText).toContain('histogram');
 
-    const yAxisItems = page.locator('[data-test="dashboard-y-layout"] [data-test^="dashboard-y-item-"]');
+    const yAxisItems = page.locator('[data-test="dashboard-y-layout"] [data-test="dashboard-y-item-y_axis_1"]');
     await expect(yAxisItems.first()).toBeVisible({ timeout: 15000 });
-    const yText = await yAxisItems.first().textContent();
+    const yText = await yAxisItems.first().innerText();
     expect(yText).toContain('avg');
 
     testLogger.info('Stream change resets to defaults - PASSED');

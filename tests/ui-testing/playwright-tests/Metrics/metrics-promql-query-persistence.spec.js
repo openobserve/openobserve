@@ -166,9 +166,9 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
             testLogger.info('✓ Switched back to Tab 1');
         } else {
             testLogger.warn('Could not switch to Tab 1 using helper - trying fallback');
-            // Fallback: try clicking first tab directly using data-test
-            const firstTab = page.locator('[data-test="dashboard-panel-query-tab-0"]');
-            await firstTab.click({ force: true, timeout: 10000 });
+            // Fallback: try clicking first tab directly
+            const firstTab = page.locator('[role="tab"]').first();
+            await firstTab.click({ force: true });
             await page.waitForTimeout(1500);
         }
 
