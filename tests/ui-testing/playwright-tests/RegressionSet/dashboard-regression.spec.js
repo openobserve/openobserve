@@ -15,8 +15,8 @@ const {
 } = require("../utils/enhanced-baseFixtures.js");
 import PageManager from "../../pages/page-manager.js";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
-import { ingestion } from "../dashboards/utils/dashIngestion.js";
-import { waitForDashboardPage, deleteDashboard } from "../dashboards/utils/dashCreation.js";
+import { ingestion } from "../Dashboards/utils/dashIngestion.js";
+import { waitForDashboardPage, deleteDashboard } from "../Dashboards/utils/dashCreation.js";
 const { safeWaitForHidden, safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 const {
   SELECTORS,
@@ -290,18 +290,14 @@ test.describe(
           );
 
           // Assert the VALUE matches what was selected (unused before this fix)
-          const varValueAfterDrilldown = decodeURIComponent(
-            new URL(page.url()).searchParams.get(`var-${variableName}`)
-          );
+          const varValueAfterDrilldown = new URL(page.url()).searchParams.get(`var-${variableName}`);
           testLogger.info(`URL after drilldown: ${page.url()}`);
           expect(varValueAfterDrilldown).toBe(selectedValue);
           testLogger.info(`✅ var-${variableName}=${varValueAfterDrilldown} matches selected value`);
 
           // Regression guard: same value must survive 800ms
           await page.waitForTimeout(800);
-          const varValueAfterWait = decodeURIComponent(
-            new URL(page.url()).searchParams.get(`var-${variableName}`)
-          );
+          const varValueAfterWait = new URL(page.url()).searchParams.get(`var-${variableName}`);
           expect(varValueAfterWait).toBe(selectedValue);
           testLogger.info(`✅ Bug #11134 guard passed — var-${variableName} value unchanged 800ms after same-dashboard drilldown`);
         } finally {
@@ -434,14 +430,14 @@ test.describe(
           testLogger.info("✅ Dashboard ID unchanged after same-dashboard drilldown");
 
           // var-* value must match what was selected
-          const varValueAfterDrilldown = decodeURIComponent(urlParamsAfter.get(`var-${variableName}`));
+          const varValueAfterDrilldown = urlParamsAfter.get(`var-${variableName}`);
           expect(varValueAfterDrilldown).toBe(selectedValue);
           testLogger.info(`✅ var-${variableName}=${varValueAfterDrilldown} matches selected value`);
 
           // Regression guard: both dashboard ID and var-* value must survive 800ms
           await page.waitForTimeout(800);
           const urlParamsAfterWait = new URL(page.url()).searchParams;
-          expect(decodeURIComponent(urlParamsAfterWait.get(`var-${variableName}`))).toBe(selectedValue);
+          expect(urlParamsAfterWait.get(`var-${variableName}`)).toBe(selectedValue);
           expect(urlParamsAfterWait.get("dashboard")).toBe(dashboardParam);
           testLogger.info("✅ Bug #11134 guard passed — dashboard ID and var-* value both unchanged after tab-switch drilldown");
         } finally {
