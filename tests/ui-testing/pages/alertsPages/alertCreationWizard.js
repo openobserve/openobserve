@@ -1694,4 +1694,87 @@ export class AlertCreationWizard {
 
         return randomAlertName;
     }
+
+    // ==================== STREAM SWITCHING & FULL EDITOR HELPERS ====================
+
+    /**
+     * Navigate back to Step 1 (stream selection) in the v3 wizard by clicking the first step indicator.
+     * Used to switch stream type mid-wizard without canceling.
+     */
+    async goBackToStreamSelection() {
+        // v3: step indicators are clickable circles/numbers; index 0 = Step 1 (stream setup)
+        await this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"] .q-stepper__nav-item').first().click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated back to stream selection step');
+    }
+
+    /**
+     * Open the full editor modal from within the alert wizard.
+     */
+    async openFullEditor() {
+        const openBtn = this.page.locator('[data-test="step2-view-editor-btn"], [data-test="go-to-view-editor-btn"]').first();
+        await openBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await openBtn.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Opened full editor');
+    }
+
+    /**
+     * Close the full editor modal.
+     */
+    async closeFullEditor() {
+        const closeBtn = this.page.locator('[data-test="alert-details-close-btn"], .q-dialog__close button, .q-dialog .q-btn[aria-label="Close"]').first();
+        if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await closeBtn.click();
+        } else {
+            await this.page.keyboard.press('Escape');
+        }
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Closed full editor');
+    }
+
+    /**
+     * Switch stream type within the alert wizard without leaving the wizard flow.
+     * @param {string} streamType - 'logs' | 'metrics'
+     */
+    async switchStreamTypeInWizard(streamType) {
+        await this.page.locator(this.locators.streamTypeDropdown).click();
+        await this.page.waitForTimeout(500);
+        await this.page.getByRole('option', { name: streamType }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Switched stream type in wizard', { streamType });
+    }
+
+    /**
+     * Run the current query (click "Run Query" button) and wait for results.
+     * Tries multiple selectors since the v3 UI may use different data-test attributes.
+     */
+    async runQuery() {
+        const selectors = [
+            this.locators.runQueryButton,
+            '[data-test="alert-generate-query-btn"]',
+            'button:has-text("Run")',
+            'button:has-text("Run Query")',
+            'button:has-text("Preview")',
+            '[data-test="alert-run-query-btn"]',
+        ];
+
+        let clicked = false;
+        for (const sel of selectors) {
+            const btn = this.page.locator(sel).first();
+            if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await btn.click();
+                clicked = true;
+                testLogger.info('Query executed via', { selector: sel });
+                break;
+            }
+        }
+
+        if (!clicked) {
+            // Some modes auto-run queries — just wait and check
+            testLogger.info('No Run Query button found — query may auto-run');
+        }
+
+        await this.page.waitForTimeout(2000);
+    }
 }

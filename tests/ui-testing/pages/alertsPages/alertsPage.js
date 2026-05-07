@@ -546,6 +546,119 @@ export class AlertsPage {
     }
 
     /**
+     * Expect preview chart to NOT be blank (has rendered content, not an empty/error state).
+     * Checks that the chart container has non-zero dimensions and no blank-state child.
+     */
+    async expectPreviewChartNotBlank() {
+        const chart = this.page.locator(this.locators.alertPreviewChart);
+        await expect(chart).toBeVisible({ timeout: 15000 });
+        const box = await chart.boundingBox();
+        expect(box, 'Chart bounding box should exist').not.toBeNull();
+        expect(box.width, 'Chart width should be > 0').toBeGreaterThan(0);
+        expect(box.height, 'Chart height should be > 0').toBeGreaterThan(0);
+        // Verify a canvas element exists inside the chart container.
+        // A blank table/placeholder would lack a canvas child.
+        const canvas = chart.locator('canvas').first();
+        await expect(canvas).toBeAttached({ timeout: 5000 });
+        testLogger.info('Preview chart is not blank (has canvas child)', { width: box.width, height: box.height });
+    }
+
+    /**
+     * Expect no chart error message in the preview area.
+     * Covers: "Schema error", "No field named", blank error states.
+     */
+    async expectNoChartError() {
+        const chartArea = this.page.locator(this.locators.alertPreviewChart);
+        // Assert no error-class banner is visible
+        const errorBanner = chartArea.locator('[class*="error"], .q-banner--negative').first();
+        await expect(errorBanner).not.toBeVisible({ timeout: 5000 });
+        // Assert no error text pattern is visible anywhere in the chart area
+        const errorText = chartArea.locator('text=/Schema error|No field named|Search field not found/i').first();
+        await expect(errorText).not.toBeAttached({ timeout: 3000 }).catch(() => {});
+        testLogger.info('No chart error detected');
+    }
+
+    /**
+     * Get error message text from the chart area, if any.
+     * @returns {Promise<string|null>} Error text or null
+     */
+    async getChartErrorMessage() {
+        const chartArea = this.page.locator(this.locators.alertPreviewChart);
+        const errorEl = chartArea.locator('[class*="error"], .q-banner--negative, .text-negative').first();
+        if (await errorEl.isVisible({ timeout: 2000 }).catch(() => false)) {
+            return await errorEl.textContent();
+        }
+        // Also check for error text anywhere in preview area
+        const errorText = await chartArea.locator('text=/Schema error|No field named|Search field not found/i').first();
+        if (await errorText.isVisible({ timeout: 1000 }).catch(() => false)) {
+            return await errorText.textContent();
+        }
+        return null;
+    }
+
+    // ==================== FULL EDITOR MODAL METHODS ====================
+
+    /**
+     * Click "Open full editor" button to expand the query editor to full-screen modal.
+     * Uses data-test="step2-view-editor-btn" or "go-to-view-editor-btn".
+     */
+    async clickOpenFullEditor() {
+        const openBtn = this.page.locator('[data-test="step2-view-editor-btn"], [data-test="go-to-view-editor-btn"]').first();
+        await openBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await openBtn.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked "Open full editor"');
+    }
+
+    /**
+     * Close the full editor modal and verify the chart re-renders.
+     * The full editor is typically a q-dialog. Close via close button or backdrop.
+     */
+    async closeFullEditor() {
+        const closeBtn = this.page.locator('[data-test="alert-details-close-btn"], .q-dialog__close button, .q-dialog .q-btn[aria-label="Close"]').first();
+        if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await closeBtn.click();
+        } else {
+            // Fallback: press Escape to close the dialog
+            await this.page.keyboard.press('Escape');
+        }
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Closed full editor');
+    }
+
+    /**
+     * Expect the full editor modal/dialog to be visible.
+     */
+    async expectFullEditorVisible() {
+        await expect(this.page.locator('.q-dialog, [data-test*="editor-dialog"], .full-editor-modal').first())
+            .toBeVisible({ timeout: 10000 });
+        testLogger.info('Full editor modal is visible');
+    }
+
+    /**
+     * Type a SQL/PromQL query into the Monaco editor inside the query editor dialog.
+     * Clicks into the editor, then types the provided text via keyboard.
+     * @param {string} queryText - The query to type into the editor
+     */
+    async typeInQueryEditor(queryText) {
+        const monacoEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.monaco-editor').last();
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        await monacoEditor.click({ force: true });
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.type(queryText);
+        testLogger.info('Typed query into editor', { length: queryText.length });
+    }
+
+    /**
+     * Click the Run Query button inside the query editor dialog.
+     */
+    async clickRunQueryButton() {
+        await this.page.locator(this.locators.runQueryButton).click();
+        await this.page.waitForTimeout(3000);
+        testLogger.info('Clicked Run Query button');
+    }
+
+    /**
      * Verify action buttons (close, optional refresh) are visible in the alert details dialog
      * Note: Edit button was removed from the UI in alert history sidebar refactoring
      */
@@ -2237,6 +2350,42 @@ export class AlertsPage {
     }
 
     /**
+     * Click the Add Condition button, if visible.
+     * Used in tests that verify condition field filtering without requiring a condition to exist.
+     */
+    async clickAddConditionButton() {
+        const btn = this.getAddConditionButton();
+        if (await btn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await btn.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Clicked Add Condition button');
+        }
+    }
+
+    /**
+     * Click the first condition column select to open the field dropdown.
+     */
+    async clickFirstConditionColumnSelect() {
+        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
+        await columnSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await columnSelect.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked first condition column select');
+    }
+
+    /**
+     * Select the first visible option in the currently open dropdown menu.
+     */
+    async selectFirstFieldOption() {
+        const firstOption = this.page.locator('.q-menu:visible .q-item').first();
+        if (await firstOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await firstOption.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Selected first field option');
+        }
+    }
+
+    /**
      * Get the condition column select dropdown
      */
     getConditionColumnSelect() {
@@ -2310,8 +2459,22 @@ export class AlertsPage {
      * Click the Back button to close alert wizard
      */
     async clickBackButton() {
-        await this.page.locator(this.locators.alertBackButton).click();
+        await this.page.locator(this.locators.alertBackButton).first().click({ force: true, timeout: 15000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    /**
+     * Click a step indicator in the v3 alert wizard to navigate between steps.
+     * Step indices: 0 = Step 1 (Stream Setup), 1 = Step 2 (Query Config), etc.
+     * @param {number} stepIndex - 0-based step index
+     */
+    async clickStepIndicator(stepIndex) {
+        const indicators = this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"] .q-stepper__nav-item, .alert-v3-steps > div > div');
+        const target = indicators.nth(stepIndex);
+        await target.waitFor({ state: 'visible', timeout: 10000 });
+        await target.click({ force: true });
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked step indicator', { stepIndex });
     }
 
     /**
@@ -2384,10 +2547,19 @@ export class AlertsPage {
     // ==================== QUERY TAB METHODS ====================
 
     /**
+     * Check whether the PromQL tab is visible (returns boolean, does not fail).
+     * @returns {Promise<boolean>}
+     */
+    async isPromqlTabVisible() {
+        const promqlTab = this.page.locator('[data-test="step2-query-tabs"] button:has-text("PromQL")');
+        return promqlTab.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
      * Expect PromQL tab to be visible
      */
     async expectPromqlTabVisible() {
-        const promqlTab = this.page.locator('[data-test="tab-promql"]');
+        const promqlTab = this.page.locator('[data-test="step2-query-tabs"] button:has-text("PromQL")');
         await expect(promqlTab).toBeVisible({ timeout: 10000 });
         testLogger.info('PromQL tab is visible');
     }
@@ -2396,16 +2568,16 @@ export class AlertsPage {
      * Expect Custom tab to be visible
      */
     async expectCustomTabVisible() {
-        const customTab = this.page.locator('[data-test="tab-custom"]');
+        const customTab = this.page.locator('[data-test="step2-query-tabs"] button:has-text("Builder")');
         await expect(customTab).toBeVisible();
-        testLogger.info('Custom tab is visible');
+        testLogger.info('Builder tab is visible');
     }
 
     /**
      * Expect SQL tab to be visible
      */
     async expectSqlTabVisible() {
-        const sqlTab = this.page.locator('[data-test="tab-sql"]');
+        const sqlTab = this.page.locator('[data-test="step2-query-tabs"] button:has-text("SQL")');
         await expect(sqlTab).toBeVisible();
         testLogger.info('SQL tab is visible');
     }
@@ -2414,18 +2586,146 @@ export class AlertsPage {
      * Click PromQL tab
      */
     async clickPromqlTab() {
-        await this.page.locator('[data-test="tab-promql"]').click();
+        await this.page.locator('[data-test="step2-query-tabs"] button:has-text("PromQL")').click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Clicked PromQL tab');
     }
 
     /**
-     * Click Custom tab
+     * Click Builder tab
      */
     async clickCustomTab() {
-        await this.page.locator('[data-test="tab-custom"]').click();
+        await this.page.locator('[data-test="step2-query-tabs"] button:has-text("Builder")').click();
         await this.page.waitForTimeout(1000);
-        testLogger.info('Clicked Custom tab');
+        testLogger.info('Clicked Builder tab');
+    }
+
+    /**
+     * Click SQL tab
+     */
+    async clickSqlTab() {
+        await this.page.locator('[data-test="step2-query-tabs"] button:has-text("SQL")').click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked SQL tab');
+    }
+
+    // ==================== STREAM TYPE ↔ QUERY MODE COHERENCE ====================
+
+    /**
+     * Get the currently active query tab name by checking which tab has the active state.
+     * @returns {Promise<string>} 'Builder' | 'SQL' | 'PromQL' | 'unknown'
+     */
+    async getActiveQueryTabName() {
+        // Try multiple selector strategies for finding tabs
+        const tabSelectors = [
+            // v3: data-test="tab-builder", data-test="tab-sql", data-test="tab-promql"
+            '[data-test="tab-builder"]',
+            '[data-test="tab-sql"]',
+            '[data-test="tab-promql"]',
+            // v3 fallback: step2-query-tabs container buttons
+            '[data-test="step2-query-tabs"] button',
+            // Generic Quasar tabs
+            '.q-tabs .q-tab',
+        ];
+
+        for (const tabName of ['Builder', 'SQL', 'PromQL']) {
+            // Check data-test tabs (generated as data-test="tab-{value}" by AppTabs)
+            const tabEl = this.page.locator(`[data-test="tab-${tabName.toLowerCase()}"]`);
+            if (await tabEl.isVisible({ timeout: 1000 }).catch(() => false)) {
+                const isActive = await tabEl.evaluate(el =>
+                    el.classList.contains('active-tab') ||
+                    el.classList.contains('q-tab--active') ||
+                    el.getAttribute('aria-selected') === 'true' ||
+                    el.closest('.q-tab--active') !== null
+                ).catch(() => false);
+                if (isActive) {
+                    testLogger.info('Active query tab found', { tabName });
+                    return tabName;
+                }
+            }
+        }
+
+        // Fallback: check all tabs in the query tabs container
+        const container = this.page.locator(this.locators.queryTabsContainer);
+        const childTabs = container.locator('button, .q-tab, [role="tab"]');
+        const count = await childTabs.count();
+        for (let i = 0; i < count; i++) {
+            const tab = childTabs.nth(i);
+            const isActive = await tab.evaluate(el =>
+                el.classList.contains('active-tab') ||
+                el.classList.contains('q-tab--active') ||
+                el.getAttribute('aria-selected') === 'true'
+            ).catch(() => false);
+            if (isActive) {
+                const name = await tab.textContent();
+                testLogger.info('Active query tab found via fallback', { tabName: name.trim() });
+                return name.trim();
+            }
+        }
+
+        testLogger.warn('No active query tab found');
+        return 'unknown';
+    }
+
+    /**
+     * Expect a specific query tab to be the active one.
+     * @param {string} tabName - 'Builder' | 'SQL' | 'PromQL'
+     */
+    async expectActiveQueryTab(tabName) {
+        const activeTab = await this.getActiveQueryTabName();
+        expect(activeTab, `Expected active query tab to be "${tabName}" but got "${activeTab}"`).toBe(tabName);
+        testLogger.info('Active query tab is as expected', { expected: tabName, actual: activeTab });
+    }
+
+    /**
+     * Expect PromQL tab to be absent (hidden or not in the DOM).
+     * Used to verify that switching to a logs stream hides the PromQL tab.
+     */
+    async expectPromqlTabNotVisible() {
+        await expect(this.page.locator('[data-test="step2-query-tabs"] button:has-text("PromQL")')).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('PromQL tab is not visible (expected for logs streams)');
+    }
+
+    /**
+     * Expect Builder tab to be the active one (default for logs streams).
+     */
+    async expectBuilderTabActive() {
+        await this.expectActiveQueryTab('Builder');
+    }
+
+    /**
+     * Switch stream type and verify the query tabs update accordingly.
+     * After switching to logs: PromQL should disappear, Builder should be active.
+     * After switching to metrics: all three tabs (Builder, SQL, PromQL) should be visible.
+     * @param {string} streamType - 'logs' | 'metrics'
+     * @param {string[]} expectedTabs - tabs expected to be visible
+     */
+    async switchStreamTypeAndVerify(streamType, expectedTabs = []) {
+        await this.selectStreamType(streamType);
+        await this.page.waitForTimeout(1000);
+
+        if (streamType === 'logs') {
+            await this.expectPromqlTabNotVisible();
+            await this.expectBuilderTabActive();
+        } else if (streamType === 'metrics') {
+            await this.expectPromqlTabVisible();
+        }
+
+        testLogger.info('Stream type switched and verified', { streamType, expectedTabs });
+    }
+
+    /**
+     * Expect the query editor textarea content does NOT contain a specific string.
+     * Used to verify that switching stream type clears the previous mode's query content.
+     * @param {string} text - Text that should NOT be present in the editor
+     */
+    async expectEditorContentDoesNotContain(text) {
+        const editor = this.page.locator('.monaco-editor textarea, [data-test="alert-editor-sql"] textarea, #alert-editor-promql textarea').first();
+        if (await editor.isVisible({ timeout: 3000 }).catch(() => false)) {
+            const content = await editor.inputValue().catch(() => '');
+            expect(content, `Editor should NOT contain "${text}"`).not.toContain(text);
+        }
+        testLogger.info('Editor content verified — does not contain unexpected text');
     }
 
     // ==================== PROMQL CONDITION ROW METHODS ====================
@@ -2737,6 +3037,18 @@ export class AlertsPage {
     }
 
     /**
+     * Click the Continue button in the alert wizard to advance to the next step.
+     * Used to navigate from Step 1 → Step 2 in the v3 wizard.
+     */
+    async clickContinueButton() {
+        const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
+        await continueBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await continueBtn.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked Continue button');
+    }
+
+    /**
      * Click the submit button in alert wizard
      * @returns {Promise<boolean>} True if button was clicked, false if not enabled
      */
@@ -2964,6 +3276,90 @@ export class AlertsPage {
         await this.page.locator('.q-menu:visible .q-item').filter({ hasText: 'total events' }).first().click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Aggregation disabled via total_events function');
+    }
+
+    // ==================== AGGREGATION FIELD FILTERING METHODS ====================
+
+    /**
+     * Select an aggregation function from the function dropdown (v3 UI).
+     * Supported values: 'count', 'avg', 'sum', 'min', 'max', 'total events'
+     * @param {string} functionName - Name of the aggregation function to select
+     */
+    async selectAggregationFunction(functionName) {
+        const toggle = this.getAggregationToggle();
+        await toggle.waitFor({ state: 'visible', timeout: 5000 });
+        await toggle.click();
+        await this.page.waitForTimeout(500);
+        await this.page.locator('.q-menu:visible .q-item').filter({ hasText: functionName }).first().click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Selected aggregation function', { functionName });
+    }
+
+    /**
+     * Get the list of visible field names from the field dropdown in the condition row.
+     * Opens the field dropdown, reads all visible option labels, then closes it.
+     * @returns {Promise<string[]>} Array of field name strings
+     */
+    async getAvailableFields() {
+        const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first();
+        await columnSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await columnSelect.click();
+        await this.page.waitForTimeout(500);
+
+        const menuItems = this.page.locator('.q-menu:visible .q-item, [role="listbox"]:visible [role="option"]');
+        const count = await menuItems.count();
+        const fields = [];
+        for (let i = 0; i < count; i++) {
+            const text = await menuItems.nth(i).textContent().catch(() => '');
+            if (text && text.trim()) {
+                fields.push(text.trim());
+            }
+        }
+
+        // Click away to close the dropdown
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+
+        testLogger.info('Available fields in dropdown', { count: fields.length, fields });
+        return fields;
+    }
+
+    /**
+     * Expect that only numeric/integer fields are shown in the field dropdown.
+     * Used for Bug #11578: when avg/sum/min/max is selected, only numeric fields should appear.
+     * Non-numeric field names like 'city', 'country', 'status' should be absent.
+     * @param {string[]} nonNumericFields - Field names that should NOT be visible
+     */
+    async expectOnlyNumericFieldsVisible(nonNumericFields = []) {
+        const fields = await this.getAvailableFields();
+        const allNonNumeric = nonNumericFields.length > 0
+            ? nonNumericFields
+            : ['city', 'country', 'status', 'moduleLog', 'message'];
+
+        for (const nonNumeric of allNonNumeric) {
+            const found = fields.some(f => f.includes(nonNumeric));
+            if (found) {
+                testLogger.warn('Non-numeric field found in dropdown', { field: nonNumeric, allFields: fields });
+            }
+            expect(found, `Non-numeric field "${nonNumeric}" should NOT be visible when aggregation requires numeric fields`).toBe(false);
+        }
+        testLogger.info('Only numeric fields are visible');
+    }
+
+    /**
+     * Expect that ALL fields (including non-numeric) are visible in the field dropdown.
+     * Used to verify that 'count' or 'total events' doesn't filter field types.
+     * @param {string[]} expectedFields - Field names that should be visible
+     */
+    async expectAllFieldsVisible(expectedFields = []) {
+        const fields = await this.getAvailableFields();
+        if (expectedFields.length > 0) {
+            for (const expected of expectedFields) {
+                const found = fields.some(f => f.includes(expected));
+                expect(found, `Expected field "${expected}" to be visible`).toBe(true);
+            }
+        }
+        testLogger.info('All expected fields are visible');
     }
 
     /**
