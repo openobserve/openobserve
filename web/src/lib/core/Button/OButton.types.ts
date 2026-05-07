@@ -68,7 +68,9 @@ export type ButtonSize =
   // Tall narrow vertical rectangle — 32×20px for splitter collapse/expand buttons
   | "sidebar-button"
   // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
-  | "sm-toolbar";
+  | "sm-toolbar"
+  // Chip with fixed 12px font — for dashboard query builder axis field chips
+  | "chip-12";
 
 export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */

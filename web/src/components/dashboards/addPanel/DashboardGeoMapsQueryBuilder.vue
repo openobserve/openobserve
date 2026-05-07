@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
+          radius="sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -59,64 +60,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
         >
-          <div>
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              size="13px"
-              class="'cursor-grab q-my-xs'"
-            />
-            <OButton
-              variant="primary"
-              size="chip"
-              :data-test="`dashboard-latitude-item-${latitudeLabel}`"
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            class="cursor-grab"
+            :data-test="`dashboard-latitude-item-${latitudeLabel}-drag`"
+          >
+            <template #icon-left>
+              <q-icon name="drag_indicator" size="13px" />
+            </template>
+          </OButton>
+          <OButton
+            variant="primary"
+            size="chip-12"
+            :data-test="`dashboard-latitude-item-${latitudeLabel}`"
+          >
+            {{ latitudeLabel }}
+            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <q-menu
+              class="field-function-menu-popup"
+              :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
             >
-              {{ latitudeLabel }}
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
+              <div
+                style="padding: 3px 16px 16px 16px"
+                :style="{
+                  width:
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery ||
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.latitude.isDerived
+                      ? 'auto'
+                      : '771px',
+                }"
               >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.latitude.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <DynamicFunctionPopUp
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.latitude
-                    "
-                    :allowAggregation="false"
-                    :customQuery="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery
-                    "
-                    :chartType="dashboardPanelData.data.type"
-                  />
-                </div>
-              </q-menu>
-            </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-chip"
-              :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
-              @click="removeLatitude()"
-            >
-              <template #icon-left><q-icon name="close" /></template>
-            </OButton>
-          </div>
+                <DynamicFunctionPopUp
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.latitude
+                  "
+                  :allowAggregation="false"
+                  :customQuery="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                  "
+                  :chartType="dashboardPanelData.data.type"
+                />
+              </div>
+            </q-menu>
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
+            @click="removeLatitude()"
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
         </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
@@ -158,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
+          radius="sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -174,64 +178,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
         >
-          <div>
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              size="13px"
-              class="'cursor-grab q-my-xs'"
-            />
-            <OButton
-              variant="primary"
-              size="chip"
-              :data-test="`dashboard-longitude-item-${longitudeLabel}`"
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            class="cursor-grab"
+            :data-test="`dashboard-longitude-item-${longitudeLabel}-drag`"
+          >
+            <template #icon-left>
+              <q-icon name="drag_indicator" size="13px" />
+            </template>
+          </OButton>
+          <OButton
+            variant="primary"
+            size="chip-12"
+            :data-test="`dashboard-longitude-item-${longitudeLabel}`"
+          >
+            {{ longitudeLabel }}
+            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <q-menu
+              class="field-function-menu-popup"
+              :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
             >
-              {{ longitudeLabel }}
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
+              <div
+                style="padding: 3px 16px 16px 16px"
+                :style="{
+                  width:
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery ||
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.longitude.isDerived
+                      ? 'auto'
+                      : '771px',
+                }"
               >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.longitude.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <DynamicFunctionPopUp
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.longitude
-                    "
-                    :allowAggregation="false"
-                    :customQuery="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery
-                    "
-                    :chartType="dashboardPanelData.data.type"
-                  />
-                </div>
-              </q-menu>
-            </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-chip"
-              :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
-              @click="removeLongitude()"
-            >
-              <template #icon-left><q-icon name="close" /></template>
-            </OButton>
-          </div>
+                <DynamicFunctionPopUp
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.longitude
+                  "
+                  :allowAggregation="false"
+                  :customQuery="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                  "
+                  :chartType="dashboardPanelData.data.type"
+                />
+              </div>
+            </q-menu>
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
+            @click="removeLongitude()"
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
         </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
@@ -273,6 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
+          radius="sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -289,64 +296,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
         >
-          <div>
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              size="13px"
-              class="'cursor-grab q-my-xs'"
-            />
-            <OButton
-              variant="primary"
-              size="chip"
-              :data-test="`dashboard-weight-item-${weightLabel}`"
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            class="cursor-grab"
+            :data-test="`dashboard-weight-item-${weightLabel}-drag`"
+          >
+            <template #icon-left>
+              <q-icon name="drag_indicator" size="13px" />
+            </template>
+          </OButton>
+          <OButton
+            variant="primary"
+            size="chip-12"
+            :data-test="`dashboard-weight-item-${weightLabel}`"
+          >
+            {{ weightLabel }}
+            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <q-menu
+              class="field-function-menu-popup"
+              :data-test="`dashboard-weight-item-${weightLabel}-menu`"
             >
-              {{ weightLabel }}
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-weight-item-${weightLabel}-menu`"
+              <div
+                style="padding: 3px 16px 16px 16px"
+                :style="{
+                  width:
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery ||
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.weight.isDerived
+                      ? 'auto'
+                      : '771px',
+                }"
               >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.weight.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <DynamicFunctionPopUp
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.weight
-                    "
-                    :allowAggregation="true"
-                    :customQuery="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery
-                    "
-                    :chartType="dashboardPanelData.data.type"
-                  />
-                </div>
-              </q-menu>
-            </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-chip"
-              :data-test="`dashboard-weight-item-${weightLabel}-remove`"
-              @click="removeWeight()"
-            >
-              <template #icon-left><q-icon name="close" /></template>
-            </OButton>
-          </div>
+                <DynamicFunctionPopUp
+                  v-model="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.weight
+                  "
+                  :allowAggregation="true"
+                  :customQuery="
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery
+                  "
+                  :chartType="dashboardPanelData.data.type"
+                />
+              </div>
+            </q-menu>
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            :data-test="`dashboard-weight-item-${weightLabel}-remove`"
+            @click="removeWeight()"
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
         </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"

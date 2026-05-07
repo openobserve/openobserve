@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <div class="tw:flex-1" />
-
+          </div>
         </div>
       </div>
 
@@ -464,7 +464,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :isEditing="beingUpdated"
     />
   </q-dialog>
-</div>
 </template>
 
 <script lang="ts">
