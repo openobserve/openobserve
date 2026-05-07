@@ -1189,11 +1189,9 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should not show partitions error when switching pages during query @bug-6702 @P1 @errorHandling @navigation @regression", async ({ page }) => {
     testLogger.info('Test: Verify no partitions error on page switch during query (Bug #6702)');
 
-    const orgIdentifier = getOrgIdentifier() || 'default';
-    const logsUrl = `${logData.logsUrl}?org_identifier=${orgIdentifier}`;
-    const streamsUrl = `/web/streams?org_identifier=${orgIdentifier}`;
-
-    await page.goto(logsUrl);
+    // Use SPA menu navigation — not page.goto — because full reloads reset Pinia/Vue state,
+    // destroying the in-flight query that the bug requires to trigger the partitions error
+    await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(1000);
@@ -1216,15 +1214,15 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Don't wait for completion - switch pages while query is in progress
     await page.waitForTimeout(1500);
 
-    // Navigate to streams page while query is still running
-    testLogger.info('Switching to streams page during query');
-    await page.goto(streamsUrl);
+    // Navigate to streams page via SPA while query is still running
+    testLogger.info('Switching to streams page during query (SPA)');
+    await pm.logsPage.clickMenuLinkStreamsItem();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    // Navigate back to logs page
-    testLogger.info('Switching back to logs page');
-    await page.goto(logsUrl);
+    // Navigate back to logs page via SPA
+    testLogger.info('Switching back to logs page (SPA)');
+    await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(3000);
 
@@ -1235,7 +1233,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     expect(partitionsErrors.length, `Bug #6702: Should have no partitions page errors, got: ${JSON.stringify(partitionsErrors)}`).toBe(0);
     testLogger.info('✓ No partitions-related page errors');
 
-    // Verify page loaded correctly
     testLogger.info('✓ PASSED: No partitions error on page switch (Bug #6702)');
   });
 
@@ -1308,20 +1305,32 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.enableHistogram();
     await page.waitForTimeout(500);
 
-    // Intercept _search POST requests to simulate a slow histogram call that gets cancelled
+    // Intercept _search POST requests to simulate a slow histogram call that gets cancelled.
+    // Use a wasCancelled flag + Promise.race with a guard timeout so the test cannot hang
+    // forever if clickRefreshButton() never fires a _search POST (slow CI, network warm-up).
     let heldRoute = null;
     let routeResolve = null;
+    let wasCancelled = false;
     await page.route(`**/api/${orgName}/_search`, async (route) => {
       if (route.request().method() === 'POST') {
         if (!heldRoute) {
-          // Hold the first request to simulate slow response
           heldRoute = route;
           testLogger.info('Holding first _search request (simulating slow histogram)');
-          await new Promise(resolve => { routeResolve = resolve; });
-          testLogger.info('First _search request released (aborted by cancel)');
-          await route.abort('aborted');
+          // Timeout guard: if cancel never fires, continue the request after 8s instead of hanging
+          await Promise.race([
+            new Promise(resolve => { routeResolve = resolve; }),
+            new Promise(resolve => setTimeout(resolve, 8000))
+          ]);
+          if (wasCancelled) {
+            testLogger.info('First _search request released (aborted by cancel)');
+            await route.abort('aborted');
+          } else {
+            testLogger.info('Cancel guard timed out — continuing request normally');
+            await route.continue();
+          }
           heldRoute = null;
           routeResolve = null;
+          wasCancelled = false;
           return;
         }
       }
@@ -1333,9 +1342,10 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(1500);
 
-    // Cancel by clicking refresh again while the first histogram call is still in flight
+    // Cancel by clicking refresh again while the first histogram call is still in flight.
+    // wasCancelled tells the route handler to abort rather than continue.
     testLogger.info('Cancelling in-flight histogram by clicking refresh again');
-    // Release the held route so it gets aborted, then let the new request through
+    wasCancelled = true;
     if (routeResolve) routeResolve();
     await page.waitForTimeout(500);
     await pm.logsPage.clickRefreshButton();
