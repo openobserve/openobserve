@@ -2870,7 +2870,9 @@ export class LogsPage {
         } else {
             // pressSequentially fires per-character input events that reliably
             // trigger Quasar q-input's debounced update:model-value chain.
-            await inputLocator.click({ clickCount: 3 });
+            // force:true bypasses Monaco editor's <span class="highlight">code</span>
+            // overlay that can intercept pointer events on the splitter panel.
+            await inputLocator.click({ clickCount: 3, force: true });
             await inputLocator.pressSequentially(text, { delay: 30 });
         }
         await this.page.waitForTimeout(500);
@@ -3204,7 +3206,7 @@ export class LogsPage {
             }
             // Button not visible — re-apply filter to ensure field is in the list.
             await inputLocator.fill('');
-            await inputLocator.click();
+            await inputLocator.click({ force: true });
             await inputLocator.pressSequentially(field, { delay: 30 });
             await this.page.waitForTimeout(500);
         }
@@ -3433,7 +3435,7 @@ export class LogsPage {
     }
 
     async clickLogSearchIndexListFieldSearchInput() {
-        return await this.page.locator(this.logSearchIndexListFieldSearchInput).click();
+        return await this.page.locator(this.logSearchIndexListFieldSearchInput).click({ force: true });
     }
 
     async fillLogSearchIndexListFieldSearchInput(text) {
