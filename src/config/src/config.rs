@@ -3044,6 +3044,13 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "ZO_MEMORY_CACHE_MAX_SIZE is larger than total memory, please set a smaller value"
         ));
     }
+    let local_node_role: Vec<cluster::Role> = cfg
+        .common
+        .node_role
+        .clone()
+        .split(',')
+        .map(|s| s.parse().unwrap())
+        .collect();
     if cfg.memory_cache.datafusion_max_size == 0 {
         if local_node_role == [cluster::Role::Compactor] {
             cfg.memory_cache.datafusion_max_size = mem_total / cfg.limit.file_merge_thread_num;
