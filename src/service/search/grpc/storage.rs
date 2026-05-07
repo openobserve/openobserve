@@ -413,12 +413,7 @@ pub async fn cache_files(
     }
 }
 
-/// Filter file list using inverted index
-/// This function will load the index file corresponding to each file in the file list.
-/// FSTs in those files are used to match the incoming query in `SearchRequest`.
-/// If the query does not match any FST in the index file, the file will be filtered out.
-/// If the query does match then the segment IDs for the file will be updated.
-/// If the query not find corresponding index file, the file will *not* be filtered out.
+/// Filter file list using tantivy index
 #[tracing::instrument(name = "service:search:grpc:storage:tantivy_search", skip_all)]
 pub async fn tantivy_search(
     query: Arc<super::QueryParams>,
@@ -600,11 +595,8 @@ pub async fn tantivy_search(
             // Each result corresponds to a file in the file list
             match result {
                 Ok((file_name, result, has_skipped_conditions)) => {
-                    // If any AND condition was skipped because its field does
-                    // not exist in this tantivy index (e.g., a newly added
-                    // secondary-index field with no historical data), keep the
-                    // DataFusion filter so it can evaluate the skipped
-                    // predicates on the parquet data.
+                    // when has_skipped_conditions is true, we should add filter back to datafusion,
+                    // because the index result is not accurate
                     if has_skipped_conditions {
                         is_add_filter_back = true;
                     }
@@ -726,10 +718,7 @@ pub async fn get_tantivy_directory(
 }
 
 /// Returns (file_key, result, has_skipped_conditions).
-/// `has_skipped_conditions` is true when one or more AND conditions were skipped
-/// because the corresponding field does not exist in this tantivy index (e.g., a
-/// newly added secondary-index field). The caller must preserve the DataFusion
-/// filter to handle those skipped predicates.
+/// when has_skipped_conditions is true, we should all filter back to datafusion.
 async fn search_tantivy_index(
     trace_id: &str,
     time_range: (i64, i64),
@@ -807,7 +796,7 @@ async fn search_tantivy_index(
     let condition: IndexCondition =
         index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
     let (query, has_skipped_conditions) =
-        condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
+        condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
     let need_all_term_fields = condition
         .need_all_term_fields()
         .into_iter()
