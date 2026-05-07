@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card-section>
     <q-separator />
     <!-- Single Tab Row -->
-    <div class="row justify-between q-pt-sm">
-      <div class="col-10">
+    <div class="row justify-between q-pt-sm items-center">
+      <div class="col tw:flex tw:items-center tw:gap-2">
         <OTabs v-model="tab" align="left">
           <OTab
             data-test="log-detail-json-tab"
@@ -68,16 +68,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="correlated-traces"
             :label="t('correlation.correlatedTraces')"
           />
-          <!-- o2 ai context add button in the detail table -->
-          <O2AIContextAddBtn
-            class="tw:px-2 tw:py-2"
-            @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
-             />
         </OTabs>
+        <!-- o2 ai context add button outside OTabs for proper alignment -->
+        <O2AIContextAddBtn
+          @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
+        />
       </div>
       <div
         v-show="tab === 'table'"
-        class="col-2 flex justify-end align-center q-pr-md"
+        class="col-auto flex justify-end align-center q-pr-md"
       >
         <q-toggle
           data-test="log-detail-wrap-values-toggle-btn"
