@@ -220,6 +220,9 @@ pub async fn all_organizations(
                 None
             }
         });
+        let settings = crate::service::db::organization::get_org_setting(org.identifier)
+            .await
+            .unwrap_or_default();
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
@@ -235,6 +238,7 @@ pub async fn all_organizations(
             billing_provider: billing_info
                 .map(|(_, _, provider)| provider.clone())
                 .unwrap_or_default(),
+            org_storage_enabled: settings.org_storage_enabled,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());

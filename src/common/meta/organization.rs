@@ -162,6 +162,7 @@ pub struct AllOrgListDetails {
     pub contract_end_date: Option<i64>,
     #[serde(default)]
     pub billing_provider: String,
+    pub org_storage_enabled: bool,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -712,6 +713,7 @@ mod tests {
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
+            org_storage_enabled: false,
         };
 
         assert_eq!(details.plan, 0);
@@ -760,6 +762,7 @@ mod tests {
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
+            org_storage_enabled: false,
         };
 
         let details2 = AllOrgListDetails {
@@ -773,6 +776,7 @@ mod tests {
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
+            org_storage_enabled: true,
         };
 
         let response = AllOrganizationResponse {
@@ -841,6 +845,7 @@ mod tests {
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
+            org_storage_enabled: true,
         };
 
         let v = serde_json::to_value(&with_contract).unwrap();
@@ -859,6 +864,7 @@ mod tests {
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
+            org_storage_enabled: true,
         };
 
         let v = serde_json::to_value(&without_contract).unwrap();
