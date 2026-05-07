@@ -74,12 +74,12 @@ export interface InputSlots {
   append?: () => unknown;
 }
 
-// ── InputStub ──────────────────────────────────────────────────────────────
-// OInputStub renders a read-only display field that looks like OInput
+// ── InputDisplay ─────────────────────────────────────────────────────────────
+// OInputDisplay renders a read-only display field that looks like OInput
 // but accepts arbitrary content in its default slot. Useful as a preview
 // placeholder before a real value has been chosen.
 
-export interface InputStubProps {
+export interface InputDisplayProps {
   /** Label above the stub */
   label?: string;
   /** Placeholder text when no content is slotted */
@@ -90,7 +90,7 @@ export interface InputStubProps {
   size?: InputSize;
 }
 
-export interface InputStubSlots {
+export interface InputDisplaySlots {
   /** The content to display inside the stub */
   default?: () => unknown;
 }
