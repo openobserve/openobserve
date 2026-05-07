@@ -65,7 +65,7 @@ test.describe("Alerts Stream Switching Regression", () => {
     await streamDropdown.click();
     await page.waitForTimeout(300);
     // Type to filter, then click the target option in the same dropdown opening
-    await page.keyboard.press('Control+a');
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
     await page.keyboard.type(streamName, { delay: 30 });
     await page.waitForTimeout(800);
     const streamOption = page.locator('.q-menu:visible').getByText(streamName, { exact: true });
@@ -253,18 +253,16 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     // avg: identify numeric vs non-numeric fields from the stream's actual data
     await pm.alertsPage.selectAggregationFunction('avg');
-    await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields);
-    const avgFields = await pm.alertsPage.getAvailableFields();
+    const avgFields = await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields);
     const numericFields = avgFields; // fields kept by avg = numeric
     const stringFields = allFields.filter(f => !avgFields.includes(f)); // fields dropped = string
 
     // sum: verify same filtering, plus cross-check with known types
     await pm.alertsPage.selectAggregationFunction('sum');
-    await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields, {
+    const sumFields = await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields, {
         knownNumeric: numericFields,
         knownString: stringFields,
     });
-    const sumFields = await pm.alertsPage.getAvailableFields();
     expect(avgFields.sort(), 'avg and sum should filter to the same numeric-only field set').toEqual(sumFields.sort());
 
     // count: all fields available (no filtering)

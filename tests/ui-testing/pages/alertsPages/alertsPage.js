@@ -2585,8 +2585,8 @@ export class AlertsPage {
         testLogger.info('Checking editor content via .view-line elements', { viewLinesFound: count });
         const allText = [];
         for (let i = 0; i < count; i++) {
-            const text = await viewLines.nth(i).textContent().catch(() => '');
-            allText.push(text);
+            const lineText = await viewLines.nth(i).textContent().catch(() => '');
+            allText.push(lineText);
         }
         const combined = allText.join('\n');
         expect(combined, `Editor content should NOT contain "${text}"`).not.toContain(text);
@@ -2902,20 +2902,6 @@ export class AlertsPage {
     }
 
     /**
-     * Click the Continue button in the alert wizard to advance to the next step.
-     * Used to navigate from Step 1 → Step 2 in the v3 wizard.
-     */
-    async clickContinueButton() {
-        // v3 uses a flat layout with NO Continue button; v2 uses a step-based wizard.
-        // The data-test "add-alert-continue-btn" does not appear in any alert Vue component.
-        const continueBtn = this.page.locator('button:has-text("Continue")').first();
-        await continueBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await continueBtn.click();
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Clicked Continue button');
-    }
-
-    /**
      * Click the submit button in alert wizard
      * @returns {Promise<boolean>} True if button was clicked, false if not enabled
      */
@@ -3212,6 +3198,7 @@ export class AlertsPage {
      * @param {Object} [opts] - Optional known-field checks
      * @param {string[]} [opts.knownString] - Fields known to be string type; must be absent
      * @param {string[]} [opts.knownNumeric] - Fields known to be numeric; at least one must be present
+     * @returns {Promise<string[]>} The field names collected (caller can reuse, avoiding a 2nd dropdown open)
      */
     async expectOnlyNumericFieldsVisible(allFieldsBaseline, { knownString = [], knownNumeric = [] } = {}) {
         const fields = await this.getAvailableFields();
@@ -3235,6 +3222,7 @@ export class AlertsPage {
         }
 
         testLogger.info('Only numeric fields are visible', { totalFields: fields.length, filteredOut: missing.length, filteredFields: missing });
+        return fields;
     }
 
     /**
