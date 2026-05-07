@@ -150,7 +150,7 @@ export class SDRPatternsPage {
 
   async confirmDelete() {
     testLogger.info('Confirming pattern deletion');
-    const confirmButton = this.page.locator('[data-test="confirm-button"]');
+    const confirmButton = this.page.locator('[data-test="custom-confirm-button"]');
     await expect(this.page.getByText('Delete Regex Pattern')).toBeVisible();
     await confirmButton.click();
   }

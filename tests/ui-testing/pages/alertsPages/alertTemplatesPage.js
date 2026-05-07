@@ -25,7 +25,7 @@ export class AlertTemplatesPage {
         this.templateDeleteButton = '[data-test="alert-template-list-{templateName}-delete-template"]';
         this.templateUpdateButton = '[data-test="alert-template-list-{templateName}-update-template"]';
         this.deleteConfirmText = 'Delete Template';
-        this.confirmButton = '[data-test="confirm-button"]';
+        this.confirmButton = '[data-test="custom-confirm-button"]';
         this.templateDeletedMessage = 'Template %s deleted successfully';
         this.templateInUseMessage = 'Template is in use for destination';
         this.templateCountText = 'Templates';
@@ -319,7 +319,13 @@ export class AlertTemplatesPage {
 
         // Click delete button using the correct locator
         await this.page.locator(this.templateDeleteButton.replace('{templateName}', templateName)).click();
-        await expect(this.page.getByText(this.deleteConfirmText, { exact: true })).toBeVisible();
+
+        // Wait for delete confirmation dialog to appear - use dialog container instead of text
+        await expect(this.page.locator('[data-test="dialog-box"]')).toBeVisible();
+
+        // Verify we're in the correct dialog by checking for both title and message
+        await expect(this.page.getByRole('dialog', { name: 'Delete Template' })).toBeVisible();
+
         await this.page.locator(this.confirmButton).click();
         await this.page.waitForTimeout(4000);
 

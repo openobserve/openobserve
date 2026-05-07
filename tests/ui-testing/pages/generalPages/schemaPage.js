@@ -49,7 +49,7 @@ class SchemaPage {
             dataTypePlaceholder: 'Data Type *',
             schemaFieldSearchInput: '[data-test="schema-field-search-input"]',
             schemaDeleteButton: '[data-test="schema-delete-button"]',
-            confirmButton: '[data-test="confirm-button"]'
+            confirmButton: '[data-test="custom-confirm-button"]'
         };
     }
 

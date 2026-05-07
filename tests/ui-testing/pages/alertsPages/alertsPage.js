@@ -154,7 +154,7 @@ export class AlertsPage {
             alertUpdateButton: '[data-test="alert-list-{alertName}-update-alert"]',
             alertCloneButton: '[data-test="alert-list-{alertName}-clone-alert"]',
             alertMoreOptions: '[data-test="alert-list-{alertName}-more-options"]',
-            confirmButton: '[data-test="confirm-button"]',
+            confirmButton: '[data-test="custom-confirm-button"]',
 
             // Alert movement locators
             selectAllCheckboxRowName: '# Name Owner Period Frequency',

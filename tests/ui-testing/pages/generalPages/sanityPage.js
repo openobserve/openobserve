@@ -39,7 +39,7 @@ export class SanityPage {
         this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
         this.savedViewsButton = '[data-test="logs-search-saved-views-btn"]';
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
-        this.confirmButton = '[data-test="confirm-button"]';
+        this.confirmButton = '[data-test="custom-confirm-button"]';
         
         // Function locators
         this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
