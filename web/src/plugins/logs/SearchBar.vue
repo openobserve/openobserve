@@ -4791,7 +4791,7 @@ export default defineComponent({
         searchObj.data.stream.selectedStream.length > 1
       ) {
         showErrorNotification(
-          "Please enable SQL mode or select a single stream to visualize",
+          t("search.enableSqlOrSelectStream"),
         );
         return;
       }
@@ -4857,7 +4857,7 @@ export default defineComponent({
           searchObj?.data?.stream?.selectedStream?.length === 0
         ) {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           return;
         }
@@ -4877,7 +4877,7 @@ export default defineComponent({
           logsPageQuery.length > 1
         ) {
           showErrorNotification(
-            "Multiple SQL queries are not allowed to visualize",
+            t("search.multipleSqlNotAllowed"),
           );
           return;
         }
@@ -4893,7 +4893,7 @@ export default defineComponent({
         // validate sql query that all fields have alias
         if (!allSelectionFieldsHaveAlias(logsPageQuery)) {
           showErrorNotification(
-            "Fields using aggregation functions must have aliases to visualize.",
+            t("search.aggregationFieldsNeedAlias"),
           );
           return;
         }
