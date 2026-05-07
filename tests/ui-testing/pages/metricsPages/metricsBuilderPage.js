@@ -34,7 +34,7 @@ export class MetricsBuilderPage {
         this.runQueryButton = '[data-test="metrics-apply"]';
 
         // Add to Dashboard dialog selectors
-        this.addToDashboardButton = 'button:has-text("Add To Dashboard"), button:has-text("Add to Dashboard")';
+        this.addToDashboardButton = '[data-test="panel-editor-add-to-dashboard-btn"], button:has-text("Add To Dashboard"), button:has-text("Add to Dashboard")';
         this.dashboardDialogTitle = '[data-test="schema-title-text"]';
         this.dashboardPanelTitleInput = '[data-test="metrics-new-dashboard-panel-title"]';
         this.dashboardCancelButton = '[data-test="metrics-schema-cancel-button"]';

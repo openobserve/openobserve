@@ -138,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:flex tw:items-center tw:gap-2">
                       <OButton
                         v-if="resolvedConfig.showAddToDashboardButton"
+                        data-test="panel-editor-add-to-dashboard-btn"
                         variant="primary"
                         size="xs"
                         @click="emit('addToDashboard')"
