@@ -9,6 +9,16 @@
  * - Quick mode query removed when selecting interesting field
  * - Pagination not showing with histogram and SQL disabled
  * - Error message should identify problematic field
+ * - #8224: Showing message not displayed on logs page
+ * - #5894: Timestamp not default selected for multi stream
+ * - #10344: Run query button infinite loading when switching home↔logs
+ * - #11469: Copy/include/exclude shown on hover in traces correlation
+ * - #5010: Console error when aggregating with non-existent alias
+ * - #5278: Pagination not showing when histogram is turned off
+ * - #3821: Cannot read partitions error on stream change during query
+ * - #6702: Partitions error when switching pages during query
+ * - #3131: Order by not default for distinct queries
+ * - #4315: Blank histogram on cancelling histogram query
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -849,6 +859,490 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     testLogger.info('✓ PASSED: VRL saved views test completed (Bug #9690)');
+  });
+
+  // ==========================================================================
+  // Bug #8224: Logs page showing message not display
+  // https://github.com/openobserve/openobserve/issues/8224
+  // ==========================================================================
+  test("should display showing message on logs page after query @bug-8224 @P2 @showingMessage @regression", async ({ page }) => {
+    testLogger.info('Test: Verify showing message visible after query (Bug #8224)');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Run query
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // STRONG ASSERTION: Result pagination (showing X of Y records) should be visible
+    await pm.logsPage.expectResultPaginationVisible();
+    testLogger.info('✓ Showing message / result pagination is visible');
+
+    // STRONG ASSERTION: Logs table should be visible (confirms data loaded)
+    await pm.logsPage.expectLogsTableVisible();
+    testLogger.info('✓ Logs table visible with data');
+
+    testLogger.info('✓ PASSED: Showing message displays correctly (Bug #8224)');
+  });
+
+  // ==========================================================================
+  // Bug #5894: Timestamp should be default selected for multi stream selection
+  // https://github.com/openobserve/openobserve/issues/5894
+  // ==========================================================================
+  test("should have timestamp column selected by default for multi stream @bug-5894 @P2 @timestamp @multiStream @regression", async ({ page }) => {
+    testLogger.info('Test: Verify timestamp default selected for multi stream (Bug #5894)');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Ingest data into a second stream for multi-stream testing
+    const secondStream = `e2e_multistream_${Date.now()}`;
+    fieldCacheStreamsToCleanup.push(secondStream);
+    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
+    await ingestTestData(page, secondStream);
+    await page.waitForTimeout(2000);
+
+    // Select second stream for multi-stream mode (without page navigation)
+    testLogger.info('Selecting second stream for multi-stream mode');
+    await pm.logsPage.addStreamToSelection(secondStream);
+    await page.waitForTimeout(1000);
+
+    // Run query
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // STRONG ASSERTION: _timestamp column should be visible in the table header
+    await pm.logsPage.expectTimestampColumnVisible();
+    testLogger.info('✓ _timestamp column visible in table');
+
+    testLogger.info('✓ PASSED: Timestamp column displayed for multi stream (Bug #5894)');
+  });
+
+  // ==========================================================================
+  // Bug #10344: Run query button infinite loading when switching home↔logs
+  // https://github.com/openobserve/openobserve/issues/10344
+  // ==========================================================================
+  test("should not have run query button stuck in loading state after home-logs navigation @bug-10344 @P0 @runQuery @loading @regression", async ({ page }) => {
+    testLogger.info('Test: Verify run query button not stuck loading after navigation (Bug #10344)');
+
+    // Navigate to logs page via SPA menu click (not page.goto — Bug #10344 is about
+    // SPA state-leak across in-app navigation, which full reloads would reset)
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+
+    // Navigate between home and logs multiple times using SPA menu clicks
+    for (let i = 0; i < 4; i++) {
+      testLogger.info(`Navigation cycle ${i + 1}/4: Logs → Home → Logs`);
+
+      // Verify run query button is visible and not in loading state on logs page
+      await pm.logsPage.expectRefreshButtonVisible();
+      await pm.logsPage.expectRefreshButtonEnabled();
+      testLogger.info(`✓ Run query button not loading on logs page (cycle ${i + 1})`);
+
+      // Navigate to home page via SPA menu click
+      await pm.logsPage.navigateToHome();
+      await page.waitForTimeout(1000);
+      testLogger.info(`✓ Home page loaded via SPA (cycle ${i + 1})`);
+
+      // Navigate back to logs page via SPA menu click
+      await pm.logsPage.clickMenuLinkLogsItem();
+      await page.waitForTimeout(1000);
+    }
+
+    // STRONG ASSERTION: After all navigation cycles, button should still be enabled
+    await pm.logsPage.expectRefreshButtonEnabled();
+    testLogger.info('✓ Run query button enabled after all SPA navigation cycles');
+
+    testLogger.info('✓ PASSED: Run query button not stuck in loading state (Bug #10344)');
+  });
+
+  // ==========================================================================
+  // Bug #11469: Copy, include exclude displayed on hover under traces correlation
+  // https://github.com/openobserve/openobserve/issues/11469
+  // ==========================================================================
+  test("should not show copy/include/exclude on hover in traces correlation area @bug-11469 @P2 @correlation @hover @regression", async ({ page }) => {
+    testLogger.info('Test: Verify correlation section hover behavior (Bug #11469)');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Run query to load data (traces was ingested by global setup)
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Expand a log row to reveal the detail dialog with correlation tabs
+    await pm.logsPage.clickTableExpandMenuFirst();
+    await page.waitForTimeout(1000);
+
+    // Bug #11469 is about the traces correlation panel — an enterprise feature.
+    // If View Related is not available (OSS), skip rather than testing an unrelated area.
+    const correlationAvailable = await pm.logsPage.isViewRelatedButtonVisible();
+    if (!correlationAvailable) {
+      test.skip(true, 'Bug #11469: View Related (correlation) not available — enterprise feature required');
+      return;
+    }
+
+    await pm.logsPage.clickViewRelatedButton();
+    await page.waitForTimeout(2000);
+    testLogger.info('Opened correlation / View Related panel');
+
+    // Bug assertion: hover over the correlation panel and verify no
+    // copy/include/exclude context menu appears on simple hover
+    await pm.logsPage.hoverOnCorrelationDashboard();
+    await page.waitForTimeout(500);
+    await pm.logsPage.expectNoContextMenuVisible();
+    testLogger.info('✓ No unwanted context menu on hover over correlation panel');
+
+    testLogger.info('✓ PASSED: Correlation hover behavior verified (Bug #11469)');
+  });
+
+  // ==========================================================================
+  // Bug #5010: Console error when aggregating field with non-existent alias
+  // https://github.com/openobserve/openobserve/issues/5010
+  // ==========================================================================
+  test("should not have console errors when aggregating with non-existent alias @bug-5010 @P1 @errorHandling @consoleError @regression", async ({ page }) => {
+    testLogger.info('Test: Verify no console errors with non-existent alias aggregation (Bug #5010)');
+
+    // Track console errors
+    const consoleErrors = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+        testLogger.warn(`Console error: ${msg.text()}`);
+      }
+    });
+    page.on('pageerror', err => {
+      consoleErrors.push(err.message);
+      testLogger.warn(`Page error: ${err.message}`);
+    });
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Enable SQL mode to write aggregation query
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(500);
+
+    // Write aggregation query with non-existent alias
+    const nonExistentAlias = `nonexistent_alias_${Date.now()}`;
+    const aggregationQuery = `SELECT count(*) as ${nonExistentAlias} FROM "e2e_automate"`;
+    testLogger.info(`Running aggregation query with non-existent alias: ${aggregationQuery}`);
+    await pm.logsPage.clearAndFillQueryEditor(aggregationQuery);
+    await page.waitForTimeout(500);
+
+    // Run query
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    // Check for query-level errors
+    const errorVisible = await page.locator(pm.logsPage.errorMessage).isVisible({ timeout: 3000 }).catch(() => false);
+    testLogger.info(`Query error message visible: ${errorVisible}`);
+
+    // Expand first log detail if available
+    const expandMenu = page.locator(pm.logsPage.tableRowExpandMenu).first();
+    if (await expandMenu.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await pm.logsPage.clickTableExpandMenuFirst();
+      await page.waitForTimeout(1000);
+      testLogger.info('Expanded first log detail');
+    }
+
+    // Wait for any delayed console errors
+    await page.waitForTimeout(2000);
+
+    // Filter to only errors directly related to the bug: the specific non-existent
+    // alias we created, or "Cannot read properties of undefined" (the bug signature)
+    const relevantErrors = consoleErrors.filter(e =>
+      e.includes(nonExistentAlias) || /Cannot read properties of undefined/.test(e)
+    );
+    expect(relevantErrors.length, `Bug #5010: Should have no console errors related to non-existent alias, got: ${JSON.stringify(relevantErrors)}`).toBe(0);
+    testLogger.info('✓ No relevant console errors detected (filtered from ' + consoleErrors.length + ' total)');
+
+    testLogger.info('✓ PASSED: No console errors with non-existent alias (Bug #5010)');
+  });
+
+  // ==========================================================================
+  // Bug #5278: Not getting pagination when histogram is turned off
+  // https://github.com/openobserve/openobserve/issues/5278
+  // ==========================================================================
+  test("should show correct pagination when histogram is turned off @bug-5278 @P1 @pagination @histogram @regression", async ({ page }) => {
+    testLogger.info('Test: Verify pagination shows correctly with histogram off (Bug #5278)');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Turn off histogram
+    await pm.logsPage.ensureHistogramToggleState(false);
+    await page.waitForTimeout(500);
+
+    // Set wide time range to get more records
+    await pm.logsPage.clickDateTimeButton();
+    await page.waitForTimeout(500);
+    await pm.logsPage.clickRelative6WeeksButton();
+    await page.waitForTimeout(500);
+
+    // Run query
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    // STRONG ASSERTION: Logs table should be visible (query completed)
+    await pm.logsPage.expectLogsTableVisible();
+    testLogger.info('✓ Logs table visible');
+
+    // STRONG ASSERTION: Result pagination should be visible
+    await pm.logsPage.expectResultPaginationVisible();
+    testLogger.info('✓ Result pagination visible with histogram off');
+
+    // STRONG ASSERTION: SQL pagination should NOT be visible when SQL mode is off
+    await pm.logsPage.expectSQLPaginationNotVisible();
+    testLogger.info('✓ SQL pagination NOT visible (expected with SQL mode off)');
+
+    testLogger.info('✓ PASSED: Pagination displayed correctly with histogram off (Bug #5278)');
+  });
+
+  // ==========================================================================
+  // Bug #3821: Cannot read properties of undefined (reading 'partitions')
+  //            when user changes stream selection during query
+  // https://github.com/openobserve/openobserve/issues/3821
+  // ==========================================================================
+  test("should not show partitions error when changing stream during query @bug-3821 @P1 @errorHandling @streamSwitch @regression", async ({ page }) => {
+    testLogger.info('Test: Verify no partitions error on stream change during query (Bug #3821)');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Set wide time range to make query take longer
+    await pm.logsPage.clickDateTimeButton();
+    await page.waitForTimeout(300);
+    await pm.logsPage.clickRelative6WeeksButton();
+    await page.waitForTimeout(500);
+
+    // Track console errors
+    const consoleErrors = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+        testLogger.warn(`Console error: ${msg.text()}`);
+      }
+    });
+    page.on('pageerror', err => {
+      consoleErrors.push(err.message);
+      testLogger.warn(`Page error: ${err.message}`);
+    });
+
+    // Start running the query
+    await pm.logsPage.clickRefreshButton();
+    // Don't wait for query to finish - switch streams while it's in progress
+    await page.waitForTimeout(1000);
+
+    // Deselect the stream while query is in progress
+    testLogger.info('Deselecting stream while query in progress');
+    await pm.logsPage.deselectStream('e2e_automate');
+
+    // Wait for page to settle
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // STRONG ASSERTION: No "Cannot read properties of undefined" or "partitions" errors
+    const partitionsErrors = consoleErrors.filter(e =>
+      e.includes('Cannot read properties of undefined') || e.includes('partitions')
+    );
+    expect(partitionsErrors.length, `Bug #3821: Should have no partitions errors, got: ${JSON.stringify(partitionsErrors)}`).toBe(0);
+    testLogger.info('✓ No partitions-related console errors');
+
+    // Verify no error message displayed on page
+    const errorMsg = page.locator(pm.logsPage.errorMessage);
+    const errorVisible = await errorMsg.isVisible({ timeout: 2000 }).catch(() => false);
+    if (errorVisible) {
+      const errorText = await errorMsg.textContent();
+      const hasPartitionsError = /partitions|cannot read properties/i.test(errorText);
+      expect(hasPartitionsError, `Bug #3821: Error message should not mention partitions. Got: ${errorText}`).toBe(false);
+    }
+    testLogger.info('✓ No partitions error message on page');
+
+    testLogger.info('✓ PASSED: No partitions error on stream change (Bug #3821)');
+  });
+
+  // ==========================================================================
+  // Bug #6702: Cannot read properties of undefined partitions error when
+  //            switching from logs to streams and back during query
+  // https://github.com/openobserve/openobserve/issues/6702
+  // ==========================================================================
+  test("should not show partitions error when switching pages during query @bug-6702 @P1 @errorHandling @navigation @regression", async ({ page }) => {
+    testLogger.info('Test: Verify no partitions error on page switch during query (Bug #6702)');
+
+    // Use SPA menu navigation — not page.goto — because full reloads reset Pinia/Vue state,
+    // destroying the in-flight query that the bug requires to trigger the partitions error
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Set wide time range
+    await pm.logsPage.clickDateTimeButton();
+    await page.waitForTimeout(300);
+    await pm.logsPage.clickRelative6WeeksButton();
+    await page.waitForTimeout(500);
+
+    // Track page errors
+    const pageErrors = [];
+    page.on('pageerror', err => {
+      pageErrors.push(err.message);
+      testLogger.warn(`Page error: ${err.message}`);
+    });
+
+    // Start query
+    await pm.logsPage.clickRefreshButton();
+    // Don't wait for completion - switch pages while query is in progress
+    await page.waitForTimeout(1500);
+
+    // Navigate to streams page via SPA while query is still running
+    testLogger.info('Switching to streams page during query (SPA)');
+    await pm.logsPage.clickMenuLinkStreamsItem();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Navigate back to logs page via SPA
+    testLogger.info('Switching back to logs page (SPA)');
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    // STRONG ASSERTION: No "Cannot read properties of undefined" or "partitions" errors
+    const partitionsErrors = pageErrors.filter(e =>
+      e.includes('Cannot read properties of undefined') || e.includes('partitions')
+    );
+    expect(partitionsErrors.length, `Bug #6702: Should have no partitions page errors, got: ${JSON.stringify(partitionsErrors)}`).toBe(0);
+    testLogger.info('✓ No partitions-related page errors');
+
+    testLogger.info('✓ PASSED: No partitions error on page switch (Bug #6702)');
+  });
+
+  // ==========================================================================
+  // Bug #3131: Order by not displayed by default for distinct queries and
+  //            interesting field does not disappear on deselecting
+  // https://github.com/openobserve/openobserve/issues/3131
+  // ==========================================================================
+  // SKIPPED: ORDER BY auto-injection for DISTINCT queries is server-side behavior
+  // (Rust backend). The frontend sends the exact SQL as typed — neither the Monaco
+  // editor text nor the _search POST payload will ever contain an auto-injected
+  // ORDER BY clause. There is no UI-observable difference between the fixed and
+  // broken states, so a meaningful UI regression test is not feasible for this bug.
+  test.skip("should show order by default for distinct queries @bug-3131 @P2 @distinct @orderBy @regression", async ({ page }) => {
+    testLogger.info('Test: Verify order by displayed for distinct queries (Bug #3131) — SKIPPED: backend behavior, not UI-verifiable');
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(500);
+
+    const distinctQuery = `SELECT DISTINCT kubernetes_pod_name FROM "e2e_automate"`;
+    await pm.logsPage.clearAndFillQueryEditor(distinctQuery);
+    await page.waitForTimeout(500);
+
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    await pm.logsPage.expectLogsTableVisible();
+    await pm.logsPage.expectResultPaginationVisible();
+
+    testLogger.info('✓ PASSED: Order by default for distinct queries verified (Bug #3131)');
+  });
+
+  // ==========================================================================
+  // Bug #4315: Blank histogram on cancelling histogram API/query
+  // https://github.com/openobserve/openobserve/issues/4315
+  // ==========================================================================
+  test("should not show blank histogram after cancelling query @bug-4315 @P2 @histogram @cancel @regression", async ({ page }) => {
+    testLogger.info('Test: Verify histogram not blank after cancel (Bug #4315)');
+
+    const orgName = getOrgIdentifier() || 'default';
+
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Ensure histogram is enabled
+    await pm.logsPage.enableHistogram();
+    await page.waitForTimeout(500);
+
+    // Intercept _search POST requests to simulate a slow histogram call that gets cancelled.
+    // Use a wasCancelled flag + Promise.race with a guard timeout so the test cannot hang
+    // forever if clickRefreshButton() never fires a _search POST (slow CI, network warm-up).
+    let heldRoute = null;
+    let routeResolve = null;
+    let wasCancelled = false;
+    await page.route(`**/api/${orgName}/_search`, async (route) => {
+      if (route.request().method() === 'POST') {
+        if (!heldRoute) {
+          heldRoute = route;
+          testLogger.info('Holding first _search request (simulating slow histogram)');
+          // Timeout guard: if cancel never fires, continue the request after 8s instead of hanging
+          await Promise.race([
+            new Promise(resolve => { routeResolve = resolve; }),
+            new Promise(resolve => setTimeout(resolve, 8000))
+          ]);
+          if (wasCancelled) {
+            testLogger.info('First _search request released (aborted by cancel)');
+            await route.abort('aborted');
+          } else {
+            testLogger.info('Cancel guard timed out — continuing request normally');
+            await route.continue();
+          }
+          heldRoute = null;
+          routeResolve = null;
+          wasCancelled = false;
+          return;
+        }
+      }
+      await route.continue();
+    });
+
+    // Run query — first _search request will be held
+    testLogger.info('Starting query (histogram request will be delayed)');
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForTimeout(1500);
+
+    // Cancel by clicking refresh again while the first histogram call is still in flight.
+    // wasCancelled tells the route handler to abort rather than continue.
+    testLogger.info('Cancelling in-flight histogram by clicking refresh again');
+    wasCancelled = true;
+    if (routeResolve) routeResolve();
+    await page.waitForTimeout(500);
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    // Remove route handler
+    await page.unroute(`**/api/${orgName}/_search`);
+
+    // Bug assertion: the histogram must NOT be blank after cancel — it must have rendered content
+    await pm.logsPage.expectBarChartHasContent();
+
+    testLogger.info('✓ PASSED: Histogram not blank after cancel (Bug #4315)');
   });
 
   test.afterEach(async () => {
