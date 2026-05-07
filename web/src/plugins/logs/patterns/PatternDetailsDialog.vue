@@ -175,17 +175,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
               <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
-              <q-chip
+              <span
                 v-else
-                dense
-                size="xs"
-                class="wildcard-chip-detail q-my-none q-mx-none"
-                :class="wildcardChipColor(tok.value)"
-                @mouseenter="onMouseEnter(tok.value, tok.topValues, $event)"
+                class="tw:inline-flex"
+                @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
                 @mouseleave="onMouseLeave"
               >
-                {{ tok.value }}
-              </q-chip>
+                <q-chip
+                  dense
+                  size="xs"
+                  class="wildcard-chip-detail q-my-none q-mx-none"
+                  :class="wildcardChipColor(tok.value)"
+                >
+                  {{ tok.value }}
+                </q-chip>
+              </span>
             </template>
           </div>
         </div>
@@ -303,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <WildcardValuePopover
       :visible="!!hoveredToken"
       :token="hoveredToken?.token ?? ''"
-      :topValues="hoveredToken?.topValues ?? []"
+      :displayValues="hoveredToken?.displayValues ?? []"
       :anchorEl="hoveredToken?.anchorEl ?? null"
       @popoverEnter="onPopoverEnter"
       @popoverLeave="onPopoverLeave"
