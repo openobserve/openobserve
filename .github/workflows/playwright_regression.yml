@@ -2,12 +2,12 @@ name: Playwright Regression Tests
 
 on:
   schedule:
-    - cron: '37 3,7,11,15,19,23 * * *'  # Every 4 hrs from 9 AM IST (3:30, 7:30, 11:30, 15:30, 19:30, 23:30 UTC)
+    - cron: '30 3,7,11,15,19,23 * * *'  # Every 4 hrs from 9 AM IST (3:30, 7:30, 11:30, 15:30, 19:30, 23:30 UTC)
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   COLUMNS: 150
@@ -241,6 +241,7 @@ jobs:
           npx playwright merge-reports --config playwright.config.js ./all-blob-reports
 
       - name: Upload to TestDino
+        continue-on-error: true
         if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
@@ -284,7 +285,7 @@ jobs:
             UI_OK=true
           fi
 
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
+          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ]; then
             MERGE_OK=true
           fi
 
