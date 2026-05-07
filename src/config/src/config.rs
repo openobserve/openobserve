@@ -3045,7 +3045,9 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
     if cfg.memory_cache.datafusion_max_size == 0 {
-        if cfg.common.local_mode {
+        if local_node_role == [cluster::Role::Compactor] {
+            cfg.memory_cache.datafusion_max_size = mem_total / cfg.limit.file_merge_thread_num;
+        } else if cfg.common.local_mode {
             cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 25%
         } else {
             cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size; // 50%
