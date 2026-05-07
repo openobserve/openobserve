@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     position="right"
     full-height
     :maximized="true"
+    allow-focus-outside
     transition-show="slide-left"
     transition-hide="slide-right"
     @hide="onClose"

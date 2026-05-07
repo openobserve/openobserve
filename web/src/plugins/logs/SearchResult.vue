@@ -453,6 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="right"
         full-height
         maximized
+        allow-focus-outside
         @escap.stop="reDrawChart"
         @hide="reDrawChart"
         @before-hide="reDrawChart"
