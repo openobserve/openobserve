@@ -318,6 +318,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('dashboard.scheduledReports')"
         @close="showScheduledReportsDialog = false"
       >
+        <template #header>
+          <div class="tw:flex tw:justify-between tw:w-full">
+            <div
+              class="q-table__title tw:flex tw:items-center"
+              data-test="alerts-list-title"
+            >
+              {{ t("dashboard.scheduledDashboards") }}
+            </div>
+
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <div class="app-tabs-container tw:h-[36px]">
+                <AppTabs
+                  class="tabs-selection-container"
+                  :tabs="scheduledReportTypeTabs"
+                  v-model:active-tab="scheduledActiveTab"
+                />
+              </div>
+
+              <q-input
+                data-test="alert-list-search-input"
+                v-model="scheduledFilterQuery"
+                borderless
+                dense
+                class="no-border tw:border tw:border-[var(--q-color-button-border,#d1d5db)] tw:rounded-md tw:px-2 tw:h-9"
+                :placeholder="t('reports.search')"
+                hide-bottom-space
+              >
+                <template #prepend>
+                  <q-icon name="search" class="cursor-pointer" />
+                </template>
+              </q-input>
+
+              <OButton
+                variant="primary"
+                size="sm-action"
+                data-test="alert-list-add-alert-btn"
+                @click="createScheduledReport"
+                >{{ t("dashboard.newReport") }}</OButton
+              >
+            </div>
+          </div>
+        </template>
+
         <ScheduledDashboards
           :reports="scheduledReports"
           :loading="isLoadingReports"
@@ -325,6 +368,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dashboardId="dashboardId"
           :tabId="tabId"
           :tabs="currentDashboardData?.data?.tabs || []"
+          :filterQuery="scheduledFilterQuery"
+          :activeTab="scheduledActiveTab"
           @close="showScheduledReportsDialog = false"
         />
       </ODrawer>
@@ -415,6 +460,8 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+import { Database, CalendarClock } from "lucide-vue-next";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -455,6 +502,7 @@ export default defineComponent({
     DashboardJsonEditor,
     OButton,
     ODrawer,
+    AppTabs,
   },
   setup() {
     const { t } = useI18n();
@@ -466,6 +514,31 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
+    const scheduledFilterQuery = ref("");
+    const scheduledActiveTab = ref("cached");
+    const scheduledReportTypeTabs = reactive([
+      {
+        label: t("reports.cached"),
+        value: "cached",
+        icon: Database,
+      },
+      {
+        label: t("reports.scheduled"),
+        value: "shared",
+        icon: CalendarClock,
+      },
+    ]);
+    const createScheduledReport = () => {
+      router.push({
+        name: "createReport",
+        query: {
+          folderId: folderId.value,
+          dashboardId: dashboardId.value,
+          tabId: tabId.value,
+          type: "cached",
+        },
+      });
+    };
     const {
       showPositiveNotification,
       showErrorNotification,
@@ -1925,6 +1998,10 @@ export default defineComponent({
       showScheduledReportsDialog,
       isLoadingReports,
       scheduledReports,
+      scheduledFilterQuery,
+      scheduledActiveTab,
+      scheduledReportTypeTabs,
+      createScheduledReport,
       dashboardId,
       folderId,
       reportId,
