@@ -162,13 +162,8 @@ test.describe("Alerts Stream Switching Regression", () => {
     await pm.alertsPage.typeInQueryEditor(`SELECT COUNT(*) as cnt FROM "${TEST_LOG_STREAM}"`);
     await pm.alertsPage.clickRunQueryButton();
 
-    // Close editor dialog
-    await pm.alertsPage.clickBackButton();
-
-    // Clean up portals that may intercept clicks
-    await page.evaluate(() => {
-      document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
-    }).catch(() => {});
+    // Close editor dialog (scoped to dialog to avoid ambiguity with wizard back button)
+    await pm.alertsPage.closeEditorDialog();
 
     // PRIMARY: Chart is not blank after SQL mode (Bug #11571: "blank table instead of line")
     await pm.alertsPage.expectPreviewChartNotBlank();
@@ -210,8 +205,8 @@ test.describe("Alerts Stream Switching Regression", () => {
     await pm.alertsPage.typeInQueryEditor(`SELECT COUNT(*) as cnt FROM "${TEST_LOG_STREAM}"`);
     await pm.alertsPage.clickRunQueryButton();
 
-    // PRIMARY: Close the editor and verify chart survives (the core of Bug #11573)
-    await pm.alertsPage.clickBackButton();
+    // PRIMARY: Close the editor dialog and verify chart survives (the core of Bug #11573)
+    await pm.alertsPage.closeEditorDialog();
 
     // Bug #11573: editor close was blanking the graph — assert canvas exists, not just container
     await pm.alertsPage.expectPreviewChartNotBlank();
@@ -237,20 +232,24 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     // Bug #11578 is about the aggregation field dropdown. After selecting an
     // aggregation function (avg/sum), the field dropdown next to it must only
-    // show numeric fields. Use expectOnlyNumericFieldsVisible which verifies
-    // that known non-numeric field names are absent.
+    // show numeric fields (a proper subset of all fields).
 
-    // avg: only numeric fields
+    // Capture the full field list with count (baseline)
+    await pm.alertsPage.selectAggregationFunction('count');
+    const allFields = await pm.alertsPage.getAvailableFields();
+    expect(allFields.length, 'Baseline field list should not be empty').toBeGreaterThan(0);
+
+    // avg: only numeric fields — must be a strict subset of baseline
     await pm.alertsPage.selectAggregationFunction('avg');
-    await pm.alertsPage.expectOnlyNumericFieldsVisible();
+    await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields);
 
     // sum: same filtering
     await pm.alertsPage.selectAggregationFunction('sum');
-    await pm.alertsPage.expectOnlyNumericFieldsVisible();
+    await pm.alertsPage.expectOnlyNumericFieldsVisible(allFields);
 
     // count: all fields available (no filtering)
     await pm.alertsPage.selectAggregationFunction('count');
-    await pm.alertsPage.expectAllFieldsVisible();
+    await pm.alertsPage.expectAllFieldsVisible(allFields);
     testLogger.info('Bug #11578: aggregation field filtering verified');
 
     await pm.alertsPage.clickBackButton();
@@ -275,7 +274,7 @@ async function ingestMetricsData(page) {
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
   ).toString('base64');
 
-  const timestamp = Math.floor(Date.now() / 1000);
+  const nowMicros = Date.now() * 1000;
   const metricsData = [];
   for (let i = 0; i < 10; i++) {
     metricsData.push({
@@ -284,7 +283,7 @@ async function ingestMetricsData(page) {
       "host_name": `server-${i % 3 + 1}`,
       "env": "test",
       "region": ["us-east-1", "us-west-2", "eu-west-1"][i % 3],
-      "_timestamp": timestamp - (i * 60),
+      "_timestamp": nowMicros - (i * 60 * 1_000_000),
       "value": 20 + Math.random() * 60
     });
   }

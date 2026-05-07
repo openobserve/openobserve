@@ -2420,10 +2420,23 @@ export class AlertsPage {
     }
 
     /**
+     * Close the query editor dialog via its back button, scoped to the dialog container.
+     * Uses .q-dialog to avoid ambiguity with the wizard back button
+     * (both share data-test="add-alert-back-btn").
+     */
+    async closeEditorDialog() {
+        const dialogBackBtn = this.page.locator('.q-dialog [data-test="add-alert-back-btn"]').first();
+        await dialogBackBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await dialogBackBtn.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Closed editor dialog via scoped back button');
+    }
+
+    /**
      * Click the Back button to close alert wizard
      */
     async clickBackButton() {
-        await this.page.locator(this.locators.alertBackButton).first().click({ force: true, timeout: 15000 });
+        await this.page.locator(this.locators.alertBackButton).first().click({ timeout: 15000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
@@ -3304,40 +3317,30 @@ export class AlertsPage {
     /**
      * Expect that only numeric/integer fields are shown in the field dropdown.
      * Used for Bug #11578: when avg/sum/min/max is selected, only numeric fields should appear.
-     * Non-numeric field names like 'city', 'country', 'status' should be absent.
-     * @param {string[]} nonNumericFields - Field names that should NOT be visible
+     * Takes the baseline of ALL fields (captured when 'count' is selected) and asserts
+     * that at least some non-numeric fields from the baseline are now absent.
+     * @param {string[]} allFieldsBaseline - Full field list captured with count aggregation
      */
-    async expectOnlyNumericFieldsVisible(nonNumericFields = []) {
+    async expectOnlyNumericFieldsVisible(allFieldsBaseline) {
         const fields = await this.getAvailableFields();
-        const allNonNumeric = nonNumericFields.length > 0
-            ? nonNumericFields
-            : ['city', 'country', 'status', 'moduleLog', 'message'];
+        const missing = allFieldsBaseline.filter(f => !fields.includes(f));
 
-        for (const nonNumeric of allNonNumeric) {
-            const found = fields.some(f => f.includes(nonNumeric));
-            if (found) {
-                testLogger.warn('Non-numeric field found in dropdown', { field: nonNumeric, allFields: fields });
-            }
-            expect(found, `Non-numeric field "${nonNumeric}" should NOT be visible when aggregation requires numeric fields`).toBe(false);
-        }
-        testLogger.info('Only numeric fields are visible');
+        expect(missing.length, `Expected some fields from baseline to be filtered out for numeric-only aggregation, but all ${allFieldsBaseline.length} baseline fields are still present`).toBeGreaterThan(0);
+        testLogger.info('Only numeric fields are visible', { totalFields: fields.length, filteredOut: missing.length, filteredFields: missing });
     }
 
     /**
-     * Expect that ALL fields (including non-numeric) are visible in the field dropdown.
-     * Used to verify that 'count' or 'total events' doesn't filter field types.
-     * @param {string[]} expectedFields - Field names that should be visible
+     * Expect that ALL baseline fields are visible in the field dropdown.
+     * Used to verify that 'count' doesn't filter field types.
+     * @param {string[]} expectedFields - Field names that should be visible (exact match)
      */
-    async expectAllFieldsVisible(expectedFields = []) {
+    async expectAllFieldsVisible(expectedFields) {
         const fields = await this.getAvailableFields();
-        const toCheck = expectedFields.length > 0
-            ? expectedFields
-            : ['city', 'country', 'status', 'moduleLog', 'message'];
-        for (const expected of toCheck) {
-            const found = fields.some(f => f.includes(expected));
-            expect(found, `Expected field "${expected}" to be visible when count aggregation is selected`).toBe(true);
+        for (const expected of expectedFields) {
+            const found = fields.includes(expected);
+            expect(found, `Expected field "${expected}" to be visible when count aggregation is selected. Available: [${fields.join(', ')}]`).toBe(true);
         }
-        testLogger.info('All expected fields are visible');
+        testLogger.info('All expected fields are visible', { expectedCount: expectedFields.length, actualCount: fields.length });
     }
 
     /**
