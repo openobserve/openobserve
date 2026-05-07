@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-sm"
             data-test="close-dialog"
-          ><X :size="16" /></OButton>
+          ><q-icon name="cancel" size="16px" /></OButton>
         </div>
       </div>
     </q-card-section>
@@ -173,9 +173,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
                         size="icon-xs"
                         variant="ghost"
+                        class="log-json-field-dropdown-btn"
                         aria-label="Add icon"
                       >
-                        <q-icon :name="tableDropdownOpenMap[props.row.field] ? 'expand_less' : 'expand_more'" size="14px" />
+                        <q-icon :name="tableDropdownOpenMap[props.row.field] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
                       </OButton>
                     </template>
                     <ODropdownItem
@@ -209,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="log-details-include-field-btn"
                       @select="addFieldToTable(props.row.field.toString())"
                     >
-                      <template #icon-left><Eye class="tw:size-4" /></template>
+                      <template #icon-left><q-icon name="visibility" size="16px" /></template>
                       {{ t("common.addFieldToTable") }}
                     </ODropdownItem>
                     <ODropdownItem
@@ -217,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="log-details-include-field-btn"
                       @select="addFieldToTable(props.row.field.toString())"
                     >
-                      <template #icon-left><EyeOff class="tw:size-4" /></template>
+                      <template #icon-left><q-icon name="visibility_off" size="16px" /></template>
                       {{ t("common.removeFieldFromTable") }}
                     </ODropdownItem>
                     <!-- Cross-link options -->
@@ -229,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`log-details-cross-link-${crossLink.name}`"
                         @select.stop="openCrossLink(crossLink.resolvedUrl)"
                       >
-                        <template #icon-left><ExternalLink class="tw:size-4" /></template>
+                        <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
                         {{ crossLink.name }}
                       </ODropdownItem>
                     </template>
@@ -379,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-          ><ChevronLeft :size="14" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
+          ><q-icon name="navigate_before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
         </div>
         <div
           v-show="
@@ -416,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-          >{{ t('common.next') }}<ChevronRight :size="14" class="tw:ml-1" /></OButton>
+          >{{ t('common.next') }}<q-icon name="navigate_next" size="14px" class="tw:ml-1" /></OButton>
         </div>
       </div>
     </q-card-section>
@@ -447,7 +448,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { X, Eye, EyeOff, ExternalLink, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
@@ -461,7 +461,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, X, Eye, EyeOff, ExternalLink, ChevronLeft, ChevronRight },
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -854,6 +854,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 @import "@/styles/logs/detail-table.scss";
+@import "@/styles/logs/json-preview.scss";
 
 // Make correlation tab panels use full remaining height (no footer space)
 .full-height-panels {
