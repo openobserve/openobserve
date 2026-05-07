@@ -157,6 +157,17 @@
   --color-tabs-focus-ring: var(--color-primary-400);
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
+
+  /* Field semantic widths (OInput, OInputDisplay, OSelect) */
+  /* xs  ~120px — zip codes, CVV, short numbers          */
+  /* sm  ~200px — dates, narrow labels                   */
+  /* md  ~280px — names, phone numbers (default narrow)  */
+  /* lg  ~400px — emails, full addresses                 */
+  /* full is 100% — no token needed, handled in CSS var  */
+  --spacing-field-width-xs: 7.5rem;
+  --spacing-field-width-sm: 12.5rem;
+  --spacing-field-width-md: 17.5rem;
+  --spacing-field-width-lg: 25rem;
 }
 
 /* ToggleGroup — primary variant (colored tray) */
@@ -310,4 +321,33 @@
   --color-tabs-focus-ring: var(--color-tabs-focus-ring);
   --spacing-tabs-height: var(--spacing-tabs-height);
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
+
+  /* Field semantic widths (used by OInput, OInputDisplay, OSelect) */
+  --spacing-field-width-xs: var(--spacing-field-width-xs);
+  --spacing-field-width-sm: var(--spacing-field-width-sm);
+  --spacing-field-width-md: var(--spacing-field-width-md);
+  --spacing-field-width-lg: var(--spacing-field-width-lg);
+
+
+  /* Dialog */
+  --color-dialog-overlay: var(--color-dialog-overlay);
+  --color-dialog-bg: var(--color-dialog-bg);
+  --color-dialog-border: var(--color-dialog-border);
+  --shadow-dialog: var(--shadow-dialog);
+  --color-dialog-header-bg: var(--color-dialog-header-bg);
+  --color-dialog-header-text: var(--color-dialog-header-text);
+  --color-dialog-header-border: var(--color-dialog-header-border);
+  --color-dialog-content-text: var(--color-dialog-content-text);
+  --color-dialog-footer-bg: var(--color-dialog-footer-bg);
+  --color-dialog-footer-border: var(--color-dialog-footer-border);
+  --color-dialog-close-text: var(--color-dialog-close-text);
+  --color-dialog-close-hover-bg: var(--color-dialog-close-hover-bg);
+  --color-dialog-close-active-bg: var(--color-dialog-close-active-bg);
+  --color-dialog-focus-ring: var(--color-dialog-focus-ring);
+  --spacing-dialog-header-px: var(--spacing-dialog-header-px);
+  --spacing-dialog-header-py: var(--spacing-dialog-header-py);
+  --spacing-dialog-content-px: var(--spacing-dialog-content-px);
+  --spacing-dialog-content-py: var(--spacing-dialog-content-py);
+  --spacing-dialog-footer-px: var(--spacing-dialog-footer-px);
+  --spacing-dialog-footer-py: var(--spacing-dialog-footer-py);
 }

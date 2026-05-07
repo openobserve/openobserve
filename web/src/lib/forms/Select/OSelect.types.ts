@@ -1,5 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { InjectionKey } from "vue";
+import type { FieldWidth } from "../Input/OInput.types";
+
+/** Injection key for the value map that preserves original numeric/string types across OSelect → OSelectItem */
+export const SELECT_VALUE_MAP_KEY: InjectionKey<Map<string, string | number>> =
+  Symbol("SelectValueMap");
+
 export type SelectSize = "sm" | "md";
 
 // ── Option shape ──────────────────────────────────────────────────────────
@@ -40,12 +47,20 @@ export interface SelectProps {
   /** HTML name */
   name?: string;
   /**
-   * Override the component width.
-   * Pass a number for pixels (e.g. `:width="200"` → `200px`)
-   * or a CSS string (e.g. `width="50%"` / `width="12rem"`).
-   * Defaults to `100%` (fills the container).
+   * Semantic field width — controls how wide the component renders.
+   * Defaults to `"full"` (fills the container).
+   * @see FieldWidth
    */
-  width?: string | number;
+  width?: FieldWidth;
+  /**
+   * Validation rules run on value change.
+   * Each function receives the current value and must return `true` when valid
+   * or an error string when invalid. The first failing rule's message is shown.
+   *
+   * @example
+   * :rules="[(v) => v !== undefined || 'Required']"
+   */
+  rules?: Array<(val: string | number | undefined) => true | string>;
 }
 
 export interface SelectEmits {

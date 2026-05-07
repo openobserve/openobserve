@@ -2,6 +2,16 @@
 
 export type InputSize = "sm" | "md";
 
+/**
+ * Semantic field width — maps to pre-defined CSS tokens.
+ * - `xs`   ~120px  zip codes, CVV, short numbers
+ * - `sm`   ~200px  dates, narrow labels
+ * - `md`   ~280px  names, phone numbers
+ * - `lg`   ~400px  emails, full addresses
+ * - `full` 100%    fills the container (default)
+ */
+export type FieldWidth = "xs" | "sm" | "md" | "lg" | "full";
+
 export type InputType =
   | "text"
   | "password"
@@ -52,12 +62,20 @@ export interface InputProps {
   /** HTML autocomplete */
   autocomplete?: string;
   /**
-   * Override the component width.
-   * Pass a number for pixels (e.g. `:width="200"` → `200px`)
-   * or a CSS string (e.g. `width="50%"` / `width="12rem"`).
-   * Defaults to `100%` (fills the container).
+   * Semantic field width — controls how wide the component renders.
+   * Defaults to `"full"` (fills the container).
+   * @see FieldWidth
    */
-  width?: string | number;
+  width?: FieldWidth;
+  /**
+   * Validation rules run on blur (and on value change after the first blur).
+   * Each function receives the current value and must return `true` when valid
+   * or an error string when invalid. The first failing rule's message is shown.
+   *
+   * @example
+   * :rules="[(v) => !!v || 'Required', (v) => String(v).length >= 3 || 'Min 3 chars']"
+   */
+  rules?: Array<(val: string | number | undefined) => true | string>;
 }
 
 export interface InputEmits {
@@ -96,12 +114,11 @@ export interface InputDisplayProps {
   /** Control size */
   size?: InputSize;
   /**
-   * Override the component width.
-   * Pass a number for pixels (e.g. `:width="200"` → `200px`)
-   * or a CSS string (e.g. `width="50%"` / `width="12rem"`).
-   * Defaults to `100%` (fills the container).
+   * Semantic field width — controls how wide the component renders.
+   * Defaults to `"full"` (fills the container).
+   * @see FieldWidth
    */
-  width?: string | number;
+  width?: FieldWidth;
 }
 
 export interface InputDisplaySlots {
