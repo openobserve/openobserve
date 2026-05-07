@@ -175,9 +175,9 @@ class AnomalyDetectionPage {
         // Try multiple base selectors with filter pattern to avoid injection
         const baseSelectors = [
             '[class*="tw:cursor-pointer"]',
-            '.q-tab',
+            '[role="group"] button',
             'button',
-            'div[role="tab"]'
+            '[role="tab"]'
         ];
 
         let tabFound = false;
@@ -330,8 +330,8 @@ class AnomalyDetectionPage {
         const tabSelectors = [
             '[class*="tw:cursor-pointer"]:has-text("Alerting")',
             'text=Alerting',
-            '.q-tab:has-text("Alerting")',
-            'button:has-text("Alerting")'
+            'button:has-text("Alerting")',
+            '[role="group"] button:has-text("Alerting")'
         ];
 
         let alertingTab = null;
@@ -730,7 +730,8 @@ class AnomalyDetectionPage {
         const tabSelectors = [
             '[class*="tw:cursor-pointer"]:has-text("Detection Config")',
             'text=Detection Config',
-            '.q-tab:has-text("Detection Config")'
+            'button:has-text("Detection Config")',
+            '[role="group"] button:has-text("Detection Config")'
         ];
 
         let found = false;

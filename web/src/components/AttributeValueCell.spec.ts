@@ -90,14 +90,14 @@ describe("AttributeValueCell", () => {
       let capturedField: string | undefined;
       let capturedValue: string | undefined;
 
-      // Stub q-btn-dropdown so its content slot renders immediately (not lazily in a teleport).
+      // Stub ODropdown so its content slot renders immediately (not lazily in a teleport).
       // This lets us verify the scoped slot bindings without needing to open the dropdown.
       wrapper = mount(AttributeValueCell, {
         props: { field: "service", value: "frontend" },
         global: {
           stubs: {
-            "q-btn-dropdown": {
-              template: `<div><slot /></div>`,
+            ODropdown: {
+              template: `<div><slot name="trigger" /><slot /></div>`,
             },
           },
         },

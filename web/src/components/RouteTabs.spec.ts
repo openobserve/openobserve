@@ -3,6 +3,14 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import RouteTabs from '@/components/RouteTabs.vue';
 import { Quasar } from 'quasar';
 
+vi.mock('vue-router', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    currentRoute: { value: { name: '', query: {} } },
+  }),
+  useRoute: () => ({ name: '', query: {} }),
+}));
+
 describe('RouteTabs.vue', () => {
   let wrapper: VueWrapper;
 
@@ -49,14 +57,15 @@ describe('RouteTabs.vue', () => {
       global: {
         plugins: [Quasar],
         stubs: {
-          'q-tabs': {
-            template: '<div class="q-tabs-stub" :data-test="dataTest" :class="{ vertical: vertical }"><slot></slot></div>',
-            props: ['dataTest', 'modelValue', 'vertical', 'indicatorColor', 'inlineLabel']
+          OTabs: {
+            template: '<div class="o-tabs-stub" :data-test="dataTest" :class="{ vertical: orientation === \'vertical\' }"><slot></slot></div>',
+            props: ['dataTest', 'modelValue', 'orientation', 'indicatorColor', 'inlineLabel'],
+            emits: ['update:modelValue'],
           },
-          'q-route-tab': {
-            template: '<div class="q-route-tab-stub" :data-test="dataTest">{{ label }}</div>',
-            props: ['dataTest', 'name', 'to', 'label', 'contentClass']
-          }
+          ORouteTab: {
+            template: '<div class="o-route-tab-stub" :data-test="dataTest">{{ label }}</div>',
+            props: ['dataTest', 'name', 'to', 'label', 'contentClass', 'icon', 'default'],
+          },
         }
       }
     });
@@ -70,27 +79,27 @@ describe('RouteTabs.vue', () => {
 
     it('renders q-tabs component', () => {
       wrapper = createWrapper();
-      const tabs = wrapper.find('.q-tabs-stub');
+      const tabs = wrapper.find('.o-tabs-stub');
       expect(tabs.exists()).toBe(true);
     });
 
     it('passes correct props to q-tabs', () => {
       wrapper = createWrapper({ dataTest: 'custom-test' });
-      const tabs = wrapper.find('.q-tabs-stub');
+      const tabs = wrapper.find('.o-tabs-stub');
       
       expect(tabs.attributes('data-test')).toBe('custom-test');
     });
 
     it('renders all tab items', () => {
       wrapper = createWrapper();
-      const routeTabs = wrapper.findAll('.q-route-tab-stub');
+      const routeTabs = wrapper.findAll('.o-route-tab-stub');
       
       expect(routeTabs.length).toBe(3);
     });
 
     it('displays tab labels correctly', () => {
       wrapper = createWrapper();
-      const routeTabs = wrapper.findAll('.q-route-tab-stub');
+      const routeTabs = wrapper.findAll('.o-route-tab-stub');
       
       expect(routeTabs[0].text()).toBe('Tab 1');
       expect(routeTabs[1].text()).toBe('Tab 2');
@@ -125,14 +134,14 @@ describe('RouteTabs.vue', () => {
 
     it('handles empty tabs array', () => {
       wrapper = createWrapper({ tabs: [] });
-      const routeTabs = wrapper.findAll('.q-route-tab-stub');
+      const routeTabs = wrapper.findAll('.o-route-tab-stub');
       
       expect(routeTabs.length).toBe(0);
     });
 
     it('passes tab properties to q-route-tab', () => {
       wrapper = createWrapper();
-      const firstTab = wrapper.find('.q-route-tab-stub');
+      const firstTab = wrapper.find('.o-route-tab-stub');
       
       expect(firstTab.attributes('data-test')).toBe('tab-1-test');
     });
@@ -210,7 +219,7 @@ describe('RouteTabs.vue', () => {
   describe('Direction Handling', () => {
     it('applies vertical direction by default', () => {
       wrapper = createWrapper();
-      const tabs = wrapper.find('.q-tabs-stub');
+      const tabs = wrapper.find('.o-tabs-stub');
       
       // Check if vertical class or attribute is applied
       expect(wrapper.props('direction')).toBe('vertical');
@@ -224,7 +233,7 @@ describe('RouteTabs.vue', () => {
 
     it('passes direction to q-tabs component', () => {
       wrapper = createWrapper({ direction: 'vertical' });
-      const tabs = wrapper.find('.q-tabs-stub');
+      const tabs = wrapper.find('.o-tabs-stub');
       
       expect(tabs.classes()).toContain('vertical');
     });
@@ -243,7 +252,7 @@ describe('RouteTabs.vue', () => {
       ];
       
       wrapper = createWrapper({ tabs: complexTabs });
-      const tab = wrapper.find('.q-route-tab-stub');
+      const tab = wrapper.find('.o-route-tab-stub');
       
       expect(tab.exists()).toBe(true);
       expect(tab.text()).toBe('Complex Tab');
@@ -260,7 +269,7 @@ describe('RouteTabs.vue', () => {
       ];
       
       wrapper = createWrapper({ tabs: simpleTabs });
-      const tab = wrapper.find('.q-route-tab-stub');
+      const tab = wrapper.find('.o-route-tab-stub');
       
       expect(tab.exists()).toBe(true);
       expect(tab.text()).toBe('Simple Tab');
@@ -268,7 +277,7 @@ describe('RouteTabs.vue', () => {
 
     it('maintains tab order', () => {
       wrapper = createWrapper();
-      const tabs = wrapper.findAll('.q-route-tab-stub');
+      const tabs = wrapper.findAll('.o-route-tab-stub');
       
       expect(tabs[0].text()).toBe('Tab 1');
       expect(tabs[1].text()).toBe('Tab 2');
@@ -350,7 +359,7 @@ describe('RouteTabs.vue', () => {
       ];
       
       wrapper = createWrapper({ tabs: specialTabs });
-      const tabs = wrapper.findAll('.q-route-tab-stub');
+      const tabs = wrapper.findAll('.o-route-tab-stub');
       
       expect(tabs).toHaveLength(2);
       expect(tabs[0].text()).toBe('Tab With Dashes');

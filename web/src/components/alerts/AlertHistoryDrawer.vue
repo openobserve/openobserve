@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -86,35 +86,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <!-- Tab toggle -->
-            <div
-              class="tab-toggle tw:shrink-0 tw:ml-4"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'tab-toggle-dark'
-                  : 'tab-toggle-light'
-              "
+            <OToggleGroup
+              class="tw:shrink-0 tw:ml-4"
+              :model-value="activeTab"
+              @update:model-value="activeTab = ($event as string)"
             >
-              <button
-                class="tab-toggle-btn"
-                :class="activeTab === 'history' ? 'tab-toggle-btn-active' : ''"
-                @click="activeTab = 'history'"
+              <OToggleGroupItem
+                value="history"
+                size="sm"
                 data-test="alert-history-tab-history"
               >
-                <q-icon name="history" size="14px" />
+                <template #icon-left>
+                  <History class="tw:size-3.5 tw:shrink-0" />
+                </template>
                 History
-              </button>
-              <button
-                class="tab-toggle-btn"
-                :class="
-                  activeTab === 'condition' ? 'tab-toggle-btn-active' : ''
-                "
-                @click="activeTab = 'condition'"
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                value="condition"
+                size="sm"
                 data-test="alert-history-tab-condition"
               >
-                <q-icon name="code" size="14px" />
+                <template #icon-left>
+                  <Code2 class="tw:size-3.5 tw:shrink-0" />
+                </template>
                 Condition
-              </button>
-            </div>
+              </OToggleGroupItem>
+            </OToggleGroup>
           </div>
         </div>
         <div class="col-auto tw:flex tw:items-center tw:gap-1">
@@ -131,13 +128,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-history-drawer-date-picker"
             @on:date-change="updateDateTime"
           />
-          <q-btn
+          <OButton
             v-close-popup="true"
-            round
-            flat
-            icon="cancel"
+            variant="ghost"
+            size="icon-circle-sm"
             data-test="alert-details-close-btn"
-          />
+          >
+            <q-icon name="cancel" />
+          </OButton>
         </div>
       </div>
     </q-card-section>
@@ -150,14 +148,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="alertDetails"
     >
       <!-- Tab Panels -->
-      <q-tab-panels
+      <OTabPanels
         v-model="activeTab"
         animated
         class="tw:flex-1 tw:overflow-hidden tw:bg-transparent"
         style="display: flex; flex-direction: column"
       >
         <!-- History Panel -->
-        <q-tab-panel
+        <OTabPanel
           name="history"
           class="tw:flex tw:flex-col tw:h-full tw:p-0 tw:overflow-hidden"
         >
@@ -354,10 +352,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-table>
             </div>
           </div>
-        </q-tab-panel>
+        </OTabPanel>
 
         <!-- Condition Panel -->
-        <q-tab-panel
+        <OTabPanel
           name="condition"
           class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden tw:p-0"
         >
@@ -394,18 +392,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       SQL
                     </span>
                   </div>
-                  <q-btn
+                  <OButton
                     v-if="anomalySql"
                     @click="copyToClipboard(anomalySql, 'SQL')"
-                    flat
-                    dense
-                    size="xs"
-                    icon="content_copy"
-                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    variant="ghost-muted"
+                    size="icon-xs-sq"
                     data-test="anomaly-details-copy-sql-btn"
                   >
+                    <q-icon name="content_copy" />
                     <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
                 <pre
                   class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
@@ -451,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}
                     </span>
                   </div>
-                  <q-btn
+                  <OButton
                     v-if="
                       alertDetails.conditions &&
                       alertDetails.conditions !== '' &&
@@ -467,15 +463,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : t('alerts.alertDetails.conditions'),
                       )
                     "
-                    flat
-                    dense
-                    size="xs"
-                    icon="content_copy"
-                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
+                    variant="ghost-muted"
+                    size="icon-xs-sq"
                     data-test="alert-details-copy-conditions-btn"
                   >
+                    <q-icon name="content_copy" />
                     <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
@@ -520,17 +514,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </q-tab-panel>
-      </q-tab-panels>
+        </OTabPanel>
+      </OTabPanels>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
+import OButton from '@/lib/core/Button/OButton.vue';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import { History, Code2 } from 'lucide-vue-next';
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
@@ -970,54 +970,6 @@ watch(
 </script>
 
 <style lang="scss" scoped>
-/* ── Tab toggle (header) ── */
-.tab-toggle {
-  display: flex;
-  align-items: center;
-  height: 1.625rem; /* 26px — same as chips */
-  border-radius: 6px;
-  border: 1px solid;
-  overflow: hidden;
-}
-.tab-toggle-light {
-  border-color: #d1d5db;
-  background: #f3f4f6;
-}
-.tab-toggle-dark {
-  border-color: #374151;
-  background: #1f2937;
-}
-.tab-toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 12px;
-  height: 100%;
-  font-size: 12px;
-  font-weight: 500;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  white-space: nowrap;
-  color: inherit;
-  line-height: 1;
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-.tab-toggle-btn + .tab-toggle-btn {
-  border-left: 1px solid;
-  border-color: inherit;
-}
-.tab-toggle-light .tab-toggle-btn-active {
-  background: #fff;
-  color: #1d4ed8;
-}
-.tab-toggle-dark .tab-toggle-btn-active {
-  background: #374151;
-  color: #60a5fa;
-}
-
 /* ── Code Block ── */
 .code-block {
   border-radius: 8px;
@@ -1072,13 +1024,13 @@ watch(
 }
 
 /* ── Tab panels fill height ── */
-:deep(.q-tab-panels) {
+:deep(.o-tab-panels) {
   flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
-:deep(.q-tab-panel) {
+:deep(.o-tab-panel) {
   flex: 1;
 }
 </style>

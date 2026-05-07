@@ -80,7 +80,7 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const toggle = wrapper.findComponent({ name: "q-btn-toggle" });
+      const toggle = wrapper.findComponent({ name: "OToggleGroup" });
       await toggle.vm.$emit("update:model-value", "all_fields");
 
       expect(wrapper.emitted("toggle-schema")).toBeTruthy();
@@ -101,7 +101,7 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="logs-interesting-fields-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-page-field-list-user-defined-schema-toggle"]').exists()).toBe(true);
     });
 
     it("should emit toggle-interesting-fields event when interesting fields toggle changes", async () => {
@@ -116,7 +116,7 @@ describe("FieldListPagination.vue", () => {
         },
       });
 
-      const toggle = wrapper.findComponent({ name: "q-btn-toggle" });
+      const toggle = wrapper.findComponent({ name: "OToggleGroup" });
       await toggle.vm.$emit("update:model-value", true);
 
       expect(wrapper.emitted("toggle-interesting-fields")).toBeTruthy();
@@ -309,7 +309,7 @@ describe("FieldListPagination.vue", () => {
       });
 
       const currentBtn = wrapper.find('[data-test="logs-page-fields-list-pagination-page-3-button"]');
-      expect(currentBtn.classes()).toContain("pagination-page-active");
+      expect(currentBtn.classes()).toContain("tw:bg-button-primary");
     });
   });
 

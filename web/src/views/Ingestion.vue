@@ -1,4 +1,4 @@
-<!-- eslint-disable no-prototype-builtins -->
+﻿<!-- eslint-disable no-prototype-builtins -->
 <!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
@@ -22,51 +22,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container">
         <div class="q-px-md q-pt-md full-width">
           <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
-          <q-btn
+          <span
             v-if="
               rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
               store.state.organizationData.rumToken.rum_token != ''
             "
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
-            :label="t(`ingestion.resetRUMTokenLabel`)"
-            @click="showRUMUpdateDialogFn"
-          />
-          <q-btn
+            class="float-right q-ml-md q-mb-xs"
+          >
+            <OButton variant="primary" size="sm" @click="showRUMUpdateDialogFn">
+              {{ t(`ingestion.resetRUMTokenLabel`) }}
+            </OButton>
+          </span>
+          <span
             v-else-if="
               rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
               store.state.organizationData.rumToken.rum_token == ''
             "
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
-            :label="t(`ingestion.generateRUMTokenLabel`)"
-            @click="generateRUMToken"
-          />
-          <q-btn
-            v-else
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
-            :label="t(`ingestion.resetTokenBtnLabel`)"
-            @click="showUpdateDialogFn"
-          />
+            class="float-right q-ml-md q-mb-xs"
+          >
+            <OButton variant="primary" size="sm" @click="generateRUMToken">
+              {{ t(`ingestion.generateRUMTokenLabel`) }}
+            </OButton>
+          </span>
+          <span v-else class="float-right q-ml-md q-mb-xs">
+            <OButton variant="primary" size="sm" @click="showUpdateDialogFn">
+              {{ t(`ingestion.resetTokenBtnLabel`) }}
+            </OButton>
+          </span>
           <q-input
             v-model="globalSearchQuery"
             :placeholder="t('common.search')"
@@ -108,139 +90,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="confirmRUMUpdate"
           />
         </div>
-        <q-tabs v-model="ingestTabType" horizontal
-align="left" class="q-ml-md">
-          <q-route-tab
-            default
-            name="recommended"
-            :to="{
-              name: 'recommended',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.recommendedLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="custom"
-            :to="{
-              name: 'custom',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.customLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="server"
-            :to="{
-              name: 'servers',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.serverLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="database"
-            :to="{
-              name: 'databases',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.databaseLabel')"
-            content-class="tab_content"
-          />
+        <div class="q-ml-md">
+          <OTabs v-model="ingestTabType" horizontal align="left">
+            <ORouteTab
+              name="recommended"
+              :to="{
+                name: 'recommended',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.recommendedLabel')"
+            />
+            <ORouteTab
+              name="custom"
+              :to="{
+                name: 'custom',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.customLabel')"
+            />
+            <ORouteTab
+              name="server"
+              :to="{
+                name: 'servers',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.serverLabel')"
+            />
+            <ORouteTab
+              name="database"
+              :to="{
+                name: 'databases',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.databaseLabel')"
+            />
 
-          <q-route-tab
-            name="security"
-            :to="{
-              name: 'security',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.securityLabel')"
-            content-class="tab_content"
-          />
+            <ORouteTab
+              name="security"
+              :to="{
+                name: 'security',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.securityLabel')"
+            />
 
-          <q-route-tab
-            name="devops"
-            :to="{
-              name: 'devops',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.devopsLabel')"
-            content-class="tab_content"
-          />
+            <ORouteTab
+              name="devops"
+              :to="{
+                name: 'devops',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.devopsLabel')"
+            />
 
-          <q-route-tab
-            name="networking"
-            :to="{
-              name: 'networking',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.networkingLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="message-queues"
-            :to="{
-              name: 'message-queues',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.messageQueuesLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="languages"
-            :to="{
-              name: 'languages',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.languagesLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="ai-integrations"
-            :to="{
-              name: 'ai-integrations',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.aiLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            name="others"
-            :to="{
-              name: 'others',
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            }"
-            :label="t('ingestion.otherLabel')"
-            content-class="tab_content"
-          />
-        </q-tabs>
+            <ORouteTab
+              name="networking"
+              :to="{
+                name: 'networking',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.networkingLabel')"
+            />
+            <ORouteTab
+              name="message-queues"
+              :to="{
+                name: 'message-queues',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.messageQueuesLabel')"
+            />
+            <ORouteTab
+              name="languages"
+              :to="{
+                name: 'languages',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.languagesLabel')"
+            />
+            <ORouteTab
+              name="ai-integrations"
+              :to="{
+                name: 'ai-integrations',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.aiLabel')"
+            />
+            <ORouteTab
+              name="others"
+              :to="{
+                name: 'others',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :label="t('ingestion.otherLabel')"
+            />
+          </OTabs>
+        </div>
       </div>
     </div>
-    <div
-      class="tw:max-h-[calc(100vh - var(--navbar-height) - 100px)]"
-    >
+    <div class="tw:max-h-[calc(100vh - var(--navbar-height) - 100px)]">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"
@@ -253,6 +222,9 @@ align="left" class="q-ml-md">
 </template>
 
 <script lang="ts">
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -277,7 +249,7 @@ import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog },
+  components: { ConfirmDialog, OTabs, ORouteTab, OButton },
   setup() {
     const { t } = useI18n();
     const store = useStore();

@@ -543,13 +543,14 @@ describe("UpdateRole Component", () => {
 
   describe("Close Button Functionality", () => {
     it("has close button in header", () => {
-      const closeButton = wrapper.findComponent({ name: 'QBtn', props: { icon: 'cancel' } });
+      const closeButton = wrapper.find('.col-auto button[data-o2-btn]');
       expect(closeButton.exists()).toBe(true);
     });
 
     it("has cancel button in form", () => {
-      const cancelButton = wrapper.findComponent({ name: 'QBtn', props: { 'text-color': 'light-text' } });
-      expect(cancelButton.exists()).toBe(true);
+      const buttons = wrapper.findAll('button[data-o2-btn]');
+      const cancelButton = buttons.find(btn => btn.text().toLowerCase().includes('cancel'));
+      expect(cancelButton).toBeDefined();
     });
   });
 

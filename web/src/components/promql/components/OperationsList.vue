@@ -15,31 +15,29 @@
         >
           <template v-for="(element, index) in props.operations">
             <div class="operation-item">
-              <q-btn-group>
-                <q-btn
-                  square
-                  icon="drag_indicator"
-                  no-caps
-                  dense
-                  flat
-                  size="sm"
-                  class="drag-handle"
+              <OButtonGroup class="axis-field" radius="sm">
+                <OButton
+                  variant="outline"
+                  size="icon-chip"
+                  class="drag-handle cursor-grab"
                   :data-test="`promql-operation-drag-${index}`"
                 >
+                  <template #icon-left>
+                    <q-icon name="drag_indicator" size="13px" />
+                  </template>
                   <q-tooltip>Drag to reorder</q-tooltip>
-                </q-btn>
-                <q-btn
-                  square
-                  icon-right="arrow_drop_down"
-                  no-caps
-                  dense
+                </OButton>
+                <OButton
+                  variant="primary"
+                  size="chip"
+                  class="tw:!text-[12px]"
                   :no-wrap="true"
-                  color="primary"
-                  size="sm"
-                  :label="computedLabel(element)"
-                  class="q-pl-sm"
                   :data-test="`promql-operation-${index}`"
                 >
+                  {{ computedLabel(element) }}
+                  <template #icon-right
+                    ><q-icon name="arrow_drop_down"
+                  /></template>
                   <q-menu class="q-pa-md">
                     <div style="width: 350px">
                       <div class="text-weight-medium">
@@ -122,32 +120,31 @@
                       </template>
                     </div>
                   </q-menu>
-                </q-btn>
-                <q-btn
-                  size="xs"
-                  dense
+                </OButton>
+                <OButton
+                  variant="outline"
+                  size="icon-chip"
                   @click="removeOperation(index)"
-                  icon="close"
                   :data-test="`promql-operation-remove-${index}`"
-                />
-              </q-btn-group>
+                >
+                  <template #icon-left><q-icon name="close" /></template>
+                </OButton>
+              </OButtonGroup>
             </div>
           </template>
         </draggable>
 
         <!-- Add Button -->
-        <q-btn
-          flat
-          dense
-          icon="add"
+        <OButton
+          variant="ghost-primary"
           size="sm"
-          color="primary"
           @click="showOperationSelector = true"
           class="add-operation-btn tw:ml-[0.25rem]"
           data-test="promql-add-operation"
         >
+          <q-icon name="add" size="14px" />
           <q-tooltip>Add operation</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
     </div>
 
@@ -207,7 +204,9 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="outline" size="sm-action" v-close-popup>
+            Close
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -216,6 +215,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {
@@ -328,7 +329,7 @@ const filterOperationLabels = (val: string, update: any) => {
       // Filter labels based on input
       const needle = val.toLowerCase();
       filteredLabels.value = availableLabels.value.filter((label: string) =>
-        label.toLowerCase().includes(needle)
+        label.toLowerCase().includes(needle),
       );
     }
   });
@@ -340,7 +341,7 @@ watch(
   (newLabels) => {
     filteredLabels.value = newLabels;
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 defineExpose({

@@ -32,47 +32,50 @@
           :condition-index="index"
         />
       </div>
-      <q-btn
-        icon="add"
-        color="primary"
-        size="xs"
-        round
-        class="add-btn"
+      <OButton
+        variant="primary"
+        size="icon-xs-circle"
         data-test="dashboard-add-condition-add"
       >
+        <template #icon-left><q-icon name="add" /></template>
         <q-menu v-model="showAddMenu">
           <q-list>
             <q-item clickable @click="emitAddCondition">
-              <q-item-section data-test="dashboard-add-group-add-condition">{{ t("common.addCondition") }}</q-item-section>
+              <q-item-section data-test="dashboard-add-group-add-condition">{{
+                t("common.addCondition")
+              }}</q-item-section>
             </q-item>
             <q-item clickable @click="emitAddGroup">
-              <q-item-section data-test="dashboard-add-group-add-group">{{ t("common.addGroup") }}</q-item-section>
+              <q-item-section data-test="dashboard-add-group-add-group">{{
+                t("common.addGroup")
+              }}</q-item-section>
             </q-item>
           </q-list>
         </q-menu>
-      </q-btn>
+      </OButton>
     </div>
     <div v-if="groupNestedIndex !== 0" class="group-remove">
-      <q-btn
-        flat
-        size="xs"
-        dense
+      <OButton
+        variant="ghost"
+        size="icon"
         @click="$emit('remove-group')"
-        icon="close"
         data-test="dashboard-add-group-remove"
-      />
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
   name: "Group",
-  components: { AddCondition },
+  components: { AddCondition, OButton },
   props: {
     group: {
       type: Object,
@@ -204,11 +207,5 @@ export default defineComponent({
   padding: 0px 0px 0px 0px;
   min-height: 35px;
   gap: 8px;
-}
-
-.add-btn {
-  height: 20px;
-  width: 20px;
-  margin-right: 5px;
 }
 </style>

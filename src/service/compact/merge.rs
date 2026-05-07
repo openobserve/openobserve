@@ -452,10 +452,6 @@ pub async fn merge_by_stream(
     // do partition by partition key
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
-        // skip the files which already reach the max_file_size * 95%
-        if file.meta.original_size > cfg.compact.max_file_size as i64 * 95 / 100 {
-            continue;
-        }
         let file_name = file.key.clone();
         let prefix = file_name[..file_name.rfind('/').unwrap()].to_string();
         let partition = partition_files_with_size.entry(prefix).or_default();
@@ -929,7 +925,7 @@ pub async fn merge_files(
                     &retain_file_list,
                     &mut new_file_meta,
                     latest_schema.clone(),
-                    &buf,
+                    buf,
                 )
                 .await?;
             }
@@ -975,7 +971,7 @@ pub async fn merge_files(
                         &retain_file_list,
                         &mut new_file_meta,
                         latest_schema.clone(),
-                        &buf,
+                        buf,
                     )
                     .await?;
                 }
@@ -1006,7 +1002,7 @@ async fn generate_inverted_index(
     retain_file_list: &[FileKey],
     new_file_meta: &mut FileMeta,
     latest_schema: Arc<Schema>,
-    buf: &Bytes,
+    buf: Bytes,
 ) -> Result<(), anyhow::Error> {
     let file_format = get_config().common.file_format;
     let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;

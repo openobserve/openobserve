@@ -143,6 +143,30 @@ const createWrapper = (props = {}, options = {}) => {
         QBtn: {
           template: '<button data-test-stub="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot></button>',
         },
+        // O2 component stubs (migrated from Quasar)
+        OTabs: {
+          template: '<div data-test-stub="q-tabs"><slot></slot></div>',
+          props: ['modelValue', 'dense', 'align', 'orientation'],
+          emits: ['update:modelValue'],
+        },
+        OTab: {
+          template: '<button data-test-stub="q-tab" @click="$emit(\'click\')"><slot></slot></button>',
+          props: ['name', 'label'],
+        },
+        OTabPanels: {
+          template: '<div data-test-stub="q-tab-panels"><slot></slot></div>',
+          props: ['modelValue', 'animated'],
+          emits: ['update:modelValue'],
+        },
+        OTabPanel: {
+          template: '<div data-test-stub="q-tab-panel"><slot></slot></div>',
+          props: ['name'],
+        },
+        OButton: {
+          template: '<button data-test-stub="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot><slot name="icon-left"></slot></button>',
+          props: ['variant', 'size', 'disabled', 'loading'],
+          emits: ['click'],
+        },
         QIcon: {
           template: '<i data-test-stub="q-icon"></i>',
         },

@@ -3,44 +3,103 @@
    Overrides semantic (and component) tokens for dark themes.
    ============================================================ */
 
-@custom-variant dark (&:where(.dark, .dark *));
-
+:root.dark,
+.dark :root,
 .dark {
-  :root, & {
     /* --- Text --- */
-    --color-text-primary:   var(--color-grey-50);
+    --color-text-primary: var(--color-grey-50);
     --color-text-secondary: var(--color-grey-400);
-    --color-text-disabled:  var(--color-grey-600);
-    --color-text-inverse:   var(--color-grey-900);
+    --color-text-disabled: var(--color-grey-600);
+    --color-text-inverse: var(--color-grey-900);
 
     /* --- Surfaces --- */
-    --color-surface-base:    var(--color-grey-950);
-    --color-surface-panel:   var(--color-grey-900);
+    --color-surface-base: var(--color-grey-950);
+    --color-surface-panel: var(--color-grey-900);
     --color-surface-overlay: var(--color-grey-800);
+    --color-surface-subtle: var(--color-grey-800);
+    --color-surface-subtle-hover: var(--color-grey-700);
 
     /* --- Borders --- */
     --color-border-default: var(--color-grey-700);
-    --color-border-strong:  var(--color-grey-500);
+    --color-border-strong: var(--color-grey-500);
 
     /* ---- Button overrides ---- */
 
     /* secondary (darkened surface) */
-    --color-button-secondary:            var(--color-grey-800);
-    --color-button-secondary-hover:      var(--color-grey-700);
-    --color-button-secondary-active:     var(--color-grey-600);
-    --color-button-secondary-disabled:   var(--color-grey-800);
-    --color-button-secondary-foreground: var(--color-grey-100);
+    --color-button-secondary: var(--color-surface-overlay);
+    --color-button-secondary-hover: var(--color-primary-900);
+    --color-button-secondary-active: var(--color-primary-800);
+    --color-button-secondary-disabled: var(--color-surface-overlay);
+    --color-button-secondary-foreground: var(--color-text-primary);
 
     /* outline */
-    --color-button-outline-text:         var(--color-grey-100);
-    --color-button-outline-border:       var(--color-grey-600);
-    --color-button-outline-hover-bg:     var(--color-grey-800);
-    --color-button-outline-hover-border: var(--color-grey-500);
-    --color-button-outline-active-bg:    var(--color-grey-700);
+    --color-button-outline-text: var(--color-text-primary);
+    --color-button-outline-border: var(--color-primary-700);
+    --color-button-outline-hover-bg: var(--color-primary-900);
+    --color-button-outline-hover-border: var(--color-primary-600);
+    --color-button-outline-active-bg: var(--color-primary-800);
 
     /* ghost */
-    --color-button-ghost-text:           var(--color-grey-200);
-    --color-button-ghost-hover-bg:       var(--color-grey-800);
-    --color-button-ghost-active-bg:      var(--color-grey-700);
-  }
+    --color-button-ghost-text: var(--color-text-primary);
+    --color-button-ghost-hover-bg: var(--color-primary-900);
+    --color-button-ghost-active-bg: var(--color-primary-800);
+
+    /* ghost-primary */
+    --color-button-ghost-primary-text: var(--color-primary-400);
+    --color-button-ghost-primary-hover-bg: var(--color-primary-900);
+    --color-button-ghost-primary-active-bg: var(--color-primary-800);
+
+    /* ghost-destructive */
+    --color-button-ghost-destructive-text: var(--color-error-400);
+    --color-button-ghost-destructive-hover-bg: var(--color-surface-overlay);
+    --color-button-ghost-destructive-active-bg: var(--color-surface-overlay);
+
+    /* ghost-muted */
+    --color-button-ghost-muted-hover-text: var(--color-primary-400);
+    --color-button-ghost-muted-hover-bg: var(--color-primary-900);
+    --color-button-ghost-muted-active-bg: var(--color-primary-800);
+
+    /* ghost-subtle */
+    --color-button-ghost-subtle-hover-bg: var(--color-primary-900);
+    --color-button-ghost-subtle-active-bg: var(--color-primary-800);
+
+    /* destructive */
+    --color-button-destructive-focus-ring: var(--color-error-300);
+
+    /* ButtonGroup ΓÇö divider inherits from border-default override above */
+
+    /* Dropdown */
+    --color-dropdown-item-hover-bg: var(--color-primary-900);
+    --color-dropdown-item-active-bg: var(--color-primary-800);
+    --color-dropdown-item-destructive-text: var(--color-error-400);
+    --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
+
+    /* ToggleGroup */
+    --color-toggle-item-hover-bg: var(--color-primary-950);
+    --color-toggle-item-active-bg: var(--color-primary-900);
+    --color-toggle-item-active-text: var(--color-white);
+
+    /* Tabs */
+    --color-tabs-active-bg: var(--color-primary-800);
+    --color-tabs-active-text: var(--color-white);
+    --color-tabs-hover-bg: var(--color-primary-900);
+    --color-tabs-bar-border: var(--color-grey-700);
+
+    /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */
+    --color-button-ghost-warning-text: var(--color-warning-400);
+    --color-button-outline-warning-text: var(--color-warning-400);
+    --color-button-outline-warning-border: var(--color-warning-500);
+
+    /* RefreshButton — staleness dot (slightly muted in dark mode) */
+    --color-refresh-dot-stale: var(--color-warning-500);
+    --color-refresh-dot-critical: var(--color-error-400);
+}
+
+/* ToggleGroup — primary variant dark overrides */
+.dark [data-variant="primary"] {
+    --color-toggle-track-bg: var(--color-primary-900);
+    --color-toggle-border: var(--color-primary-700);
+    --color-toggle-item-hover-bg: var(--color-primary-950);
+    --color-toggle-item-active-bg: var(--color-primary-800);
+    --color-toggle-item-active-text: var(--color-primary-200);
 }

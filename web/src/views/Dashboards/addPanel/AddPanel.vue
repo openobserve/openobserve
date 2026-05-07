@@ -43,161 +43,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex q-gutter-sm">
-          <q-btn
-            outline
-            padding="xs sm"
-            class="q-mr-sm tw:h-[36px] el-border"
-            no-caps
-            label="Dashboard Tutorial"
+          <OButton
+            variant="outline"
+            size="sm"
             @click="showTutorial"
             data-test="dashboard-panel-tutorial-btn"
-          ></q-btn>
-          <q-btn
+            >Dashboard Tutorial</OButton
+          >
+          <OButton
             v-if="
               !['html', 'markdown', 'custom_chart'].includes(
                 dashboardPanelData.data.type,
               )
             "
-            outline
-            padding="sm"
-            class="q-mr-sm tw:h-[36px] el-border"
-            no-caps
-            icon="info_outline"
+            variant="outline"
+            size="icon-sm"
             @click="showViewPanel = true"
             data-test="dashboard-panel-data-view-query-inspector-btn"
           >
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip anchor="center left" self="center right"
-              >Query Inspector
-            </q-tooltip>
-          </q-btn>
+              >Query Inspector</q-tooltip
+            >
+          </OButton>
           <DateTimePickerDashboard
             v-if="selectedDate"
             v-model="selectedDate"
             ref="dateTimePickerRef"
             :disable="disable"
-            class="tw:h-[36px]"
             @hide="setTimeForVariables"
             data-test="dashboard-global-date-time-picker"
           />
-          <q-btn
-            outline
-            color="red"
-            no-caps
-            flat
-            class="o2-secondary-button tw:h-[36px] q-ml-md"
-            style="color: red !important"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            :label="t('panel.discard')"
+          <OButton
+            variant="outline-destructive"
+            size="sm-action"
             @click="goBackToDashboardList"
             data-test="dashboard-panel-discard"
-          />
-          <q-btn
-            class="o2-secondary-button tw:h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            flat
-            :label="t('panel.save')"
+            >{{ t("panel.discard") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="sm-action"
             data-test="dashboard-panel-save"
             @click.stop="savePanelData.execute()"
             :loading="savePanelData.isLoading.value"
-          />
+            >{{ t("panel.save") }}</OButton
+          >
           <template
             v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           >
-            <q-btn
+            <OButton
               v-if="config.isEnterprise === 'false'"
+              variant="primary"
+              size="sm-action"
               data-test="dashboard-apply"
-              class="tw:h-[36px] q-ml-md o2-primary-button"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              no-caps
-              flat
-              dense
               :loading="searchRequestTraceIds.length > 0"
-              :disable="searchRequestTraceIds.length > 0"
-              :label="t('panel.apply')"
+              :disabled="searchRequestTraceIds.length > 0"
               @click="() => runQuery(false)"
-            />
-            <q-btn-group
-              v-if="config.isEnterprise === 'true'"
-              class="tw:h-[36px] q-ml-md o2-primary-button"
-              style="
-                padding-left: 0px !important ;
-                padding-right: 0px !important;
-                display: inline-flex;
-              "
-              :class="
-                store.state.theme === 'dark'
-                  ? searchRequestTraceIds.length > 0
-                    ? 'o2-negative-button-dark'
-                    : 'o2-secondary-button-dark'
-                  : searchRequestTraceIds.length > 0
-                    ? 'o2-negative-button-light'
-                    : 'o2-secondary-button-light'
-              "
+              >{{ t("panel.apply") }}</OButton
             >
-              <q-btn
+            <OButtonGroup v-if="config.isEnterprise === 'true'">
+              <OButton
                 :data-test="
                   searchRequestTraceIds.length > 0
                     ? 'dashboard-cancel'
                     : 'dashboard-apply'
                 "
-                no-caps
-                :label="
-                  searchRequestTraceIds.length > 0
-                    ? t('panel.cancel')
-                    : t('panel.apply')
+                :variant="
+                  searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'
                 "
+                size="sm-action"
                 @click="onApplyBtnClick"
-              />
-
-              <q-btn-dropdown
-                class="text-bold no-border tw:px-0"
-                no-caps
-                flat
-                dense
-                auto-close
-                dropdown-icon="keyboard_arrow_down"
-                :disable="searchRequestTraceIds.length > 0"
               >
-                <q-list>
-                  <q-item
-                    clickable
-                    @click="runQuery(true)"
-                    :disable="searchRequestTraceIds.length > 0"
+                {{
+                  searchRequestTraceIds.length > 0
+                    ? t("panel.cancel")
+                    : t("panel.apply")
+                }}
+              </OButton>
+
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :variant="
+                      searchRequestTraceIds.length > 0
+                        ? 'destructive'
+                        : 'primary'
+                    "
+                    size="icon-sm"
+                    :disabled="searchRequestTraceIds.length > 0"
                   >
-                    <q-item-section avatar>
-                      <q-icon
-                        size="xs"
-                        name="refresh"
-                        style="align-items: baseline; padding: 0px"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label
-                        style="
-                          font-size: 12px;
-                          align-items: baseline;
-                          padding: 0px;
-                        "
-                        >Refresh Cache & Apply</q-item-label
-                      >
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-btn-dropdown>
-            </q-btn-group>
+                    <q-icon name="keyboard_arrow_down" size="xs" />
+                  </OButton>
+                </template>
+                <ODropdownItem @select="runQuery(true)">
+                  <div class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon size="xs" name="refresh" />
+                    <span>Refresh Cache &amp; Apply</span>
+                  </div>
+                </ODropdownItem>
+              </ODropdown>
+            </OButtonGroup>
           </template>
         </div>
       </div>
@@ -221,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Query Inspector Dialog -->
-    <q-dialog v-model="showViewPanel">
+    <q-dialog v-model="showViewPanel" data-test="query-inspector-dialog">
       <QueryInspector :metaData="metaData" :data="panelTitle"></QueryInspector>
     </q-dialog>
 
@@ -292,6 +238,10 @@ import {
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -302,6 +252,10 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
+    OButtonGroup,
+    OButton,
+    ODropdown,
+    ODropdownItem,
     DateTimePickerDashboard,
     AddSettingVariable,
     QueryInspector,
@@ -1824,6 +1778,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+:deep(.date-time-button) {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
 .dynamic-input {
   min-width: 200px;
   max-width: 500px;

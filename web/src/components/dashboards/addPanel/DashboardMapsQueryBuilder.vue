@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'name', null)"
         data-test="dashboard-name-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -66,17 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              color="primary"
-              dense
-              size="sm"
-              :label="nameLabel"
-              class="q-pl-sm"
+            <OButton
+              variant="primary"
+              size="chip"
               :data-test="`dashboard-name-item-${nameLabel}`"
             >
+              {{ nameLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-name-item-${nameLabel}-menu`"
@@ -115,17 +111,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-chip"
               :data-test="`dashboard-name-item-${nameLabel}-remove`"
               @click="removeMapName()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -165,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'value_for_maps', null)"
         data-test="dashboard-value_for_maps-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -190,17 +186,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="valueLabel"
+            <OButton
+              variant="primary"
+              size="chip"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
-              class="q-pl-sm"
             >
+              {{ valueLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
@@ -239,17 +231,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-chip"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
               @click="removeMapValue()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -295,10 +287,14 @@ import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuil
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import useNotifications from "@/composables/useNotifications";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
+    OButtonGroup,
+    OButton,
     SortByBtnGrp,
     CommonAutoComplete,
     SanitizedHtmlRenderer,

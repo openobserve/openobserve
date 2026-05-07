@@ -5,17 +5,17 @@
    ============================================================ */
 
 :root {
-  /* --- Primary palette --- */
-  --color-primary-50:  #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+  /* --- Primary palette — brand color #3F7994 (HSL 199°, 40%, 41%) --- */
+  --color-primary-50:  #f5f8f9;
+  --color-primary-100: #e4edf1;
+  --color-primary-200: #bad3de;
+  --color-primary-300: #8eb9cc;
+  --color-primary-400: #629fbc;
+  --color-primary-500: #4b8faf;
+  --color-primary-600: #3f7994;
+  --color-primary-700: #316177;
+  --color-primary-800: #224758;
+  --color-primary-900: #16303c;
 
   /* --- Grey palette --- */
   --color-grey-0:   #ffffff;
@@ -44,14 +44,26 @@
   --color-success-500: #22c55e;
   --color-success-700: #15803d;
 
-  /* --- Warning palette --- */
-  --color-warning-50:  #fffbeb;
-  --color-warning-500: #f59e0b;
-  --color-warning-700: #b45309;
+  /* --- Warning palette (Tailwind yellow scale) --- */
+  --color-warning-50:  #fefce8;
+  --color-warning-100: #fef9c3;
+  --color-warning-400: #facc15;
+  --color-warning-500: #eab308;
+  --color-warning-600: #ca8a04;
+  --color-warning-700: #a16207;
 
   /* --- White / Black --- */
   --color-white: #ffffff;
   --color-black: #000000;
+
+  /* --- Spacing scale --- */
+  --spacing-px:  1px;
+  --spacing-3:   0.75rem;   /* 12px */
+  --spacing-4:   1rem;      /* 16px */
+  --spacing-5:   1.25rem;   /* 20px */
+  --spacing-6:   1.5rem;    /* 24px */
+  --spacing-8:   2rem;      /* 32px */
+  --spacing-10:  2.5rem;    /* 40px */
 
   /* --- Radius scale --- */
   --radius-sm:   0.25rem;   /* 4px  */

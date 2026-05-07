@@ -15,47 +15,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn-group
+  <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs tw:h-[32px] transform-selector element-box-shadow el-border"
+    class="q-pa-none float-left q-mr-xs transform-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
+    <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
     <div class="tw:flex tw:items-center">
-      <q-toggle
-        data-test="logs-search-bar-show-query-toggle-btn"
-        v-model="searchObj.meta.showTransformEditor"
-        class="o2-toggle-button-xs"
-        size="xs"
-        flat
-        :disable="!searchObj.data.transformType"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-xs-dark'
-            : 'o2-toggle-button-xs-light'
-        "
-      >
-        <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-          {{ getTransformLabelTooltip }}
-        </q-tooltip>
-      </q-toggle>
-    </div>
-    <div style="border-right: 1px solid var(--o2-border-color)">
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-        transformsLabel
-      }}</q-tooltip>
-      <q-btn-dropdown
-        data-test="logs-search-bar-function-dropdown"
-        v-model="functionModel"
-        size="12px"
-        :icon="transformIcon"
-        no-caps
-        class="btn-function no-case q-pr-none no-border no-outline tw:border-none"
-        :class="`${searchObj.data.transformType || 'transform'}-icon`"
-        label-class="no-case"
-      >
-        <q-tooltip :delay="0">
-          {{ transformsLabel }}
-        </q-tooltip>
-        <q-list data-test="logs-search-saved-function-list">
+      <div class="tw:flex tw:items-center">
+        <q-toggle
+          data-test="logs-search-bar-show-query-toggle-btn"
+          v-model="searchObj.meta.showTransformEditor"
+          class="o2-toggle-button-xs"
+          size="xs"
+          flat
+          :disable="!searchObj.data.transformType"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-xs-dark'
+              : 'o2-toggle-button-xs-light'
+          "
+        >
+          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+            {{ getTransformLabelTooltip }}
+          </q-tooltip>
+        </q-toggle>
+      </div>
+      <ODropdown v-model:open="functionModel" side="bottom" align="start">
+        <template #trigger>
+          <OButton
+            data-test="logs-search-bar-function-dropdown"
+            variant="ghost"
+            size="icon-toolbar"
+          >
+            <img
+              v-if="transformIcon?.startsWith('img:')"
+              :src="transformIcon.slice(4)"
+              alt="Transform"
+              class="tw:size-4"
+            />
+            <q-icon v-else :name="transformIcon" size="16px" />
+            <q-icon name="arrow_drop_down" size="18px" class="tw:ms-0.5" />
+            <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
+              transformsLabel
+            }}</q-tooltip>
+          </OButton>
+        </template>
+        <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
           <!-- Search Input -->
           <div
             data-test="logs-search-bar-transform-type-select"
@@ -102,12 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               clickable
               v-for="(item, i) in filteredTransformOptions"
               :key="'transform-' + item?.name"
-              v-close-popup
+              @click="selectTransform(item, true)"
             >
-              <q-item-section
-                @click.stop="selectTransform(item, true)"
-                v-close-popup
-              >
+              <q-item-section>
                 <q-item-label>{{ item.name }}</q-item-label>
               </q-item-section>
             </q-item>
@@ -130,16 +132,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
           </div>
         </q-list>
-      </q-btn-dropdown>
+      </ODropdown>
     </div>
-    <q-btn
+    <OButton
       data-test="logs-search-bar-save-transform-btn"
-      class=" save-transform-btn q-px-sm"
-      icon="save"
-      :disable="searchObj.data.transformType !== 'function'"
+      variant="ghost"
+      size="icon-toolbar"
+      :disabled="searchObj.data.transformType !== 'function'"
       @click="fnSavedFunctionDialog"
-
     >
+      <q-icon name="save" size="16px" />
       <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
         {{
           searchObj.data.transformType === "action"
@@ -147,12 +149,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t("common.save")
         }}
       </q-tooltip>
-    </q-btn>
-  </q-btn-group>
+    </OButton>
+  </OButtonGroup>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -255,16 +260,38 @@ const transformsLabel = computed(() => {
 });
 
 const transformIcon = computed(() => {
+  const isDark = store.state.theme === "dark";
   if (!isActionsEnabled.value)
-    return "img:" + getImageURL("images/common/function.svg");
+    return (
+      "img:" +
+      getImageURL(
+        isDark
+          ? "images/common/function_dark.svg"
+          : "images/common/function.svg",
+      )
+    );
 
   if (searchObj.data.transformType === "function")
-    return "img:" + getImageURL("images/common/function.svg");
+    return (
+      "img:" +
+      getImageURL(
+        isDark
+          ? "images/common/function_dark.svg"
+          : "images/common/function.svg",
+      )
+    );
 
   if (searchObj.data.transformType === "action") return "code";
 
   if (!searchObj.data.transformType)
-    return "img:" + getImageURL("images/common/transform.svg");
+    return (
+      "img:" +
+      getImageURL(
+        isDark
+          ? "images/common/transform_dark.svg"
+          : "images/common/transform.svg",
+      )
+    );
 });
 
 const updateTransforms = () => {
@@ -284,6 +311,7 @@ const updateEditorWidth = () => {
 };
 
 const selectTransform = (item: any, isSelected: boolean) => {
+  functionModel.value = false;
   if (searchObj.data.transformType === "function") {
     emit("select:function", item, isSelected);
   }
@@ -315,11 +343,12 @@ const fnSavedFunctionDialog = () => {
 const getTransformLabelTooltip = computed(() => {
   if (!isActionsEnabled.value) return t("search.toggleFunctionEditor");
 
-  const editorType = searchObj.data.transformType === "action"
-    ? t("search.actionLabel")
-    : searchObj.data.transformType === "function"
-      ? t("search.functionLabel")
-      : t("search.transformLabel");
+  const editorType =
+    searchObj.data.transformType === "action"
+      ? t("search.actionLabel")
+      : searchObj.data.transformType === "function"
+        ? t("search.functionLabel")
+        : t("search.transformLabel");
 
   return searchObj.meta.showTransformEditor
     ? t("search.hide")
@@ -328,8 +357,8 @@ const getTransformLabelTooltip = computed(() => {
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/logs/transform-selector.scss';
-.save-transform-btn{
+@import "@/styles/logs/transform-selector.scss";
+.save-transform-btn {
   border-left: 1px solid var(--o2-border-color);
 }
 </style>

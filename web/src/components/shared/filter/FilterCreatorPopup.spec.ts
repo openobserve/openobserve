@@ -76,6 +76,12 @@ const globalStubs = {
     attrs: { "v-close-popup": "" },
     emits: ["click"],
   },
+  OButton: {
+    template:
+      '<button class="q-btn" @click="$emit(\'click\')"><slot></slot></button>',
+    props: ["variant", "size"],
+    emits: ["click"],
+  },
 };
 
 function mountComponent(props: Record<string, any> = {}) {

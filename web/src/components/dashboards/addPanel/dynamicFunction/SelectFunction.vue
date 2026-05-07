@@ -145,16 +145,15 @@
                 />
 
                 <!-- Remove argument button -->
-                <q-btn
+                <OButton
                   v-if="canRemoveArgument(fields.functionName, argIndex)"
-                  icon="close"
-                  dense
-                  flat
-                  round
+                  variant="ghost"
+                  size="icon"
                   @click="removeArgument(argIndex)"
-                  class="tw:h-10 tw:w-10"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
-                />
+                >
+                  <template #icon-left><q-icon name="close" /></template>
+                </OButton>
               </div>
             </div>
           </div>
@@ -163,17 +162,16 @@
         <!-- Add more arguments if allowed -->
       </div>
     </div>
-    <q-btn
+    <OButton
       v-if="canAddArgument(fields.functionName)"
+      variant="outline"
+      size="sm"
       @click="addArgument()"
-      color="primary"
-      label="+ Add"
-      padding="5px 14px"
       class="tw:mt-3"
-      no-caps
-      dense
       :data-test="`dashboard-function-dropdown-add-argument-button`"
-    />
+    >
+      + Add
+    </OButton>
   </div>
 </template>
 
@@ -185,6 +183,7 @@ import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
 import { addMissingArgs } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import {
   symOutlinedFunction,
   symOutlinedTitle,
@@ -194,7 +193,12 @@ import {
 
 export default {
   name: "SelectFunction",
-  components: { HistogramIntervalDropDown, StreamFieldSelect, SubTaskArrow },
+  components: {
+    HistogramIntervalDropDown,
+    StreamFieldSelect,
+    SubTaskArrow,
+    OButton,
+  },
   props: {
     modelValue: {
       type: Object,

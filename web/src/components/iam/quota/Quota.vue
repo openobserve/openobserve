@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -66,23 +66,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex items-center" v-if="selectedOrganization">
-              <q-btn
+              <OButton
                 v-if="!editTable"
                 data-test="edit-table-btn"
-                label="Edit Quota"
-                flat
-                class="border title-height o2-secondary-button tw:h-[36px]"
-                :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                no-caps
-                :disable="activeTab == 'role-limits' && !expandedRow"
+                variant="outline"
+                size="sm"
+                :disabled="activeTab == 'role-limits' && !expandedRow"
                 @click="editTableWithInput"
               >
-                <q-icon
-                  name="edit"
-                  style="font-weight: 200; opacity: 0.7"
-                  class="q-ml-sm"
-                />
-              </q-btn>
+                Edit Quota
+                <template #icon-right>
+                  <q-icon name="edit" style="font-weight: 200; opacity: 0.7" />
+                </template>
+              </OButton>
             </div>
           </div>
           <div class="flex items-center justify-between full-width q-mb-sm">
@@ -333,17 +329,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="col.style"
             >
               <template v-if="col.name == 'role_name'">
-                <q-btn
-                  dense
-                  flat
-                  size="xs"
-                  :icon="
-                    expandedRow != props.row.uuid
-                      ? 'chevron_right'
-                      : 'expand_more'
-                  "
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
                   @click="triggerExpand(props)"
-                />
+                >
+                  <q-icon :name="expandedRow != props.row.uuid ? 'chevron_right' : 'expand_more'" />
+                </OButton>
                 {{ props.row[col.name] }}
               </template>
               <template v-else> </template>
@@ -493,49 +485,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </div>
       <div
-        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md tw:py-2"
+        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md tw:py-2 tw:gap-2"
         v-if="editTable && activeType == 'table'"
       >
-        <q-btn
-          label="Cancel"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        <OButton
+          variant="outline"
+          size="sm-action"
           @click="cancelChanges"
-        />
-        <q-btn
-          label="Save"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :disable="Object.keys(changedValues).length === 0"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        >
+          Cancel
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="Object.keys(changedValues).length === 0"
           @click="saveChanges"
-        />
+        >
+          Save
+        </OButton>
       </div>
       <div
-        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md q-mt-md"
+        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md q-mt-md tw:gap-2"
         v-if="editTable && activeType == 'json'"
       >
-        <q-btn
-          label="Cancel"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        <OButton
+          variant="outline"
+          size="sm-action"
           @click="cancelJsonChanges"
-          :disable="isSavingJson"
-        />
-        <q-btn
-          :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
-          class="o2-primary-button no-border tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :disabled="isSavingJson"
+        >
+          Cancel
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
           @click="saveJsonChanges"
-          :disable="isSavingJson"
-        />
+          :disabled="isSavingJson"
+        >
+          {{ isSavingJson ? 'Saving Changes...' : 'Save Changes' }}
+        </OButton>
       </div>
     </div>
 
@@ -564,6 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import { useI18n } from "vue-i18n";
 import {
   computed,
@@ -575,9 +564,11 @@ import {
   defineAsyncComponent,
 } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Gauge, Shield, Timer, Clock, Hourglass, Table2, Braces } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
@@ -601,6 +592,7 @@ export default defineComponent({
   name: "Quota",
   components: {
     NoOrganizationSelected,
+    OButton,
     AppTabs,
     QTablePagination,
     ConfirmDialog,
@@ -637,10 +629,12 @@ export default defineComponent({
       {
         label: "API Limits",
         value: "api-limits",
+        icon: Gauge,
       },
       {
         label: "Role Limits",
         value: "role-limits",
+        icon: Shield,
       },
     ]);
 
@@ -648,14 +642,17 @@ export default defineComponent({
       {
         label: "Per Second",
         value: "second",
+        icon: Timer,
       },
       {
         label: "Per Minute",
         value: "minute",
+        icon: Clock,
       },
       {
         label: "Per Hour",
         value: "hour",
+        icon: Hourglass,
       },
     ]);
 
@@ -663,10 +660,12 @@ export default defineComponent({
       {
         label: "Table",
         value: "table",
+        icon: Table2,
       },
       {
         label: "JSON",
         value: "json",
+        icon: Braces,
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);

@@ -20,12 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     :style="computedStyleForFunction"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
+    <div
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+    >
       {{ t("pipeline.associateFunction") }}
       <div>
-          <q-btn v-close-popup="true" round flat icon="cancel" >
-          </q-btn>
-        </div>
+        <OButton variant="ghost" size="icon" v-close-popup>
+          <q-icon name="cancel" size="14px" />
+        </OButton>
+      </div>
     </div>
     <q-separator />
 
@@ -51,7 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="create-function-toggle"
           class="q-mb-sm tw:inline-block tw:h-[36px] o2-toggle-button-lg"
           size="lg"
-          :class="[store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light', !createNewFunction ? '-tw:ml-4' : '']"
+          :class="[
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light',
+            !createNewFunction ? '-tw:ml-4' : '',
+          ]"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
           v-model="createNewFunction"
         />
@@ -101,23 +109,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Function Definition Display -->
-        <div v-if="!createNewFunction && selectedFunction && pipelineObj.functions[selectedFunction]" class="function-definition-section">
+        <div
+          v-if="
+            !createNewFunction &&
+            selectedFunction &&
+            pipelineObj.functions[selectedFunction]
+          "
+          class="function-definition-section"
+        >
           <q-card class="function-definition-card">
             <q-card-section class="function-definition-header q-pb-sm">
               <div class="text-body1 text-weight-medium text-primary">
-                {{ t('function.function_definition') }}
+                {{ t("function.function_definition") }}
               </div>
             </q-card-section>
             <q-separator />
             <q-card-section class="function-definition-content q-pa-none">
               <div class="function-code-container">
-                <pre class="function-code">{{ pipelineObj.functions[selectedFunction]?.function || 'No definition available' }}</pre>
+                <pre class="function-code">{{
+                  pipelineObj.functions[selectedFunction]?.function ||
+                  "No definition available"
+                }}</pre>
               </div>
             </q-card-section>
           </q-card>
         </div>
 
-        <div  v-if="createNewFunction" class="pipeline-add-function tw:w-[95vw]">
+        <div v-if="createNewFunction" class="pipeline-add-function tw:w-[95vw]">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"
@@ -136,11 +154,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="associate-function-after-flattening-toggle"
             class="q-mb-sm tw:h-[36px] o2-toggle-button-lg tw:mr-3 -tw:ml-4"
             size="lg"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-lg-dark'
+                : 'o2-toggle-button-lg-light'
+            "
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"
           />
-          
+
           <!-- Info note explaining RAF/RBF -->
           <q-card class="note-container">
             <q-card-section class="q-pa-sm">
@@ -148,55 +170,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-banner inline dense class="note-info">
                 <div>
                   <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span><span class="highlight">RBF (Run Before Flattening):</span> Function executes before data structure is flattened</span>
+                  <span
+                    ><span class="highlight">RBF (Run Before Flattening):</span>
+                    Function executes before data structure is flattened</span
+                  >
                 </div>
                 <div>
                   <q-icon name="info" color="orange" class="q-mr-sm" />
-                  <span><span class="highlight">RAF (Run After Flattening):</span> Function executes after data structure is flattened</span>
+                  <span
+                    ><span class="highlight">RAF (Run After Flattening):</span>
+                    Function executes after data structure is flattened</span
+                  >
                 </div>
               </q-banner>
             </q-card-section>
           </q-card>
         </div>
 
-        <div
-          class="flex justify-start full-width"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        >
-        <q-btn
+        <div class="tw:flex tw:gap-2">
+          <OButton
             v-if="pipelineObj.isEditNode && !createNewFunction"
             data-test="associate-function-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
+            variant="outline-destructive"
+            size="sm-action"
             @click="openDeleteDialog"
-          >
-          <q-icon name="delete" class="q-mr-xs" />
-          {{ t('pipeline.deleteNode') }}
-        </q-btn>
-          <q-btn
+          >{{ t("pipeline.deleteNode") }}</OButton>
+          <OButton
             v-if="!createNewFunction"
             data-test="associate-function-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
+            variant="outline"
+            size="sm-action"
             @click="openCancelDialog"
-          />
-          <q-btn
+          >{{ t('alerts.cancel') }}</OButton>
+          <OButton
             v-if="!createNewFunction"
             data-test="associate-function-save-btn"
-            :label="
-              createNewFunction ? t('alerts.createFunction') : t('alerts.save')
-            "
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
+            variant="primary"
+            size="sm-action"
             type="submit"
-          />
+          >{{ createNewFunction ? t('alerts.createFunction') : t('alerts.save') }}</OButton>
         </div>
       </q-form>
     </div>
@@ -223,6 +235,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
@@ -285,9 +298,8 @@ const loading = ref(false);
 
 const afterFlattening = ref(
   (pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })
-    ?.after_flatten ?? true
+    ?.after_flatten ?? true,
 );
-
 
 const filteredFunctions: Ref<any[]> = ref([]);
 
@@ -305,7 +317,7 @@ const nodeLink = ref({
 
 const computedStyleForFunction = computed(() => {
   return createNewFunction.value
-    ? { width: "100%", }
+    ? { width: "100%" }
     : { width: "100%", height: "100%" };
 });
 
@@ -450,9 +462,9 @@ const filterFunctions = (val: any, update: any) => {
 }
 
 .note-container {
-  background-color: #F9F290;
+  background-color: #f9f290;
   border-radius: 4px;
-  border: 1px solid #F5A623;
+  border: 1px solid #f5a623;
   color: #865300;
   width: 100%;
   margin-bottom: 20px;
@@ -483,7 +495,7 @@ const filterFunctions = (val: any, update: any) => {
 .note-info {
   font-size: small;
   color: #865300;
-  background-color: #F9F290;
+  background-color: #f9f290;
   display: flex;
   flex-direction: column;
   align-items: start;
@@ -513,7 +525,6 @@ const filterFunctions = (val: any, update: any) => {
   font-weight: 600;
 }
 
-
 .function-code-container {
   background-color: #fafbfc;
   border-radius: 0;
@@ -523,13 +534,13 @@ const filterFunctions = (val: any, update: any) => {
   position: relative;
 }
 
-
 .function-code {
   color: #2d3748;
   background-color: transparent;
   margin: 0;
   padding: 16px;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family:
+    "JetBrains Mono", "Fira Code", "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -589,7 +600,6 @@ const filterFunctions = (val: any, update: any) => {
   background-color: #0d1117;
   border: 1px solid #21262d;
 }
-
 
 .body--dark .function-code {
   color: #f7fafc;

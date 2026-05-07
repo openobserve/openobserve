@@ -32,18 +32,15 @@
             </q-icon>
           </template>
           <template #right>
-            <q-btn
-              :label="t('search.runQuery')"
-              class="test-function-run-query-btn text-bold tw:ml-[12px] no-border"
-              padding="sm md"
-              icon="search"
-              no-caps
-              dense
-              size="xs"
-              color="primary"
+            <OButton
+              variant="primary"
+              size="sm-action"
               type="submit"
               :disabled="!selectedStream.name || !inputQuery || loading.events"
-            />
+            >
+              <Search :size="14" class="tw:mr-1" />
+              {{ t('search.runQuery') }}
+            </OButton>
           </template>
         </FullViewContainer>
         <div
@@ -212,10 +209,10 @@
            <!-- o2 ai context add button in the test function -->
            <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
-            :size="'6px'"
-            :imageHeight="'16px'"
-            :imageWidth="'16px'"
+            imageHeight="24px"
+            imageWidth="24px"
             :class="'tw:px-2 tw:mr-4'"
+            style="width: 32px !important; height: 32px !important; min-width: 32px !important; min-height: 32px !important;"
            />
           </template>
       </FullViewContainer>
@@ -335,6 +332,8 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Search, FileText, BarChart2, Activity } from "lucide-vue-next";
 
 const props = defineProps({
   vrlFunction: {
@@ -409,9 +408,9 @@ const { getStreams } = useStreams();
 const { buildQueryPayload } = useQuery();
 
 const streamTypes = [
-  { label: "Logs", value: "logs" },
-  { label: "Metrics", value: "metrics" },
-  { label: "Traces", value: "traces" },
+  { label: "Logs", value: "logs", icon: FileText },
+  { label: "Metrics", value: "metrics", icon: BarChart2 },
+  { label: "Traces", value: "traces", icon: Activity },
 ];
 
 const isFetchingStreams = ref(false);

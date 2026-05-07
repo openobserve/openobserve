@@ -182,6 +182,12 @@ describe('ScheduledDashboards', () => {
             props: ['class', 'padding', 'color', 'no-caps', 'label', 'round', 'flat', 'icon'],
             emits: ['click']
           },
+          'OButton': {
+            name: 'OButton',
+            template: '<button class="q-btn-mock"><slot /></button>',
+            props: ['variant', 'size', 'disabled', 'loading', 'active'],
+            emits: ['click']
+          },
           'q-icon': {
             name: 'q-icon',
             template: '<div class="q-icon-mock"></div>',

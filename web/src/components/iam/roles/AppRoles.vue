@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("iam.roles") }}
         </div>
-        <div class="row items-center justify-end">
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
             <div data-test="iam-roles-search-input">
               <q-input
                 v-model="filterQuery"
@@ -41,14 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-input>
             </div>
 
-            <q-btn
+            <OButton
               data-test="alert-list-add-alert-btn"
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="t(`iam.addRole`)"
+              variant="primary"
+              size="sm"
               @click="addRole"
-            />
+            >
+              {{ t('iam.addRole') }}
+            </OButton>
           </div>
       </div>
     </div>
@@ -77,49 +77,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:actions="slotProps: any">
         <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
-          <q-btn
+          <OButton
             :data-test="`iam-roles-edit-${slotProps.column.row.role_name}-role-icon`"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            icon="edit"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="t('common.edit')"
             @click="() => editRole(slotProps.column.row)"
           >
-          </q-btn>
-          <q-btn
+            <q-icon name="edit" />
+          </OButton>
+          <OButton
             :data-test="`iam-roles-delete-${slotProps.column.row.role_name}-role-icon`"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            :icon="outlinedDelete"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="t('common.delete')"
             @click="() => showConfirmDialog(slotProps.column.row)"
           >
-          </q-btn>
+            <q-icon :name="outlinedDelete" />
+          </OButton>
         </div>
       </template>
       <template v-slot:bottom-actions>
-        <q-btn
+        <OButton
           v-if="selectedRoles.length > 0"
           data-test="iam-roles-bulk-delete-btn"
-          class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          dense
+          variant="outline"
+          size="sm"
+          class="tw:mr-2"
           @click="openBulkDeleteDialog"
         >
-          <q-icon name="delete" size="16px" />
-          <span class="tw:ml-2">{{ t('common.delete') }}</span>
-        </q-btn>
+          <template #icon-left><q-icon name="delete" /></template>
+          {{ t('common.delete') }}
+        </OButton>
       </template>
     </app-table>
   </div>
@@ -152,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";

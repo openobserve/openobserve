@@ -49,36 +49,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ selectedValues.length }} selected
         </span>
         <span v-else class="selection-hint">Select to filter</span>
-        <q-btn
+        <OButton
           v-if="selectedValues.length > 0"
-          flat
-          round
-          dense
-          size="0.2rem"
-          padding="0.1rem"
+          variant="ghost"
+          size="icon-xs-circle"
           title="Clear selection"
           class="selection-clear-btn"
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
         >
           <q-icon name="close" size="0.6rem" />
-        </q-btn>
+        </OButton>
       </div>
       <div
         class="filter-mode-toggle"
         data-test="field-values-panel-filter-mode-toggle"
       >
-        <q-btn
-          flat
-          dense
-          no-caps
-          size="xs"
-          padding="0.1rem 0.35rem"
-          :class="[
-            'filter-mode-btn',
-            filterMode === 'include' ? 'filter-mode-btn--active-include' : '',
-          ]"
-          :disable="filterMode !== 'include' && isModeToggleDisabled"
+        <OButton
+          :variant="filterMode === 'include' ? 'primary' : 'ghost-muted'"
+          size="icon-chip"
+          class="filter-mode-btn"
+          :disabled="filterMode !== 'include' && isModeToggleDisabled"
           title="Include mode (=)"
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
@@ -86,18 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
             <EqualIcon />
           </q-icon>
-        </q-btn>
-        <q-btn
-          flat
-          dense
-          no-caps
-          size="xs"
-          padding="0.1rem 0.35rem"
-          :class="[
-            'filter-mode-btn',
-            filterMode === 'exclude' ? 'filter-mode-btn--active-exclude' : '',
-          ]"
-          :disable="filterMode !== 'exclude' && isModeToggleDisabled"
+        </OButton>
+        <OButton
+          :variant="filterMode === 'exclude' ? 'destructive' : 'ghost-muted'"
+          size="icon-chip"
+          class="filter-mode-btn"
+          :disabled="filterMode !== 'exclude' && isModeToggleDisabled"
           title="Exclude mode (≠)"
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
@@ -105,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
             <NotEqualIcon />
           </q-icon>
-        </q-btn>
+        </OButton>
       </div>
     </div>
 
@@ -189,20 +174,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
       class="view-more-container q-px-sm q-pt-xs"
     >
-      <q-btn
-        flat
-        no-caps
-        dense
-        size="0.2rem"
-        padding="0.1rem 0.3rem"
-        class="view-more-btn full-width"
-        :disable="isLoadingMore"
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        :block="true"
+        class="view-more-btn"
+        :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
         <q-spinner-dots v-if="isLoadingMore" color="primary" size="1em" />
         <span v-else>View more values</span>
-      </q-btn>
+      </OButton>
     </div>
   </div>
 </template>
@@ -213,6 +196,7 @@ import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface FieldValues {
   isLoading: boolean;
@@ -477,21 +461,9 @@ defineExpose({ reset });
 
   .filter-mode-btn {
     border-radius: 0 !important;
-    color: var(--o2-text-secondary, #888) !important;
-    min-height: 1.25rem !important;
     transition:
       background 0.15s,
       color 0.15s;
-
-    &--active-include {
-      background: var(--q-primary) !important;
-      color: #fff !important;
-    }
-
-    &--active-exclude {
-      background: var(--q-negative) !important;
-      color: #fff !important;
-    }
   }
 }
 

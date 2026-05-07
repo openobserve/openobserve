@@ -9,13 +9,14 @@
             </div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               data-test="metrics-schema-cancel"
-              round
-              flat
-              icon="cancel"
-            />
+              @click="$emit('cancel')"
+            >
+              <X class="tw:size-4" />
+            </OButton>
           </div>
         </div>
       </q-card-section>
@@ -30,7 +31,6 @@
             v-if="activeFolderId"
             :folder-id="activeFolderId"
             @dashboard-selected="updateSelectedDashboard"
-            class="showLabelOnTop"
           />
 
           <!-- select tab or create new tab and select -->
@@ -39,7 +39,6 @@
             :folder-id="activeFolderId"
             :dashboard-id="selectedDashboard"
             @tab-selected="updateActiveTabId"
-            class="showLabelOnTop"
           />
           <span>&nbsp;</span>
           <q-input
@@ -55,37 +54,25 @@
             data-test="metrics-new-dashboard-panel-title"
           />
 
-          <div class="flex justify-start q-mt-sm">
-            <q-btn
-              v-close-popup="true"
+          <div class="flex justify-start q-mt-sm tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
               data-test="metrics-schema-cancel-button"
-              class="o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              :label="t('metrics.cancel')"
-              flat
-              dense
-              no-caps
-            />
-            <q-btn
-              data-test="metrics-schema-update-settings-button"
-              :label="t('metrics.add')"
-              class="o2-primary-button tw:h-[36px] q-ml-md"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              flat
-              dense
+              @click="$emit('cancel')"
+            >
+              {{ t('metrics.cancel') }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
               type="submit"
-              no-caps
+              data-test="metrics-schema-update-settings-button"
               :loading="onSubmit.isLoading.value"
-              :disable="!panelTitle.trim()"
-            />
+              :disabled="!panelTitle.trim()"
+            >
+              {{ t('metrics.add') }}
+            </OButton>
           </div>
         </q-form>
       </q-card-section>
@@ -104,6 +91,8 @@ import { useQuasar } from "quasar";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { X } from 'lucide-vue-next';
 import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
@@ -114,6 +103,8 @@ export default defineComponent({
     SelectFolderDropdown,
     SelectDashboardDropdown,
     SelectTabDropdown,
+    OButton,
+    X,
   },
   props: {
     dashboardPanelData: {
@@ -121,7 +112,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ["save"],
+  emits: ["save", "cancel"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();

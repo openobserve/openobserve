@@ -19,16 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tabContent__head">
       <div>
         <div class="copy_action">
-          <q-btn
+          <OButton
             data-test="rum-copy-btn"
-            flat
-            round
-            size="0.5rem"
-            padding="0.6rem"
-            icon="content_copy"
-            color="grey"
+            variant="ghost"
+            size="icon"
             @click="copyToClipboardFn()"
-          />
+          >
+            <q-icon name="content_copy" size="16px" />
+          </OButton>
         </div>
       </div>
     </div>
@@ -43,9 +41,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, copyToClipboard } from "quasar";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "CopyContent",
+  components: { OButton },
   props: {
     content: {
       type: String,

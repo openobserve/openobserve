@@ -27,12 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="col-auto">
-        <q-btn
-          v-close-popup="true"
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-        />
+        <OButton variant="ghost" size="icon-circle" v-close-popup="true">
+          <template #icon-left
+            ><img
+              :src="getImageURL('images/common/close_icon.svg')"
+              style="width: 20px; height: 20px"
+          /></template>
+        </OButton>
       </div>
     </div>
     <q-separator></q-separator>
@@ -50,7 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             bg-color="input-bg"
             class="showLabelOnTop"
             stack-label
-            borderless hide-bottom-space
+            borderless
+            hide-bottom-space
             dense
             type="number"
             :rules="[
@@ -86,25 +88,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-icon>
         </div>
       </div>
-      <div class="flex justify-center q-mt-lg">
-        <q-btn
-          ref="closeBtn"
+      <div class="flex justify-center q-mt-lg tw:gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
           v-close-popup="true"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          flat
-          :label="t('dashboard.cancel')"
           data-test="panel-layout-settings-cancel"
-        />
-        <q-btn
-          :label="t('dashboard.save')"
-          class="o2-primary-button tw:h-[36px] q-ml-md"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          padding="sm xl"
+          >{{ t("dashboard.cancel") }}</OButton
+        >
+        <OButton
+          variant="primary"
+          size="sm-action"
           type="submit"
-          no-caps
           data-test="panel-layout-settings-save"
-        />
+          >{{ t("dashboard.save") }}</OButton
+        >
       </div>
     </q-form>
   </div>
@@ -116,10 +114,11 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: {},
+  components: { OButton },
   props: {
     layout: {
       type: Object,
