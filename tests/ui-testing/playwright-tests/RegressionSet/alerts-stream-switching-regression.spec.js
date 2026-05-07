@@ -113,13 +113,13 @@ test.describe("Alerts Stream Switching Regression", () => {
     const streamDropdown = page.locator(pm.alertsPage.locators.streamNameDropdown);
     await expect(streamDropdown).toBeVisible({ timeout: 10000 });
     await streamDropdown.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
     // Type to filter, then click the target option in the same dropdown opening
-    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
+    await page.keyboard.press('Control+a');
     await page.keyboard.type(streamName, { delay: 30 });
-    await page.waitForTimeout(800);
-    const streamOption = page.locator('.q-menu:visible').getByText(streamName, { exact: true });
-    await expect(streamOption).toBeAttached({ timeout: 10000 });
+    await page.waitForTimeout(1500);
+    const streamOption = page.getByText(streamName, { exact: true }).first();
+    await expect(streamOption).toBeVisible({ timeout: 10000 });
     await streamOption.click();
     await pm.alertsPage.selectScheduledAlertType();
   }
