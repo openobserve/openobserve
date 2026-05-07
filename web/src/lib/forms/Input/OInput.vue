@@ -18,21 +18,64 @@ const emit = defineEmits<InputEmits>();
 
 defineSlots<InputSlots>();
 
-const inputId = computed(() => props.id ?? useId());
+// useId() must be called at setup top-level — not inside computed — otherwise
+// each re-evaluation produces a new id, breaking the <label :for> association.
+const _fallbackId = useId();
+const inputId = computed(() => props.id ?? _fallbackId);
 const inputRef = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
-const hasError = computed(() => props.error === true || !!props.errorMessage);
+// ── Validation ─────────────────────────────────────────────────────────────
+const ruleError = ref<string | null>(null);
+const touched = ref(false);
+
+function runRules(val: string | number | undefined): void {
+  if (!props.rules?.length) return;
+  for (const rule of props.rules) {
+    const result = rule(val);
+    if (result !== true) {
+      ruleError.value = result;
+      return;
+    }
+  }
+  ruleError.value = null;
+}
+
+function handleBlur(event: FocusEvent) {
+  if (!touched.value) {
+    touched.value = true;
+    runRules(props.modelValue);
+  }
+  emit("blur", event);
+}
+
+// ── Error state ────────────────────────────────────────────────────────────
+// External errorMessage / error prop always wins; internal rule error is secondary.
+const effectiveError = computed(
+  () =>
+    props.errorMessage ||
+    (props.error ? " " : null) ||
+    ruleError.value ||
+    null,
+);
+const hasError = computed(() => !!effectiveError.value);
 
 const isTextarea = computed(() => props.type === "textarea");
 
-const rootStyle = computed(() => ({
-  width:
-    props.width === undefined
-      ? "100%"
-      : typeof props.width === "number"
-        ? `${props.width}px`
-        : props.width,
-}));
+// ── Width ──────────────────────────────────────────────────────────────────
+const fieldWidthClass = computed(() => {
+  switch (props.width) {
+    case "xs":
+      return "tw:w-[var(--spacing-field-width-xs)]";
+    case "sm":
+      return "tw:w-[var(--spacing-field-width-sm)]";
+    case "md":
+      return "tw:w-[var(--spacing-field-width-md)]";
+    case "lg":
+      return "tw:w-[var(--spacing-field-width-lg)]";
+    default:
+      return "tw:w-full";
+  }
+});
 
 const charCount = computed(() => {
   if (!props.maxlength) return 0;
@@ -42,10 +85,13 @@ const charCount = computed(() => {
 
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement | HTMLTextAreaElement;
-  emit("update:modelValue", target.value);
+  const val = target.value;
+  if (touched.value) runRules(val);
+  emit("update:modelValue", val);
 }
 
 function handleClear() {
+  if (touched.value) runRules("");
   emit("update:modelValue", "");
   emit("clear");
   inputRef.value?.focus();
@@ -62,7 +108,7 @@ const wrapperClasses = computed(() => [
   "tw:bg-input-bg",
   hasError.value
     ? "tw:border-input-border-error"
-    : "tw:border-input-border hover:tw:border-input-border-hover",
+    : "tw:border-input-border tw:hover:border-input-border-hover",
   "tw:focus-within:border-input-border-focus",
   "tw:focus-within:ring-2 tw:focus-within:ring-input-focus-ring",
   props.disabled
@@ -73,7 +119,7 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div :style="rootStyle" class="tw:flex tw:flex-col tw:gap-1">
+  <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
       v-if="label"
@@ -117,7 +163,7 @@ const wrapperClasses = computed(() => [
           'tw:text-sm tw:resize-y',
         ]"
         @input="handleInput"
-        @blur="emit('blur', $event)"
+        @blur="handleBlur"
         @focus="emit('focus', $event)"
         @keydown="emit('keydown', $event)"
         @keyup="emit('keyup', $event)"
@@ -129,7 +175,7 @@ const wrapperClasses = computed(() => [
         v-else
         :id="inputId"
         ref="inputRef"
-        :value="modelValue"
+        :value="String(modelValue ?? '')"
         :type="type"
         :name="name"
         :placeholder="placeholder"
@@ -147,7 +193,7 @@ const wrapperClasses = computed(() => [
           $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
         ]"
         @input="handleInput"
-        @blur="emit('blur', $event)"
+        @blur="handleBlur"
         @focus="emit('focus', $event)"
         @keydown="emit('keydown', $event)"
         @keyup="emit('keyup', $event)"
@@ -192,15 +238,15 @@ const wrapperClasses = computed(() => [
 
     <!-- Bottom row: hint / error / counter -->
     <div
-      v-if="errorMessage || hint || maxlength"
+      v-if="effectiveError || hint || maxlength"
       class="tw:flex tw:items-center tw:justify-between tw:gap-2"
     >
       <span
-        v-if="errorMessage"
+        v-if="effectiveError && effectiveError.trim()"
         class="tw:text-xs tw:text-input-error-text tw:leading-none"
         role="alert"
       >
-        {{ errorMessage }}
+        {{ effectiveError }}
       </span>
       <span
         v-else-if="hint"
