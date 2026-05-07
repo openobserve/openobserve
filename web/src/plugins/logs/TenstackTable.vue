@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="parentRef"
     :class="[
-      'container tw:rounded-none! tw:overflow-x-auto tw:overflow-y-clip! tw:relative',
+      'container tw:rounded-none! tw:overflow-x-auto tw:relative',
       !props.scrollEl ? 'table-container' : '',
     ]"
   >
@@ -165,7 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs" name="warning" class="q-mr-xs" />
+              <q-icon size="xs"
+name="warning"
+class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>

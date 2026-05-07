@@ -222,7 +222,7 @@ size="14px"
           class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white tw:bg-[var(--o2-card-bg)]!"
         >
           <div
-            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem]"
+            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.25rem]"
           >
             <OToggleGroup
               :model-value="activeTab"
@@ -267,11 +267,11 @@ size="sm">
             </OToggleGroup>
           </div>
 
-          <div class="tw:flex tw:items-center tw:space-x-2">
+          <div class="tw:flex tw:items-center tw:space-x-2 tw:gap-[0.5rem] tw:pr-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map'"
-              class="unified-search-group"
+              class="unified-search-group tw:mr-0!"
             >
               <div class="log-stream-search-input">
                 <q-input
@@ -401,7 +401,8 @@ size="sm">
                 <OButton
                   data-test="trace-details-view-logs-btn"
                   variant="outline"
-                  size="sm"
+                  size="xs"
+                  class="tw:h-full tw:text-[0.75rem]!"
                   :title="t('traces.viewLogs')"
                   @click="redirectToLogs"
                 >
@@ -2942,7 +2943,7 @@ $traceChartCollapseHeight: 42px;
 }
 
 .log-stream-search-input {
-  width: 20rem;
+  width: 20.2rem;
 
   .q-field .q-field__control {
     padding: 0px 8px;

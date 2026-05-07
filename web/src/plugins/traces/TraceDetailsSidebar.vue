@@ -104,7 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <q-icon name="schedule" size="12px" class="q-mr-xs" />
+            <q-icon name="schedule"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
           </q-chip>
@@ -118,7 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <q-icon name="speed" size="12px" class="q-mr-xs" />
+            <q-icon name="speed"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
           </q-chip>
@@ -131,7 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <q-icon name="access_time" size="12px" class="q-mr-xs" />
+            <q-icon name="access_time"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
           </q-chip>
@@ -145,7 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
-            <q-icon name="replay" size="12px" class="q-mr-xs" />
+            <q-icon name="replay"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
           </q-chip>
@@ -162,7 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <q-icon name="tag" size="12px" class="q-mr-xs" />
+            <q-icon name="tag"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-value">{{ span.span_id }}</span>
             <q-icon
               name="content_copy"
@@ -176,8 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
             <OButton
               variant="outline"
-              size="sm"
-              :title="t('traces.viewLogs')"
+             size="xs"
+                  class="tw:h-full tw:text-[0.75rem]!"
+:title="t('traces.viewLogs')"
               @click.stop="viewSpanLogs"
               data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
             >
@@ -218,7 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <q-icon name="arrow_upward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_upward"
+size="10px"
+class="q-mr-xs" />
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </q-chip>
@@ -230,7 +243,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <q-icon name="arrow_downward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_downward"
+size="10px"
+class="q-mr-xs" />
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </q-chip>
@@ -261,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="text-bold q-mx-sm span_details_tabs">
+    <div class="text-bold q-mx-sm span_details_tabs ">
       <OTabs
         v-model="activeTab"
         dense
@@ -275,6 +290,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Preview"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-preview"
+                    class="tw:font-normal!"
+
         />
 
         <OTab
@@ -282,23 +299,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.attributes')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-attributes"
+          class="tw:font-normal!"
         />
         <OTab
           name="events"
           :label="t('common.events')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-events"
+                    class="tw:font-normal!"
+
         />
         <OTab
           name="error"
           :label="t('common.error')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-exceptions"
+                    class="tw:font-normal!"
+
         >
           <span>Error</span>
           <q-badge
             v-if="hasExceptionEvents.length"
-            class="q-ml-xs tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]!"
+            class="tw:font-normal! q-ml-xs tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]!"
             :label="hasExceptionEvents.length"
             data-test="trace-details-sidebar-tabs-error-count"
           />
@@ -308,6 +330,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.links')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-links"
+          class="tw:font-normal!"
+
         />
         <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
         <OTab
@@ -316,6 +340,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.correlatedLogs')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-correlated-logs"
+          class="tw:font-normal!"
+
         />
         <OTab
           v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
@@ -323,12 +349,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.correlatedMetrics')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
+          class="tw:font-normal!"
         />
       </OTabs>
     </div>
     <q-separator style="width: 100%" />
-    <div class="span_details_tab-panels">
-      <OTabPanels v-model="activeTab" grow class="tw:h-full">
+    <div class="span_details_tab-panels  tw:p-2">
+      <OTabPanels v-model="activeTab"
+grow
+class="tw:h-full tw:overflow-y-auto">
         <!-- LLM Preview Tab Panel -->
         <OTabPanel
           v-if="isLLMSpan"
@@ -461,15 +490,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-pa-none tw:flex tw:flex-col tw:overflow-hidden"
         >
           <!-- View mode toggle toolbar -->
-          <div class="tw:flex tw:items-center tw:justify-start tw:pb-[0.3rem]">
+          <div class="tw:flex tw:items-center tw:justify-start tw:pb-1.5! tw:h-fit!">
             <OToggleGroup v-model="attributesViewMode" class="tw:rounded!">
-              <OToggleGroupItem value="json" size="xs">
+              <OToggleGroupItem value="json"
+size="xs"
+class="tw:h-5! tw:text-[0.75rem]!">
                 <template #icon-left
                   ><Braces class="tw:size-3.5 tw:shrink-0"
                 /></template>
                 JSON
               </OToggleGroupItem>
-              <OToggleGroupItem value="table" size="xs">
+              <OToggleGroupItem value="table"
+size="xs"
+class="tw:h-5! tw:text-[0.75rem]!">
                 <template #icon-left
                   ><Table2 class="tw:size-3.5 tw:shrink-0"
                 /></template>

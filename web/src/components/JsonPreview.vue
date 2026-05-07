@@ -17,7 +17,7 @@
     </div>
     {
     <div
-      class="log_json_content"
+      class="log_json_content tw:flex"
       v-for="(key, index) in Object.keys(value)"
       :key="key"
     >
@@ -31,7 +31,7 @@
         <template #trigger>
           <OButton
             data-test="json-preview-field-dropdown-btn"
-            size="icon-xs"
+            size="xs"
             variant="ghost"
             class="q-ml-sm log-json-field-dropdown-btn"
             aria-label="Add icon"
@@ -40,7 +40,9 @@
           </OButton>
         </template>
         <div class="logs-table-list tw:min-w-[180px]">
-          <slot name="field-dropdown" :field="key" :value="value[key]" />
+          <slot name="field-dropdown"
+:field="key"
+:value="value[key]" />
         </div>
       </ODropdown>
 

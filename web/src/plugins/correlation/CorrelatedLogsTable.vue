@@ -58,7 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!hasResults"
                 >
                   <template v-if="true">
-                    <q-icon name="view_column" size="16px" class="tw:mr-1" />
+                    <q-icon name="view_column"
+size="16px"
+class="tw:mr-1" />
                     {{ t('search.showHideColumns') }}
                   </template>
                 </OButton>
@@ -130,9 +132,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Show skeleton while loading -->
       <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
-        <q-skeleton type="rect" width="200px" height="32px" />
-        <q-skeleton type="rect" width="200px" height="32px" />
-        <q-skeleton type="rect" width="200px" height="32px" />
+        <q-skeleton type="rect"
+width="200px"
+height="32px" />
+        <q-skeleton type="rect"
+width="200px"
+height="32px" />
+        <q-skeleton type="rect"
+width="200px"
+height="32px" />
       </div>
 
       <!-- Results Summary Row -->
@@ -179,6 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-stream-fields="selectedFields"
           :hide-search-term-actions="hideSearchTermActions"
           :hide-view-related-button="hideViewRelatedButton"
+          class="tw:overflow-y-auto!"
           @click:dataRow="handleRowClick"
           @copy="handleCopy"
           @sendToAiChat="handleSendToAiChat"
