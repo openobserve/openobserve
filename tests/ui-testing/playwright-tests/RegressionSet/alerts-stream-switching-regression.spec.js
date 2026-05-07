@@ -26,20 +26,70 @@ test.describe("Alerts Stream Switching Regression", () => {
   let pm;
   const TEST_LOG_STREAM = 'e2e_automate';
   const METRICS_STREAM = 'e2e_test_cpu_usage';
+  const DESTINATION_NAME = 'e2e_stream_sw_dest';
+  const TEMPLATE_NAME = 'e2e_stream_sw_template';
   const ORG_ID = getOrgIdentifier() || 'default';
 
   // ============================================================================
-  // beforeAll - Ingest metrics data
+  // beforeAll - Ingest metrics data + create template and destination
   // ============================================================================
   test.beforeAll(async ({ browser }) => {
-    testLogger.info('Setting up metrics data for stream switching regression tests');
+    testLogger.info('Setting up prerequisites for stream switching regression tests');
     const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
     const page = await context.newPage();
     try {
-      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${ORG_ID}`);
+      const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+      await page.goto(`${baseUrl}?org_identifier=${ORG_ID}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
       await ingestMetricsData(page, ORG_ID);
-      testLogger.info('Metrics data setup completed');
+
+      const authToken = Buffer.from(
+        `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
+      ).toString('base64');
+
+      // Create template via API
+      const templatePayload = {
+        name: TEMPLATE_NAME,
+        body: JSON.stringify({ text: "Alert: {alert_name}" }),
+        isDefault: false
+      };
+      const templateResponse = await page.evaluate(async ({ baseUrl, org, authToken, templatePayload }) => {
+        const response = await fetch(`${baseUrl}/api/${org}/alerts/templates`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(templatePayload)
+        });
+        return { status: response.status, data: await response.json().catch(() => ({})) };
+      }, { baseUrl, org: ORG_ID, authToken, templatePayload });
+      testLogger.info('Template ready', { name: TEMPLATE_NAME, status: templateResponse.status });
+
+      // Create destination via API
+      const destinationPayload = {
+        name: DESTINATION_NAME,
+        url: "https://httpbin.org/post",
+        method: "post",
+        skip_tls_verify: false,
+        template: TEMPLATE_NAME,
+        headers: {}
+      };
+      const destResponse = await page.evaluate(async ({ baseUrl, org, authToken, destinationPayload }) => {
+        const response = await fetch(`${baseUrl}/api/${org}/alerts/destinations`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(destinationPayload)
+        });
+        return { status: response.status, data: await response.json().catch(() => ({})) };
+      }, { baseUrl, org: ORG_ID, authToken, destinationPayload });
+      testLogger.info('Destination ready', { name: DESTINATION_NAME, status: destResponse.status });
+
+      testLogger.info('Prerequisites setup completed');
     } finally {
       await page.close();
       await context.close();
