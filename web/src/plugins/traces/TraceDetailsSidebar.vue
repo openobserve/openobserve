@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -254,6 +254,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="trace-details-sidebar-tabs-preview"
       />
 
+      <!-- Database Tab (conditional - shown for DB spans) -->
+      <q-tab
+        v-if="hasDbSpan"
+        name="database"
+        label="Database"
+        style="text-transform: capitalize"
+        data-test="trace-details-sidebar-tabs-database"
+      />
+
       <q-tab
         name="attributes"
         :label="t('common.attributes')"
@@ -414,6 +423,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</pre>
           </q-expansion-item>
         </div>
+      </q-tab-panel>
+
+      <!-- Database Tab Panel -->
+      <q-tab-panel name="database" class="tw:h-full tw:p-0">
+        <DbSpanDetails :span="span" />
       </q-tab-panel>
 
       <q-tab-panel
@@ -997,6 +1011,9 @@ import { escapeHtml } from "@/utils/html";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
+import useTraceDetails from "@/composables/traces/useTraceDetails";
+import TraceErrorTab from "./components/TraceErrorTab.vue";
+import DbSpanDetails from "./DbSpanDetails.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1039,6 +1056,8 @@ export default defineComponent({
     NotEqualIcon,
     AttributeValueCell,
     DeployedCode,
+    TraceErrorTab,
+    DbSpanDetails,
   },
   emits: [
     "close",
@@ -2185,6 +2204,7 @@ export default defineComponent({
       config,
       // LLM
       isLLMSpan,
+      hasDbSpan,
       llmMetrics,
       copyContent,
       formatModelParams,
