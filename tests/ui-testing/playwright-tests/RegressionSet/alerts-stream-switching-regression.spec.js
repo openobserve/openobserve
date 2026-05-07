@@ -110,7 +110,7 @@ test.describe("Alerts Stream Switching Regression", () => {
   // ============================================================================
   async function switchStreamAndReconfirm(page, streamType, streamName) {
     await pm.alertsPage.selectStreamType(streamType);
-    const streamDropdown = page.locator('[data-test="alert-stream-name-dropdown"]');
+    const streamDropdown = page.locator(pm.alertsPage.locators.streamNameDropdown);
     await expect(streamDropdown).toBeVisible({ timeout: 10000 });
     await streamDropdown.click();
     await page.waitForTimeout(300);
