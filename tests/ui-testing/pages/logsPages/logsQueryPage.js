@@ -143,7 +143,7 @@ export class LogsQueryPage {
     await this.page.locator(this.autoRunDropdownBtn).click();
     const toggle = this.page.locator(this.autoRunToggleItem);
     await expect(toggle).toBeVisible({ timeout: 5000 });
-    if ((await toggle.textContent()).includes(expectedLabel)) {
+    if (((await toggle.textContent()) || '').includes(expectedLabel)) {
       await toggle.click();
     } else {
       await this.page.keyboard.press('Escape');
