@@ -3326,7 +3326,9 @@
     "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
     "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen.",
     "serviceGroupProtected": "De servicegroep kan niet worden verwijderd. U kunt alleen de toegewezen velden wijzigen.",
-    "noDataFound": "Geen gegevens gevonden"
+    "noDataFound": "Geen gegevens gevonden",
+    "isWorkloadType": "Service-ID",
+    "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",
