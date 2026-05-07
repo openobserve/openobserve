@@ -279,9 +279,9 @@ export default defineComponent({
       // DateTimePicker is now mounted; safe to read its value
       updateDateTime(selectedDate.value);
 
-      // If a stream was persisted, load its fields and generate the SQL query.
-      // onBeforeMount sets the defaults (histogram + avg) but PanelEditor's watcher
-      // can't generate SQL until stream fields are loaded.
+      // If a stream was persisted, load its fields and run the initial query.
+      // This must happen in onMounted (not the stream watcher) because
+      // updateDateTime needs DateTimePicker to be mounted first.
       const stream =
         dashboardPanelData.data.queries[0].fields.stream;
       if (stream && dashboardPanelData.data.queryType === "sql") {
@@ -326,6 +326,7 @@ export default defineComponent({
         }
 
         if (
+          isPanelConfigWatcherActivated &&
           stream &&
           dashboardPanelData.data.queryType === "sql" &&
           dashboardPanelData.data.queries[0]?.fields?.stream_type === "metrics"
