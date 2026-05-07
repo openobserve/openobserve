@@ -3057,10 +3057,13 @@ const DEFAULT_TRACKED_OPTIONS = [
 const trackedAliasOptions = computed(() => {
   const groups = availableGroups.value;
   if (groups.length > 0) {
-    return groups.map((g: FoundGroup) => ({
-      label: g.display,
-      value: g.group_id,
-    }));
+    // Backend rejects "service" — it is always tracked implicitly
+    return groups
+      .filter((g: FoundGroup) => g.group_id !== "service")
+      .map((g: FoundGroup) => ({
+        label: g.display,
+        value: g.group_id,
+      }));
   }
   return DEFAULT_TRACKED_OPTIONS;
 });
@@ -3720,10 +3723,17 @@ async function saveConfig() {
       return;
     }
 
-    const payload: ServiceIdentityConfig = {
-      sets,
-      tracked_alias_ids: trackedAliasIds.value,
-    };
+    // "service" is always tracked implicitly by the backend; strip it to avoid 400.
+    // Also drop orphan ids that no longer correspond to any known group (e.g. the
+    // group was deleted from Field Mappings after being added to tracked aliases).
+    const knownGroupIds = new Set([
+      ...availableGroups.value.map(g => g.group_id),
+      ...trackedAliasOptions.value.map(o => o.value),
+    ]);
+    const sanitizedTrackedAliasIds = trackedAliasIds.value.filter(id =>
+      id !== "service" && knownGroupIds.has(id)
+    );
+    const payload: ServiceIdentityConfig = { sets, tracked_alias_ids: sanitizedTrackedAliasIds };
 
     await serviceStreamsService.saveIdentityConfig(
       props.orgIdentifier,

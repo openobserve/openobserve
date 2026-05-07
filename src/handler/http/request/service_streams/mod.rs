@@ -366,12 +366,19 @@ pub async fn save_identity_config(
     #[cfg(feature = "enterprise")]
     {
         use std::collections::HashSet;
-        let known_ids: HashSet<String> =
-            crate::service::db::system_settings::get_semantic_field_groups(&org_id)
-                .await
+        // Defaults from bundled JSON
+        let mut known_ids: HashSet<String> =
+            o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file()
                 .into_iter()
                 .map(|g| g.id)
                 .collect();
+        // User-defined semantic groups stored in system_settings
+        known_ids.extend(
+            crate::service::db::system_settings::get_semantic_field_groups(&org_id)
+                .await
+                .into_iter()
+                .map(|g| g.id),
+        );
         let unknown: Vec<&str> = body
             .tracked_alias_ids
             .iter()
