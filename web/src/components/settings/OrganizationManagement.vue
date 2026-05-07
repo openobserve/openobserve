@@ -84,15 +84,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="confirmRevokeContract(props.row)"
               />
               <q-btn
+                v-if="!props.row.org_storage_enabled"
                 padding="sm"
                 unelevated
                 size="sm"
                 round
                 flat
-                :icon="props.row.org_storage_enabled ? 'cloud_off' : 'cloud_upload'"
-                :title="props.row.org_storage_enabled ? 'Disable Storage' : 'Enable Storage'"
-                data-test="org-management-storage-toggle-btn"
+                icon="cloud_upload"
+                title="Enable Storage"
+                data-test="org-management-storage-enable-btn"
                 @click.stop="toggleOrgStorage(props.row)"
+              />
+              <q-btn
+                v-else
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                disable
+                icon="cloud_done"
+                color="positive"
+                title="Storage Enabled"
+                data-test="org-management-storage-enabled-btn"
               />
             </div>
           </q-td>
@@ -562,24 +576,23 @@ export default defineComponent({
     };
 
     const toggleOrgStorage = (row: any) => {
-      const label = row.org_storage_enabled ? "Disable" : "Enable";
       $q.dialog({
-        title: `${label} Storage Settings`,
-        message: `Are you sure you want to ${label.toLowerCase()} storage settings for "${row.name}"?`,
+        title: "Enable Storage Settings",
+        message: `Are you sure you want to enable storage settings for "${row.name}"?`,
         cancel: true,
         persistent: true,
       }).onOk(() => {
         loading.value = true;
         const dismiss = $q.notify({
           spinner: true,
-          message: `${label.toLowerCase()}ing storage settings...`,
+          message: "enabling storage settings...",
         });
         orgStorageService
           .enable(row.identifier)
           .then(() => {
             $q.notify({
               type: "positive",
-              message: `Storage settings ${label.toLowerCase()}d successfully.`,
+              message: "Storage settings enabled successfully.",
             });
             getData();
             loading.value = false;
@@ -592,7 +605,7 @@ export default defineComponent({
               type: "negative",
               message:
                 error.response?.data?.message ||
-                `Failed to ${label.toLowerCase()} org storage.`,
+                "Failed to enable storage settings.",
               timeout: 5000,
             });
           });

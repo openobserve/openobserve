@@ -29,7 +29,7 @@ const orgStorage = {
   },
 
   enable: (org_identifier: string) => {
-    return http().post(`/api/${org_identifier}/enabled_org_storage`, {
+    return http().put(`/api/_meta/enable_org_storage`, {
       org_id: org_identifier,
     });
   },
