@@ -306,10 +306,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="selectedPanelConfig.show = false"
       >
         <PanelLayoutSettings
+          ref="panelLayoutSettingsRef"
           :layout="selectedPanelConfig.data.layout"
           @save:layout="savePanelLayout"
           @close="selectedPanelConfig.show = false"
         />
+        <template #footer>
+          <div class="tw:flex tw:justify-end tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="panel-layout-settings-cancel"
+              @click="selectedPanelConfig.show = false"
+              >{{ t("dashboard.cancel") }}</OButton
+            >
+            <OButton
+              variant="primary"
+              size="sm-action"
+              data-test="panel-layout-settings-save"
+              @click="panelLayoutSettingsRef?.submitForm()"
+              >{{ t("dashboard.save") }}</OButton
+            >
+          </div>
+        </template>
       </ODrawer>
 
       <ODrawer
@@ -579,6 +598,7 @@ export default defineComponent({
     const reportId = computed(() => route.query.tab);
 
     const renderDashboardChartsRef = ref(null);
+    const panelLayoutSettingsRef = ref(null);
 
     // Initialize dashboard run ID management
     const runId = ref(getUUID().replace(/-/g, ""));
@@ -2017,6 +2037,7 @@ export default defineComponent({
       selectedPanelConfig,
       savePanelLayout,
       renderDashboardChartsRef,
+      panelLayoutSettingsRef,
       folderNameFromFolderId,
       showJsonEditorDialog,
       openJsonEditor,

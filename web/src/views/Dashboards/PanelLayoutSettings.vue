@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
-    <q-form @submit="savePanelLayout">
+    <q-form ref="panelFormRef" @submit="savePanelLayout">
       <div class="q-mx-md">
         <div
           data-test="panel-layout-settings-height"
-          class="o2-input tw:relative"
+          class="o2-input"
           style="padding-top: 12px"
         >
           <q-input
@@ -50,42 +50,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="panel-layout-settings-height-input"
           />
 
-          <div class="tw:text-[12px]">
-            Approximately
-            <span class="tw:font-bold">{{ getRowCount }}</span> table rows will
-            be displayed
+          <div class="tw:text-[12px] tw:flex tw:items-center tw:gap-1 tw:mt-1">
+            <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
+            <q-icon
+              name="info_outline"
+              class="cursor-pointer tw:shrink-0"
+              size="14px"
+            >
+              <q-tooltip
+                anchor="center end"
+                self="center left"
+                class="tw:text-[12px]"
+              >
+                1 unit = 30px
+              </q-tooltip>
+            </q-icon>
           </div>
 
-          <q-icon
-            name="info_outline"
-            class="cursor-pointer q-ml-sm tw:absolute tw:top-[14px] tw:left-[94px]"
-            size="16px"
-          >
-            <q-tooltip
-              anchor="center end"
-              self="center left"
-              class="tw:text-[12px]"
-            >
-              1 unit = 30px
-            </q-tooltip>
-          </q-icon>
+       
         </div>
-      </div>
-      <div class="flex justify-center q-mt-lg tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="$emit('close')"
-          data-test="panel-layout-settings-cancel"
-          >{{ t("dashboard.cancel") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          type="submit"
-          data-test="panel-layout-settings-save"
-          >{{ t("dashboard.save") }}</OButton
-        >
       </div>
     </q-form>
   </div>
@@ -97,11 +80,9 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
-import OButton from "@/lib/core/Button/OButton.vue";
-
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { OButton },
+  components: {},
   props: {
     layout: {
       type: Object,
@@ -114,10 +95,15 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
 
+    const panelFormRef = ref(null);
     const updatedLayout = ref({ ...props.layout });
 
     const savePanelLayout = () => {
       emit("save:layout", { ...updatedLayout.value });
+    };
+
+    const submitForm = () => {
+      panelFormRef.value?.submit();
     };
 
     const getRowCount = computed(() => {
@@ -136,8 +122,10 @@ export default defineComponent({
       router,
       getImageURL,
       savePanelLayout,
+      submitForm,
       getRowCount,
       updatedLayout,
+      panelFormRef,
     };
   },
 });
