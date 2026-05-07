@@ -380,7 +380,7 @@ export default defineComponent({
     let slackURL = "https://short.openobserve.ai/community";
     if (
       config.isEnterprise == "true" &&
-      store.state.zoConfig.custom_slack_url != ""
+      store.state.zoConfig.custom_slack_url
     ) {
       slackURL = store.state.zoConfig.custom_slack_url;
     }
