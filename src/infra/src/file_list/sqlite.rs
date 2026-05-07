@@ -1790,21 +1790,21 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
         &client,
         "file_list",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(256) default '' not null",
     )
     .await?;
     add_column(
         &client,
         "file_list_history",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(256) default '' not null",
     )
     .await?;
     add_column(
         &client,
         "file_list_deleted",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(256) default '' not null",
     )
     .await?;
 
