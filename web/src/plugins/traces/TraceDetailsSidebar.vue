@@ -290,7 +290,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-tabs-events"
         />
         <OTab
-          v-if="hasSpanError"
           name="error"
           :label="t('common.error')"
           style="text-transform: capitalize"
@@ -329,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-separator style="width: 100%" />
     <div class="span_details_tab-panels">
-      <OTabPanels v-model="activeTab" grow>
+      <OTabPanels v-model="activeTab" grow class="tw:h-full">
         <!-- LLM Preview Tab Panel -->
         <OTabPanel
           v-if="isLLMSpan"
@@ -655,7 +654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             No events present for this span
           </div>
         </OTabPanel>
-        <OTabPanel name="error">
+        <OTabPanel name="error" class="tw:h-full">
           <TraceErrorTab
             :span="span"
             :search-query="searchQuery"
@@ -920,6 +919,10 @@ export default defineComponent({
       type: String,
       default: "standalone",
     },
+    activeTab: {
+      type: String,
+      default: "attributes",
+    },
   },
   components: {
     OTabs,
@@ -954,6 +957,7 @@ export default defineComponent({
     "add-filter",
     "apply-filter-immediately",
     "add-field-to-table",
+    "update:activeTab",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -978,7 +982,10 @@ export default defineComponent({
       return !isNaN(num) && num > 0 ? num : null;
     });
 
-    const activeTab = ref(isLLMSpan.value ? "preview" : "attributes");
+    const activeTab = computed({
+      get: () => props.activeTab,
+      set: (value: string) => emit("update:activeTab", value),
+    });
 
     const navigateToError = () => {
       activeTab.value = "error";
@@ -1144,7 +1151,6 @@ export default defineComponent({
       () => {
         tags.value = {};
         spanDetails.value = getFormattedSpanDetails();
-        activeTab.value = isLLMSpan.value ? "preview" : "attributes";
       },
       {
         deep: true,

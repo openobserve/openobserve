@@ -15,6 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <div
+    v-if="!hasSpanError"
+    class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height tw:h-full"
+    data-test="trace-details-sidebar-no-error"
+  >
+    No error present for this span
+  </div>
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
@@ -51,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- DB Response Status Code -->
   <div
-    v-if="hasSpanError && spanDbResponseStatusCode"
+    v-else-if="hasSpanError && spanDbResponseStatusCode"
     class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
     :style="{
       background: 'var(--o2-status-error-bg)',
@@ -79,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Process Exit Code -->
   <div
-    v-if="hasSpanError && spanProcessExitCode"
+    v-else-if="hasSpanError && spanProcessExitCode"
     class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
     :style="{
       background: 'var(--o2-status-error-bg)',
@@ -280,8 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ></pre>
                 </div>
                 <div v-else class="stacktrace-empty">
-                  <q-icon name="info" size="16px"
-class="q-mr-xs" />
+                  <q-icon name="info" size="16px" class="q-mr-xs" />
                   <span>No stacktrace available</span>
                 </div>
               </div>
