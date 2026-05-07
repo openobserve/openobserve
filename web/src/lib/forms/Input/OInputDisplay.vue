@@ -16,11 +16,18 @@ const heightClasses: Record<NonNullable<InputDisplayProps["size"]>, string> = {
   md: "tw:min-h-10 tw:text-sm",
 };
 
-const hasContent = computed(() => true); // slot always renders
+const rootStyle = computed(() => ({
+  width:
+    props.width === undefined
+      ? "100%"
+      : typeof props.width === "number"
+        ? `${props.width}px`
+        : props.width,
+}));
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div :style="rootStyle" class="tw:flex tw:flex-col tw:gap-1">
     <span
       v-if="label"
       class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none"

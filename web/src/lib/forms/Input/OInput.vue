@@ -25,6 +25,15 @@ const hasError = computed(() => props.error === true || !!props.errorMessage);
 
 const isTextarea = computed(() => props.type === "textarea");
 
+const rootStyle = computed(() => ({
+  width:
+    props.width === undefined
+      ? "100%"
+      : typeof props.width === "number"
+        ? `${props.width}px`
+        : props.width,
+}));
+
 const charCount = computed(() => {
   if (!props.maxlength) return 0;
   const val = props.modelValue;
@@ -61,21 +70,10 @@ const wrapperClasses = computed(() => [
     : "",
   props.readonly ? "tw:border-input-border tw:bg-input-bg" : "",
 ]);
-
-const inputClasses = computed(() => [
-  "tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none",
-  "tw:text-input-text tw:placeholder:text-input-placeholder",
-  "tw:disabled:cursor-not-allowed",
-  isTextarea.value
-    ? "tw:py-2 tw:ps-3 tw:pe-3 tw:resize-y"
-    : [heightClasses[props.size ?? "md"], "tw:ps-3 tw:pe-3"].join(" "),
-  !props.$slots?.prefix && !props.prefix ? "" : "tw:ps-0",
-  !props.$slots?.suffix && !props.suffix && !props.clearable ? "" : "tw:pe-0",
-]);
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div :style="rootStyle" class="tw:flex tw:flex-col tw:gap-1">
     <!-- Label -->
     <label
       v-if="label"
