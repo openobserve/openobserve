@@ -127,9 +127,12 @@ impl StorageClientFactory {
     pub fn get_name_by_path(&self, org_id: &str, path: &Path) -> Option<String> {
         // org level storage will override any other strategy, so check that first
         // if found, return that account name else continue with flow for other strategies
+        log::warn!("[org_storage test]: getting account for org {org_id}");
         if crate::table::org_storage_providers::get_for_org_from_cache(org_id).is_some() {
+            log::warn!("[org_storage test]: found account for org {org_id}");
             return Some(super::get_org_storage_key(org_id));
         }
+        log::warn!("[org_storage test]: did not find account for org {org_id}");
 
         if self.only_default {
             return None;

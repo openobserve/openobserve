@@ -40,7 +40,7 @@ pub enum ProviderType {
     AzureCredentials,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct OrgStorageProvider {
     pub org_id: String,
     pub provider_type: ProviderType,

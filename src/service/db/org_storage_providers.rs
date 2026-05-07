@@ -128,6 +128,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
+                log::warn!(
+                    "[org_storage test]: received account via nats org {org} entry : {entry:?}"
+                );
                 infra::storage::add_account(&org, provider).await;
 
                 // we must invalidate the infra level cache, or there be dragons!
