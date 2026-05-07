@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <q-item
+            :data-test="`index-dropdown-stream-option-${scope.opt.name}`"
             :class="
               store.state.theme === 'dark' &&
               dashboardPanelData.data.queries[
@@ -113,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-item-section avatar class="metric-explore-metric-icon">
               <q-icon
+                :data-test="`index-dropdown-stream-metric-icon-${scope.opt.metrics_meta?.metric_type}`"
                 size="chip"
                 :name="
                   metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''
@@ -126,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #no-option>
-          <q-item>
+          <q-item data-test="index-dropdown-stream-no-option">
             <q-item-section
               :class="store.state.theme === 'dark' ? 'text-white' : ''"
             >
