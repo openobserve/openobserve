@@ -104,8 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <q-icon name="schedule" size="12px"
-class="q-mr-xs" />
+            <q-icon name="schedule" size="12px" class="q-mr-xs" />
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
           </q-chip>
@@ -119,8 +118,7 @@ class="q-mr-xs" />
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <q-icon name="speed" size="12px"
-class="q-mr-xs" />
+            <q-icon name="speed" size="12px" class="q-mr-xs" />
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
           </q-chip>
@@ -133,8 +131,7 @@ class="q-mr-xs" />
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <q-icon name="access_time" size="12px"
-class="q-mr-xs" />
+            <q-icon name="access_time" size="12px" class="q-mr-xs" />
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
           </q-chip>
@@ -148,8 +145,7 @@ class="q-mr-xs" />
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
-            <q-icon name="replay" size="12px"
-class="q-mr-xs" />
+            <q-icon name="replay" size="12px" class="q-mr-xs" />
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
           </q-chip>
@@ -166,8 +162,7 @@ class="q-mr-xs" />
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <q-icon name="tag" size="12px"
-class="q-mr-xs" />
+            <q-icon name="tag" size="12px" class="q-mr-xs" />
             <span class="chip-value">{{ span.span_id }}</span>
             <q-icon
               name="content_copy"
@@ -225,8 +220,7 @@ class="q-mr-xs" />
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <q-icon name="arrow_upward" size="10px"
-class="q-mr-xs" />
+              <q-icon name="arrow_upward" size="10px" class="q-mr-xs" />
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </q-chip>
@@ -238,8 +232,7 @@ class="q-mr-xs" />
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <q-icon name="arrow_downward" size="10px"
-class="q-mr-xs" />
+              <q-icon name="arrow_downward" size="10px" class="q-mr-xs" />
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </q-chip>
@@ -971,9 +964,7 @@ export default defineComponent({
       return !isNaN(num) && num > 0 ? num : null;
     });
 
-    const activeTab = ref(
-      hasSpanError.value ? "error" : isLLMSpan.value ? "preview" : "attributes",
-    );
+    const activeTab = ref(isLLMSpan.value ? "preview" : "attributes");
 
     const navigateToError = () => {
       activeTab.value = "error";
@@ -1139,11 +1130,7 @@ export default defineComponent({
       () => {
         tags.value = {};
         spanDetails.value = getFormattedSpanDetails();
-        activeTab.value = hasSpanError.value
-          ? "error"
-          : isLLMSpan.value
-            ? "preview"
-            : "attributes";
+        activeTab.value = isLLMSpan.value ? "preview" : "attributes";
       },
       {
         deep: true,
