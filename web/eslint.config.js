@@ -128,6 +128,10 @@ export default [
         {
           element: 'q-btn-toggle',
           message: 'Use <OToggleGroup> from "@/lib/core/ToggleGroup/OToggleGroup.vue" instead of <q-btn-toggle>.'
+        },
+        {
+          element: 'q-btn-dropdown',
+          message: 'Use <OButton> with <ODropdown> instead of <q-btn-dropdown>.'
         }
       ]
     }
