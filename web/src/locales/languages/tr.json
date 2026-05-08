@@ -124,7 +124,8 @@
     "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
     "resources": "Kaynaklar",
     "updated_at": "Güncellendi:",
-    "error": "Hata"
+    "error": "Hata",
+    "db": "Veritabanı"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

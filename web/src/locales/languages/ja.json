@@ -124,7 +124,8 @@
     "create": "作成",
     "resources": "リソース",
     "updated_at": "更新日",
-    "error": "[エラー]"
+    "error": "[エラー]",
+    "db": "[データベース]"
   },
   "search": {
     "metrics": "メトリクス",

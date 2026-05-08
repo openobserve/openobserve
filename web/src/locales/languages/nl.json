@@ -124,7 +124,8 @@
     "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
     "resources": "Hulpbronnen",
     "updated_at": "Bijgewerkt op",
-    "error": "Fout"
+    "error": "Fout",
+    "db": "Database"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
