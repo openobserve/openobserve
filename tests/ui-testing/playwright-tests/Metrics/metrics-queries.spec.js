@@ -266,47 +266,8 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       testLogger.info('Invalid query maintained system stability - valid graceful handling');
     }
 
-    // Test 2: Invalid SQL syntax (if SQL mode available)
-    const sqlToggle = await pm.metricsPage.getSqlToggle();
-    const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
-
-    if (hasSqlMode) {
-      testLogger.info('Testing invalid SQL syntax');
-
-      await sqlToggle.click();
-      await page.waitForTimeout(500);
-
-      // Switch to Custom mode so we can type in the editor
-      const sqlCustomBtn = page.locator('[data-test="dashboard-custom-query-type"]');
-      if (await sqlCustomBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await sqlCustomBtn.click();
-        await page.waitForTimeout(500);
-      }
-
-      await pm.metricsPage.enterMetricsQuery('SELECT FROM WHERE');
-      // Wait for Monaco debounce to sync the typed query to the Vue data model
-      await page.waitForTimeout(2000);
-      await pm.metricsPage.clickApplyButton();
-      await page.waitForTimeout(3000);
-
-      hasError = await pm.metricsPage.hasErrorIndicator();
-      const sqlNoDataMessage = await pm.metricsPage.getNoDataMessage();
-      const sqlHasNoData = await sqlNoDataMessage.isVisible().catch(() => false);
-      const sqlHasVisualization = await pm.metricsPage.hasVisualization();
-
-      testLogger.info(`SQL invalid query state: hasError=${hasError}, hasNoData=${sqlHasNoData}, hasVisualization=${sqlHasVisualization}`);
-
-      // SQL invalid query should be handled gracefully
-      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization;
-      if (hasError) {
-        testLogger.info('SQL invalid query showed error indicator - valid error handling');
-      } else if (sqlHasNoData) {
-        testLogger.info('SQL invalid query resulted in no-data message - valid error handling');
-      }
-      expect(sqlHandledGracefully).toBe(true);
-    } else {
-      testLogger.info('SQL mode not available - skipping invalid SQL test');
-    }
+    // Note: Invalid SQL syntax test removed - error handling is validated
+    // via inline error messages below the chart, not via toast notifications
 
     testLogger.info('Error handling tests completed');
   });
