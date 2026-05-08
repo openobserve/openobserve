@@ -169,6 +169,7 @@ pub async fn prune(
 #[cfg(test)]
 mod tests {
     use config::meta::stream::{FileKey, FileMeta};
+    use infra::bloom::{BloomBuilder, BloomReader, BloomWriter, file_id_from_path};
 
     use super::*;
 
@@ -176,6 +177,72 @@ mod tests {
         let mut k = FileKey::new(0, "default".into(), key.into(), FileMeta::default(), false);
         k.meta.bloom_ver = bloom_ver;
         k
+    }
+
+    /// Builds a `.bf` blob with two parquet files and one indexed field,
+    /// then evaluates the predicates directly against the parsed reader
+    /// the same way `prune()` does (without going through the
+    /// `file_data::get` ladder, which would need an object-store backend).
+    /// This nails down the writer→reader→predicate-evaluation contract.
+    #[test]
+    fn test_writer_reader_predicate_contract() {
+        let key_a = "files/o/logs/s/2026/05/08/14/a.parquet";
+        let key_b = "files/o/logs/s/2026/05/08/14/b.parquet";
+        let id_a = file_id_from_path(key_a);
+        let id_b = file_id_from_path(key_b);
+
+        let mut bb = BloomBuilder::new();
+        let i_a = bb.begin(id_a, "trace_id", 100);
+        bb.insert(i_a, b"present-A");
+        let i_b = bb.begin(id_b, "trace_id", 100);
+        bb.insert(i_b, b"present-B");
+        let blob = BloomWriter::serialize(bb.finish());
+        let mut r = BloomReader::parse(blob).unwrap();
+
+        // Predicate matching only file A
+        let pred = BloomPredicate {
+            field: "trace_id".into(),
+            values: vec!["present-A".into()],
+        };
+        // file A: any value matches → kept
+        assert!(
+            pred.values
+                .iter()
+                .any(|v| r.check(&pred.field, id_a, v.as_bytes()).unwrap())
+        );
+        // file B: no value matches → would be dropped
+        assert!(
+            !pred
+                .values
+                .iter()
+                .any(|v| r.check(&pred.field, id_b, v.as_bytes()).unwrap())
+        );
+
+        // IN list with one present + one absent → still kept (any-of within
+        // a predicate)
+        let pred_in = BloomPredicate {
+            field: "trace_id".into(),
+            values: vec!["present-A".into(), "absent-X".into()],
+        };
+        assert!(
+            pred_in
+                .values
+                .iter()
+                .any(|v| r.check(&pred_in.field, id_a, v.as_bytes()).unwrap())
+        );
+
+        // Multi-predicate AND: every predicate must hit
+        let pred_other = BloomPredicate {
+            field: "trace_id".into(),
+            values: vec!["absent-Z".into()],
+        };
+        let preds = [pred.clone(), pred_other];
+        let kept = preds.iter().all(|p| {
+            p.values
+                .iter()
+                .any(|v| r.check(&p.field, id_a, v.as_bytes()).unwrap())
+        });
+        assert!(!kept, "AND of preds where one fully misses must drop");
     }
 
     #[tokio::test]
