@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
 import OTab from '@/lib/navigation/Tabs/OTab.vue';
@@ -98,6 +98,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
 
     const selectedCategory = ref(aiCategories[0].slug);
     const selectedIntegration = ref(aiCategories[0].integrations[0].routeName);
@@ -158,6 +159,16 @@ export default defineComponent({
             break;
           }
         }
+      }
+    });
+
+    // Handle re-clicking the AI Integrations main tab while already on a child
+    // route. The route config redirect ("" → first integration) resolves to the
+    // same route the user is already on, so Vue Router cancels it as a duplicate
+    // navigation and the <router-view> can go blank.
+    watch(() => route.name, (newName) => {
+      if (newName === "ai-integrations") {
+        navigateToFirstIntegration(selectedCategory.value);
       }
     });
 
