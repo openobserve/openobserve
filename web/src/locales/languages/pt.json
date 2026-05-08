@@ -123,7 +123,8 @@
     "version": "Versão",
     "create": "Criar",
     "resources": "Recursos",
-    "updated_at": "Atualizado em"
+    "updated_at": "Atualizado em",
+    "error": "Erro"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -2914,7 +2915,21 @@
       "minutesAgo": "{n} m atrás",
       "hoursAgo": "{n} h atrás",
       "daysAgo": "{n} d atrás"
-    }
+    },
+    "noErrorPresent": "Nenhum erro presente neste período",
+    "httpStatusCode": "Código de status HTTP",
+    "grpcStatusCode": "Código de status gRPC",
+    "dbResponseStatusCode": "Código de status de resposta do banco de dados",
+    "processExitCode": "Código de saída do processo",
+    "exceptionsWithCount": "Exceções ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Mensagem:",
+    "escapedLabel": "Escapou:",
+    "stacktraceLabel": "Stacktrace:",
+    "copyStacktrace": "Copiar stacktrace",
+    "noStacktraceAvailable": "Nenhum stacktrace disponível",
+    "stacktraceCopied": "Stacktrace copiado para a área de transferência",
+    "stacktraceCopyFailed": "Falha ao copiar o stacktrace"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",

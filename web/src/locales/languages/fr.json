@@ -123,7 +123,8 @@
     "version": "Version",
     "create": "Créez",
     "resources": "Ressources",
-    "updated_at": "Mis à jour à"
+    "updated_at": "Mis à jour à",
+    "error": "Erreur"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -2914,7 +2915,21 @@
       "minutesAgo": "il y a {n} m",
       "hoursAgo": "il y a {n} h",
       "daysAgo": "il y a {n} d"
-    }
+    },
+    "noErrorPresent": "Aucune erreur n'est présente pour cette période",
+    "httpStatusCode": "Code d'état HTTP",
+    "grpcStatusCode": "Code d'état gRPC",
+    "dbResponseStatusCode": "Code d'état de réponse DB",
+    "processExitCode": "Code de sortie du processus",
+    "exceptionsWithCount": "Exceptions ({count})",
+    "typeLabel": "Tapez :",
+    "messageLabel": "Message :",
+    "escapedLabel": "Échappé :",
+    "stacktraceLabel": "StackTrace :",
+    "copyStacktrace": "Copier stacktrace",
+    "noStacktraceAvailable": "Aucun stacktrace disponible",
+    "stacktraceCopied": "Stacktrace copié dans le presse-papiers",
+    "stacktraceCopyFailed": "Impossible de copier stacktrace"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
