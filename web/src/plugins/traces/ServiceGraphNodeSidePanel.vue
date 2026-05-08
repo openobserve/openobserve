@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-p99="{ item }">
                       <span
                         :class="
-                          item.p99 !== 'N/A'
+                          item.p99 > 0
                             ? 'tw:text-[var(--o2-latency-p99)]'
                             : ''
                         "
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-p95="{ item }">
                       <span
                         :class="
-                          item.p95 !== 'N/A'
+                          item.p95 > 0
                             ? 'tw:text-[var(--o2-latency-p95)]'
                             : ''
                         "
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-p75="{ item }">
                       <span
                         :class="
-                          item.p75 !== 'N/A'
+                          item.p75 > 0
                             ? 'tw:text-[var(--o2-latency-p75)]'
                             : ''
                         "
@@ -465,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-p99="{ item }">
                       <span
                         :class="
-                          item.p99 !== 'N/A'
+                          item.p99 > 0
                             ? 'tw:text-[var(--o2-latency-p99)]'
                             : ''
                         "
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-p95="{ item }">
                       <span
                         :class="
-                          item.p95 !== 'N/A'
+                          item.p95 > 0
                             ? 'tw:text-[var(--o2-latency-p95)]'
                             : ''
                         "
@@ -485,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-p75="{ item }">
                       <span
                         :class="
-                          item.p75 !== 'N/A'
+                          item.p75 > 0
                             ? 'tw:text-[var(--o2-latency-p75)]'
                             : ''
                         "
