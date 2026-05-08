@@ -123,14 +123,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!(
-                            "error getting provider for org {org} which was synced via events, skipping update : {e}"
+                            "[org_storage] error getting provider for org {org} which was synced via events, skipping update : {e}"
                         );
                         continue;
                     }
                 };
-                log::warn!(
-                    "[org_storage test]: received account via nats org {org} entry : {entry:?}"
-                );
+                log::info!("[org_storage]: received provider info via nats org {org}");
                 infra::storage::add_account(&org, provider).await;
 
                 // we must invalidate the infra level cache, or there be dragons!

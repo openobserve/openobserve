@@ -86,14 +86,8 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
             log::error!("service:db:file_list: delete {key}, remove error: {e}");
         }
     } else if let Some(data) = data {
-        log::warn!(
-            "[org_storage test]: setting file list : acc {account} key : {key} delete {delete}"
-        );
         match infra::file_list::add(account, key, data).await {
             Ok(v) => {
-                log::warn!(
-                    "[org_storage test]: successfully set file list : acc {account} key : {key} delete {delete}"
-                );
                 id = v;
             }
             Err(e) => {

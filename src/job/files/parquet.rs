@@ -537,7 +537,6 @@ async fn move_files(
             }
         }
 
-        log::warn!("[org_storage test]: storing file : acc : {account} name : {new_file_name}");
         // write file list to storage
         if let Err(e) =
             db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
@@ -822,7 +821,6 @@ async fn merge_files(
     }
 
     let account = storage::get_account(&org_id, &new_file_key).unwrap_or_default();
-    log::warn!("[org_storage test]: putting file : acc : {account} name : {new_file_key}");
     storage::put(&account, &new_file_key, buf.clone()).await?;
 
     // Enterprise: Extract service metadata during data processing
