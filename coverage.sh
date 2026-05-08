@@ -34,7 +34,7 @@ _cov_test() {
         --no-cfg-coverage \
         --no-cfg-coverage-nightly \
         --ignore-filename-regex 'job|.*generated.*' \
-        --test-threads=1 \
+        --test-threads=16 \
         --no-fail-fast \
         --retries 1 \
         "$@"
