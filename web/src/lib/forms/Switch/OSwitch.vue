@@ -67,17 +67,17 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
 </script>
 
 <template>
-  <label
+  <div
     :class="[
       'tw:inline-flex tw:items-center tw:gap-2',
       labelPosition === 'left' ? 'tw:flex-row-reverse' : 'tw:flex-row',
       disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
-    :for="id"
   >
     <SwitchRoot
       :id="id"
       :name="name"
+      type="button"
       :checked="isChecked"
       :disabled="disabled"
       :class="[
@@ -123,8 +123,9 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
         'tw:select-none tw:leading-none',
         disabled ? 'tw:text-switch-label-disabled' : 'tw:text-switch-label',
       ]"
+      @click="!disabled && handleUpdate(!isChecked)"
     >
       <slot name="label">{{ label }}</slot>
     </span>
-  </label>
+  </div>
 </template>

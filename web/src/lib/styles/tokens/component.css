@@ -169,6 +169,69 @@
   --spacing-field-width-md: 17.5rem;
   --spacing-field-width-lg: 25rem;
 
+  /* Input (OInput, OTextarea) */
+  --color-input-bg: var(--color-surface-base);
+  --color-input-border: var(--color-border-strong);
+  --color-input-border-hover: var(--color-primary-400);
+  --color-input-border-error: var(--color-error-500);
+  --color-input-disabled-bg: var(--color-surface-subtle);
+  --color-input-disabled-border: var(--color-border-default);
+  --color-input-focus-ring: var(--color-primary-400);
+  --color-input-text: var(--color-text-primary);
+  --color-input-placeholder: var(--color-text-disabled);
+  --color-input-label: var(--color-text-secondary);
+  --color-input-hint: var(--color-text-secondary);
+  --color-input-help-text: var(--color-text-secondary);
+  --color-input-error-text: var(--color-error-600);
+  --color-input-addon-text: var(--color-text-secondary);
+  --color-input-clear-btn: var(--color-text-secondary);
+  --color-input-clear-btn-hover: var(--color-text-primary);
+
+  /* Select (OSelect) */
+  --color-select-bg: var(--color-surface-base);
+  --color-select-border: var(--color-border-strong);
+  --color-select-border-hover: var(--color-primary-400);
+  --color-select-border-focus: var(--color-primary-500);
+  --color-select-border-error: var(--color-error-500);
+  --color-select-disabled-bg: var(--color-surface-subtle);
+  --color-select-focus-ring: var(--color-primary-400);
+  --color-select-text: var(--color-text-primary);
+  --color-select-placeholder: var(--color-text-disabled);
+  --color-select-label: var(--color-text-secondary);
+  --color-select-icon: var(--color-text-secondary);
+  --color-select-error-text: var(--color-error-600);
+  --color-select-content-bg: var(--color-surface-overlay);
+  --color-select-content-border: var(--color-border-default);
+  --color-select-item-text: var(--color-text-primary);
+  --color-select-item-hover-bg: var(--color-primary-50);
+  --color-select-item-selected-bg: var(--color-primary-100);
+  --color-select-item-selected-text: var(--color-primary-700);
+  --color-select-item-disabled: var(--color-text-disabled);
+
+  /* Switch (OSwitch) */
+  --color-switch-track-off: var(--color-grey-300);
+  --color-switch-track-on: var(--color-primary-600);
+  --color-switch-thumb: var(--color-white);
+  --color-switch-disabled-track-off: var(--color-grey-200);
+  --color-switch-disabled-track-on: var(--color-primary-300);
+  --color-switch-disabled-thumb: var(--color-grey-400);
+  --color-switch-focus-ring: var(--color-primary-400);
+  --color-switch-label: var(--color-text-primary);
+  --color-switch-label-disabled: var(--color-text-disabled);
+
+  /* Checkbox (OCheckbox) */
+  --color-checkbox-bg: var(--color-surface-base);
+  --color-checkbox-border: var(--color-border-strong);
+  --color-checkbox-hover-border: var(--color-primary-400);
+  --color-checkbox-checked-bg: var(--color-primary-600);
+  --color-checkbox-checked-border: var(--color-primary-600);
+  --color-checkbox-checked-fg: var(--color-white);
+  --color-checkbox-disabled-bg: var(--color-surface-subtle);
+  --color-checkbox-disabled-border: var(--color-border-default);
+  --color-checkbox-focus-ring: var(--color-primary-400);
+  --color-checkbox-label: var(--color-text-primary);
+  --color-checkbox-label-disabled: var(--color-text-disabled);
+
   /* ── Dialog ──────────────────────────────────────────────── */
 
   /* Overlay */
@@ -364,6 +427,69 @@
   --spacing-field-width-sm: var(--spacing-field-width-sm);
   --spacing-field-width-md: var(--spacing-field-width-md);
   --spacing-field-width-lg: var(--spacing-field-width-lg);
+
+  /* Input (OInput, OTextarea) */
+  --color-input-bg: var(--color-input-bg);
+  --color-input-border: var(--color-input-border);
+  --color-input-border-hover: var(--color-input-border-hover);
+  --color-input-border-error: var(--color-input-border-error);
+  --color-input-disabled-bg: var(--color-input-disabled-bg);
+  --color-input-disabled-border: var(--color-input-disabled-border);
+  --color-input-focus-ring: var(--color-input-focus-ring);
+  --color-input-text: var(--color-input-text);
+  --color-input-placeholder: var(--color-input-placeholder);
+  --color-input-label: var(--color-input-label);
+  --color-input-hint: var(--color-input-hint);
+  --color-input-help-text: var(--color-input-help-text);
+  --color-input-error-text: var(--color-input-error-text);
+  --color-input-addon-text: var(--color-input-addon-text);
+  --color-input-clear-btn: var(--color-input-clear-btn);
+  --color-input-clear-btn-hover: var(--color-input-clear-btn-hover);
+
+  /* Select (OSelect) */
+  --color-select-bg: var(--color-select-bg);
+  --color-select-border: var(--color-select-border);
+  --color-select-border-hover: var(--color-select-border-hover);
+  --color-select-border-focus: var(--color-select-border-focus);
+  --color-select-border-error: var(--color-select-border-error);
+  --color-select-disabled-bg: var(--color-select-disabled-bg);
+  --color-select-focus-ring: var(--color-select-focus-ring);
+  --color-select-text: var(--color-select-text);
+  --color-select-placeholder: var(--color-select-placeholder);
+  --color-select-label: var(--color-select-label);
+  --color-select-icon: var(--color-select-icon);
+  --color-select-error-text: var(--color-select-error-text);
+  --color-select-content-bg: var(--color-select-content-bg);
+  --color-select-content-border: var(--color-select-content-border);
+  --color-select-item-text: var(--color-select-item-text);
+  --color-select-item-hover-bg: var(--color-select-item-hover-bg);
+  --color-select-item-selected-bg: var(--color-select-item-selected-bg);
+  --color-select-item-selected-text: var(--color-select-item-selected-text);
+  --color-select-item-disabled: var(--color-select-item-disabled);
+
+  /* Switch (OSwitch) */
+  --color-switch-track-off: var(--color-switch-track-off);
+  --color-switch-track-on: var(--color-switch-track-on);
+  --color-switch-thumb: var(--color-switch-thumb);
+  --color-switch-disabled-track-off: var(--color-switch-disabled-track-off);
+  --color-switch-disabled-track-on: var(--color-switch-disabled-track-on);
+  --color-switch-disabled-thumb: var(--color-switch-disabled-thumb);
+  --color-switch-focus-ring: var(--color-switch-focus-ring);
+  --color-switch-label: var(--color-switch-label);
+  --color-switch-label-disabled: var(--color-switch-label-disabled);
+
+  /* Checkbox (OCheckbox) */
+  --color-checkbox-bg: var(--color-checkbox-bg);
+  --color-checkbox-border: var(--color-checkbox-border);
+  --color-checkbox-hover-border: var(--color-checkbox-hover-border);
+  --color-checkbox-checked-bg: var(--color-checkbox-checked-bg);
+  --color-checkbox-checked-border: var(--color-checkbox-checked-border);
+  --color-checkbox-checked-fg: var(--color-checkbox-checked-fg);
+  --color-checkbox-disabled-bg: var(--color-checkbox-disabled-bg);
+  --color-checkbox-disabled-border: var(--color-checkbox-disabled-border);
+  --color-checkbox-focus-ring: var(--color-checkbox-focus-ring);
+  --color-checkbox-label: var(--color-checkbox-label);
+  --color-checkbox-label-disabled: var(--color-checkbox-label-disabled);
 
 
   /* Dialog */
