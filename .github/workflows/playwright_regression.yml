@@ -9,7 +9,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-permissions: read-all
+permissions:
+  contents: read
 
 env:
   COLUMNS: 150
@@ -46,6 +47,9 @@ jobs:
     name: build_binary
     runs-on:
       labels: ubicloud-standard-16
+    permissions:
+      contents: read
+      actions: write
 
     steps:
       - name: Remove unused tools
@@ -112,6 +116,9 @@ jobs:
     needs: [build_binary]
     runs-on:
       labels: ubicloud-standard-8
+    permissions:
+      contents: read
+      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -205,6 +212,9 @@ jobs:
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
       labels: ubicloud-standard-8
+    permissions:
+      contents: read
+      actions: read
 
     steps:
       - name: Clone the current repo
