@@ -430,6 +430,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'table-container--with-histogram',
           ]"
         >
+          <!-- Pattern Filter Bar (accumulated filters) -->
+          <PatternFilterBar
+            :filterPatterns="filterBarPatterns"
+            @remove="removeFilterPattern"
+            @apply="applyAccumulatedFilters"
+            @clear="clearFilterPatterns"
+          />
+
           <!-- Patterns List -->
           <PatternList
             :patterns="patternsState?.patterns?.patterns || []"
@@ -443,6 +451,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @add-to-search="addPatternToSearch"
             @create-alert="createAlertFromPattern"
             @filter-value="addWildcardValueToSearch"
+            @copy-sql="copyPatternSql"
+            @contextmenu="handlePatternContextMenu"
+            @widen-time-range="handleWidenTimeRange"
+            @keynav="handlePatternKeyNav"
           />
         </div>
       </div>
@@ -504,6 +516,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :totalPatterns="patternsState?.patterns?.patterns?.length || 0"
         @navigate="navigatePatternDetail"
         @filter-value="addWildcardValueToSearch"
+      />
+
+      <!-- Pattern Context Menu -->
+      <PatternContextMenu
+        :visible="showContextMenu"
+        :x="contextMenuX"
+        :y="contextMenuY"
+        :pattern="contextMenuPattern"
+        @close="closeContextMenu"
+        @filter-in="handleContextMenuFilterIn"
+        @filter-out="handleContextMenuFilterOut"
+        @create-alert="handleContextMenuCreateAlert"
+        @copy-sql="handleContextMenuCopySql"
+        @view-details="handleContextMenuViewDetails"
       />
 
       <!-- Volume Analysis Dashboard -->
@@ -570,7 +596,9 @@ import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
-import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
+import PatternFilterBar from "@/plugins/logs/patterns/PatternFilterBar.vue";
+import PatternContextMenu from "@/plugins/logs/patterns/PatternContextMenu.vue";
+import { extractConstantsFromPattern, buildPatternSqlQuery } from "@/plugins/logs/patterns/patternUtils";
 import {
   convertLogData,
   convertStackedLogData,
@@ -614,6 +642,8 @@ export default defineComponent({
     PatternDetailsDialog: defineAsyncComponent(
       () => import("./patterns/PatternDetailsDialog.vue"),
     ),
+    PatternFilterBar,
+    PatternContextMenu,
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
     ),
@@ -866,6 +896,10 @@ export default defineComponent({
     const {
       selectedPattern,
       showPatternDetails,
+      filterBarPatterns,
+      removeFilterPattern,
+      clearFilterPatterns,
+      applyAccumulatedFilters,
       openPatternDetails,
       navigatePatternDetail,
       addPatternToSearch,
@@ -1149,7 +1183,7 @@ export default defineComponent({
 
     const reDrawChart = () => {
       if (
-        // eslint-disable-next-line no-prototype-builtins
+         
         searchObj.data.histogram.hasOwnProperty("xData") &&
         searchObj.data.histogram.xData.length > 0
       ) {
@@ -1663,6 +1697,98 @@ export default defineComponent({
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
 
+    // ── Pattern context menu state ──
+    const showContextMenu = ref(false);
+    const contextMenuX = ref(0);
+    const contextMenuY = ref(0);
+    const contextMenuPattern = ref<any>(null);
+    const focusedPatternIndex = ref(-1);
+
+    const handlePatternContextMenu = (pattern: any, event: MouseEvent) => {
+      showContextMenu.value = true;
+      contextMenuX.value = event.clientX;
+      contextMenuY.value = event.clientY;
+      contextMenuPattern.value = pattern;
+    };
+
+    const closeContextMenu = () => {
+      showContextMenu.value = false;
+      contextMenuPattern.value = null;
+    };
+
+    const handleContextMenuFilterIn = (pattern: any) => {
+      addPatternToSearch(pattern, "include");
+      closeContextMenu();
+    };
+
+    const handleContextMenuFilterOut = (pattern: any) => {
+      addPatternToSearch(pattern, "exclude");
+      closeContextMenu();
+    };
+
+    const handleContextMenuCreateAlert = (pattern: any) => {
+      createAlertFromPattern(pattern);
+      closeContextMenu();
+    };
+
+    const handleContextMenuCopySql = (pattern: any) => {
+      copyPatternSql(pattern);
+      closeContextMenu();
+    };
+
+    const handleContextMenuViewDetails = (pattern: any) => {
+      const idx = (patternsState.value.patterns?.patterns || []).indexOf(pattern);
+      openPatternDetails(pattern, idx >= 0 ? idx : 0);
+      closeContextMenu();
+    };
+
+    const copyPatternSql = (pattern: any) => {
+      try {
+        const sql = buildPatternSqlQuery(
+          pattern.template ?? "",
+          searchObj.data.stream.selectedStream[0] || "",
+        );
+        navigator.clipboard.writeText(sql);
+        $q.notify({
+          type: "positive",
+          message: t("search.patternSqlCopied"),
+          timeout: 2000,
+        });
+      } catch {
+        $q.notify({
+          type: "negative",
+          message: t("search.patternSqlCopyFailed") || "Failed to copy SQL",
+          timeout: 2000,
+        });
+      }
+    };
+
+    const handleWidenTimeRange = () => {
+      const dt = (searchObj.data as any).datetime;
+      if (dt) {
+        // Widen to last 24 hours
+        const now = Date.now() * 1000;
+        const oneDayAgo = now - 24 * 60 * 60 * 1000 * 1000;
+        dt.startTime = oneDayAgo;
+        dt.endTime = now;
+        dt.selectedTab = "custom";
+      }
+      emit("run-query");
+    };
+
+    const handlePatternKeyNav = (direction: string, index: number) => {
+      const patterns = patternsState.value?.patterns?.patterns || [];
+      if (direction === "escape") {
+        focusedPatternIndex.value = -1;
+        return;
+      }
+      if (direction === "up" && index > 0) {
+        focusedPatternIndex.value = index - 1;
+      } else if (direction === "down" && index < patterns.length - 1) {
+        focusedPatternIndex.value = index + 1;
+      }
+    };
+
     return {
       t,
       store,
@@ -1670,6 +1796,10 @@ export default defineComponent({
       plotChart,
       searchObj,
       patternsState,
+      filterBarPatterns,
+      removeFilterPattern,
+      clearFilterPatterns,
+      applyAccumulatedFilters,
       updatedLocalLogFilterField,
       byString,
       searchTableRef,
@@ -1747,6 +1877,21 @@ export default defineComponent({
       openCorrelationPanel,
       openCorrelationFromLog,
       openLogDetailsWithCorrelation,
+      showContextMenu,
+      contextMenuX,
+      contextMenuY,
+      contextMenuPattern,
+      handlePatternContextMenu,
+      closeContextMenu,
+      handleContextMenuFilterIn,
+      handleContextMenuFilterOut,
+      handleContextMenuCreateAlert,
+      handleContextMenuCopySql,
+      handleContextMenuViewDetails,
+      copyPatternSql,
+      handleWidenTimeRange,
+      handlePatternKeyNav,
+      focusedPatternIndex,
     };
   },
   computed: {

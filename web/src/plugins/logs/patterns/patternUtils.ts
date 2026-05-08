@@ -103,6 +103,76 @@ export interface PatternAlertData {
 /**
  * Build the full patternData payload used to pre-fill the AddAlert form.
  */
+// ── Frequency bar color thresholds ──
+export const FREQUENCY_BAR_THRESHOLD_HIGH = 5;
+export const FREQUENCY_BAR_THRESHOLD_MID = 20;
+
+export const getFrequencyBarColor = (
+  percentage: number,
+  isAnomaly: boolean,
+): string => {
+  if (isAnomaly) return "var(--o2-anomaly-bar, #ef4444)";
+  if (percentage >= FREQUENCY_BAR_THRESHOLD_HIGH)
+    return "var(--o2-primary-color)";
+  if (percentage >= 1)
+    return "var(--o2-secondary-bar, #f59e0b)";
+  return "var(--o2-text-muted, #9ca3af)";
+};
+
+// ── Pattern clustering ──
+export const extractConstantKey = (template: string): string => {
+  return template.replace(/<[:*][^>]*>/g, "<*>");
+};
+
+export interface PatternCluster {
+  basePattern: string;
+  variations: any[];
+  totalFrequency: number;
+  totalPercentage: number;
+}
+
+export const clusterPatterns = (patterns: any[]): PatternCluster[] => {
+  const groups = new Map<string, PatternCluster>();
+  for (const p of patterns) {
+    const key = extractConstantKey(p.template ?? "");
+    const existing = groups.get(key);
+    if (existing) {
+      existing.variations.push(p);
+      existing.totalFrequency += p.frequency ?? 0;
+      existing.totalPercentage += p.percentage ?? 0;
+    } else {
+      groups.set(key, {
+        basePattern: key,
+        variations: [p],
+        totalFrequency: p.frequency ?? 0,
+        totalPercentage: p.percentage ?? 0,
+      });
+    }
+  }
+  return Array.from(groups.values());
+};
+
+// ── CSV export ──
+export const exportPatternsAsCSV = (patterns: any[]): string => {
+  const headers = [
+    "Template",
+    "Description",
+    "Frequency",
+    "Percentage",
+    "Is Anomaly",
+    "Pattern ID",
+  ];
+  const rows = patterns.map((p: any) => [
+    `"${(p.template ?? "").replace(/"/g, '""')}"`,
+    `"${(p.description ?? "").replace(/"/g, '""')}"`,
+    p.frequency ?? 0,
+    (p.percentage ?? 0).toFixed(2),
+    p.is_anomaly ? "Yes" : "No",
+    p.pattern_id ?? "",
+  ]);
+  return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+};
+
 export const buildPatternAlertData = (
   pattern: any,
   streamName: string,

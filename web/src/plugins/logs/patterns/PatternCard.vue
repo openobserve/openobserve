@@ -16,16 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover"
-    :class="wrap ? 'tw:items-start' : 'tw:items-center'"
-    @click="$emit('click', pattern, index)"
+    class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:p-[0.75rem] tw:mb-[0.5rem] tw:cursor-pointer tw:transition-[box-shadow] tw:duration-150 hover:tw:shadow-md"
     :data-test="`pattern-card-${index}`"
+    tabindex="0"
+    role="button"
+    @click="$emit('click', pattern, index)"
+    @contextmenu.prevent="$emit('contextmenu', pattern, $event)"
+    @keydown.up.prevent="$emit('keynav', 'up', index)"
+    @keydown.down.prevent="$emit('keynav', 'down', index)"
+    @keydown.enter.prevent="$emit('click', pattern, index)"
+    @keydown.escape.prevent="$emit('keynav', 'escape', index)"
   >
-    <!-- Pattern Column -->
-    <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:px-2">
-      <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
+    <!-- Top row: Template (hero) + anomaly badge -->
+    <div class="tw:flex tw:items-start tw:gap-[0.5rem] tw:mb-[0.5rem]">
       <div
-        class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:w-full"
+        class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:flex-1 tw:min-w-0"
         :class="[
           store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8',
           wrap
@@ -57,73 +62,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
 
-      <!-- Anomaly badge with explanation tooltip -->
+      <!-- Anomaly badge -->
       <span
         v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw:text-[0.625rem] tw:cursor-help"
+        class="tw:inline-flex tw:items-center tw:gap-[0.125rem] tw:rounded-full tw:px-[0.5rem] tw:py-[0.125rem] tw:text-[0.6875rem] tw:font-bold tw:cursor-help tw:flex-shrink-0 tw:bg-[var(--o2-anomaly-bg,#fef2f2)] tw:text-[var(--o2-anomaly-color,#ef4444)] tw:border tw:border-[var(--o2-anomaly-border,#fecaca)]"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
-        ⚠️ {{ t("search.anomalyLabel") }}
+        <q-icon name="warning" size="0.6875rem" />
+        {{ t("search.anomalyLabel") }}
         <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
           <div class="tw:text-xs tw:max-w-[22rem]">{{ anomalyExplanationText }}</div>
         </q-tooltip>
       </span>
     </div>
 
-    <!-- Occurrence Column -->
-    <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-right">
+    <!-- Example log preview -->
+    <div
+      v-if="previewLog"
+      class="tw:mb-[0.5rem] tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]"
+      :data-test="`pattern-card-${index}-value-preview`"
+    >
+      <span class="tw:opacity-60">{{ t("search.patternExample") }}:</span>
+      <span class="tw:font-mono tw:ml-[0.25rem] tw:line-clamp-2 tw:break-all">{{ previewLog }}</span>
+    </div>
+
+    <!-- Frequency bar -->
+    <PatternFrequencyBar
+      :percentage="pattern.percentage"
+      :isAnomaly="pattern.is_anomaly"
+      :dataTestSuffix="`${index}`"
+    />
+
+    <!-- Stats row: occurrence + percentage badges -->
+    <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mt-[0.5rem] tw:mb-[0.625rem]">
       <span
-        class="tw:text-[var(--o2-text-4)]"
+        class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-primary)]"
         :data-test="`pattern-card-${index}-frequency`"
       >
         {{ pattern.frequency.toLocaleString() }}
+        {{ t("search.occurrenceColumnHeader").toLowerCase() }}
+      </span>
+      <span
+        class="tw:text-xs tw:font-semibold tw:text-[var(--o2-primary-color)] tw:bg-[var(--o2-primary-bg-light)] tw:rounded-full tw:px-[0.5rem] tw:py-[0.063rem]"
+        :data-test="`pattern-card-${index}-percentage`"
+      >
+        {{ pattern.percentage.toFixed(2) }}%
       </span>
     </div>
 
-    <!-- Percentage Column -->
-    <div class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:text-right">
-      <span
-        class="tw:text-[var(--o2-text-4)]"
-        :data-test="`pattern-card-${index}-percentage`"
-        >{{ pattern.percentage.toFixed(2) }}%</span
-      >
-    </div>
-
-    <!-- Actions Column -->
+    <!-- Action buttons row -->
     <div
-      class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center tw:justify-center tw:gap-[2px]"
+      class="tw:flex tw:items-center tw:gap-[0.375rem] tw:flex-wrap"
       :class="wrap ? 'tw:pt-1' : ''"
     >
       <OButton
-        variant="ghost"
-        size="icon"
+        variant="ghost-primary"
+        size="sm"
         @click.stop="$emit('include', pattern)"
-        :title="t('search.includePatternInSearch')"
+        :title="t('search.patternFilterIn')"
         :data-test="`pattern-card-${index}-include-btn`"
       >
-        <q-icon style="height: 8px; width: 8px">
-          <EqualIcon />
-        </q-icon>
+        <template #icon-left>
+          <q-icon style="height: 0.625rem; width: 0.625rem">
+            <EqualIcon />
+          </q-icon>
+        </template>
+        {{ t("search.patternFilterIn") }}
       </OButton>
       <OButton
-        variant="ghost"
-        size="icon"
+        variant="ghost-primary"
+        size="sm"
         @click.stop="$emit('exclude', pattern)"
-        :title="t('search.excludePatternFromSearch')"
+        :title="t('search.patternFilterOut')"
         :data-test="`pattern-card-${index}-exclude-btn`"
       >
-        <q-icon style="height: 8px; width: 8px">
-          <NotEqualIcon />
-        </q-icon>
+        <template #icon-left>
+          <q-icon style="height: 0.625rem; width: 0.625rem">
+            <NotEqualIcon />
+          </q-icon>
+        </template>
+        {{ t("search.patternFilterOut") }}
       </OButton>
       <OButton
-        variant="ghost"
-        size="icon"
+        variant="ghost-primary"
+        size="sm"
         @click.stop="$emit('create-alert', pattern)"
         :data-test="`pattern-card-${index}-create-alert-btn`"
       >
-        <q-icon name="notifications" size="15px" />
-        <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
+        <template #icon-left>
+          <q-icon name="notifications" size="0.8125rem" />
+        </template>
+        {{ t("search.patternAlert") }}
+      </OButton>
+      <div class="tw:flex-1" />
+      <OButton
+        variant="ghost"
+        size="icon"
+        @click.stop="handleCopySql"
+        :title="t('search.patternCopySql')"
+        :data-test="`pattern-card-${index}-copy-sql-btn`"
+      >
+        <q-icon name="content_copy" size="0.8125rem" />
       </OButton>
     </div>
   </div>
@@ -133,9 +172,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useQuasar } from "quasar";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import PatternFrequencyBar from "./PatternFrequencyBar.vue";
+import { buildPatternSqlQuery } from "./patternUtils";
 import {
   tokenizeTemplate,
   wildcardChipColor,
@@ -154,10 +196,14 @@ defineEmits<{
   (e: "include", pattern: any): void;
   (e: "exclude", pattern: any): void;
   (e: "create-alert", pattern: any): void;
+  (e: "copy-sql", pattern: any): void;
+  (e: "contextmenu", pattern: any, event: MouseEvent): void;
+  (e: "keynav", direction: string, index: number): void;
 }>();
 
 const store = useStore();
 const { t } = useI18n();
+const $q = useQuasar();
 const { onMouseEnter, onMouseLeave } = useWildcardHover();
 
 const templateTokens = computed(() =>
@@ -165,36 +211,55 @@ const templateTokens = computed(() =>
 );
 
 const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
+
+const previewLog = computed(() => {
+  const examples = props.pattern?.examples;
+  if (!examples || examples.length === 0) return "";
+  const first = examples[0];
+  return first?.log_message || first?.log || "";
+});
+
+const streamName = computed(() => {
+  return store.state.zoConfig?.selectedStream?.[0] || props.pattern.stream_name || "";
+});
+
+const handleCopySql = () => {
+  try {
+    const sql = buildPatternSqlQuery(props.pattern.template, streamName.value);
+    navigator.clipboard.writeText(sql);
+    $q.notify({
+      type: "positive",
+      message: t("search.patternSqlCopied"),
+      timeout: 2000,
+    });
+     
+  } catch (_e) {
+    $q.notify({
+      type: "negative",
+      message: t("search.patternSqlCopyFailed"),
+      timeout: 2000,
+    });
+  }
+};
 </script>
 
 <style scoped lang="scss">
-@import "@/styles/logs/search-result.scss";
-
 .pattern-template-text {
   font-family: monospace;
-  font-size: 12px;
-}
-
-// Add explicit hover styles
-.table-row-hover {
-  transition: background-color 0.15s ease-in-out;
-
-  &:hover {
-    background-color: var(--o2-hover-gray) !important;
-  }
+  font-size: 0.8125rem;
 }
 </style>
 
 <style lang="scss">
 @import "@/assets/styles/log-highlighting.css";
+
 .wildcard-chip {
   font-family: monospace;
-  font-size: 10px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 3px;
-  line-height: 16px;
-  // Prevent chips from inheriting the truncate overflow of the parent row
+  font-size: 0.625rem;
+  height: 1rem;
+  padding: 0 0.25rem;
+  border-radius: 0.1875rem;
+  line-height: 1rem;
   flex-shrink: 0;
 }
 </style>

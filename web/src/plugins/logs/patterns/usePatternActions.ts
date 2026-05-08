@@ -25,6 +25,12 @@ import {
   buildPatternAlertData,
 } from "./patternUtils";
 
+export interface FilterBarPattern {
+  pattern_id: string;
+  template: string;
+  action: "include" | "exclude";
+}
+
 export const usePatternActions = () => {
   const $q = useQuasar();
   const store = useStore();
@@ -34,6 +40,67 @@ export const usePatternActions = () => {
 
   const selectedPattern = ref<any>(null);
   const showPatternDetails = ref(false);
+
+  // Multi-select accumulator state
+  const filterBarPatterns = ref<FilterBarPattern[]>([]);
+  const selectedPatternIds = ref<Set<string>>(new Set());
+
+  const togglePatternSelection = (pattern: any, action: "include" | "exclude") => {
+    const id = pattern.pattern_id || pattern.template;
+    if (selectedPatternIds.value.has(id)) {
+      selectedPatternIds.value.delete(id);
+      filterBarPatterns.value = filterBarPatterns.value.filter(
+        (p) => p.pattern_id !== id,
+      );
+    } else {
+      selectedPatternIds.value.add(id);
+      filterBarPatterns.value.push({
+        pattern_id: id,
+        template: pattern.template,
+        action,
+      });
+    }
+    // Trigger reactivity
+    selectedPatternIds.value = new Set(selectedPatternIds.value);
+  };
+
+  const removeFilterPattern = (patternId: string) => {
+    selectedPatternIds.value.delete(patternId);
+    filterBarPatterns.value = filterBarPatterns.value.filter(
+      (p) => p.pattern_id !== patternId,
+    );
+    selectedPatternIds.value = new Set(selectedPatternIds.value);
+  };
+
+  const clearFilterPatterns = () => {
+    selectedPatternIds.value = new Set();
+    filterBarPatterns.value = [];
+  };
+
+  const applyAccumulatedFilters = () => {
+    if (filterBarPatterns.value.length === 0) return;
+
+    const includeClauses: string[] = [];
+    const excludeClauses: string[] = [];
+
+    for (const fp of filterBarPatterns.value) {
+      const constants = extractConstantsFromPattern(fp.template);
+      if (constants.length === 0) continue;
+      const matchAllClauses = constants.map(
+        (constant: string) => `match_all('${escapeForMatchAll(constant)}')`,
+      );
+      if (fp.action === "include") {
+        includeClauses.push(`(${matchAllClauses.join(" AND ")})`);
+      } else {
+        excludeClauses.push(`NOT (${matchAllClauses.join(" AND ")})`);
+      }
+    }
+
+    const allClauses = [...includeClauses, ...excludeClauses];
+    searchObj.data.stream.addToFilter = allClauses.join(" AND ");
+    searchObj.meta.logsVisualizeToggle = "logs";
+    clearFilterPatterns();
+  };
 
   const openPatternDetails = (pattern: any, index: number) => {
     selectedPattern.value = { pattern, index };
@@ -62,33 +129,40 @@ export const usePatternActions = () => {
   const addPatternToSearch = (
     pattern: any,
     action: "include" | "exclude",
+    immediate: boolean = false,
   ) => {
-    const constants = extractConstantsFromPattern(pattern.template);
+    if (immediate) {
+      const constants = extractConstantsFromPattern(pattern.template);
 
-    if (constants.length === 0) {
-      $q.notify({
-        type: "warning",
-        message: "No strings longer than 10 characters found in pattern",
-        timeout: 2000,
-      });
+      if (constants.length === 0) {
+        $q.notify({
+          type: "warning",
+          message: "No strings longer than 10 characters found in pattern",
+          timeout: 2000,
+        });
+        return;
+      }
+
+      const matchAllClauses = constants.map(
+        (constant) => `match_all('${escapeForMatchAll(constant)}')`,
+      );
+
+      let filterExpression = matchAllClauses.join(" AND ");
+
+      if (action === "exclude") {
+        filterExpression =
+          matchAllClauses.length > 1
+            ? `NOT (${filterExpression})`
+            : `NOT ${filterExpression}`;
+      }
+
+      searchObj.data.stream.addToFilter = filterExpression;
+      searchObj.meta.logsVisualizeToggle = "logs";
       return;
     }
 
-    const matchAllClauses = constants.map(
-      (constant) => `match_all('${escapeForMatchAll(constant)}')`,
-    );
-
-    let filterExpression = matchAllClauses.join(" AND ");
-
-    if (action === "exclude") {
-      filterExpression =
-        matchAllClauses.length > 1
-          ? `NOT (${filterExpression})`
-          : `NOT ${filterExpression}`;
-    }
-
-    searchObj.data.stream.addToFilter = filterExpression;
-    searchObj.meta.logsVisualizeToggle = "logs";
+    // Accumulated mode: add to filter bar instead of immediately switching
+    togglePatternSelection(pattern, action);
   };
 
   const addWildcardValueToSearch = (
@@ -157,6 +231,12 @@ export const usePatternActions = () => {
   return {
     selectedPattern,
     showPatternDetails,
+    filterBarPatterns,
+    selectedPatternIds,
+    togglePatternSelection,
+    removeFilterPattern,
+    clearFilterPatterns,
+    applyAccumulatedFilters,
     openPatternDetails,
     navigatePatternDetail,
     addPatternToSearch,
