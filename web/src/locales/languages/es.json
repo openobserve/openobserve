@@ -390,7 +390,8 @@
     "autoRunEnabled": "Ejecución automática habilitada",
     "selectStreamFirst": "Selecciona primero una transmisión",
     "traces": "Huellas",
-    "switchToLogs": "haga clic para volver a Registros"
+    "switchToLogs": "haga clic para volver a Registros",
+    "patternNoValuesAvailable": "No hay valores disponibles"
   },
   "menu": {
     "home": "Inicio",

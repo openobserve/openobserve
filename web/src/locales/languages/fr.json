@@ -390,7 +390,8 @@
     "autoRunEnabled": "Exécution automatique activée",
     "selectStreamFirst": "Sélectionnez d'abord un flux",
     "traces": "Des traces",
-    "switchToLogs": "cliquez pour revenir à Logs"
+    "switchToLogs": "cliquez pour revenir à Logs",
+    "patternNoValuesAvailable": "Aucune valeur disponible"
   },
   "menu": {
     "home": "Accueil",

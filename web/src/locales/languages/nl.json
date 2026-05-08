@@ -390,7 +390,8 @@
     "autoRunEnabled": "Automatisch uitvoeren ingeschakeld",
     "selectStreamFirst": "Selecteer eerst een stream",
     "traces": "Sporen",
-    "switchToLogs": "klik om terug te schakelen naar de logboeken"
+    "switchToLogs": "klik om terug te schakelen naar de logboeken",
+    "patternNoValuesAvailable": "Geen waarden beschikbaar"
   },
   "menu": {
     "home": "Home",

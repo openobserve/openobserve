@@ -459,4 +459,19 @@ describe("PatternDetailsDialog", () => {
       expect(nextBtn.attributes("disabled")).toBeUndefined();
     });
   });
+
+  describe("WildcardValuePopover integration", () => {
+    it("should render WildcardValuePopover component", () => {
+      const popover = wrapper.findComponent({ name: "WildcardValuePopover" });
+      expect(popover.exists()).toBe(true);
+    });
+
+    it("should forward filter-value event from WildcardValuePopover", async () => {
+      const popover = wrapper.findComponent({ name: "WildcardValuePopover" });
+      expect(popover.exists()).toBe(true);
+      await popover.vm.$emit("filter-value", "192.168.1.1", "include");
+      expect(wrapper.emitted("filter-value")).toBeTruthy();
+      expect(wrapper.emitted("filter-value")![0]).toEqual(["192.168.1.1", "include"]);
+    });
+  });
 });

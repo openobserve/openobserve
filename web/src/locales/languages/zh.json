@@ -390,7 +390,8 @@
     "autoRunEnabled": "自动运行已启用",
     "selectStreamFirst": "先选择一个直播",
     "traces": "痕迹",
-    "switchToLogs": "点击切换回日志"
+    "switchToLogs": "点击切换回日志",
+    "patternNoValuesAvailable": "没有可用值"
   },
   "menu": {
     "home": "主页",

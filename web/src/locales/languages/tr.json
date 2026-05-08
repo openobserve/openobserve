@@ -390,7 +390,8 @@
     "autoRunEnabled": "Otomatik çalıştırma etkin",
     "selectStreamFirst": "Önce bir yayın seçin",
     "traces": "İzleri",
-    "switchToLogs": "Günlüklere geri dönmek için tıklayın"
+    "switchToLogs": "Günlüklere geri dönmek için tıklayın",
+    "patternNoValuesAvailable": "Mevcut değer yok"
   },
   "menu": {
     "home": "Ana Sayfa",

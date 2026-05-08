@@ -390,7 +390,8 @@
     "autoRunEnabled": "自動実行有効",
     "selectStreamFirst": "最初にストリームを選択してください",
     "traces": "トレース",
-    "switchToLogs": "クリックしてログに戻る"
+    "switchToLogs": "クリックしてログに戻る",
+    "patternNoValuesAvailable": "使用可能な値はありません"
   },
   "menu": {
     "home": "ホーム",
