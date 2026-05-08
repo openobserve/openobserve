@@ -1,18 +1,18 @@
 <template>
-  <ODialog v-model:open="internalValue" persistent size="xl" :show-close="false" data-test="test-model-match-dialog">
-    <template #header>
-      <div class="tw:flex tw:items-start tw:justify-between tw:w-full tw:gap-2">
-        <div>
-          <div class="tmm-title">{{ t("modelPricing.testMatchTitle") }}</div>
-          <div class="tmm-subtitle">
-            {{ t("modelPricing.testMatchSubtitle") }}
-          </div>
-        </div>
-        <OButton variant="ghost" size="icon" @click="internalValue = false">
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </template>
+  <ODialog
+    v-model:open="internalValue"
+    persistent
+    size="xl"
+    data-test="test-model-match-dialog"
+    :title="t('modelPricing.testMatchTitle')"
+    :sub-title="t('modelPricing.testMatchSubtitle')"
+    :secondary-button-label="t('modelPricing.close')"
+    :primary-button-label="t('modelPricing.testMatch')"
+    :primary-button-disabled="!testModelName"
+    :primary-button-loading="testing"
+    @click:secondary="internalValue = false"
+    @click:primary="runTest"
+  >
 
     <!-- Two-column body -->
     <div class="tmm-body" style="height: 100%">
@@ -244,28 +244,6 @@
         </div>
       </div>
 
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:items-center tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="internalValue = false"
-          data-test="test-match-close-btn"
-        >
-          {{ t("modelPricing.close") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="!testModelName"
-          :loading="testing"
-          @click="runTest"
-          data-test="test-match-run-btn"
-        >
-          {{ t("modelPricing.testMatch") }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

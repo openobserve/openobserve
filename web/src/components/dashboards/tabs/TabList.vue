@@ -67,19 +67,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #icon-left><q-icon name="add" /></template>
       <q-tooltip>Add Tab</q-tooltip>
     </OButton>
-    <ODrawer v-model:open="showAddTabDialog" size="md" :show-close="false" @close="showAddTabDialog = false">
+    <ODrawer
+      v-model:open="showAddTabDialog"
+      size="md"
+      :show-close="false"
+      @close="showAddTabDialog = false"
+      secondary-button-label="Cancel"
+      primary-button-label="Save"
+      @click:secondary="showAddTabDialog = false"
+      @click:primary="addTabRef?.submit()"
+    >
       <AddTab
         ref="addTabRef"
         :dashboard-id="dashboardData?.dashboardId"
         @refresh="refreshDashboard"
         @close="showAddTabDialog = false"
       />
-      <template #footer>
-        <div class="tw:flex tw:justify-start tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showAddTabDialog = false" data-test="dashboard-add-cancel">Cancel</OButton>
-          <OButton variant="primary" size="sm-action" data-test="dashboard-add-tab-submit" @click="addTabRef?.submit()">Save</OButton>
-        </div>
-      </template>
     </ODrawer>
   </div>
 </template>

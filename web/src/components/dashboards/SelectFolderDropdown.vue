@@ -58,14 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('common.addFolder')"
     :width="30"
     data-test="dashboard-folder-move-dialog"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    @click:secondary="showAddFolderDialog = false"
+    @click:primary="addFolderRef?.submit()"
   >
     <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
-    <template #footer>
-      <div class="tw:flex tw:justify-start tw:gap-2">
-        <OButton variant="outline" size="sm-action" @click="showAddFolderDialog = false" data-test="dashboard-folder-add-cancel">{{ t('dashboard.cancel') }}</OButton>
-        <OButton variant="primary" size="sm-action" data-test="dashboard-folder-add-save" @click="addFolderRef?.submit()">{{ t('dashboard.save') }}</OButton>
-      </div>
-    </template>
   </ODrawer>
 </template>
 

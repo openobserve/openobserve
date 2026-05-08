@@ -117,7 +117,13 @@
     </div>
 
     <!-- Query Preview Dialog -->
-    <ODialog v-model:open="showQueryDialog" size="md" title="Generated Query">
+    <ODialog
+      v-model:open="showQueryDialog"
+      size="md"
+      title="Generated Query"
+      primary-button-label="Close"
+      @click:primary="showQueryDialog = false"
+    >
       <div>
         <div class="text-caption text-grey-7 q-mb-sm">
           This query would be executed to fetch related
@@ -125,13 +131,6 @@
         </div>
         <pre class="query-preview">{{ queryPreview.sql }}</pre>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end">
-          <OButton variant="outline" size="sm-action" @click="showQueryDialog = false">
-            Close
-          </OButton>
-        </div>
-      </template>
     </ODialog>
   </q-page>
 </template>
@@ -140,7 +139,6 @@
 import { ref } from "vue";
 import TelemetryCorrelationPanel from "@/components/TelemetryCorrelationPanel.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 // Demo state

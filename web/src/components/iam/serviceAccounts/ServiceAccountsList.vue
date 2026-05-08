@@ -207,63 +207,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </ODrawer>
 
-    <ODialog v-model:open="confirmRefresh" size="xs" :title="t('serviceAccounts.confirmRefreshHead')">
+    <ODialog
+      v-model:open="confirmRefresh"
+      size="xs"
+      :title="t('serviceAccounts.confirmRefreshHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmRefresh = false"
+      @click:primary="refreshServiceToken(toBeRefreshed)"
+    >
       <p>{{ t('serviceAccounts.confirmRefreshMsg') }}</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="cancel-button"
-            @click="confirmRefresh = false"
-          >
-            {{ t('user.cancel') }}
-          </OButton>
-          <OButton
-            data-test="confirm-button"
-            variant="primary"
-            size="sm-action"
-            @click="refreshServiceToken(toBeRefreshed)"
-          >
-            {{ t('user.ok') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
-    <ODialog v-model:open="confirmDelete" size="xs" :title="t('serviceAccounts.confirmDeleteHead')">
+    <ODialog
+      v-model:open="confirmDelete"
+      size="xs"
+      :title="t('serviceAccounts.confirmDeleteHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmDelete = false"
+      @click:primary="deleteUser"
+    >
       <p>{{ t('serviceAccounts.confirmDeleteMsg') }}</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmDelete = false" data-test="cancel-button">
-            {{ t('user.cancel') }}
-          </OButton>
-          <OButton variant="primary" size="sm-action" data-test="confirm-button" @click="deleteUser">
-            {{ t('user.ok') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
-    <ODialog v-model:open="confirmBulkDelete" size="xs" title="Delete Service Accounts">
+    <ODialog
+      v-model:open="confirmBulkDelete"
+      size="xs"
+      title="Delete Service Accounts"
+      secondary-button-label="Cancel"
+      primary-button-label="OK"
+      @click:secondary="confirmBulkDelete = false"
+      @click:primary="bulkDeleteServiceAccounts"
+    >
       <p>Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmBulkDelete = false">Cancel</OButton>
-          <OButton variant="primary" size="sm-action" @click="bulkDeleteServiceAccounts">OK</OButton>
-        </div>
-      </template>
     </ODialog>
 
-    <ODialog v-model:open="isShowToken" persistent size="md">
-      <template #header>
-        <div class="tw:flex tw:justify-between tw:items-center tw:flex-1">
-          <span class="tw:font-semibold tw:text-sm">Service Account Token</span>
-          <OButton data-test="sa-cancel-button" variant="ghost" size="icon-circle-sm" @click="isShowToken = false">
-            <q-icon name="cancel" />
-          </OButton>
-        </div>
-      </template>
+    <ODialog
+      v-model:open="isShowToken"
+      persistent
+      size="md"
+      title="Service Account Token"
+    >
 
       <div class="tw:flex tw:items-center tw:gap-2 tw:rounded-lg" style="padding: 0rem 0.5rem;">
         <!-- Token section taking 75% of the width -->

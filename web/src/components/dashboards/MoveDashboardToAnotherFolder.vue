@@ -69,12 +69,11 @@ import { moveDashboardToAnotherFolder } from "../../utils/commons";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components: { SelectFolderDropdown, OButton, ODrawer },
+  components: { SelectFolderDropdown, ODrawer },
   props: {
     activeFolderId: {
       type: String,

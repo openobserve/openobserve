@@ -400,7 +400,17 @@
     </div>
 
     <!-- License Key Modal -->
-    <ODialog v-model:open="showLicenseKeyModal" persistent size="md" :title="t('about.license_key')">
+    <ODialog
+      v-model:open="showLicenseKeyModal"
+      persistent
+      size="md"
+      :title="t('about.license_key')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="t('about.copy_key')"
+      :primary-button-disabled="!licenseData.key"
+      @click:secondary="showLicenseKeyModal = false"
+      @click:primary="copyLicenseKey"
+    >
       <div class="text-body2 q-mb-md">
         {{ t('about.your_complete_license_key') }}
       </div>
@@ -413,27 +423,6 @@
         rows="8"
         style="font-family: monospace; font-size: 12px"
       />
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            data-test="license-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="showLicenseKeyModal = false"
-          >
-            {{ t('common.cancel') }}
-          </OButton>
-          <OButton
-            data-test="license-copy-key-btn"
-            variant="primary"
-            size="sm-action"
-            :disabled="!licenseData.key"
-            @click="copyLicenseKey"
-          >
-            {{ t('about.copy_key') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
   </div>
 </template>

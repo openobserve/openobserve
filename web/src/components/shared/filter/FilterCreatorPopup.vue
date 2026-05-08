@@ -1,8 +1,10 @@
 <template>
-  <ODialog v-model:open="show" size="sm">
-    <template #header>
-      <div class="text-h6">{{ fieldName }}</div>
-    </template>
+  <ODialog v-model:open="show" size="sm" :title="fieldName"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('common.apply')"
+    @click:secondary="show = false"
+    @click:primary="applyFilter"
+  >
     <div class="q-pa-md filter-container">
       <q-card-section class="q-pa-none">
         <q-select
@@ -44,18 +46,6 @@
         </div>
       </q-card-section>
     </div>
-    <template #footer>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="show = false"
-      >{{ t('common.cancel') }}</OButton>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        @click="applyFilter"
-      >{{ t('common.apply') }}</OButton>
-    </template>
   </ODialog>
 </template>
 
@@ -64,11 +54,10 @@
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 export default defineComponent({
   name: "FilterCreatorPopup",
-  components: { OButton, ODialog },
+  components: { ODialog },
   props: [
     "fieldName",
     "fieldValues",

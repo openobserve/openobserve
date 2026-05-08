@@ -100,22 +100,18 @@
       </div>
     </template>
 
-    <ODialog v-model:open="showDeleteConfirm" size="xs" title="Confirm Delete">
+    <ODialog
+      v-model:open="showDeleteConfirm"
+      size="xs"
+      title="Confirm Delete"
+      secondary-button-label="Cancel"
+      primary-button-label="Delete"
+      primary-button-variant="destructive"
+      :primary-button-loading="deleteAnnotation.isLoading.value"
+      @click:secondary="showDeleteConfirm = false"
+      @click:primary="deleteAnnotation.execute()"
+    >
       <p>Are you sure you want to delete this annotation?</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showDeleteConfirm = false"
-            >Cancel</OButton
-          >
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            :loading="deleteAnnotation.isLoading.value"
-            @click="deleteAnnotation.execute()"
-            >Delete</OButton
-          >
-        </div>
-      </template>
     </ODialog>
   </ODialog>
 </template>

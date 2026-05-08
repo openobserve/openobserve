@@ -433,40 +433,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="lg"
     color="primary"
   ></q-spinner-hourglass>
-  <ODialog v-model:open="confirmDeleteImage" size="xs">
+  <ODialog
+    v-model:open="confirmDeleteImage"
+    size="xs"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="cancelConfirmDialog"
+    @click:primary="confirmDialogOK"
+  >
     <p>{{ t('settings.deleteLogoMessage') }}</p>
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          data-test="logs-search-bar-confirm-dialog-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="cancelConfirmDialog"
-        >
-          {{ t('confirmDialog.cancel') }}
-        </OButton>
-        <OButton
-          data-test="logs-search-bar-confirm-dialog-ok-btn"
-          variant="primary"
-          size="sm-action"
-          @click="confirmDialogOK"
-        >
-          {{ t('confirmDialog.ok') }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 
-  <!-- Color Picker Dialog -->
-  <ODialog v-model:open="showColorPicker" @update:open="(v) => !v && onColorPickerClose()" size="xs" :title="t('settings.pickCustomColor')">
+  <ODialog
+    v-model:open="showColorPicker"
+    @update:open="(v) => !v && onColorPickerClose()"
+    size="xs"
+    :title="t('settings.pickCustomColor')"
+    primary-button-label="Close"
+    @click:primary="showColorPicker = false"
+  >
     <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
-    <template #footer>
-      <div class="tw:flex tw:justify-end">
-        <OButton variant="outline" size="sm-action" @click="showColorPicker = false">
-          {{ t('settings.close') }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

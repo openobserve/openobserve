@@ -1571,49 +1571,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <ODialog ref="confirmDialog" v-model:open="confirmDialogVisible" size="xs">
+    <ODialog
+      ref="confirmDialog"
+      v-model:open="confirmDialogVisible"
+      size="xs"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="cancelConfirmDialog"
+      @click:primary="confirmDialogOK"
+    >
       <p>{{ confirmMessage }}</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="cancelConfirmDialog"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="logs-search-bar-confirm-dialog-ok-btn"
-            variant="primary"
-            size="sm-action"
-            @click="confirmDialogOK"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </div>
-      </template>
     </ODialog>
 
-    <ODialog ref="confirmSavedViewDialog" v-model:open="confirmSavedViewDialogVisible" size="xs">
+    <ODialog
+      ref="confirmSavedViewDialog"
+      v-model:open="confirmSavedViewDialogVisible"
+      size="xs"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="cancelConfirmDialog"
+      @click:primary="confirmDialogOK"
+    >
       <p>{{ confirmMessageSavedView }}</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="cancelConfirmDialog"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="logs-search-bar-confirm-dialog-ok-btn"
-            variant="primary"
-            size="sm-action"
-            @click="confirmDialogOK"
-          >{{ t('confirmDialog.ok') }}</OButton>
-        </div>
-      </template>
     </ODialog>
-    <ODialog v-model:open="customDownloadDialog" size="md" title="Custom Download">
+    <ODialog
+      v-model:open="customDownloadDialog"
+      size="md"
+      title="Custom Download"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('search.btnDownload')"
+      @click:secondary="customDownloadDialog = false"
+      @click:primary="downloadRangeData"
+    >
       <p>{{ t('search.customDownloadMessage') }}</p>
       <q-input
         type="number"
@@ -1661,26 +1650,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ option.label }}</OButton>
         </OButtonGroup>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            @click="customDownloadDialog = false"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            data-test="logs-search-bar-confirm-dialog-ok-btn"
-            @click="downloadRangeData"
-            >{{ t("search.btnDownload") }}</OButton
-          >
-        </div>
-      </template>
     </ODialog>
-    <ODialog v-model:open="store.state.savedViewDialog" size="md" :title="t('search.savedViewsLabel')">
+    <ODialog
+      v-model:open="store.state.savedViewDialog"
+      size="md"
+      :title="t('search.savedViewsLabel')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('common.save')"
+      :primary-button-loading="saveViewLoader"
+      @click:secondary="store.state.savedViewDialog = false"
+      @click:primary="handleSavedView"
+    >
       <div v-if="isSavedViewAction == 'create'">
         <q-input
           data-test="add-alert-name-input"
@@ -1719,35 +1699,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rules="[(val: any) => !!val || 'Field is required!']"
         />
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            data-test="saved-view-dialog-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="store.state.savedViewDialog = false"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="saved-view-dialog-save-btn"
-            v-if="!saveViewLoader"
-            variant="primary"
-            size="sm-action"
-            @click="handleSavedView"
-            >{{ t("common.save") }}</OButton
-          >
-          <OButton
-            data-test="saved-view-dialog-loading-btn"
-            v-if="saveViewLoader"
-            variant="primary"
-            size="sm-action"
-            :loading="true"
-            >{{ t("confirmDialog.loading") }}</OButton
-          >
-        </div>
-      </template>
     </ODialog>
-    <ODialog v-model:open="store.state.savedFunctionDialog" size="md" :title="t('search.functionPlaceholder')">
+    <ODialog
+      v-model:open="store.state.savedFunctionDialog"
+      size="md"
+      :title="t('search.functionPlaceholder')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      :primary-button-loading="saveFunctionLoader"
+      @click:secondary="store.state.savedFunctionDialog = false"
+      @click:primary="saveFunction"
+    >
       <div class="tw:flex tw:items-center">
         <span class="tw:mt-2">Update</span>
         <q-toggle
@@ -1798,35 +1760,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rules="[(val: any) => !!val || 'Field is required!']"
         />
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            data-test="saved-function-dialog-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="store.state.savedFunctionDialog = false"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="saved-view-dialog-save-btn"
-            v-if="!saveFunctionLoader"
-            variant="primary"
-            size="sm-action"
-            @click="saveFunction"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-          <OButton
-            data-test="saved-function-dialog-loading-btn"
-            v-if="saveFunctionLoader"
-            variant="primary"
-            size="sm-action"
-            :loading="true"
-            >{{ t("confirmDialog.loading") }}</OButton
-          >
-        </div>
-      </template>
     </ODialog>
-    <ODialog v-model:open="searchSchedulerJob" size="md" :title="t('search.scheduleSearchJob')">
+    <ODialog
+      v-model:open="searchSchedulerJob"
+      size="md"
+      :title="t('search.scheduleSearchJob')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="searchSchedulerJob = false; searchObj.meta.showSearchScheduler = false;"
+      @click:primary="addJobScheduler"
+    >
       <div>
         <div class="text-left q-mb-xs">
           {{ t("search.noOfRecords") }}:
@@ -1867,28 +1810,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon name="warning" color="red" class="q-mr-sm" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            data-test="search-scheduler-max-records-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="searchSchedulerJob = false; searchObj.meta.showSearchScheduler = false;"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="search-scheduler-max-records-submit-btn"
-            variant="primary"
-            size="sm-action"
-            @click="addJobScheduler"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </div>
-      </template>
     </ODialog>
 
     <!-- Search Inspect Dialog -->
-    <ODialog v-model:open="searchInspectDialog" size="sm" title="Search Inspect">
+    <ODialog
+      v-model:open="searchInspectDialog"
+      size="sm"
+      title="Search Inspect"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      :primary-button-disabled="!searchInspectTraceId.trim()"
+      @click:secondary="searchInspectDialog = false"
+      @click:primary="navigateToSearchInspect"
+    >
       <div class="text-left q-mb-xs">Trace ID:</div>
       <q-input
         v-model="searchInspectTraceId"
@@ -1902,24 +1836,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         autofocus
         data-test="search-inspect-trace-id-input"
       />
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="searchInspectDialog = false"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!searchInspectTraceId.trim()"
-            @click="navigateToSearchInspect"
-            data-test="search-inspect-submit-btn"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </div>
-      </template>
     </ODialog>
 
     <ConfirmDialog

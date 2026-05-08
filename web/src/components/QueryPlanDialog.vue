@@ -15,16 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog v-model:open="showDialog" size="full" :show-close="false" @update:open="(v) => !v && onClose()">
-    <template #header>
-      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-        <div class="text-h6">{{ t("search.queryPlan") }}</div>
-        <OButton variant="ghost" size="icon" @click="onClose">
-          <q-icon name="close" size="14px" />
-          <q-tooltip>Close (ESC)</q-tooltip>
-        </OButton>
-      </div>
-    </template>
+  <ODialog v-model:open="showDialog" size="full" :title="t('search.queryPlan')" @update:open="(v) => !v && onClose()">
     <div class="query-plan-content full-height q-pa-none">
         <q-splitter v-model="splitterPosition" class="full-height">
           <!-- Left Pane: SQL Query -->

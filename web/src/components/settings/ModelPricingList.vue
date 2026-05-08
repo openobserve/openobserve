@@ -781,11 +781,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
-    <ODrawer v-model:open="showPricingDialog" :width="30">
-      <template #header>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:flex-1">
-          <!-- Source icon -->
-          <span
+    <ODrawer v-model:open="showPricingDialog" :width="30" title="Hello">
+      <!-- #header-left: source icon is conditional (3 variants) with tooltips — cannot be expressed as a simple prop -->
+      <template #header-left>
+        <span
             v-if="getSource(pricingDialogRow) === 'built_in'"
             class="tw:shrink-0 tw:cursor-default tw:inline-flex"
           >
@@ -812,7 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="18px"
             class="tw:shrink-0 tw:cursor-default source-icon"
           >
-            <q-tooltip
+             <q-tooltip
               :delay="500"
               anchor="top middle"
               self="bottom middle"
@@ -832,24 +831,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("modelPricing.sourceCustom") }}</q-tooltip
             >
           </q-icon>
-          <div style="font-size: 18px" class="tw:truncate">
-            {{ pricingDialogRow?.name }}
-            <q-tooltip
-              v-if="
-                pricingDialogRow?.name && pricingDialogRow.name.length > 20
-              "
-              :delay="300"
-              anchor="bottom middle"
-              self="top middle"
-              style="
-                max-width: none;
-                white-space: normal;
-                word-break: break-all;
-              "
-              >{{ pricingDialogRow.name }}</q-tooltip
-            >
-          </div>
-        </div>
       </template>
 
       <div class="q-pa-md pricing-dialog-body">

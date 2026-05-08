@@ -279,18 +279,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
   </q-card>
-  <ODialog v-model:open="logout_confirm" persistent size="xs" title="Password Changed">
+  <ODialog
+    v-model:open="logout_confirm"
+    persistent
+    size="xs"
+    title="Password Changed"
+    primary-button-label="Ok"
+    @click:primary="signout"
+  >
     <div class="tw:flex tw:items-center tw:gap-3">
       <q-avatar icon="info" color="primary" text-color="white" />
       <span>As you've chosen to change your password, you'll be automatically
         logged out.</span
       >
     </div>
-    <template #footer>
-      <div class="tw:flex tw:justify-end">
-        <OButton variant="primary" size="sm-action" @click="signout">Ok</OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

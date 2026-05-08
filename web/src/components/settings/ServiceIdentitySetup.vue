@@ -230,24 +230,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Field Mapping Dialog -->
-          <ODialog v-model:open="showFieldMappingDialog" size="sm">
-            <template #header>
-              <div>
-                <div class="text-h6">
-                  {{ t("settings.correlation.customizeFieldMappings") }}
-                </div>
-                <div
-                  class="tw:text-xs tw:mt-1"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tw:text-grey-5'
-                      : 'tw:text-grey-6'
-                  "
-                >
-                  {{ t("settings.correlation.fieldMappingDialogHelp") }}
-                </div>
-              </div>
-            </template>
+          <ODialog
+            v-model:open="showFieldMappingDialog"
+            size="sm"
+            :title="t('settings.correlation.customizeFieldMappings')"
+            :sub-title="t('settings.correlation.fieldMappingDialogHelp')"
+            :secondary-button-label="t('common.cancel')"
+            :primary-button-label="t('common.save')"
+            :primary-button-loading="savingFieldMappings"
+            @click:secondary="showFieldMappingDialog = false"
+            @click:primary="saveFieldMappings"
+          >
             <TagInput
               :model-value="editableServiceFields"
               @update:model-value="editableServiceFields = $event"
@@ -256,21 +249,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               label=""
             />
-            <template #footer>
-              <div class="tw:flex tw:gap-2 tw:justify-end">
-                <OButton variant="outline" size="sm-action" @click="showFieldMappingDialog = false">
-                  {{ t("common.cancel") }}
-                </OButton>
-                <OButton
-                  variant="primary"
-                  size="sm-action"
-                  :loading="savingFieldMappings"
-                  @click="saveFieldMappings"
-                >
-                  {{ t("common.save") }}
-                </OButton>
-              </div>
-            </template>
           </ODialog>
 
           <!-- Service Optional toggle -->
@@ -1075,6 +1053,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:open="insightDialogOpen"
           :width="insightPanelWidthPct"
         >
+          <!-- #header kept: first line combines plain subtitle text with an inline theme-colored badge
+               containing the title + tooltip; second line is a conditional coverage row with icon.
+               Cannot be expressed cleanly with title + sub-title props alone. -->
           <template #header>
             <div class="tw:flex-1 tw:min-w-0">
               <div class="tw:text-[16px] tw:flex tw:items-center">
@@ -1378,15 +1359,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:open="detailsDialogVisible"
         @update:open="(v) => { if (!v) { preselectedValue = ''; popupPrimaryValue = ''; popupColumnSelections = []; } }"
         size="md"
+        :title="primaryDim?.display"
+        :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
       >
-        <template #header>
-          <div class="text-h6 tw:flex tw:items-center tw:gap-2">
-            {{ primaryDim?.display }}
-            <span v-if="popupPrimaryValue" class="text-subtitle2 text-grey"
-              >: {{ popupPrimaryValue }}</span
-            >
-          </div>
-        </template>
 
           <q-card-section
             class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t"

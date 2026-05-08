@@ -21,6 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     :title="t('correlation.logs.timeRange.title')"
     data-test="time-range-editor-dialog"
+    :secondary-button-label="t('common.cancel')"
+    :neutral-button-label="t('common.reset')"
+    :primary-button-label="t('common.apply')"
+    :primary-button-disabled="!isValid"
+    @click:secondary="handleCancel"
+    @click:neutral="handleReset"
+    @click:primary="handleApply"
   >
         <!-- Source Log Time -->
         <div class="tw:mb-6">
@@ -142,36 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
 
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="handleCancel"
-          data-test="cancel-btn"
-        >
-          {{ t('common.cancel') }}
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          @click="handleReset"
-          data-test="reset-btn"
-        >
-          <RotateCcw :size="14" class="tw:mr-1" />
-          {{ t('common.reset') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="handleApply"
-          :disabled="!isValid"
-          data-test="apply-btn"
-        >
-          {{ t('common.apply') }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 
@@ -179,7 +156,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { date } from 'quasar';
-import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { X, RotateCcw } from 'lucide-vue-next';
 

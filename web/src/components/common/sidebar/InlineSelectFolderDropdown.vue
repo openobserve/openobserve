@@ -43,6 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showDialog"
       :width="30"
       :show-close="false"
+      secondary-button-label="Cancel"
+      primary-button-label="Save"
+      @click:secondary="showDialog = false"
+      @click:primary="addFolderRef?.submit()"
     >
       <AddFolder
         ref="addFolderRef"
@@ -51,12 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:modelValue="onFolderAdded"
         @close="showDialog = false"
       />
-      <template #footer>
-        <div class="tw:flex tw:justify-start tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showDialog = false" data-test="dashboard-folder-add-cancel">Cancel</OButton>
-          <OButton variant="primary" size="sm-action" data-test="dashboard-folder-add-save" @click="addFolderRef?.submit()">Save</OButton>
-        </div>
-      </template>
     </ODrawer>
   </div>
 </template>

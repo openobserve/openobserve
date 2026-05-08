@@ -214,42 +214,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </ODrawer>
 
-    <ODialog v-model:open="confirmDelete" size="xs" :title="t('user.confirmDeleteHead')">
+    <ODialog
+      v-model:open="confirmDelete"
+      size="xs"
+      :title="t('user.confirmDeleteHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmDelete = false"
+      @click:primary="deleteUser"
+    >
       <p>{{ t('user.confirmDeleteMsg') }}</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmDelete = false">
-            {{ t('user.cancel') }}
-          </OButton>
-          <OButton variant="primary" size="sm-action" @click="deleteUser">
-            {{ t('user.ok') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
-    <ODialog v-model:open="confirmRevoke" size="xs" title="Revoke Invitation">
+    <ODialog
+      v-model:open="confirmRevoke"
+      size="xs"
+      title="Revoke Invitation"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmRevoke = false"
+      @click:primary="revokeInvite"
+    >
       <p>Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmRevoke = false">
-            {{ t('user.cancel') }}
-          </OButton>
-          <OButton variant="primary" size="sm-action" @click="revokeInvite">
-            {{ t('user.ok') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
-    <ODialog v-model:open="confirmBulkDelete" size="xs" title="Delete Users">
+    <ODialog
+      v-model:open="confirmBulkDelete"
+      size="xs"
+      title="Delete Users"
+      secondary-button-label="Cancel"
+      primary-button-label="OK"
+      @click:secondary="confirmBulkDelete = false"
+      @click:primary="bulkDeleteUsers"
+    >
       <p>Are you sure you want to delete {{ selectedUsers.length }} user(s)?</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmBulkDelete = false">Cancel</OButton>
-          <OButton variant="primary" size="sm-action" @click="bulkDeleteUsers">OK</OButton>
-        </div>
-      </template>
     </ODialog>
   </q-page>
 </template>

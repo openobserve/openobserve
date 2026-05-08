@@ -18,11 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="show"
     :width="55"
+    title="Backfill Job Details"
     data-test="backfill-job-details-dialog"
   >
-    <template #header>
-      <div class="text-h6" data-test="dialog-title">Backfill Job Details</div>
-    </template>
 
     <div v-if="loading" class="flex justify-center q-pa-lg">
       <q-spinner color="primary" size="50px" />

@@ -67,12 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useLoading } from "@/composables/useLoading";
   import useNotifications from "@/composables/useNotifications";
   import SelectFolderDropDown from "./SelectFolderDropDown.vue";
-  import OButton from "@/lib/core/Button/OButton.vue";
   import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
   export default defineComponent({
     name: "MoveAcrossFolders",
-    components: { SelectFolderDropDown, OButton, ODrawer },
+    components: { SelectFolderDropDown, ODrawer },
     props: {
       activeFolderId: {
         type: String,

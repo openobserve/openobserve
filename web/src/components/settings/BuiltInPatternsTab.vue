@@ -164,7 +164,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Preview Dialog -->
-    <ODialog v-model:open="showPreview" size="md" :title="previewedPattern?.name" data-test="pattern-preview-dialog">
+    <ODialog
+      v-model:open="showPreview"
+      size="md"
+      :title="previewedPattern?.name"
+      data-test="pattern-preview-dialog"
+      :secondary-button-label="t('regex_patterns.close')"
+      :primary-button-label="t('regex_patterns.import_this_pattern')"
+      @click:secondary="showPreview = false"
+      @click:primary="importSinglePattern"
+    >
       <div style="max-height: 60vh; overflow-y: auto">
         <div class="q-mb-md">
           <div class="text-weight-bold q-mb-xs">
@@ -226,21 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-list>
         </div>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showPreview = false">
-            {{ t('regex_patterns.close') }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="importSinglePattern"
-            data-test="import-single-pattern-btn"
-          >
-            {{ t('regex_patterns.import_this_pattern') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
   </div>
 </template>

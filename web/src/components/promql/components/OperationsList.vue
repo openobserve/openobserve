@@ -149,7 +149,10 @@
     </div>
 
     <!-- Operation Selector Dialog -->
-    <ODialog v-model:open="showOperationSelector" size="sm" title="Add Operation">
+    <ODialog v-model:open="showOperationSelector" size="sm" title="Add Operation"
+      primary-button-label="Close"
+      @click:primary="showOperationSelector = false"
+    >
       <q-input
         v-model="searchQuery"
         dense
@@ -189,14 +192,7 @@
           </template>
         </q-list>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end">
-          <OButton variant="outline" size="sm-action" @click="showOperationSelector = false">
-            Close
-          </OButton>
-        </div>
-      </template>
-    </ODialog>
+    </ODialog>>
   </div>
 </template>
 

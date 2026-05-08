@@ -420,17 +420,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       size="lg"
+      :title="selectedService?.service_name"
       data-test="service-side-panel"
     >
-      <template #header>
-        <div
-          class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:flex-1 tw:min-w-0"
-        >
-          <span class="panel-service-name">{{
-            selectedService?.service_name
-          }}</span>
-          <span class="set-id-badge">{{ selectedService?.set_id }}</span>
-        </div>
+      <template #header-right>
+        <span class="set-id-badge">{{ selectedService?.set_id }}</span>
       </template>
 
       <!-- Default set warning banner -->

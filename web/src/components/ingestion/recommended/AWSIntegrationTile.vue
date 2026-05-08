@@ -76,7 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card-actions>
 
     <!-- Unified Integration Method Selection Dialog -->
-    <ODialog v-model:open="showTemplateDialog" size="sm" title="Choose Integration Method">
+    <ODialog v-model:open="showTemplateDialog" size="sm" title="Choose Integration Method"
+      secondary-button-label="Cancel"
+      @click:secondary="showTemplateDialog = false"
+    >
       <div class="text-subtitle2 q-mb-md">
         Select how you want to integrate {{ integration.displayName }}:
       </div>
@@ -127,11 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </q-list>
-      <template #footer>
-        <div class="tw:flex tw:justify-end">
-          <OButton variant="outline" size="sm-action" @click="showTemplateDialog = false">Cancel</OButton>
-        </div>
-      </template>
     </ODialog>
 
     <!-- Component Display Dialog -->
