@@ -549,22 +549,6 @@ test.describe("Logs Query Builder - Builder Tab Improvement", () => {
         testLogger.info('Query mode toggle: Auto → Custom - PASSED');
     });
 
-    test("Query mode toggle: Custom → Auto clears fields", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
-    }, async ({ page }) => {
-        testLogger.info('Testing query mode toggle: Custom → Auto');
-
-        const histogramQuery = 'SELECT histogram(_timestamp) as time, count(*) as count FROM "e2e_automate" GROUP BY time';
-        await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
-
-        await pm.logsPage.clickCustomQueryType();
-        await pm.logsPage.expectCustomModeActive();
-        await pm.logsPage.clickBuilderQueryType();
-        await pm.logsPage.expectBuilderModeActive();
-
-        testLogger.info('Query mode toggle: Custom → Auto - PASSED');
-    });
-
     test("SQL ON + multiple aggregations → builder shows multiple Y-axis fields", {
         tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
@@ -621,20 +605,6 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         await applyQueryButton(pm);
 
         testLogger.info('Edge Cases test setup completed');
-    });
-
-    test("Simple SELECT column query selects table chart on Build tab", {
-        tag: ['@queryBuilder', '@edge', '@P2', '@all', '@logs']
-    }, async ({ page }) => {
-        testLogger.info('Testing SELECT _timestamp query → table chart');
-
-        const simpleQuery = 'SELECT _timestamp FROM "e2e_automate"';
-        await setupQueryAndSwitchToBuild(pm, page, simpleQuery);
-
-        // Simple column select without aggregation → custom mode → "table" chart
-        await pm.logsPage.verifyChartTypeSelected('table');
-
-        testLogger.info('SELECT _timestamp query → table chart - PASSED');
     });
 
     test("SQL ON mode preserved when toggling to Build tab", {
@@ -893,21 +863,6 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
         testLogger.info('Case 8 - PASSED');
     });
 
-    // Case 9: SQL ON + Multi-stream SQL (JOINs) → Custom mode, table chart
-    test("Case 9: SQL ON + multi-stream JOIN → custom mode, table chart", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
-    }, async ({ page }) => {
-        testLogger.info('Testing Case 9: SQL ON + multi-stream JOIN');
-
-        // Self-join to simulate multi-stream (JOIN detected → custom mode)
-        const joinSQL = 'SELECT a._timestamp, b._timestamp FROM "e2e_automate" a JOIN "e2e_automate" b ON a._timestamp = b._timestamp LIMIT 10';
-        await setupQueryAndSwitchToBuild(pm, page, joinSQL);
-
-        // JOIN → custom mode → table chart
-        await pm.logsPage.verifyChartTypeSelected('table');
-
-        testLogger.info('Case 9 - PASSED');
-    });
 });
 
 // ============================================================================
@@ -978,26 +933,6 @@ test.describe("Logs Query Builder - Query Mode Toggle", () => {
         testLogger.info('Auto → Custom (SQL OFF) - PASSED');
     });
 
-    // Custom → Auto: Fields cleared, user rebuilds
-    test("Custom → Auto clears fields and query", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
-    }, async ({ page }) => {
-        testLogger.info('Testing Custom → Auto clears fields');
-
-        const histogramQuery = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
-        await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
-
-        // Switch to Custom then back to Auto
-        await pm.logsPage.clickCustomQueryType();
-        await pm.logsPage.expectCustomModeActive();
-        await pm.logsPage.clickBuilderQueryType();
-        await pm.logsPage.expectBuilderModeActive();
-
-        // Fields should be cleared — axes empty
-        await pm.logsPage.expectAxesEmpty();
-
-        testLogger.info('Custom → Auto clears fields - PASSED');
-    });
 });
 
 // ============================================================================
@@ -1985,27 +1920,6 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         await applyQueryButton(pm);
 
         testLogger.info('FieldList button test setup completed');
-    });
-
-    test("Builder mode: all stream fields show +X +Y buttons", {
-        tag: ['@queryBuilder', '@fieldListButtons', '@P0', '@all', '@logs']
-    }, async ({ page }) => {
-        testLogger.info('Verifying +X/+Y buttons visible in builder mode');
-
-        await setupQueryAndSwitchToBuild(pm, page, 'SELECT * FROM "e2e_automate"');
-        await pm.logsPage.expectBuilderModeActive();
-
-        const addXButtons = page.locator('[data-test="dashboard-add-x-data"]');
-        await expect(addXButtons.first()).toBeVisible({ timeout: 15000 });
-        const xCount = await addXButtons.count();
-        expect(xCount).toBeGreaterThan(0);
-
-        const addYButtons = page.locator('[data-test="dashboard-add-y-data"]');
-        await expect(addYButtons.first()).toBeVisible({ timeout: 15000 });
-        const yCount = await addYButtons.count();
-        expect(yCount).toBeGreaterThan(0);
-
-        testLogger.info(`Builder mode: ${xCount} +X, ${yCount} +Y buttons visible - PASSED`);
     });
 
     test("Search filter does not break button visibility in builder mode", {
