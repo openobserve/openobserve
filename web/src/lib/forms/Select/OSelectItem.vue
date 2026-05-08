@@ -2,28 +2,40 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SelectItemProps, SelectItemSlots } from "./OSelect.types";
+import { SELECT_VALUE_MAP_KEY } from "./OSelect.types";
 import { SelectItem, SelectItemText, SelectItemIndicator } from "reka-ui";
+import { inject, onMounted, onUnmounted } from "vue";
 
-withDefaults(defineProps<SelectItemProps>(), {
+const props = withDefaults(defineProps<SelectItemProps>(), {
   disabled: false,
 });
 
 defineSlots<SelectItemSlots>();
+
+// Register original value type into the parent OSelect's value map so that
+// numeric (or boolean) values are recovered when Reka UI returns a string.
+const valueMap = inject(SELECT_VALUE_MAP_KEY, null);
+onMounted(() => {
+  valueMap?.set(String(props.value), props.value);
+});
+onUnmounted(() => {
+  valueMap?.delete(String(props.value));
+});
 </script>
 
 <template>
   <SelectItem
-    :value="String(value)"
-    :disabled="disabled"
+    :value="String(props.value)"
+    :disabled="props.disabled"
     :class="[
       'tw:relative tw:flex tw:items-center tw:w-full',
       'tw:ps-8 tw:pe-3 tw:py-1.5 tw:text-sm',
       'tw:text-select-item-text tw:rounded-sm',
       'tw:cursor-pointer tw:select-none tw:outline-none',
       'tw:transition-colors tw:duration-100',
-      'tw:data-[highlighted]:bg-select-item-hover-bg',
+      'tw:data-highlighted:bg-select-item-hover-bg',
       'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
-      'tw:data-[disabled]:text-select-item-disabled tw:data-[disabled]:cursor-not-allowed tw:data-[disabled]:pointer-events-none',
+      'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
     ]"
   >
     <!-- Check indicator -->
@@ -46,7 +58,7 @@ defineSlots<SelectItemSlots>();
     </SelectItemIndicator>
 
     <SelectItemText>
-      <slot>{{ label }}</slot>
+      <slot>{{ props.label }}</slot>
     </SelectItemText>
   </SelectItem>
 </template>

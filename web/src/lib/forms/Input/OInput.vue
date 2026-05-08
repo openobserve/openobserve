@@ -39,7 +39,10 @@ const ruleError = ref<string | null>(null);
 const touched = ref(false);
 
 function runRules(val: string | number | undefined): void {
-  if (!props.rules?.length) return;
+  if (!props.rules?.length) {
+    ruleError.value = null;
+    return;
+  }
   for (const rule of props.rules) {
     const result = rule(val);
     if (result !== true) {
@@ -53,7 +56,18 @@ function runRules(val: string | number | undefined): void {
 function handleBlur(event: FocusEvent) {
   if (!touched.value) {
     touched.value = true;
-    runRules(props.modelValue);
+    // If a debounce timer is pending the model hasn't been updated yet —
+    // flush it synchronously so runRules validates the actual current value.
+    if (debounceTimer.value) {
+      clearTimeout(debounceTimer.value);
+      debounceTimer.value = null;
+      const el = inputRef.value;
+      const currentVal = el ? normalizeByModifiers(el.value) : props.modelValue;
+      emit("update:modelValue", currentVal ?? "");
+      runRules(currentVal);
+    } else {
+      runRules(props.modelValue);
+    }
   }
   emit("blur", event);
 }
