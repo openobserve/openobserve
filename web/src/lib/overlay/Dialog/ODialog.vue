@@ -82,11 +82,15 @@ function handleInteractOutside(e: Event) {
   }
 }
 
-// Header renders when there is a header slot, a title, OR a visible close button.
+// Header renders when there is a header slot, a title, any sub-slot, OR a visible close button.
 // This ensures the × always appears even in component-wrapper dialogs with no title.
 const hasHeader = computed(
   () =>
-    !!slots.header || !!props.title || (!props.persistent && props.showClose),
+    !!slots.header ||
+    !!slots["header-left"] ||
+    !!slots["header-right"] ||
+    !!props.title ||
+    (!props.persistent && props.showClose),
 );
 const hasFooter = computed(
   () =>
@@ -224,16 +228,15 @@ const contentStyle = computed(() =>
             !isFullSize && 'tw:rounded-t-xl',
           ]"
         >
-          <!--
-            Content wrapper: flex-1 + min-w-0 ensures the title/slot fills
-            available space and can truncate, keeping the close button always visible
-            at the right edge regardless of header slot complexity.
-          -->
-          <div class="tw:flex-1 tw:min-w-0">
-            <!-- Custom header slot takes the full available width -->
-            <slot v-if="slots.header" name="header" />
-            <!-- Plain title prop — use span to avoid browser h2/heading default styles -->
-            <template v-else-if="title || subTitle">
+          <!-- CASE 1: Full override — backward compat, sub-slots are ignored -->
+          <div v-if="slots.header" class="tw:flex-1 tw:min-w-0">
+            <slot name="header" />
+          </div>
+
+          <!-- CASE 2: Default / structured layout -->
+          <template v-else>
+            <!-- Title + subtitle block — fixed width, never grows -->
+            <div v-if="title || subTitle" class="tw:shrink-0 tw:min-w-0">
               <span
                 v-if="title"
                 class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
@@ -246,8 +249,21 @@ const contentStyle = computed(() =>
               >
                 {{ subTitle }}
               </span>
-            </template>
-          </div>
+            </div>
+
+            <!-- #header-left sub-slot — grows to fill space if present -->
+            <div v-if="slots['header-left']" class="tw:flex-1 tw:min-w-0">
+              <slot name="header-left" />
+            </div>
+
+            <!-- #header-right sub-slot — grows to fill space if present -->
+            <div v-if="slots['header-right']" class="tw:flex-1 tw:min-w-0">
+              <slot name="header-right" />
+            </div>
+
+            <!-- Spacer — when no sub-slots, push close button to right edge (preserves current layout) -->
+            <div v-if="!slots['header-left'] && !slots['header-right']" class="tw:flex-1" />
+          </template>
 
           <!-- Close button — shrink-0 so it is never squeezed out by header content -->
           <DialogClose v-if="!persistent && showClose" as-child>
