@@ -311,13 +311,12 @@ class="q-mr-xs" />
         />
         <OTab
           name="error"
-          :label="t('common.error')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-exceptions"
                     class="tw:font-normal!"
 
         >
-          <span>Error</span>
+          {{ t('common.error') }}
           <q-badge
             v-if="hasExceptionEvents.length"
             class="tw:font-normal! q-ml-xs tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]!"
