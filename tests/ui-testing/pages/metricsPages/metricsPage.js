@@ -1775,6 +1775,7 @@ export class MetricsPage {
     async getErrorIndicators() {
         // Return the first visible error indicator
         const errorSelectors = [
+            '[data-test="dashboard-error"]',
             '.q-notification--negative',
             '.q-notification.bg-negative',
             '.q-banner--negative',
@@ -1791,7 +1792,7 @@ export class MetricsPage {
                 return element;
             }
         }
-        return this.page.locator('.q-notification--negative, .q-notification__message').first();
+        return this.page.locator('[data-test="dashboard-error"], .q-notification--negative, .q-notification__message').first();
     }
 
     // SQL mode methods
