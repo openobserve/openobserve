@@ -1532,13 +1532,18 @@ export default defineComponent({
       () => hoveredSpanId.value || selectedSpanId.value,
     );
 
-    // Only set the default sidebar tab on the first span selection,
-    // not on subsequent clicks — preserves the user's tab choice.
+    // Set the default sidebar tab on the first span selection,
+    // and re-evaluate when the current tab no longer exists for the new span
+    // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
-      if (newSpanId && !oldSpanId && spanMap.value[newSpanId]) {
-        sidebarActiveTab.value = isLLMTrace(spanMap.value[newSpanId])
-          ? "preview"
-          : "attributes";
+      if (newSpanId && spanMap.value[newSpanId]) {
+        const isLLM = isLLMTrace(spanMap.value[newSpanId]);
+        if (
+          !oldSpanId ||
+          (sidebarActiveTab.value === "preview" && !isLLM)
+        ) {
+          sidebarActiveTab.value = isLLM ? "preview" : "attributes";
+        }
       }
     });
 
