@@ -655,23 +655,24 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         testLogger.info('Case 7: >2 GROUP BY → table chart - PASSED');
     });
 
-    // Case 9: Multi-stream SQL (JOINs) → Custom mode, table chart
-    // Note: Requires a second stream. If e2e_automate is the only stream,
-    // the JOIN will fail but the builder should still enter custom mode.
-    test("Case 9: SQL ON + multi-stream JOIN → custom mode, table chart", {
+    // Case 9: Multi-stream SQL (JOINs) → Builder mode with bar chart
+    // Note: The builder now parses JOIN queries into builder mode
+    // with the join represented in the Joins row.
+    test("Case 9: SQL ON + multi-stream JOIN → builder mode, bar chart", {
         tag: ['@queryBuilder', '@edge', '@P2', '@all', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Testing Case 9: multi-stream JOIN → custom mode → table');
+        testLogger.info('Testing Case 9: multi-stream JOIN → builder mode → bar');
 
-        // Multi-stream JOIN query — even if the second stream doesn't exist,
-        // the query parser should detect JOIN and enter custom mode
+        // Multi-stream JOIN query — the builder should parse the JOIN
+        // and enter builder mode with the join represented in the Joins row
         const joinQuery = 'SELECT a._timestamp, b._timestamp FROM "e2e_automate" a JOIN "e2e_automate" b ON a._timestamp = b._timestamp LIMIT 10';
         await setupQueryAndSwitchToBuild(pm, page, joinQuery);
 
-        // Multi-stream JOIN → custom mode → "table" chart
-        await pm.logsPage.verifyChartTypeSelected('table');
+        // Multi-stream JOIN → should enter builder mode with bar chart
+        await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.verifyChartTypeSelected('bar');
 
-        testLogger.info('Case 9: multi-stream JOIN → table chart - PASSED');
+        testLogger.info('Case 9: multi-stream JOIN → builder mode, bar chart - PASSED');
     });
 });
 
@@ -1931,7 +1932,7 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         await pm.logsPage.expectBuilderModeActive();
 
         // Type a search term in the field filter
-        const searchInput = page.locator('[data-test="index-field-search-input"]');
+        const searchInput = page.locator('[data-test="index-field-search-input"]:visible').first();
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
         await searchInput.fill('kubernetes');
         await page.waitForTimeout(500);
@@ -1961,7 +1962,7 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         await page.waitForTimeout(1000);
 
         // Search for a field
-        const searchInput = page.locator('[data-test="index-field-search-input"]');
+        const searchInput = page.locator('[data-test="index-field-search-input"]:visible').first();
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
         await searchInput.fill('kubernetes');
         await page.waitForTimeout(500);
