@@ -57,6 +57,16 @@ const useEnterpriseRoutes = () => {
           name: "users",
           meta: {
             title: "Users",
+            titleKey: "menu.user",
+            searchable: true,
+            icon: "group",
+            section: "Management",
+            keywords: [
+              "user management",
+              "team members",
+              "roles",
+              "permissions",
+            ],
           },
           component: Users,
           beforeEnter(to: any, from: any, next: any) {
@@ -68,13 +78,23 @@ const useEnterpriseRoutes = () => {
           name: "serviceAccounts",
           meta: {
             title: "Service Accounts",
+            searchable: true,
+            icon: "manage_accounts",
+            section: "Management",
+            keywords: [
+              "API keys",
+              "service accounts",
+              "programmatic access",
+              "tokens",
+            ],
           },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
             // Check if service accounts are enabled
             // Note: Using window.store here because useStore() doesn't work in route guards
             const store = (window as any).store;
-            const serviceAccountEnabled = store?.state?.zoConfig?.service_account_enabled ?? true;
+            const serviceAccountEnabled =
+              store?.state?.zoConfig?.service_account_enabled ?? true;
 
             if (!serviceAccountEnabled) {
               // Redirect to users page if service accounts are disabled
@@ -90,6 +110,10 @@ const useEnterpriseRoutes = () => {
           name: "organizations",
           meta: {
             title: "Organizations",
+            searchable: true,
+            icon: "corporate_fare",
+            section: "Management",
+            keywords: ["organization management", "switch org", "tenants"],
           },
           component: Organizations,
           beforeEnter(to: any, from: any, next: any) {
@@ -110,6 +134,11 @@ const useEnterpriseRoutes = () => {
         component: IncidentList,
         meta: {
           title: "Incidents",
+          titleKey: "menu.incidents",
+          searchable: true,
+          icon: "emergency",
+          section: "Observability",
+          keywords: ["incident management", "on-call", "outage", "SLO breach"],
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -132,6 +161,19 @@ const useEnterpriseRoutes = () => {
       path: "actions",
       name: "actionScripts",
       component: ActionScripts,
+      meta: {
+        title: "Action Scripts",
+        titleKey: "menu.actions",
+        searchable: true,
+        icon: "code",
+        section: "Management",
+        keywords: [
+          "automation",
+          "runbooks",
+          "remediation scripts",
+          "alert actions",
+        ],
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -143,6 +185,15 @@ const useEnterpriseRoutes = () => {
           name: "groups",
           meta: {
             title: "Groups",
+            searchable: true,
+            icon: "group_work",
+            section: "Management",
+            keywords: [
+              "user groups",
+              "RBAC groups",
+              "access groups",
+              "group permissions",
+            ],
           },
           component: AppGroups,
           beforeEnter(to: any, from: any, next: any) {
@@ -165,6 +216,15 @@ const useEnterpriseRoutes = () => {
           name: "roles",
           meta: {
             title: "Roles",
+            searchable: true,
+            icon: "admin_panel_settings",
+            section: "Management",
+            keywords: [
+              "RBAC roles",
+              "role-based access",
+              "permissions",
+              "access control",
+            ],
           },
           component: AppRoles,
           beforeEnter(to: any, from: any, next: any) {
@@ -186,6 +246,18 @@ const useEnterpriseRoutes = () => {
           path: "quota",
           name: "quota",
           component: Quota,
+          meta: {
+            title: "Quota",
+            searchable: true,
+            icon: "data_usage",
+            section: "Management",
+            keywords: [
+              "usage quota",
+              "ingestion limits",
+              "storage limits",
+              "rate limits",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

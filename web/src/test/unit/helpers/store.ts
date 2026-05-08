@@ -133,7 +133,6 @@ const store = createStore({
       isDataIngested: false,
       allDashboardData: {},
       foldersByType: [],
-      allReportsListByFolderId: {},
     },
     alertListFilters: {
       searchQuery: "",
@@ -193,9 +192,6 @@ const store = createStore({
     },
     setAllAlertsListByFolderId(state, payload) {
       state.organizationData.allAlertsListByFolderId = payload;
-    },
-    setAllReportsListByFolderId(state, payload) {
-      state.organizationData.allReportsListByFolderId = payload;
     },
     setAllAlertsListByNames(state, payload) {
       state.organizationData.allAlertsListByNames = payload;
@@ -315,6 +311,33 @@ const store = createStore({
         },
       },
     },
+    commandPalette: {
+      namespaced: true,
+      state: {
+        isOpen: false,
+      },
+      getters: {
+        isOpen(state: any) {
+          return state.isOpen;
+        },
+      },
+      mutations: {
+        open(state: any) {
+          state.isOpen = true;
+        },
+        close(state: any) {
+          state.isOpen = false;
+        },
+      },
+      actions: {
+        open(context: any) {
+          context.commit("open");
+        },
+        close(context: any) {
+          context.commit("close");
+        },
+      },
+    },
     incidents: {
       namespaced: true,
       state: {
@@ -413,9 +436,6 @@ const store = createStore({
     },
     setAllAlertsListByFolderId(context, payload) {
       context.commit("setAllAlertsListByFolderId", payload);
-    },
-    setAllReportsListByFolderId(context, payload) {
-      context.commit("setAllReportsListByFolderId", payload);
     },
     setAllAlertsListByNames(context, payload) {
       context.commit("setAllAlertsListByNames", payload);
