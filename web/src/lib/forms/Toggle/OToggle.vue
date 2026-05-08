@@ -48,13 +48,25 @@ const labelSize: Record<NonNullable<ToggleProps["size"]>, string> = {
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
+const effectiveLabelPlacement = computed(() =>
+  props.leftLabel ? "start" : props.labelPlacement,
+);
+const thumbIcon = computed(() => {
+  if (props.modelValue) {
+    return props.checkedIcon ?? props.icon;
+  }
+  return props.uncheckedIcon ?? props.icon;
+});
 </script>
 
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-2',
-      labelPlacement === 'start' ? 'tw:flex-row-reverse' : 'tw:flex-row',
+      'tw:inline-flex tw:items-center',
+      dense ? 'tw:gap-1' : 'tw:gap-2',
+      effectiveLabelPlacement === 'start'
+        ? 'tw:flex-row-reverse'
+        : 'tw:flex-row',
       disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
     :for="id"
@@ -74,8 +86,8 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
         'tw:bg-switch-track-off',
         'tw:data-[state=checked]:bg-switch-track-on',
         // Disabled
-        'tw:data-[disabled]:bg-switch-disabled-track-off',
-        'tw:data-[state=checked]:data-[disabled]:bg-switch-disabled-track-on',
+        'tw:data-disabled:bg-switch-disabled-track-off',
+        'tw:data-[state=checked]:data-disabled:bg-switch-disabled-track-on',
         // Focus
         'tw:outline-none',
         'tw:focus-visible:ring-2 tw:focus-visible:ring-switch-focus-ring',
@@ -91,13 +103,21 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
           // Sizing
           currentSizes.thumb,
           // Disabled thumb
-          'tw:data-[disabled]:bg-switch-disabled-thumb',
+          'tw:data-disabled:bg-switch-disabled-thumb',
           // Animate between positions
           'tw:transition-transform tw:duration-200',
           'tw:translate-x-0',
           currentSizes.thumbTranslate,
         ]"
-      />
+      >
+        <span
+          v-if="thumbIcon"
+          class="tw:text-[0.5rem] tw:leading-none tw:text-switch-label"
+          aria-hidden="true"
+        >
+          {{ thumbIcon }}
+        </span>
+      </SwitchThumb>
     </SwitchRoot>
 
     <span

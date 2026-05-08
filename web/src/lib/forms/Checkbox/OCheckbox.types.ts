@@ -2,21 +2,41 @@
 
 import type { InjectionKey } from "vue";
 
-export type CheckboxSize = "sm" | "md";
+export type CheckboxSize = "xs" | "sm" | "md";
+export type CheckboxPrimitive = string | number | boolean;
+export type CheckboxModelValue =
+  | boolean
+  | "indeterminate"
+  | CheckboxPrimitive
+  | CheckboxPrimitive[];
 
 export interface CheckboxProps {
   /** Current checked state. Use `true`, `false`, or `'indeterminate'` */
-  modelValue?: boolean | "indeterminate";
+  modelValue?: CheckboxModelValue;
   /**
    * Value used when this checkbox is a member of an OCheckboxGroup.
    * When set and a group context is present, modelValue is ignored in favour
    * of the group's checked-values array.
    */
-  value?: string | number | boolean;
+  value?: CheckboxPrimitive;
+  /** q-checkbox compatibility alias for `value` */
+  val?: CheckboxPrimitive;
   /** Accessible label rendered next to the checkbox */
   label?: string;
   /** Control size */
   size?: CheckboxSize;
+  /** q-checkbox compatibility for tighter spacing */
+  dense?: boolean;
+  /** q-checkbox compatibility prop; color token selection is handled internally */
+  color?: string;
+  /** q-checkbox compatibility prop; kept for migration parity */
+  keepColor?: boolean;
+  /** Value to emit when checked in custom-value mode */
+  trueValue?: CheckboxPrimitive;
+  /** Value to emit when unchecked in custom-value mode */
+  falseValue?: CheckboxPrimitive;
+  /** Value to emit in indeterminate state in custom-value mode */
+  indeterminateValue?: CheckboxPrimitive;
   /** Prevents interaction */
   disabled?: boolean;
   /** HTML id — forwarded to the native input for external label association */
@@ -26,9 +46,9 @@ export interface CheckboxProps {
 }
 
 export interface CheckboxEmits {
-  (_e: "update:modelValue", _value: boolean | "indeterminate"): void;
+  (_e: "update:modelValue", _value: CheckboxModelValue): void;
   /** Fired when the checkbox is inside a group — emits the item value */
-  (_e: "change", _value: boolean | "indeterminate"): void;
+  (_e: "change", _value: CheckboxModelValue): void;
 }
 
 export interface CheckboxSlots {
@@ -39,13 +59,13 @@ export interface CheckboxSlots {
 // ── Group ──────────────────────────────────────────────────────────────────
 
 /** Values checked in the group */
-export type CheckboxGroupValue = Array<string | number | boolean>;
+export type CheckboxGroupValue = Array<CheckboxPrimitive>;
 
 export interface CheckboxGroupContext {
   modelValue: CheckboxGroupValue;
   disabled: boolean;
-  toggle(_value: string | number | boolean): void;
-  isChecked(_value: string | number | boolean): boolean;
+  toggle(_value: CheckboxPrimitive): void;
+  isChecked(_value: CheckboxPrimitive): boolean;
 }
 
 export const CHECKBOX_GROUP_KEY: InjectionKey<CheckboxGroupContext> =

@@ -2,15 +2,15 @@
 
 import type { InjectionKey } from "vue";
 
-export type RadioSize = "sm" | "md";
+export type RadioSize = "xs" | "sm" | "md";
+export type RadioValue = string | number | boolean;
 
-export const RADIO_VALUE_MAP_KEY: InjectionKey<
-  Map<string, string | number | boolean>
-> = Symbol("RadioValueMap");
+export const RADIO_VALUE_MAP_KEY: InjectionKey<Map<string, RadioValue>> =
+  Symbol("RadioValueMap");
 
 export interface RadioGroupProps {
   /** Currently selected value */
-  modelValue?: string | number | boolean;
+  modelValue?: RadioValue;
   /** Accessible name for the group — rendered as a visually-hidden legend */
   label?: string;
   /** Disables all radio buttons in the group */
@@ -22,7 +22,7 @@ export interface RadioGroupProps {
 }
 
 export interface RadioGroupEmits {
-  (_e: "update:modelValue", _value: string | number | boolean): void;
+  (_e: "update:modelValue", _value: RadioValue): void;
 }
 
 export interface RadioGroupSlots {
@@ -37,11 +37,17 @@ export interface RadioProps {
    * The value this radio represents.
    * Compared against ORadioGroup's modelValue to determine checked state.
    */
-  value: string | number | boolean;
+  value?: RadioValue;
+  /** q-radio compatibility alias for `value` */
+  val?: RadioValue;
   /** Accessible label */
   label?: string;
   /** Control size */
   size?: RadioSize;
+  /** q-radio compatibility for tighter spacing */
+  dense?: boolean;
+  /** q-radio compatibility prop; visual tokens are handled internally */
+  color?: string;
   /** Prevents interaction */
   disabled?: boolean;
   /** HTML id — forwarded for label association */

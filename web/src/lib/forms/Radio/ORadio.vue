@@ -13,7 +13,7 @@
 import type { RadioProps, RadioSlots } from "./ORadio.types";
 import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupItem, RadioGroupIndicator } from "reka-ui";
-import { inject, watchEffect } from "vue";
+import { computed, inject, watchEffect } from "vue";
 
 withDefaults(defineProps<RadioProps>(), {
   size: "md",
@@ -23,31 +23,40 @@ withDefaults(defineProps<RadioProps>(), {
 defineSlots<RadioSlots>();
 
 const valueMap = inject(RADIO_VALUE_MAP_KEY, null);
+const resolvedValue = computed(() => value ?? val);
 
 watchEffect(() => {
-  valueMap?.set(String(value), value);
+  if (resolvedValue.value !== undefined) {
+    valueMap?.set(String(resolvedValue.value), resolvedValue.value);
+  }
 });
 
-const circleSize: Record<NonNullable<RadioProps["size"]>, string> = {
+const circleSize: Record<"xs" | "sm" | "md", string> = {
+  xs: "tw:size-3",
   sm: "tw:size-3.5",
   md: "tw:size-4",
 };
 
-const dotSize: Record<NonNullable<RadioProps["size"]>, string> = {
+const dotSize: Record<"xs" | "sm" | "md", string> = {
+  xs: "tw:size-1",
   sm: "tw:size-1.5",
   md: "tw:size-2",
 };
 
-const labelSize: Record<NonNullable<RadioProps["size"]>, string> = {
+const labelSize: Record<"xs" | "sm" | "md", string> = {
+  xs: "tw:text-xs",
   sm: "tw:text-xs",
   md: "tw:text-sm",
 };
+
+const resolvedSize = computed(() => (size ?? "md") as "xs" | "sm" | "md");
 </script>
 
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-2',
+      'tw:inline-flex tw:items-center',
+      dense ? 'tw:gap-1' : 'tw:gap-2',
       disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
     :for="id"
@@ -59,24 +68,25 @@ const labelSize: Record<NonNullable<RadioProps["size"]>, string> = {
     -->
     <RadioGroupItem
       :id="id"
-      :value="String(value)"
+      :value="String(resolvedValue ?? '')"
       :disabled="disabled"
       :class="[
         'tw:shrink-0 tw:rounded-full tw:border tw:flex tw:items-center tw:justify-center',
         'tw:transition-colors tw:duration-150',
         'tw:outline-none',
         'tw:focus-visible:ring-2 tw:focus-visible:ring-radio-focus-ring',
-        circleSize[size ?? 'md'],
+        circleSize[resolvedSize],
         'tw:bg-radio-bg tw:border-radio-border',
         'tw:enabled:hover:border-radio-hover-border',
         'tw:data-[state=checked]:border-radio-checked-border',
-        'tw:data-[disabled]:bg-radio-disabled-bg tw:data-[disabled]:border-radio-disabled-border',
+        'tw:data-disabled:bg-radio-disabled-bg',
+        'tw:data-disabled:border-radio-disabled-border',
       ]"
     >
       <RadioGroupIndicator
         :class="[
           'tw:rounded-full tw:bg-radio-checked-dot',
-          dotSize[size ?? 'md'],
+          dotSize[resolvedSize],
         ]"
       />
     </RadioGroupItem>
@@ -85,7 +95,7 @@ const labelSize: Record<NonNullable<RadioProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        labelSize[size ?? 'md'],
+        labelSize[resolvedSize],
         'tw:select-none tw:leading-none',
         disabled ? 'tw:text-radio-label-disabled' : 'tw:text-radio-label',
       ]"
