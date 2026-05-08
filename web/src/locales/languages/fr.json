@@ -123,7 +123,9 @@
     "version": "Version",
     "create": "Créez",
     "resources": "Ressources",
-    "updated_at": "Mis à jour à"
+    "updated_at": "Mis à jour à",
+    "discardChanges": "Ignorer les modifications",
+    "unsavedChanges": "Modifications non enregistrées"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",

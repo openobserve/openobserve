@@ -123,7 +123,9 @@
     "version": "版本",
     "create": "创建",
     "resources": "资源",
-    "updated_at": "更新于"
+    "updated_at": "更新于",
+    "discardChanges": "放弃更改",
+    "unsavedChanges": "未保存的更改"
   },
   "search": {
     "selectIndex": "选择数据流",
