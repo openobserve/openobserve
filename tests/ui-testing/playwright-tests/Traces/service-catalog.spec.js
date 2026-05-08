@@ -1,80 +1,18 @@
 // service-catalog.spec.js
 // E2E tests for the Service Catalog feature in Traces module
 // Tests table rendering, filtering, sorting, pagination, status pills, side panel, and edge cases
+// Uses existing default stream data (no beforeAll ingestion) — like other trace test files
 
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const {
-  generateFullTopology,
-  waitForServiceGraphData,
-} = require('../utils/service-graph-ingestion.js');
-const { getAuthHeaders } = require('../utils/cloud-auth.js');
-
-// Fixed test stream name to isolate from default stream data.
-// Must be deterministic so parallel workers all use the same stream.
-const TEST_STREAM = 'e2e-service-catalog';
 
 test.describe("Service Catalog testcases", () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
 
   // =========================================================================
-  // beforeAll — Ingest traces to a unique stream, wait for daemon
-  // =========================================================================
-  test.beforeAll(async ({ browser }) => {
-    testLogger.info('=== SERVICE CATALOG SETUP: Ingesting trace data ===');
-    testLogger.info(`Test stream: ${TEST_STREAM}`);
-    const context = await browser.newContext({
-      storageState: 'playwright-tests/utils/auth/user.json',
-    });
-    const page = await context.newPage();
-
-    try {
-      const traces = generateFullTopology({ tracesPerFlow: 3, errorRate: 0.2 });
-      testLogger.info(`Generated ${traces.length} traces for ingestion`);
-
-      // Ingest directly with stream-name header (not via ingestTraces to avoid
-      // modifying the shared library)
-      const headers = getAuthHeaders();
-      headers['stream-name'] = TEST_STREAM;
-      const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || '').replace(/\/+$/, '');
-      const orgId = process.env.ORGNAME || 'default';
-
-      let success = 0;
-      for (const trace of traces) {
-        try {
-          const resp = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
-            headers,
-            data: trace.payload || trace,
-          });
-          if (resp.status() === 200) success++;
-        } catch (_) {}
-      }
-      testLogger.info(`Trace ingestion complete: ${success}/${traces.length}`);
-
-      testLogger.info('Waiting for service graph daemon to process data...');
-      const waitResult = await waitForServiceGraphData(page, {
-        maxWaitMs: 240000,
-        pollIntervalMs: 10000,
-        expectedMinEdges: 10,
-      });
-
-      if (waitResult.success) {
-        testLogger.info(`Service graph data ready: ${waitResult.edges.length} edges after ${waitResult.waitedMs}ms`);
-        testLogger.info('Waiting additional 30s for node creation to complete...');
-        await new Promise(resolve => setTimeout(resolve, 30000));
-      } else {
-        testLogger.warn(`Service graph data may be incomplete after ${waitResult.waitedMs}ms`);
-      }
-    } finally {
-      await page.close();
-      await context.close();
-    }
-  });
-
-  // =========================================================================
-  // beforeEach — Navigate to services catalog tab and select test stream
+  // beforeEach — Navigate to services catalog tab (uses default stream with existing data)
   // =========================================================================
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -82,8 +20,7 @@ test.describe("Service Catalog testcases", () => {
 
     await pm.servicesCatalogPage.navigate('24h');
     await pm.servicesCatalogPage.waitForLoad();
-    await pm.servicesCatalogPage.selectStream(TEST_STREAM);
-    testLogger.info(`Navigated to services catalog tab, stream: ${TEST_STREAM}`);
+    testLogger.info('Navigated to services catalog tab');
   });
 
   test.afterEach(async ({}, testInfo) => {

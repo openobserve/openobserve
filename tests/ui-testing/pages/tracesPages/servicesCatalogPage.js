@@ -49,18 +49,19 @@ export class ServicesCatalogPage {
     await this.page.goto(`${baseUrl}/web/traces?tab=services-catalog&org_identifier=${org}&period=${period}`, {
       timeout: 60000,
     });
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    // Use load instead of networkidle — networkidle hangs on SPAs with websockets
+    await this.page.waitForLoadState('load', { timeout: 15000 }).catch(() => {});
   }
 
   async waitForLoad() {
     // Wait for loading spinner to disappear
     await this.page.locator(this.loading)
-      .waitFor({ state: 'hidden', timeout: 15000 })
+      .waitFor({ state: 'hidden', timeout: 10000 })
       .catch(() => {});
     // Wait for either table or empty state
     await Promise.race([
-      this.page.locator(this.table).waitFor({ state: 'visible', timeout: 15000 }),
-      this.page.locator(this.emptyState).waitFor({ state: 'visible', timeout: 15000 }),
+      this.page.locator(this.table).waitFor({ state: 'visible', timeout: 10000 }),
+      this.page.locator(this.emptyState).waitFor({ state: 'visible', timeout: 10000 }),
     ]).catch(() => {});
   }
 
@@ -75,7 +76,6 @@ export class ServicesCatalogPage {
     // Dismiss the dropdown to prevent portal interference with subsequent clicks
     await this.page.keyboard.press('Escape').catch(() => {});
     await this.page.waitForTimeout(300);
-    await this.waitForLoad();
   }
 
   async filterByServiceName(text) {
@@ -250,8 +250,24 @@ export class ServicesCatalogPage {
   }
 
   async goToPage(n) {
-    // Use aria-label for precise matching (avoids "2" matching "12" or "20")
-    await this.page.locator(`${this.pagination} button[aria-label="${n}"]`).click();
+    // Quasar q-pagination sets aria-label="Page N" on page number buttons.
+    // We also try a fallback for other rendering modes.
+    const pageBtn = this.page.locator(`${this.pagination} button[aria-label="Page ${n}"]`);
+    const count = await pageBtn.count();
+    if (count > 0) {
+      await pageBtn.click();
+    } else {
+      // Fallback: click button with exact text (avoids "2" matching "12" or "20")
+      const allBtns = this.page.locator(`${this.pagination} button`);
+      const btnCount = await allBtns.count();
+      for (let i = 0; i < btnCount; i++) {
+        const text = (await allBtns.nth(i).textContent()).trim();
+        if (text === String(n)) {
+          await allBtns.nth(i).click();
+          break;
+        }
+      }
+    }
     await this.page.waitForTimeout(500);
   }
 
