@@ -6347,7 +6347,7 @@ export class LogsPage {
      * Assert that the Patterns toggle is in selected state
      */
     async expectPatternsToggleSelected() {
-        await expect(this.page.locator(this.patternsToggle)).toHaveClass(/selected/);
+        await expect(this.page.locator(this.patternsToggle)).toHaveAttribute('data-state', 'on');
         testLogger.info('Patterns toggle is in selected state');
     }
 
