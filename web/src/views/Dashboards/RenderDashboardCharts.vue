@@ -326,6 +326,7 @@ import {
   resolvePanelTimeValue,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
+import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -1174,6 +1175,11 @@ export default defineComponent({
         gridStackInstance.destroy(false);
         gridStackInstance = null;
       }
+      // Remove console helpers
+      delete (window as any).oo_logAllPanelsJSON;
+      delete (window as any).oo_getAllPanelsCsv;
+      panelDownloadRegistry.clear();
+      panelCsvRegistry.clear();
     });
 
     /**
@@ -1333,6 +1339,9 @@ export default defineComponent({
 
     // Store refs to panel datetime picker components using a Map (not reactive)
     const panelDateTimePickerRefs = new Map<string, any>();
+
+    // panelDownloadRegistry is a module-level singleton (see utils/panelDownloadRegistry.ts).
+    // PanelContainer instances register themselves on mount; no provide/inject needed.
 
     // Track panels that are initializing (to prevent spurious change events)
     const panelsInitializing = ref<Set<string>>(new Set());
@@ -1525,6 +1534,39 @@ export default defineComponent({
     // Initialize panel times when component is mounted
     onMounted(() => {
       initializePanelTimes();
+
+      // Console helper — prints each panel's raw data to the console.
+      // Usage:  window.oo_logAllPanelsJSON()
+      (window as any).oo_logAllPanelsJSON = () => {
+        const total = panelDownloadRegistry.size;
+        if (total === 0) {
+          console.warn("[oo] No panels found on the current tab.");
+          return;
+        }
+        panelDownloadRegistry.forEach((fn, id) => {
+          try {
+            fn();
+          } catch (e) {
+            console.warn(`[oo] Error on panel ${id}`, e);
+          }
+        });
+      };
+
+      // Report-server helper — returns { [panelId]: { title, csv } } as a plain
+      // JS object so the report server can capture it via page.evaluate().
+      // Usage:  window.oo_getAllPanelsCsv()
+      (window as any).oo_getAllPanelsCsv = (): Record<string, { title: string; csv: string }> => {
+        const result: Record<string, { title: string; csv: string }> = {};
+        panelCsvRegistry.forEach((fn, id) => {
+          try {
+            const data = fn();
+            if (data) result[id] = data;
+          } catch (e) {
+            console.warn(`[oo] Error getting CSV for panel ${id}`, e);
+          }
+        });
+        return result;
+      };
     });
 
     // Re-initialize panel times when panels change or when global time changes
