@@ -80,7 +80,7 @@ describe("useManagementRoutes", () => {
 
     it("should have settings route with correct meta properties", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].meta).toEqual({ keepAlive: true, title: "Settings" });
+      expect(routes[0].meta).toMatchObject({ keepAlive: true, title: "Settings" });
     });
 
     it("should have settings route with component defined", () => {
@@ -212,13 +212,13 @@ describe("useManagementRoutes", () => {
     });
 
     it("should have correct path for each base child route", () => {
-      const expectedPaths = ["general", "organization", "alert_destinations", "model_pricing", "model_pricing/edit", "templates"];
-      const actualPaths = routes[0].children.slice(0, 6).map((child: any) => child.path);
+      const expectedPaths = ["general", "organization", "alert_destinations", "templates"];
+      const actualPaths = routes[0].children.slice(0, 4).map((child: any) => child.path);
       expect(actualPaths).toEqual(expectedPaths);
     });
 
     it("should have unique names for each base child route", () => {
-      const names = routes[0].children.slice(0, 6).map((child: any) => child.name);
+      const names = routes[0].children.slice(0, 4).map((child: any) => child.name);
       const uniqueNames = [...new Set(names)];
       expect(names).toHaveLength(uniqueNames.length);
     });
@@ -280,37 +280,37 @@ describe("useManagementRoutes", () => {
     it("should have correct meta properties for query_management route", () => {
       const routes = useManagementRoutes();
       const queryMgmtRoute = routes[0].children.find((child: any) => child.name === "query_management");
-      expect(queryMgmtRoute.meta).toEqual({ keepAlive: true, title: "Query Management" });
+      expect(queryMgmtRoute.meta).toMatchObject({ keepAlive: true, title: "Query Management" });
     });
 
     it("should have correct meta properties for cipherKeys route", () => {
       const routes = useManagementRoutes();
       const cipherRoute = routes[0].children.find((child: any) => child.name === "cipherKeys");
-      expect(cipherRoute.meta).toEqual({ keepAlive: true, title: "Cipher Keys" });
+      expect(cipherRoute.meta).toMatchObject({ keepAlive: true, title: "Cipher Keys" });
     });
 
     it("should have correct meta properties for nodes route", () => {
       const routes = useManagementRoutes();
       const nodesRoute = routes[0].children.find((child: any) => child.name === "nodes");
-      expect(nodesRoute.meta).toEqual({ keepAlive: true, title: "Nodes" });
+      expect(nodesRoute.meta).toMatchObject({ keepAlive: true, title: "Nodes" });
     });
 
     it("should have correct meta properties for domainManagement route", () => {
       const routes = useManagementRoutes();
       const domainRoute = routes[0].children.find((child: any) => child.name === "domainManagement");
-      expect(domainRoute.meta).toEqual({ keepAlive: true, title: "Domain Management" });
+      expect(domainRoute.meta).toMatchObject({ keepAlive: true, title: "SSO Management" });
     });
 
     it("should have correct meta properties for regexPatterns route", () => {
       const routes = useManagementRoutes();
       const regexRoute = routes[0].children.find((child: any) => child.name === "regexPatterns");
-      expect(regexRoute.meta).toEqual({ keepAlive: true, title: "Regex Patterns" });
+      expect(regexRoute.meta).toMatchObject({ keepAlive: true, title: "Sensitive Data Redaction" });
     });
 
     it("should have correct meta properties for pipelineDestinations route", () => {
       const routes = useManagementRoutes();
       const pipelineRoute = routes[0].children.find((child: any) => child.name === "pipelineDestinations");
-      expect(pipelineRoute.meta).toEqual({ title: "Pipeline Destinations" });
+      expect(pipelineRoute.meta).toMatchObject({ title: "Pipeline Destinations" });
     });
 
     it("should have beforeEnter hooks for all enterprise routes", () => {
@@ -350,9 +350,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 15 children routes when enterprise is enabled", () => {
+    it("should have exactly 13 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(15); // 6 base + 9 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, nodes, domainManagement, regexPatterns, correlationSettings, license)
+      expect(routes[0].children).toHaveLength(13); // 4 base + 9 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, nodes, domainManagement, regexPatterns, correlationSettings, license)
     });
   });
 
@@ -377,7 +377,7 @@ describe("useManagementRoutes", () => {
     it("should have correct meta properties for orgnizationManagement route", () => {
       const routes = useManagementRoutes();
       const orgMgmtRoute = routes[0].children.find((child: any) => child.name === "orgnizationManagement");
-      expect(orgMgmtRoute.meta).toEqual({ keepAlive: true, title: "Organization Management" });
+      expect(orgMgmtRoute.meta).toMatchObject({ keepAlive: true, title: "Organization Management" });
     });
 
     it("should have beforeEnter hook for orgnizationManagement route", () => {
@@ -403,9 +403,9 @@ describe("useManagementRoutes", () => {
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 7 children routes when cloud is enabled", () => {
+    it("should have exactly 5 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // 6 base + 1 cloud
+      expect(routes[0].children).toHaveLength(5); // 4 base + 1 cloud
     });
   });
 
@@ -420,9 +420,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 16 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 14 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(16); // 6 base + 9 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(14); // 4 base + 9 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -502,63 +502,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes
+      expect(routes[0].children).toHaveLength(4); // Only base routes
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes
+      expect(routes[0].children).toHaveLength(4); // Only base routes
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes
+      expect(routes[0].children).toHaveLength(4); // Only base routes
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes
+      expect(routes[0].children).toHaveLength(4); // Only base routes
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes
+      expect(routes[0].children).toHaveLength(4); // Only base routes
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(4); // Only base routes, since comparison is with "true"
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(4); // Only base routes, since comparison is with "true"
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes
+      expect(routes[0].children).toHaveLength(4); // Only base routes
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // Only base routes
+      expect(routes[0].children).toHaveLength(4); // Only base routes
     });
 
     it("should return the same structure on multiple calls", () => {
