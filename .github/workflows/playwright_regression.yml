@@ -49,7 +49,6 @@ jobs:
       labels: ubicloud-standard-16
     permissions:
       contents: read
-      actions: write
 
     steps:
       - name: Remove unused tools
@@ -118,7 +117,6 @@ jobs:
       labels: ubicloud-standard-8
     permissions:
       contents: read
-      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -214,7 +212,6 @@ jobs:
       labels: ubicloud-standard-8
     permissions:
       contents: read
-      actions: read
 
     steps:
       - name: Clone the current repo
