@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem]"
+      class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container card-container--col"
       :class="
-        store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 2.5rem)]' : 'tw:h-full'
+        store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'
       "
     >
       <!-- Banners -->
@@ -65,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             aria-label="View all streams"
             :title="t('home.viewButton')"
-            data-test="home-usage-tab-view-streams-btn"
           >
             <q-icon name="arrow_forward" class="view-arrow-icon" />
             <router-link
@@ -112,15 +111,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'positive-increase-light'
                   "
                 >
-                  <q-icon name="arrow_upward" size="0.875rem" /> 2.89% from last
+                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last
                   week
                 </div>
               </div>
-              <div
-                class="data-to-display row items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-streams-count"
-              >
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ animatedStreamsCount || summary.streams_count }}
               </div>
             </div>
@@ -153,15 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'positive-increase-light'
                   "
                 >
-                  <q-icon name="arrow_upward" size="0.875rem" /> 2.89% from last
+                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last
                   week
                 </div>
               </div>
-              <div
-                class="data-to-display row items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-events-count"
-              >
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ formattedAnimatedEventsCount }}
               </div>
             </div>
@@ -196,15 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'negative-increase-light'
                   "
                 >
-                  <q-icon name="arrow_downward" size="0.875rem" /> 2.89% from last
+                  <q-icon name="arrow_downward" size="14px" /> 2.89% from last
                   week
                 </div>
               </div>
-              <div
-                class="data-to-display row items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-ingested-size"
-              >
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ formattedAnimatedIngestedSize }}
               </div>
             </div>
@@ -239,15 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'positive-increase-light'
                   "
                 >
-                  <q-icon name="arrow_upward" size="0.875rem" /> 2.89% from last
+                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last
                   week
                 </div>
               </div>
-              <div
-                class="data-to-display row items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-compressed-size"
-              >
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ formattedAnimatedCompressedSize }}
               </div>
             </div>
@@ -280,15 +263,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'positive-increase-light'
                   "
                 >
-                  <q-icon name="arrow_upward" size="0.875rem" /> 0.00% from last
+                  <q-icon name="arrow_upward" size="14px" /> 0.00% from last
                   week
                 </div>
               </div>
-              <div
-                class="data-to-display row items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-index-size"
-              >
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ formattedAnimatedIndexSize }}
               </div>
             </div>
@@ -337,7 +316,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     aria-label="View all functions"
                     class="tw:flex-shrink-0"
                     :title="t('home.viewButton')"
-                    data-test="home-usage-tab-view-functions-btn"
                   >
                     <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
@@ -355,11 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
               </div>
-              <div
-                class="data-to-display row items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-functions-count"
-              >
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ animatedFunctionCount || summary.function_count }}
               </div>
             </div>
@@ -402,7 +376,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     aria-label="View all dashboards"
                     class="tw:flex-shrink-0"
                     :title="t('home.viewButton')"
-                    data-test="home-usage-tab-view-dashboards-btn"
                   >
                     <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
@@ -420,11 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
               </div>
-              <div
-                class="data-to-display row items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-dashboards-count"
-              >
+              <div class="data-to-display row items-end" aria-live="polite">
                 {{ animatedDashboardCount || summary.dashboard_count }}
               </div>
             </div>
@@ -460,7 +429,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 aria-label="View all alerts"
                 :title="t('home.viewButton')"
-                data-test="home-usage-tab-view-alerts-btn"
               >
                 <q-icon name="arrow_forward" class="view-arrow-icon" />
                 <router-link
@@ -482,22 +450,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-subtitle">{{
                   t("home.scheduledAlert")
                 }}</span>
-                <span
-                  class="results-count"
-                  aria-live="polite"
-                  data-test="home-usage-tab-scheduled-alerts-count"
-                >{{
+                <span class="results-count" aria-live="polite">{{
                   animatedScheduledAlerts || summary.scheduled_alerts
                 }}</span>
               </div>
               <OSeparator :vertical="true" />
               <div class="column">
                 <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
-                <span
-                  class="results-count"
-                  aria-live="polite"
-                  data-test="home-usage-tab-rt-alerts-count"
-                >{{
+                <span class="results-count" aria-live="polite">{{
                   animatedRtAlerts || summary.rt_alerts
                 }}</span>
               </div>
@@ -543,7 +503,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 aria-label="View all pipelines"
                 :title="t('home.viewButton')"
-                data-test="home-usage-tab-view-pipelines-btn"
               >
                 <q-icon name="arrow_forward" class="view-arrow-icon" />
                 <router-link
@@ -565,11 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-subtitle">
                   {{ t("home.schedulePipelineTitle") }}</span
                 >
-                <span
-                  class="results-count"
-                  aria-live="polite"
-                  data-test="home-usage-tab-scheduled-pipelines-count"
-                >{{
+                <span class="results-count" aria-live="polite">{{
                   animatedScheduledPipelines || summary.scheduled_pipelines
                 }}</span>
               </div>
@@ -578,11 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-subtitle">{{
                   t("home.rtPipelineTitle")
                 }}</span>
-                <span
-                  class="results-count"
-                  aria-live="polite"
-                  data-test="home-usage-tab-rt-pipelines-count"
-                >{{
+                <span class="results-count" aria-live="polite">{{
                   animatedRtPipelines || summary.rt_pipelines
                 }}</span>
               </div>
@@ -605,7 +556,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="no_data_ingest && !isLoadingSummary"
       class="tw:p-4 row items-start tw:gap-4 home-no-data-panel"
-      data-test="home-usage-tab-no-data"
     >
       <TrialPeriod></TrialPeriod>
       <div class="my-card">
@@ -619,7 +569,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:py-2 tw:text-center">
           <OButton
             variant="ghost-primary"
-            data-test="home-usage-tab-find-ingestion-btn"
             @click="() => $router.push({ name: 'ingestion' })"
             >{{ t("home.findIngestion") }}
           </OButton>
@@ -628,13 +577,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoadingSummary" data-test="home-usage-tab-loading">
+    <div v-if="isLoadingSummary">
       <HomeViewSkeleton />
     </div>
   </div>
 </template>
 
-<!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -1252,8 +1200,23 @@ watch(orgId, (newVal, oldVal) => {
   }
 }
 
+.streams-container {
+  @include container-base;
+  box-sizing: border-box;
+  border-left: 3px solid var(--accent-blue);
+  contain: layout style;
+  padding: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px var(--hover-shadow);
+  }
+}
+
 .streams-header {
-  margin-bottom: 0.75rem;
+  margin-bottom: 12px;
 }
 .dark-stream-container,
 .light-stream-container {
@@ -1262,12 +1225,12 @@ watch(orgId, (newVal, oldVal) => {
 }
 .view-button-light {
   cursor: pointer;
-  padding: 0;
+  padding: 0px;
 }
 .view-button-dark {
   cursor: pointer;
-  padding: 0;
-  margin: 0;
+  padding: 0px;
+  margin: 0px;
 }
 .view-button-light,
 .view-button-dark {
@@ -1283,7 +1246,7 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 .view-arrow-icon {
-  font-size: 1.125rem;
+  font-size: 18px;
   transition:
     transform 0.4s ease-in-out,
     opacity 0.4s ease-in-out;
@@ -1294,7 +1257,7 @@ watch(orgId, (newVal, oldVal) => {
 
 .view-button-light:hover .view-arrow-icon,
 .view-button-dark:hover .view-arrow-icon {
-  transform: translateX(1.25rem);
+  transform: translateX(20px);
   opacity: 0;
 }
 
@@ -1305,12 +1268,12 @@ watch(orgId, (newVal, oldVal) => {
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) translateX(-1.25rem);
+  transform: translate(-50%, -50%) translateX(-20px);
   opacity: 0;
   transition:
     transform 0.4s ease-in-out,
     opacity 0.4s ease-in-out;
-  font-size: 1.125rem;
+  font-size: 18px;
   pointer-events: none;
   z-index: 1;
   line-height: 1;
@@ -1325,8 +1288,8 @@ watch(orgId, (newVal, oldVal) => {
 
 .tiles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
 }
 
 .tile {
@@ -1353,7 +1316,7 @@ watch(orgId, (newVal, oldVal) => {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(1.25rem);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
@@ -1367,35 +1330,35 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 .section-header {
-  font-size: 1.25rem;
+  font-size: 20px;
   font-weight: 600;
-  line-height: 1.5rem;
+  line-height: 24px;
 }
 
 .tile-title {
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 500;
-  line-height: 1.25rem;
+  line-height: 20px;
   letter-spacing: 0%;
 }
 .performance-text {
-  border-radius: 3.125rem;
-  width: 10rem;
-  padding: 0 0.5rem;
+  border-radius: 50px;
+  width: 160px;
+  padding: 0px 8px;
   display: flex;
   align-items: center;
   background-color: #ebfdf5;
   color: #0e6842;
-  font-size: 0.75rem !important;
+  font-size: 12px !important;
 }
 .positive-increase-light {
   background-color: #ebfdf5;
-  border: 0.0625rem solid #e4e7ec;
+  border: 1px solid #e4e7ec;
   color: #0e6842;
 }
 .negative-increase-light {
   background-color: #ffebe9;
-  border: 0.0625rem solid #e4e7ec;
+  border: 1px solid #e4e7ec;
   color: #b42318;
 }
 .positive-increase-dark {
@@ -1407,9 +1370,9 @@ watch(orgId, (newVal, oldVal) => {
   color: #ffd6d6;
 }
 .data-to-display {
-  font-size: 1.5rem;
+  font-size: 24px;
   font-weight: 600;
-  line-height: 1.75rem;
+  line-height: 28px;
 }
 
 .charts-main-container {
@@ -1480,29 +1443,57 @@ watch(orgId, (newVal, oldVal) => {
   }
 }
 
+.chart-container.loading::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.chart-container-dark.loading::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+}
 .text-title {
-  font-size: 1.125rem;
+  font-size: 18px;
   font-weight: 500;
-  line-height: 1.25rem;
+  line-height: 20px;
   letter-spacing: 0%;
 }
 .text-subtitle {
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 400;
-  line-height: 1.25rem;
+  line-height: 20px;
   letter-spacing: 0%;
 }
 .results-count {
-  font-size: 1.25rem;
+  font-size: 20px;
   font-weight: 600;
-  line-height: 1.5rem;
+  line-height: 24px;
 }
 .details-container {
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 .charts-main-container {
-  gap: 0.75rem;
+  gap: 12px;
 }
 
 .tile-icon {
@@ -1510,18 +1501,18 @@ watch(orgId, (newVal, oldVal) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.5rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
 
   img {
-    height: 1.5rem;
+    height: 24px;
   }
 }
 
 .functions-tile-content .tile-icon img,
 .dashboards-tile-content .tile-icon img {
-  height: 1.25rem;
+  height: 20px;
 }
 
 .dark-tile-content .tile-icon img,
@@ -1532,31 +1523,38 @@ watch(orgId, (newVal, oldVal) => {
 
 .tile-icon.icon-bg-blue {
   background: rgba(57, 126, 246, 0.2);
-  border: 0.0625rem solid rgba(57, 126, 246, 0.35);
+  border: 1px solid rgba(57, 126, 246, 0.35);
 }
 
 .tile-icon.icon-bg-orange {
   background: rgba(238, 95, 38, 0.2);
-  border: 0.0625rem solid rgba(238, 95, 38, 0.35);
+  border: 1px solid rgba(238, 95, 38, 0.35);
 }
 
 .tile-icon.icon-bg-yellow {
   background: rgba(245, 235, 147, 0.25);
-  border: 0.0625rem solid rgba(245, 235, 147, 0.45);
+  border: 1px solid rgba(245, 235, 147, 0.45);
 }
 
 .tile-icon.icon-bg-purple {
   background: rgba(242, 220, 245, 0.25);
-  border: 0.0625rem solid rgba(242, 220, 245, 0.45);
+  border: 1px solid rgba(242, 220, 245, 0.45);
 }
 
 /* ===== 4. Interactive States ===== */
+
+.tile-content,
+.functions-tile-content,
+.dashboards-tile-content,
+.chart-container,
+.streams-container {
+}
 
 .view-button-light:focus-visible,
 .view-button-dark:focus-visible {
   outline: 2px solid var(--accent-blue);
   outline-offset: 2px;
-  border-radius: 0.25rem;
+  border-radius: 4px;
 }
 
 a:focus-visible,
@@ -1575,17 +1573,17 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: 0.75rem;
+  gap: 12px;
   opacity: 0.6;
 }
 
 .empty-state-icon {
-  font-size: 3rem;
+  font-size: 48px;
   opacity: 0.5;
 }
 
 .empty-state-text {
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 500;
   color: inherit;
 }
