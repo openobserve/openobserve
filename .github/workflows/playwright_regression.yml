@@ -1,0 +1,311 @@
+name: Playwright Regression Tests
+
+on:
+  schedule:
+    - cron: '30 3,7,11,15,19,23 * * *'  # Every 4 hrs from 9 AM IST (3:30, 7:30, 11:30, 15:30, 19:30, 23:30 UTC)
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080
+  WS_ZO_BASE_URL: ws://localhost:5080
+  ZO_BASE_URL_SC: http://localhost:5080
+  ZO_BASE_URL_SC_UI: http://localhost:5080
+  INGESTION_URL: http://localhost:5080
+  ORGNAME: default
+  ZO_WEB_URL: "http://localhost:5080"
+  ZO_QUICK_MODE_NUM_FIELDS: 100
+  ZO_QUICK_MODE_STRATEGY: first
+  ZO_ALLOW_USER_DEFINED_SCHEMAS: true
+  ZO_INGEST_ALLOWED_UPTO: 5
+  ZO_FEATURE_QUERY_EXCLUDE_ALL: false
+  ZO_USAGE_BATCH_SIZE: 200
+  ZO_USAGE_PUBLISH_INTERVAL: 2
+  ZO_USAGE_REPORTING_ENABLED: true
+  ZO_MIN_AUTO_REFRESH_INTERVAL: 5
+  ZO_STREAMING_ENABLED: true
+  ZO_COLS_PER_RECORD_LIMIT: "80000"
+  ZO_SMTP_ENABLED: true
+  ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
+  ZO_CREATE_ORG_THROUGH_INGESTION: true
+  ZO_UTF8_VIEW_ENABLED: false
+  ZO_ENABLE_CROSS_LINKING: true
+  ZO_SSRF_ALLOW_LOOPBACK: true
+  UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
+
+jobs:
+  build_binary:
+    name: build_binary
+    runs-on:
+      labels: ubicloud-standard-16
+    permissions:
+      contents: read
+
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-11-11
+          targets: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: playwright-regression-ci
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install Protoc
+        run: |
+          bash ./.github/protoc.sh
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Lint frontend code
+        run: cd web && npm ci && npm run lint:ci
+
+      - name: Build binary and frontend
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+          GIT_HASH_OVERRIDE: ${{ github.sha }}
+        run: |
+          bash -c "cd web && npm run build && cp -r ./dist /tmp/dist" &
+          sed -i 's|folder = "web/dist/"|folder = "/tmp/dist/"|' src/handler/http/router/ui.rs
+          cargo build --profile release-ci --target x86_64-unknown-linux-gnu
+          wait
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ci-binary
+          path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
+          retention-days: 1
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: /tmp/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  ui_integration_tests:
+    name: e2e / ${{ matrix.spec }}
+    needs: [build_binary]
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - spec: "logs-regression.spec.js"
+          - spec: "logs-regression-bugs.spec.js"
+          - spec: "logs-9754.spec.js"
+          - spec: "streams-regression.spec.js"
+          - spec: "enrichment-regression.spec.js"
+          - spec: "ui-regression.spec.js"
+          - spec: "pipeline-regression.spec.js"
+          - spec: "alerts-stream-switching-regression.spec.js"
+          - spec: "metrics-regression.spec.js"
+          - spec: "traces-regression.spec.js"
+          - spec: "dashboard-regression.spec.js"
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: release-ci-binary
+          path: release-ci-binary
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: frontend-dist
+          path: /tmp/dist
+
+      - name: Start OpenObserve
+        run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
+
+      - name: Wait for start
+        run: |
+          for i in $(seq 1 120); do
+            if curl -sf http://localhost:5080/web/login > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start in 120s"
+          exit 1
+
+      - name: Ensure we are getting a reply from the server
+        run: curl http://localhost:5080/web/login
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies and run ui-tests
+        run: |
+          touch .env
+          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
+          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
+          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
+          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
+          echo "INGESTION_URL=${INGESTION_URL}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
+          echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
+          mv .env tests/ui-testing
+          cd tests/ui-testing && npm ci
+          npx playwright install --with-deps chromium
+
+          SPEC_FILE="./playwright-tests/RegressionSet/${{ matrix.spec }}"
+          echo "Running: $SPEC_FILE"
+          npx playwright test "$SPEC_FILE"
+
+      - name: Upload blob report to GitHub Actions Artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.spec }}-${{ github.run_attempt }}
+          path: tests/ui-testing/blob-report
+          retention-days: 1
+
+      - name: Check OpenObserve logs
+        if: always()
+        run: cat o2.log
+
+  merge_and_upload_reports:
+    name: Merge Reports and Upload to TestDino
+    needs: [ui_integration_tests]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install project dependencies
+        run: cd tests/ui-testing && npm ci
+
+      - name: Download blob reports from GitHub Actions Artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: tests/ui-testing/all-blob-reports
+          pattern: blob-report-*-${{ github.run_attempt }}
+          merge-multiple: true
+
+      - name: Merge Reports
+        run: |
+          cd tests/ui-testing
+
+          if [ ! -d "all-blob-reports" ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+            echo "::warning::No blob reports found to merge. Creating empty report."
+            mkdir -p playwright-results/html-report
+            START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+            echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":"'"$START_TIME"'","duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
+            echo "<html><body><h1>No test reports found</h1></body></html>" > playwright-results/html-report/index.html
+            exit 0
+          fi
+
+          unset CI
+          npx playwright merge-reports --config playwright.config.js ./all-blob-reports
+
+      - name: Upload to TestDino
+        continue-on-error: true
+        if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
+        run: |
+          cd tests/ui-testing
+
+          if [ ! -f "playwright-results/report.json" ]; then
+            echo "::notice::Skipping TestDino upload - no report.json found"
+            exit 0
+          fi
+
+          START_TIME=$(jq -r '.stats.startTime // empty' playwright-results/report.json)
+          if [ -n "$START_TIME" ] && [[ "$START_TIME" =~ ^[0-9]+$ ]]; then
+            jq '.stats.startTime = (.stats.startTime / 1000 | strftime("%Y-%m-%dT%H:%M:%S.000Z"))' playwright-results/report.json > playwright-results/report.json.tmp
+            mv playwright-results/report.json.tmp playwright-results/report.json
+          fi
+
+          npx --yes tdpw@latest upload playwright-results \
+            --json-report playwright-results/report.json \
+            --html-report playwright-results/html-report \
+            --upload-html \
+            --verbose \
+            --token="${{ secrets.TESTDINO_API_TOKEN }}"
+
+  playwright_summary:
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions: {}
+    needs: [build_binary, ui_integration_tests, merge_and_upload_reports]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          BUILD_OK=false
+          UI_OK=false
+          MERGE_OK=false
+
+          if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
+            BUILD_OK=true
+          fi
+
+          if [ "${{ needs.ui_integration_tests.result }}" == "success" ] || [ "${{ needs.ui_integration_tests.result }}" == "skipped" ]; then
+            UI_OK=true
+          fi
+
+          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ]; then
+            MERGE_OK=true
+          fi
+
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
+            echo "All regression tests completed successfully"
+            exit 0
+          else
+            echo "Regression tests failed:"
+            echo "  build_binary: ${{ needs.build_binary.result }}"
+            echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
+            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
+            exit 1
+          fi
