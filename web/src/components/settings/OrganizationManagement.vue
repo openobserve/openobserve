@@ -121,15 +121,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Extend Trial Dialog -->
-    <ODialog v-model:open="extendTrialPrompt" size="sm">
-      <template #header>
-        <div>
-          <div class="tw:font-semibold tw:text-sm tw:truncate" :title="extendTrialDataRow?.name">
-            Extend Trial for {{ extendTrialDataRow?.name }}
-          </div>
-          <div class="tw:text-xs tw:text-gray-500">Set the new trial extension period.</div>
-        </div>
-      </template>
+    <ODialog
+      v-model:open="extendTrialPrompt"
+      size="sm"
+      :title="`Extend Trial for ${extendTrialDataRow?.name}`"
+      sub-title="Set the new trial extension period."
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="`Extend trial by ${extendedTrial} week(s)`"
+      @click:secondary="extendTrialPrompt = false"
+      @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
+    >
       <div>
         <div class="float-left text-bold">Week(s)</div>
         <div class="float-right q-gutter-xs">
@@ -148,30 +149,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2 q-mt-md">
-          <OButton variant="outline" size="sm-action" @click="extendTrialPrompt = false" class="q-mr-md">
-            {{ t('common.cancel') }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
-          >
-            Extend trial by {{ extendedTrial }} week(s)
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
     <!-- External Contract Dialog -->
-    <ODialog v-model:open="contractPrompt" size="sm">
-      <template #header>
-        <div class="tw:font-semibold tw:text-sm tw:truncate" :title="contractDataRow?.name">
-          {{ contractMode === 'create' ? 'Create' : 'Extend' }} External
-          Contract for {{ contractDataRow?.name }}
-        </div>
-      </template>
+    <ODialog
+      v-model:open="contractPrompt"
+      size="sm"
+      :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+      @click:secondary="contractPrompt = false"
+      @click:primary="submitContract"
+    >
       <div class="q-mb-md">
         <div class="text-bold q-mb-xs">
           {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
@@ -190,16 +179,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="contractPrompt = false" class="q-mr-md">
-            {{ t('common.cancel') }}
-          </OButton>
-          <OButton variant="primary" size="sm-action" @click.stop="submitContract">
-            {{ contractMode === 'create' ? 'Create Contract' : 'Extend Contract' }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
   </q-page>
 </template>

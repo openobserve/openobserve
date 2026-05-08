@@ -21,6 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="t('correlation.logs.filters.title')"
     data-test="dimension-filter-editor-dialog"
+    :secondary-button-label="t('common.cancel')"
+    :neutral-button-label="t('common.reset')"
+    :primary-button-label="t('common.apply')"
+    :primary-button-disabled="!hasChanges"
+    @click:secondary="handleCancel"
+    @click:neutral="handleReset"
+    @click:primary="handleApply"
   >
         <!-- Description -->
         <div class="tw:mb-4 tw:text-sm tw:text-gray-600">
@@ -139,36 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
 
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="handleCancel"
-          data-test="cancel-btn"
-        >
-          {{ t('common.cancel') }}
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          @click="handleReset"
-          data-test="reset-btn"
-        >
-          <RotateCcw :size="14" class="tw:mr-1" />
-          {{ t('common.reset') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="handleApply"
-          :disabled="!hasChanges"
-          data-test="apply-btn"
-        >
-          {{ t('common.apply') }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

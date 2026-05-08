@@ -199,18 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
-    <ODialog v-model:open="confirmForceDelete" persistent size="md">
-      <template #header>
-        <div class="tw:flex tw:justify-between tw:items-center tw:flex-1">
-          <span class="tw:font-semibold tw:text-sm">
-            Pipelines Associated with
-            <strong> {{ selectedDelete.name }}</strong>
-          </span>
-          <OButton variant="ghost" size="icon-circle-sm" @click="closeDialog">
-            <q-icon name="close" />
-          </OButton>
-        </div>
-      </template>
+    <ODialog v-model:open="confirmForceDelete" persistent size="md"
+      :title="`Pipelines Associated with ${selectedDelete?.name}`"
+    >
       <div
         v-if="transformedPipelineList.length > 0"
         class="pipeline-list-container"

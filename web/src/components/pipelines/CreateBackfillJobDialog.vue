@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="show"
     :width="47"
+    title="Create Backfill Job for"
     secondary-button-label="Cancel"
     primary-button-label="Create Backfill Job"
     :primary-button-loading="loading"
@@ -25,23 +26,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit"
     data-test="create-backfill-job-dialog"
   >
-    <template #header>
-      <div class="tw:flex tw:items-center tw:gap-2" data-test="dialog-title">
-        <span class="text-h6">Create Backfill Job for</span>
-        <span
-          :class="[
-            'text-h6 tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
-            $q.dark.isActive
-              ? 'tw:text-blue-400 tw:bg-blue-900/50'
-              : 'tw:text-blue-600 tw:bg-blue-50'
-          ]"
-        >
+    <template #header-right>
+      <span
+        :class="[
+          'text-h6 tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+          $q.dark.isActive
+            ? 'tw:text-blue-400 tw:bg-blue-900/50'
+            : 'tw:text-blue-600 tw:bg-blue-50'
+        ]"
+      >
+        {{ pipelineName }}
+        <q-tooltip v-if="pipelineName && pipelineName.length > 25" class="tw:text-xs">
           {{ pipelineName }}
-          <q-tooltip v-if="pipelineName && pipelineName.length > 25" class="tw:text-xs">
-            {{ pipelineName }}
-          </q-tooltip>
-        </span>
-      </div>
+        </q-tooltip>
+      </span>
     </template>
 
     <div class="tw:space-y-6">

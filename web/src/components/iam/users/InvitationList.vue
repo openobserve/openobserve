@@ -96,40 +96,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <ODialog v-model:open="confirmAccept" size="xs" :title="t('invitation.confirmAcceptHead')">
+    <ODialog
+      v-model:open="confirmAccept"
+      size="xs"
+      :title="t('invitation.confirmAcceptHead')"
+      :secondary-button-label="t('invitation.cancel')"
+      :primary-button-label="t('invitation.accept')"
+      @click:secondary="confirmAccept = false"
+      @click:primary="confirmAcceptInvitation"
+    >
       <p>{{ t('invitation.confirmAcceptMsg', { org: selectedInvitation?.org_name }) }}</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmAccept = false">
-            {{ t('invitation.cancel') }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="confirmAcceptInvitation"
-          >
-            {{ t('invitation.accept') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
-    <ODialog v-model:open="confirmReject" size="xs" :title="t('invitation.confirmRejectHead')">
+    <ODialog
+      v-model:open="confirmReject"
+      size="xs"
+      :title="t('invitation.confirmRejectHead')"
+      :secondary-button-label="t('invitation.cancel')"
+      :primary-button-label="t('invitation.reject')"
+      @click:secondary="confirmReject = false"
+      @click:primary="confirmRejectInvitation"
+    >
       <p>{{ t('invitation.confirmRejectMsg', { org: selectedInvitation?.org_name }) }}</p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmReject = false">
-            {{ t('invitation.cancel') }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="confirmRejectInvitation"
-          >
-            {{ t('invitation.reject') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
   </div>
 </template>

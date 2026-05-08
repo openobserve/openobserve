@@ -263,7 +263,16 @@
         </div>
       </div>
     </div>
-    <ODialog v-if="config.isEnterprise == 'true'" v-model:open="typeOfRegexPattern" size="lg" title="What is the type of regex pattern you want to create?">
+    <ODialog
+      v-if="config.isEnterprise == 'true'"
+      v-model:open="typeOfRegexPattern"
+      size="lg"
+      title="What is the type of regex pattern you want to create?"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="typeOfRegexPattern = false"
+      @click:primary="confirmRegexPatternType"
+    >
       <q-input
         type="text"
         data-test="regex-pattern-type-input"
@@ -277,22 +286,6 @@
         filled
         dense
       />
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            data-test="search-scheduler-max-records-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="typeOfRegexPattern = false"
-          >{{ t('confirmDialog.cancel') }}</OButton>
-          <OButton
-            data-test="search-scheduler-max-records-submit-btn"
-            variant="primary"
-            size="sm-action"
-            @click="confirmRegexPatternType"
-          >{{ t('confirmDialog.ok') }}</OButton>
-        </div>
-      </template>
     </ODialog>
   </div>
 </template>

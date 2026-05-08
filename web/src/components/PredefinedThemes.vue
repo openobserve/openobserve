@@ -19,19 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="dialogOpen"
     size="sm"
     seamless
+    title="Predefined Themes"
   >
-    <template #header>
-      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-        <div class="text-h6">Predefined Themes</div>
-        <OButton
-          variant="ghost-destructive"
-          size="xs"
-          @click="resetToDefaultTheme"
-        >
-          <template #icon-left><q-icon name="refresh" size="14px" /></template>
-          Reset
-        </OButton>
-      </div>
+    <template #header-right>
+      <OButton
+        variant="ghost-destructive"
+        size="xs"
+        @click="resetToDefaultTheme"
+      >
+        <template #icon-left><q-icon name="refresh" size="14px" /></template>
+        Reset
+      </OButton>
     </template>
 
       <q-card-section class="q-pt-none">
@@ -210,21 +208,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
     <!-- Color Picker Dialog -->
-    <ODialog v-model:open="showColorPicker" size="sm">
-      <template #header>
-        <div class="text-h6">Pick Custom Color</div>
-      </template>
+    <ODialog
+      v-model:open="showColorPicker"
+      size="sm"
+      title="Pick Custom Color"
+      primary-button-label="Close"
+      @click:primary="showColorPicker = false"
+    >
       <q-color
         v-model="tempColor"
         @update:model-value="updateCustomColor"
       />
-      <template #footer>
-        <div class="flex justify-end">
-          <OButton variant="outline" size="sm-action" @click="showColorPicker = false" data-test="color-picker-close-btn">
-            Close
-          </OButton>
-        </div>
-      </template>
     </ODialog>
   </ODrawer>
 </template>

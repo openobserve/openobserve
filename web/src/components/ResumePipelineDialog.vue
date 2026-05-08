@@ -15,13 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog v-model:open="open" size="sm">
-    <template #header>
-      <div>
-        <div class="dialog-title">Resume Pipeline Ingestion</div>
-        <div v-if="lastPausedAt" class="last-paused-at-text">Last paused: {{ convertUnixToQuasarFormat(lastPausedAt) }}</div>
-      </div>
-    </template>
+  <ODialog
+    v-model:open="open"
+    size="sm"
+    title="Resume Pipeline Ingestion"
+    :sub-title="lastPausedAt ? `Last paused: ${convertUnixToQuasarFormat(lastPausedAt)}` : undefined"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('pipeline_list.run_pipeline')"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
 
     <div class="resume-pipeline-dialog-body">
       <q-radio
@@ -44,26 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-radio>
     </div>
 
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-          data-test="cancel-button"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="onConfirm"
-          data-test="confirm-button"
-        >
-          {{ t('pipeline_list.run_pipeline') }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 
@@ -72,12 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { convertUnixToQuasarFormat } from "@/utils/zincutils";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  components: { OButton, ODialog },
+  components: { ODialog },
   emits: ["update:ok", "update:cancel", "update:shouldStartfromNow", "update:modelValue"],
   props: {
     title: { type: String },

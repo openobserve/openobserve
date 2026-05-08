@@ -297,12 +297,12 @@ watch(internalOpen, (open) => {
             </div>
 
             <!-- #header-left sub-slot — grows to fill space if present -->
-            <div v-if="slots['header-left']" class="tw:flex-1 tw:min-w-0">
+            <div v-if="slots['header-left']" class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:justify-start tw:gap-2">
               <slot name="header-left" />
             </div>
 
             <!-- #header-right sub-slot — grows to fill space if present -->
-            <div v-if="slots['header-right']" class="tw:flex-1 tw:min-w-0">
+            <div v-if="slots['header-right']" class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:justify-end tw:gap-2">
               <slot name="header-right" />
             </div>
 

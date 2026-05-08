@@ -358,26 +358,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <ODrawer v-model:open="showSqlDialog" size="lg">
-      <template #header>
-        <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-          <div class="text-h6">SQL Query</div>
-          <OButton
-            v-if="profileData?.sql"
-            variant="ghost"
-            size="icon-sm"
-            :class="[
+    <ODrawer v-model:open="showSqlDialog" size="lg" title="SQL Query">
+      <template #header-right>
+        <OButton
+          v-if="profileData?.sql"
+          variant="ghost"
+          size="icon-sm"
+          :class="[
                 'tw:border',
                 copiedSql ? 'tw:text-green-600 tw:border-green-400' : 'tw:border-gray-300'
               ]"
-            @click="copySql"
-            data-test="inspector-copy-sql-btn"
-          >
-            <Copy v-if="!copiedSql" :size="16" />
+          @click="copySql"
+          data-test="inspector-copy-sql-btn"
+        >
+          <Copy v-if="!copiedSql" :size="16" />
               <Check v-else :size="16" />
-            <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
-          </OButton>
-        </div>
+          <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
+        </OButton>
       </template>
       <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
         <pre class="sql-query" data-test="inspector-sql-query-content">{{ profileData?.sql || 'No SQL query available' }}</pre>
@@ -385,10 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODrawer>
 
     <!-- Trace ID Dialog -->
-    <ODialog v-model:open="showTraceIdDialog" size="sm">
-      <template #header>
-        <div class="text-h6">Full Trace ID</div>
-      </template>
+    <ODialog v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
       <div class="tw:flex tw:items-center tw:gap-3">
         <div class="tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:p-3 tw:rounded tw:border"
              :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">

@@ -21,20 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="isOpen"
     side="right"
     :width="90"
+    :title="`Correlated Streams - ${serviceName}`"
+    :sub-title="formatTimeRange(timeRange)"
     @update:open="(v) => !v && onClose()"
   >
-    <template #header>
-      <div class="tw:flex tw:items-center tw:gap-3">
-        <q-icon name="link" size="md" color="primary" />
-        <div class="tw:flex tw:flex-col tw:gap-0">
-          <span class="tw:text-lg tw:font-semibold">
-            Correlated Streams - {{ serviceName }}
-          </span>
-          <span class="tw:text-xs tw:opacity-70">
-            {{ formatTimeRange(timeRange) }}
-          </span>
-        </div>
-      </div>
+    <template #header-left>
+      <q-icon name="link" size="md" color="primary" />
     </template>
 
       <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->

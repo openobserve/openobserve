@@ -131,6 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="md"
       :show-close="false"
       data-test="dashboard-tab-settings-add-tab-dialog"
+      :secondary-button-label="t('dashboard.cancel')"
+      :primary-button-label="t('dashboard.save')"
+      @click:secondary="showAddTabDialog = false"
+      @click:primary="addTabRef?.submit()"
     >
       <AddTab
         ref="addTabRef"
@@ -140,12 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @refresh="refreshRequired"
         @close="showAddTabDialog = false"
       />
-      <template #footer>
-        <div class="tw:flex tw:justify-start tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showAddTabDialog = false" data-test="dashboard-add-cancel">{{ t('dashboard.cancel') }}</OButton>
-          <OButton variant="primary" size="sm-action" data-test="dashboard-add-tab-submit" @click="addTabRef?.submit()">{{ t('dashboard.save') }}</OButton>
-        </div>
-      </template>
     </ODrawer>
     <!-- delete tab dialog -->
     <TabsDeletePopUp

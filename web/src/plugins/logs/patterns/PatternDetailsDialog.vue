@@ -20,33 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="modelValue"
     @update:open="$emit('update:modelValue', $event)"
     :width="90"
-    :show-close="false"
+    :title="t('search.patternDetailsTitle')"
+    :sub-title="selectedPattern ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns }) : undefined"
   >
-    <template v-if="selectedPattern" #header>
-      <div class="row items-center no-wrap tw:w-full">
-        <div class="col">
-          <div class="text-body1 text-bold">{{ t("search.patternDetailsTitle") }}</div>
-          <div
-            class="text-caption"
-            :class="
-              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-            "
-          >
-            {{ t("search.patternXofY", { index: selectedPattern.index + 1, total: totalPatterns }) }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            variant="ghost"
-            size="icon-circle"
-            data-test="close-pattern-dialog"
-            @click="$emit('update:modelValue', false)"
-          >
-            <q-icon name="cancel" />
-          </OButton>
-        </div>
-      </div>
-    </template>
     <template v-if="selectedPattern">
         <!-- Statistics -->
         <div class="tw-mb-[1rem]">

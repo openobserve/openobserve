@@ -1,18 +1,14 @@
 <template>
   <ODialog v-model:open="dialogVisible" persistent size="md" :show-close="false"
+    :title="isEditing ? t('crossLinks.editCrossLink') : t('crossLinks.addCrossLink')"
     :secondary-button-label="t('common.cancel')"
     :primary-button-label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
     :primary-button-disabled="!form.name || !form.url"
     @click:secondary="onCancel"
     @click:primary="onSubmit"
   >
-    <template #header>
-      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-        <div class="text-h6">
-          {{ isEditing ? t("crossLinks.editCrossLink") : t("crossLinks.addCrossLink") }}
-        </div>
-        <CrossLinkUserGuide />
-      </div>
+    <template #header-right>
+      <CrossLinkUserGuide />
     </template>
         <q-form @submit.prevent="onSubmit">
           <!-- Name -->

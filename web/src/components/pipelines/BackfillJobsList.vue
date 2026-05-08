@@ -329,13 +329,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="errorDialogVisible"
       size="md"
+      title="Backfill Job Error"
+      primary-button-label="Close"
       @update:open="(v) => !v && closeErrorDialog()"
+      @click:primary="errorDialogVisible = false; closeErrorDialog()"
     >
-      <template #header>
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <q-icon name="error" color="negative" size="18px" />
-          <span class="tw:font-semibold tw:text-sm">Backfill Job Error</span>
-        </div>
+      <template #header-left>
+        <q-icon name="error" color="negative" size="18px" />
       </template>
 
       <div v-if="errorDialogData">
@@ -361,13 +361,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <template #footer>
-        <div class="tw:flex tw:justify-end">
-          <OButton variant="outline" size="sm-action" @click="errorDialogVisible = false; closeErrorDialog()">
-            Close
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
     <!-- Confirm Dialog -->

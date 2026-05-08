@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <ODialog v-model:open="detailsDialog" size="lg" title="Pipeline Execution Details">
+    <ODialog v-model:open="detailsDialog" size="lg" title="Pipeline Execution Details" primary-button-label="Close" @click:primary="detailsDialog = false">
       <div
         class="scroll"
         style="max-height: 70vh"
@@ -527,60 +527,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
         </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="detailsDialog = false">
-            Close
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
     <!-- Error Dialog -->
-    <ODialog v-model:open="errorDialog" size="sm" :show-close="false">
-      <template #header>
-        <div class="pipeline-error-header tw:flex tw:items-start tw:w-full">
-          <div class="tw:flex-1">
-            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-              <q-icon name="error" size="24px" class="error-icon" />
-              <span class="pipeline-name">{{ errorMessage.pipeline_name }}</span>
-            </div>
-            <div class="error-timestamp">
-              <span class="tw:ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw:mr-1" />
-              {{
-                errorMessage.last_error_timestamp &&
-                new Date(
-                  errorMessage.last_error_timestamp / 1000,
-                ).toLocaleString()
-              }}
-            </div>
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon"
-            @click="closeErrorDialog"
-            class="close-btn"
-          >
-            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-          </OButton>
-        </div>
+    <ODialog
+      v-model:open="errorDialog"
+      size="sm"
+      :title="errorMessage?.pipeline_name"
+      :sub-title="errorMessage?.last_error_timestamp ? `Last error: ${new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()}` : undefined"
+      primary-button-label="Close"
+      @update:open="(v) => !v && closeErrorDialog()"
+      @click:primary="closeErrorDialog"
+    >
+      <template #header-left>
+        <q-icon name="error" size="24px" class="error-icon" />
       </template>
       <div class="tw:mb-4">
         <div class="section-label tw:mb-2">Error Summary</div>
         <div class="error-summary-box">
-          {{ errorMessage.error }}
+          {{ errorMessage?.error }}
         </div>
       </div>
-      <template #footer>
-        <div class="pipeline-error-actions">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="closeErrorDialog"
-          >Close</OButton>
-        </div>
-      </template>
     </ODialog>
   </div>
 </template>
@@ -650,7 +617,7 @@ const dateTimeValues = ref({
 const detailsDialog = ref(false);
 const errorDialog = ref(false);
 const selectedRow = ref<any>(null);
-const errorMessage = ref("");
+const errorMessage = ref<any>(null);
 
 // Table columns
 const columns = ref([
@@ -985,7 +952,7 @@ const showDetailsDialog = (row: any) => {
   detailsDialog.value = true;
 };
 
-const showErrorDialog = (error: string) => {
+const showErrorDialog = (error: any) => {
   errorMessage.value = error;
   errorDialog.value = true;
 };

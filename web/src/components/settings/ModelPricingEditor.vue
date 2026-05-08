@@ -159,17 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
 
               <!-- Pattern Examples Dialog -->
-              <ODialog v-model:open="showExamples" size="sm">
-                <template #header>
-                  <div>
-                    <div class="tw:font-semibold tw:text-sm">
-                      {{ t("modelPricing.patternExamplesTitle") }}
-                    </div>
-                    <div class="tw:text-xs tw:opacity-50 tw:mt-0.5">
-                      {{ t("modelPricing.patternExamplesDesc") }}
-                    </div>
-                  </div>
-                </template>
+              <ODialog v-model:open="showExamples" size="sm"
+                :title="t('modelPricing.patternExamplesTitle')"
+                :sub-title="t('modelPricing.patternExamplesDesc')"
+              >
                 <div class="examples-table">
                   <div class="examples-table-head">
                     <span>{{

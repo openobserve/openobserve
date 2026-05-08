@@ -20,26 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="open"
     size="md"
+    :title="`Delete ${dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.name}`"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
-    <template #header>
-      <span
-        data-test="dashboard-tab-delete-tab-head"
-        class="tw:text-base tw:font-semibold"
-      >
-        Delete
-        <span
-          style="text-decoration: underline"
-          data-test="dashboard-tab-delete-tab-name"
-          >{{
-            dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.name
-          }}</span
-        >
-      </span>
-    </template>
 
     <div data-test="dialog-box">
       <p class="para" data-test="dashboard-tab-delete-tab-para">
@@ -50,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- only show if there are panels in the tab -->
       <div
         v-if="
-          dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.panels
+          dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.panels
             ?.length
         "
         class="tw:mt-4"
