@@ -272,6 +272,8 @@ describe("usePatternActions", () => {
         sqlQuery: "SELECT *",
         alertName: "Alert_test-stream_User",
       });
+      // Ensure stream is selected (previous tests may have cleared it)
+      mockSearchObj.data.stream.selectedStream = ["test-stream"];
     });
 
     it("should navigate to addAlert with pattern data", () => {
