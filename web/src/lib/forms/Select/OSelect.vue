@@ -28,7 +28,7 @@ import {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "reka-ui";
-import { computed, provide, ref, useSlots } from "vue";
+import { computed, onBeforeUnmount, provide, ref, useSlots, watch } from "vue";
 
 type NormalizedOption = {
   label: string;
@@ -46,7 +46,16 @@ const props = withDefaults(defineProps<SelectProps>(), {
   clearable: false,
   error: false,
   multiple: false,
+  useInput: false,
+  fillInput: false,
   searchable: false,
+  inputDebounce: 0,
+  hideSelected: false,
+  useChips: false,
+  newValueMode: undefined,
+  popupContentStyle: undefined,
+  popupNoRouteDismiss: false,
+  behavior: "menu",
   searchPlaceholder: "Search...",
   emptyText: "No options found",
   optionLabel: DEFAULT_OPTION_LABEL,
@@ -104,14 +113,23 @@ const normalizedOptions = computed<NormalizedOption[]>(() => {
 
 const searchTerm = ref("");
 const popoverOpen = ref(false);
+const filterDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+
+const inputEnabled = computed(() => props.searchable || props.useInput);
 
 const filteredOptions = computed(() => {
-  if (!props.searchable) return normalizedOptions.value;
+  if (!inputEnabled.value) return normalizedOptions.value;
   const term = searchTerm.value.trim().toLowerCase();
-  if (!term) return normalizedOptions.value;
-  return normalizedOptions.value.filter((opt) =>
-    opt.label.toLowerCase().includes(term),
-  );
+  let options = normalizedOptions.value;
+
+  if (props.hideSelected && props.multiple && selectedValues.value.length > 0) {
+    options = options.filter(
+      (opt) => !selectedValues.value.includes(opt.value),
+    );
+  }
+
+  if (!term) return options;
+  return options.filter((opt) => opt.label.toLowerCase().includes(term));
 });
 
 const listboxModeEnabled = computed(
@@ -119,6 +137,7 @@ const listboxModeEnabled = computed(
     !!props.options?.length &&
     !slots.default &&
     (props.multiple ||
+      props.useInput ||
       props.searchable ||
       props.optionLabel !== DEFAULT_OPTION_LABEL ||
       props.optionValue !== DEFAULT_OPTION_VALUE ||
@@ -149,6 +168,39 @@ const triggerDisplayLabel = computed(() => {
   if (props.multiple) return selectedLabels.value.join(", ");
   return selectedLabels.value[0] ?? "";
 });
+
+function emitFilter(value: string) {
+  emit(
+    "filter",
+    value,
+    (cb?: () => void) => {
+      if (cb) cb();
+    },
+    () => {},
+  );
+}
+
+watch(searchTerm, (value) => {
+  if (!inputEnabled.value) return;
+  if ((props.inputDebounce ?? 0) > 0) {
+    if (filterDebounceTimer.value) clearTimeout(filterDebounceTimer.value);
+    filterDebounceTimer.value = setTimeout(
+      () => emitFilter(value),
+      props.inputDebounce,
+    );
+    return;
+  }
+  emitFilter(value);
+});
+
+watch(
+  () => props.modelValue,
+  () => {
+    if (!props.fillInput || !props.useInput || props.multiple) return;
+    searchTerm.value = triggerDisplayLabel.value;
+  },
+  { immediate: true },
+);
 
 // ── Validation ─────────────────────────────────────────────────────────────
 const ruleError = ref<string | null>(null);
@@ -221,6 +273,12 @@ function handleListboxUpdate(value: unknown) {
   runRules(resolved);
   emit("update:modelValue", resolved);
 
+  if (props.fillInput && !props.multiple) {
+    searchTerm.value = Array.isArray(resolved)
+      ? String(resolved[0] ?? "")
+      : String(resolved ?? "");
+  }
+
   if (!props.multiple) {
     popoverOpen.value = false;
   }
@@ -240,7 +298,59 @@ function handleClear() {
   runRules(clearedValue);
   emit("update:modelValue", clearedValue);
   emit("clear");
+  searchTerm.value = "";
 }
+
+function commitNewValue(raw: string, mode: "add" | "add-unique") {
+  const term = raw.trim();
+  if (!term) return;
+
+  const optionMatch = normalizedOptions.value.find(
+    (opt) => opt.label === term || String(opt.value) === term,
+  );
+  const createdValue: SelectPrimitiveValue = optionMatch?.value ?? term;
+
+  if (props.multiple) {
+    const current = Array.isArray(props.modelValue)
+      ? [...props.modelValue]
+      : [];
+    const exists = current.includes(createdValue);
+    if (!(mode === "add-unique" && exists)) {
+      current.push(createdValue);
+    }
+    runRules(current);
+    emit("update:modelValue", current);
+  } else {
+    runRules(createdValue);
+    emit("update:modelValue", createdValue);
+    popoverOpen.value = false;
+  }
+}
+
+function handleCreateFromInput() {
+  const term = searchTerm.value.trim();
+  if (!term) return;
+
+  const hasExisting = normalizedOptions.value.some(
+    (opt) => opt.label === term || String(opt.value) === term,
+  );
+  if (hasExisting) return;
+
+  let handled = false;
+  emit("new-value", term, (value, mode) => {
+    const resolved = value ?? term;
+    commitNewValue(String(resolved), mode ?? props.newValueMode ?? "add");
+    handled = true;
+  });
+
+  if (!handled && props.newValueMode) {
+    commitNewValue(term, props.newValueMode);
+  }
+}
+
+onBeforeUnmount(() => {
+  if (filterDebounceTimer.value) clearTimeout(filterDebounceTimer.value);
+});
 
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "tw:h-8 tw:text-sm",
@@ -298,7 +408,23 @@ const fieldWidthClass = computed(() => {
               ]"
             >
               <slot name="trigger" :value="modelValue">
+                <template
+                  v-if="multiple && useChips && selectedLabels.length > 0"
+                >
+                  <div
+                    class="tw:flex-1 tw:flex tw:flex-wrap tw:gap-1 tw:py-1 tw:pe-2"
+                  >
+                    <span
+                      v-for="labelText in selectedLabels"
+                      :key="labelText"
+                      class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text"
+                    >
+                      {{ labelText }}
+                    </span>
+                  </div>
+                </template>
                 <span
+                  v-else
                   :class="[
                     'tw:flex-1 tw:text-start tw:truncate',
                     hasSelection
@@ -367,6 +493,7 @@ const fieldWidthClass = computed(() => {
               'tw:bg-select-content-bg tw:border-select-content-border',
               'tw:p-1',
             ]"
+            :style="popupContentStyle"
           >
             <ListboxRoot
               :model-value="listboxStringModelValue"
@@ -375,10 +502,11 @@ const fieldWidthClass = computed(() => {
               @update:model-value="handleListboxUpdate"
             >
               <ListboxFilter
-                v-if="searchable"
+                v-if="inputEnabled"
                 v-model="searchTerm"
                 class="tw:w-full tw:h-9 tw:px-3 tw:mb-1 tw:rounded-md tw:border tw:bg-input-bg tw:border-input-border tw:text-input-text tw:placeholder:text-input-placeholder tw:outline-none tw:focus:ring-2 tw:focus:ring-input-focus-ring"
                 :placeholder="searchPlaceholder"
+                @keydown.enter.prevent="handleCreateFromInput"
               />
 
               <div class="tw:max-h-60 tw:overflow-auto">
@@ -528,6 +656,7 @@ const fieldWidthClass = computed(() => {
             'tw:data-[side=bottom]:slide-in-from-top-2',
             'tw:data-[side=top]:slide-in-from-bottom-2',
           ]"
+          :style="popupContentStyle"
         >
           <SelectScrollUpButton
             class="tw:flex tw:items-center tw:justify-center tw:h-6 tw:text-select-icon"

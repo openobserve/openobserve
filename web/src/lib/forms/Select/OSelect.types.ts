@@ -34,8 +34,26 @@ export interface SelectProps {
   options?: SelectOption[];
   /** Allows selecting multiple options */
   multiple?: boolean;
+  /** Enables editable input behavior similar to q-select use-input */
+  useInput?: boolean;
+  /** Fills input area with selected value label when supported */
+  fillInput?: boolean;
   /** Enables local text filtering for options mode */
   searchable?: boolean;
+  /** Debounce (ms) before emitting filter events */
+  inputDebounce?: number;
+  /** Hides already selected options in multiple mode */
+  hideSelected?: boolean;
+  /** Renders multiple selected values as chips in the trigger */
+  useChips?: boolean;
+  /** Strategy for values created by typing into the input */
+  newValueMode?: "add" | "add-unique";
+  /** Optional popup content style passthrough */
+  popupContentStyle?: string | Record<string, string | number>;
+  /** Compatibility prop with q-select; currently no-op */
+  popupNoRouteDismiss?: boolean;
+  /** Compatibility prop with q-select; currently no-op */
+  behavior?: "menu" | "dialog";
   /** Placeholder text shown in the internal search input */
   searchPlaceholder?: string;
   /** Empty-state text when no options match */
@@ -84,6 +102,19 @@ export interface SelectProps {
 export interface SelectEmits {
   (_e: "update:modelValue", _value: SelectModelValue): void;
   (_e: "clear"): void;
+  /** q-select-compatible filter callback trigger */
+  (
+    _e: "filter",
+    _value: string,
+    _update: (_cb?: () => void) => void,
+    _abort: () => void,
+  ): void;
+  /** q-select-compatible new value callback trigger */
+  (
+    _e: "new-value",
+    _value: string,
+    _done: (_value?: SelectValue, _mode?: "add" | "add-unique") => void,
+  ): void;
 }
 
 export interface SelectSlots {
