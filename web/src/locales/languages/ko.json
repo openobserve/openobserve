@@ -2925,7 +2925,21 @@
       "minutesAgo": "{n} m 전",
       "hoursAgo": "{n} 시간 전",
       "daysAgo": "{n} 일 전"
-    }
+    },
+    "noErrorPresent": "이 스팬에는 오류가 없습니다.",
+    "httpStatusCode": "HTTP 상태 코드",
+    "grpcStatusCode": "gRPC 상태 코드",
+    "dbResponseStatusCode": "DB 응답 상태 코드",
+    "processExitCode": "프로세스 종료 코드",
+    "exceptionsWithCount": "예외 ({개수})",
+    "typeLabel": "유형:",
+    "messageLabel": "메시지:",
+    "escapedLabel": "탈출:",
+    "stacktraceLabel": "스택 트레이스:",
+    "copyStacktrace": "스택 트레이스 복사",
+    "noStacktraceAvailable": "스택트레이스를 사용할 수 없음",
+    "stacktraceCopied": "스택트레이스를 클립보드에 복사했습니다.",
+    "stacktraceCopyFailed": "스택 트레이스를 복사하지 못했습니다."
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",

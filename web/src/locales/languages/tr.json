@@ -2925,7 +2925,21 @@
       "minutesAgo": "{n} m önce",
       "hoursAgo": "{n} saat önce",
       "daysAgo": "{n} d önce"
-    }
+    },
+    "noErrorPresent": "Bu aralıkta hata yok",
+    "httpStatusCode": "HTTP Durum Kodu",
+    "grpcStatusCode": "gRPC Durum Kodu",
+    "dbResponseStatusCode": "DB Yanıt Durum Kodu",
+    "processExitCode": "İşlem Çıkış Kodu",
+    "exceptionsWithCount": "İstisnalar ({count})",
+    "typeLabel": "Türü:",
+    "messageLabel": "Mesaj:",
+    "escapedLabel": "Kaçıldı:",
+    "stacktraceLabel": "Yığın izleme:",
+    "copyStacktrace": "Stacktrace'i kopyala",
+    "noStacktraceAvailable": "Yığın izleme mevcut değil",
+    "stacktraceCopied": "Stacktrace panoya kopyalandı",
+    "stacktraceCopyFailed": "Stacktrace kopyalanamadı"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

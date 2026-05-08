@@ -2912,7 +2912,21 @@
       "minutesAgo": "Hace {n} m",
       "hoursAgo": "Hace {n} h",
       "daysAgo": "Hace {n} d"
-    }
+    },
+    "noErrorPresent": "No hay ningún error en este intervalo",
+    "httpStatusCode": "Código de estado HTTP",
+    "grpcStatusCode": "Código de estado de gRPC",
+    "dbResponseStatusCode": "Código de estado de respuesta de base de datos",
+    "processExitCode": "Código de salida del proceso",
+    "exceptionsWithCount": "Excepciones ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Mensaje:",
+    "escapedLabel": "Se escapó:",
+    "stacktraceLabel": "Stacktrace:",
+    "copyStacktrace": "Copiar stacktrace",
+    "noStacktraceAvailable": "No hay stacktrace disponible",
+    "stacktraceCopied": "Stacktrace copiado al portapapeles",
+    "stacktraceCopyFailed": "No se pudo copiar stacktrace"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
