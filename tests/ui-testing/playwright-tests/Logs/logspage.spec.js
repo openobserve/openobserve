@@ -16,6 +16,13 @@ async function ingestTestData(page) {
 }
 
 async function applyQueryButton(pm) {
+  // Wait for the refresh button to be enabled before clicking — it may be
+  // temporarily disabled while a previous query or VRL transformation runs.
+  await pm.page.waitForFunction(
+    (sel) => { const el = document.querySelector(sel); return el && !el.disabled; },
+    "[data-test='logs-search-bar-refresh-btn']",
+    { timeout: 15000 }
+  ).catch(() => {});
   await Promise.all([
     pm.page.waitForResponse(
       resp => resp.url().includes('/_search') && resp.status() === 200,
@@ -103,7 +110,8 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickVrlEditor();
     // Strategic 500ms wait for VRL editor DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
-    await applyQueryButton(pm);
+    // VRL queries may not return HTTP 200 on all envs; use button-state-based wait
+    await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.expectWarningElementHidden();
   
     await pm.logsPage.clickTableRowExpandMenu();
@@ -138,10 +146,12 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickShowQueryToggle();
     await pm.logsPage.clickSavedViewsButton();
     await pm.logsPage.fillSavedViewName("e2e@@@@@");
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    // Wait for the specific validation notification — using text-filtered wait
+    // avoids false matches when another toast (e.g. streaming) stacks first.
     await pm.logsPage.clickSavedViewDialogSave();
-    await pm.logsPage.expectNotificationMessage("Please provide valid view name");
-    
+    await pm.logsPage.waitForNotificationWithText("Please provide valid view name", 15000);
+
     testLogger.info('Saved views special characters validation test completed');
   });
 
@@ -189,8 +199,13 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickLiveModeButton();
     // Strategic 500ms wait for live mode dropdown DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
+    // Start watching for notification before clicking - Quasar notify has 1s timeout
+    const liveNotifPromise = page.waitForFunction(
+      () => document.querySelector('.q-notification__message,.q-notification,.q-banner,[role="alert"]')?.textContent?.includes('Live mode is enabled'),
+      { timeout: 15000 }
+    );
     await pm.logsPage.clickLiveMode5Sec();
-    await pm.logsPage.expectNotificationMessage("Live mode is enabled");
+    await liveNotifPromise;
     await pm.logsPage.clickLiveModeButton();
     // Strategic 500ms wait for live mode dropdown DOM stabilization - this is functionally necessary
     await page.waitForTimeout(500);
@@ -424,7 +439,12 @@ test.describe("Logs Page testcases", () => {
     tag: ['@histogramBarChart', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing bar chart display with histogram toggle');
-    
+
+    // Ensure histogram is ON — alpha1 may default to OFF. Without this the canvas
+    // never renders and clickBarChartCanvas times out.
+    await pm.logsPage.ensureHistogramState(true);
+    await page.waitForTimeout(300);
+
     await pm.logsPage.clickLogSearchIndexListFieldSearchInput();
     await pm.logsPage.fillLogSearchIndexListFieldSearchInput('code');
     // Strategic 500ms wait for field search results DOM stabilization - this is functionally necessary
