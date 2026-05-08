@@ -1520,6 +1520,7 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "short_url" => db::short_url::cache().await,
         "realtime_triggers" => db::alerts::realtime_triggers::cache().await,
         "org_users" => db::org_users::cache().await,
+        "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
         _ => Err(anyhow::anyhow!("unsupported module")),
     }

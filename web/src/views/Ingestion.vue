@@ -22,9 +22,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container">
         <div class="q-px-md q-pt-md full-width">
           <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
+          <!-- Org token management button (non-RUM pages) -->
+          <q-btn
+            v-if="!isRUMPage"
+            class="o2-primary-button tw:h-[36px] q-ml-sm q-mb-xs text-bold no-border right float-right"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
+            flat
+            no-caps
+            icon="vpn_key"
+            :label="t('ingestion.manageTokensBtnLabel')"
+            @click="navigateToIngestionTokens"
+          />
+          <!-- RUM token buttons -->
           <q-btn
             v-if="
-              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+              isRUMPage &&
               store.state.organizationData.rumToken.rum_token != ''
             "
             class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
@@ -40,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             v-else-if="
-              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+              isRUMPage &&
               store.state.organizationData.rumToken.rum_token == ''
             "
             class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
@@ -53,19 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             :label="t(`ingestion.generateRUMTokenLabel`)"
             @click="generateRUMToken"
-          />
-          <q-btn
-            v-else
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
-            :label="t(`ingestion.resetTokenBtnLabel`)"
-            @click="showUpdateDialogFn"
           />
           <q-input
             v-model="globalSearchQuery"
@@ -93,13 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("ingestion.redirectionIngestionMsg") }}
           </span>
           <div style="clear: both"></div>
-          <ConfirmDialog
-            title="Reset Token"
-            message="Are you sure you want to update token for this organization?"
-            @update:ok="updatePasscode"
-            @update:cancel="confirmUpdate = false"
-            v-model="confirmUpdate"
-          />
           <ConfirmDialog
             title="Reset RUM Token"
             message="Are you sure you want to update rum token for this organization?"
@@ -249,6 +245,7 @@ align="left" class="q-ml-md">
       >
       </router-view>
     </div>
+
   </q-page>
 </template>
 
@@ -317,14 +314,17 @@ export default defineComponent({
       },
     ];
 
+    const isRUMPage = computed(() =>
+      rumRoutes.indexOf(router.currentRoute.value.name) > -1,
+    );
+
     onBeforeMount(() => {
-      if (
-        (!store.state.organizationData.organizationPasscode ||
-          !store.state.organizationData.rumToken.rum_token) &&
-        store.state.selectedOrganization.identifier != undefined
-      ) {
+      if (store.state.selectedOrganization.identifier != undefined) {
         getOrganizationPasscode();
-        getRUMToken();
+        fetchOrgTokens();
+        if (!store.state.organizationData.rumToken.rum_token) {
+          getRUMToken();
+        }
       }
     });
 
@@ -356,7 +356,7 @@ export default defineComponent({
       organizationsService
         .get_organization_passcode(store.state.selectedOrganization.identifier)
         .then((res) => {
-          if (res.data.data.token == "") {
+          if (res.data.data.passcode == "") {
             q.notify({
               type: "negative",
               message: "API Key not found.",
@@ -364,9 +364,13 @@ export default defineComponent({
             });
           } else {
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
+            store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
             currentOrgIdentifier.value =
               store.state.selectedOrganization.identifier;
           }
+        })
+        .catch(() => {
+          // Silently fail — passcode is not critical for page render
         });
     };
 
@@ -384,7 +388,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
         )
         .then((res) => {
-          if (res.data.data.token == "") {
+          if (res.data.data.passcode == "") {
             q.notify({
               type: "negative",
               message: "API Key not found.",
@@ -397,6 +401,7 @@ export default defineComponent({
               timeout: 5000,
             });
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
+            store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
             currentOrgIdentifier.value =
               store.state.selectedOrganization.identifier;
           }
@@ -419,12 +424,34 @@ export default defineComponent({
       });
     };
 
-    const showUpdateDialogFn = () => {
+    const showResetDefaultDialogFn = () => {
       confirmUpdate.value = true;
     };
 
     const showRUMUpdateDialogFn = () => {
       confirmRUMUpdate.value = true;
+    };
+
+    const fetchOrgTokens = () => {
+      organizationsService
+        .list_org_ingestion_tokens(
+          store.state.selectedOrganization.identifier,
+        )
+        .then((res) => {
+          store.dispatch("setOrgTokens", res.data.data);
+        })
+        .catch(() => {
+          // Silently fail — settings page will retry on load
+        });
+    };
+
+    const navigateToIngestionTokens = () => {
+      router.push({
+        name: "ingestionTokens",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     const copyToClipboardFn = (content: any) => {
@@ -652,8 +679,11 @@ export default defineComponent({
       currentOrgIdentifier,
       currentUserEmail: store.state.userInfo.email,
       updatePasscode,
-      showUpdateDialogFn,
+      showResetDefaultDialogFn,
       showRUMUpdateDialogFn,
+      fetchOrgTokens,
+      navigateToIngestionTokens,
+      isRUMPage,
       confirmUpdate,
       confirmRUMUpdate,
       getImageURL,

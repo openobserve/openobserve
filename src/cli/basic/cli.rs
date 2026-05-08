@@ -188,6 +188,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "reset" => {
             infra::init().await?;
             db::org_users::cache().await?;
+            db::org_ingestion_tokens::cache().await?;
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
@@ -306,6 +307,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 "user" => {
                     db::user::cache().await?;
                     db::org_users::cache().await?;
+                    db::org_ingestion_tokens::cache().await?;
                     let mut id = 0;
                     for user in USERS.iter() {
                         id += 1;

@@ -45,7 +45,7 @@ use {
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     common::{
-        infra::config::ORG_USERS,
+        infra::config::{ORG_INGESTION_TOKENS, ORG_USERS},
         meta::organization::{
             AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
             OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
@@ -55,6 +55,7 @@ use crate::{
     },
     service::{
         db::{self, org_users},
+        ingestion_tokens,
         self_reporting,
         stream::get_streams,
         users::add_admin_to_org,
@@ -197,6 +198,25 @@ pub async fn get_passcode(
     org_id: Option<&str>,
     user_id: &str,
 ) -> Result<IngestionPasscode, anyhow::Error> {
+    let lookup_org_id = org_id.unwrap_or(DEFAULT_ORG);
+
+    // Try default org ingestion token first — returns actual unmasked value
+    if let Ok(Some(token_record)) =
+        infra::table::org_ingestion_tokens::get_by_name(lookup_org_id, "default").await
+    {
+        // Populate cache on cache miss
+        ORG_INGESTION_TOKENS
+            .insert(
+                db::org_ingestion_tokens::cache_key(lookup_org_id, &token_record.token),
+                token_record.name,
+            );
+        return Ok(IngestionPasscode {
+            user: format!("ingestion:default@{}", lookup_org_id),
+            passcode: token_record.token,
+        });
+    }
+
+    // Fall back to existing user token lookup
     let Ok(Some(user)) = db::user::get(org_id, user_id).await else {
         return Err(anyhow::Error::msg("User not found"));
     };
@@ -240,6 +260,21 @@ pub async fn update_passcode(
     org_id: Option<&str>,
     user_id: &str,
 ) -> Result<IngestionPasscode, anyhow::Error> {
+    let lookup_org_id = org_id.unwrap_or(DEFAULT_ORG);
+
+    // Try rotating the default org ingestion token first
+    if infra::table::org_ingestion_tokens::get_by_name(lookup_org_id, "default")
+        .await
+        .is_ok_and(|r| r.is_some())
+    {
+        let new_token = ingestion_tokens::rotate_token(lookup_org_id, "default").await?;
+        return Ok(IngestionPasscode {
+            user: format!("ingestion:default@{}", lookup_org_id),
+            passcode: new_token.token,
+        });
+    }
+
+    // Fall back to existing user token rotation
     let is_rum_update = false;
     match update_passcode_inner(org_id, user_id, is_rum_update).await {
         Ok(IngestionTokensContainer::Passcode(response)) => Ok(response),
@@ -396,6 +431,16 @@ pub async fn create_org(
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
+
+            // Create the default org-level ingestion token
+            if let Err(e) =
+                ingestion_tokens::create_default_token(&org.identifier, user_email).await
+            {
+                log::error!(
+                    "Failed to create default ingestion token for org '{}': {e}",
+                    org.identifier
+                );
+            }
 
             // Determine which user to add to the org
             // If service_account is specified, add it instead of the caller
@@ -582,6 +627,15 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
                 stream_name: None,
             })
             .await;
+            // Create default org-level ingestion token for auto-provisioned orgs
+            if let Err(e) =
+                ingestion_tokens::create_default_token(&org.identifier, "system").await
+            {
+                log::error!(
+                    "Failed to create default ingestion token for org '{}': {e}",
+                    org.identifier
+                );
+            }
             Ok(org.clone())
         }
         Err(e) => {
@@ -610,7 +664,18 @@ pub async fn check_and_create_org_without_ofga(
         service_account: None,
     };
     match db::organization::save_org(org).await {
-        Ok(_) => Ok(org.clone()),
+        Ok(_) => {
+            // Create default org-level ingestion token for auto-provisioned orgs
+            if let Err(e) =
+                ingestion_tokens::create_default_token(&org.identifier, "system").await
+            {
+                log::error!(
+                    "Failed to create default ingestion token for org '{}': {e}",
+                    org.identifier
+                );
+            }
+            Ok(org.clone())
+        }
         Err(e) => {
             log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))

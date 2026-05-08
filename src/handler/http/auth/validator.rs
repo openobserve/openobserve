@@ -33,6 +33,7 @@ use o2_openfga::config::get_config as get_openfga_config;
 
 use crate::{
     common::{
+        infra::config::ORG_INGESTION_TOKENS,
         meta::{
             ingestion::INGESTION_EP,
             organization::DEFAULT_ORG,
@@ -237,6 +238,102 @@ pub async fn validate_credentials(
         && v.is_empty()
     {
         path_columns.pop();
+    }
+
+    // Check org-level ingestion tokens before user lookup.
+    // Org tokens are prefixed with "o2oi_" for fast identification —
+    // if the password starts with this prefix, check the dedicated
+    // org_ingestion_tokens cache/table instead of the user tables.
+    if user_password.starts_with(infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX) {
+        let org_id = if path_columns.len() > 1 && path_columns[0].eq(V2_API_PREFIX) {
+            path_columns.get(1).copied()
+        } else {
+            path_columns.first().copied()
+        };
+
+        if let Some(org_id) = org_id {
+            let cache_key = format!("{}/{}", org_id, user_password);
+
+            // Cache hit — token is valid and enabled (disabled/deleted tokens
+            // are purged from cache at the time of disable/delete).
+            if let Some(r) = ORG_INGESTION_TOKENS.get(&cache_key) {
+                let token_name = r.value().clone();
+                let is_ingestion_path = path_columns.len() == 1
+                    || INGESTION_EP
+                        .iter()
+                        .any(|ep| path_columns.contains(ep));
+
+                if !is_ingestion_path {
+                    return Ok(TokenValidationResponse {
+                        is_valid: false,
+                        user_email: format!("ingestion:{}@{}", token_name, org_id),
+                        is_internal_user: false,
+                        user_role: None,
+                        user_name: token_name.clone(),
+                        family_name: "".to_string(),
+                        given_name: token_name.clone(),
+                    });
+                }
+
+                return Ok(TokenValidationResponse {
+                    is_valid: true,
+                    user_email: format!("ingestion:{}@{}", token_name, org_id),
+                    is_internal_user: true,
+                    user_role: None,
+                    user_name: token_name.clone(),
+                    family_name: "".to_string(),
+                    given_name: token_name.clone(),
+                });
+            }
+
+            // Cache miss — do DB lookup. find_by_token filters by enabled=true.
+            match infra::table::org_ingestion_tokens::find_by_token(org_id, user_password).await {
+                Ok(Some(token_record)) => {
+                    // Populate cache for future fast lookups
+                    ORG_INGESTION_TOKENS.insert(cache_key, token_record.name.clone());
+
+                    let is_ingestion_path = path_columns.len() == 1
+                        || INGESTION_EP
+                            .iter()
+                            .any(|ep| path_columns.contains(ep));
+
+                    if !is_ingestion_path {
+                        return Ok(TokenValidationResponse {
+                            is_valid: false,
+                            user_email: format!(
+                                "ingestion:{}@{}",
+                                token_record.name, org_id
+                            ),
+                            is_internal_user: false,
+                            user_role: None,
+                            user_name: token_record.name.clone(),
+                            family_name: "".to_string(),
+                            given_name: token_record.name,
+                        });
+                    }
+
+                    return Ok(TokenValidationResponse {
+                        is_valid: true,
+                        user_email: format!(
+                            "ingestion:{}@{}",
+                            token_record.name, org_id
+                        ),
+                        is_internal_user: true,
+                        user_role: None,
+                        user_name: token_record.name.clone(),
+                        family_name: "".to_string(),
+                        given_name: token_record.name,
+                    });
+                }
+                Ok(None) => {
+                    // Token not found or disabled — fall through to user lookup
+                }
+                Err(e) => {
+                    log::error!("Error checking org ingestion token: {e}");
+                    // Fall through to user lookup on error
+                }
+            }
+        }
     }
 
     let mut user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {

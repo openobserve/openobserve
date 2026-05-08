@@ -589,6 +589,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/summary", get(organization::org::org_summary))
         .route("/{org_id}/passcode", get(organization::org::get_user_passcode).put(organization::org::update_user_passcode))
         .route("/{org_id}/rumtoken", get(organization::org::get_user_rumtoken).post(organization::org::create_user_rumtoken).put(organization::org::update_user_rumtoken))
+        .route("/{org_id}/ingestion-tokens", get(organization::ingestion_tokens::list_ingestion_tokens).post(organization::ingestion_tokens::create_ingestion_token))
+        .route("/{org_id}/ingestion-tokens/{name}", patch(organization::ingestion_tokens::enable_disable_ingestion_token))
         .route("/{org_id}/node/list", get(organization::org::node_list))
         .route("/{org_id}/cluster/info", get(organization::org::cluster_info))
         .route("/{org_id}/rename", put(organization::org::rename_org))

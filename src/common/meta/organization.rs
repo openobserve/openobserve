@@ -294,6 +294,41 @@ pub struct RumIngestionResponse {
     pub data: RumIngestionToken,
 }
 
+// --- Org-level ingestion tokens ---
+
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct OrgIngestionToken {
+    pub name: String,
+    pub token: String,
+    pub description: String,
+    pub is_default: bool,
+    pub enabled: bool,
+    pub created_by: String,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OrgIngestionTokenListResponse {
+    pub data: Vec<OrgIngestionToken>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateOrgIngestionTokenRequest {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct OrgIngestionTokenEnableRequest {
+    pub enabled: bool,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OrgIngestionTokenResponse {
+    pub data: OrgIngestionToken,
+}
+
 fn default_scrape_interval() -> u32 {
     config::get_config().common.default_scrape_interval
 }

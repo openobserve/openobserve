@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 pub mod assume_service_account;
 pub mod es;
+pub mod ingestion_tokens;
 pub mod org;
 pub mod settings;
 pub mod system_settings;

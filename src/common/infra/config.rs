@@ -101,6 +101,9 @@ pub static USER_SESSIONS_EXPIRY: Lazy<RwHashMap<String, i64>> = Lazy::new(Defaul
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
+/// Org ingestion token cache — key format: "org_id/token", value = token name.
+/// Presence means the token is valid and enabled. Absence means cache miss (check DB).
+pub static ORG_INGESTION_TOKENS: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 
 /// System settings cache
 /// Key format: "{scope}:{org_id}:{user_id}:{setting_key}" where org_id/user_id can be "_" if not
