@@ -780,6 +780,55 @@ describe("ServicesCatalog", () => {
 
       expect(wrapper.vm.filteredServices).toHaveLength(0);
     });
+
+    it("should handle null/undefined filterText gracefully when filterText is not initialized", async () => {
+      // Populate services via the streaming callback
+      mockFetchQueryDataWithHttpStream.mockImplementation(
+        (_req: any, callbacks: any) => {
+          const hits = mockServices.map((s) => ({
+            service_name: s.service_name,
+            total_requests: s.total_requests,
+            error_count: s.error_count,
+            error_rate: s.error_rate,
+            avg_duration_ns: s.avg_duration_ns,
+            max_duration_ns: s.max_duration_ns,
+            p50_latency_ns: s.p50_latency_ns,
+            p95_latency_ns: s.p95_latency_ns,
+            p99_latency_ns: s.p99_latency_ns,
+          }));
+
+          if (callbacks?.data) {
+            callbacks.data(null, {
+              type: "search_response_hits",
+              content: { results: { hits } },
+            });
+          }
+          if (callbacks?.complete) {
+            callbacks.complete(null, {});
+          }
+        },
+      );
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      // All 5 services should be present before setting filterText to null
+      expect(wrapper.vm.filteredServices).toHaveLength(5);
+
+      // Set filterText to null — the optional chaining filterText?.value?.trim()
+      // prevents a crash that would occur with filterText.value.trim()
+      wrapper.vm.filterText = null;
+      await flushPromises();
+
+      // Should return all services (no crash, empty-filter fallback)
+      expect(wrapper.vm.filteredServices).toHaveLength(5);
+
+      // Set filterText to undefined — same null-safety applies
+      wrapper.vm.filterText = undefined;
+      await flushPromises();
+
+      expect(wrapper.vm.filteredServices).toHaveLength(5);
+    });
   });
 
   // -----------------------------------------------------------------------
