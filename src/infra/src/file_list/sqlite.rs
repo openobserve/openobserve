@@ -1629,6 +1629,7 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    bloom_ver BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1654,6 +1655,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    bloom_ver BIGINT default 0 not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1798,6 +1800,12 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
 
     // create column updated_at for version >= 0.14.7
     let column = "updated_at";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+
+    // create column bloom_ver for bloom filter pruning above tantivy
+    let column = "bloom_ver";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list", column, data_type).await?;
     add_column(&client, "file_list_history", column, data_type).await?;
@@ -1978,6 +1986,7 @@ mod tests {
             compressed_size: 10000,
             flattened: false,
             index_size: 5000,
+            bloom_ver: 0,
         }
     }
 
@@ -2383,5 +2392,152 @@ mod tests {
 
         // Should attempt the query (may fail due to no database, but shouldn't short-circuit)
         let _ = result;
+    }
+
+    // ── bloom_ver schema migration + round-trip on a fresh in-memory DB ──────
+    //
+    // These tests exercise the column add path and the FromRow mapping without
+    // touching the global CLIENT_RW.
+
+    async fn fresh_in_memory_pool() -> sqlx::Pool<sqlx::Sqlite> {
+        sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory sqlite")
+    }
+
+    /// Old-shape file_list table that pre-dates the bloom_ver column.
+    /// Mirrors the historical DDL plus all columns the migration block adds in order.
+    async fn create_legacy_file_list_table(pool: &sqlx::Pool<sqlx::Sqlite>) {
+        sqlx::query(
+            r#"
+            CREATE TABLE file_list (
+                id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                account         VARCHAR DEFAULT '' NOT NULL,
+                org             VARCHAR NOT NULL,
+                stream          VARCHAR NOT NULL,
+                date            VARCHAR NOT NULL,
+                file            VARCHAR NOT NULL,
+                deleted         BOOLEAN DEFAULT false NOT NULL,
+                flattened       BOOLEAN DEFAULT false NOT NULL,
+                min_ts          BIGINT NOT NULL,
+                max_ts          BIGINT NOT NULL,
+                records         BIGINT NOT NULL,
+                original_size   BIGINT NOT NULL,
+                compressed_size BIGINT NOT NULL,
+                index_size      BIGINT DEFAULT 0 NOT NULL,
+                updated_at      BIGINT DEFAULT 0 NOT NULL
+            );
+            "#,
+        )
+        .execute(pool)
+        .await
+        .expect("legacy table");
+    }
+
+    async fn column_exists(pool: &sqlx::Pool<sqlx::Sqlite>, table: &str, col: &str) -> bool {
+        let rows: Vec<(i64, String, String, i64, Option<String>, i64)> =
+            sqlx::query_as(&format!("PRAGMA table_info({table});"))
+                .fetch_all(pool)
+                .await
+                .unwrap();
+        rows.iter().any(|(_, name, ..)| name == col)
+    }
+
+    #[tokio::test]
+    async fn test_add_column_bloom_ver_migration_idempotent() {
+        let pool = fresh_in_memory_pool().await;
+        create_legacy_file_list_table(&pool).await;
+
+        // Pre-state: bloom_ver does not exist.
+        assert!(!column_exists(&pool, "file_list", "bloom_ver").await);
+
+        // Apply the migration once — should add the column.
+        crate::db::sqlite::add_column(&pool, "file_list", "bloom_ver", "BIGINT default 0 not null")
+            .await
+            .expect("first add_column");
+        assert!(column_exists(&pool, "file_list", "bloom_ver").await);
+
+        // Apply again — must be idempotent (no error, no duplicate column).
+        crate::db::sqlite::add_column(&pool, "file_list", "bloom_ver", "BIGINT default 0 not null")
+            .await
+            .expect("second add_column should be idempotent");
+        assert!(column_exists(&pool, "file_list", "bloom_ver").await);
+    }
+
+    #[tokio::test]
+    async fn test_legacy_rows_default_to_bloom_ver_zero_after_migration() {
+        let pool = fresh_in_memory_pool().await;
+        create_legacy_file_list_table(&pool).await;
+
+        // Insert a row in the legacy schema (no bloom_ver column).
+        sqlx::query(
+            r#"INSERT INTO file_list
+                (account, org, stream, date, file, deleted, flattened,
+                 min_ts, max_ts, records, original_size, compressed_size,
+                 index_size, updated_at)
+               VALUES ('a', 'o', 's/logs/x', '2026/05/08/00', 'legacy.parquet',
+                       false, false, 1, 2, 3, 4, 5, 6, 7);"#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Migrate.
+        crate::db::sqlite::add_column(&pool, "file_list", "bloom_ver", "BIGINT default 0 not null")
+            .await
+            .unwrap();
+
+        // FromRow reads — legacy row should expose bloom_ver = 0.
+        let rec: FileRecord = sqlx::query_as(
+            r#"SELECT id, account, stream, date, file, deleted, flattened,
+                       min_ts, max_ts, records, original_size, compressed_size,
+                       index_size, bloom_ver, updated_at
+               FROM file_list WHERE file = 'legacy.parquet';"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rec.bloom_ver, 0);
+    }
+
+    #[tokio::test]
+    async fn test_bloom_ver_round_trip_through_sqlite() {
+        // End-to-end: write a row with non-zero bloom_ver, read it back, confirm value preserved.
+        let pool = fresh_in_memory_pool().await;
+        create_legacy_file_list_table(&pool).await;
+        crate::db::sqlite::add_column(&pool, "file_list", "bloom_ver", "BIGINT default 0 not null")
+            .await
+            .unwrap();
+
+        let bv: i64 = 1_715_000_000_000_000;
+        sqlx::query(
+            r#"INSERT INTO file_list
+                (account, org, stream, date, file, deleted, flattened,
+                 min_ts, max_ts, records, original_size, compressed_size,
+                 index_size, bloom_ver, updated_at)
+               VALUES ('a', 'o', 's/logs/x', '2026/05/08/00', 'with_bv.parquet',
+                       false, false, 1, 2, 3, 4, 5, 6, ?, 7);"#,
+        )
+        .bind(bv)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let rec: FileRecord = sqlx::query_as(
+            r#"SELECT id, account, stream, date, file, deleted, flattened,
+                       min_ts, max_ts, records, original_size, compressed_size,
+                       index_size, bloom_ver, updated_at
+               FROM file_list WHERE file = 'with_bv.parquet';"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rec.bloom_ver, bv);
+
+        // Conversion to FileMeta must carry the value through.
+        let meta = FileMeta::from(&rec);
+        assert_eq!(meta.bloom_ver, bv);
     }
 }

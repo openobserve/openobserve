@@ -2252,6 +2252,11 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .execute(&mut *tx)
     .await?;
     sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bloom_ver BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
         "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS updated_at BIGINT DEFAULT 1762819200000000 NOT NULL"
     ))
     .execute(&mut *tx)
@@ -2587,6 +2592,15 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             Some("p") => {
                 // Already partitioned: just ensure partitions exist
                 log::info!("[POSTGRES] Table {table} already partitioned, ensuring partitions");
+                // Ensure newly-added columns exist on already-partitioned tables.
+                // PG declarative partitioning propagates ALTER on parent to all partitions.
+                if *table == "file_list" || *table == "file_list_history" {
+                    sqlx::query(&format!(
+                        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bloom_ver BIGINT DEFAULT 0 NOT NULL"
+                    ))
+                    .execute(pool)
+                    .await?;
+                }
             }
             Some("r") => {
                 // Regular table: needs migration
@@ -2655,6 +2669,7 @@ CREATE TABLE {table} (
     original_size   BIGINT NOT NULL,
     compressed_size BIGINT NOT NULL,
     index_size      BIGINT NOT NULL,
+    bloom_ver BIGINT DEFAULT 0 NOT NULL,
     updated_at      BIGINT NOT NULL
 ) PARTITION BY RANGE (date)
         "#
@@ -3315,6 +3330,7 @@ mod tests {
             compressed_size: 10000,
             flattened: false,
             index_size: 5000,
+            bloom_ver: 0,
         }
     }
 

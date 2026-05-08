@@ -319,6 +319,8 @@ pub struct FileMeta {
     pub original_size: i64,
     pub compressed_size: i64,
     pub index_size: i64,
+    #[serde(default)]
+    pub bloom_ver: i64, // 0 = no .bf; otherwise = microsecond ts encoded in .bf filename
     pub flattened: bool,
 }
 
@@ -629,6 +631,7 @@ impl From<&FileMeta> for cluster_rpc::FileMeta {
             original_size: req.original_size,
             compressed_size: req.compressed_size,
             index_size: req.index_size,
+            bloom_ver: req.bloom_ver,
         }
     }
 }
@@ -643,6 +646,7 @@ impl From<&cluster_rpc::FileMeta> for FileMeta {
             compressed_size: req.compressed_size,
             flattened: false,
             index_size: req.index_size,
+            bloom_ver: req.bloom_ver,
         }
     }
 }
@@ -1364,6 +1368,7 @@ mod tests {
             compressed_size: 1,
             flattened: false,
             index_size: 0,
+            bloom_ver: 0,
         };
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
@@ -1382,6 +1387,7 @@ mod tests {
             compressed_size: 500,
             index_size: 50,
             flattened: false,
+            bloom_ver: 0,
         };
 
         stats.add_file_meta(&meta);
@@ -1869,6 +1875,7 @@ mod tests {
             compressed_size: 512,
             index_size: 0,
             flattened: false,
+            bloom_ver: 0,
         };
         let key = FileKey::new(
             42,
@@ -2259,5 +2266,91 @@ mod tests {
         let a = TimeRange::new(0, 30);
         let b = TimeRange::new(50, 100);
         assert!(!a.intersects(&b));
+    }
+
+    // ── bloom_ver coverage on FileMeta ─────────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_default_bloom_ver_is_zero() {
+        let m = FileMeta::default();
+        assert_eq!(m.bloom_ver, 0);
+    }
+
+    #[test]
+    fn test_file_meta_grpc_roundtrip_preserves_bloom_ver() {
+        let original = FileMeta {
+            min_ts: 100,
+            max_ts: 200,
+            records: 10,
+            original_size: 1024,
+            compressed_size: 512,
+            index_size: 64,
+            flattened: false,
+            bloom_ver: 1_715_000_000_000_000,
+        };
+        let rpc = cluster_rpc::FileMeta::from(&original);
+        assert_eq!(rpc.bloom_ver, original.bloom_ver);
+        let back = FileMeta::from(&rpc);
+        assert_eq!(back.bloom_ver, original.bloom_ver);
+    }
+
+    #[test]
+    fn test_file_meta_serde_json_roundtrip_with_bloom_ver() {
+        let m = FileMeta {
+            min_ts: 1,
+            max_ts: 2,
+            records: 3,
+            original_size: 4,
+            compressed_size: 5,
+            index_size: 6,
+            flattened: true,
+            bloom_ver: 42,
+        };
+        let s = serde_json::to_string(&m).unwrap();
+        assert!(s.contains("\"bloom_ver\":42"));
+        let parsed: FileMeta = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed, m);
+    }
+
+    #[test]
+    fn test_file_meta_serde_json_legacy_without_bloom_ver_defaults_to_zero() {
+        // Old payloads written before bloom_ver was added must still deserialize.
+        let legacy = r#"{
+            "min_ts": 1,
+            "max_ts": 2,
+            "records": 3,
+            "original_size": 4,
+            "compressed_size": 5,
+            "index_size": 6,
+            "flattened": false
+        }"#;
+        let parsed: FileMeta = serde_json::from_str(legacy).unwrap();
+        assert_eq!(parsed.bloom_ver, 0);
+    }
+
+    #[test]
+    fn test_file_meta_is_empty_independent_of_bloom_ver() {
+        // bloom_ver should not affect emptiness.
+        let mut m = FileMeta::default();
+        assert!(m.is_empty());
+        m.bloom_ver = 99;
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn test_kv_metadata_to_file_meta_leaves_bloom_ver_zero() {
+        // Parquet KV metadata never carries bloom_ver — it must default to 0.
+        use parquet::file::metadata::KeyValue;
+        let kvs = vec![
+            KeyValue::new("min_ts".to_string(), "10".to_string()),
+            KeyValue::new("max_ts".to_string(), "20".to_string()),
+            KeyValue::new("records".to_string(), "5".to_string()),
+            KeyValue::new("original_size".to_string(), "100".to_string()),
+            KeyValue::new("compressed_size".to_string(), "50".to_string()),
+        ];
+        let m: FileMeta = (kvs.as_slice()).into();
+        assert_eq!(m.min_ts, 10);
+        assert_eq!(m.max_ts, 20);
+        assert_eq!(m.bloom_ver, 0);
     }
 }

@@ -20,6 +20,9 @@ pub struct FileMeta {
     pub compressed_size: i64,
     #[prost(int64, tag = "6")]
     pub index_size: i64,
+    /// 0 = no .bf; otherwise = us ts encoded in .bf filename
+    #[prost(int64, tag = "7")]
+    pub bloom_ver: i64,
 }
 /// Job information for a request
 #[derive(serde::Serialize)]

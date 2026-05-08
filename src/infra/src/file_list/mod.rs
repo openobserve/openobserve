@@ -661,6 +661,8 @@ pub struct FileRecord {
     #[sqlx(default)]
     pub index_size: i64,
     #[sqlx(default)]
+    pub bloom_ver: i64,
+    #[sqlx(default)]
     pub flattened: bool,
     #[sqlx(default)]
     pub updated_at: i64,
@@ -688,6 +690,7 @@ impl From<&FileRecord> for FileMeta {
             original_size: r.original_size,
             compressed_size: r.compressed_size,
             index_size: r.index_size,
+            bloom_ver: r.bloom_ver,
             flattened: r.flattened,
         }
     }
@@ -875,6 +878,7 @@ mod tests {
             original_size: 102400,
             compressed_size: 51200,
             index_size: 1024,
+            bloom_ver: 0,
             flattened: true,
             updated_at: 9999,
         };
@@ -907,6 +911,7 @@ mod tests {
             original_size: 4096,
             compressed_size: 2048,
             index_size: 0,
+            bloom_ver: 0,
             flattened: false,
             updated_at: 0,
         };
@@ -922,6 +927,59 @@ mod tests {
         assert!(key.segment_ids.is_none());
         assert_eq!(key.meta.min_ts, 100);
         assert_eq!(key.meta.max_ts, 200);
+    }
+
+    // ── bloom_ver coverage on FileRecord ─────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_from_file_record_carries_bloom_ver() {
+        let record = FileRecord {
+            id: 1,
+            account: "a".to_string(),
+            org: "o".to_string(),
+            stream: "s/logs/x".to_string(),
+            date: "2026/05/08/00".to_string(),
+            file: "f.parquet".to_string(),
+            deleted: false,
+            min_ts: 1,
+            max_ts: 2,
+            records: 3,
+            original_size: 4,
+            compressed_size: 5,
+            index_size: 6,
+            bloom_ver: 1_715_000_000_000_000,
+            flattened: false,
+            updated_at: 0,
+        };
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.bloom_ver, record.bloom_ver);
+    }
+
+    #[test]
+    fn test_file_record_bloom_ver_default_is_zero() {
+        // sqlx::FromRow with #[sqlx(default)] should fall back to 0 for missing column.
+        let record = FileRecord {
+            id: 0,
+            account: String::new(),
+            org: String::new(),
+            stream: String::new(),
+            date: String::new(),
+            file: String::new(),
+            deleted: false,
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 0,
+            compressed_size: 0,
+            index_size: 0,
+            bloom_ver: 0,
+            flattened: false,
+            updated_at: 0,
+        };
+        // Conversion yields meta.bloom_ver == 0 too, which is the "no .bf" sentinel
+        // that downstream search code uses to fall back to the original tantivy path.
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.bloom_ver, 0);
     }
 
     // ── From<&StatsRecord> for StreamStats ───────────────────────────────────

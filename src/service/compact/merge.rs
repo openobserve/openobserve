@@ -741,6 +741,7 @@ pub async fn merge_files(
         compressed_size: 0,
         flattened: false,
         index_size: 0,
+        bloom_ver: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -1321,6 +1322,7 @@ mod tests {
                 compressed_size: original_size / 2, // assume 50% compression
                 index_size: 0,
                 flattened: false,
+                bloom_ver: 0,
             },
             deleted: false,
             segment_ids: None,

@@ -106,6 +106,7 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
+            bloom_ver: 0,
             updated_at: updated_at_col.value(idx),
         };
         ret.push(t);

@@ -686,6 +686,7 @@ async fn generate_dump(
         compressed_size: buf.len() as i64,
         index_size: 0,
         flattened: false,
+        bloom_ver: 0,
     };
 
     // store the file in storage
@@ -1015,6 +1016,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            bloom_ver: 0,
             updated_at: 1100,
         };
 
@@ -1074,7 +1076,8 @@ mod tests {
                 original_size: 10000,
                 compressed_size: 5000,
                 index_size: 500,
-                updated_at: 1100,
+                bloom_ver: 0,
+            updated_at: 1100,
             },
             FileRecord {
                 id: 2,
@@ -1091,7 +1094,8 @@ mod tests {
                 original_size: 20000,
                 compressed_size: 10000,
                 index_size: 1000,
-                updated_at: 2100,
+                bloom_ver: 0,
+            updated_at: 2100,
             },
             FileRecord {
                 id: 3,
@@ -1108,7 +1112,8 @@ mod tests {
                 original_size: 30000,
                 compressed_size: 15000,
                 index_size: 1500,
-                updated_at: 3100,
+                bloom_ver: 0,
+            updated_at: 3100,
             },
         ];
 
@@ -1164,6 +1169,7 @@ mod tests {
             original_size: 500000,
             compressed_size: 250000,
             index_size: 25000,
+            bloom_ver: 0,
             updated_at: 1234568000,
         };
 
@@ -1205,6 +1211,7 @@ mod tests {
             original_size: 10000,
             compressed_size: 5000,
             index_size: 500,
+            bloom_ver: 0,
             updated_at: 1100,
         };
 
@@ -1258,6 +1265,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            bloom_ver: 0,
             updated_at: 0,
         };
 
@@ -1298,6 +1306,7 @@ mod tests {
             original_size: i64::MAX,
             compressed_size: i64::MAX,
             index_size: i64::MAX,
+            bloom_ver: 0,
             updated_at: i64::MAX,
         };
 
@@ -1338,7 +1347,8 @@ mod tests {
                 original_size: 1024,
                 compressed_size: 512,
                 index_size: 64,
-                updated_at: i * 1000 + 1000,
+                bloom_ver: 0,
+            updated_at: i * 1000 + 1000,
             })
             .collect();
 
@@ -1375,7 +1385,8 @@ mod tests {
                 original_size: 2048,
                 compressed_size: 1024,
                 index_size: 128,
-                updated_at: 3000,
+                bloom_ver: 0,
+            updated_at: 3000,
             })
             .collect();
 
@@ -1411,6 +1422,7 @@ mod tests {
             original_size: 100,
             compressed_size: 50,
             index_size: 5,
+            bloom_ver: 0,
             updated_at: 200,
         };
 
@@ -1443,6 +1455,7 @@ mod tests {
             original_size: 0,
             compressed_size: 0,
             index_size: 0,
+            bloom_ver: 0,
             updated_at: 0,
         };
 
@@ -1482,6 +1495,7 @@ mod tests {
             original_size: 100_000,
             compressed_size: 40_000,
             index_size: 5_000,
+            bloom_ver: 0,
             updated_at: 9999,
         };
 
@@ -1537,7 +1551,8 @@ mod tests {
                 original_size: i * 1000,
                 compressed_size: i * 500,
                 index_size: i * 50,
-                updated_at: i * 100 + 100,
+                bloom_ver: 0,
+            updated_at: i * 100 + 100,
             })
             .collect();
 
@@ -1566,6 +1581,7 @@ mod tests {
             original_size: 25_000,
             compressed_size: 12_500,
             index_size: 1_250,
+            bloom_ver: 0,
             updated_at: 20_001,
         };
 
@@ -1609,7 +1625,8 @@ mod tests {
                 original_size: i * 100,
                 compressed_size: i * 50,
                 index_size: i * 5,
-                updated_at: i * 1000 + 1000,
+                bloom_ver: 0,
+            updated_at: i * 1000 + 1000,
             })
             .collect();
 
