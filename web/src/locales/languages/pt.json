@@ -2240,6 +2240,8 @@
     "editJson": "Editar alerta JSON",
     "additional_settings": "Configurações adicionais",
     "alertNamePlaceholder": "Nome do alerta",
+    "nameRequired": "O nome do alerta é obrigatório.",
+    "nameNoSpecialChars": "O nome do alerta não pode conter ':', '#', '?', '&', '%', aspas ou espaços. Use sublinhados (_) em vez disso.",
     "anomalyNamePlaceholder": "Nome da anomalia",
     "folder": "Pasta",
     "selectStreamTypeFirst": "Selecione primeiro um tipo de stream",

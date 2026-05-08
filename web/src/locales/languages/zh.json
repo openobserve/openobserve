@@ -2240,6 +2240,8 @@
     "editJson": "编辑警报 JSON",
     "additional_settings": "其他设置",
     "alertNamePlaceholder": "警报名称",
+    "nameRequired": "警报名称不能为空。",
+    "nameNoSpecialChars": "警报名称不能包含 ':'、'#'、'?'、'&'、'%'、引号或空格字符，请使用下划线 (_) 代替。",
     "anomalyNamePlaceholder": "异常名称",
     "folder": "文件夹",
     "selectStreamTypeFirst": "请先选择直播类型",
