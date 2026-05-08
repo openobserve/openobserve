@@ -19,6 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="open"
     :size="warningMessage?.length ? 'sm' : 'xs'"
     :title="title"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
   >
     <div data-test="dialog-box" class="tw:text-center">
       <div class="para">{{ message }}</div>
@@ -45,26 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-banner>
       </div>
     </div>
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-          data-test="cancel-button"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="onConfirm"
-          data-test="confirm-button"
-        >
-          {{ t("confirmDialog.ok") }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 
@@ -73,12 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  components: { OButton, ODialog },
+  components: { ODialog },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: { type: String },

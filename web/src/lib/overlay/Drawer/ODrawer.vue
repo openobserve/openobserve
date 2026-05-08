@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "reka-ui";
 import { ref, watch, useSlots, computed, inject, provide } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = withDefaults(defineProps<DrawerProps>(), {
   persistent: false,
@@ -19,6 +20,15 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   showClose: true,
   width: undefined,
   seamless: false,
+  primaryButtonVariant: "primary",
+  secondaryButtonVariant: "secondary",
+  neutralButtonVariant: "ghost",
+  primaryButtonDisabled: false,
+  secondaryButtonDisabled: false,
+  neutralButtonDisabled: false,
+  primaryButtonLoading: false,
+  secondaryButtonLoading: false,
+  neutralButtonLoading: false,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -86,9 +96,33 @@ const hasHeader = computed(
   () =>
     !!slots.header || !!props.title || (!props.persistent && props.showClose),
 );
-const hasFooter = computed(() => !!slots.footer);
+const hasFooter = computed(
+  () =>
+    !!slots.footer ||
+    !!props.primaryButtonLabel ||
+    !!props.secondaryButtonLabel ||
+    !!props.neutralButtonLabel,
+);
 const hasTrigger = computed(() => !!slots.trigger);
 const isRight = computed(() => props.side !== "left");
+
+// Auto-disable all buttons when any one of them is loading
+const anyButtonLoading = computed(
+  () =>
+    props.primaryButtonLoading ||
+    props.secondaryButtonLoading ||
+    props.neutralButtonLoading,
+);
+
+const primaryEffectivelyDisabled = computed(
+  () => props.primaryButtonDisabled || anyButtonLoading.value,
+);
+const secondaryEffectivelyDisabled = computed(
+  () => props.secondaryButtonDisabled || anyButtonLoading.value,
+);
+const neutralEffectivelyDisabled = computed(
+  () => props.neutralButtonDisabled || anyButtonLoading.value,
+);
 
 // Width preset → CSS class
 const sizeClasses = computed(() => {
@@ -197,12 +231,20 @@ const contentStyle = computed(() => {
           <!-- Title area: flex-1 + min-w-0 lets long titles truncate gracefully -->
           <div class="tw:flex-1 tw:min-w-0">
             <slot v-if="slots.header" name="header" />
-            <span
-              v-else-if="title"
-              class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
-            >
-              {{ title }}
-            </span>
+            <template v-else-if="title || subTitle">
+              <span
+                v-if="title"
+                class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+              >
+                {{ title }}
+              </span>
+              <span
+                v-if="subTitle"
+                class="tw:text-sm tw:text-dialog-content-text tw:opacity-70 tw:truncate tw:block tw:mt-0.5"
+              >
+                {{ subTitle }}
+              </span>
+            </template>
           </div>
 
           <!-- Close button — always shrink-0 so it is never squeezed out -->
@@ -262,7 +304,52 @@ const contentStyle = computed(() => {
             'tw:border-t tw:border-dialog-footer-border',
           ]"
         >
-          <slot name="footer" />
+          <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
+          <div
+            v-if="!slots.footer"
+            class="tw:flex tw:items-center tw:justify-between tw:gap-2"
+          >
+            <!-- Left: neutral button -->
+            <div>
+              <OButton
+                v-if="neutralButtonLabel"
+                :variant="neutralButtonVariant"
+                size="sm-action"
+                :disabled="neutralEffectivelyDisabled"
+                :loading="neutralButtonLoading"
+                @click="emit('click:neutral')"
+              >
+                {{ neutralButtonLabel }}
+              </OButton>
+            </div>
+
+            <!-- Right: secondary + primary -->
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <OButton
+                v-if="secondaryButtonLabel"
+                :variant="secondaryButtonVariant"
+                size="sm-action"
+                :disabled="secondaryEffectivelyDisabled"
+                :loading="secondaryButtonLoading"
+                @click="emit('click:secondary')"
+              >
+                {{ secondaryButtonLabel }}
+              </OButton>
+              <OButton
+                v-if="primaryButtonLabel"
+                :variant="primaryButtonVariant"
+                size="sm-action"
+                :disabled="primaryEffectivelyDisabled"
+                :loading="primaryButtonLoading"
+                @click="emit('click:primary')"
+              >
+                {{ primaryButtonLabel }}
+              </OButton>
+            </div>
+          </div>
+
+          <!-- Custom footer slot (takes over entirely when provided) -->
+          <slot v-else name="footer" />
         </div>
       </DialogContent>
     </DialogPortal>

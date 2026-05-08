@@ -20,6 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="open"
     size="md"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
   >
     <template #header>
       <span
@@ -83,26 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-          data-test="cancel-button"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="onConfirm"
-          data-test="confirm-button"
-        >
-          {{ t("confirmDialog.ok") }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 
@@ -110,12 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onMounted } from "vue";
 import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "TabsDeletePopUp",
-  components: { OButton, ODialog },
+  components: { ODialog },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     tabId: { type: String },

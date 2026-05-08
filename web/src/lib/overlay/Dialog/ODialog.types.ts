@@ -2,6 +2,8 @@
  * ODialog.types.ts — public types for ODialog.
  */
 
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
+
 export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl" | "full";
 
 export interface DialogProps {
@@ -41,11 +43,55 @@ export interface DialogProps {
    * When provided, overrides the `size` preset width entirely.
    */
   width?: number;
+
+  // ── Header subtitle ────────────────────────────────────────────────────
+
+  /**
+   * Optional subtitle rendered below the title in the header, left-aligned.
+   * Ignored when the `header` slot is provided.
+   */
+  subTitle?: string;
+
+  // ── Inbuilt footer buttons ──────────────────────────────────────────────
+
+  /** Label for the primary action button (right side). Omit to hide. */
+  primaryButtonLabel?: string;
+  /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
+  secondaryButtonLabel?: string;
+  /** Label for the neutral action button (left side). Omit to hide. */
+  neutralButtonLabel?: string;
+
+  /** OButton variant for the primary button. @default "primary" */
+  primaryButtonVariant?: ButtonVariant;
+  /** OButton variant for the secondary button. @default "secondary" */
+  secondaryButtonVariant?: ButtonVariant;
+  /** OButton variant for the neutral button. @default "ghost" */
+  neutralButtonVariant?: ButtonVariant;
+
+  /** Explicitly disables the primary button. Auto-disabled when any button is loading. */
+  primaryButtonDisabled?: boolean;
+  /** Explicitly disables the secondary button. Auto-disabled when any button is loading. */
+  secondaryButtonDisabled?: boolean;
+  /** Explicitly disables the neutral button. Auto-disabled when any button is loading. */
+  neutralButtonDisabled?: boolean;
+
+  /** Shows loading spinner on primary button (also disables all buttons). */
+  primaryButtonLoading?: boolean;
+  /** Shows loading spinner on secondary button (also disables all buttons). */
+  secondaryButtonLoading?: boolean;
+  /** Shows loading spinner on neutral button (also disables all buttons). */
+  neutralButtonLoading?: boolean;
 }
 
 export interface DialogEmits {
   /** Fires whenever the open state changes — use with v-model:open */
   (e: "update:open", value: boolean): void;
+  /** Fires when the primary inbuilt button is clicked. */
+  (e: "click:primary"): void;
+  /** Fires when the secondary inbuilt button is clicked. */
+  (e: "click:secondary"): void;
+  /** Fires when the neutral inbuilt button is clicked. */
+  (e: "click:neutral"): void;
 }
 
 export interface DialogSlots {

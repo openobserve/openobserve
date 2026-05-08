@@ -15,7 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" title="Index Fields Detected">
+  <ODialog :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" title="Index Fields Detected"
+    secondary-button-label="Skip"
+    primary-button-label="Add Fields"
+    @click:secondary="$emit('skip')"
+    @click:primary="$emit('add-fields')"
+  >
     <div v-if="fieldsByType.fts.length > 0" class="q-mb-sm">
       <div class="text-caption text-weight-medium q-mb-xs">
         Full Text Search ({{ fieldsByType.fts.length }})
@@ -55,23 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-chip>
       </div>
     </div>
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton variant="outline" size="sm-action" @click="$emit('skip')">
-          Skip
-        </OButton>
-        <OButton variant="primary" size="sm-action" @click="$emit('add-fields')">
-          Add Fields
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed, PropType } from "vue";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export interface PerformanceField {
@@ -81,7 +75,7 @@ export interface PerformanceField {
 
 export default defineComponent({
   name: "PerformanceFieldsDialog",
-  components: { OButton, ODialog },
+  components: { ODialog },
   props: {
     modelValue: {
       type: Boolean,

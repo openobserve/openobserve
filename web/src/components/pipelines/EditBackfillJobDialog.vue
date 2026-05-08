@@ -18,11 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="show"
     :width="47"
+    title="Edit Backfill Job"
+    secondary-button-label="Cancel"
+    primary-button-label="Update Job"
+    :primary-button-loading="loading"
+    @click:secondary="onCancel"
+    @click:primary="onSubmit"
     data-test="edit-backfill-job-dialog"
   >
-    <template #header>
-      <div class="text-h6" data-test="dialog-title">Edit Backfill Job</div>
-    </template>
 
     <q-form @submit="onSubmit" id="edit-backfill-form" class="tw-space-y-4">
           <!-- Time Range Section -->
@@ -134,25 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ errorMessage }}
       </div>
     </q-form>
-
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-          data-test="cancel-btn"
-        >Cancel</OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :loading="loading"
-          :disabled="loading"
-          @click="onSubmit"
-          data-test="update-btn"
-        >Update Job</OButton>
-      </div>
-    </template>
   </ODrawer>
 </template>
 
@@ -160,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, nextTick } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { X } from "lucide-vue-next";
 import backfillService, { type BackfillJob } from "../../services/backfill";
