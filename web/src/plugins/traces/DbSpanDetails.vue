@@ -86,9 +86,9 @@ const metadataRows = computed(() =>
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full tw:overflow-auto tw:gap-3 tw:p-2">
+  <div class="tw:flex tw:flex-col tw:h-full tw:overflow-auto tw:gap-3">
     <q-card flat data-test="traces-db-span-details-metadata-grid">
-      <q-card-section class="tw:py-[0.375rem]! tw:px-0!">
+      <q-card-section class="tw:py-0! tw:px-0!">
         <div class="tw:flex tw:flex-wrap tw:gap-2">
           <span
             v-for="row in metadataRows"

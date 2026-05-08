@@ -302,14 +302,6 @@ class="q-mr-xs" />
           class="tw:font-normal!"
         />
         <OTab
-          name="events"
-          :label="t('common.events')"
-          style="text-transform: capitalize"
-          data-test="trace-details-sidebar-tabs-events"
-                    class="tw:font-normal!"
-
-        />
-        <OTab
           name="error"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-exceptions"
@@ -329,7 +321,16 @@ class="q-mr-xs" />
           name="database"
           :label="t('common.db')"
           style="text-transform: capitalize"
+          class="tw:font-normal!"
           data-test="trace-details-sidebar-tabs-exceptions"
+        />
+        <OTab
+          name="events"
+          :label="t('common.events')"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-events"
+                    class="tw:font-normal!"
+
         />
         <OTab
           name="links"
@@ -934,6 +935,7 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
+import TraceErrorTab from "./components/TraceErrorTab.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -990,6 +992,7 @@ export default defineComponent({
     AttributeValueCell,
     DeployedCode,
     DbSpanDetails,
+    TraceErrorTab
   },
   emits: [
     "close",
