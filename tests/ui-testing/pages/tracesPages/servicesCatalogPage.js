@@ -117,7 +117,8 @@ export class ServicesCatalogPage {
 
   async getServiceCount() {
     const text = await this.page.locator(this.statusPill).textContent().catch(() => '0');
-    const match = text.match(/^(\d+)/);
+    // Text is "N/M" when filter active, "N" when unfiltered — always return total (last number)
+    const match = text.match(/(\d+)$/);
     return match ? parseInt(match[1]) : 0;
   }
 
@@ -168,8 +169,9 @@ export class ServicesCatalogPage {
   // ===== TABLE =====
 
   async getRowCount() {
-    // Count status badges (one per row) — these are rendered inside TenstackTable
-    return await this.page.locator('[data-test^="services-catalog-status-"]').count();
+    // Count service-name links (one per row, scoped to TenstackTable body)
+    // Uses service-link prefix to avoid matching status-pill / status-legend in the toolbar
+    return await this.page.locator('[data-test^="services-catalog-service-link-"]').count();
   }
 
   async getServiceCellText(serviceName) {
@@ -230,8 +232,11 @@ export class ServicesCatalogPage {
 
   async getRowsPerPage() {
     const el = this.page.locator(this.rowsPerPage);
-    const text = await el.textContent().catch(() => '25');
-    return parseInt(text) || 25;
+    await el.waitFor({ state: 'attached', timeout: 5000 });
+    const text = await el.textContent();
+    const val = parseInt(text);
+    if (Number.isNaN(val)) throw new Error(`getRowsPerPage: could not parse "${text}"`);
+    return val;
   }
 
   async setRowsPerPage(count) {
@@ -287,9 +292,12 @@ export class ServicesCatalogPage {
 
   async getCurrentPage() {
     // Quasar QPagination sets aria-current="true" on the active button
-    const text = await this.page.locator(`${this.pagination} button[aria-current="true"]`)
-      .textContent().catch(() => '1');
-    return parseInt(text) || 1;
+    const el = this.page.locator(`${this.pagination} button[aria-current="true"]`);
+    await el.waitFor({ state: 'attached', timeout: 5000 });
+    const text = await el.textContent();
+    const val = parseInt(text);
+    if (Number.isNaN(val)) throw new Error(`getCurrentPage: could not parse "${text}"`);
+    return val;
   }
 
   async isPaginationVisible() {
@@ -307,7 +315,8 @@ export class ServicesCatalogPage {
 
   async getSortIcon(columnKey) {
     const th = this.page.locator(`[data-test="o2-table-th-${columnKey}"]`);
-    const icon = th.locator('.material-icons, .q-icon');
+    // Use :visible to avoid concatenating text from hidden icons (e.g. both arrow directions rendered, one hidden)
+    const icon = th.locator('.material-icons:visible, .q-icon:visible');
     const text = await icon.textContent().catch(() => '');
     return text;
   }
