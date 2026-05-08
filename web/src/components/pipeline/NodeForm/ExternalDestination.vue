@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-stream-input-stream-routing-section"
-    class="tw:h-[calc(100vh)] tw:overflow-auto tw:w-[40vw]"
+    class="tw:h-[calc(100vh)] tw:overflow-hidden tw:w-[65vw]"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <q-page>
-      <div class="o2-input">
-        <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
+    <q-page class="tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
+      <div class="o2-input tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden">
+        <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md tw:flex-shrink-0">
           <div class="flex items-center tw:w-full">
             <div class="tw:w-full" data-test="add-destination-title">
               <div
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <q-separator />
-        <div class="row q-col-gutter-sm q-px-lg">
+        <div class="row q-col-gutter-sm q-px-lg tw:flex-1 tw:min-h-0 tw:overflow-hidden">
           <q-toggle
             data-test="create-stream-toggle"
             class="q-mb-sm tw:h-[36px] o2-toggle-button-xs tw:mr-3 q-mt-md"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="createNewDestination"
           />
 
-          <div v-if="createNewDestination" class="q-mt-sm q-mb-md col-12">
+          <div v-if="createNewDestination" class="q-mt-sm q-mb-md col-12 tw:flex-1 tw:min-h-0">
             <!-- Create New Destination Form -->
             <CreateDestinationForm
               @created="handleDestinationCreated"

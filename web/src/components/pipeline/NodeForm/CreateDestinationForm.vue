@@ -15,129 +15,106 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="create-destination-form">
+  <div class="create-destination-form tw:h-full tw:overflow-hidden">
     <q-form
       ref="destinationForm"
       @submit="createDestination"
-      class="col-12 pipeline-add-remote-destination-form"
+      class="col-12 pipeline-add-remote-destination-form tw:h-full tw:overflow-hidden"
     >
-      <!-- Stepper for Create New Destination -->
-      <q-stepper
-        v-model="step"
-        ref="stepper"
-        color="primary"
-        animated
-        flat
-        class="modern-stepper"
-      >
-        <!-- Step 1: Choose Destination Type -->
-        <q-step
-          :name="1"
-          title="Choose Type"
-          icon="category"
-          :done="step > 1"
-          :header-nav="step > 1"
-        >
-          <div class="text-subtitle2 q-mb-md" style="font-weight: 500">
-            Select Destination Type <span class="text-red">*</span>
-          </div>
-          <div class="destination-type-grid">
-            <div
-              v-for="destType in destinationTypes"
-              :key="destType.value"
-              :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card"
-              :class="{
-                selected: formData.destination_type === destType.value,
-                'dark-mode': store.state.theme === 'dark',
-              }"
-              @click="formData.destination_type = destType.value"
-            >
-              <img
-                v-if="destType.image"
-                :src="destType.image"
-                :alt="destType.label"
-                class="card-image"
-              />
-              <q-icon
-                v-else
-                :name="destType.icon"
-                size="28px"
-                class="card-icon"
-              />
-              <div class="card-label">{{ destType.label }}</div>
-              <div
-                v-if="formData.destination_type === destType.value"
-                class="check-icon"
-              >
-                <!-- eslint-disable-next-line vue/max-attributes-per-line -->
-                <q-icon name="check_circle" size="20px" color="positive" />
+      <div style="display: flex; height: 100%; overflow: hidden; gap: 24px;">
+        <!-- Left Column: Form Fields -->
+        <div style="flex: 1; overflow-y: auto; min-height: 0; min-width: 0;">
+          <div class="tw:flex tw:flex-col tw:gap-4">
+            <!-- Row 1: Destination Type -->
+            <div class="row q-col-gutter-xs">
+              <div class="col-12">
+                <q-select
+                  data-test="add-destination-type-select"
+                  v-model="formData.destination_type"
+                  :label="'Destination Type' + ' *'"
+                  :options="destinationTypes"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  stack-label
+                  emit-value
+                  hide-bottom-space
+                  map-options
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  tabindex="0"
+                >
+                  <template #selected-item="scope">
+                    <div class="row items-center no-wrap">
+                      <img
+                        v-if="scope.opt.image"
+                        :src="scope.opt.image"
+                        class="option-image q-mr-sm"
+                      />
+                      <q-icon
+                        v-else
+                        :name="scope.opt.icon"
+                        size="20px"
+                        class="q-mr-sm"
+                      />
+                      <span>{{ scope.opt.label }}</span>
+                    </div>
+                  </template>
+                  <template #option="scope">
+                    <q-item v-bind="scope.itemProps" class="dest-option-item">
+                      <q-item-section avatar>
+                        <img
+                          v-if="scope.opt.image"
+                          :src="scope.opt.image"
+                          class="option-image"
+                        />
+                        <q-icon
+                          v-else
+                          :name="scope.opt.icon"
+                          size="22px"
+                        />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label>{{ scope.opt.label }}</q-item-label>
+                      </q-item-section>
+                    </q-item>
+                    <q-separator
+                      v-if="scope.opt.value !== destinationTypes[destinationTypes.length - 1].value"
+                    />
+                  </template>
+                </q-select>
               </div>
             </div>
-          </div>
-        </q-step>
 
-        <!-- Step 2: Connection Details -->
-        <q-step
-          :name="2"
-          title="Connection"
-          icon="settings_ethernet"
-          :done="step > 2"
-          :header-nav="step > 2"
-        >
-          <div class="text-subtitle2 q-mb-lg" style="font-weight: 500">
-            Connection Details
-          </div>
+            <!-- Row 2: Name -->
+            <div class="row q-col-gutter-xs">
+              <div class="col-12">
+                <q-input
+                  data-test="add-destination-name-input"
+                  v-model="formData.name"
+                  :label="t('alerts.name') + ' *'"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  hide-bottom-space
+                  dense
+                  flat
+                  stack-label
+                  :rules="[
+                    (val: any) =>
+                      !!val
+                        ? isValidResourceName(val) ||
+                          `Characters like :, ?, /, #, and spaces are not allowed.`
+                        : t('common.nameRequired'),
+                  ]"
+                  tabindex="0"
+                ></q-input>
+              </div>
+            </div>
 
-          <div class="q-gutter-sm">
-            <q-input
-              data-test="add-destination-name-input"
-              v-model="formData.name"
-              :label="t('alerts.name') + ' *'"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  !!val
-                    ? isValidResourceName(val) ||
-                      `Characters like :, ?, /, #, and spaces are not allowed.`
-                    : t('common.nameRequired'),
-              ]"
-              tabindex="0"
-            ></q-input>
-
-            <q-input
-              data-test="add-destination-url-input"
-              v-model="formData.url"
-              :label="t('alert_destinations.url') + ' *'"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) => !!val.trim() || 'Field is required!',
-                (val: any) =>
-                  !val.trim().endsWith('/') ||
-                  'URL should not end with a trailing slash',
-              ]"
-              tabindex="0"
-            >
-              <template #hint>
-                <span class="text-caption"
-                  >Base URL without trailing slash (e.g.,
-                  https://your-domain.com)</span
-                >
-              </template>
-            </q-input>
-
-            <!-- OpenObserve Organization and Stream fields -->
+            <!-- Row 2: OpenObserve Organization + Stream Name -->
             <div
               v-if="formData.destination_type === 'openobserve'"
-              class="row q-col-gutter-xs q-mt-xs q-ml-xs"
+              class="row q-col-gutter-xs"
             >
               <div class="col-6">
                 <q-input
@@ -149,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   dense
                   flat
+                  hide-bottom-space
                   stack-label
                   :rules="[
                     (val: any) =>
@@ -174,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   dense
                   flat
+                  hide-bottom-space
                   stack-label
                   :rules="[
                     (val: any) =>
@@ -189,267 +168,354 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Endpoint Path field - shown for all destination types -->
-            <q-input
-              data-test="add-destination-url-endpoint-input"
-              v-model="formData.url_endpoint"
-              :label="
-                formData.destination_type === 'custom'
-                  ? 'Endpoint Path'
-                  : 'Endpoint Path *'
-              "
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              bottom-slots
-              :disable="formData.destination_type !== 'custom'"
-              :rules="[
-                ...(formData.destination_type === 'custom'
-                  ? []
-                  : [(val: any) => !!val.trim() || 'Field is required!']),
-                (val: any) =>
-                  !val.trim() ||
-                  val.trim().startsWith('/') ||
-                  'Endpoint path must start with /',
-              ]"
-              tabindex="0"
-            >
-              <template #hint>
-                <span class="text-caption">
-                  Path will be appended to base URL (must start with /)
-                </span>
-              </template>
-            </q-input>
-            <!-- Method field - only shown for Custom destination type -->
-            <q-select
-              v-if="formData.destination_type === 'custom'"
-              data-test="add-destination-method-select"
-              v-model="formData.method"
-              :label="t('alert_destinations.method') + ' *'"
-              :options="apiMethods"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :popup-content-style="{ textTransform: 'uppercase' }"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              tabindex="0"
-            />
+            <!-- URL -->
+            <div class="row q-col-gutter-xs">
+              <div class="col-12">
+                <q-input
+                  data-test="add-destination-url-input"
+                  v-model="formData.url"
+                  :label="t('alert_destinations.url') + ' *'"
+                  :placeholder="'https://your-domain.com'"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  hide-bottom-space
+                  stack-label
+                  :rules="[
+                    (val: any) => !!val.trim() || 'Field is required!',
+                    (val: any) =>
+                      !val.trim().endsWith('/') ||
+                      'URL should not end with a trailing slash',
+                  ]"
+                  tabindex="0"
+                >
+                  <template #hint>
+                    <span class="text-caption">Base URL without trailing slash</span>
+                  </template>
+                </q-input>
+              </div>
+            </div>
 
-            <!-- Output Format field - disabled for all except Custom -->
-            <q-select
-              data-test="add-destination-output-format-select"
-              v-model="formData.output_format"
-              :label="t('alert_destinations.output_format') + ' *'"
-              :options="outputFormats"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              emit-value
-              map-options
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              :disable="formData.destination_type !== 'custom'"
-              tabindex="0"
-            />
+            <!-- Endpoint Path + Output Format -->
+            <div class="row q-col-gutter-xs">
+              <div class="col-6">
+                <q-input
+                  data-test="add-destination-url-endpoint-input"
+                  v-model="formData.url_endpoint"
+                  :label="
+                    formData.destination_type === 'custom'
+                      ? 'Endpoint Path'
+                      : 'Endpoint Path *'
+                  "
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  hide-bottom-space
+                  stack-label
+                  :disable="formData.destination_type !== 'custom'"
+                  :rules="[
+                    ...(formData.destination_type === 'custom'
+                      ? []
+                      : [(val: any) => !!val.trim() || 'Field is required!']),
+                    (val: any) =>
+                      !val.trim() ||
+                      val.trim().startsWith('/') ||
+                      'Endpoint path must start with /',
+                  ]"
+                  tabindex="0"
+                >
+                  <template #hint>
+                    <span class="text-caption">
+                      Path will be appended to base URL (must start with /)
+                    </span>
+                  </template>
+                </q-input>
+              </div>
+              <div class="col-6">
+                <q-select
+                  data-test="add-destination-output-format-select"
+                  v-model="formData.output_format"
+                  :label="t('alert_destinations.output_format') + ' *'"
+                  :options="outputFormats"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  hide-bottom-space
+                  stack-label
+                  emit-value
+                  map-options
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  :disable="formData.destination_type !== 'custom'"
+                  tabindex="0"
+                />
+              </div>
+            </div>
+            <!-- Method field - only shown for Custom destination type -->
+            <div
+              v-if="formData.destination_type === 'custom'"
+              class="row q-col-gutter-xs"
+            >
+              <div class="col-12">
+                <q-select
+                  data-test="add-destination-method-select"
+                  v-model="formData.method"
+                  :label="t('alert_destinations.method') + ' *'"
+                  :options="apiMethods"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  hide-bottom-space
+                  stack-label
+                  :popup-content-style="{ textTransform: 'uppercase' }"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  tabindex="0"
+                />
+              </div>
+            </div>
 
             <!-- ESBulk Index Name field - only shown when output format is esbulk -->
-            <q-input
+            <div
               v-if="formData.output_format === 'esbulk'"
-              data-test="add-destination-esbulk-index-input"
-              v-model="formData.esbulk_index"
-              :label="'ESBulk Index Name *'"
-              :placeholder="'Enter index name (e.g., logs, events)'"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  !!val?.trim() || 'Index name is required for ESBulk format',
-              ]"
-              tabindex="0"
+              class="row q-col-gutter-xs"
             >
-              <template v-slot:hint>
-                Index name where data will be written in Elasticsearch
-              </template>
-            </q-input>
+              <div class="col-12">
+                <q-input
+                  data-test="add-destination-esbulk-index-input"
+                  v-model="formData.esbulk_index"
+                  :label="'ESBulk Index Name *'"
+                  :placeholder="'Enter index name (e.g., logs, events)'"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  hide-bottom-space
+                  stack-label
+                  :rules="[
+                    (val: any) =>
+                      !!val?.trim() || 'Index name is required for ESBulk format',
+                  ]"
+                  tabindex="0"
+                >
+                  <template v-slot:hint>
+                    Index name where data will be written in Elasticsearch
+                  </template>
+                </q-input>
+              </div>
+            </div>
 
             <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
-            <q-input
+            <div
               v-if="formData.output_format === 'stringseparated'"
-              data-test="add-destination-separator-input"
-              v-model="formData.separator"
-              :label="t('alert_destinations.separator') + ' *'"
-              :placeholder="t('alert_destinations.separator_placeholder')"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  (val !== null && val !== undefined && val !== '') ||
-                  'Separator is required for StringSeparated format',
-              ]"
-              tabindex="0"
+              class="row q-col-gutter-xs"
             >
-              <template v-slot:hint>
-                {{ t('alert_destinations.separator_hint') }}
-              </template>
-            </q-input>
+              <div class="col-12">
+                <q-input
+                  data-test="add-destination-separator-input"
+                  v-model="formData.separator"
+                  :label="t('alert_destinations.separator') + ' *'"
+                  :placeholder="t('alert_destinations.separator_placeholder')"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  hide-bottom-space
+                  stack-label
+                  :rules="[
+                    (val: any) =>
+                      (val !== null && val !== undefined && val !== '') ||
+                      'Separator is required for StringSeparated format',
+                  ]"
+                  tabindex="0"
+                >
+                  <template v-slot:hint>
+                    {{ t('alert_destinations.separator_hint') }}
+                  </template>
+                </q-input>
+              </div>
+            </div>
           </div>
 
           <!-- Destination-specific Metadata Section -->
-          <div v-if="showMetadataFields" class="q-gutter-sm q-mt-md">
-            <div class="col-12 tw:text-[14px] tw:font-bold header-label">
-              Metadata Configuration
+          <div v-if="showMetadataFields" class="q-mt-md">
+            <div class="row q-col-gutter-xs">
+              <div class="col-12">
+                <div class="tw:text-[14px] tw:font-bold header-label">
+                  Metadata Configuration
+                </div>
+              </div>
             </div>
 
-            <!-- Splunk Metadata Fields -->
-            <template v-if="formData.destination_type === 'splunk'">
-              <q-input
-                data-test="add-destination-metadata-source-input"
-                v-model="formData.metadata!.source"
-                :label="'Source'"
-                :placeholder="'Enter source (e.g., http:my_source)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk source field for event metadata
-                </template>
-              </q-input>
+            <div class="q-gutter-sm">
+              <!-- Splunk Metadata Fields -->
+              <template v-if="formData.destination_type === 'splunk'">
+                <div class="row q-col-gutter-xs">
+                  <div class="col-6">
+                    <q-input
+                      data-test="add-destination-metadata-source-input"
+                      v-model="formData.metadata!.source"
+                      :label="'Source'"
+                      :placeholder="'Enter source (e.g., http:my_source)'"
+                      class="no-border showLabelOnTop"
+                      borderless
+                      dense
+                      flat
+                      hide-bottom-space
+                      stack-label
+                      tabindex="0"
+                    >
+                      <template v-slot:hint>
+                        Splunk source field for event metadata
+                      </template>
+                    </q-input>
+                  </div>
+                  <div class="col-6">
+                    <q-input
+                      data-test="add-destination-metadata-sourcetype-input"
+                      v-model="formData.metadata!.sourcetype"
+                      :label="'Source Type'"
+                      :placeholder="'Enter source type (e.g., _json)'"
+                      class="no-border showLabelOnTop"
+                      borderless
+                      dense
+                      flat
+                      hide-bottom-space
+                      stack-label
+                      tabindex="0"
+                    >
+                      <template v-slot:hint>
+                        Splunk sourcetype field for event metadata
+                      </template>
+                    </q-input>
+                  </div>
+                </div>
+                <div class="row q-col-gutter-xs">
+                  <div class="col-12">
+                    <q-input
+                      data-test="add-destination-metadata-hostname-input"
+                      v-model="formData.metadata!.hostname"
+                      :label="'Hostname'"
+                      :placeholder="'Enter hostname (e.g., server01)'"
+                      class="no-border showLabelOnTop"
+                      borderless
+                      dense
+                      flat
+                      hide-bottom-space
+                      stack-label
+                      tabindex="0"
+                    >
+                      <template v-slot:hint>
+                        Splunk host field for event metadata
+                      </template>
+                    </q-input>
+                  </div>
+                </div>
+              </template>
 
-              <q-input
-                data-test="add-destination-metadata-sourcetype-input"
-                v-model="formData.metadata!.sourcetype"
-                :label="'Source Type'"
-                :placeholder="'Enter source type (e.g., _json)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk sourcetype field for event metadata
-                </template>
-              </q-input>
-
-              <q-input
-                data-test="add-destination-metadata-hostname-input"
-                v-model="formData.metadata!.hostname"
-                :label="'Hostname'"
-                :placeholder="'Enter hostname (e.g., server01)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk host field for event metadata
-                </template>
-              </q-input>
-            </template>
-
-            <!-- Datadog Metadata Fields -->
-            <template v-if="formData.destination_type === 'datadog'">
-              <q-input
-                data-test="add-destination-metadata-ddsource-input"
-                v-model="formData.metadata!.ddsource"
-                :label="'DD Source *'"
-                :placeholder="'Enter source (e.g., nginx, java)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'DD Source is required for Datadog',
-                ]"
-                tabindex="0"
-              >
-                <template v-slot:hint>
-                  Source attribute for Datadog logs
-                </template>
-              </q-input>
-
-              <q-input
-                data-test="add-destination-metadata-ddtags-input"
-                v-model="formData.metadata!.ddtags"
-                :label="'DD Tags *'"
-                :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'DD Tags are required for Datadog',
-                ]"
-                tabindex="0"
-              >
-                <template v-slot:hint>
-                  Comma-separated tags for Datadog logs
-                </template>
-              </q-input>
-
-              <q-input
-                data-test="add-destination-metadata-service-input"
-                v-model="formData.metadata!.service"
-                :label="'Service'"
-                :placeholder="'Enter service name (e.g., api-gateway)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                tabindex="0"
-              >
-                <template v-slot:hint> Service name for Datadog logs </template>
-              </q-input>
-
-              <q-input
-                data-test="add-destination-metadata-hostname-input"
-                v-model="formData.metadata!.hostname"
-                :label="'Hostname'"
-                :placeholder="'Enter hostname (e.g., server01)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                tabindex="0"
-              >
-                <template v-slot:hint> Hostname for Datadog logs </template>
-              </q-input>
-            </template>
-
+              <!-- Datadog Metadata Fields -->
+              <template v-if="formData.destination_type === 'datadog'">
+                <div class="row q-col-gutter-xs">
+                  <div class="col-6">
+                    <q-input
+                      data-test="add-destination-metadata-ddsource-input"
+                      v-model="formData.metadata!.ddsource"
+                      :label="'DD Source *'"
+                      :placeholder="'Enter source (e.g., nginx, java)'"
+                      class="no-border showLabelOnTop"
+                      borderless
+                      dense
+                      flat
+                      hide-bottom-space
+                      stack-label
+                      :rules="[
+                        (val: any) =>
+                          !!val?.trim() || 'DD Source is required for Datadog',
+                      ]"
+                      tabindex="0"
+                    >
+                      <template v-slot:hint>
+                        Source attribute for Datadog logs
+                      </template>
+                    </q-input>
+                  </div>
+                  <div class="col-6">
+                    <q-input
+                      data-test="add-destination-metadata-ddtags-input"
+                      v-model="formData.metadata!.ddtags"
+                      :label="'DD Tags *'"
+                      :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
+                      class="no-border showLabelOnTop"
+                      borderless
+                      dense
+                      flat
+                      hide-bottom-space
+                      stack-label
+                      :rules="[
+                        (val: any) =>
+                          !!val?.trim() || 'DD Tags are required for Datadog',
+                      ]"
+                      tabindex="0"
+                    >
+                      <template v-slot:hint>
+                        Comma-separated tags for Datadog logs
+                      </template>
+                    </q-input>
+                  </div>
+                </div>
+                <div class="row q-col-gutter-xs">
+                  <div class="col-6">
+                    <q-input
+                      data-test="add-destination-metadata-service-input"
+                      v-model="formData.metadata!.service"
+                      :label="'Service'"
+                      :placeholder="'Enter service name (e.g., api-gateway)'"
+                      class="no-border showLabelOnTop"
+                      borderless
+                      dense
+                      flat
+                      hide-bottom-space
+                      stack-label
+                      tabindex="0"
+                    >
+                      <template v-slot:hint> Service name for Datadog logs </template>
+                    </q-input>
+                  </div>
+                  <div class="col-6">
+                    <q-input
+                      data-test="add-destination-metadata-hostname-input"
+                      v-model="formData.metadata!.hostname"
+                      :label="'Hostname'"
+                      :placeholder="'Enter hostname (e.g., server01)'"
+                      class="no-border showLabelOnTop"
+                      borderless
+                      dense
+                      flat
+                      hide-bottom-space
+                      stack-label
+                      tabindex="0"
+                    >
+                      <template v-slot:hint> Hostname for Datadog logs </template>
+                    </q-input>
+                  </div>
+                </div>
+              </template>
+            </div>
           </div>
 
-          <div class="q-gutter-sm">
-            <div class="col-12 tw:text-[14px] tw:font-bold header-label">
-              Headers
+          <div class="row q-col-gutter-xs q-mt-md">
+              <div class="col-12">
+                <div class="tw:text-[14px] tw:font-bold header-label">
+                  Headers
+                </div>
+              </div>
             </div>
             <div
               v-for="(header, index) in apiHeaders"
               :key="header.uuid"
-              class="row q-col-gutter-xs q-ml-xs"
+              class="row q-col-gutter-xs q-mb-sm"
             >
               <div class="col-5">
                 <q-input
@@ -458,8 +524,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="input-border"
                   bg-color="input-bg"
                   stack-label
-                  outlined
-                  filled
+                  borderless
+                  hide-bottom-space
                   :placeholder="t('alert_destinations.api_header')"
                   dense
                   tabindex="0"
@@ -473,8 +539,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="input-border"
                   bg-color="input-bg"
                   stack-label
-                  outlined
-                  filled
+                  borderless
+                  hide-bottom-space
                   dense
                   tabindex="0"
                 />
@@ -505,13 +571,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
             </div>
-          </div>
 
-          <div class="col-12 q-mt-md tw:inline-flex">
-            <q-toggle
-              data-test="add-destination-skip-tls-verify-toggle"
-              class="o2-toggle-button-xs q-mt-sm tw:inline-flex"
-              size="xs"
+          <div class="row q-col-gutter-xs q-mt-sm">
+            <div class="col-12 tw:inline-flex">
+              <q-toggle
+                data-test="add-destination-skip-tls-verify-toggle"
+                class="o2-toggle-button-xs"
+                size="xs"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-toggle-button-xs-dark'
@@ -520,101 +586,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.skip_tls_verify"
               :label="t('alert_destinations.skip_tls_verify')"
             />
+            </div>
           </div>
 
-          <!-- Connection Notes Card -->
-          <q-card
-            flat
-            bordered
-            class="connection-notes-card q-mb-lg q-mt-md"
-            :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-blue-1'"
+          <!-- Form buttons footer (shown when not using external footer) -->
+          <div
+            v-if="!hideFooter"
+            class="form-footer card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
           >
-            <q-card-section>
-              <div class="row items-center q-mb-sm">
-                <q-icon
-                  name="info"
-                  color="primary"
-                  size="20px"
-                  class="q-mr-sm"
-                />
-                <div class="text-subtitle2 text-weight-medium">
+            <OButton
+              data-test="add-destination-cancel-btn"
+              variant="outline"
+              size="sm-action"
+              @click="$emit('cancel')"
+            >
+              {{ t('alerts.cancel') }}
+            </OButton>
+            <OButton
+              data-test="add-destination-submit-btn"
+              variant="primary"
+              size="sm-action"
+              type="submit"
+            >
+              {{ t('alerts.save') }}
+            </OButton>
+          </div>
+        </div>
+
+        <!-- Right Column: Connection Notes -->
+        <div style="flex: 0 0 42%; overflow-y: auto; min-height: 0; min-width: 0;">
+          <div class="side-panel">
+            <div
+              class="connection-notes-card"
+              :class="store.state.theme === 'dark' ? 'connection-notes-dark' : 'connection-notes-light'"
+            >
+              <div class="notes-header">
+                <div class="notes-header-icon">
+                  <q-icon name="link" size="18px" />
+                </div>
+                <div class="notes-header-text">
                   {{ connectionNotes.title }}
                 </div>
               </div>
-              <div class="text-body2">
-                <ol class="connection-steps q-pl-md q-mb-none">
-                  <li
-                    v-for="(stepText, index) in connectionNotes.steps"
-                    :key="index"
-                    class="q-mb-xs"
-                  >
-                    {{ stepText }}
-                  </li>
-                </ol>
+              <div class="notes-steps">
                 <div
-                  v-if="connectionNotes.example"
-                  class="q-mt-sm q-pa-sm example-url"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-white'
-                  "
+                  v-for="(stepText, index) in connectionNotes.steps"
+                  :key="index"
+                  class="step-row"
                 >
-                  <strong>Example:</strong>
-                  <code class="q-ml-xs">{{ connectionNotes.example }}</code>
+                  <div class="step-number">
+                    <span>{{ index + 1 }}</span>
+                  </div>
+                  <div class="step-text">{{ stepText }}</div>
                 </div>
               </div>
-            </q-card-section>
-          </q-card>
-        </q-step>
-      </q-stepper>
-
-      <!-- Form buttons -->
-      <div class="flex justify-start q-mb-md">
-        <div v-if="step === 1" class="tw:flex tw:gap-2">
-          <OButton
-            data-test="step1-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="$emit('cancel')"
-          >
-            {{ t('alerts.cancel') }}
-          </OButton>
-          <OButton
-            data-test="step1-continue-btn"
-            variant="primary"
-            size="sm-action"
-            :disabled="!canProceedStep1"
-            @click="nextStep"
-          >
-            Continue
-          </OButton>
-        </div>
-        <div v-if="step > 1" class="tw:flex tw:gap-2">
-          <OButton
-            data-test="step3-back-btn"
-            variant="ghost"
-            size="icon-xs-sq"
-            @click="prevStep"
-          >
-            <template #icon-left>
-              <ChevronLeft class="tw:size-3.5 tw:shrink-0" />
-            </template>
-          </OButton>
-          <OButton
-            data-test="add-destination-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="$emit('cancel')"
-          >
-            {{ t('alerts.cancel') }}
-          </OButton>
-          <OButton
-            data-test="add-destination-submit-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-          >
-            {{ t('alerts.save') }}
-          </OButton>
+              <div
+                v-if="connectionNotes.example"
+                class="notes-example"
+                :class="store.state.theme === 'dark' ? 'notes-example-dark' : 'notes-example-light'"
+              >
+                <div class="notes-example-label">Example URL</div>
+                <code class="notes-example-value">{{ connectionNotes.example }}</code>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </q-form>
@@ -636,6 +671,7 @@ import { Trash2, Plus, ChevronLeft } from "lucide-vue-next";
 // Props
 const props = defineProps<{
   destination?: DestinationData | null;
+  hideFooter?: boolean;
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
@@ -698,13 +734,12 @@ const destinationTypes = [
   },
 ];
 
-const destinationForm = ref(null);
-const step = ref(1);
+const destinationForm = ref<{ submit: () => void } | null>(null);
 
 const formData: Ref<DestinationData> = ref({
   name: "",
   url: "",
-  url_endpoint: "/api/default/default/_json", // Default endpoint for OpenObserve
+  url_endpoint: "/api/default/default/_json",
   method: "post",
   skip_tls_verify: false,
   template: "",
@@ -802,7 +837,6 @@ const getDefaultHeaders = (destinationType: string) => {
   return headers;
 };
 
-// Initialize apiHeaders with default headers for OpenObserve (the default destination type)
 const apiHeaders: Ref<
   {
     key: string;
@@ -815,18 +849,14 @@ const apiHeaders: Ref<
 watch(
   () => formData.value.destination_type,
   (newType) => {
-    // Only auto-set values if not in edit mode
     if (!isEditMode.value) {
       if (newType !== "custom") {
-        // Set method to POST for all non-custom types
         formData.value.method = "post";
 
-        // Set output_format based on destination type
         if (newType === "splunk") {
           formData.value.output_format = "nestedevent";
         } else if (newType === "elasticsearch") {
           formData.value.output_format = "esbulk";
-          // Set default index name if not already set
           if (!formData.value.esbulk_index) {
             formData.value.esbulk_index = "default";
           }
@@ -835,29 +865,23 @@ watch(
         }
       }
 
-      // Set endpoint based on destination type
       if (newType === "openobserve") {
-        // For OpenObserve, use org and stream values
         formData.value.url_endpoint = `/api/${openobserveOrg.value || "default"}/${openobserveStream.value || "default"}/_json`;
       } else {
-        // For other types, use the default endpoint
         formData.value.url_endpoint = defaultUrlEndpoint.value;
       }
 
-      // Set default headers for the destination type
       apiHeaders.value = getDefaultHeaders(newType);
     }
   },
 );
 
-// Function to populate form when editing an existing destination
 const populateFormForEdit = (destination: any) => {
   formData.value.name = destination.name || "";
   formData.value.method = destination.method || "post";
   formData.value.skip_tls_verify = destination.skip_tls_verify || false;
   formData.value.template = destination.template || "";
 
-  // Handle output_format
   if (destination.output_format) {
     if (
       typeof destination.output_format === "object" &&
@@ -886,17 +910,14 @@ const populateFormForEdit = (destination: any) => {
     formData.value.separator = "";
   }
 
-  // Use destination_type_name from backend, fallback to destination_type or default
   const destType =
     destination.destination_type_name || destination.destination_type;
   formData.value.destination_type =
     destType && destType.trim() !== "" ? destType : "openobserve";
 
-  // Split URL into hostname and endpoint for all destination types except custom
   const fullUrl = destination.url || "";
   if (fullUrl && formData.value.destination_type !== "custom") {
     try {
-      // Add protocol if missing for URL parsing, but only if it looks like a valid URL
       const hasProtocol = fullUrl.includes("://");
       const looksLikeUrl = fullUrl.includes(".") || fullUrl.includes(":");
       const urlToParse = hasProtocol
@@ -906,14 +927,10 @@ const populateFormForEdit = (destination: any) => {
           : fullUrl;
 
       const url = new URL(urlToParse);
-      // Base URL is protocol + hostname + port (if any) - always include protocol for consistency
       formData.value.url = url.origin;
-      // URL endpoint is the path + search + hash
       const endpoint = url.pathname + url.search + url.hash;
-      // Only set endpoint if it's not just "/"
       formData.value.url_endpoint = endpoint === "/" ? "" : endpoint;
     } catch (error) {
-      // If URL parsing fails, try to split manually
       console.warn(
         "Failed to parse URL, attempting manual split:",
         fullUrl,
@@ -921,22 +938,18 @@ const populateFormForEdit = (destination: any) => {
       );
       const firstSlashIndex = fullUrl.indexOf("/");
       if (firstSlashIndex > 0) {
-        // Split at first slash
         formData.value.url = fullUrl.substring(0, firstSlashIndex);
         formData.value.url_endpoint = fullUrl.substring(firstSlashIndex);
       } else {
-        // No slash found, keep full URL as-is
         formData.value.url = fullUrl;
         formData.value.url_endpoint = "";
       }
     }
   } else {
-    // For custom destination or empty URL, don't split
     formData.value.url = fullUrl;
     formData.value.url_endpoint = "";
   }
 
-  // Populate headers
   if (destination.headers && typeof destination.headers === "object") {
     apiHeaders.value = Object.entries(destination.headers).map(
       ([key, value]) => ({
@@ -947,19 +960,16 @@ const populateFormForEdit = (destination: any) => {
     );
   }
 
-  // Populate metadata object
   if (destination.metadata && typeof destination.metadata === "object") {
     formData.value.metadata = { ...destination.metadata };
   } else {
     formData.value.metadata = {};
   }
 
-  // Extract OpenObserve org and stream from endpoint if it's OpenObserve
   if (
     formData.value.destination_type === "openobserve" &&
     formData.value.url_endpoint
   ) {
-    // Parse endpoint like /api/{org}/{stream}/_json
     const match = formData.value.url_endpoint.match(
       /^\/api\/([^/]+)\/([^/]+)\/_json$/,
     );
@@ -968,12 +978,8 @@ const populateFormForEdit = (destination: any) => {
       openobserveStream.value = match[2] || "default";
     }
   }
-
-  // Move to step 2 since destination type is already selected
-  step.value = 2;
 };
 
-// Watch for destination prop changes to populate form in edit mode
 watch(
   () => props.destination,
   (destination) => {
@@ -984,7 +990,6 @@ watch(
   { immediate: true },
 );
 
-// Watch destination_type changes to ensure method is set to "post" for non-custom types
 watch(
   () => formData.value.destination_type,
   (newType) => {
@@ -998,7 +1003,6 @@ const isValidDestination = computed(() => {
   return !!(formData.value.name && formData.value.url && formData.value.method);
 });
 
-// Default URL endpoints for different destination types (shown as hint)
 const defaultUrlEndpoint = computed(() => {
   switch (formData.value.destination_type) {
     case "openobserve":
@@ -1020,12 +1024,10 @@ const defaultUrlEndpoint = computed(() => {
   }
 });
 
-// Show metadata fields for specific destination types
 const showMetadataFields = computed(() => {
   return ["splunk", "datadog"].includes(formData.value.destination_type);
 });
 
-// Watch to ensure metadata is initialized when needed
 watch(
   showMetadataFields,
   (needsMetadata) => {
@@ -1036,84 +1038,11 @@ watch(
   { immediate: true },
 );
 
-// Watch OpenObserve org and stream to update endpoint dynamically
 watch([openobserveOrg, openobserveStream], ([org, stream]) => {
   if (formData.value.destination_type === "openobserve") {
     formData.value.url_endpoint = `/api/${org || "default"}/${stream || "default"}/_json`;
   }
 });
-
-// Step validation
-const canProceedStep1 = computed(() => {
-  return !!formData.value.destination_type;
-});
-
-const canProceedStep2 = computed(() => {
-  const basicValidation =
-    formData.value.name &&
-    isValidResourceName(formData.value.name) &&
-    formData.value.url &&
-    formData.value.method &&
-    formData.value.output_format;
-
-  if (!basicValidation) return false;
-
-  // Validate url_endpoint for non-custom destination types
-  if (
-    formData.value.destination_type !== "custom" &&
-    !formData.value.url_endpoint?.trim()
-  ) {
-    return false;
-  }
-
-  // Validate destination-specific metadata
-  if (formData.value.destination_type === "splunk") {
-    return !!(
-      formData.value.metadata?.source?.trim() &&
-      formData.value.metadata?.sourcetype?.trim() &&
-      formData.value.metadata?.hostname?.trim()
-    );
-  }
-
-  if (formData.value.destination_type === "elasticsearch") {
-    // Validate esbulk_index is set
-    return !!(
-      formData.value.output_format === "esbulk" &&
-      formData.value.esbulk_index?.trim()
-    );
-  }
-
-  if (formData.value.destination_type === "datadog") {
-    return !!(
-      formData.value.metadata?.ddsource?.trim() &&
-      formData.value.metadata?.ddtags?.trim()
-    );
-  }
-
-  // Additional validation for StringSeparated format
-  if (formData.value.output_format === "stringseparated") {
-    return !!(
-      formData.value.separator !== null &&
-      formData.value.separator !== undefined &&
-      formData.value.separator !== ""
-    );
-  }
-
-  return true;
-});
-
-// Navigation functions
-const nextStep = () => {
-  if (step.value === 1 && canProceedStep1.value) {
-    step.value = 2;
-  }
-};
-
-const prevStep = () => {
-  if (step.value > 1) {
-    step.value--;
-  }
-};
 
 // Connection notes for each destination type
 const connectionNotes = computed(() => {
@@ -1239,12 +1168,8 @@ const createDestination = () => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
 
-  // Merge URL + URL endpoint
   const fullUrl = formData.value.url + (formData.value.url_endpoint || "");
 
-  // Handle output format - for esbulk, format as JSON object with index
-  // For stringseparated, format as JSON object with separator
-  // For all other formats (json, nestedevent, etc.), keep as string
   let outputFormat: any = formData.value.output_format;
   if (formData.value.output_format === "esbulk") {
     outputFormat = {
@@ -1259,7 +1184,6 @@ const createDestination = () => {
       },
     };
   } else {
-    // Keep output_format as string for json, nestedevent, and other formats
     outputFormat = formData.value.output_format;
   }
 
@@ -1275,7 +1199,6 @@ const createDestination = () => {
     destination_type_name: formData.value.destination_type,
   };
 
-  // Add metadata as JSON object
   if (
     formData.value.metadata &&
     Object.keys(formData.value.metadata).length > 0
@@ -1283,9 +1206,7 @@ const createDestination = () => {
     payload.metadata = formData.value.metadata;
   }
 
-  // Check if we're in edit mode
   if (isEditMode.value) {
-    // Update existing destination
     destinationService
       .update({
         org_identifier: store.state.selectedOrganization.identifier,
@@ -1308,7 +1229,6 @@ const createDestination = () => {
         });
       });
   } else {
-    // Create new destination
     destinationService
       .create({
         org_identifier: store.state.selectedOrganization.identifier,
@@ -1346,7 +1266,6 @@ const deleteApiHeader = (header: any) => {
   if (!apiHeaders.value.length) addApiHeader();
 };
 
-// Reset form when needed
 const resetForm = () => {
   const defaultDestinationType = "openobserve";
   formData.value = {
@@ -1364,29 +1283,25 @@ const resetForm = () => {
     esbulk_index: "",
     separator: "",
   };
-  // Reset OpenObserve specific fields
   openobserveOrg.value = "default";
   openobserveStream.value = "default";
-  // Set default headers for OpenObserve
   apiHeaders.value = getDefaultHeaders(defaultDestinationType);
-  step.value = 1;
 };
 
-// Expose functions for testing
+const submitForm = () => {
+  destinationForm.value?.submit();
+};
+
 defineExpose({
   getUUID,
   createDestination,
+  submitForm,
   addApiHeader,
   deleteApiHeader,
   resetForm,
   formData,
   apiHeaders,
   isValidDestination,
-  step,
-  nextStep,
-  prevStep,
-  canProceedStep1,
-  canProceedStep2,
   connectionNotes,
   populateFormForEdit,
   openobserveOrg,
@@ -1395,160 +1310,17 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-// Destination Type Cards Grid
-.destination-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+// Option image in select dropdown
+.option-image {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
-.destination-type-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
-  background: #ffffff;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-height: 120px;
-
-  &:hover {
-    border-color: var(--o2-border-color);
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
-    transform: translateY(-2px);
-  }
-
-  &.selected {
-    border-color: var(--o2-border-color);
-    background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
-
-    .card-icon {
-      color: var(--o2-border-color);
-    }
-
-    .card-label {
-      color: #333333;
-    }
-  }
-
-  &.dark-mode {
-    background: #1e1e1e;
-    border-color: #424242;
-
-    &:hover {
-      border-color: #5d9cec;
-      box-shadow: 0 4px 12px rgba(93, 156, 236, 0.2);
-    }
-
-    &.selected {
-      border-color: #5d9cec;
-      background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
-      box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
-
-      .card-icon {
-        color: #5d9cec;
-      }
-
-      .card-label {
-        color: #ffffff;
-      }
-    }
-  }
-
-  .card-icon {
-    margin-bottom: 8px;
-    color: #666;
-    transition: color 0.3s ease;
-  }
-
-  .card-image {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 8px;
-    object-fit: contain;
-    transition: all 0.3s ease;
-  }
-
-  .card-label {
-    font-size: 13px;
-    font-weight: 500;
-    text-align: center;
-    line-height: 1.3;
-    margin-top: 4px;
-    color: var(--o2-text-primary);
-  }
-
-  .check-icon {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-  }
-}
-
-// Stepper Styles
-.modern-stepper {
-  box-shadow: none;
-
-  :deep(.q-stepper__header) {
-    border-bottom: 1px solid #e0e0e0;
-  }
-
-  :deep(.q-stepper__tab) {
-    padding: 16px 24px;
-  }
-
-  :deep(.q-stepper__tab--active) {
-    color: #1976d2;
-    font-weight: 600;
-  }
-
-  :deep(.q-stepper__tab--done) {
-    color: #4caf50;
-  }
-
-  :deep(.q-stepper__dot) {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
-    background: var(--o2-primary-btn-bg);
-  }
-
-  :deep(.q-stepper__step-inner) {
-    padding: 10px 0;
-  }
-}
-
-// Connection Notes Card
-.connection-notes-card {
-  border-radius: 8px;
-  border: 1px solid #e3f2fd;
-
-  .connection-steps {
-    line-height: 1.8;
-
-    li {
-      margin-bottom: 8px;
-      color: inherit;
-    }
-  }
-
-  .example-url {
-    border-radius: 6px;
-    font-size: 13px;
-
-    code {
-      background: transparent;
-      padding: 0;
-      font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-      color: #1976d2;
-    }
-  }
+// Side panel sticky wrapper
+.side-panel {
+  position: sticky;
+  top: 0;
 }
 
 // Enhanced input fields
@@ -1569,19 +1341,177 @@ defineExpose({
 .header-label {
   color: var(--o2-input-label-text-color);
 }
+
+// Connection Notes Card
+.connection-notes-card {
+  border-radius: 14px;
+  padding: 28px;
+  font-size: 13px;
+  line-height: 1.6;
+  position: relative;
+  overflow: hidden;
+
+  &.connection-notes-light {
+    background: linear-gradient(135deg, #fafbff 0%, #f1f5f9 100%);
+    border: 1px solid #e8ecf4;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  &.connection-notes-dark {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid #334155;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.notes-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.notes-header-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  .connection-notes-light & {
+    background: linear-gradient(135deg, #5960f5 0%, #7c3aed 100%);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(89, 96, 245, 0.25);
+  }
+
+  .connection-notes-dark & {
+    background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(129, 140, 248, 0.2);
+  }
+}
+
+.notes-header-text {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.notes-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+
+  .connection-notes-light & {
+    background: rgba(255, 255, 255, 0.6);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.9);
+    }
+  }
+
+  .connection-notes-dark & {
+    background: rgba(255, 255, 255, 0.03);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}
+
+.step-number {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+
+  .connection-notes-light & {
+    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+    color: #5960f5;
+  }
+
+  .connection-notes-dark & {
+    background: rgba(129, 140, 248, 0.15);
+    color: #a5b4fc;
+  }
+}
+
+.step-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.6;
+  color: inherit;
+  padding-top: 2px;
+}
+
+.notes-example {
+  border-radius: 10px;
+  overflow: hidden;
+
+  &.notes-example-light {
+    background: #fff;
+    border: 1px solid #e8ecf4;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  }
+
+  &.notes-example-dark {
+    background: #0f172a;
+    border: 1px solid #334155;
+  }
+}
+
+.notes-example-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 12px 16px 4px;
+  color: #94a3b8;
+}
+
+.notes-example-value {
+  display: block;
+  padding: 4px 16px 14px;
+  font-family: "SF Mono", "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 12.5px;
+  color: #5960f5;
+  word-break: break-all;
+  background: transparent;
+  line-height: 1.7;
+}
 </style>
 
 <style lang="scss">
-.pipeline-add-remote-destination-form .modern-stepper .q-stepper__tab {
-  padding: 5px 5px 15px 5px !important;
-  min-height: 35px !important;
+.pipeline-add-remote-destination-form {
+  .q-select__dropdown-icon {
+    font-size: 20px;
+  }
+
+  // Add spacing between dropdown options
+  .dest-option-item {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
 }
 
 .create-destination-form {
-  .q-stepper {
-    background: transparent !important;
-  }
-
   .q-field--labeled.showLabelOnTop .q-field__bottom {
     padding: 0.275rem 0 0 !important;
   }
