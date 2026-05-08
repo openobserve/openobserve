@@ -9,6 +9,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+permissions: read-all
+
 env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: root@example.com
