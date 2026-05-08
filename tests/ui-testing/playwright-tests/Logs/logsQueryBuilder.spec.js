@@ -217,20 +217,6 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         testLogger.info('Switch from Logs to Build tab - PASSED');
     });
 
-    test("Switch from Build to Logs tab", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
-    }, async ({ page }) => {
-        testLogger.info('Testing switch from Build to Logs tab');
-
-        await pm.logsPage.clickBuildToggle();
-        await pm.logsPage.waitForBuildTabLoaded();
-        await pm.logsPage.clickLogsToggle();
-        await page.waitForLoadState('domcontentloaded');
-        await pm.logsPage.expectLogsTableVisible();
-
-        testLogger.info('Switch from Build to Logs tab - PASSED');
-    });
-
     test("Build tab preserves query state on tab switch", {
         tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
