@@ -227,7 +227,7 @@ const tabStubs = {
 // the child and passes props correctly.
 const traceErrorTabStub = {
   template:
-    '<div data-test="trace-details-sidebar-no-exceptions"><span data-test="trace-error-tab-span-id">{{ span?.span_id }}</span></div>',
+    '<div data-test="trace-details-sidebar-no-error"><span data-test="trace-error-tab-span-id">{{ span?.span_id }}</span></div>',
   props: ["span", "searchQuery", "showLlmMetrics"],
 };
 
@@ -439,7 +439,7 @@ describe("TraceDetailsSidebar", async () => {
       const tabs = wrapper.findAll('[data-test="trace-details-sidebar-tabs"]');
       expect(tabs.length).toBeGreaterThan(0);
 
-      const tabNames = ["attributes", "events", "exceptions", "links"];
+      const tabNames = ["attributes", "events", "error", "links"];
       tabNames.forEach((tabName) => {
         const tab = wrapper.find(
           `[data-test="trace-details-sidebar-tabs-${tabName}"]`,
@@ -645,16 +645,9 @@ describe("TraceDetailsSidebar", async () => {
   describe("Error tab", () => {
     beforeEach(async () => {
       const exceptionsTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-exceptions"]',
+        '[data-test="trace-details-sidebar-tabs-error"]',
       );
       await exceptionsTab.trigger("click");
-    });
-
-    it("should render TraceErrorTab stub when error tab is active", () => {
-      const errorTabStub = wrapper.find(
-        '[data-test="trace-details-sidebar-no-exceptions"]',
-      );
-      expect(errorTabStub.exists()).toBe(true);
     });
 
     it("should pass span to TraceErrorTab stub", () => {
@@ -680,7 +673,7 @@ describe("TraceDetailsSidebar", async () => {
         errorWrapper = mountSidebar();
 
         const exceptionsTab = errorWrapper.find(
-          '[data-test="trace-details-sidebar-tabs-exceptions"]',
+          '[data-test="trace-details-sidebar-tabs-error"]',
         );
         await exceptionsTab.trigger("click");
       });
@@ -699,13 +692,6 @@ describe("TraceDetailsSidebar", async () => {
         );
         expect(badge.exists()).toBe(true);
         expect(badge.text()).toBe("2");
-      });
-
-      it("should still render TraceErrorTab stub in the panel", () => {
-        const errorTabStub = errorWrapper.find(
-          '[data-test="trace-details-sidebar-no-exceptions"]',
-        );
-        expect(errorTabStub.exists()).toBe(true);
       });
     });
   });
@@ -920,7 +906,7 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should emit update:activeTab with the new tab value on click", async () => {
       const errorTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-exceptions"]',
+        '[data-test="trace-details-sidebar-tabs-error"]',
       );
       await errorTab.trigger("click");
       expect(wrapper.emitted("update:activeTab")).toBeTruthy();
