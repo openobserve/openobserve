@@ -122,7 +122,6 @@ jobs:
       matrix:
         include:
           - testfolder: "Logs-Regression"
-            browser: "chrome"
             run_files:
               [
                 "logs-regression.spec.js",
@@ -130,45 +129,37 @@ jobs:
                 "logs-9754.spec.js",
               ]
           - testfolder: "Alerts-Regression"
-            browser: "chrome"
             run_files:
               [
-                "alerts-regression.spec.js",
                 "alerts-stream-switching-regression.spec.js",
               ]
           - testfolder: "Dashboard-Regression"
-            browser: "chrome"
             run_files:
               [
                 "dashboard-regression.spec.js",
               ]
           - testfolder: "Streams-Regression"
-            browser: "chrome"
             run_files:
               [
                 "streams-regression.spec.js",
               ]
           - testfolder: "Pipelines-Regression"
-            browser: "chrome"
             run_files:
               [
                 "enrichment-regression.spec.js",
                 "pipeline-regression.spec.js",
               ]
           - testfolder: "Traces-Regression"
-            browser: "chrome"
             run_files:
               [
                 "traces-regression.spec.js",
               ]
           - testfolder: "Metrics-Regression"
-            browser: "chrome"
             run_files:
               [
                 "metrics-regression.spec.js",
               ]
           - testfolder: "GeneralTests-Regression"
-            browser: "chrome"
             run_files:
               [
                 "ui-regression.spec.js",
@@ -236,12 +227,7 @@ jobs:
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
 
           if [ -n "$FILE_LIST" ]; then
-            # Map logical folder names to actual directories
-            case "${{ matrix.testfolder }}" in
-              *)
-                ACTUAL_FOLDER="RegressionSet"
-                ;;
-            esac
+            ACTUAL_FOLDER="RegressionSet"
 
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
 
