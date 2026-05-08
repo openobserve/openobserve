@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   showClose: true,
   width: undefined,
   primaryButtonVariant: "primary",
-  secondaryButtonVariant: "secondary",
+  secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
   primaryButtonDisabled: false,
   secondaryButtonDisabled: false,
@@ -251,13 +251,13 @@ const contentStyle = computed(() =>
               </span>
             </div>
 
-            <!-- #header-left sub-slot — grows to fill space if present -->
-            <div v-if="slots['header-left']" class="tw:flex-1 tw:min-w-0">
+            <!-- #header-left sub-slot — grows to fill space, content flows left-to-right after title -->
+            <div v-if="slots['header-left']" class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:justify-start tw:gap-2">
               <slot name="header-left" />
             </div>
 
-            <!-- #header-right sub-slot — grows to fill space if present -->
-            <div v-if="slots['header-right']" class="tw:flex-1 tw:min-w-0">
+            <!-- #header-right sub-slot — grows to fill space, content flows right-to-left before close button -->
+            <div v-if="slots['header-right']" class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:justify-end tw:gap-2">
               <slot name="header-right" />
             </div>
 
