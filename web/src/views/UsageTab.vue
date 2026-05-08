@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container card-container--col"
+      class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem]"
       :class="
         store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 2.5rem)]' : 'tw:h-full'
       "
