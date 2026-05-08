@@ -3,8 +3,11 @@
 import type { InjectionKey } from "vue";
 import type { FieldWidth } from "../Input/OInput.types";
 
-/** Injection key for the value map that preserves original numeric/string types across OSelect → OSelectItem */
-export const SELECT_VALUE_MAP_KEY: InjectionKey<Map<string, string | number>> =
+export type SelectValue = string | number | boolean;
+export type SelectModelValue = SelectValue | SelectValue[] | undefined;
+
+/** Injection key for the value map that preserves original value types across OSelect → OSelectItem */
+export const SELECT_VALUE_MAP_KEY: InjectionKey<Map<string, SelectValue>> =
   Symbol("SelectValueMap");
 
 export type SelectSize = "sm" | "md";
@@ -13,21 +16,36 @@ export type SelectSize = "sm" | "md";
 
 export interface SelectOption {
   label: string;
-  value: string | number;
+  value: SelectValue;
   disabled?: boolean;
+  [key: string]: unknown;
 }
 
 // ── Root ──────────────────────────────────────────────────────────────────
 
 export interface SelectProps {
   /** Currently selected value */
-  modelValue?: string | number;
+  modelValue?: SelectModelValue;
   /**
    * Flat list of options. When provided, OSelectItem nodes are rendered
    * automatically. For grouped or custom-rendered options, use the `default`
    * slot instead.
    */
   options?: SelectOption[];
+  /** Allows selecting multiple options */
+  multiple?: boolean;
+  /** Enables local text filtering for options mode */
+  searchable?: boolean;
+  /** Placeholder text shown in the internal search input */
+  searchPlaceholder?: string;
+  /** Empty-state text when no options match */
+  emptyText?: string;
+  /** Key to read label from each option object */
+  optionLabel?: string;
+  /** Key to read value from each option object */
+  optionValue?: string;
+  /** Key to read disabled state from each option object */
+  optionDisabled?: string;
   /** Floating label rendered above the trigger */
   label?: string;
   /** Placeholder text shown when no value is selected */
@@ -60,11 +78,11 @@ export interface SelectProps {
    * @example
    * :rules="[(v) => v !== undefined || 'Required']"
    */
-  rules?: Array<(val: string | number | undefined) => true | string>;
+  rules?: Array<(val: SelectModelValue) => true | string>;
 }
 
 export interface SelectEmits {
-  (_e: "update:modelValue", _value: string | number | undefined): void;
+  (_e: "update:modelValue", _value: SelectModelValue): void;
   (_e: "clear"): void;
 }
 
@@ -72,14 +90,14 @@ export interface SelectSlots {
   /** Custom options — render OSelectItem / OSelectGroup nodes here */
   default?: () => unknown;
   /** Custom trigger content — overrides the default value display */
-  trigger?: (_scope: { value: string | number | undefined }) => unknown;
+  trigger?: (_scope: { value: SelectModelValue }) => unknown;
 }
 
 // ── Item ─────────────────────────────────────────────────────────────────
 
 export interface SelectItemProps {
   /** The value emitted when this item is selected */
-  value: string | number;
+  value: SelectValue;
   /** Display label */
   label?: string;
   /** Prevents selection */

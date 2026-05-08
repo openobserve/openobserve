@@ -6,7 +6,9 @@ import type {
   RadioGroupEmits,
   RadioGroupSlots,
 } from "./ORadio.types";
+import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupRoot } from "reka-ui";
+import { provide } from "vue";
 
 withDefaults(defineProps<RadioGroupProps>(), {
   disabled: false,
@@ -17,8 +19,11 @@ const emit = defineEmits<RadioGroupEmits>();
 
 defineSlots<RadioGroupSlots>();
 
+const valueMap = new Map<string, string | number | boolean>();
+provide(RADIO_VALUE_MAP_KEY, valueMap);
+
 function handleUpdate(value: string) {
-  emit("update:modelValue", value);
+  emit("update:modelValue", valueMap.get(value) ?? value);
 }
 </script>
 

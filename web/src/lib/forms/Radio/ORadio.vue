@@ -11,7 +11,9 @@
 //   </ORadioGroup>
 
 import type { RadioProps, RadioSlots } from "./ORadio.types";
+import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupItem, RadioGroupIndicator } from "reka-ui";
+import { inject, watchEffect } from "vue";
 
 withDefaults(defineProps<RadioProps>(), {
   size: "md",
@@ -19,6 +21,12 @@ withDefaults(defineProps<RadioProps>(), {
 });
 
 defineSlots<RadioSlots>();
+
+const valueMap = inject(RADIO_VALUE_MAP_KEY, null);
+
+watchEffect(() => {
+  valueMap?.set(String(value), value);
+});
 
 const circleSize: Record<NonNullable<RadioProps["size"]>, string> = {
   sm: "tw:size-3.5",

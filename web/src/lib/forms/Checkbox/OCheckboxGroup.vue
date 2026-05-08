@@ -8,7 +8,7 @@ import type {
   CheckboxGroupValue,
 } from "./OCheckbox.types";
 import { CHECKBOX_GROUP_KEY } from "./OCheckbox.types";
-import { computed, provide } from "vue";
+import { provide } from "vue";
 
 const props = withDefaults(defineProps<CheckboxGroupProps>(), {
   modelValue: () => [],
@@ -32,8 +32,12 @@ function isChecked(value: string | number | boolean): boolean {
 }
 
 provide(CHECKBOX_GROUP_KEY, {
-  modelValue: computed(() => props.modelValue ?? []).value,
-  disabled: computed(() => props.disabled).value,
+  get modelValue() {
+    return props.modelValue ?? [];
+  },
+  get disabled() {
+    return props.disabled;
+  },
   toggle,
   isChecked,
 });
