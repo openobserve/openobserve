@@ -1935,10 +1935,9 @@ fn extract_limit_with_prefix(tpl: &str, prefix: &str) -> Option<usize> {
 }
 
 fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue, is_email: bool) {
-    // 1) Handle every `{var:N}` occurrence first. We scan left-to-right and
-    //    advance `cursor` past each match so we don't loop forever on inputs
-    //    that can't be parsed (e.g. `{var:abc}`) and so multiple distinct
-    //    lengths in the same template (`{msg:100}` and `{msg:200}`) are all
+    // 1) Handle every `{var:N}` occurrence first. We scan left-to-right and advance `cursor` past
+    //    each match so we don't loop forever on inputs that can't be parsed (e.g. `{var:abc}`) and
+    //    so multiple distinct lengths in the same template (`{msg:100}` and `{msg:200}`) are all
     //    replaced.
     let prefix = format!("{{{var_name}:");
     let mut cursor = 0usize;
@@ -3839,12 +3838,7 @@ mod tests {
     #[test]
     fn test_process_variable_replace_both_forms_same_template() {
         let mut tpl = "full={msg} short={msg:5}".to_string();
-        process_variable_replace(
-            &mut tpl,
-            "msg",
-            &VarValue::Str("hello world"),
-            false,
-        );
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello world"), false);
         assert_eq!(tpl, "full=hello world short=hello");
     }
 
@@ -3852,12 +3846,7 @@ mod tests {
     #[test]
     fn test_process_variable_replace_multiple_length_specs() {
         let mut tpl = "a={msg:3} b={msg:7}".to_string();
-        process_variable_replace(
-            &mut tpl,
-            "msg",
-            &VarValue::Str("abcdefghij"),
-            false,
-        );
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("abcdefghij"), false);
         assert_eq!(tpl, "a=abc b=abcdefg");
     }
 
@@ -3865,12 +3854,7 @@ mod tests {
     #[test]
     fn test_process_variable_replace_repeated_length_spec() {
         let mut tpl = "x={msg:3} y={msg:3}".to_string();
-        process_variable_replace(
-            &mut tpl,
-            "msg",
-            &VarValue::Str("abcdef"),
-            false,
-        );
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("abcdef"), false);
         assert_eq!(tpl, "x=abc y=abc");
     }
 
@@ -3879,12 +3863,7 @@ mod tests {
     #[test]
     fn test_process_variable_replace_invalid_length_is_skipped() {
         let mut tpl = "bad={msg:abc} good={msg:5}".to_string();
-        process_variable_replace(
-            &mut tpl,
-            "msg",
-            &VarValue::Str("hello world"),
-            false,
-        );
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello world"), false);
         assert_eq!(tpl, "bad={msg:abc} good=hello");
     }
 
@@ -3892,12 +3871,7 @@ mod tests {
     #[test]
     fn test_process_variable_replace_zero_length_then_bare() {
         let mut tpl = "z={msg:0} b={msg}".to_string();
-        process_variable_replace(
-            &mut tpl,
-            "msg",
-            &VarValue::Str("hello"),
-            false,
-        );
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello"), false);
         // {msg:0} is left as-is; {msg} is replaced.
         assert_eq!(tpl, "z={msg:0} b=hello");
     }
