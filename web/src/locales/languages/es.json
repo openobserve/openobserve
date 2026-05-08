@@ -124,7 +124,8 @@
     "create": "Crear",
     "resources": "Recursos",
     "updated_at": "Actualizado en",
-    "error": "Error"
+    "error": "Error",
+    "db": "Base de datos"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",

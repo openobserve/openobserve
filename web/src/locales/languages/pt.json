@@ -124,7 +124,8 @@
     "create": "Criar",
     "resources": "Recursos",
     "updated_at": "Atualizado em",
-    "error": "Erro"
+    "error": "Erro",
+    "db": "Banco de dados"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
