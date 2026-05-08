@@ -466,22 +466,32 @@ test.describe("Metrics testcases", () => {
     await pm.metricsPage.clickApplyButton();
     await page.waitForTimeout(3000);
 
-    // Check for inline error in the error list below the chart
+    // Check for inline error list rendered by DashboardErrors component
     const inlineError = page.locator('[data-test="dashboard-error"]');
-    const hasInlineError = await inlineError.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasInlineError = await inlineError.isVisible({ timeout: 5000 }).catch(() => false);
+
+    // Check for chart-area error rendered by PanelSchemaRenderer (.errorMessage class)
+    // This element is shown when errorDetail.message is set; at that point [data-test="no-data"]
+    // is intentionally hidden (v-if="!errorDetail?.message"), so we must check both paths.
+    const chartError = page.locator('.errorMessage');
+    const hasChartError = await chartError.isVisible({ timeout: 3000 }).catch(() => false);
+
+    // Check for no-data message (only present when there is no error detail)
     const noDataMessage = await pm.metricsPage.getNoDataMessage();
-    const hasNoData = await noDataMessage.isVisible().catch(() => false);
+    const hasNoData = await noDataMessage.isVisible({ timeout: 3000 }).catch(() => false);
 
-    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasNoData=${hasNoData}`);
+    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasChartError=${hasChartError}, hasNoData=${hasNoData}`);
 
-    // System must handle invalid syntax gracefully - error, no data, or stable (no crash)
-    const hasVisualization = await pm.metricsPage.hasVisualization();
-    const handledGracefully = hasInlineError || hasNoData || hasVisualization;
+    // System must handle invalid syntax gracefully - show error or no data
+    const handledGracefully = hasInlineError || hasChartError || hasNoData;
     expect(handledGracefully).toBe(true);
 
     if (hasInlineError) {
       const errorText = await inlineError.textContent().catch(() => '');
-      testLogger.info(`Error displayed: ${errorText.substring(0, 100)}`);
+      testLogger.info(`Dashboard error displayed: ${errorText.substring(0, 100)}`);
+    } else if (hasChartError) {
+      const errorText = await chartError.textContent().catch(() => '');
+      testLogger.info(`Chart error displayed: ${errorText.substring(0, 100)}`);
     } else {
       testLogger.info('Invalid query resulted in no-data - valid handling');
     }
