@@ -82,9 +82,8 @@ pub async fn grpc_search(
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(
-                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {:?}",
+                        "[trace_id: {trace_id}] search->grpc: node: {}, search err: {err:?}",
                         node.get_grpc_addr(),
-                        err
                     );
                     let err = ErrorCodes::from_json(err.message())?;
                     return Err(Error::ErrorCode(err));
