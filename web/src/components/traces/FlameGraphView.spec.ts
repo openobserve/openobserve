@@ -28,6 +28,30 @@ const ChartRendererStub = {
   template: '<div class="chart-renderer-stub"></div>',
 };
 
+// Stub TraceDetailsSidebar so defineAsyncComponent resolves
+const TraceDetailsSidebarStub = {
+  name: "TraceDetailsSidebar",
+  props: [
+    "span",
+    "baseTracePosition",
+    "searchQuery",
+    "streamName",
+    "serviceStreamsEnabled",
+    "parentMode",
+    "activeTab",
+  ],
+  emits: [
+    "view-logs",
+    "close",
+    "select-span",
+    "open-trace",
+    "add-filter",
+    "apply-filter-immediately",
+    "update:activeTab",
+  ],
+  template: '<div class="trace-details-sidebar-stub"></div>',
+};
+
 // Mock useTraces composable
 const mockSearchObj = {
   meta: {
@@ -35,6 +59,11 @@ const mockSearchObj = {
       "service-1": "#4caf50",
       "service-2": "#2196f3",
       "service-3": "#ff9800",
+    },
+  },
+  data: {
+    traceDetails: {
+      selectedSpanId: null as string | null,
     },
   },
 };
@@ -100,7 +129,12 @@ describe("FlameGraphView", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    config.global.stubs = { ChartRenderer: ChartRendererStub };
+    config.global.stubs = {
+      ChartRenderer: ChartRendererStub,
+      TraceDetailsSidebar: TraceDetailsSidebarStub,
+    };
+    // Reset store state between tests
+    mockSearchObj.data.traceDetails.selectedSpanId = null;
   });
 
   afterEach(() => {
@@ -448,7 +482,7 @@ describe("FlameGraphView", () => {
   });
 
   describe("Chart Interaction", () => {
-    it("should emit span-selected event when span is clicked", async () => {
+    it("should open bottom panel and set selectedSpanId when span is clicked", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -460,7 +494,10 @@ describe("FlameGraphView", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      // Call handleChartClick directly (ChartRenderer emits 'click' which calls this)
+      // Sidebar should not be visible initially
+      expect(wrapper.vm.sidebarVisible).toBe(false);
+
+      // Click a span
       wrapper.vm.handleChartClick({
         data: {
           spanData: {
@@ -469,11 +506,13 @@ describe("FlameGraphView", () => {
         },
       });
 
-      expect(wrapper.emitted("span-selected")).toBeTruthy();
-      expect(wrapper.emitted("span-selected")[0]).toEqual(["span-1", true]);
+      // Should set selectedSpanId in the store
+      expect(mockSearchObj.data.traceDetails.selectedSpanId).toBe("span-1");
+      // Should open the bottom panel
+      expect(wrapper.vm.sidebarVisible).toBe(true);
     });
 
-    it("should not emit event when clicking without span data", async () => {
+    it("should not open bottom panel when clicking without span data", async () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -488,7 +527,157 @@ describe("FlameGraphView", () => {
       // Click without span data
       wrapper.vm.handleChartClick({ data: null });
 
-      expect(wrapper.emitted("span-selected")).toBeFalsy();
+      expect(wrapper.vm.sidebarVisible).toBe(false);
+      expect(mockSearchObj.data.traceDetails.selectedSpanId).toBeNull();
+    });
+
+    it("should render TraceDetailsSidebar when bottom panel is open", async () => {
+      wrapper = mount(FlameGraphView, {
+        props: {
+          spans: mockSpans,
+          traceDuration: 100,
+          selectedSpanId: null,
+        },
+      });
+
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      // Sidebar should not be rendered initially
+      expect(wrapper.find(".trace-details-sidebar-stub").exists()).toBe(false);
+
+      // Click a span to open the panel
+      wrapper.vm.handleChartClick({
+        data: {
+          spanData: {
+            span_id: "span-1",
+          },
+        },
+      });
+      await wrapper.vm.$nextTick();
+
+      // Sidebar should now be rendered
+      expect(wrapper.find(".trace-details-sidebar-stub").exists()).toBe(true);
+    });
+  });
+
+  describe("Bottom Panel Behavior", () => {
+    it("should close sidebar and emit close event", async () => {
+      wrapper = mount(FlameGraphView, {
+        props: {
+          spans: mockSpans,
+          traceDuration: 100,
+          selectedSpanId: null,
+        },
+      });
+
+      // Open sidebar first
+      wrapper.vm.sidebarVisible = true;
+      await wrapper.vm.$nextTick();
+
+      // Close sidebar
+      wrapper.vm.closeSidebar();
+
+      expect(wrapper.vm.sidebarVisible).toBe(false);
+      expect(wrapper.emitted("close")).toBeTruthy();
+    });
+
+    it("should close sidebar when selectedSpanId prop becomes null", async () => {
+      wrapper = mount(FlameGraphView, {
+        props: {
+          spans: mockSpans,
+          traceDuration: 100,
+          selectedSpanId: "span-1",
+        },
+      });
+
+      // Open sidebar
+      wrapper.vm.sidebarVisible = true;
+      await wrapper.vm.$nextTick();
+
+      // Change prop to null (simulating parent clearing selection)
+      await wrapper.setProps({ selectedSpanId: null });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarVisible).toBe(false);
+    });
+
+    it("should emit select-span when handleSelectSpan is called", async () => {
+      wrapper = mount(FlameGraphView, {
+        props: {
+          spans: mockSpans,
+          traceDuration: 100,
+          selectedSpanId: null,
+        },
+      });
+
+      wrapper.vm.handleSelectSpan("span-2");
+
+      expect(mockSearchObj.data.traceDetails.selectedSpanId).toBe("span-2");
+      expect(wrapper.emitted("select-span")).toBeTruthy();
+      expect(wrapper.emitted("select-span")[0]).toEqual(["span-2"]);
+    });
+
+    it("should set sidebarActiveTab default to attributes", () => {
+      wrapper = mount(FlameGraphView, {
+        props: {
+          spans: mockSpans,
+          traceDuration: 100,
+          selectedSpanId: null,
+        },
+      });
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+  });
+
+  describe("New Props", () => {
+    it("should accept spanMap prop and compute selectedSpan", async () => {
+      const spanMap = {
+        "span-1": createMockSpan({ span_id: "span-1" }),
+        "span-2": createMockSpan({ span_id: "span-2" }),
+      };
+
+      wrapper = mount(FlameGraphView, {
+        props: {
+          spans: mockSpans,
+          traceDuration: 100,
+          selectedSpanId: "span-1",
+          spanMap,
+        },
+      });
+
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.selectedSpan).toEqual(spanMap["span-1"]);
+    });
+
+    it("should return null from selectedSpan when spanId not in spanMap", () => {
+      wrapper = mount(FlameGraphView, {
+        props: {
+          spans: mockSpans,
+          traceDuration: 100,
+          selectedSpanId: "nonexistent",
+          spanMap: {},
+        },
+      });
+
+      expect(wrapper.vm.selectedSpan).toBeNull();
+    });
+
+    it("should accept streamName and parentMode props", () => {
+      wrapper = mount(FlameGraphView, {
+        props: {
+          spans: mockSpans,
+          traceDuration: 100,
+          selectedSpanId: null,
+          streamName: "test-stream",
+          parentMode: "embedded",
+        },
+      });
+
+      expect(wrapper.props("streamName")).toBe("test-stream");
+      expect(wrapper.props("parentMode")).toBe("embedded");
     });
   });
 
