@@ -25,12 +25,6 @@ export interface CheckboxProps {
   label?: string;
   /** Control size */
   size?: CheckboxSize;
-  /** q-checkbox compatibility for tighter spacing */
-  dense?: boolean;
-  /** q-checkbox compatibility prop; color token selection is handled internally */
-  color?: string;
-  /** q-checkbox compatibility prop; kept for migration parity */
-  keepColor?: boolean;
   /** Value to emit when checked in custom-value mode */
   trueValue?: CheckboxPrimitive;
   /** Value to emit when unchecked in custom-value mode */

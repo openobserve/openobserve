@@ -41,7 +41,7 @@ const hasCustomValues = computed(
 );
 
 /** Whether this checkbox is checked, considering the group context if present */
-const checked = computed<boolean | "indeterminate">(() => {
+const checked = computed((): boolean | "indeterminate" => {
   if (
     isGroupMember.value &&
     groupContext &&
@@ -69,7 +69,7 @@ const checked = computed<boolean | "indeterminate">(() => {
     return Boolean(props.modelValue);
   }
 
-  return props.modelValue ?? false;
+  return (props.modelValue as boolean | "indeterminate") ?? false;
 });
 
 const isDisabled = computed(
@@ -132,8 +132,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center',
-      dense ? 'tw:gap-1' : 'tw:gap-2',
+      'tw:inline-flex tw:items-center tw:gap-2',
       isDisabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
   >
