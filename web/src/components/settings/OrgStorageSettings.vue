@@ -47,29 +47,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="hero-page__left">
 
           <div class="hero-page__headline">
-            Bring your own storage to <span class="hero-page__brand-text">OpenObserve.</span>
+            {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text">OpenObserve.</span>
           </div>
 
           <div class="hero-page__sub">
-            Connect your own cloud bucket , data stays in your infrastructure — full control, zero lock-in.
+            {{ t("storage_settings.heroSub") }}
           </div>
 
           <div class="hero-page__actions">
-            <q-btn
+            <OButton
               data-test="storage-settings-configure-btn"
-              icon="cloud_upload"
-              label="Configure storage"
+              variant="primary"
               class="no-border o2-primary-button hero-cta-btn"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              flat
-              no-caps
               @click="navigateToCreate"
-            />
+            >
+              {{ t("storage_settings.configureStorage") }}
+            </OButton>
           </div>
 
           <!-- supported infrastructure -->
           <div class="hero-page__inline-providers">
-            <span class="hero-page__inline-label">Supported providers</span>
+            <span class="hero-page__inline-label">{{ t("storage_settings.supportedProviders") }}</span>
             <div class="hero-page__inline-logos">
               <div
                 v-for="p in availableProviders"
@@ -116,41 +115,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="ent-empty__title">No storage configured</div>
+      <div class="ent-empty__title">{{ t("storage_settings.noStorageConfigured") }}</div>
 
       <div class="ent-empty__desc">
-        Route this org's data to a dedicated bucket — independently of other orgs and global defaults.
+        {{ t("storage_settings.routeDataDesc") }}
       </div>
 
       <!-- key fact chips -->
       <div class="ent-empty__chips">
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
           <q-icon name="corporate_fare" size="13px" />
-          Per-org isolation
+          {{ t("storage_settings.perOrgIsolation") }}
         </span>
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
           <q-icon name="bolt" size="13px" />
-          Applies to new data immediately
+          {{ t("storage_settings.appliesImmediately") }}
         </span>
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
           <q-icon name="lock" size="13px" />
-          Uses org-scoped credentials
+          {{ t("storage_settings.usesOrgCredentials") }}
         </span>
       </div>
 
-      <q-btn
+      <OButton
         data-test="storage-settings-configure-btn"
-        icon="cloud_upload"
-        label="Configure storage"
+        variant="primary"
         class="no-border o2-primary-button ent-empty__btn"
         :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        flat
-        no-caps
         @click="navigateToCreate"
-      />
+      >
+        {{ t("storage_settings.configureStorage") }}
+      </OButton>
 
       <div class="ent-empty__providers">
-        <span class="ent-empty__providers-label">Supported providers</span>
+        <span class="ent-empty__providers-label">{{ t("storage_settings.supportedProviders") }}</span>
         <div class="ent-empty__providers-logos">
           <div
             v-for="p in providerDefinitions"
@@ -192,19 +190,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="font-size: 11px; border-radius: 20px; padding: 2px 8px; margin-top: 4px;"
               >
                 <q-icon name="check_circle" size="11px" style="margin-right: 3px;" />
-                active
+                {{ t("storage_settings.active") }}
               </q-badge>
             </div>
           </div>
-          <q-btn
+          <OButton
             data-test="storage-settings-update-btn"
-            label="Update Storage"
+            variant="primary"
             class="no-border o2-primary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
             @click="navigateToEdit"
-          />
+          >
+            {{ t("storage_settings.updateStorage") }}
+          </OButton>
         </q-card-section>
 
         <q-separator />
@@ -213,27 +211,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="q-px-lg q-pt-md q-pb-md">
           <div class="storage-detail-grid">
             <div v-if="storageData.bucket_name" class="storage-field">
-              <div class="storage-field__label">bucket name</div>
+              <div class="storage-field__label">{{ t("storage_settings.bucketName") }}</div>
               <div class="storage-field__value">{{ storageData.bucket_name }}</div>
             </div>
             <div v-if="storageData.region" class="storage-field">
-              <div class="storage-field__label">region</div>
+              <div class="storage-field__label">{{ t("storage_settings.region") }}</div>
               <div class="storage-field__value">{{ storageData.region }}</div>
             </div>
             <div v-if="storageData.server_url && !isCloud" class="storage-field">
-              <div class="storage-field__label">server url</div>
+              <div class="storage-field__label">{{ t("storage_settings.serverUrl") }}</div>
               <div class="storage-field__value">{{ storageData.server_url }}</div>
             </div>
             <div v-if="storageData.access_key" class="storage-field">
-              <div class="storage-field__label">access key</div>
+              <div class="storage-field__label">{{ t("storage_settings.accessKey") }}</div>
               <div class="storage-field__value">{{ storageData.access_key }}</div>
             </div>
             <div v-if="storageData.secret_key" class="storage-field">
-              <div class="storage-field__label">secret key</div>
+              <div class="storage-field__label">{{ t("storage_settings.secretKey") }}</div>
               <div class="storage-field__value">{{ storageData.secret_key }}</div>
             </div>
             <div v-if="storageData.role_arn" class="storage-field">
-              <div class="storage-field__label">role arn</div>
+              <div class="storage-field__label">{{ t("storage_settings.roleArn") }}</div>
               <div class="storage-field__value" style="word-break: break-all;">{{ storageData.role_arn }}</div>
             </div>
           </div>
@@ -245,11 +243,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section v-if="configTimestamps" class="q-px-lg q-py-sm">
           <div class="row" style="gap: 40px;">
             <div v-if="configTimestamps.created_at" class="row items-center" style="gap: 6px;">
-              <span class="storage-field__label" style="margin-bottom: 0;">created at</span>
+              <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
               <span class="text-body2">{{ configTimestamps.created_at }}</span>
             </div>
             <div v-if="configTimestamps.updated_at" class="row items-center" style="gap: 6px;">
-              <span class="storage-field__label" style="margin-bottom: 0;">updated at</span>
+              <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
               <span class="text-body2">{{ configTimestamps.updated_at }}</span>
             </div>
           </div>
@@ -268,6 +266,7 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const store = useStore();
 const { t } = useI18n();
@@ -276,13 +275,13 @@ const router = useRouter();
 const features = [
   {
     icon: "dataset",
-    title: "Own your data end-to-end",
-    desc: "Store ingested data directly in your own bucket and stay in complete control of who can access it.",
+    title: t("storage_settings.featureOwnDataTitle"),
+    desc: t("storage_settings.featureOwnDataDesc"),
   },
   {
     icon: "security",
-    title: "Secure & compliant",
-    desc: "Fine grained access keys, your sensitive data stays in your infrastructure.",
+    title: t("storage_settings.featureSecureTitle"),
+    desc: t("storage_settings.featureSecureDesc"),
   },
 ];
 

@@ -22,13 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           data-test="storage-settings-editor-back-btn"
           class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
-          title="Go Back"
+          :title="t('storage_settings.goBack')"
           @click="goBack"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <div class="text-h6" data-test="storage-settings-editor-title">
-          {{ isEditMode ? 'Update Storage' : 'New Storage Configuration' }}
+          {{ isEditMode ? t("storage_settings.updateStorage") : t("storage_settings.newStorageConfiguration") }}
         </div>
       </div>
     </div>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :header-nav="step > 1 && !isEditMode"
           >
             <div class="text-body2 text-grey q-mb-md">
-              select a cloud storage provider to store this organization's data.
+              {{ t("storage_settings.selectProviderDesc") }}
               once configured, all new data for this org will be written to your
               own storage infrastructure.
             </div>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disable="isEditMode"
                   :rules="[
                     (val: any) =>
-                      !!val?.trim() || 'Bucket name is required',
+                      !!val?.trim() || t('storage_settings.bucketNameRequired'),
                   ]"
                 />
                 <q-input
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   stack-label
                   :rules="[
                     (val: any) =>
-                      !!val?.trim() || 'Access key is required',
+                      !!val?.trim() || t('storage_settings.accessKeyRequired'),
                   ]"
                 />
                 <q-input
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="password"
                   :rules="[
                     (val: any) =>
-                      !!val?.trim() || 'Secret key is required',
+                      !!val?.trim() || t('storage_settings.secretKeyRequired'),
                   ]"
                 />
               </template>
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   stack-label
                   :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || 'Bucket name is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
                 />
                 <q-input
                   data-test="storage-settings-access-key-input"
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   stack-label
-                  :rules="[(val: any) => !!val?.trim() || 'Access key is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.accessKeyRequired')]"
                 />
                 <q-input
                   data-test="storage-settings-secret-key-input"
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   stack-label
                   type="password"
-                  :rules="[(val: any) => !!val?.trim() || 'Secret key is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.secretKeyRequired')]"
                 />
                 <q-input
                   v-if="!isCloud"
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   stack-label
                   :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || 'Bucket name is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
                 />
                 <q-input
                   data-test="storage-settings-access-key-input"
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   stack-label
-                  :rules="[(val: any) => !!val?.trim() || 'Access key is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.accessKeyRequired')]"
                 />
                 <q-input
                   v-if="!isCloud"
@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   stack-label
                   :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || 'Server URL is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.serverURLRequired')]"
                 />
               </template>
 
@@ -290,10 +290,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon name="info" size="18px" color="primary" class="tw:flex-shrink-0 tw:mt-px" />
                   <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
                     <template v-if="isCloud">
-                      This uses AWS sts to assume role and perform operations. You must add Openobserve AWS account as trusted entity type for this role in AWS console. Please contact Openobserve team to get the account information or for further help setting this up.
+                      {{ t("storage_settings.awsStsCloudInfo") }}
                     </template>
                     <template v-else>
-                      This uses AWS sts to assume role and perform operations. Make sure you have configured aws credentials in the installation env that have access to this role.
+                      {{ t("storage_settings.awsStsSelfHostedInfo") }}
                     </template>
                   </div>
                 </div>
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   stack-label
                   :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || 'Bucket name is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
                 />
                 <q-input
                   data-test="storage-settings-region-input"
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   stack-label
                   :disable="isEditMode || !!cloudRegion"
-                  :rules="[(val: any) => !!val?.trim() || 'Region is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.regionRequired')]"
                 />
                 <q-input
                   data-test="storage-settings-role-arn-input"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   stack-label
-                  :rules="[(val: any) => !!val?.trim() || 'Role ARN is required']"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.roleARNRequired')]"
                 />
               </template>
             </div>
@@ -340,75 +340,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Form buttons -->
         <div class="flex justify-start q-mb-md">
           <div v-if="step === 1">
-            <q-btn
+            <OButton
               data-test="step1-cancel-btn"
+              variant="outline"
               class="o2-secondary-button tw:h-[36px] q-mr-sm"
-              :label="t('alerts.cancel')"
-              flat
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
-              no-caps
               @click="goBack"
-            />
-            <q-btn
+            >
+              {{ t("alerts.cancel") }}
+            </OButton>
+            <OButton
               data-test="step1-continue-btn"
-              @click="nextStep"
-              :disable="!canProceedStep1"
-              label="Continue"
+              variant="primary"
               class="no-border o2-primary-button tw:h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'
                   : 'o2-primary-button-light'
               "
-              flat
-              no-caps
-            />
+              :disabled="!canProceedStep1"
+              @click="nextStep"
+            >
+              {{ t("storage_settings.continue") }}
+            </OButton>
           </div>
           <div v-if="step > 1">
-            <q-btn
+            <OButton
               v-if="!isEditMode"
               data-test="step2-back-btn"
-              @click="prevStep"
-              label="Back"
+              variant="outline"
               class="o2-secondary-button tw:h-[36px] q-mr-sm"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
-              flat
-              no-caps
-            />
-            <q-btn
+              @click="prevStep"
+            >
+              {{ t("storage_settings.back") }}
+            </OButton>
+            <OButton
               data-test="step2-cancel-btn"
+              variant="outline"
               class="o2-secondary-button tw:h-[36px]"
-              :label="t('alerts.cancel')"
-              flat
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
-              no-caps
               @click="goBack"
-            />
-            <q-btn
+            >
+              {{ t("alerts.cancel") }}
+            </OButton>
+            <OButton
               data-test="storage-settings-submit-btn"
-              :label="isEditMode ? 'Update' : 'Save'"
+              variant="primary"
               class="no-border q-ml-sm o2-primary-button tw:h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'
                   : 'o2-primary-button-light'
               "
-              flat
               type="submit"
-              no-caps
-            />
+            >
+              {{ isEditMode ? t("storage_settings.update") : t("storage_settings.save") }}
+            </OButton>
           </div>
         </div>
       </q-form>
@@ -426,6 +426,7 @@ import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const store = useStore();
 const { t } = useI18n();

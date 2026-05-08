@@ -42,62 +42,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
               <OButton
                 variant="ghost"
-                size="sm"
-                class="q-ml-xs"
+                size="icon-xs-circle"
                 data-test="otg-management-extend-trial-btn"
                 @click.stop="toggleExtendTrialDialog(props.row)"
               >
-                {{ t("settings.extendTrial") }}
+                <q-icon name="event" size="14px" />
+                <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
               </OButton>
               <OButton
                 v-if="props.row.billing_provider === '-'"
                 variant="ghost"
-                size="sm"
-                class="q-ml-xs tw:text-emerald-600"
+                size="icon-xs-circle"
                 data-test="org-management-add-contract-btn"
                 @click.stop="toggleContractDialog(props.row, 'create')"
               >
-                Add Contract
+                <q-icon name="note_add" size="14px" />
+                <q-tooltip>Add Contract</q-tooltip>
               </OButton>
               <OButton
                 v-if="props.row.billing_provider === 'no_op'"
                 variant="ghost"
-                size="sm"
-                class="q-ml-xs tw:text-emerald-600"
+                size="icon-xs-circle"
                 data-test="org-management-extend-contract-btn"
                 @click.stop="toggleContractDialog(props.row, 'extend')"
               >
-                Extend Contract
+                <q-icon name="event" size="14px" />
+                <q-tooltip>Extend Contract</q-tooltip>
               </OButton>
               <OButton
                 v-if="props.row.billing_provider === 'no_op'"
                 variant="ghost-destructive"
-                size="sm"
-                class="q-ml-xs"
+                size="icon-xs-circle"
                 data-test="org-management-revoke-contract-btn"
                 @click.stop="confirmRevokeContract(props.row)"
               >
-                Revoke
+                <q-icon name="block" size="14px" />
+                <q-tooltip>Revoke</q-tooltip>
               </OButton>
               <OButton
                 v-if="!props.row.org_storage_enabled"
                 variant="ghost"
-                size="sm"
-                class="q-ml-xs"
+                size="icon-xs-circle"
                 data-test="org-management-storage-enable-btn"
                 @click.stop="toggleOrgStorage(props.row)"
               >
-                Enable Storage
+                <q-icon name="cloud_upload" size="14px" />
+                <q-tooltip>Enable Storage</q-tooltip>
               </OButton>
               <OButton
                 v-else
                 variant="ghost"
-                size="sm"
-                class="q-ml-xs"
+                size="icon-xs-circle"
                 disabled
+                class="text-positive"
                 data-test="org-management-storage-enabled-btn"
               >
-                Storage Enabled
+                <q-icon name="cloud_done" size="14px" />
+                <q-tooltip>Storage Enabled</q-tooltip>
               </OButton>
             </div>
           </q-td>
