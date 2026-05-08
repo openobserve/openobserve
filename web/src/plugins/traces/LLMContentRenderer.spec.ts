@@ -960,7 +960,7 @@ describe("LLMContentRenderer", () => {
   describe("toolContentJson & parsedContentJson", () => {
     it("should stringify toolContentJson for object content", () => {
       const mockSpan = {
-        llm_tool_call_arguments: '{"key": "value"}',
+        gen_ai_tool_call_arguments: '{"key": "value"}',
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -981,7 +981,7 @@ describe("LLMContentRenderer", () => {
           content: null,
           observationType: "TOOL",
           contentType: "input",
-          span: { llm_tool_call_arguments: "null" },
+          span: { gen_ai_tool_call_arguments: "null" },
         },
       });
 
@@ -1186,9 +1186,9 @@ describe("LLMContentRenderer", () => {
 
     it("should render CodeQueryEditor stub for tool content", () => {
       const mockSpan = {
-        llm_tool_name: "test-tool",
-        llm_tool_call_id: "call-1",
-        llm_tool_call_arguments: '{"op": "add"}',
+        gen_ai_tool_name: "test-tool",
+        gen_ai_tool_call_id: "call-1",
+        gen_ai_tool_call_arguments: '{"op": "add"}',
       };
 
       wrapper = mount(LLMContentRenderer, {
