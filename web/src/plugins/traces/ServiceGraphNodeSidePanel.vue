@@ -287,7 +287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <TenstackTable
                     :columns="operationsTableColumns"
-                    :rows="operationsTableRows"
+                    :rows="sortedOperationsTableRows"
+                    :sort-by="sortBy"
+                    :sort-order="sortOrder"
                     :loading="false"
                     :default-columns="false"
                     :enable-column-reorder="false"
@@ -296,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
                     :row-height="28"
+                    @sort-change="handleSortChange"
                     @click:data-row="
                       (row: any) =>
                         navigateToTraces({ operationName: row._name })
@@ -318,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'tw:text-[var(--o2-latency-p99)]'
                             : ''
                         "
-                        >{{ item.p99 }}</span
+                        >{{ formatOperationLatency(item.p99) }}</span
                       >
                     </template>
                     <template #cell-p95="{ item }">
@@ -328,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'tw:text-[var(--o2-latency-p95)]'
                             : ''
                         "
-                        >{{ item.p95 }}</span
+                        >{{ formatOperationLatency(item.p95) }}</span
                       >
                     </template>
                     <template #cell-p75="{ item }">
@@ -338,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'tw:text-[var(--o2-latency-p75)]'
                             : ''
                         "
-                        >{{ item.p75 }}</span
+                        >{{ formatOperationLatency(item.p75) }}</span
                       >
                     </template>
                     <template #cell-actions="{ row, column, active }">
@@ -412,7 +415,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <TenstackTable
                     :columns="buildEntityTableColumns(cfg.colId, cfg.colLabel)"
-                    :rows="buildResourceTableRows(cfg)"
+                    :rows="sortResourceRows(buildResourceTableRows(cfg))"
+                    :sort-by="sortBy"
+                    :sort-order="sortOrder"
                     :loading="false"
                     :default-columns="false"
                     :enable-column-reorder="false"
@@ -421,6 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
                     :row-height="28"
+                    @sort-change="handleSortChange"
                     @click:data-row="
                       (row: any) =>
                         navigateToTraces({
@@ -477,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'tw:text-[var(--o2-latency-p99)]'
                             : ''
                         "
-                        >{{ item.p99 }}</span
+                        >{{ formatOperationLatency(item.p99) }}</span
                       >
                     </template>
                     <template #cell-p95="{ item }">
@@ -487,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'tw:text-[var(--o2-latency-p95)]'
                             : ''
                         "
-                        >{{ item.p95 }}</span
+                        >{{ formatOperationLatency(item.p95) }}</span
                       >
                     </template>
                     <template #cell-p75="{ item }">
@@ -497,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? 'tw:text-[var(--o2-latency-p75)]'
                             : ''
                         "
-                        >{{ item.p75 }}</span
+                        >{{ formatOperationLatency(item.p75) }}</span
                       >
                     </template>
                     <template #empty>
@@ -1435,6 +1441,52 @@ export default defineComponent({
       });
     };
 
+    // ── Sorting state ──────────────────────────────────────────────────────
+    const sortBy = ref<string>("errors");
+    const sortOrder = ref<"asc" | "desc">("desc");
+
+    function handleSortChange(field: string, order: "asc" | "desc") {
+      sortBy.value = field;
+      sortOrder.value = order;
+    }
+
+    const compareRows = (a: any, b: any, field: string): number => {
+      // For latency percentiles, sort by raw underscore-prefixed values
+      if (field === "p99" || field === "p95" || field === "p75") {
+        const rawKey = `${field}` as const;
+        return (a[rawKey] ?? 0) - (b[rawKey] ?? 0);
+      }
+      // For requests, sort by raw _requests value
+      if (field === "requests") {
+        return (a.requests ?? 0) - (b.requests ?? 0);
+      }
+      const va = a[field];
+      const vb = b[field];
+      if (typeof va === "number" && typeof vb === "number") {
+        return va - vb;
+      }
+      return String(va ?? "").localeCompare(String(vb ?? ""));
+    };
+
+    const sortedOperationsTableRows = computed(() => {
+      const rows = operationsTableRows.value;
+      if (!sortBy.value) return rows;
+      const order = sortOrder.value;
+      return [...rows].sort((a, b) => {
+        const result = compareRows(a, b, sortBy.value);
+        return order === "desc" ? -result : result;
+      });
+    });
+
+    const sortResourceRows = (rows: any[]) => {
+      if (!sortBy.value) return rows;
+      const order = sortOrder.value;
+      return [...rows].sort((a, b) => {
+        const result = compareRows(a, b, sortBy.value);
+        return order === "desc" ? -result : result;
+      });
+    };
+
     // Generic helper: builds table columns with a dynamic first (entity) column
     const buildEntityTableColumns = (
       entityId: string,
@@ -1445,41 +1497,48 @@ export default defineComponent({
         accessorKey: entityId,
         header: entityHeader,
         size: 220,
-        meta: { slot: false },
+        enableSorting: true,
+        meta: { slot: false, sortable: true },
       },
       {
         id: "requests",
-        accessorKey: "requests",
+        accessorFn: (row: any) => formatNumber(row.requests),
         header: "Requests",
         size: 100,
+        enableSorting: true,
+        meta: { sortable: true },
       },
       {
         id: "errors",
         accessorKey: "errors",
         header: "Errors",
         size: 80,
-        meta: { slot: true },
+        enableSorting: true,
+        meta: { slot: true, sortable: true },
       },
       {
         id: "p99",
         accessorKey: "p99",
         header: "P99",
         size: 80,
-        meta: { slot: true },
+        enableSorting: true,
+        meta: { slot: true, sortable: true },
       },
       {
         id: "p95",
         accessorKey: "p95",
         header: "P95",
         size: 80,
-        meta: { slot: true },
+        enableSorting: true,
+        meta: { slot: true, sortable: true },
       },
       {
         id: "p75",
         accessorKey: "p75",
         header: "P75",
         size: 80,
-        meta: { slot: true },
+        enableSorting: true,
+        meta: { slot: true, sortable: true },
       },
     ];
 
@@ -1492,16 +1551,12 @@ export default defineComponent({
     const operationsTableRows = computed(() =>
       recentOperations.value.map((op) => ({
         operation: op.name,
-        requests: formatNumber(op.requestCount),
+        requests: op.requestCount,
         errors: op.errorCount,
-        p99: formatOperationLatency(op.p99Latency),
-        p95: formatOperationLatency(op.p95Latency),
-        p75: formatOperationLatency(op.p75Latency),
-        p50: formatOperationLatency(op.p50Latency),
-        _name: op.name,
-        _p99: op.p99Latency,
-        _p95: op.p95Latency,
-        _p75: op.p75Latency,
+        p99: op.p99Latency,
+        p95: op.p95Latency,
+        p75: op.p75Latency,
+        p50: op.p50Latency,
       })),
     );
 
@@ -1798,16 +1853,12 @@ export default defineComponent({
     const buildResourceTableRows = (config: ResourceTabConfig) =>
       (resourceTabData.value[config.id] || []).map((row) => ({
         [config.colId]: row.name,
-        requests: formatNumber(row.requestCount),
+        requests: row.requestCount,
         errors: row.errorCount,
-        p99: formatOperationLatency(row.p99Latency),
-        p95: formatOperationLatency(row.p95Latency),
-        p75: formatOperationLatency(row.p75Latency),
-        p50: formatOperationLatency(row.p50Latency),
-        _name: row.name,
-        _p99: row.p99Latency,
-        _p95: row.p95Latency,
-        _p75: row.p75Latency,
+        p99: row.p99Latency,
+        p95: row.p95Latency,
+        p75: row.p75Latency,
+        p50: row.p50Latency,
       }));
 
     // Lazy-fetch resource tab data / metrics when their tab is activated
@@ -2067,6 +2118,12 @@ export default defineComponent({
       metricsCorrelationLoaded,
       fetchMetricsCorrelation,
       metricGroupResources,
+      sortedOperationsTableRows,
+      sortBy,
+      sortOrder,
+      handleSortChange,
+      sortResourceRows,
+      formatOperationLatency,
     };
   },
 });
