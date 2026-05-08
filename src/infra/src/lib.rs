@@ -15,6 +15,7 @@
 
 #![feature(btree_cursors)]
 
+pub mod bloom;
 pub mod cache;
 pub mod client;
 pub mod cluster;

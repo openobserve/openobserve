@@ -335,6 +335,8 @@ arrow-flight = "58"
 arrow-json = "58"
 arrow-schema = { version = "58", features = ["serde"] }
 parquet = { version = "58", features = ["arrow", "async", "object_store"] }
+sbbf-rs-safe = "0.3"
+twox-hash = "2"
 object_store = { version = "0.13", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.61", features = ["serde", "visitor"] }
 dotenv_config = "0.2"
