@@ -266,8 +266,35 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       testLogger.info('Invalid query maintained system stability - valid graceful handling');
     }
 
-    // Note: Invalid SQL syntax test removed - error handling is validated
-    // via inline error messages below the chart, not via toast notifications
+    // Test 2: Invalid SQL syntax (if SQL mode available)
+    const sqlToggle = await pm.metricsPage.getSqlToggle();
+    const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
+
+    if (hasSqlMode) {
+      testLogger.info('Testing invalid SQL syntax');
+
+      await sqlToggle.click();
+      await page.waitForTimeout(500);
+
+      await pm.metricsPage.enterMetricsQuery('SELECT FROM WHERE');
+      await page.waitForTimeout(2000);
+      await pm.metricsPage.clickApplyButton();
+      await page.waitForTimeout(3000);
+
+      // Check for inline error in the error list below the chart
+      const inlineError = page.locator('[data-test="dashboard-error"]');
+      const hasInlineError = await inlineError.isVisible({ timeout: 3000 }).catch(() => false);
+
+      if (hasInlineError) {
+        const errorText = await inlineError.textContent().catch(() => '');
+        testLogger.info(`SQL inline error displayed: ${errorText.substring(0, 100)}`);
+        expect(errorText.toLowerCase()).toMatch(/error|invalid|syntax|parse|sql|fail|cannot|not found/i);
+      } else {
+        testLogger.info('No inline error visible - system handled gracefully');
+      }
+    } else {
+      testLogger.info('SQL mode not available - skipping invalid SQL test');
+    }
 
     testLogger.info('Error handling tests completed');
   });

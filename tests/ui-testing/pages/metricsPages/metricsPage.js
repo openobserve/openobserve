@@ -1749,7 +1749,7 @@ export class MetricsPage {
             '.q-banner--negative',                 // Quasar negative banner
             '[data-test="error-message"]',         // Explicit error message data-test
             '.error-notification',                 // Explicit error notification class
-            '.errorMessage'                        // Inline error in PanelSchemaRenderer
+            '[data-test="dashboard-error"]'          // Inline error list (DashboardErrors)
         ];
 
         for (const selector of errorSelectors) {
