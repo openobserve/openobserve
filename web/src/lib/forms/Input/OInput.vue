@@ -34,49 +34,13 @@ const inputId = computed(() => props.id ?? _fallbackId);
 const inputRef = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 const debounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 
-// ── Validation ─────────────────────────────────────────────────────────────
-const ruleError = ref<string | null>(null);
-const touched = ref(false);
-
-function runRules(val: string | number | undefined): void {
-  if (!props.rules?.length) {
-    ruleError.value = null;
-    return;
-  }
-  for (const rule of props.rules) {
-    const result = rule(val);
-    if (result !== true) {
-      ruleError.value = result;
-      return;
-    }
-  }
-  ruleError.value = null;
-}
-
 function handleBlur(event: FocusEvent) {
-  if (!touched.value) {
-    touched.value = true;
-    // If a debounce timer is pending the model hasn't been updated yet —
-    // flush it synchronously so runRules validates the actual current value.
-    if (debounceTimer.value) {
-      clearTimeout(debounceTimer.value);
-      debounceTimer.value = null;
-      const el = inputRef.value;
-      const currentVal = el ? normalizeByModifiers(el.value) : props.modelValue;
-      emit("update:modelValue", currentVal ?? "");
-      runRules(currentVal);
-    } else {
-      runRules(props.modelValue);
-    }
-  }
   emit("blur", event);
 }
 
 // ── Error state ────────────────────────────────────────────────────────────
-// External errorMessage / error prop always wins; internal rule error is secondary.
 const effectiveError = computed(
-  () =>
-    props.errorMessage || (props.error ? " " : null) || ruleError.value || null,
+  () => props.errorMessage || (props.error ? " " : null) || null,
 );
 const hasError = computed(() => !!effectiveError.value);
 
@@ -169,7 +133,6 @@ function handleInput(event: Event) {
 
   const emitValue = () => {
     const normalized = normalizeByModifiers(val);
-    if (touched.value) runRules(normalized);
     emit("update:modelValue", normalized);
   };
 
@@ -187,7 +150,6 @@ function handleInput(event: Event) {
 
 function handleClear() {
   if (debounceTimer.value) clearTimeout(debounceTimer.value);
-  if (touched.value) runRules("");
   emit("update:modelValue", "");
   emit("clear");
   inputRef.value?.focus();
@@ -353,9 +315,9 @@ const wrapperClasses = computed(() => [
       </span>
     </div>
 
-    <!-- Bottom row: hint / error / counter -->
+    <!-- Bottom row: helpText / error / counter -->
     <div
-      v-if="effectiveError || hint || maxlength"
+      v-if="effectiveError || helpText || maxlength"
       class="tw:flex tw:items-center tw:justify-between tw:gap-2"
     >
       <span
@@ -366,10 +328,10 @@ const wrapperClasses = computed(() => [
         {{ effectiveError }}
       </span>
       <span
-        v-else-if="hint"
+        v-else-if="helpText"
         class="tw:text-xs tw:text-input-hint tw:leading-none"
       >
-        {{ hint }}
+        {{ helpText }}
       </span>
       <span v-else class="tw:flex-1" />
 

@@ -45,8 +45,8 @@ describe("OInput", () => {
     expect(wrapper.text()).toContain("Required field");
   });
 
-  it("shows hint when provided", () => {
-    wrapper = mount(OInput, { props: { hint: "Enter your name" } });
+  it("shows helpText when provided", () => {
+    wrapper = mount(OInput, { props: { helpText: "Enter your name" } });
     expect(wrapper.text()).toContain("Enter your name");
   });
 
