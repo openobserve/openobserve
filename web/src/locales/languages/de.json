@@ -124,7 +124,8 @@
     "create": "Erstellen",
     "resources": "Ressourcen",
     "updated_at": "Aktualisiert am",
-    "error": "Fehler"
+    "error": "Fehler",
+    "db": "Datenbank"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
