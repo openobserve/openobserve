@@ -280,6 +280,13 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await sqlToggle.click();
       await page.waitForTimeout(500);
 
+      // Switch to Custom mode so we can type in the editor
+      const sqlCustomBtn = page.locator('[data-test="dashboard-custom-query-type"]');
+      if (await sqlCustomBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await sqlCustomBtn.click();
+        await page.waitForTimeout(500);
+      }
+
       await pm.metricsPage.enterMetricsQuery('SELECT FROM WHERE');
       await pm.metricsPage.clickApplyButton();
       await page.waitForTimeout(3000);
