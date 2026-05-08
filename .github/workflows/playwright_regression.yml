@@ -111,7 +111,7 @@ jobs:
           if-no-files-found: error
 
   ui_integration_tests:
-    name: e2e / ${{ matrix.spec }}
+    name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
       labels: ubicloud-standard-8
@@ -121,17 +121,58 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - spec: "logs-regression.spec.js"
-          - spec: "logs-regression-bugs.spec.js"
-          - spec: "logs-9754.spec.js"
-          - spec: "streams-regression.spec.js"
-          - spec: "enrichment-regression.spec.js"
-          - spec: "ui-regression.spec.js"
-          - spec: "pipeline-regression.spec.js"
-          - spec: "alerts-stream-switching-regression.spec.js"
-          - spec: "metrics-regression.spec.js"
-          - spec: "traces-regression.spec.js"
-          - spec: "dashboard-regression.spec.js"
+          - testfolder: "Logs-Regression"
+            browser: "chrome"
+            run_files:
+              [
+                "logs-regression.spec.js",
+                "logs-regression-bugs.spec.js",
+                "logs-9754.spec.js",
+              ]
+          - testfolder: "Alerts-Regression"
+            browser: "chrome"
+            run_files:
+              [
+                "alerts-regression.spec.js",
+                "alerts-stream-switching-regression.spec.js",
+              ]
+          - testfolder: "Dashboard-Regression"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-regression.spec.js",
+              ]
+          - testfolder: "Streams-Regression"
+            browser: "chrome"
+            run_files:
+              [
+                "streams-regression.spec.js",
+              ]
+          - testfolder: "Pipelines-Regression"
+            browser: "chrome"
+            run_files:
+              [
+                "enrichment-regression.spec.js",
+                "pipeline-regression.spec.js",
+              ]
+          - testfolder: "Traces-Regression"
+            browser: "chrome"
+            run_files:
+              [
+                "traces-regression.spec.js",
+              ]
+          - testfolder: "Metrics-Regression"
+            browser: "chrome"
+            run_files:
+              [
+                "metrics-regression.spec.js",
+              ]
+          - testfolder: "GeneralTests-Regression"
+            browser: "chrome"
+            run_files:
+              [
+                "ui-regression.spec.js",
+              ]
 
     steps:
       - name: Clone the current repo
@@ -189,15 +230,40 @@ jobs:
           cd tests/ui-testing && npm ci
           npx playwright install --with-deps chromium
 
-          SPEC_FILE="./playwright-tests/RegressionSet/${{ matrix.spec }}"
-          echo "Running: $SPEC_FILE"
-          npx playwright test "$SPEC_FILE"
+          # Get list of files to run using join function
+          FILE_LIST="${{ join(matrix.run_files, ' ') }}"
+          echo "DEBUG: FILE_LIST = $FILE_LIST"
+          echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
+
+          if [ -n "$FILE_LIST" ]; then
+            # Map logical folder names to actual directories
+            case "${{ matrix.testfolder }}" in
+              *)
+                ACTUAL_FOLDER="RegressionSet"
+                ;;
+            esac
+
+            echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
+
+            # Build file paths
+            FILE_PATHS=""
+            for file in $FILE_LIST; do
+              FILE_PATH="./playwright-tests/$ACTUAL_FOLDER/$file"
+              echo "DEBUG: Will run file: $FILE_PATH"
+              FILE_PATHS="$FILE_PATHS $FILE_PATH"
+            done
+
+            echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
+            npx playwright test $FILE_PATHS
+          else
+            echo "No files specified to run for ${{ matrix.testfolder }} folder"
+          fi
 
       - name: Upload blob report to GitHub Actions Artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: blob-report-${{ matrix.spec }}-${{ github.run_attempt }}
+          name: blob-report-${{ matrix.testfolder }}-${{ github.run_attempt }}
           path: tests/ui-testing/blob-report
           retention-days: 1
 
