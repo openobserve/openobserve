@@ -847,8 +847,8 @@ export default defineComponent({
         panel.layout.h = 10;
 
         let query = panel.queries[0].query
-          .replace("[STREAM_NAME]", `"${streamName}"`)
-          .replace("[WHERE_CLAUSE]", whereClause);
+          .replace("[STREAM_NAME]", () => `"${streamName}"`)
+          .replace("[WHERE_CLAUSE]", () => whereClause);
 
         // Use count(*) instead of approx_distinct(trace_id)
         query = query
