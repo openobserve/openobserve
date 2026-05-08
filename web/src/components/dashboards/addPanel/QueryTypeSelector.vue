@@ -98,10 +98,6 @@ import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { Database, ChartLine, Wrench, Code2 } from "lucide-vue-next";
-import {
-  DEFAULT_METRICS_X_FIELD,
-  DEFAULT_METRICS_Y_FIELD,
-} from "@/utils/metrics/constants";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -126,8 +122,6 @@ export default defineComponent({
       dashboardPanelData,
       removeXYFilters,
       updateXYFieldsForCustomQueryMode,
-      makeAutoSQLQuery,
-      updateGroupedFields,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDialogMessage = ref(
@@ -302,27 +296,6 @@ export default defineComponent({
         dashboardPanelData.data.queries[queryIdx].query = "";
       }
 
-      // For metrics page: when switching to SQL, apply default fields and generate query
-      if (
-        dashboardPanelDataPageKey === "metrics" &&
-        isQueryTypeChange &&
-        popupSelectedButtonType.value === "sql"
-      ) {
-        const query = dashboardPanelData.data.queries[queryIdx];
-        query.customQuery = false;
-        query.fields.x = [DEFAULT_METRICS_X_FIELD()];
-        query.fields.y = [DEFAULT_METRICS_Y_FIELD()];
-        query.fields.breakdown = [];
-        query.fields.filter = {
-          filterType: "group",
-          logicalOperator: "AND",
-          conditions: [],
-        };
-
-        // Generate the SQL query based on the default fields
-        await updateGroupedFields();
-        await makeAutoSQLQuery();
-      }
 
       // When switching to SQL mode, multi-query is not supported.
       // Keep only the current query, remove others, and reset index to 0.
