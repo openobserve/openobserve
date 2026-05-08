@@ -6,13 +6,20 @@ import OTextarea from "./OTextarea.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import type { FormTextareaProps } from "./OFormTextarea.types";
 
+defineOptions({ inheritAttrs: false });
+
 const props = defineProps<FormTextareaProps>();
 
-const form = inject(FORM_CONTEXT_KEY);
+const form = inject(FORM_CONTEXT_KEY, null);
+
+if (import.meta.env.DEV && !form) {
+  console.warn("[OFormTextarea] must be rendered inside <OForm>. No form context found.");
+}
 </script>
 
 <template>
   <component
+    v-if="form"
     :is="form.Field"
     :name="props.name"
     :validators="

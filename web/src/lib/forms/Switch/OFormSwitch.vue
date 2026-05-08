@@ -7,13 +7,20 @@ import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import type { FormSwitchProps } from "./OFormSwitch.types";
 import type { SwitchValue } from "./OSwitch.types";
 
+defineOptions({ inheritAttrs: false });
+
 const props = defineProps<FormSwitchProps>();
 
-const form = inject(FORM_CONTEXT_KEY);
+const form = inject(FORM_CONTEXT_KEY, null);
+
+if (import.meta.env.DEV && !form) {
+  console.warn("[OFormSwitch] must be rendered inside <OForm>. No form context found.");
+}
 </script>
 
 <template>
   <component
+    v-if="form"
     :is="form.Field"
     :name="props.name"
     :validators="
