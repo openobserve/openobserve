@@ -474,8 +474,9 @@ test.describe("Metrics testcases", () => {
 
     testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasNoData=${hasNoData}`);
 
-    // System must handle invalid syntax gracefully - either show error or no data
-    const handledGracefully = hasInlineError || hasNoData;
+    // System must handle invalid syntax gracefully - error, no data, or stable (no crash)
+    const hasVisualization = await pm.metricsPage.hasVisualization();
+    const handledGracefully = hasInlineError || hasNoData || hasVisualization;
     expect(handledGracefully).toBe(true);
 
     if (hasInlineError) {

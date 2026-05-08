@@ -376,7 +376,8 @@ export class MetricsPage {
             const dataState = await customBtn.getAttribute('data-state').catch(() => '');
             if (dataState !== 'on') {
                 await customBtn.click();
-                await this.page.waitForTimeout(500);
+                // Wait for default query to be populated by the watcher (e.g. streamName{})
+                await this.page.waitForTimeout(2000);
             }
         }
 
