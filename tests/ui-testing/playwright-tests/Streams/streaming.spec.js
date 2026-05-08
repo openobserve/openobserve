@@ -154,6 +154,7 @@ test.describe("Streaming for logs", () => {
         testLogger.info('Testing add/remove interesting fields');
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
+        await pm.streamsPage.enableSQLMode();
         await pm.streamsPage.clickQuickModeToggle();
         await pm.streamsPage.clickAllFieldsButton();
         await pm.streamsPage.selectRunQuery();

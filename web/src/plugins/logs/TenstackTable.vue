@@ -190,12 +190,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-xs"
-                class="q-mr-xs"
+                class="q-mr-xs log-row-expand-btn"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
-                ><component
-                  :is="isFunctionErrorOpen ? ChevronDown : ChevronRight"
-                  :size="14" /></OButton
+                ><q-icon :name="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'" size="14px" /></OButton
               ><b>
                 <q-icon name="warning" size="15px"></q-icon>
                 {{ t("search.functionErrorLabel") }}</b
@@ -335,16 +333,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="cellIndex == 0"
                   variant="ghost"
                   size="icon-xs"
-                  class="q-mr-xs"
+                  class="q-mr-xs log-row-expand-btn"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
-                  ><component
-                    :is="
+                  ><q-icon
+                    :name="
                       expandedRowIndices.has(virtualRow.index)
-                        ? ChevronDown
-                        : ChevronRight
+                        ? 'expand_more'
+                        : 'chevron_right'
                     "
-                    :size="14"
+                    size="14px"
                 /></OButton>
 
                 <template
@@ -432,7 +430,6 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronRight, ChevronDown } from "lucide-vue-next";
 
 interface StreamField {
   name: string;
@@ -1112,6 +1109,15 @@ defineExpose({
 </style>
 <style scoped lang="scss">
 @import "@/styles/logs/tenstack-table.scss";
+
+// Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat
+.log-row-expand-btn {
+  height: 24px !important;
+  width: 24px !important;
+  min-height: 24px !important;
+  min-width: 24px !important;
+  padding: 0 !important;
+}
 
 // Add explicit hover styles for log rows
 .table-row-hover {

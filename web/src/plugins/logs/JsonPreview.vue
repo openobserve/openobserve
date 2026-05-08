@@ -16,7 +16,7 @@
         variant="outline"
         class="tw:mb-[0.375rem] q-mr-sm"
         @click="copyLogToClipboard"
-      ><Copy :size="14" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+      ><q-icon name="content_copy" size="14px" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
       <OButton
         v-if="showViewRelatedBtn"
         size="sm-action"
@@ -25,7 +25,7 @@
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <Link :size="14" class="tw:mr-1" />{{ t('search.viewRelated') }}
+        <q-icon name="link" size="14px" class="tw:mr-1" />{{ t('search.viewRelated') }}
         <q-tooltip>
           {{ t("search.viewRelatedTooltip") }}
         </q-tooltip>
@@ -103,7 +103,7 @@
           size="sm-action"
           variant="outline"
           @click="redirectToTraces"
-        ><GitBranch :size="14" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
+        ><q-icon :name="outlinedAccountTree" size="14px" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
@@ -137,10 +137,10 @@
               data-test="log-details-include-exclude-field-btn"
               size="icon-xs"
               variant="ghost"
-              class="q-ml-sm"
+              class="q-ml-sm log-json-field-dropdown-btn"
               aria-label="Add icon"
             >
-              <q-icon :name="dropdownOpenMap[key] ? 'expand_less' : 'expand_more'" size="14px" />
+              <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
             </OButton>
           </template>
           <ODropdownItem
@@ -175,7 +175,7 @@
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
           >
-            <template #icon-left><Eye class="tw:size-4" /></template>
+            <template #icon-left><q-icon name="visibility" size="16px" /></template>
             {{ addOrRemoveLabel(key) }}
           </ODropdownItem>
           <!-- Cross-link options -->
@@ -187,7 +187,7 @@
               :data-test="`log-details-cross-link-${crossLink.name}`"
               @select.stop="openCrossLink(crossLink.resolvedUrl)"
             >
-              <template #icon-left><ExternalLink class="tw:size-4" /></template>
+              <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
               {{ crossLink.name }}
             </ODropdownItem>
           </template>
@@ -343,7 +343,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { Copy, Link, GitBranch, Eye, ExternalLink, AlignLeft, FileJson } from "lucide-vue-next";
+import { AlignLeft, FileJson } from "lucide-vue-next";
 
 export default {
   name: "JsonPreview",
@@ -394,11 +394,6 @@ export default {
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
-    Copy,
-    Link,
-    GitBranch,
-    Eye,
-    ExternalLink,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

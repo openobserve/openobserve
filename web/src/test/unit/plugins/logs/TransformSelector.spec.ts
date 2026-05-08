@@ -925,7 +925,7 @@ describe("TransformSelector.vue", () => {
         },
       });
 
-      // Save button tooltip should show "Save" not "Not supported for visualization"
+      // Save button tooltip should show "Save" not "Not supported for timechart"
       // The ternary check for logsVisualizeToggle === 'visualize' was removed
       expect(wrapper.exists()).toBe(true);
     });

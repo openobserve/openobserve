@@ -12,7 +12,7 @@
           <OButtonGroup class="axis-field" radius="sm">
             <OButton
               variant="primary"
-              size="chip"
+              size="chip-12"
               :data-test="`dashboard-join-item-${index}`"
             >
               <div class="join-btn-content">

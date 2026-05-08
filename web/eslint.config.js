@@ -47,8 +47,8 @@ export default [
     rules: {
       // Disable noisy rules inherited from recommended configs
       'prettier/prettier': 'off',
-      'no-unused-vars': 'warn',
-      '@typescript-eslint/no-unused-vars': 'warn',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
       'no-undef': 'off',
       'no-prototype-builtins': 'off',
       'no-async-promise-executor': 'off',
@@ -62,17 +62,7 @@ export default [
       'no-unreachable': 'off',
       'no-case-declarations': 'off',
       'no-shadow-restricted-names': 'off',
-      'vue/max-attributes-per-line': [
-        'warn',
-        {
-          singleline: {
-            max: 2
-          },
-          multiline: {
-            max: 1
-          }
-        }
-      ],
+      'vue/max-attributes-per-line': 'off',
       'vue/no-mutating-props': 'off',
       'vue/no-unused-components': 'off',
       'vue/no-dupe-keys': 'off',

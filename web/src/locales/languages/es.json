@@ -3313,7 +3313,9 @@
     "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado.",
     "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros.",
     "serviceGroupProtected": "No se puede eliminar el grupo de servicios. Solo puede modificar los campos mapeados.",
-    "noDataFound": "No se han encontrado datos"
+    "noDataFound": "No se han encontrado datos",
+    "isWorkloadType": "Identificador de servicio",
+    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

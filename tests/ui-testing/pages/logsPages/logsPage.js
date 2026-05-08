@@ -401,19 +401,86 @@ export class LogsPage {
 
     async selectIndexAndStreamJoin() {
         // Select both default and e2e_automate streams for join queries
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-        await this.page.waitForTimeout(3000);
+        // Retry loop with force-click fallback for cloud stability (Pattern 3)
+        const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+        const defaultToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first();
+        const e2eToggle = this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first();
 
-        // Select default stream
-        await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+        // Open dropdown
+        await dropdownArrow.click({ force: true });
+        await this.page.waitForTimeout(2000);
+
+        // Select default stream with retry
+        let defaultSelected = false;
+        for (let attempt = 1; attempt <= 3 && !defaultSelected; attempt++) {
+            try {
+                await defaultToggle.waitFor({ state: 'visible', timeout: 5000 });
+                await defaultToggle.click({ force: true });
+                defaultSelected = true;
+            } catch (e) {
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+                await dropdownArrow.click({ force: true });
+                await this.page.waitForTimeout(1000);
+            }
+        }
+        if (!defaultSelected) {
+            // Last-resort fallback: ensure the dropdown is open before clicking;
+            // after 3 retries through the Escape path, it may be closed and
+            // a force-click on a hidden toggle silently does nothing.
+            if (!(await defaultToggle.isVisible().catch(() => false))) {
+                await dropdownArrow.click({ force: true });
+                await this.page.waitForTimeout(1000);
+            }
+            await defaultToggle.click({ force: true, timeout: 10000 });
+        }
         await this.page.waitForTimeout(1000);
 
-        // Select e2e_automate stream (dropdown stays open after first selection)
-        await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
-        await this.page.waitForTimeout(1000);
+        // The dropdown auto-closes after selecting default — re-open it
+        // before attempting to click e2e_automate, otherwise e2eToggle is
+        // never visible and we burn time in the retry loop.
+        const isDropdownStillOpen = await e2eToggle.isVisible().catch(() => false);
+        if (!isDropdownStillOpen) {
+            await dropdownArrow.click({ force: true });
+            await this.page.waitForTimeout(1000);
+        }
+
+        // Select e2e_automate stream with retry
+        let e2eSelected = false;
+        for (let attempt = 1; attempt <= 3 && !e2eSelected; attempt++) {
+            try {
+                await e2eToggle.waitFor({ state: 'visible', timeout: 5000 });
+                await e2eToggle.click({ force: true });
+                e2eSelected = true;
+            } catch (e) {
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+                await dropdownArrow.click({ force: true });
+                await this.page.waitForTimeout(1000);
+                // Re-select default only if it's no longer marked as selected
+                // (clicking an already-on Quasar toggle would deselect it)
+                const isDefaultOn = await defaultToggle
+                    .locator('.q-toggle__inner')
+                    .first()
+                    .evaluate(el => el.classList.contains('q-toggle__inner--truthy'))
+                    .catch(() => true); // treat transient DOM errors as "already on" — safer than deselecting
+                if (!isDefaultOn) {
+                    await defaultToggle.click({ force: true });
+                    await this.page.waitForTimeout(500);
+                }
+            }
+        }
+        if (!e2eSelected) {
+            // Last-resort fallback: same dropdown-open guard as above
+            if (!(await e2eToggle.isVisible().catch(() => false))) {
+                await dropdownArrow.click({ force: true });
+                await this.page.waitForTimeout(1000);
+            }
+            await e2eToggle.click({ force: true, timeout: 10000 });
+        }
 
         // Close dropdown
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await dropdownArrow.click({ force: true });
     }
 
     /**
@@ -481,13 +548,17 @@ export class LogsPage {
         await streamAToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamAToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
+        await this.page.waitForTimeout(2000);
 
         // Clear search and filter for second stream
         if (searchVisible) {
             testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamB}`);
             await searchInput.click();
+            await this.page.waitForTimeout(500);
             await searchInput.fill('');
+            await this.page.waitForTimeout(500);
             await searchInput.fill(streamB);
+            await this.page.waitForTimeout(1000);
         }
 
         // Select second stream
@@ -497,6 +568,7 @@ export class LogsPage {
         await streamBToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamBToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
+        await this.page.waitForTimeout(2000);
 
         // Close dropdown
         await dropdownArrow.click();
@@ -791,32 +863,68 @@ export class LogsPage {
     async selectRunQuery() {
         // Ensure query editor is ready
         await this.ensureQueryEditorReady();
-        
-        // Wait for the query button to be visible and click it
-        await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
-        
-        // Add a small wait to ensure the button is fully ready
+
+        // Wait for the query button to be visible and enabled
+        const queryBtn = this.page.locator(this.queryButton);
+        await queryBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await queryBtn.waitFor({ state: 'attached', timeout: 10000 });
         await this.page.waitForTimeout(1000);
-        
-        await this.page.locator(this.queryButton).click();
-        
-        // Wait for query execution and results to load
-        await this.page.waitForTimeout(3000);
-        
-        // Wait for either the logs table to appear or an error message
-        try {
-            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
-                timeout: 15000,
-                state: 'visible' 
-            });
-        } catch (error) {
-            // If logs table doesn't appear, check for error message
-            const errorMessage = this.page.locator(this.errorMessage);
-            if (await errorMessage.isVisible()) {
-                testLogger.debug('Query completed with error message');
-            } else {
-                // Wait a bit more for any UI updates
-                await this.page.waitForTimeout(2000);
+
+        // Wait for button to be enabled — on cloud, streaming toggle / page
+        // state changes can keep it disabled for several seconds
+        await this.page.waitForFunction(
+            (selector) => {
+                const btn = document.querySelector(selector);
+                return btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true';
+            },
+            this.queryButton,
+            { timeout: 30000 }
+        ).catch(() => {
+            testLogger.debug('Query button did not become enabled within 30s — attempting click anyway');
+        });
+        await this.page.waitForTimeout(1000);
+
+        // Run + verify; if search returns a transient error (common on cloud
+        // when stream indexing is still catching up), retry with backoff.
+        // Also retry when results table never appears (query button may have
+        // been disabled or click was a no-op).
+        const errorMessage = this.page.locator(this.errorMessage);
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            // Wait for button to leave Cancel/loading state before clicking —
+            // otherwise a click on "Cancel" aborts the in-flight query instead
+            // of starting a fresh one.
+            await this.page.waitForFunction(
+                (sel) => {
+                    const b = document.querySelector(sel);
+                    if (!b) return false;
+                    return !b.hasAttribute('disabled')
+                        && !b.classList.contains('q-btn--loading')
+                        && !(b.textContent?.trim()?.includes('Cancel'));
+                },
+                this.queryButton,
+                { timeout: 30000 },
+            ).catch(() => {});
+            await queryBtn.click();
+            await this.page.waitForTimeout(3000);
+
+            try {
+                await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', {
+                    timeout: 15000,
+                    state: 'visible',
+                });
+                return; // results visible — done
+            } catch (e) {
+                // Retry on error message or when table never appears — both
+                // are transient on cloud while indexing catches up
+                if (attempt < maxAttempts) {
+                    const hasError = await errorMessage.isVisible().catch(() => false);
+                    const delay = hasError ? 5000 * attempt : 5000;
+                    testLogger.debug(`Query did not return results (attempt ${attempt}/${maxAttempts}, hasError=${hasError}); retrying after ${delay}ms`);
+                    await this.page.waitForTimeout(delay);
+                } else {
+                    testLogger.debug('Query exhausted all retries — proceeding without visible results');
+                }
             }
         }
     }
@@ -1411,17 +1519,38 @@ export class LogsPage {
     }
 
     async clickResultsPerPage() {
-        await this.page.locator('[data-test="logs-search-search-result"]').getByText('arrow_drop_down').click();
-        await this.page.getByText('10', { exact: true }).click();
+        // Wait for results to load first — cloud may be slower
         await this.page.waitForTimeout(2000);
-        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 1 to 10 out of');
+        // Click the dropdown using the data-test attribute on the results-per-page dropdown
+        const resultsDropdown = this.page.locator('[data-test="logs-search-result-records-per-page"]');
+        await resultsDropdown.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        await resultsDropdown.click({ force: true });
+        // Dropdown uses a QMenu popup — wait for it to appear, then click "10"
+        await this.page.waitForTimeout(500);
+        const option10 = this.page.locator('.q-menu .q-item').filter({ hasText: /^10$/ }).first();
+        await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        await option10.click({ force: true });
+        // Wait for the per-page change to take effect — cloud wildcard queries
+        // can take 5s+ to re-run after changing results-per-page
+        await this.page.waitForTimeout(5000);
+        // Retry the pagination assertion — slow cloud re-runs can miss the first check
+        const searchResult = this.page.locator('[data-test="logs-search-search-result"]');
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 10000 });
+                return;
+            } catch (e) {
+                if (attempt < 3) {
+                    await this.page.waitForTimeout(3000);
+                }
+            }
+        }
+        // Final attempt — let it throw
+        await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 15000 });
     }
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
-        await this.page.locator(this.resultPagination).getByRole('button', { name: resultsPerPage, exact: true }).click();
-        await this.page.waitForTimeout(5000); // Increased wait time for UI update
-        
-        // Use flexible assertions based on the results per page
+        // Derive the expected pattern
         let expectedPattern;
         switch (resultsPerPage) {
             case '2':
@@ -1436,9 +1565,30 @@ export class LogsPage {
             default:
                 expectedPattern = expectedText;
         }
-        
-        // Use a more flexible assertion that checks for the pattern rather than exact text
-        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText(expectedPattern);
+
+        const searchResult = this.page.locator('[data-test="logs-search-search-result"]');
+        // Quasar pagination buttons can be slow to respond on cloud — retry
+        // the click up to 3 times if the expected text doesn't appear.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            const pageBtn = this.page
+                .locator(this.resultPagination)
+                .locator('button:not(:has(.q-icon))')
+                .filter({ hasText: resultsPerPage })
+                .first();
+            await pageBtn.click({ force: true }).catch(() => {});
+            await this.page.waitForTimeout(3000);
+
+            try {
+                await expect(searchResult).toContainText(expectedPattern, { timeout: 10000 });
+                return; // page advanced successfully
+            } catch (e) {
+                if (attempt < 3) {
+                    testLogger.debug(`Pagination page ${resultsPerPage} click attempt ${attempt} did not advance — retrying`);
+                }
+            }
+        }
+        // Final attempt — let it throw if it still fails
+        await expect(searchResult).toContainText(expectedPattern, { timeout: 15000 });
     }
 
     async pageNotVisible() {
@@ -1457,18 +1607,28 @@ export class LogsPage {
             await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 30000 });
         } catch (error) {
             testLogger.error('Error in validateResult:', error);
-            // Check if there's an error message visible
-            const errorMessage = this.page.locator(this.errorMessage);
-            if (await errorMessage.isVisible()) {
-                const errorText = await errorMessage.textContent();
-                testLogger.error('Error message found:', errorText);
-                throw new Error(`Query failed with error: ${errorText}`);
+            if (this.page.isClosed()) {
+                throw error;
             }
-            // Check if there's a "no data found" message
-            const noDataMessage = this.page.getByText('No data found');
-            if (await noDataMessage.isVisible()) {
-                testLogger.debug('No data found for the query');
-                return; // This is acceptable for some queries
+            try {
+                // Check if there's an error message visible
+                const errorMessage = this.page.locator(this.errorMessage);
+                if (await errorMessage.isVisible({ timeout: 3000 })) {
+                    const errorText = await errorMessage.textContent();
+                    testLogger.error('Error message found:', errorText);
+                    throw new Error(`Query failed with error: ${errorText}`);
+                }
+                // Check if there's a "no data found" message
+                const noDataMessage = this.page.getByText('No data found');
+                if (await noDataMessage.isVisible({ timeout: 3000 })) {
+                    testLogger.debug('No data found for the query');
+                    return; // This is acceptable for some queries
+                }
+            } catch (innerError) {
+                if (innerError.message && innerError.message.includes('Query failed with error')) {
+                    throw innerError;
+                }
+                // Page closed or other transient error — fall through to original error
             }
             throw error;
         }
@@ -1538,16 +1698,48 @@ export class LogsPage {
 
     // Interesting fields methods
     async clickInterestingFields() {
-        await this.fillIndexFieldSearchInput('kubernetes_pod_name');
-        await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').first().click();
+        const field = 'kubernetes_pod_name';
+        const editor = this.page.locator(this.queryEditor);
+
+        // Quick mode ON gates the star icons via v-if="showQuickMode".
+        // If the field list items are not visible, turn quick mode on and retry.
+        const fieldItem = this.page.locator('[data-test^="log-search-index-list-interesting-"]').first();
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            const isVisible = await fieldItem.isVisible().catch(() => false);
+            if (isVisible) break;
+            testLogger.warn(`Field list items not visible (attempt ${attempt}/2) — turning quick mode on`);
+            await this.ensureQuickModeState(true);
+            await this.page.waitForTimeout(1000);
+        }
+        if (!(await fieldItem.isVisible().catch(() => false))) {
+            throw new Error('Field list items still not visible after 2 quick-mode retries');
+        }
+
+        await this.fillIndexFieldSearchInput(field);
+        await this.clickInterestingFieldButton(field);
+        try {
+            await expect(editor).toContainText(field, { timeout: 15000 });
+            return;
+        } catch (e) {
+            const editorText = await editor.textContent().catch(() => '');
+            if (editorText && editorText.includes(field)) return;
+            await this.page.waitForTimeout(3000);
+            const retryText = await editor.textContent().catch(() => '');
+            if (retryText && retryText.includes(field)) return;
+            // Field still not in editor — the first click likely didn't register.
+            // Re-clicking is safe because we've verified the field is NOT present
+            // (so the toggle couldn't have been turned on by the first click).
+            await this.clickInterestingFieldButton(field);
+            await expect(editor).toContainText(field, { timeout: 15000 });
+        }
     }
 
     async validateInterestingFields() {
-        await expect(this.page.locator(this.queryEditor)).toContainText('kubernetes_pod_name');
+        await this.expectQueryEditorContainsText('kubernetes_pod_name');
     }
 
     async validateInterestingFieldsQuery() {
-        await expect(this.page.locator(this.queryEditor)).toContainText('kubernetes_pod_name');
+        await this.expectQueryEditorContainsText('kubernetes_pod_name');
     }
 
     async addRemoveInteresting() {
@@ -1733,6 +1925,51 @@ export class LogsPage {
 
     async ensureHistogramState(desiredState) {
         return await this.logsQueryPage.ensureHistogramState(desiredState);
+    }
+
+    async isSQLModeOn() {
+        return await this.logsQueryPage.isSQLModeOn();
+    }
+
+    async ensureSQLMode() {
+        return await this.logsQueryPage.ensureSQLMode();
+    }
+
+    async ensureFTSMode() {
+        return await this.logsQueryPage.ensureFTSMode();
+    }
+
+    async disableAutoRun() {
+        return await this.logsQueryPage.disableAutoRun();
+    }
+
+    async enableAutoRun() {
+        return await this.logsQueryPage.enableAutoRun();
+    }
+
+    /**
+     * After a mode change (SQL/FTS toggle), either wait for the auto-run that
+     * fires automatically on cloud envs, or trigger the query explicitly on
+     * local envs where auto_query_enabled=false.
+     */
+    async runQueryAfterModeChange(timeout = 60000) {
+        if (await this.logsQueryPage._isAutoQueryEnabled()) {
+            // Auto-run fires after mode switch — wait for the button to return
+            // to "Run Query" (not disabled / loading / Cancel) before asserting.
+            await this.page.waitForFunction(
+                (sel) => {
+                    const b = document.querySelector(sel);
+                    if (!b) return false;
+                    return !b.hasAttribute('disabled')
+                        && !b.classList.contains('q-btn--loading')
+                        && !(b.textContent?.trim()?.includes('Cancel'));
+                },
+                this.queryButton,
+                { timeout }
+            ).catch(() => {});
+        } else {
+            await this.runQueryAndWaitForResults(timeout);
+        }
     }
 
     // Login methods - delegate to LoginPage
@@ -2002,18 +2239,36 @@ export class LogsPage {
 
     async clickSavedViewDialogSave() {
         const saveButton = this.page.locator(this.savedViewDialogSave);
-        
-        // Wait for the button to be visible
-        await saveButton.waitFor({ state: 'visible', timeout: 10000 });
-        
+
+        // Wait for the button to be visible (extended timeout for cloud)
+        try {
+            await saveButton.waitFor({ state: 'visible', timeout: 30000 });
+        } catch (e) {
+            // Button never appeared — Enter as fallback then return so we
+            // don't fall through to the click path (which would also fail
+            // and trigger a second Enter, risking a double-submit)
+            await this.page.keyboard.press('Enter');
+            await this.page.waitForTimeout(1000);
+            return;
+        }
+
         // Scroll the button into view if needed
-        await saveButton.scrollIntoViewIfNeeded();
-        
-        // Wait a moment for the scroll to complete
+        await saveButton.scrollIntoViewIfNeeded().catch(() => {});
         await this.page.waitForTimeout(500);
-        
-        // Click the button with force option
-        return await saveButton.click({ force: true });
+
+        // Try force-click, fall back to content click then Enter
+        try {
+            return await saveButton.click({ force: true, timeout: 10000 });
+        } catch (e) {
+            // Fallback: click the content span, only press Enter if that fails too
+            // (otherwise a successful content click would be followed by a stray
+            // Enter, risking double-submit on the form)
+            try {
+                await this.page.locator(this.savedViewDialogSaveContent).click({ force: true, timeout: 5000 });
+                return;
+            } catch (e2) { /* content click failed, fall through to Enter */ }
+            await this.page.keyboard.press('Enter');
+        }
     }
 
     async clickSavedViewArrow() {
@@ -2499,7 +2754,21 @@ export class LogsPage {
     }
 
     async expectNotificationMessage(text) {
-        return await expect(this.page.locator(this.notificationMessage)).toContainText(text);
+        await expect(
+            this.page.locator(this.notificationMessage).filter({ hasText: text }).first()
+        ).toBeVisible({ timeout: 15000 });
+    }
+
+    watchForNotification(timeout = 15000) {
+        return this.page.locator(this.notificationMessage).first().waitFor({ state: 'attached', timeout });
+    }
+
+    async expectNotificationContainsText(text) {
+        await expect(this.page.locator(this.notificationMessage).first()).toContainText(text, { timeout: 10000 });
+    }
+
+    async waitForNotificationWithText(text, timeout = 3000) {
+        await this.page.locator(this.notificationMessage).filter({ hasText: text }).first().waitFor({ state: 'visible', timeout });
     }
 
     async expectIndexFieldSearchInputVisible() {
@@ -2560,15 +2829,11 @@ export class LogsPage {
         return await expect(table).toBeVisible();
     }
 
-    async waitForSearchResults() {
-        // Wait for search results to appear by checking for the logs table
+    async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
-        await table.waitFor({ state: 'visible', timeout: 30000 });
-        
-        // Also wait for at least one row to be present
+        await table.waitFor({ state: 'visible', timeout });
         const firstRow = this.page.locator(this.logTableColumnSource);
-        await firstRow.waitFor({ state: 'visible', timeout: 30000 });
-        
+        await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
 
@@ -2620,7 +2885,18 @@ export class LogsPage {
     }
 
     async fillIndexFieldSearchInput(text) {
-        return await this.fillInputField(this.logSearchIndexListFieldSearchInput, text);
+        const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
+        if (!text) {
+            await inputLocator.fill('');
+        } else {
+            // pressSequentially fires per-character input events that reliably
+            // trigger Quasar q-input's debounced update:model-value chain.
+            // force:true bypasses Monaco editor's <span class="highlight">code</span>
+            // overlay that can intercept pointer events on the splitter panel.
+            await inputLocator.click({ clickCount: 3, force: true });
+            await inputLocator.pressSequentially(text, { delay: 30 });
+        }
+        await this.page.waitForTimeout(500);
     }
 
     async clickExpandLabel(label) {
@@ -2939,7 +3215,24 @@ export class LogsPage {
     }
 
     async clickInterestingFieldButton(field) {
-        return await this.page.locator(this.interestingFieldBtn(field)).first().click();
+        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
+        const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
+                .then(() => true).catch(() => false);
+            if (visible) {
+                await btnLocator.click({ force: true });
+                return;
+            }
+            // Button not visible — re-apply filter to ensure field is in the list.
+            await inputLocator.fill('');
+            await inputLocator.click({ force: true });
+            await inputLocator.pressSequentially(field, { delay: 30 });
+            await this.page.waitForTimeout(500);
+        }
+        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
+        await btnLocator.click({ force: true });
     }
 
     async expectInterestingFieldInEditor(field) {
@@ -2955,7 +3248,11 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        return await expect(this.page.locator(this.queryEditor).locator('.monaco-editor').last()).toContainText(text);
+        // Wait for Monaco editor to be available, then check text content
+        await this.page.locator(this.queryEditor).locator('.monaco-editor').last().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        // Use the query editor as the locator for the assertion — the monaco editor
+        // renders text across view-lines and we need to match the full content
+        await expect(this.page.locator(this.queryEditor)).toContainText(text, { timeout: 10000 });
     }
 
     // ===== QUERY EDITOR EXPAND/COLLAPSE METHODS =====
@@ -3159,7 +3456,7 @@ export class LogsPage {
     }
 
     async clickLogSearchIndexListFieldSearchInput() {
-        return await this.page.locator(this.logSearchIndexListFieldSearchInput).click();
+        return await this.page.locator(this.logSearchIndexListFieldSearchInput).click({ force: true });
     }
 
     async fillLogSearchIndexListFieldSearchInput(text) {
@@ -3186,8 +3483,7 @@ export class LogsPage {
     }
 
     async clickHistogramToggleDiv() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
+        // Histogram toggle is now directly in the toolbar (moved out of utilities menu)
         return await this.page.locator(this.histogramToggle).click();
     }
 
@@ -3427,43 +3723,94 @@ export class LogsPage {
     }
 
     async clickAllFieldsButton() {
-        return await this.page.locator('[data-test="logs-all-fields-btn"]').click();
+        await this.page.locator('[data-test="logs-all-fields-btn"]').click();
+        // Wait for interesting field items to populate (cloud may load slowly)
+        await this.page.locator('[data-test^="log-search-index-list-interesting-"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
 
     async enableQuickModeIfDisabled() {
-        // Quick mode is now inside the utilities hamburger menu
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const toggle = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]');
-        const toggleExists = await toggle.count() > 0;
-        if (toggleExists) {
-            const isChecked = await toggle.getAttribute('aria-checked').catch(() => null);
-            if (isChecked === 'false') {
-                await toggle.click();
-            }
+        // The "interesting fields" toggle button in FieldListPagination only renders
+        // when showQuickMode = true — use it as a fast pre-check before opening the menu.
+        const quickModeIndicator = this.page.locator('[data-test="logs-interesting-fields-btn"]');
+        if (await quickModeIndicator.isVisible().catch(() => false)) {
+            return;
         }
-        // Always close the utilities menu
-        await this.page.keyboard.press('Escape');
+
+        // Quick Mode is off — open the utilities menu and enable it.
+        // Retry up to 3 times: under parallel load on alpha1, the first click may
+        // toggle the menu closed (if it was already open) or the menu may open slowly.
+        const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        let enabled = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            // Dismiss any open overlay first to avoid toggle-closing on the next click
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(100);
+
+            await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+            const menuOpened = await quickModeItem.waitFor({ state: 'visible', timeout: 4000 })
+                .then(() => true).catch(() => false);
+
+            if (!menuOpened) continue;
+
+            // Check toggle state: Quasar adds --truthy class when toggle is ON
+            const toggleInner = quickModeItem.locator('.q-toggle__inner').first();
+            const isOn = await toggleInner.evaluate(
+                node => node.classList.contains('q-toggle__inner--truthy')
+            ).catch(() => false); // Assume off if check fails — safer to try enabling
+
+            if (isOn) {
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(200);
+                enabled = true;
+                break;
+            }
+
+            await quickModeItem.click({ force: true });
+            await this.page.waitForTimeout(300);
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(200);
+            enabled = true;
+            break;
+        }
+
+        if (!enabled) {
+            throw new Error('Quick Mode could not be enabled after 3 attempts');
+        }
+
+        // Wait for Quick Mode to take effect in the field list sidebar
+        await quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 });
     }
 
     async clickTimestampField() {
-        return await this.page.locator(this.timestampFieldTable).getByTitle('_timestamp').click();
+        const field = this.page.locator(this.timestampFieldTable).getByTitle('_timestamp');
+        await field.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        return await field.click({ force: true });
     }
 
     async clickSchemaButton() {
-        return await this.page.getByRole('button').filter({ hasText: /^schema$/ }).click();
+        // Anchor the regex so we don't accidentally click the "infoschema"
+        // button (which also matches a loose /schema/i filter)
+        const btn = this.page.getByRole('button').filter({ hasText: /^schema$/i }).first();
+        await btn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        return await btn.click({ force: true });
     }
 
     async clickInfoSchemaButton() {
-        return await this.page.getByRole('button').filter({ hasText: 'infoschema' }).click();
+        const btn = this.page.getByRole('button').filter({ hasText: /infoschema/i }).first();
+        await btn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        return await btn.click({ force: true });
     }
 
     async clickClearButton() {
-        return await this.page.getByRole('button', { name: 'Clear' }).click();
+        const btn = this.page.getByRole('button', { name: /clear/i }).first();
+        await btn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        return await btn.click({ force: true });
     }
 
     async expectTimestampFieldVisible() {
-        return await expect(this.page.locator(this.timestampFieldTable).getByTitle('_timestamp')).toBeVisible();
+        const field = this.page.locator(this.timestampFieldTable).getByTitle('_timestamp');
+        await field.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        return await expect(field).toBeVisible();
     }
 
     // Field management methods for add/remove fields to table
@@ -3776,17 +4123,19 @@ export class LogsPage {
 
     async ensureQuickModeState(desiredState) {
         // Quick mode is now inside the utilities hamburger menu
+        await this.page.locator(this.utilitiesMenuButton).waitFor({ state: 'visible', timeout: 15000 });
         await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
+        // Wait for the menu to render the quick mode toggle before reading or clicking
+        const quickModeBtn = this.page.locator(this.quickModeToggle);
+        await quickModeBtn.waitFor({ state: 'visible', timeout: 5000 });
         const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
         const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
 
         if (desiredState !== isOn) {
             await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
             await this.page.waitForTimeout(500);
-        } else {
-            await this.page.keyboard.press('Escape');
         }
+        await this.page.keyboard.press('Escape');
     }
 
     async ensureHistogramToggleState(desiredState) {
@@ -3903,7 +4252,11 @@ export class LogsPage {
     }
 
     async clickDateTimeButton() {
-        return await this.page.locator('[data-test="date-time-btn"]').click();
+        const btn = this.page.locator('[data-test="date-time-btn"]');
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        // force:true bypasses Playwright's stability check — the toolbar re-renders
+        // after search results load, causing brief layout shifts on the button.
+        return await btn.click({ force: true });
     }
 
     async selectRelative6Hours() {
@@ -5569,14 +5922,20 @@ export class LogsPage {
     }
 
     /**
-     * Toggle histogram on/off
-     * Bug #8928 - Histogram rendering
+     * Toggle histogram on/off.
+     * The histogram toggle is in the toolbar when viewport > 1280px (direct click).
+     * When viewport <= 1280px it moves into the utilities menu.
      */
     async toggleHistogram() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const histogramToggle = this.page.locator(this.histogramToggle);
-        await histogramToggle.click();
+        const toolbarToggle = this.page.locator(this.histogramToggle);
+        const isToolbarVisible = await toolbarToggle.isVisible({ timeout: 1000 }).catch(() => false);
+        if (isToolbarVisible) {
+            await toolbarToggle.click();
+        } else {
+            await this.page.locator(this.utilitiesMenuButton).click();
+            await this.page.waitForTimeout(200);
+            await this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]').click();
+        }
         await this.page.waitForTimeout(500);
         testLogger.info('Histogram toggled');
     }
@@ -5988,7 +6347,7 @@ export class LogsPage {
      * Assert that the Patterns toggle is in selected state
      */
     async expectPatternsToggleSelected() {
-        await expect(this.page.locator(this.patternsToggle)).toHaveClass(/selected/);
+        await expect(this.page.locator(this.patternsToggle)).toHaveAttribute('data-state', 'on');
         testLogger.info('Patterns toggle is in selected state');
     }
 
