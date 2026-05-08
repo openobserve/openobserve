@@ -6,13 +6,20 @@ import OInput from "./OInput.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import type { FormInputProps } from "./OFormInput.types";
 
+defineOptions({ inheritAttrs: false });
+
 const props = defineProps<FormInputProps>();
 
-const form = inject(FORM_CONTEXT_KEY);
+const form = inject(FORM_CONTEXT_KEY, null);
+
+if (import.meta.env.DEV && !form) {
+  console.warn("[OFormInput] must be rendered inside <OForm>. No form context found.");
+}
 </script>
 
 <template>
   <component
+    v-if="form"
     :is="form.Field"
     :name="props.name"
     :validators="
