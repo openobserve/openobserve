@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           navigateToTraces({
                             operationName: row.operation,
                             errorsOnly: column.id === 'errors',
-                            minDurationMicros: row[column.id]
+                            minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined
                           })
                         "
                       >
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               value: row[cfg.colId],
                             },
                             errorsOnly: column.id === 'errors',
-                            minDurationMicros: row[column.id]
+                            minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined
                           })
                         "
                       >
@@ -1437,7 +1437,6 @@ export default defineComponent({
     }
 
     const compareRows = (a: any, b: any, field: string): number => {
-      // For latency percentiles, sort by raw underscore-prefixed values
       if (field === "p99" || field === "p95" || field === "p75") {
         return (a[field] ?? 0) - (b[field] ?? 0);
       }
@@ -2050,6 +2049,10 @@ export default defineComponent({
       return "status-critical";
     };
 
+    const isDurationColumn = (column: string) => {
+     return ['p99','p95','p75'].includes(column);
+    }
+
     return {
       t,
       serviceMetrics,
@@ -2109,6 +2112,7 @@ export default defineComponent({
       handleSortChange,
       sortResourceRows,
       formatOperationLatency,
+      isDurationColumn
     };
   },
 });
