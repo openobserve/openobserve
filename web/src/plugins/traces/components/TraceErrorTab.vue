@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:text-[var(--o2-text-4)]! tw:text-[0.85rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
       >
-        {{ spanStatusCode ? "HTTP Stats Code" : "gRPC Status Code" }}
+        {{ spanStatusCode ? "HTTP Status Code" : "gRPC Status Code" }}
       </div>
       <div class="tw:flex tw:items-center">
         <SpanStatusCodeBadge
