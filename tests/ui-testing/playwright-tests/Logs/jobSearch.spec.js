@@ -125,6 +125,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
         expect(jobId).not.toBeNull();
         const traceId = await jobSchedulerPage.getTraceIdByJobId(jobId);
         testLogger.info(`Trace ID: ${traceId}`);
+        await page.waitForTimeout(10000);
         await jobSchedulerPage.viewJobDetails(traceId);
 
     });

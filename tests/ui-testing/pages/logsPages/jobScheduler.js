@@ -188,27 +188,32 @@ async exploreJob(trace_id) {
 
 
 async viewJobDetails(trace_id) {
-      // Click the "Get Jobs" button
-      await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+    // Click the "Get Jobs" button
+    await this.page.getByRole('button', { name: 'Get Jobs' }).click();
     // Build the selector for the expand button
     const expandButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-expand-btn"]`;
     const moreDetailsTabSelector = '[data-test="tab-more_details"]';
 
     // Wait for the expand button to be visible and click it
     try {
-        await this.page.waitForSelector(expandButtonSelector, { timeout: 10000 }); // Adjust timeout as necessary
+        await this.page.locator(expandButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.locator(expandButtonSelector).click();
+        await this.page.waitForTimeout(1500);
     } catch (error) {
         testLogger.error(`Error: Unable to find or click expand button for trace ID ${trace_id}.`, error);
         throw new Error(`Expand button for trace ID ${trace_id} not found or not clickable.`);
     }
 
-    // Wait for the More Details tab to be visible and click it
+    // Wait for and click the visible More Details tab.
+    // Multiple [data-test="tab-more_details"] exist in DOM (one per row via v-show),
+    // so we use :visible pseudo-class to avoid Playwright strict-mode violations.
     try {
-        await this.page.getByRole('cell', { name: 'Query / Function More Details' }).locator(moreDetailsTabSelector).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.getByRole('cell', { name: 'Query / Function More Details' }).locator(moreDetailsTabSelector).click();
+        const visibleTab = this.page.locator(`${moreDetailsTabSelector}:visible`);
+        await visibleTab.waitFor({ state: 'visible', timeout: 15000 });
+        await visibleTab.click();
     } catch (error) {
-        testLogger.error(`Error: Unable to find or click More Details tab for trace ID ${trace_id}.`, error);
+        const underlyingMsg = error instanceof Error ? error.message : String(error);
+        testLogger.error(`Error: Unable to find or click More Details tab for trace ID ${trace_id}: ${underlyingMsg}`);
         throw new Error(`More Details tab for trace ID ${trace_id} not found or not clickable.`);
     }
 

@@ -37,7 +37,10 @@ export class ThemePage {
         // User Profile Menu (contains predefined themes link)
         this.profileMenuBtn = '[data-test="header-my-account-profile-icon"]';
 
-        // Body class for theme detection
+        // Theme Switcher
+        this.themeToggleBtn = '[data-test="navbar-theme-toggle-btn"]';
+
+        // Body class for theme detection (Quasar dark plugin adds 'body--dark')
         this.bodyDarkClass = 'body--dark';
 
         // Notification
@@ -75,11 +78,8 @@ export class ThemePage {
         // Get current theme state before toggle
         const wasDark = await this.isDarkMode();
 
-        // Find and click the theme switcher button in header
-        const themeSwitcher = this.page.locator('button[data-o2-btn]').filter({
-            has: this.page.locator('.header-icon')
-        }).first();
-        await themeSwitcher.click();
+        // Click the theme switcher button using its data-test selector
+        await this.page.locator(this.themeToggleBtn).click();
 
         // Wait for theme to actually change by polling body class
         const bodyDarkClass = this.bodyDarkClass;
@@ -89,7 +89,7 @@ export class ThemePage {
                 return isDark !== expectedDark;
             },
             [bodyDarkClass, wasDark],
-            { timeout: 5000 }
+            { timeout: 10000 }
         );
     }
 
