@@ -10,8 +10,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, useSlots, computed } from "vue";
+import { ref, watch, useSlots, computed, nextTick } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 
 const props = withDefaults(defineProps<DialogProps>(), {
   persistent: false,
@@ -151,6 +152,45 @@ const isFullSize = computed(() => props.size === "full");
 const contentStyle = computed(() =>
   props.width != null ? { width: `${props.width}vw` } : undefined,
 );
+
+// ── Auto-focus logic ─────────────────────────────────────────────────────────
+const bodyRef = ref<HTMLElement | null>(null);
+const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+
+function handleOpenAutoFocus(event: Event) {
+  event.preventDefault();
+  nextTick(() => {
+    const body = bodyRef.value;
+    if (body) {
+      const firstField = body.querySelector<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"]',
+      );
+      if (firstField) {
+        firstField.focus();
+        return;
+      }
+    }
+    // No form field found → focus primary button (confirm dialog pattern)
+    const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
+    if (btnEl) {
+      btnEl.focus();
+    }
+  });
+}
+
+// ── Scroll shadow ────────────────────────────────────────────────────────────
+const { canScrollUp, canScrollDown, update: updateShadow, attach: attachShadow, detach: detachShadow } = useScrollShadow(bodyRef);
+
+watch(internalOpen, (open) => {
+  if (open) {
+    nextTick(() => {
+      attachShadow();
+      updateShadow();
+    });
+  } else {
+    detachShadow();
+  }
+});
 </script>
 
 <template>
@@ -202,6 +242,7 @@ const contentStyle = computed(() =>
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
+        @open-auto-focus="handleOpenAutoFocus"
       >
         <!--
           DialogTitle is ALWAYS rendered for accessibility.
@@ -305,10 +346,14 @@ const contentStyle = computed(() =>
         <!-- overflow-x-hidden prevents horizontal scrollbar when content is wider than dialog -->
         <!-- No flex-1: panel height = content height (capped at max-h), footer flows below body -->
         <div
+          ref="bodyRef"
           :class="[
             'tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden',
             'tw:px-(--spacing-dialog-content-px) tw:py-(--spacing-dialog-content-py)',
             'tw:text-dialog-content-text',
+            canScrollUp && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
+            canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            canScrollUp && canScrollDown && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
         >
           <slot />
@@ -358,6 +403,7 @@ const contentStyle = computed(() =>
               </OButton>
               <OButton
                 v-if="primaryButtonLabel"
+                ref="primaryBtnRef"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :disabled="primaryEffectivelyDisabled"
