@@ -92,7 +92,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <template v-slot:option="scope">
+        <template
+          v-slot:option="scope"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type == 'metrics'
+          "
+        >
           <q-item
             :class="
               store.state.theme === 'dark' &&
@@ -103,18 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : ''
             "
             v-bind="scope.itemProps"
-            :data-test="`index-dropdown-stream-option-${scope.opt.name}`"
           >
-            <q-item-section
-              v-if="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream_type == 'metrics' &&
-                scope.opt.metrics_meta
-              "
-              avatar
-              class="metric-explore-metric-icon"
-            >
+            <q-item-section avatar class="metric-explore-metric-icon">
               <q-icon
                 size="chip"
                 :name="
