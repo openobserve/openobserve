@@ -25,6 +25,11 @@ export type InputType =
 export interface InputProps {
   /** Bound value */
   modelValue?: string | number;
+  /** v-model modifiers passthrough for number/trim semantics */
+  modelModifiers?: {
+    number?: boolean;
+    trim?: boolean;
+  };
   /** HTML input type — use `textarea` for a multi-line field */
   type?: InputType;
   /** Floating / static label */
@@ -51,6 +56,10 @@ export interface InputProps {
   autofocus?: boolean;
   /** Debounce delay in milliseconds before emitting model updates */
   debounce?: number;
+  /** Auto-resize textarea height to fit content */
+  autogrow?: boolean;
+  /** Input mask compatibility (supports `time`, `fulltime`, `DD-MM-YYYY`) */
+  mask?: string;
   /** Maximum character length — shows a counter when set */
   maxlength?: number;
   /** Rows for textarea type */
