@@ -134,9 +134,17 @@ impl TableProvider for ListingTableAdapter {
             .scan(state, parquet_projection, filters, limit)
             .await?;
 
-        let reverse = !self.listing_table.options().file_sort_order.is_empty()
-            && parquet_exec.properties().output_ordering().is_none();
-        let parquet_exec = handler_tantivy_index(&self.trace_id, parquet_exec, reverse);
+        let order_by_time_desc = !self.listing_table.options().file_sort_order.is_empty();
+        let reverse = order_by_time_desc && parquet_exec.properties().output_ordering().is_none();
+        let target_partitions = self.listing_table.options().target_partitions;
+        let parquet_exec = handler_tantivy_index(
+            &self.trace_id,
+            state,
+            parquet_exec,
+            reverse,
+            order_by_time_desc,
+            target_partitions,
+        );
 
         // if the index condition can remove filter, we can skip the config
         // feature_query_remove_filter_with_index
@@ -181,8 +189,11 @@ impl TableProvider for ListingTableAdapter {
 
 fn handler_tantivy_index(
     trace_id: &str,
+    state: &dyn Session,
     plan: Arc<dyn ExecutionPlan>,
     reverse: bool,
+    order_by_time_desc: bool,
+    target_partitions: usize,
 ) -> Arc<dyn ExecutionPlan> {
     if let Some(data_source_exec) = plan.as_any().downcast_ref::<DataSourceExec>()
         && let Some(config) = data_source_exec
@@ -235,7 +246,13 @@ fn handler_tantivy_index(
 
         let mut config = config.clone();
         config.file_groups = new_file_groups;
-        let plan = Arc::new(DataSourceExec::new(Arc::new(config)));
+        let mut plan = Arc::new(DataSourceExec::new(Arc::new(config))) as Arc<dyn ExecutionPlan>;
+        if !order_by_time_desc
+            && let Ok(Some(repartition_plan)) =
+                plan.repartitioned(target_partitions, state.config_options())
+        {
+            plan = repartition_plan;
+        }
         return plan;
     }
     plan

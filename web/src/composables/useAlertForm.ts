@@ -1094,12 +1094,26 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
+  // Regex matching backend RE_OFGA_UNSUPPORTED_NAME in src/common/utils/auth.rs
+  const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
+
   // Sequential top-to-bottom validation with auto-focus for V3 layout
   const validateAndFocus = async (): Promise<boolean> => {
-    // 1. Alert name
+    // 1. Alert name — empty check
     if (!formData.value.name?.trim()) {
       alertNameError.value = true;
-      q.notify({ type: "negative", message: "Alert name is required.", timeout: 2000 });
+      q.notify({ type: "negative", message: t("alerts.nameRequired"), timeout: 2000 });
+      focusTopbarField(step1Ref);
+      return false;
+    }
+    // 1b. Alert name — unsupported characters (:#?\s'"%&)
+    if (ALERT_NAME_UNSUPPORTED_CHARS.test(formData.value.name)) {
+      alertNameError.value = true;
+      q.notify({
+        type: "negative",
+        message: t("alerts.nameNoSpecialChars"),
+        timeout: 4000,
+      });
       focusTopbarField(step1Ref);
       return false;
     }

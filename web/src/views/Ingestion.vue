@@ -237,7 +237,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useQuasar, copyToClipboard } from "quasar";
 import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
@@ -255,6 +255,7 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
+    const route = useRoute();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
     const confirmRUMUpdate = ref<boolean>(false);
@@ -300,6 +301,18 @@ export default defineComponent({
       }
     });
 
+    // Sync ingestTabType from the current route so page refresh on a child
+    // route (e.g. ai-agno) selects the correct parent tab (ai-integrations).
+    const syncTabFromRoute = () => {
+      const matched = route.matched;
+      if (matched.length > 2) {
+        const parentTab = matched[2].name as string;
+        if (parentTab && parentTab !== ingestTabType.value) {
+          ingestTabType.value = parentTab;
+        }
+      }
+    };
+
     onMounted(() => {
       if (router.currentRoute.value.name === "ingestion") {
         router.push({
@@ -310,7 +323,10 @@ export default defineComponent({
         });
         return;
       }
+      syncTabFromRoute();
     });
+
+    watch(() => route.name, syncTabFromRoute);
 
     onUpdated(() => {
       if (router.currentRoute.value.name === "ingestion") {
