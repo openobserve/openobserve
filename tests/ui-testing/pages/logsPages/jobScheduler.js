@@ -188,21 +188,31 @@ async exploreJob(trace_id) {
 
 
 async viewJobDetails(trace_id) {
-    // Click the "Get Jobs" button
-    await this.page.getByRole('button', { name: 'Get Jobs' }).click();
-    // Build the selector for the expand button
     const expandButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-expand-btn"]`;
     const moreDetailsTabSelector = '[data-test="tab-more_details"]';
+    const getJobsBtn = this.page.getByRole('button', { name: 'Get Jobs' });
 
-    // Wait for the expand button to be visible and click it
-    try {
-        await this.page.locator(expandButtonSelector).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(expandButtonSelector).click();
-        await this.page.waitForTimeout(1500);
-    } catch (error) {
-        testLogger.error(`Error: Unable to find or click expand button for trace ID ${trace_id}.`, error);
-        throw new Error(`Expand button for trace ID ${trace_id} not found or not clickable.`);
+    // Retry: newly created jobs may not appear immediately in the list.
+    // Poll by clicking "Get Jobs" and waiting for the row to appear.
+    const maxRetries = 5;
+    let expandBtnFound = false;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        await getJobsBtn.click();
+        try {
+            await this.page.locator(expandButtonSelector).waitFor({ state: 'visible', timeout: 5000 });
+            expandBtnFound = true;
+            break;
+        } catch {
+            testLogger.warn(`Expand button for trace ID ${trace_id} not found on attempt ${attempt + 1}/${maxRetries}, retrying...`);
+            await this.page.waitForTimeout(2000);
+        }
     }
+    if (!expandBtnFound) {
+        throw new Error(`Expand button for trace ID ${trace_id} not found after ${maxRetries} attempts.`);
+    }
+
+    // Click the expand button to reveal the expanded row
+    await this.page.locator(expandButtonSelector).click();
 
     // Wait for and click the visible More Details tab.
     // Multiple [data-test="tab-more_details"] exist in DOM (one per row via v-show),
