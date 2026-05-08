@@ -5,6 +5,7 @@ import type {
   RadioGroupProps,
   RadioGroupEmits,
   RadioGroupSlots,
+  RadioValue,
 } from "./ORadio.types";
 import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupRoot } from "reka-ui";
@@ -19,7 +20,7 @@ const emit = defineEmits<RadioGroupEmits>();
 
 defineSlots<RadioGroupSlots>();
 
-const valueMap = new Map<string, string | number | boolean>();
+const valueMap = new Map<string, RadioValue>();
 provide(RADIO_VALUE_MAP_KEY, valueMap);
 
 function handleUpdate(value: string) {

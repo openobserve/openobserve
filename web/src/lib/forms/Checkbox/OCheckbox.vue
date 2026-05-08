@@ -5,6 +5,8 @@ import type {
   CheckboxProps,
   CheckboxEmits,
   CheckboxSlots,
+  CheckboxPrimitive,
+  CheckboxModelValue,
 } from "./OCheckbox.types";
 import { CHECKBOX_GROUP_KEY } from "./OCheckbox.types";
 import { CheckboxRoot, CheckboxIndicator } from "reka-ui";
@@ -22,15 +24,51 @@ defineSlots<CheckboxSlots>();
 // ── Group context ──────────────────────────────────────────────────────────
 const groupContext = inject(CHECKBOX_GROUP_KEY, null);
 
+const resolvedValue = computed<CheckboxPrimitive | undefined>(
+  () => props.value ?? props.val,
+);
+
 const isGroupMember = computed(
-  () => groupContext !== null && props.value !== undefined,
+  () => groupContext !== null && resolvedValue.value !== undefined,
+);
+
+const isArrayModel = computed(
+  () => Array.isArray(props.modelValue) && resolvedValue.value !== undefined,
+);
+
+const hasCustomValues = computed(
+  () => props.trueValue !== undefined || props.falseValue !== undefined,
 );
 
 /** Whether this checkbox is checked, considering the group context if present */
 const checked = computed<boolean | "indeterminate">(() => {
-  if (isGroupMember.value && groupContext && props.value !== undefined) {
-    return groupContext.isChecked(props.value);
+  if (
+    isGroupMember.value &&
+    groupContext &&
+    resolvedValue.value !== undefined
+  ) {
+    return groupContext.isChecked(resolvedValue.value);
   }
+
+  if (isArrayModel.value && resolvedValue.value !== undefined) {
+    return (props.modelValue as CheckboxPrimitive[]).includes(
+      resolvedValue.value,
+    );
+  }
+
+  if (hasCustomValues.value) {
+    if (
+      props.indeterminateValue !== undefined &&
+      props.modelValue === props.indeterminateValue
+    ) {
+      return "indeterminate";
+    }
+    if (props.trueValue !== undefined) {
+      return props.modelValue === props.trueValue;
+    }
+    return Boolean(props.modelValue);
+  }
+
   return props.modelValue ?? false;
 });
 
@@ -38,23 +76,54 @@ const isDisabled = computed(
   () => props.disabled || (groupContext?.disabled ?? false),
 );
 
-function handleUpdate(value: boolean | "indeterminate") {
-  if (isGroupMember.value && groupContext && props.value !== undefined) {
-    groupContext.toggle(props.value);
-    emit("change", value);
-  } else {
-    emit("update:modelValue", value);
-    emit("change", value);
+function mapToCustomValue(
+  value: boolean | "indeterminate",
+): CheckboxModelValue {
+  if (!hasCustomValues.value) return value;
+  if (value === "indeterminate") {
+    return props.indeterminateValue ?? "indeterminate";
   }
+  if (value) {
+    return props.trueValue ?? true;
+  }
+  return props.falseValue ?? false;
+}
+
+function handleUpdate(value: boolean | "indeterminate") {
+  if (
+    isGroupMember.value &&
+    groupContext &&
+    resolvedValue.value !== undefined
+  ) {
+    groupContext.toggle(resolvedValue.value);
+    emit("change", value);
+    return;
+  }
+
+  if (isArrayModel.value && resolvedValue.value !== undefined) {
+    const current = [...(props.modelValue as CheckboxPrimitive[])];
+    const next = current.includes(resolvedValue.value)
+      ? current.filter((item) => item !== resolvedValue.value)
+      : [...current, resolvedValue.value];
+    emit("update:modelValue", next);
+    emit("change", next);
+    return;
+  }
+
+  const nextValue = mapToCustomValue(value);
+  emit("update:modelValue", nextValue);
+  emit("change", nextValue);
 }
 
 // ── Style ──────────────────────────────────────────────────────────────────
 const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
+  xs: "tw:size-3",
   sm: "tw:size-3.5",
   md: "tw:size-4",
 };
 
 const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
+  xs: "tw:text-xs",
   sm: "tw:text-xs",
   md: "tw:text-sm",
 };
@@ -63,7 +132,8 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-2',
+      'tw:inline-flex tw:items-center',
+      dense ? 'tw:gap-1' : 'tw:gap-2',
       isDisabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
   >
@@ -88,8 +158,8 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         'tw:data-[state=indeterminate]:bg-checkbox-indeterminate-bg',
         'tw:data-[state=indeterminate]:border-checkbox-indeterminate-border',
         // Disabled state
-        'tw:data-[disabled]:bg-checkbox-disabled-bg',
-        'tw:data-[disabled]:border-checkbox-disabled-border',
+        'tw:data-disabled:bg-checkbox-disabled-bg',
+        'tw:data-disabled:border-checkbox-disabled-border',
         // Focus
         'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-checkbox-focus-ring',
         // Transition

@@ -34,6 +34,10 @@ export interface SelectProps {
   options?: SelectOption[];
   /** Allows selecting multiple options */
   multiple?: boolean;
+  /** q-select compatibility prop; normalized options are always supported */
+  mapOptions?: boolean;
+  /** q-select compatibility prop; OSelect always emits value model */
+  emitValue?: boolean;
   /** Enables editable input behavior similar to q-select use-input */
   useInput?: boolean;
   /** Fills input area with selected value label when supported */
@@ -74,6 +78,12 @@ export interface SelectProps {
   error?: boolean;
   /** Shows a ✕ button to clear the selection */
   clearable?: boolean;
+  /** q-select compatibility prop; OSelect uses outlined visuals by default */
+  outlined?: boolean;
+  /** q-select compatibility prop; accepted for migration parity */
+  filled?: boolean;
+  /** q-select compatibility prop; accepted for migration parity */
+  borderless?: boolean;
   /** Prevents value changes */
   disabled?: boolean;
   /** Control size */

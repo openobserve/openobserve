@@ -68,4 +68,18 @@ describe("OToggle", () => {
     });
     expect(wrapper.find("label").classes()).toContain("tw:flex-row-reverse");
   });
+
+  it("supports leftLabel compatibility alias", () => {
+    wrapper = mount(OToggle, {
+      props: { label: "Legacy", leftLabel: true },
+    });
+    expect(wrapper.find("label").classes()).toContain("tw:flex-row-reverse");
+  });
+
+  it("renders checked icon text when provided", () => {
+    wrapper = mount(OToggle, {
+      props: { modelValue: true, checkedIcon: "check" },
+    });
+    expect(wrapper.text()).toContain("check");
+  });
 });
