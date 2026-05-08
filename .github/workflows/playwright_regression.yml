@@ -131,6 +131,7 @@ jobs:
           - spec: "alerts-stream-switching-regression.spec.js"
           - spec: "metrics-regression.spec.js"
           - spec: "traces-regression.spec.js"
+          - spec: "dashboard-regression.spec.js"
 
     steps:
       - name: Clone the current repo
