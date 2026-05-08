@@ -29,7 +29,7 @@ describe("PatternCard", () => {
   let wrapper: any;
   const mockPattern = {
     pattern_id: "pattern-1",
-    template: "User * logged in from IP *",
+    template: "User <*> logged in from IP <*>",
     description: "User login pattern",
     frequency: 1234,
     percentage: 45.67,
