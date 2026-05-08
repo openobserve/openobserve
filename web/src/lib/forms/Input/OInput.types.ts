@@ -37,7 +37,7 @@ export interface InputProps {
   /** Placeholder text */
   placeholder?: string;
   /** Helper text displayed below the field */
-  hint?: string;
+  helpText?: string;
   /** Error message — when provided the field shows error styling */
   errorMessage?: string;
   /** Marks the field as being in an error state without a message */
@@ -78,15 +78,6 @@ export interface InputProps {
    * @see FieldWidth
    */
   width?: FieldWidth;
-  /**
-   * Validation rules run on blur (and on value change after the first blur).
-   * Each function receives the current value and must return `true` when valid
-   * or an error string when invalid. The first failing rule's message is shown.
-   *
-   * @example
-   * :rules="[(v) => !!v || 'Required', (v) => String(v).length >= 3 || 'Min 3 chars']"
-   */
-  rules?: Array<(val: string | number | undefined) => true | string>;
 }
 
 export interface InputEmits {
@@ -108,31 +99,4 @@ export interface InputSlots {
   prepend?: () => unknown;
   /** Appended block placed outside the border on the right */
   append?: () => unknown;
-}
-
-// ── InputDisplay ─────────────────────────────────────────────────────────────
-// OInputDisplay renders a read-only display field that looks like OInput
-// but accepts arbitrary content in its default slot. Useful as a preview
-// placeholder before a real value has been chosen.
-
-export interface InputDisplayProps {
-  /** Label above the field */
-  label?: string;
-  /** Placeholder text when no content is slotted */
-  placeholder?: string;
-  /** Marks the field as disabled */
-  disabled?: boolean;
-  /** Control size */
-  size?: InputSize;
-  /**
-   * Semantic field width — controls how wide the component renders.
-   * Defaults to `"full"` (fills the container).
-   * @see FieldWidth
-   */
-  width?: FieldWidth;
-}
-
-export interface InputDisplaySlots {
-  /** The content to display inside the stub */
-  default?: () => unknown;
 }
