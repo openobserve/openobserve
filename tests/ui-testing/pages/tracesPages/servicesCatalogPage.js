@@ -276,12 +276,12 @@ export class ServicesCatalogPage {
   }
 
   async isPrevDisabled() {
-    const prevBtn = this.page.locator(`${this.pagination} button`).first();
+    const prevBtn = this.page.locator(`${this.pagination} button[aria-label="Previous page"]`);
     return await prevBtn.isDisabled().catch(() => true);
   }
 
   async isNextDisabled() {
-    const nextBtn = this.page.locator(`${this.pagination} button`).last();
+    const nextBtn = this.page.locator(`${this.pagination} button[aria-label="Next page"]`);
     return await nextBtn.isDisabled().catch(() => true);
   }
 

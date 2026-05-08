@@ -18,7 +18,15 @@ test.describe("Service Catalog testcases", () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
 
-    await pm.servicesCatalogPage.navigate('24h');
+    // Attach console error listener before navigation so initial mount errors are captured
+    pm._consoleErrors = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        pm._consoleErrors.push(msg.text());
+      }
+    });
+
+    await pm.servicesCatalogPage.navigate('7d');
     await pm.servicesCatalogPage.waitForLoad();
     testLogger.info('Navigated to services catalog tab');
   });
@@ -83,7 +91,7 @@ test.describe("Service Catalog testcases", () => {
     // Verify only "api" services visible
     const rowCount = await pm.servicesCatalogPage.getRowCount();
     testLogger.info(`Visible rows after filter: ${rowCount}`);
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+    expect(rowCount).toBeLessThanOrEqual(totalBefore);
   });
 
   test("P0: Clear filter — regression test for bug #11689 (null filterText)", {
@@ -191,10 +199,8 @@ test.describe("Service Catalog testcases", () => {
     await pm.servicesCatalogPage.setRowsPerPage(10);
 
     const paginationVisible = await pm.servicesCatalogPage.isPaginationVisible();
-    if (!paginationVisible) {
-      testLogger.info('Pagination not visible — not enough data, skipping');
-      return;
-    }
+    testLogger.info(`Pagination visible: ${paginationVisible}`);
+    expect(paginationVisible).toBeTruthy();
 
     const prevDisabled = await pm.servicesCatalogPage.isPrevDisabled();
     expect(prevDisabled).toBeTruthy();
@@ -216,10 +222,8 @@ test.describe("Service Catalog testcases", () => {
     await pm.servicesCatalogPage.setRowsPerPage(10);
 
     const paginationVisible = await pm.servicesCatalogPage.isPaginationVisible();
-    if (!paginationVisible) {
-      testLogger.info('Pagination not visible — not enough data, skipping');
-      return;
-    }
+    testLogger.info(`Pagination visible: ${paginationVisible}`);
+    expect(paginationVisible).toBeTruthy();
 
     // Go to page 2, then back to page 1 via prev
     await pm.servicesCatalogPage.goToPage(2);
@@ -237,10 +241,8 @@ test.describe("Service Catalog testcases", () => {
     await pm.servicesCatalogPage.setRowsPerPage(10);
 
     const paginationVisible = await pm.servicesCatalogPage.isPaginationVisible();
-    if (!paginationVisible) {
-      testLogger.info('Pagination not visible — not enough data, skipping');
-      return;
-    }
+    testLogger.info(`Pagination visible: ${paginationVisible}`);
+    expect(paginationVisible).toBeTruthy();
 
     const pageCount = await pm.servicesCatalogPage.getPageCount();
     await pm.servicesCatalogPage.goToPage(pageCount);
@@ -259,22 +261,22 @@ test.describe("Service Catalog testcases", () => {
   }, async ({ page }) => {
     testLogger.info('=== Testing status column sort toggle ===');
 
-    // Default is desc
-    let icon = await pm.servicesCatalogPage.getSortIcon('status');
-    testLogger.info(`Default status icon: "${icon}"`);
-    expect(icon).toBeTruthy();
+    const defaultIcon = await pm.servicesCatalogPage.getSortIcon('status');
+    testLogger.info(`Default status icon: "${defaultIcon}"`);
 
-    // Click to change to asc
+    // Click to change direction
     await pm.servicesCatalogPage.sortByColumn('status');
-    icon = await pm.servicesCatalogPage.getSortIcon('status');
-    testLogger.info(`After first click status icon: "${icon}"`);
-    expect(icon).toBeTruthy();
+    const afterFirstClick = await pm.servicesCatalogPage.getSortIcon('status');
+    testLogger.info(`After first click status icon: "${afterFirstClick}"`);
 
-    // Click again to go back to desc
+    // Click again to go back to original direction
     await pm.servicesCatalogPage.sortByColumn('status');
-    icon = await pm.servicesCatalogPage.getSortIcon('status');
-    testLogger.info(`After second click status icon: "${icon}"`);
-    expect(icon).toBeTruthy();
+    const afterSecondClick = await pm.servicesCatalogPage.getSortIcon('status');
+    testLogger.info(`After second click status icon: "${afterSecondClick}"`);
+
+    // Icon must change between clicks (e.g. arrow_downward ↔ arrow_upward)
+    expect(afterFirstClick).not.toBe(defaultIcon);
+    expect(afterSecondClick).toBe(defaultIcon);
   });
 
   test("P1: Click Requests column sorts numerically", {
@@ -283,9 +285,14 @@ test.describe("Service Catalog testcases", () => {
     testLogger.info('=== Testing requests column sort ===');
 
     await pm.servicesCatalogPage.sortByColumn('total_requests');
-    const icon = await pm.servicesCatalogPage.getSortIcon('total_requests');
-    testLogger.info(`Requests sort icon: "${icon}"`);
-    expect(icon).toBeTruthy();
+    const icon1 = await pm.servicesCatalogPage.getSortIcon('total_requests');
+    testLogger.info(`Requests sort icon (click 1): "${icon1}"`);
+
+    await pm.servicesCatalogPage.sortByColumn('total_requests');
+    const icon2 = await pm.servicesCatalogPage.getSortIcon('total_requests');
+    testLogger.info(`Requests sort icon (click 2): "${icon2}"`);
+
+    expect(icon1).not.toBe(icon2);
   });
 
   test("P1: Click Error Rate column sorts numerically", {
@@ -294,9 +301,14 @@ test.describe("Service Catalog testcases", () => {
     testLogger.info('=== Testing error rate column sort ===');
 
     await pm.servicesCatalogPage.sortByColumn('error_rate');
-    const icon = await pm.servicesCatalogPage.getSortIcon('error_rate');
-    testLogger.info(`Error rate sort icon: "${icon}"`);
-    expect(icon).toBeTruthy();
+    const icon1 = await pm.servicesCatalogPage.getSortIcon('error_rate');
+    testLogger.info(`Error rate sort icon (click 1): "${icon1}"`);
+
+    await pm.servicesCatalogPage.sortByColumn('error_rate');
+    const icon2 = await pm.servicesCatalogPage.getSortIcon('error_rate');
+    testLogger.info(`Error rate sort icon (click 2): "${icon2}"`);
+
+    expect(icon1).not.toBe(icon2);
   });
 
   test("P1: Click Service Name column sorts alphabetically", {
@@ -305,9 +317,14 @@ test.describe("Service Catalog testcases", () => {
     testLogger.info('=== Testing service name column sort ===');
 
     await pm.servicesCatalogPage.sortByColumn('service_name');
-    const icon = await pm.servicesCatalogPage.getSortIcon('service_name');
-    testLogger.info(`Service name sort icon: "${icon}"`);
-    expect(icon).toBeTruthy();
+    const icon1 = await pm.servicesCatalogPage.getSortIcon('service_name');
+    testLogger.info(`Service name sort icon (click 1): "${icon1}"`);
+
+    await pm.servicesCatalogPage.sortByColumn('service_name');
+    const icon2 = await pm.servicesCatalogPage.getSortIcon('service_name');
+    testLogger.info(`Service name sort icon (click 2): "${icon2}"`);
+
+    expect(icon1).not.toBe(icon2);
   });
 
   test("P1: Click duration column (P95) sorts correctly", {
@@ -316,9 +333,14 @@ test.describe("Service Catalog testcases", () => {
     testLogger.info('=== Testing P95 duration column sort ===');
 
     await pm.servicesCatalogPage.sortByColumn('p95_latency_ns');
-    const icon = await pm.servicesCatalogPage.getSortIcon('p95_latency_ns');
-    testLogger.info(`P95 sort icon: "${icon}"`);
-    expect(icon).toBeTruthy();
+    const icon1 = await pm.servicesCatalogPage.getSortIcon('p95_latency_ns');
+    testLogger.info(`P95 sort icon (click 1): "${icon1}"`);
+
+    await pm.servicesCatalogPage.sortByColumn('p95_latency_ns');
+    const icon2 = await pm.servicesCatalogPage.getSortIcon('p95_latency_ns');
+    testLogger.info(`P95 sort icon (click 2): "${icon2}"`);
+
+    expect(icon1).not.toBe(icon2);
   });
 
   // =========================================================================
@@ -338,7 +360,7 @@ test.describe("Service Catalog testcases", () => {
     await pm.servicesCatalogPage.filterByServiceName('api');
     const filteredCount = await pm.servicesCatalogPage.getFilteredCount();
     testLogger.info(`Filtered count: ${filteredCount}`);
-    expect(filteredCount).toBeGreaterThanOrEqual(0);
+    expect(filteredCount).toBeLessThanOrEqual(count);
   });
 
   test("P1: Critical / Warning / Degraded pills visible when services have those statuses", {
@@ -357,20 +379,19 @@ test.describe("Service Catalog testcases", () => {
     expect(hasPill).toBeTruthy();
   });
 
-  test("P1: Status pill counts are non-negative", {
+  test("P1: Status pill counts are non-negative and consistent with total", {
     tag: ['@serviceCatalog', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('=== Testing status pill counts ===');
 
+    const total = await pm.servicesCatalogPage.getServiceCount();
     const critical = await pm.servicesCatalogPage.getCriticalCount();
     const warning = await pm.servicesCatalogPage.getWarningCount();
     const degraded = await pm.servicesCatalogPage.getDegradedCount();
 
-    testLogger.info(`Counts — Critical: ${critical}, Warning: ${warning}, Degraded: ${degraded}`);
+    testLogger.info(`Counts — Total: ${total}, Critical: ${critical}, Warning: ${warning}, Degraded: ${degraded}`);
 
-    expect(critical).toBeGreaterThanOrEqual(0);
-    expect(warning).toBeGreaterThanOrEqual(0);
-    expect(degraded).toBeGreaterThanOrEqual(0);
+    expect(critical + warning + degraded).toBeLessThanOrEqual(total);
   });
 
   // =========================================================================
@@ -415,17 +436,10 @@ test.describe("Service Catalog testcases", () => {
   }, async ({ page }) => {
     testLogger.info('=== Verifying no console errors ===');
 
-    const consoleErrors = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
-      }
-    });
-
-    // Reload the page to capture console errors
-    await pm.servicesCatalogPage.navigate('24h');
-    await pm.servicesCatalogPage.waitForLoad();
-    await page.waitForTimeout(2000);
+    // Listener was attached in beforeEach before initial navigation,
+    // so pm._consoleErrors captures mount-time errors too.
+    const consoleErrors = pm._consoleErrors || [];
+    testLogger.info(`Console errors captured: ${consoleErrors.length}`);
 
     const criticalErrors = consoleErrors.filter(e =>
       e.includes('Cannot read properties') ||
