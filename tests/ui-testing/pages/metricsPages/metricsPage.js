@@ -370,7 +370,7 @@ export class MetricsPage {
     }
 
     async enterMetricsQuery(query) {
-        // Ensure we are in Custom mode so the editor is fully editable
+        // Ensure Custom mode is active so the editor is fully editable
         const customBtn = this.page.locator('[data-test="dashboard-custom-query-type"]');
         if (await customBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             const dataState = await customBtn.getAttribute('data-state').catch(() => '');
@@ -417,20 +417,15 @@ export class MetricsPage {
         }
         await this.page.waitForTimeout(200);
 
-        // Use platform-specific key combo for select all
+        // Select all existing content and delete it, then type the new query.
+        // Using keyboard.type instead of .fill() ensures Monaco triggers change
+        // events so the Vue data model stays in sync (critical for Custom mode).
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
         await this.page.keyboard.press(selectAllKey);
-        await this.page.waitForTimeout(100);
-
-        // Use the .inputarea to fill the query (this is the hidden textarea Monaco uses)
-        const inputArea = editorContainer.locator('.inputarea').first();
-        if (await inputArea.count() > 0) {
-            await inputArea.fill(query);
-        } else {
-            // Fallback: type the query character by character
-            await this.page.keyboard.type(query, { delay: 10 });
-        }
+        await this.page.keyboard.press('Backspace');
         await this.page.waitForTimeout(200);
+        await this.page.keyboard.type(query, { delay: 10 });
+        await this.page.waitForTimeout(500);
     }
 
     async waitForMetricsResults() {
@@ -1753,7 +1748,8 @@ export class MetricsPage {
             '.q-notification.bg-negative',         // Quasar notification with negative background
             '.q-banner--negative',                 // Quasar negative banner
             '[data-test="error-message"]',         // Explicit error message data-test
-            '.error-notification'                  // Explicit error notification class
+            '.error-notification',                 // Explicit error notification class
+            '.errorMessage'                        // Inline error in PanelSchemaRenderer
         ];
 
         for (const selector of errorSelectors) {

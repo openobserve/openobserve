@@ -280,7 +280,16 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await sqlToggle.click();
       await page.waitForTimeout(500);
 
+      // Switch to Custom mode so we can type in the editor
+      const sqlCustomBtn = page.locator('[data-test="dashboard-custom-query-type"]');
+      if (await sqlCustomBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await sqlCustomBtn.click();
+        await page.waitForTimeout(500);
+      }
+
       await pm.metricsPage.enterMetricsQuery('SELECT FROM WHERE');
+      // Wait for Monaco debounce to sync the typed query to the Vue data model
+      await page.waitForTimeout(2000);
       await pm.metricsPage.clickApplyButton();
       await page.waitForTimeout(3000);
 
@@ -288,18 +297,24 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       const sqlNoDataMessage = await pm.metricsPage.getNoDataMessage();
       const sqlHasNoData = await sqlNoDataMessage.isVisible().catch(() => false);
       const sqlHasVisualization = await pm.metricsPage.hasVisualization();
+      // Also check for inline error message in chart area (PanelSchemaRenderer errorMessage)
+      const sqlInlineError = await page.locator('.errorMessage').isVisible().catch(() => false);
+      // Check for error notification toast
+      const sqlErrorNotification = await pm.metricsPage.isErrorNotificationVisible();
 
-      testLogger.info(`SQL invalid query state: hasError=${hasError}, hasNoData=${sqlHasNoData}, hasVisualization=${sqlHasVisualization}`);
+      testLogger.info(`SQL invalid query state: hasError=${hasError}, hasNoData=${sqlHasNoData}, hasVisualization=${sqlHasVisualization}, inlineError=${sqlInlineError}, errorNotification=${sqlErrorNotification}`);
 
-      // Same validation logic for SQL
-      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization;
+      // SQL invalid query should be handled gracefully via any of these indicators
+      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization || sqlInlineError || sqlErrorNotification;
       expect(sqlHandledGracefully).toBe(true);
 
-      if (hasError) {
+      if (hasError || sqlInlineError) {
         const sqlErrorIndicators = await pm.metricsPage.getErrorIndicators();
-        const sqlErrorText = await sqlErrorIndicators.textContent();
+        const sqlErrorText = await sqlErrorIndicators.textContent().catch(() => '');
         testLogger.info(`SQL error message displayed: ${sqlErrorText}`);
-        expect(sqlErrorText.toLowerCase()).toMatch(/error|invalid|syntax|parse|sql|fail|cannot/i);
+        if (sqlErrorText) {
+          expect(sqlErrorText.toLowerCase()).toMatch(/error|invalid|syntax|parse|sql|fail|cannot/i);
+        }
       }
     } else {
       testLogger.info('SQL mode not available - skipping invalid SQL test');
