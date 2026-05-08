@@ -146,11 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="name"
       :rows-per-page-options="[0]"
       class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-      :class="
-        showLlmMetrics
-          ? 'tab-content-with-llm-metrics'
-          : 'tab-content-without-llm-metrics'
-      "
       dense
     >
       <template v-slot:body="props">
@@ -168,20 +163,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="cursor: pointer"
           >
             <div class="flex row items-center no-wrap">
-              <q-btn
-                v-if="column.name === '@timestamp'"
-                :icon="
-                  expandedEvents[props.rowIndex.toString()]
-                    ? 'expand_more'
-                    : 'chevron_right'
-                "
-                dense
-                size="xs"
-                flat
+              <OButton
+                v-if="column.name == '@timestamp'"
+                variant="ghost"
+                size="icon-xs-sq"
                 class="q-mr-xs"
-                @click.stop="expandEvent(props.rowIndex)"
                 :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
-              ></q-btn>
+                @click.capture.stop="expandEvent(props.rowIndex)"
+              >
+                  <q-icon
+                    :name="
+                      expandedEvents[props.rowIndex.toString()] ? 'expand_more' : 'chevron_right'
+                    "
+                    size="14px"
+                  /> 
+              </OButton>
               <span
                 v-if="column.name !== '@timestamp'"
                 v-html="highlightTextMatch(column.prop(props.row), searchQuery)"
@@ -236,23 +232,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="exception-label tw:text-[var(--o2-text-secondary)]!"
                     >{{ t("traces.stacktraceLabel") }}</span
                   >
-                  <q-btn
-                    v-if="
-                      props.row['exception.stacktrace'] &&
-                      props.row['exception.stacktrace'].trim()
-                    "
-                    flat
-                    dense
-                    size="xs"
-                    icon="content_copy"
+                  <OButton
+                    v-if="props.row['exception.stacktrace'] && props.row['exception.stacktrace'].trim()"      
+                    variant="secondary"
+                    size="icon-sm"
                     class="copy-btn"
-                    @click.stop="
-                      copyStackTrace(props.row['exception.stacktrace'])
-                    "
-                    :title="t('traces.copyStacktrace')"
+                    @click="copyStackTrace(props.row['exception.stacktrace'])"
                   >
+                    <q-icon name="content_copy" />
                     <q-tooltip>{{ t("traces.copyStacktrace") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
                 <div
                   v-if="
@@ -292,6 +281,7 @@ import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = defineProps<{
   span: object;
