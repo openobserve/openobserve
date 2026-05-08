@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="q-py-sm">
     <div class="row tw:gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
@@ -98,6 +98,10 @@ import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { Database, ChartLine, Wrench, Code2 } from "lucide-vue-next";
+import {
+  DEFAULT_METRICS_X_FIELD,
+  DEFAULT_METRICS_Y_FIELD,
+} from "@/utils/metrics/constants";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -122,6 +126,8 @@ export default defineComponent({
       dashboardPanelData,
       removeXYFilters,
       updateXYFieldsForCustomQueryMode,
+      makeAutoSQLQuery,
+      updateGroupedFields,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDialogMessage = ref(
@@ -286,14 +292,36 @@ export default defineComponent({
       removeXYFilters();
       updateXYFieldsForCustomQueryMode();
 
+      const queryIdx = dashboardPanelData.layout.currentQueryIndex;
+
       // Clear query when switching query types (SQL <-> PromQL)
       if (
         isQueryTypeChange &&
         dashboardPanelData.data.type !== "custom_chart"
       ) {
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = "";
+        dashboardPanelData.data.queries[queryIdx].query = "";
+      }
+
+      // For metrics page: when switching to SQL, apply default fields and generate query
+      if (
+        dashboardPanelDataPageKey === "metrics" &&
+        isQueryTypeChange &&
+        popupSelectedButtonType.value === "sql"
+      ) {
+        const query = dashboardPanelData.data.queries[queryIdx];
+        query.customQuery = false;
+        query.fields.x = [DEFAULT_METRICS_X_FIELD()];
+        query.fields.y = [DEFAULT_METRICS_Y_FIELD()];
+        query.fields.breakdown = [];
+        query.fields.filter = {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [],
+        };
+
+        // Generate the SQL query based on the default fields
+        await updateGroupedFields();
+        await makeAutoSQLQuery();
       }
 
       // For metrics page: when switching from custom to builder in PromQL, set sample query
@@ -301,17 +329,12 @@ export default defineComponent({
         dashboardPanelDataPageKey === "metrics" &&
         isSwitchingToBuilder &&
         dashboardPanelData.data.queryType === "promql" &&
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
+        dashboardPanelData.data.queries[queryIdx].fields.stream
       ) {
         const streamName =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = `${streamName}{}`;
+          dashboardPanelData.data.queries[queryIdx].fields.stream;
+        dashboardPanelData.data.queries[queryIdx].query =
+          `${streamName}{}`;
       }
 
       // empty the errors
