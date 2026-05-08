@@ -123,7 +123,8 @@
     "version": "[バージョン]",
     "create": "作成",
     "resources": "リソース",
-    "updated_at": "更新日"
+    "updated_at": "更新日",
+    "error": "[エラー]"
   },
   "search": {
     "metrics": "メトリクス",
@@ -2935,7 +2936,21 @@
       "minutesAgo": "{n} 分前",
       "hoursAgo": "{n} 時間前",
       "daysAgo": "{n} 日前"
-    }
+    },
+    "noErrorPresent": "このスパンにはエラーはありません",
+    "httpStatusCode": "HTTP ステータスコード",
+    "grpcStatusCode": "gRPC ステータスコード",
+    "dbResponseStatusCode": "DB レスポンスステータスコード",
+    "processExitCode": "プロセス終了コード",
+    "exceptionsWithCount": "例外 ({カウント})",
+    "typeLabel": "タイプ:",
+    "messageLabel": "メッセージ:",
+    "escapedLabel": "エスケープ:",
+    "stacktraceLabel": "スタックトレース:",
+    "copyStacktrace": "スタックトレースをコピー",
+    "noStacktraceAvailable": "スタックトレースはありません",
+    "stacktraceCopied": "スタックトレースをクリップボードにコピーしました",
+    "stacktraceCopyFailed": "スタックトレースをコピーできませんでした"
   },
   "actions": {
     "testAction": "アクションをテスト",
