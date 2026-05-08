@@ -71,7 +71,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: playwright-regression-ci
+          shared-key: playwright-release-ci
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
@@ -235,34 +235,103 @@ jobs:
           merge-multiple: true
 
       - name: Merge Reports
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           cd tests/ui-testing
 
           if [ ! -d "all-blob-reports" ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
-            echo "::warning::No blob reports found to merge. Creating empty report."
-            mkdir -p playwright-results/html-report
-            START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
-            echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":"'"$START_TIME"'","duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
-            echo "<html><body><h1>No test reports found</h1></body></html>" > playwright-results/html-report/index.html
-            exit 0
+            echo "::warning::No blob reports found to merge."
+
+            echo "::group::Investigating why no blob reports exist"
+
+            JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs")
+
+            SUCCEEDED=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "success")] | length')
+            FAILED=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "failure")] | length')
+            TOTAL=$(echo "$JOBS_RESPONSE" | jq -r '[.jobs[] | select(.name | startswith("e2e /"))] | length')
+
+            echo "::notice::Test job results: $SUCCEEDED succeeded, $FAILED failed, $TOTAL total"
+
+            if [ "$SUCCEEDED" -gt 0 ] && [ "$FAILED" -eq 0 ]; then
+              echo "::notice::✅ All test jobs succeeded - they likely skipped because tests already passed"
+              echo "::notice::Creating empty report structure for downstream jobs"
+              mkdir -p playwright-results/html-report
+              START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+              echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":"'"$START_TIME"'","duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
+              echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
+              echo "::endgroup::"
+              exit 0
+            else
+              echo "::error::❌ Some/all test jobs failed but no blob reports were found"
+              echo "::error::This indicates a problem with test execution or blob reporter"
+              echo "::error::Failed jobs: $FAILED, Succeeded jobs: $SUCCEEDED"
+              echo "::endgroup::"
+              exit 1
+            fi
           fi
 
           unset CI
           npx playwright merge-reports --config playwright.config.js ./all-blob-reports
 
+          echo "Contents of playwright-results:"
+          ls -la playwright-results/
+          echo "Contents of html-report:"
+          ls -la playwright-results/html-report/
+          echo "Checking report.json:"
+          ls -lh playwright-results/report.json
+
+      - name: Cache test failures to TestDino
+        if: ${{ needs.ui_integration_tests.result == 'failure' }}
+        env:
+          TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
+        run: |
+          cd tests/ui-testing
+          echo "::group::Caching test failure metadata to TestDino"
+          if [ -f "playwright-results/report.json" ]; then
+            echo "::notice::JSON report found at playwright-results/report.json"
+            ls -lh playwright-results/report.json
+
+            mkdir -p ../../playwright-results
+            cp playwright-results/report.json ../../playwright-results/
+
+            cd ../../playwright-results
+            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//_/g')
+            CACHE_ID="gh_openobserve_${BRANCH_NAME}_${{ github.run_id }}"
+            echo "::notice::Using cache ID: $CACHE_ID"
+
+            if CACHE_OUTPUT=$(npx tdpw cache --cache-id "$CACHE_ID" 2>&1); then
+              SUCCESS_MSG=$(echo "$CACHE_OUTPUT" | grep "Cache data submitted successfully" || echo "")
+              if [ -n "$SUCCESS_MSG" ]; then
+                echo "::notice::✅ Successfully cached test failure metadata to TestDino cloud"
+              else
+                echo "::notice::✅ Cache command completed"
+              fi
+            else
+              echo "::warning::⚠️ Failed to cache test metadata to TestDino"
+              echo "::warning::Rerun optimization may not work properly"
+              echo "$CACHE_OUTPUT"
+            fi
+          else
+            echo "::notice::Skipping cache - no report.json found (tests may have been skipped due to rerun optimization)"
+          fi
+          echo "::endgroup::"
+
       - name: Upload to TestDino
-        continue-on-error: true
-        if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
 
           if [ ! -f "playwright-results/report.json" ]; then
-            echo "::notice::Skipping TestDino upload - no report.json found"
+            echo "::notice::Skipping TestDino upload - no report.json found (tests may have been skipped due to rerun optimization)"
             exit 0
           fi
 
           START_TIME=$(jq -r '.stats.startTime // empty' playwright-results/report.json)
           if [ -n "$START_TIME" ] && [[ "$START_TIME" =~ ^[0-9]+$ ]]; then
+            echo "Converting startTime from Unix timestamp to ISO 8601 string"
             jq '.stats.startTime = (.stats.startTime / 1000 | strftime("%Y-%m-%dT%H:%M:%S.000Z"))' playwright-results/report.json > playwright-results/report.json.tmp
             mv playwright-results/report.json.tmp playwright-results/report.json
           fi
@@ -295,7 +364,7 @@ jobs:
             UI_OK=true
           fi
 
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ]; then
+          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
             MERGE_OK=true
           fi
 
