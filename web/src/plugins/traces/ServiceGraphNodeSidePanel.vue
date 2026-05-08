@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               value: row[cfg.colId],
                             },
                             errorsOnly: column.id === 'errors',
-                            minDurationMicros: row[cfg.colId]
+                            minDurationMicros: row[column.id]
                           })
                         "
                       >
@@ -1428,8 +1428,8 @@ export default defineComponent({
     };
 
     // ── Sorting state ──────────────────────────────────────────────────────
-    const sortBy = ref<string>("errors");
-    const sortOrder = ref<"asc" | "desc">("desc");
+    const sortBy = ref<string>("");
+    const sortOrder = ref<"asc" | "desc">("");
 
     function handleSortChange(field: string, order: "asc" | "desc") {
       sortBy.value = field;
@@ -1439,8 +1439,7 @@ export default defineComponent({
     const compareRows = (a: any, b: any, field: string): number => {
       // For latency percentiles, sort by raw underscore-prefixed values
       if (field === "p99" || field === "p95" || field === "p75") {
-        const rawKey = `${field}` as const;
-        return (a[rawKey] ?? 0) - (b[rawKey] ?? 0);
+        return (a[field] ?? 0) - (b[field] ?? 0);
       }
       // For requests, sort by raw _requests value
       if (field === "requests") {
