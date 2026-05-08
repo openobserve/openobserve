@@ -123,7 +123,9 @@
     "version": "Version",
     "create": "Erstellen",
     "resources": "Ressourcen",
-    "updated_at": "Aktualisiert am"
+    "updated_at": "Aktualisiert am",
+    "discardChanges": "Änderungen verwerfen",
+    "unsavedChanges": "Ungespeicherte Änderungen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

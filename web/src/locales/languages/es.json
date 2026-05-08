@@ -123,7 +123,9 @@
     "version": "Versión",
     "create": "Crear",
     "resources": "Recursos",
-    "updated_at": "Actualizado en"
+    "updated_at": "Actualizado en",
+    "discardChanges": "Descartar cambios",
+    "unsavedChanges": "Cambios no guardados"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
