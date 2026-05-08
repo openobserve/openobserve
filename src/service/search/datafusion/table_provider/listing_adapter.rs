@@ -15,7 +15,7 @@
 
 use std::{any::Any, sync::Arc};
 
-use arrow_schema::SchemaRef;
+use arrow_schema::{SchemaRef, SortOptions};
 use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
     catalog::{Session, TableProvider, memory::DataSourceExec},
@@ -27,7 +27,8 @@ use datafusion::{
     },
     execution::cache::cache_manager::FileStatisticsCache,
     logical_expr::TableProviderFilterPushDown,
-    physical_plan::ExecutionPlan,
+    physical_expr::{LexOrdering, PhysicalSortExpr},
+    physical_plan::{ExecutionPlan, expressions::Column},
     prelude::Expr,
 };
 use rayon::prelude::*;
@@ -134,9 +135,17 @@ impl TableProvider for ListingTableAdapter {
             .scan(state, parquet_projection, filters, limit)
             .await?;
 
-        let reverse = !self.listing_table.options().file_sort_order.is_empty()
-            && parquet_exec.properties().output_ordering().is_none();
-        let parquet_exec = handler_tantivy_index(&self.trace_id, parquet_exec, reverse);
+        let order_by_time_desc = !self.listing_table.options().file_sort_order.is_empty();
+        let reverse = order_by_time_desc && parquet_exec.properties().output_ordering().is_none();
+        let target_partitions = self.listing_table.options().target_partitions;
+        let parquet_exec = handler_tantivy_index(
+            &self.trace_id,
+            state,
+            parquet_exec,
+            reverse,
+            order_by_time_desc,
+            target_partitions,
+        );
 
         // if the index condition can remove filter, we can skip the config
         // feature_query_remove_filter_with_index
@@ -160,14 +169,6 @@ impl TableProvider for ListingTableAdapter {
             filter_projection,
         )?;
 
-        if reverse {
-            log::info!(
-                "[trace_id {}] attempted to split file groups by statistics, but there were more file groups than target_partitions: {}; falling back to unordered",
-                self.trace_id,
-                state.config().target_partitions(),
-            );
-        }
-
         Ok(plan)
     }
 
@@ -181,8 +182,11 @@ impl TableProvider for ListingTableAdapter {
 
 fn handler_tantivy_index(
     trace_id: &str,
+    state: &dyn Session,
     plan: Arc<dyn ExecutionPlan>,
     reverse: bool,
+    order_by_time_desc: bool,
+    target_partitions: usize,
 ) -> Arc<dyn ExecutionPlan> {
     if let Some(data_source_exec) = plan.as_any().downcast_ref::<DataSourceExec>()
         && let Some(config) = data_source_exec
@@ -193,15 +197,48 @@ fn handler_tantivy_index(
         let mut file_groups = config.file_groups.clone();
 
         if reverse {
-            let new_file_groups = file_groups
-                .into_iter()
-                .map(|file_group| {
-                    let mut files = file_group.into_inner();
-                    files.reverse();
-                    FileGroup::new(files)
-                })
-                .collect();
-            file_groups = new_file_groups;
+            let schema = config.file_source().table_schema().table_schema();
+            match schema.index_of(TIMESTAMP_COL_NAME) {
+                Ok(index) => {
+                    let sort_order = LexOrdering::new(vec![PhysicalSortExpr {
+                        expr: Arc::new(Column::new(TIMESTAMP_COL_NAME, index)),
+                        options: SortOptions {
+                            descending: true,
+                            nulls_first: false,
+                        },
+                    }]);
+                    if let Some(sort_order) = sort_order {
+                        match FileScanConfig::split_groups_by_statistics_with_target_partitions(
+                            schema,
+                            &file_groups,
+                            &sort_order,
+                            target_partitions,
+                        ) {
+                            Ok(new_file_groups) => {
+                                file_groups = new_file_groups;
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "[trace_id {trace_id}] failed to split file groups by statistics: {e}, falling back to reversing file groups"
+                                );
+                                file_groups = file_groups
+                                    .into_iter()
+                                    .map(|file_group| {
+                                        let mut files = file_group.into_inner();
+                                        files.reverse();
+                                        FileGroup::new(files)
+                                    })
+                                    .collect();
+                            }
+                        }
+                    }
+                }
+                Err(_) => {
+                    log::warn!(
+                        "[trace_id {trace_id}] _timestamp column not found in schema, skipping split_groups_by_statistics"
+                    );
+                }
+            }
         }
 
         let start = std::time::Instant::now();
@@ -229,13 +266,19 @@ fn handler_tantivy_index(
         let files_nums = new_file_groups.iter().map(|g| g.len()).sum::<usize>();
 
         log::info!(
-            "[trace_id {trace_id}] listing table adapter, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}, took: {} ms",
+            "[trace_id {trace_id}] listing table adapter, target_partitions: {target_partitions}, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}, took: {} ms",
             start.elapsed().as_millis() as usize,
         );
 
         let mut config = config.clone();
         config.file_groups = new_file_groups;
-        let plan = Arc::new(DataSourceExec::new(Arc::new(config)));
+        let mut plan = Arc::new(DataSourceExec::new(Arc::new(config))) as Arc<dyn ExecutionPlan>;
+        if !order_by_time_desc
+            && let Ok(Some(repartition_plan)) =
+                plan.repartitioned(target_partitions, state.config_options())
+        {
+            plan = repartition_plan;
+        }
         return plan;
     }
     plan
