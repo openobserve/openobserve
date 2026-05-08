@@ -101,10 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
           >
             <LLMInsightsDashboard
+              ref="llmInsightsRef"
               :streamName="selectedStreamName"
               :startTime="insightsTimeRange.startTime"
               :endTime="insightsTimeRange.endTime"
-              :refreshTrigger="llmRefreshNonce"
               class="tw:h-full"
             />
           </div>
@@ -419,6 +419,7 @@ const searchResultRef = ref(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
+const llmInsightsRef = ref<any>(null);
 const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
@@ -468,29 +469,35 @@ const selectedStreamName = computed(
   () => searchObj.data.stream.selectedStream.value,
 );
 
-// Bumped whenever Run Query is clicked while on the LLM Insights tab. Used as
-// a reactive dep of `insightsTimeRange` so a click on Run Query forces the
-// computed to re-evaluate (otherwise relative ranges like "Past 1 hour" return
-// the cached value because Date.now() is not reactive).
-const llmRefreshNonce = ref(0);
+// Snapshot the current datetime as microseconds. Refreshed in-place by
+// `searchData` when the LLM Insights tab is active — no nonce, no
+// `Date.now()`-as-reactive-dep trick.
+const insightsTimeRange = ref({ startTime: 0, endTime: 0 });
 
-const insightsTimeRange = computed(() => {
-  // Touch the nonce so re-running with the same relative period still
-  // produces a fresh window.
-  void llmRefreshNonce.value;
-
+function recomputeInsightsTimeRange() {
   const dt = searchObj.data.datetime;
-  if (!dt) return { startTime: 0, endTime: 0 };
+  if (!dt) {
+    insightsTimeRange.value = { startTime: 0, endTime: 0 };
+    return;
+  }
   if (dt.type === "relative") {
     const relativePeriod: any = dt.relativeTimePeriod;
-    if (!relativePeriod) return { startTime: 0, endTime: 0 };
-    return getConsumableRelativeTime(relativePeriod) || { startTime: 0, endTime: 0 };
+    insightsTimeRange.value = relativePeriod
+      ? getConsumableRelativeTime(relativePeriod) || { startTime: 0, endTime: 0 }
+      : { startTime: 0, endTime: 0 };
+    return;
   }
-  return {
-    startTime: typeof dt.startTime === "number" ? dt.startTime : new Date(dt.startTime).getTime() * 1000,
-    endTime: typeof dt.endTime === "number" ? dt.endTime : new Date(dt.endTime).getTime() * 1000,
+  insightsTimeRange.value = {
+    startTime:
+      typeof dt.startTime === "number"
+        ? dt.startTime
+        : new Date(dt.startTime).getTime() * 1000,
+    endTime:
+      typeof dt.endTime === "number"
+        ? dt.endTime
+        : new Date(dt.endTime).getTime() * 1000,
   };
-});
+}
 
 const isLLMSpanPresent = ref(false);
 
@@ -1556,6 +1563,9 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
+  // Always seed the LLM Insights datetime snapshot so the dashboard's
+  // first onMounted has a real (non-zero) window to read from props.
+  recomputeInsightsTimeRange();
   if (searchObj.data.stream.selectedStream.value) {
     searchData();
   }
@@ -1746,7 +1756,13 @@ const onSearchModeChange = (
   mode: "traces" | "spans" | "llm-insights" | "service-graph" | "services-catalog",
 ) => {
   searchObj.meta.searchMode = mode;
-  if (mode === "service-graph" || mode === "services-catalog" || mode === "llm-insights") return;
+  // Refresh the datetime snapshot on every tab-enter so the dashboard's
+  // first onMounted has the up-to-date window for relative ranges.
+  if (mode === "llm-insights") {
+    recomputeInsightsTimeRange();
+    return;
+  }
+  if (mode === "service-graph" || mode === "services-catalog") return;
   if (
     mode === "traces" &&
     searchObj.meta.resultGrid.sortBy !== "start_time" &&
@@ -1908,14 +1924,23 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
 });
 
 const searchData = () => {
-  // LLM Insights uses its own (independent) stream selector and a refresh
-  // nonce. Bump on every searchdata signal — explicit Run query click and
-  // date-picker auto-triggers alike. The auto-trigger path itself is
-  // already gated by the user's "Auto-run on change" / live-mode toggle in
-  // SearchBar, so the toggle controls whether time changes propagate here
-  // (matching the behaviour of every other Traces sub-tab).
+  // LLM Insights uses its own stream selector + cache. We refresh the
+  // dashboard by recomputing the datetime snapshot then calling its
+  // exposed refresh() method directly — no nonce, no watcher chain.
+  // The auto-trigger path is already gated by the user's "Auto-run on
+  // change" / live-mode toggle in SearchBar, so the toggle controls
+  // whether time changes propagate here (matching the behaviour of every
+  // other Traces sub-tab).
   if (activeTab.value === "llm-insights") {
-    llmRefreshNonce.value++;
+    recomputeInsightsTimeRange();
+    // Pass the freshly computed start/end directly — Vue propagates the
+    // `insightsTimeRange` ref update to the dashboard's `props.startTime`
+    // only on the next tick, so the child reading `props` here would
+    // fetch with the *previous* window.
+    llmInsightsRef.value?.refresh?.(
+      insightsTimeRange.value.startTime,
+      insightsTimeRange.value.endTime,
+    );
     return;
   }
 
@@ -2084,6 +2109,15 @@ const debouncedAutoRunOnQuery = debounce(() => {
 // Debounced auto-run on datetime changes in live mode.
 // Traces has no existing auto-run on datetime, so no guard needed.
 const debouncedAutoRunOnDatetime = debounce(() => {
+  // LLM Insights owns its refresh lifecycle explicitly: the dashboard's
+  // toolbar has a dedicated refresh button, the parent calls
+  // `recomputeInsightsTimeRange()` on tab-enter, and `searchData` is
+  // wired through `llmInsightsRef.refresh()`. Bailing here prevents the
+  // double-fetch caused by the LLM-tab date-picker's mount-time
+  // `on:date-change` emit (re-writes `searchObj.data.datetime`, which
+  // would otherwise trigger a second `searchData` 500ms after mount).
+  if (activeTab.value === "llm-insights") return;
+
   // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
   // Only auto-run here for relative time to avoid double-triggering.
   if (

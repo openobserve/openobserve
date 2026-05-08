@@ -47,35 +47,27 @@ const EMPTY_KPI: LLMKPI = {
   p95DurationMicros: 0,
 };
 
-// Module-level (singleton) state — survives component unmount/remount so
-// that tab-switching back into the LLM Insights dashboard doesn't re-fire
-// the API call. The component compares the current params against
-// `lastFetchKey` to decide whether a refetch is actually needed.
-const kpi = ref<LLMKPI>({ ...EMPTY_KPI });
-const kpiPrev = ref<LLMKPI>({ ...EMPTY_KPI });
-const sparklines = ref<LLMSparklineSeries>({
-  cost: [],
-  tokens: [],
-  traces: [],
-  p95Micros: [],
-  errorRate: [],
-});
-const loading = ref(false);
-const error = ref<string | null>(null);
-const lastFetchKey = ref<string>("");
-const hasLoadedOnce = ref(false);
-
-// Streams-list cache (also module-level so the dropdown doesn't refetch
-// on every tab switch).
-const availableStreams = ref<string[]>([]);
-const streamsLoaded = ref(false);
-
-let activeTraceIds: string[] = [];
-
 export function useLLMInsights() {
   const store = useStore();
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
     useHttpStreaming();
+
+  const kpi = ref<LLMKPI>({ ...EMPTY_KPI });
+  const kpiPrev = ref<LLMKPI>({ ...EMPTY_KPI });
+  const sparklines = ref<LLMSparklineSeries>({
+    cost: [],
+    tokens: [],
+    traces: [],
+    p95Micros: [],
+    errorRate: [],
+  });
+  const loading = ref(false);
+  const error = ref<string | null>(null);
+  const hasLoadedOnce = ref(false);
+  const availableStreams = ref<string[]>([]);
+  const streamsLoaded = ref(false);
+
+  let activeTraceIds: string[] = [];
 
   function cancelAll() {
     activeTraceIds.forEach((id) => {
@@ -87,14 +79,6 @@ export function useLLMInsights() {
     activeTraceIds = [];
   }
 
-  function enqueueTrace(id: string) {
-    activeTraceIds.push(id);
-  }
-
-  function dequeueTrace(id: string) {
-    activeTraceIds = activeTraceIds.filter((t) => t !== id);
-  }
-
   function executeQuery(
     sql: string,
     streamName: string,
@@ -104,10 +88,8 @@ export function useLLMInsights() {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const traceId = generateTraceContext().traceId;
-      enqueueTrace(traceId);
+      activeTraceIds.push(traceId);
 
-      // Only base64-encode when the org/instance has sql_base64_enabled —
-      // plain SQL is otherwise accepted by the streaming endpoint.
       const useBase64 = store.state.zoConfig?.sql_base64_enabled;
       fetchQueryDataWithHttpStream(
         {
@@ -130,14 +112,10 @@ export function useLLMInsights() {
         {
           data: (_payload: any, response: any) => {
             const hits: any[] = response.content?.results?.hits || [];
-            if (hits.length > 0) {
-              onData(hits);
-            }
+            if (hits.length > 0) onData(hits);
           },
-          error: (response: any, _traceId: any) => {
-            dequeueTrace(traceId);
-            // Streaming endpoint passes the parsed error body as the first
-            // argument (e.g. { status, code, message, error_detail }).
+          error: (response: any) => {
+            activeTraceIds = activeTraceIds.filter((t) => t !== traceId);
             const message =
               response?.message ||
               response?.error ||
@@ -149,8 +127,8 @@ export function useLLMInsights() {
             err.raw = response;
             reject(err);
           },
-          complete: (_payload: any) => {
-            dequeueTrace(traceId);
+          complete: () => {
+            activeTraceIds = activeTraceIds.filter((t) => t !== traceId);
             resolve();
           },
           reset: () => {},
@@ -170,11 +148,10 @@ export function useLLMInsights() {
     // column that doesn't exist on the stream's schema fails the query — the
     // safe path forward is to use the standard fields exclusively.
     //
-    // The stream is assumed to be LLM-marked, so every span here is part of
-    // an LLM trace. Errors are counted across all spans (not just those
-    // tagged with `gen_ai_operation_name`) because OTel SDKs typically
-    // propagate the failure to a deeper child span (e.g. `tool.tools_call`)
-    // that doesn't itself carry the gen_ai operation attribute.
+    // Errors are counted across all spans (not just those tagged with
+    // `gen_ai_operation_name`) because OTel SDKs typically propagate the
+    // failure to a deeper child span (e.g. `tool.tools_call`) that doesn't
+    // itself carry the gen_ai operation attribute.
     const sql = `
       SELECT
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL) as request_count,
@@ -204,7 +181,7 @@ export function useLLMInsights() {
 
   function bucketInterval(durationMicros: number): string {
     const seconds = durationMicros / 1_000_000;
-    const target = seconds / 30; // aim for ~30 buckets
+    const target = seconds / 30;
     if (target < 30) return "10 seconds";
     if (target < 120) return "1 minute";
     if (target < 600) return "5 minutes";
@@ -222,9 +199,6 @@ export function useLLMInsights() {
   ): Promise<void> {
     const interval = bucketInterval(endTime - startTime);
 
-    // Single query produces all 5 sparkline series, using only the new
-    // OTEL gen_ai_* fields (see fetchKPIInto for the rationale + the
-    // reason errors are counted without the gen_ai_operation_name filter).
     const mainSql = `
       SELECT
         histogram(_timestamp, '${interval}') as ts,
@@ -287,6 +261,7 @@ export function useLLMInsights() {
     startTime: number,
     endTime: number,
   ): Promise<void> {
+    if (!streamName || !startTime || !endTime) return;
     loading.value = true;
     error.value = null;
 
@@ -300,7 +275,6 @@ export function useLLMInsights() {
         fetchKPIInto(kpiPrev, streamName, prevStart, prevEnd),
         fetchSparklines(streamName, startTime, endTime),
       ]);
-      lastFetchKey.value = `${streamName}|${startTime}|${endTime}`;
       hasLoadedOnce.value = true;
     } catch (e: any) {
       error.value = e?.message || "Failed to fetch LLM insights";
@@ -310,44 +284,16 @@ export function useLLMInsights() {
     }
   }
 
-  /**
-   * Build the cache key for a given (stream, startTime, endTime). The
-   * dashboard uses this to compare against `lastFetchKey` and decide whether
-   * a refetch is required.
-   */
-  function fetchKey(streamName: string, startTime: number, endTime: number): string {
-    return `${streamName}|${startTime}|${endTime}`;
-  }
-
-  function reset() {
-    cancelAll();
-    kpi.value = { ...EMPTY_KPI };
-    kpiPrev.value = { ...EMPTY_KPI };
-    sparklines.value = {
-      cost: [],
-      tokens: [],
-      traces: [],
-      p95Micros: [],
-      errorRate: [],
-    };
-    loading.value = false;
-    error.value = null;
-    lastFetchKey.value = "";
-    hasLoadedOnce.value = false;
-  }
-
   return {
     kpi,
     kpiPrev,
     sparklines,
     loading,
     error,
-    fetchAll,
-    reset,
-    lastFetchKey,
     hasLoadedOnce,
-    fetchKey,
     availableStreams,
     streamsLoaded,
+    fetchAll,
+    cancelAll,
   };
 }

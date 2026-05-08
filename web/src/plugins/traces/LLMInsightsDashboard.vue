@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useLLMInsights } from "./composables/useLLMInsights";
@@ -204,13 +204,6 @@ interface Props {
   streamName: string;
   startTime: number; // microseconds
   endTime: number; // microseconds
-  /**
-   * Bumped by the parent whenever the page-level "Run query" button is
-   * clicked while this tab is active. We watch this value so the dashboard
-   * refreshes even when the time range itself didn't change (e.g. absolute
-   * range, or relative range producing identical timestamps).
-   */
-  refreshTrigger?: number;
 }
 
 const props = defineProps<Props>();
@@ -225,10 +218,7 @@ const {
   loading,
   error,
   fetchAll,
-  reset: resetInsights,
-  lastFetchKey,
   hasLoadedOnce,
-  fetchKey,
   availableStreams,
   streamsLoaded,
 } = useLLMInsights();
@@ -427,60 +417,40 @@ const kpiCards = computed<KpiCard[]>(() => {
   ];
 });
 
-async function loadData() {
-  // Don't fire a query without a stream or time range.
-  if (!activeStream.value || !props.startTime || !props.endTime) return;
-  // Persist the chosen stream — picked up on next mount.
+// Single fetch entry point. Always pulls from the current props (which the
+// parent keeps in sync via `recomputeInsightsTimeRange`). Stream selector
+// changes, refresh button, and onMounted all funnel through here.
+async function load(startTime?: number, endTime?: number) {
+  const start = startTime ?? props.startTime;
+  const end = endTime ?? props.endTime;
+  if (!activeStream.value || !start || !end) return;
   localStorage.setItem(STREAM_LS_KEY, activeStream.value);
-  await fetchAll(activeStream.value, props.startTime, props.endTime);
+  await fetchAll(activeStream.value, start, end);
 }
 
-// Stream change is an explicit user action — auto-apply.
 function onStreamChange() {
-  loadData();
+  load();
 }
 
-// Single watch covering both code paths that should refresh the panels:
-//
-//   1. User changes the time range → props.startTime / endTime change
-//      (same convention as every other Traces sub-tab).
-//   2. User clicks the page-level Run query → parent bumps refreshTrigger
-//      so we refresh even when an absolute range hasn't moved.
-//
-// Combining them into one watch keyed on the (start, end, trigger) tuple
-// means clicking Run query on a relative range — which both bumps the
-// trigger AND produces fresh timestamps — only fires loadData once.
-watch(
-  () => `${props.startTime}|${props.endTime}|${props.refreshTrigger ?? 0}`,
-  (next, prev) => {
-    if (next === prev) return;
-    if (!streamsLoaded.value || !activeStream.value) return;
-    loadData();
-  },
-);
+// Parent calls this on Run Query / Refresh / date-range change, passing
+// the freshly computed start/end so we don't have to wait for Vue's
+// next-tick prop propagation.
+async function refresh(startTime?: number, endTime?: number) {
+  await load(startTime, endTime);
+}
+
+defineExpose({ refresh });
 
 onMounted(async () => {
-  // Streams list is also cached at module level — refetch only on first
-  // visit so subsequent tab switches don't trigger any network call at all.
   if (!streamsLoaded.value) {
     await loadTraceStreams();
   } else if (!availableStreams.value.includes(activeStream.value)) {
-    // Cache exists from a prior mount but the persisted activeStream isn't
-    // valid for this org / availability list — clamp to first option.
     activeStream.value = availableStreams.value[0] || "";
   }
-
-  // First visit (no cached data) → auto-fetch once. Subsequent tab switches
-  // hit the singleton cache and render immediately. To refresh, the user
-  // clicks Run Query (or changes stream/time then clicks).
-  if (!hasLoadedOnce.value && activeStream.value) {
-    loadData();
+  if (activeStream.value) {
+    load();
   }
 });
-
-// Intentionally NOT resetting on unmount — preserving the loaded data is
-// what makes tab-switching cheap. The composable's reset() is only called
-// on explicit user action (or on logout/org switch elsewhere).
 </script>
 
 <style lang="scss" scoped>

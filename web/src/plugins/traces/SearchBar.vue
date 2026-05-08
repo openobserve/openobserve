@@ -157,8 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="
           searchObj.meta.searchMode !== 'service-graph' &&
-          searchObj.meta.searchMode !== 'services-catalog' &&
-          searchObj.meta.searchMode !== 'llm-insights'
+          searchObj.meta.searchMode !== 'services-catalog'
         "
         class="float-right col-auto tw:flex tw:items-center tw:gap-[0.375rem]"
       >
@@ -395,39 +394,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- LLM Insights right toolbar: DateTime, Refresh. Mirrors the
-           services-catalog pattern — no Run query button, just a manual
-           refresh that emits `searchdata` (parent bumps llmRefreshNonce). -->
-      <div
-        v-if="searchObj.meta.searchMode === 'llm-insights'"
-        class="float-right col-auto o2-input-full"
-      >
-        <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
-          <date-time
-            ref="dateTimeRef"
-            auto-apply
-            :default-type="searchObj.data.datetime.type"
-            :default-absolute-time="{
-              startTime: searchObj.data.datetime.startTime,
-              endTime: searchObj.data.datetime.endTime,
-            }"
-            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
-            data-test="llm-insights-date-time-picker"
-            class="tw:h-[2rem]!"
-            @on:date-change="updateDateTime"
-          />
-          <OButton
-            data-test="llm-insights-refresh-btn"
-            variant="outline"
-            size="icon-toolbar"
-            class="tw:mr-[0.375rem]"
-            @click="searchData"
-          >
-            <q-icon name="refresh" size="16px" />
-            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-          </OButton>
-        </div>
-      </div>
     </div>
     <div
       v-if="
@@ -757,6 +723,25 @@ export default defineComponent({
         }
       }
 
+      // Snapshot prior datetime so we can detect whether this emit is a
+      // mount-time replay (same user intent) vs a real user-driven change.
+      //
+      // For RELATIVE ranges, comparing raw startTime/endTime is unreliable:
+      // the DateTime component recomputes them from `Date.now()` on every
+      // mount, so a tab switch that remounts the picker produces a "new"
+      // timestamp even though the user's intent ("Past 12 Hours") is
+      // unchanged. We compare `relativeTimePeriod` instead.
+      // For ABSOLUTE ranges, the user-set boundaries are the source of
+      // truth — compare them directly.
+      const prev = searchObj.data.datetime;
+      const isRelative = !!value.relativeTimePeriod;
+      const datetimeChanged = !prev
+        ? true
+        : isRelative
+          ? prev.relativeTimePeriod !== value.relativeTimePeriod
+          : prev.startTime !== value.startTime ||
+            prev.endTime !== value.endTime;
+
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
@@ -796,8 +781,18 @@ export default defineComponent({
         });
       }
 
-      // Live mode: auto-trigger search on any time range change
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+      // Live mode: auto-trigger search on a real time-range change.
+      // The DateTime component also fires `on:date-change` once on its own
+      // mount with the current value (no actual change). The `prev`
+      // comparison above filters out that mount-time replay so a tab
+      // switch that remounts the picker doesn't fire a redundant search
+      // (visible in LLM Insights as a duplicate fetchAll right after the
+      // dashboard's own initial load).
+      if (
+        store.state.zoConfig?.auto_query_enabled &&
+        searchObj.meta.liveMode &&
+        datetimeChanged
+      ) {
         emit("searchdata");
       }
     };
