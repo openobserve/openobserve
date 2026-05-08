@@ -416,9 +416,9 @@ describe("PatternList", () => {
     it("should forward filter-value event from WildcardValuePopover", async () => {
       const popover = wrapper.findComponent({ name: "WildcardValuePopover" });
       expect(popover.exists()).toBe(true);
-      // WildcardValuePopover forwards filter-value to PatternList which re-emits it
-      const popoverVm = popover.vm as any;
-      expect(popoverVm).toBeDefined();
+      await popover.vm.$emit("filter-value", "test-value", "exclude");
+      expect(wrapper.emitted("filter-value")).toBeTruthy();
+      expect(wrapper.emitted("filter-value")![0]).toEqual(["test-value", "exclude"]);
     });
   });
 });

@@ -75,11 +75,8 @@ export function tokenizeTemplate(
       (wv as any)?.values ??
       [];
     if (rawValues.length === 0 && wv) {
-      console.log("[tokenizeTemplate] Found wildcard item but no values", {
-        wildcardIndex,
-        wv,
-        wvKeys: Object.keys(wv),
-      });
+      // wildcard item present but values array is empty — API may not have
+      // returned sample values for this position
     }
     tokens.push({
       kind: "wildcard",

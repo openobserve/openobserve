@@ -49,6 +49,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <span class="wildcard-value-text-inner">{{ item.value || "(empty)" }}</span>
         </span>
+        <span class="wildcard-value-row-actions">
+          <OButton
+            variant="ghost"
+            size="icon"
+            :data-test="`wildcard-value-include-${i}`"
+            @click.stop="$emit('filter-value', item.value, 'include')"
+          >
+            <q-icon name="add" size="xs" />
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon"
+            :data-test="`wildcard-value-exclude-${i}`"
+            @click.stop="$emit('filter-value', item.value, 'exclude')"
+          >
+            <q-icon name="remove" size="xs" />
+          </OButton>
+        </span>
       </div>
       <div
         v-if="displayValues.length === 0"
@@ -65,6 +83,7 @@ import { computed, ref, watch, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { formatCount } from "@/utils/logs/convertLogData";
 import { wildcardChipColor } from "@/composables/useLogs/useTemplateTokenizer";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type { WildcardDisplayValue } from "./useWildcardHover";
 
 const props = defineProps<{
@@ -83,18 +102,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const popoverRef = ref<HTMLElement | null>(null);
 const flipUpward = ref(false);
-
-watch(
-  () => [props.visible, props.token, props.displayValues],
-  () => {
-    console.log("[WildcardValuePopover] props updated", {
-      visible: props.visible,
-      token: props.token,
-      displayValues: props.displayValues,
-    });
-  },
-  { immediate: true },
-);
 
 const maxCount = computed(() =>
   Math.max(...props.displayValues.map((v) => v.count), 1),
@@ -249,24 +256,24 @@ watch(
   border-bottom: 1px solid var(--o2-border, #e5e7eb);
 
   &.wildcard-header-blue-2 {
-    background: #eff6ff;
-    color: #1e40af;
+    background: var(--o2-wildcard-header-blue-bg);
+    color: var(--o2-wildcard-header-blue-text);
   }
   &.wildcard-header-green-2 {
-    background: #f0fdf4;
-    color: #166534;
+    background: var(--o2-wildcard-header-green-bg);
+    color: var(--o2-wildcard-header-green-text);
   }
   &.wildcard-header-orange-2 {
-    background: #fff7ed;
-    color: #9a3412;
+    background: var(--o2-wildcard-header-orange-bg);
+    color: var(--o2-wildcard-header-orange-text);
   }
   &.wildcard-header-purple-2 {
-    background: #faf5ff;
-    color: #6b21a8;
+    background: var(--o2-wildcard-header-purple-bg);
+    color: var(--o2-wildcard-header-purple-text);
   }
   &.wildcard-header-grey-3 {
-    background: #f9fafb;
-    color: #374151;
+    background: var(--o2-wildcard-header-grey-bg);
+    color: var(--o2-wildcard-header-grey-text);
   }
   &.wildcard-header-default {
     background: var(--o2-surface-2, #f9fafb);
@@ -329,6 +336,20 @@ watch(
   z-index: 1;
 }
 
+.wildcard-value-row-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 0.125rem;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+.wildcard-value-row:hover .wildcard-value-row-actions {
+  opacity: 1;
+}
+
 .wildcard-value-bar-wrapper {
   position: absolute;
   inset: 0;
@@ -347,19 +368,19 @@ watch(
   }
 
   &.wildcard-bar-blue {
-    background: #3b82f6;
+    background: var(--o2-wildcard-bar-blue);
   }
   &.wildcard-bar-green {
-    background: #22c55e;
+    background: var(--o2-wildcard-bar-green);
   }
   &.wildcard-bar-orange {
-    background: #f97316;
+    background: var(--o2-wildcard-bar-orange);
   }
   &.wildcard-bar-purple {
-    background: #a855f7;
+    background: var(--o2-wildcard-bar-purple);
   }
   &.wildcard-bar-grey {
-    background: #6b7280;
+    background: var(--o2-wildcard-bar-grey);
   }
   &.wildcard-bar-default {
     background: var(--o2-text-muted, #6b7280);

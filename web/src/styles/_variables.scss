@@ -391,6 +391,23 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-tag-grey-1: #E2E8F0;
   --o2-tag-grey-2: #eaebec;
 
+  // Wildcard popover header & bar colors (light)
+  --o2-wildcard-header-blue-bg: #{$o2-blue-100};
+  --o2-wildcard-header-blue-text: #{$o2-blue-1100};
+  --o2-wildcard-header-green-bg: #{$o2-green-100};
+  --o2-wildcard-header-green-text: #{$o2-green-800};
+  --o2-wildcard-header-orange-bg: #{$o2-orange-100};
+  --o2-wildcard-header-orange-text: #{$o2-orange-900};
+  --o2-wildcard-header-purple-bg: #{$o2-purple-100};
+  --o2-wildcard-header-purple-text: #{$o2-purple-800};
+  --o2-wildcard-header-grey-bg: #{$o2-gray-200};
+  --o2-wildcard-header-grey-text: #{$o2-gray-1000};
+  --o2-wildcard-bar-blue: #{$o2-blue-600};
+  --o2-wildcard-bar-green: #{$o2-green-600};
+  --o2-wildcard-bar-orange: #{$o2-orange-600};
+  --o2-wildcard-bar-purple: #{$o2-purple-600};
+  --o2-wildcard-bar-grey: #{$o2-gray-800};
+
   // Field Type Badge Colors
   --o2-field-type-string-bg: oklch(95% 0.052 163.051);
   --o2-field-type-string-text: oklch(59.6% 0.145 163.225);
@@ -601,6 +618,22 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-tag-grey-1: #565b60;
   --o2-tag-grey-2: #313234;
 
+  // Wildcard popover header & bar colors (dark)
+  --o2-wildcard-header-blue-bg: #{$o2-dark-blue-100};
+  --o2-wildcard-header-blue-text: #{$o2-dark-blue-700};
+  --o2-wildcard-header-green-bg: #{$o2-dark-green-100};
+  --o2-wildcard-header-green-text: #{$o2-dark-green-800};
+  --o2-wildcard-header-orange-bg: #{$o2-dark-orange-100};
+  --o2-wildcard-header-orange-text: #{$o2-dark-orange-700};
+  --o2-wildcard-header-purple-bg: #{$o2-dark-purple-100};
+  --o2-wildcard-header-purple-text: #{$o2-dark-purple-700};
+  --o2-wildcard-header-grey-bg: #{$o2-dark-gray-200};
+  --o2-wildcard-header-grey-text: #{$o2-dark-gray-1000};
+  --o2-wildcard-bar-blue: #{$o2-dark-blue-600};
+  --o2-wildcard-bar-green: #{$o2-dark-green-600};
+  --o2-wildcard-bar-orange: #{$o2-dark-orange-600};
+  --o2-wildcard-bar-purple: #{$o2-dark-purple-600};
+  --o2-wildcard-bar-grey: #{$o2-dark-gray-700};
   
 }
 

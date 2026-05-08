@@ -13,6 +13,11 @@ interface HoveredToken {
   anchorEl: HTMLElement | null;
 }
 
+// Module-level singleton state — there is only ever one popover visible at a
+// time, shared across PatternCard (list rows) and PatternDetailsDialog (detail
+// view). Each consumer calls useWildcardHover() in setup which reuses the same
+// hoveredToken ref and hideTimeout. This ensures hovering a chip in one view
+// hides a popover that was open in the other.
 const hoveredToken = ref<HoveredToken | null>(null);
 let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -34,12 +39,6 @@ export default function useWildcardHover() {
     sampleValues: any[],
     event: MouseEvent,
   ) {
-    console.log("[useWildcardHover] onMouseEnter", {
-      token,
-      sampleValues,
-      sampleValuesType: typeof sampleValues[0],
-      currentTarget: event.currentTarget,
-    });
     if (hideTimeout) {
       clearTimeout(hideTimeout);
       hideTimeout = null;
