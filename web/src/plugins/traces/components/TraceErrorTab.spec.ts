@@ -269,7 +269,7 @@ describe("TraceErrorTab", () => {
           '[data-test="trace-details-sidebar-db-response-status-code"]',
         ).exists(),
       ).toBe(true);
-      expect(wrapper.text()).toContain("DB RESPONSE STATUS CODE");
+      expect(wrapper.text()).toContain("DB Response Status Code");
     });
 
     it("should display the DB status code value", () => {
@@ -319,7 +319,7 @@ describe("TraceErrorTab", () => {
           '[data-test="trace-details-sidebar-process-exit-code"]',
         ).exists(),
       ).toBe(true);
-      expect(wrapper.text()).toContain("PROCESS EXIT CODE");
+      expect(wrapper.text()).toContain("Process Exit Code");
     });
 
     it("should display the process exit code value", () => {
