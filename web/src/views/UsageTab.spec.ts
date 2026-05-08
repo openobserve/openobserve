@@ -167,6 +167,8 @@ describe("UsageTab", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-apply mocks that vi.clearAllMocks() strips
+    mockNotify.mockReturnValue(mockNotifyDismiss);
     // Default: API returns populated summary data
     vi.mocked(orgService.get_organization_summary).mockResolvedValue({
       data: mockSummaryData,
@@ -180,29 +182,38 @@ describe("UsageTab", () => {
   // ── initial render ──────────────────────────────────────────────────────
 
   describe("initial render", () => {
-    it("should render without errors", () => {
+    it("should render without errors", async () => {
       wrapper = mountUsageTab();
+      await flushPromises();
       expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should show loading skeleton while summary is being fetched", () => {
-      wrapper = mountUsageTab();
-      expect(
-        wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists(),
-      ).toBe(true);
     });
   });
 
   // ── loading state ───────────────────────────────────────────────────────
 
   describe("loading state", () => {
-    it("should display the HomeViewSkeleton component when isLoadingSummary is true", () => {
-      wrapper = mountUsageTab();
-      const skeleton = wrapper.find(
-        '[data-test="usage-tab-loading-skeleton"]',
+    it("should show loading skeleton while summary is being fetched", async () => {
+      // Defer promise resolution so isLoadingSummary stays true
+      let resolvePromise: (value: any) => void;
+      vi.mocked(orgService.get_organization_summary).mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolvePromise = resolve;
+        }),
       );
-      expect(skeleton.exists()).toBe(true);
-      expect(skeleton.text()).toBe("Loading skeleton");
+
+      wrapper = mountUsageTab();
+      await wrapper.vm.$nextTick();
+
+      expect(
+        wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="usage-tab-loading-skeleton"]').text(),
+      ).toBe("Loading skeleton");
+
+      // Resolve and clean up
+      resolvePromise!({ data: mockSummaryData });
+      await flushPromises();
     });
 
     it("should hide the skeleton once loading completes", async () => {
@@ -439,6 +450,42 @@ describe("UsageTab", () => {
         message: "Error while pulling summary.",
         timeout: 2000,
       });
+    });
+
+    it("should handle null/undefined values in response data", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: {
+          streams: {
+            num_streams: null,
+            total_storage_size: null,
+            total_records: null,
+          },
+          pipelines: null,
+          alerts: null,
+          total_dashboards: null,
+          total_functions: null,
+        },
+      });
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      // Should not crash and should treat nulls as zeros
+      expect((wrapper.vm as any).summary.streams_count).toBe(0);
+      expect((wrapper.vm as any).summary.scheduled_pipelines).toBe(0);
+      expect((wrapper.vm as any).summary.rt_pipelines).toBe(0);
+    });
+
+    it("should handle malformed API response with missing data", async () => {
+      vi.mocked(orgService.get_organization_summary).mockResolvedValueOnce({
+        data: null,
+      } as any);
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      // Should not crash
+      expect(wrapper.exists()).toBe(true);
     });
   });
 });

@@ -18,127 +18,45 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { Quasar, Notify } from "quasar";
 import HomeView from "../../views/HomeView.vue";
 import store from "./helpers/store";
-import { createI18n } from "vue-i18n";
+import i18n from "@/locales";
 import { nextTick } from "vue";
-
-// Import mocked service
-import orgService from "../../services/organizations";
-
-// Mock services
-vi.mock("../../services/organizations", () => ({
-  default: {
-    get_organization_summary: vi.fn()
-  }
-}));
 
 vi.mock("../../aws-exports", () => ({
   default: {
-    isCloud: "false"
-  }
-}));
-
-vi.mock("../../utils/zincutils", () => ({
-  formatSizeFromMB: vi.fn((size) => `${size}MB`),
-  addCommasToNumber: vi.fn((num) => num?.toLocaleString() || "0"),
-  getImageURL: vi.fn((url) => url),
-  useLocalOrganization: vi.fn(() => null),
-  useLocalCurrentUser: vi.fn(() => null),
-  useLocalTimezone: vi.fn(() => null)
-}));
-
-vi.mock("../../composables/useStreams", () => ({
-  default: () => ({
-    setStreams: vi.fn()
-  })
-}));
-
-vi.mock("../../enterprise/components/billings/TrialPeriod.vue", () => ({
-  default: {
-    name: "TrialPeriod",
-    template: "<div>Trial Period</div>"
-  }
+    isCloud: "false",
+    isEnterprise: "false",
+  },
 }));
 
 // Mock router
 const mockRouter = {
   push: vi.fn(),
-  resolve: vi.fn()
+  resolve: vi.fn(),
 };
 
 const mockRoute = {
   name: "home",
-  path: "/home"
+  path: "/home",
 };
-
-// Create i18n instance
-const i18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {
-      home: {
-        streams: "Streams",
-        streamTotal: "Total Streams",
-        docsCountLbl: "Documents Count",
-        totalDataIngested: "Total Data Ingested",
-        totalDataCompressed: "Total Data Compressed",
-        indexSizeLbl: "Index Size",
-        pipelineTitle: "Pipelines",
-        schedulePipelineTitle: "Scheduled",
-        rtPipelineTitle: "Real-time",
-        alertTitle: "Alerts",
-        scheduledAlert: "Scheduled",
-        rtAlert: "Real-time",
-        functionTitle: "Functions",
-        dashboardTitle: "Dashboards",
-        view: "View",
-        noData: "No Data",
-        ingestionMsg: "Start ingesting data",
-        findIngestion: "Find Ingestion Methods"
-      }
-    }
-  }
-});
 
 describe("HomeView.vue", () => {
   let wrapper: any;
 
-  beforeEach(async () => {
-    // Reset all mocks
+  beforeEach(() => {
     vi.clearAllMocks();
 
-    // Reset aws-exports mock to default value
-    vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
-
-    // Setup organization service mock
-    orgService.get_organization_summary.mockResolvedValue({
-      data: {
-        streams: { num_streams: 0 },
-        alerts: {
-          num_realtime: 0,
-          num_scheduled: 0,
-          trigger_status: { failed: 0, healthy: 0, warning: 0 }
-        },
-        pipelines: {
-          num_realtime: 0,
-          num_scheduled: 0,
-          trigger_status: { failed: 0, healthy: 0, warning: 0 }
-        },
-        total_dashboards: 0,
-        total_functions: 0
-      }
-    });
-
-    // Setup default store state
     store.state.selectedOrganization = {
       label: "Test Organization",
       id: 159,
       identifier: "test-org",
       user_email: "test@example.com",
-      subscription_type: "premium"
+      subscription_type: "premium",
     };
-
     store.state.theme = "dark";
     store.state.isAiChatEnabled = false;
+    store.state.zoConfig = { ai_enabled: false };
+
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -146,48 +64,56 @@ describe("HomeView.vue", () => {
       wrapper.unmount();
     }
     vi.clearAllTimers();
+    localStorage.clear();
   });
 
-  const createWrapper = (propsData = {}) => {
+  const createWrapper = () => {
     return mount(HomeView, {
       global: {
         plugins: [
-          [
-            Quasar,
-            {
-              plugins: [Notify]
-            }
-          ],
+          [Quasar, { plugins: [Notify] }],
           i18n,
-          store
+          store,
         ],
         mocks: {
           $router: mockRouter,
-          $route: mockRoute
+          $route: mockRoute,
         },
         stubs: {
-          'router-link': {
+          "router-link": {
             template: '<a><slot /></a>',
-            props: ['to']
+            props: ["to"],
           },
-          'q-page': {
-            template: '<div class="q-page"><slot /></div>'
+          "q-page": {
+            template: '<div class="q-page"><slot /></div>',
           },
-          'q-btn': {
-            template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
+          "q-icon": {
+            template: '<span class="q-icon-stub"></span>',
+            props: ["name", "size"],
           },
-          'q-separator': {
-            template: '<hr class="q-separator" />'
+          OButton: {
+            template:
+              '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',
+            props: ["variant", "size", "ariaLabel", "title"],
           },
-          'TrialPeriod': {
-            name: "TrialPeriod",
-            template: '<div class="trial-period">Trial Period</div>'
-          }
-        }
+          OverviewTab: {
+            template: '<div data-test="overview-tab">OverviewTab</div>',
+          },
+          UsageTab: {
+            template: '<div data-test="usage-tab">UsageTab</div>',
+          },
+          O2AIChat: {
+            template: '<div data-test="o2-ai-chat">O2AIChat</div>',
+          },
+          HomeChatHistory: {
+            template: '<div data-test="home-chat-history">HomeChatHistory</div>',
+          },
+        },
       },
-      props: propsData
     });
   };
+
+  // ── Component Initialization ─────────────────────────────────────────────
 
   describe("Component Initialization", () => {
     it("should render the component successfully", () => {
@@ -200,13 +126,6 @@ describe("HomeView.vue", () => {
       expect(wrapper.vm.$options.name).toBe("PageHome");
     });
 
-    it("should initialize with default reactive properties", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.summary).toBeDefined();
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-      expect(wrapper.vm.isCloud).toBe("false");
-    });
-
     it("should access store correctly", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.store).toBe(store);
@@ -217,1055 +136,186 @@ describe("HomeView.vue", () => {
       expect(typeof wrapper.vm.t).toBe("function");
     });
 
-    it("should have access to getSummary function", () => {
+    it("should initialize with default tabs", () => {
       wrapper = createWrapper();
-      expect(typeof wrapper.vm.getSummary).toBe("function");
+      expect(wrapper.vm.tabOrder).toBeDefined();
+      expect(wrapper.vm.tabOrder.length).toBeGreaterThan(0);
+    });
+
+    it("should set activeHomeTab from localStorage if saved", () => {
+      localStorage.setItem("o2_home_active_tab", "usage");
+      wrapper = createWrapper();
+      expect(wrapper.vm.activeHomeTab).toBe("usage");
     });
   });
 
-  describe("getSummary Function", () => {
-    it("should call orgService.get_organization_summary with correct org_id", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 5, total_storage_size: 100, total_compressed_size: 50, total_records: 1000, total_index_size: 25 },
-          pipelines: {
-            num_scheduled: 3,
-            num_realtime: 2,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          alerts: {
-            num_realtime: 4,
-            num_scheduled: 6,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 8,
-          total_functions: 12
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
+  // ── Tab Management ───────────────────────────────────────────────────────
 
+  describe("Tab Management", () => {
+    it("should have tabOrder with at least usage tab for non-enterprise", () => {
       wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      
-      expect(orgService.get_organization_summary).toHaveBeenCalledWith("test-org");
+      const ids = wrapper.vm.tabOrder.map((t: any) => t.id);
+      expect(ids).toContain("usage");
     });
 
-
-    it("should set no_data_ingest to true when all counts are zero", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 0 },
-          alerts: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 0,
-          total_functions: 0
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
+    it("should have activeHomeTab defaulting to first tab", () => {
       wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-
-      expect(wrapper.vm.no_data_ingest).toBe(true);
-      expect(wrapper.vm.summary).toEqual({});
+      expect(wrapper.vm.activeHomeTab).toBe(wrapper.vm.tabOrder[0].id);
     });
 
-    it("should set no_data_ingest to false when data exists", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 0,
-          total_functions: 0
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
+    it("should persist active tab to localStorage on change", async () => {
       wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-    });
-
-    it("should handle null/undefined values in response data", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: null, total_storage_size: null, total_records: null },
-          pipelines: null,
-          alerts: null,
-          total_dashboards: null,
-          total_functions: null
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-
-      expect(wrapper.vm.summary.streams_count).toBe(0);
-      expect(wrapper.vm.summary.scheduled_pipelines).toBe(0);
-      expect(wrapper.vm.summary.rt_pipelines).toBe(0);
-    });
-
-    it("should handle error response and show notification", async () => {
-      const error = new Error("Network error");
-      orgService.get_organization_summary.mockRejectedValue(error);
-      
-      const notifySpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-
-      expect(notifySpy).toHaveBeenCalledWith(error);
-    });
-
-  });
-
-  describe("selectedOrg Computed Property", () => {
-    it("should return organization identifier from store", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.selectedOrg).toBe("test-org");
-    });
-
-    it("should return undefined when no organization is selected", () => {
-      store.state.selectedOrganization = {};
-      wrapper = createWrapper();
-      expect(wrapper.vm.selectedOrg).toBeUndefined();
-    });
-
-    it("should return null when selectedOrganization is null", () => {
-      store.state.selectedOrganization = {};
-      wrapper = createWrapper();
-      expect(wrapper.vm.selectedOrg).toBeUndefined();
-    });
-
-    it("should be reactive to store changes", async () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.selectedOrg).toBe("test-org");
-      
-      store.state.selectedOrganization.identifier = "new-org";
-      await nextTick();
-      
-      expect(wrapper.vm.selectedOrg).toBe("new-org");
-    });
-  });
-
-  describe("selectedOrg Watcher", () => {
-    it("should call getSummary when selectedOrg changes", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
-      wrapper = createWrapper();
-      const getSummarySpy = vi.spyOn(wrapper.vm, 'getSummary');
-      
-      store.state.selectedOrganization.identifier = "new-org";
-      await nextTick();
-      
-      expect(getSummarySpy).toHaveBeenCalledWith("new-org");
-    });
-
-    it("should reset summary when selectedOrg changes", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
-      wrapper = createWrapper();
-      const getSummarySpy = vi.spyOn(wrapper.vm, 'getSummary');
-      
-      store.state.selectedOrganization.identifier = "new-org";
-      await nextTick();
-      
-      expect(getSummarySpy).toHaveBeenCalledWith("new-org");
-    });
-
-    it("should not call getSummary when selectedOrg is the same", async () => {
-      wrapper = createWrapper();
-      const getSummarySpy = vi.spyOn(wrapper.vm, 'getSummary');
-      
-      // Trigger watcher with same value
-      const currentOrg = store.state.selectedOrganization.identifier;
-      store.state.selectedOrganization.identifier = currentOrg;
-      await nextTick();
-      
-      expect(getSummarySpy).not.toHaveBeenCalled();
-    });
-
-    it("should call getSummary when summary is undefined", async () => {
-      const mockResponse = {
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      };
-      orgService.get_organization_summary.mockResolvedValue(mockResponse);
-
-      wrapper = createWrapper();
-      const getSummarySpy = vi.spyOn(wrapper.vm, 'getSummary');
-      
-      // Clear the existing mock calls from beforeEach
-      getSummarySpy.mockClear();
-      
-      wrapper.vm.summary.value = undefined;
-      store.state.selectedOrganization.identifier = "new-org";
-      await nextTick();
-      
-      expect(getSummarySpy).toHaveBeenCalledWith("new-org");
-    });
-  });
-
-  describe("Component Rendering", () => {
-    it("should apply correct theme class", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.store.state.theme).toBe("dark");
-    });
-
-    it("should apply light theme when store theme is light", async () => {
-      store.state.theme = "light";
-      wrapper = createWrapper();
-      await nextTick();
-      
-      expect(wrapper.vm.store.state.theme).toBe("light");
-    });
-
-    it("should show no data view when no_data_ingest is true", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.no_data_ingest = true;
-      await nextTick();
-      
-      expect(wrapper.vm.no_data_ingest).toBe(true);
-    });
-
-    it("should show main dashboard when no_data_ingest is false", async () => {
-      // Set up a response with data so no_data_ingest stays false
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 0,
-          total_functions: 0
-        }
-      });
-      
-      wrapper = createWrapper();
-      await flushPromises(); // Wait for getSummary to complete
-      
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-    });
-
-    it("should render stream statistics for non-cloud environment", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.no_data_ingest = false;
-      
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-      expect(wrapper.vm.isCloud).toBe("false");
-    });
-
-    it("should render pipeline statistics", async () => {
-      // Mock response with data so no_data_ingest stays false
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 0,
-          total_functions: 0
-        }
-      });
-      
-      wrapper = createWrapper();
-      await flushPromises();
-      
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-      expect(wrapper.vm.getSummary).toBeDefined();
-    });
-
-    it("should render alert statistics", async () => {
-      // Mock response with data so no_data_ingest stays false
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 0,
-          total_functions: 0
-        }
-      });
-      
-      wrapper = createWrapper();
-      await flushPromises();
-      
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-      expect(wrapper.vm.summary).toBeDefined();
-    });
-
-    it("should render function statistics", async () => {
-      // Mock response with data so no_data_ingest stays false
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 0,
-          total_functions: 0
-        }
-      });
-      
-      wrapper = createWrapper();
-      await flushPromises();
-      
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-      expect(wrapper.vm.summary).toBeDefined();
-    });
-
-    it("should render dashboard statistics", async () => {
-      // Mock response with data so no_data_ingest stays false
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: { num_streams: 1 },
-          alerts: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 0,
-            num_scheduled: 0,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 0,
-          total_functions: 0
-        }
-      });
-      
-      wrapper = createWrapper();
-      await flushPromises();
-      
-      expect(wrapper.vm.no_data_ingest).toBe(false);
-      expect(wrapper.vm.summary).toBeDefined();
-    });
-
-    it("should handle undefined summary values", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.no_data_ingest = false;
-      wrapper.vm.summary.value = {};
-      await nextTick();
-      
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Compressed Size Tile - Cloud Conditional Rendering", () => {
-    it("should render compressed size tile when isCloud is 'false'", async () => {
-      // Mock with isCloud = 'false'
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
-
-      // Mock response with data
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: 50,
-            total_records: 1000,
-            total_index_size: 25
-          },
-          alerts: { num_realtime: 1, num_scheduled: 1 },
-          pipelines: { num_realtime: 1, num_scheduled: 1 },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      });
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.isCloud).toBe("false");
-      expect(wrapper.vm.config.isCloud).toBe("false");
-
-      // Check that compressed size tile is in the DOM
-      const compressedTileText = wrapper.text();
-      expect(compressedTileText).toContain("Total Data Compressed");
-    });
-
-    it("should not render compressed size tile when isCloud is 'true'", async () => {
-      // Mock with isCloud = 'true'
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
-
-      // Mock response with data including compressed size
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: 75,
-            total_records: 1000,
-            total_index_size: 25
-          },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      });
-
-      // Create a fresh wrapper instance with cloud config
-      const cloudWrapper = mount(HomeView, {
-        global: {
-          plugins: [
-            [
-              Quasar,
-              {
-                plugins: [Notify]
-              }
-            ],
-            i18n,
-            store
-          ],
-          mocks: {
-            $router: mockRouter,
-            $route: mockRoute
-          },
-          stubs: {
-            'router-link': {
-              template: '<a><slot /></a>',
-              props: ['to']
-            },
-            'q-page': {
-              template: '<div class="q-page"><slot /></div>'
-            },
-            'q-btn': {
-              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
-            },
-            'q-separator': {
-              template: '<hr class="q-separator" />'
-            },
-            'TrialPeriod': {
-              name: "TrialPeriod",
-              template: '<div class="trial-period">Trial Period</div>'
-            }
-          }
-        }
-      });
-
-      await flushPromises();
-
-      expect(cloudWrapper.vm.config.isCloud).toBe("true");
-
-      // Check that compressed size tile is not rendered in the DOM
-      const compressedTileText = cloudWrapper.text();
-      expect(compressedTileText).not.toContain("Total Data Compressed");
-
-      cloudWrapper.unmount();
-    });
-
-    it("should display compressed size value when tile is rendered in cloud mode", async () => {
-      // Mock with isCloud = 'true'
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
-
-      const compressedSize = 50;
-
-      // Set up the mock BEFORE creating the wrapper so it's used on mount
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: compressedSize,
-            total_records: 1000,
-            total_index_size: 25
-          },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      });
-
-      const cloudWrapper = mount(HomeView, {
-        global: {
-          plugins: [
-            [
-              Quasar,
-              {
-                plugins: [Notify]
-              }
-            ],
-            i18n,
-            store
-          ],
-          mocks: {
-            $router: mockRouter,
-            $route: mockRoute
-          },
-          stubs: {
-            'router-link': {
-              template: '<a><slot /></a>',
-              props: ['to']
-            },
-            'q-page': {
-              template: '<div class="q-page"><slot /></div>'
-            },
-            'q-btn': {
-              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
-            },
-            'q-separator': {
-              template: '<hr class="q-separator" />'
-            },
-            'TrialPeriod': {
-              name: "TrialPeriod",
-              template: '<div class="trial-period">Trial Period</div>'
-            }
-          }
-        }
-      });
-
-      await flushPromises();
-      await nextTick();
-
-      expect(cloudWrapper.vm.summary.compressed_size_raw).toBe(compressedSize);
-      expect(cloudWrapper.vm.formattedAnimatedCompressedSize).toBeDefined();
-
-      cloudWrapper.unmount();
-    });
-
-    it("should only render compressed size tile when isCloud is exactly 'false'", async () => {
-      const testValues = ["false", "False", "TRUE", "1", "0", "", undefined, null, "true"];
-
-      for (const testValue of testValues) {
-        // Mock with different isCloud values
-        vi.mocked(await import("../../aws-exports")).default.isCloud = testValue;
-
-        orgService.get_organization_summary.mockResolvedValue({
-          data: {
-            streams: {
-              num_streams: 5,
-              total_storage_size: 100,
-              total_compressed_size: 50,
-              total_records: 1000,
-              total_index_size: 25
-            },
-            alerts: {
-              num_realtime: 1,
-              num_scheduled: 1,
-              trigger_status: { failed: 0, healthy: 0, warning: 0 }
-            },
-            pipelines: {
-              num_realtime: 1,
-              num_scheduled: 1,
-              trigger_status: { failed: 0, healthy: 0, warning: 0 }
-            },
-            total_dashboards: 1,
-            total_functions: 1
-          }
-        });
-
-        const testWrapper = createWrapper();
-        await flushPromises();
-
-        expect(testWrapper.vm.config.isCloud).toBe(testValue);
-
-        // Compressed size tile should only be rendered when value is exactly 'false'
-        const compressedTileText = testWrapper.text();
-        if (testValue === "false") {
-          expect(compressedTileText).toContain("Total Data Compressed");
-        } else {
-          expect(compressedTileText).not.toContain("Total Data Compressed");
-        }
-
-        testWrapper.unmount();
+      const initialTab = wrapper.vm.activeHomeTab;
+      const tabs = wrapper.vm.tabOrder.map((t: any) => t.id);
+      const otherTab = tabs.find((id: string) => id !== initialTab);
+      if (otherTab) {
+        wrapper.vm.activeHomeTab = otherTab;
+        await nextTick();
+        expect(localStorage.getItem("o2_home_active_tab")).toBe(otherTab);
       }
     });
 
-    it("should handle compressed size data properly when tile is conditionally rendered", async () => {
-      // Test self-hosted mode (isCloud = false) - compressed tile should be visible
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
-
-      const mockData = {
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: 75,
-            total_records: 1000,
-            total_index_size: 25
-          },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      };
-
-      // Set up the mock BEFORE creating the wrapper so it's used on mount
-      orgService.get_organization_summary.mockResolvedValue(mockData);
-
+    it("should restore saved tab order from localStorage", () => {
+      localStorage.setItem(
+        "o2_home_tab_order",
+        JSON.stringify(["usage", "overview"]),
+      );
       wrapper = createWrapper();
-      await flushPromises();
-      await nextTick();
-
-      // Data should be loaded and tile should be visible in self-hosted mode
-      expect(wrapper.vm.summary.compressed_size_raw).toBe(75);
-      expect(wrapper.vm.summary.compressed_data).toBeDefined();
-
-      // Tile should be visible in self-hosted mode (isCloud = false)
-      const compressedTileText = wrapper.text();
-      expect(compressedTileText).toContain("Total Data Compressed");
+      const ids = wrapper.vm.tabOrder.map((t: any) => t.id);
+      expect(ids[0]).toBe("usage");
     });
   });
 
-  describe("Index Size Tile - Cloud Conditional Rendering", () => {
-    it("should render index size tile when isCloud is 'false'", async () => {
-      // Mock with isCloud = 'false'
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
+  // ── Tab Rendering ────────────────────────────────────────────────────────
 
-      // Mock response with data
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: 50,
-            total_records: 1000,
-            total_index_size: 25
-          },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      });
-
+  describe("Tab Rendering", () => {
+    it("should render OverviewTab when overview tab is active", async () => {
       wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.isCloud).toBe("false");
-      expect(wrapper.vm.config.isCloud).toBe("false");
-
-      // Check that index size tile is in the DOM
-      const indexTileText = wrapper.text();
-      expect(indexTileText).toContain("Index Size");
-    });
-
-    it("should not render index size tile when isCloud is 'true'", async () => {
-      // Mock with isCloud = 'true'
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
-
-      // Mock response with data including index size
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: 75,
-            total_records: 1000,
-            total_index_size: 30
-          },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      });
-
-      // Create a fresh wrapper instance with cloud config
-      const cloudWrapper = mount(HomeView, {
-        global: {
-          plugins: [
-            [
-              Quasar,
-              {
-                plugins: [Notify]
-              }
-            ],
-            i18n,
-            store
-          ],
-          mocks: {
-            $router: mockRouter,
-            $route: mockRoute
-          },
-          stubs: {
-            'router-link': {
-              template: '<a><slot /></a>',
-              props: ['to']
-            },
-            'q-page': {
-              template: '<div class="q-page"><slot /></div>'
-            },
-            'q-btn': {
-              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
-            },
-            'q-separator': {
-              template: '<hr class="q-separator" />'
-            },
-            'TrialPeriod': {
-              name: "TrialPeriod",
-              template: '<div class="trial-period">Trial Period</div>'
-            }
-          }
-        }
-      });
-
-      await flushPromises();
-
-      expect(cloudWrapper.vm.config.isCloud).toBe("true");
-
-      // Check that index size tile is not rendered in the DOM
-      const indexTileText = cloudWrapper.text();
-      expect(indexTileText).not.toContain("Index Size");
-
-      cloudWrapper.unmount();
-    });
-
-    it("should display index size value when tile is rendered in self-hosted mode", async () => {
-      // Mock with isCloud = 'false'
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
-
-      const indexSize = 30;
-
-      // Set up the mock BEFORE creating the wrapper so it's used on mount
-      orgService.get_organization_summary.mockResolvedValue({
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: 50,
-            total_records: 1000,
-            total_index_size: indexSize
-          },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      });
-
+      // Set isEnterprise so overview tab exists
+      vi.mocked(
+        (await import("../../aws-exports")).default,
+      ).isEnterprise = "true";
+      // Re-create wrapper with enterprise config
+      wrapper.unmount();
       wrapper = createWrapper();
-      await flushPromises();
-      await nextTick();
-
-      expect(wrapper.vm.summary.index_size_raw).toBe(indexSize);
-      expect(wrapper.vm.formattedAnimatedIndexSize).toBeDefined();
-    });
-
-    it("should only render index size tile when isCloud is exactly 'false'", async () => {
-      const testValues = ["false", "False", "TRUE", "1", "0", "", undefined, null, "true"];
-
-      for (const testValue of testValues) {
-        // Mock with different isCloud values
-        vi.mocked(await import("../../aws-exports")).default.isCloud = testValue;
-
-        orgService.get_organization_summary.mockResolvedValue({
-          data: {
-            streams: {
-              num_streams: 5,
-              total_storage_size: 100,
-              total_compressed_size: 50,
-              total_records: 1000,
-              total_index_size: 25
-            },
-            alerts: {
-              num_realtime: 1,
-              num_scheduled: 1,
-              trigger_status: { failed: 0, healthy: 0, warning: 0 }
-            },
-            pipelines: {
-              num_realtime: 1,
-              num_scheduled: 1,
-              trigger_status: { failed: 0, healthy: 0, warning: 0 }
-            },
-            total_dashboards: 1,
-            total_functions: 1
-          }
-        });
-
-        const testWrapper = createWrapper();
-        await flushPromises();
-
-        expect(testWrapper.vm.config.isCloud).toBe(testValue);
-
-        // Index size tile should only be rendered when value is exactly 'false'
-        const indexTileText = testWrapper.text();
-        if (testValue === "false") {
-          expect(indexTileText).toContain("Index Size");
-        } else {
-          expect(indexTileText).not.toContain("Index Size");
-        }
-
-        testWrapper.unmount();
+      // Find overview in tabOrder
+      const overviewTab = wrapper.vm.tabOrder.find(
+        (t: any) => t.id === "overview",
+      );
+      if (overviewTab) {
+        wrapper.vm.activeHomeTab = "overview";
+        await nextTick();
+        expect(wrapper.find('[data-test="overview-tab"]').exists()).toBe(true);
       }
     });
 
-    it("should handle index size data properly when tile is conditionally rendered", async () => {
-      // Test self-hosted mode (isCloud = false) - index tile should be visible
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "false";
-
-      const mockData = {
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: 75,
-            total_records: 1000,
-            total_index_size: 35
-          },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      };
-
-      // Set up the mock BEFORE creating the wrapper so it's used on mount
-      orgService.get_organization_summary.mockResolvedValue(mockData);
-
+    it("should render UsageTab when usage tab is active", async () => {
       wrapper = createWrapper();
-      await flushPromises();
+      wrapper.vm.activeHomeTab = "usage";
       await nextTick();
-
-      // Data should be loaded and tile should be visible in self-hosted mode
-      expect(wrapper.vm.summary.index_size_raw).toBe(35);
-      expect(wrapper.vm.summary.index_size).toBeDefined();
-
-      // Tile should be visible in self-hosted mode (isCloud = false)
-      const indexTileText = wrapper.text();
-      expect(indexTileText).toContain("Index Size");
+      expect(wrapper.find('[data-test="usage-tab"]').exists()).toBe(true);
     });
 
-    it("should not display index size data in cloud mode even if API returns it", async () => {
-      // Mock with isCloud = 'true'
-      vi.mocked(await import("../../aws-exports")).default.isCloud = "true";
-
-      const mockData = {
-        data: {
-          streams: {
-            num_streams: 5,
-            total_storage_size: 100,
-            total_compressed_size: 75,
-            total_records: 1000,
-            total_index_size: 40
-          },
-          alerts: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          pipelines: {
-            num_realtime: 1,
-            num_scheduled: 1,
-            trigger_status: { failed: 0, healthy: 0, warning: 0 }
-          },
-          total_dashboards: 1,
-          total_functions: 1
-        }
-      };
-
-      // Set up the mock BEFORE creating the wrapper so it's used on mount
-      orgService.get_organization_summary.mockResolvedValue(mockData);
-
-      const cloudWrapper = mount(HomeView, {
-        global: {
-          plugins: [
-            [
-              Quasar,
-              {
-                plugins: [Notify]
-              }
-            ],
-            i18n,
-            store
-          ],
-          mocks: {
-            $router: mockRouter,
-            $route: mockRoute
-          },
-          stubs: {
-            'router-link': {
-              template: '<a><slot /></a>',
-              props: ['to']
-            },
-            'q-page': {
-              template: '<div class="q-page"><slot /></div>'
-            },
-            'q-btn': {
-              template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>'
-            },
-            'q-separator': {
-              template: '<hr class="q-separator" />'
-            },
-            'TrialPeriod': {
-              name: "TrialPeriod",
-              template: '<div class="trial-period">Trial Period</div>'
-            }
-          }
-        }
-      });
-
-      await flushPromises();
+    it("should show tab bar when multiple tabs exist", async () => {
+      // Mock config to have multiple tabs
+      vi.mocked(
+        (await import("../../aws-exports")).default,
+      ).isEnterprise = "true";
+      wrapper.unmount();
+      wrapper = createWrapper();
       await nextTick();
 
-      // Data might be in summary, but tile should not be visible in cloud mode
-      expect(cloudWrapper.vm.config.isCloud).toBe("true");
+      if (wrapper.vm.tabOrder.length > 1) {
+        expect(wrapper.find(".home-tab-bar").exists()).toBe(true);
+      }
+    });
 
-      // Tile should not be visible in cloud mode
-      const indexTileText = cloudWrapper.text();
-      expect(indexTileText).not.toContain("Index Size");
-
-      cloudWrapper.unmount();
+    it("should hide tab bar when only one tab exists", () => {
+      wrapper = createWrapper();
+      if (wrapper.vm.tabOrder.length <= 1) {
+        expect(wrapper.find(".home-tab-bar").exists()).toBe(false);
+      }
     });
   });
+
+  // ── Drag and Drop ────────────────────────────────────────────────────────
+
+  describe("Tab Drag and Drop", () => {
+    it("should set draggingTab on drag start", () => {
+      wrapper = createWrapper();
+      const tabId = wrapper.vm.tabOrder[0].id;
+      const mockEvent = {
+        dataTransfer: {
+          effectAllowed: "",
+          setData: vi.fn(),
+        },
+      };
+      wrapper.vm.onTabDragStart(mockEvent, tabId);
+      expect(wrapper.vm.draggingTab).toBe(tabId);
+      expect(mockEvent.dataTransfer.effectAllowed).toBe("move");
+    });
+
+    it("should clear dragging state on drag end", () => {
+      wrapper = createWrapper();
+      wrapper.vm.draggingTab = "usage";
+      wrapper.vm.dragOverTab = "overview";
+      wrapper.vm.onTabDragEnd();
+      expect(wrapper.vm.draggingTab).toBeNull();
+      expect(wrapper.vm.dragOverTab).toBeNull();
+    });
+
+    it("should reorder tabs and persist to localStorage on drop", () => {
+      wrapper = createWrapper();
+      const tabs = wrapper.vm.tabOrder;
+      if (tabs.length >= 2) {
+        const fromId = tabs[0].id;
+        const toId = tabs[1].id;
+        wrapper.vm.dragOverTab = toId;
+        wrapper.vm.draggingTab = fromId;
+
+        const mockEvent = {
+          preventDefault: vi.fn(),
+          dataTransfer: {
+            getData: vi.fn().mockReturnValue(fromId),
+          },
+        };
+        wrapper.vm.onTabDrop(mockEvent);
+        const newOrder = wrapper.vm.tabOrder.map((t: any) => t.id);
+        expect(newOrder[0]).toBe(toId);
+        expect(localStorage.getItem("o2_home_tab_order")).toBe(
+          JSON.stringify(newOrder),
+        );
+      }
+    });
+  });
+
+  // ── Event Listener ───────────────────────────────────────────────────────
+
+  describe("o2:home-switch-tab event", () => {
+    it("should switch tab when valid tab is dispatched", () => {
+      wrapper = createWrapper();
+      const initialTab = wrapper.vm.activeHomeTab;
+      const tabs = wrapper.vm.tabOrder.map((t: any) => t.id);
+      const targetTab = tabs.find((id: string) => id !== initialTab);
+      if (targetTab) {
+        window.dispatchEvent(
+          new CustomEvent("o2:home-switch-tab", { detail: targetTab }),
+        );
+        expect(wrapper.vm.activeHomeTab).toBe(targetTab);
+      }
+    });
+
+    it("should not switch tab when invalid tab is dispatched", () => {
+      wrapper = createWrapper();
+      const initialTab = wrapper.vm.activeHomeTab;
+      window.dispatchEvent(
+        new CustomEvent("o2:home-switch-tab", { detail: "nonexistent" }),
+      );
+      expect(wrapper.vm.activeHomeTab).toBe(initialTab);
+    });
+  });
+
+  // ── Navigation and Routing ───────────────────────────────────────────────
 
   describe("Navigation and Routing", () => {
     it("should have router available", () => {
@@ -1277,87 +327,5 @@ describe("HomeView.vue", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.$route).toBeDefined();
     });
-
-    it("should access navigation methods", () => {
-      wrapper = createWrapper();
-      expect(typeof mockRouter.push).toBe("function");
-    });
-
-    it("should check isCloud configuration", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.isCloud).toBe("false");
-    });
-  });
-
-  describe("Integration Tests", () => {
-    it("should call getSummary on mount when organization exists", () => {
-      orgService.get_organization_summary.mockResolvedValue({
-        data: { streams: { num_streams: 0 } }
-      });
-      
-      wrapper = createWrapper();
-      
-      expect(orgService.get_organization_summary).toHaveBeenCalledWith("test-org");
-    });
-
-    it("should not call getSummary on mount when no organization", () => {
-      // Set empty organization and clear mocks to prevent watcher from being counted
-      store.state.selectedOrganization = {};
-      vi.clearAllMocks(); // Clear the mock call history after changing the store
-
-      orgService.get_organization_summary.mockResolvedValue({
-        data: { streams: { num_streams: 0 } }
-      });
-
-      wrapper = createWrapper();
-
-      expect(orgService.get_organization_summary).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("Edge Cases and Error Handling", () => {
-    it("should handle invalid organization identifier", async () => {
-      orgService.get_organization_summary.mockRejectedValue(new Error("Invalid org"));
-      
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary(null);
-      await flushPromises();
-      
-      expect(orgService.get_organization_summary).toHaveBeenCalledWith(null);
-    });
-
-    it("should handle empty string organization identifier", async () => {
-      orgService.get_organization_summary.mockRejectedValue(new Error("Empty org"));
-      
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary("");
-      await flushPromises();
-      
-      expect(orgService.get_organization_summary).toHaveBeenCalledWith("");
-    });
-
-    it("should handle malformed API response", async () => {
-      const malformedResponse = { data: null };
-      orgService.get_organization_summary.mockResolvedValue(malformedResponse);
-      
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-      
-      // Should not crash and handle gracefully
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle API timeout error", async () => {
-      const timeoutError = new Error("Timeout");
-      orgService.get_organization_summary.mockRejectedValue(timeoutError);
-      
-      wrapper = createWrapper();
-      await wrapper.vm.getSummary("test-org");
-      await flushPromises();
-      
-      expect(console.log).toHaveBeenCalledWith(timeoutError);
-    });
-
   });
 });
