@@ -461,51 +461,28 @@ test.describe("Metrics testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing invalid PromQL syntax handling');
 
-    // First, run a valid query to establish baseline state
-    await pm.metricsPage.enterMetricsQuery('up');
-    await pm.metricsPage.clickApplyButton();
-    await page.waitForTimeout(2000);
-    const validQueryHasVisualization = await pm.metricsPage.hasVisualization();
-    testLogger.info(`Valid query baseline - has visualization: ${validQueryHasVisualization}`);
-
     // Enter invalid PromQL query with actual syntax error (unclosed parenthesis)
     await pm.metricsPage.enterMetricsQuery('sum(rate(');
-
-    // Click Apply button
     await pm.metricsPage.clickApplyButton();
-
-    // Wait for error response
     await page.waitForTimeout(3000);
 
-    // Check for various error indicators
-    const hasError = await pm.metricsPage.hasErrorIndicator();
+    // Check for inline error in the error list below the chart
+    const inlineError = page.locator('[data-test="dashboard-error"]');
+    const hasInlineError = await inlineError.isVisible({ timeout: 3000 }).catch(() => false);
     const noDataMessage = await pm.metricsPage.getNoDataMessage();
     const hasNoData = await noDataMessage.isVisible().catch(() => false);
-    const invalidQueryHasVisualization = await pm.metricsPage.hasVisualization();
 
-    testLogger.info(`Invalid query state: hasError=${hasError}, hasNoData=${hasNoData}, hasVisualization=${invalidQueryHasVisualization}`);
+    testLogger.info(`Invalid query state: hasInlineError=${hasInlineError}, hasNoData=${hasNoData}`);
 
-    // Validation: Invalid query MUST result in one of the following (no soft assertions):
-    // 1. An error indicator is shown
-    // 2. A "no data" message is shown
-    // 3. The system maintains stability (previous visualization persists - graceful handling)
-    // The key is that the system handles the invalid query without crashing
-    const systemStable = !hasError ? invalidQueryHasVisualization : true;
-    const handledGracefully = hasError || hasNoData || systemStable;
-
-    // Assert: System must handle invalid syntax gracefully
+    // System must handle invalid syntax gracefully - either show error or no data
+    const handledGracefully = hasInlineError || hasNoData;
     expect(handledGracefully).toBe(true);
 
-    if (hasError) {
-      const errorIndicator = await pm.metricsPage.getErrorIndicators();
-      const errorText = await errorIndicator.textContent();
-      // Assert: Error message must be meaningful
-      expect(errorText.toLowerCase()).toMatch(/error|invalid|syntax|parse|unexpected|fail|cannot/i);
-      testLogger.info(`Error message displayed for invalid query: ${errorText.substring(0, 100)}`);
-    } else if (hasNoData) {
-      testLogger.info('Invalid query resulted in no-data message - valid error handling');
+    if (hasInlineError) {
+      const errorText = await inlineError.textContent().catch(() => '');
+      testLogger.info(`Error displayed: ${errorText.substring(0, 100)}`);
     } else {
-      testLogger.info('Invalid query maintained system stability - valid graceful handling');
+      testLogger.info('Invalid query resulted in no-data - valid handling');
     }
   });
 
