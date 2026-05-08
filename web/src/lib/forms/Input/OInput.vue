@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
-import { computed, ref, useId } from "vue";
+import { computed, onBeforeUnmount, ref, useId } from "vue";
 
 const props = withDefaults(defineProps<InputProps>(), {
   type: "text",
@@ -23,6 +23,7 @@ defineSlots<InputSlots>();
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 const inputRef = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
+const debounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 
 // ── Validation ─────────────────────────────────────────────────────────────
 const ruleError = ref<string | null>(null);
@@ -52,10 +53,7 @@ function handleBlur(event: FocusEvent) {
 // External errorMessage / error prop always wins; internal rule error is secondary.
 const effectiveError = computed(
   () =>
-    props.errorMessage ||
-    (props.error ? " " : null) ||
-    ruleError.value ||
-    null,
+    props.errorMessage || (props.error ? " " : null) || ruleError.value || null,
 );
 const hasError = computed(() => !!effectiveError.value);
 
@@ -86,16 +84,32 @@ const charCount = computed(() => {
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement | HTMLTextAreaElement;
   const val = target.value;
-  if (touched.value) runRules(val);
-  emit("update:modelValue", val);
+
+  const emitValue = () => {
+    if (touched.value) runRules(val);
+    emit("update:modelValue", val);
+  };
+
+  if ((props.debounce ?? 0) > 0) {
+    if (debounceTimer.value) clearTimeout(debounceTimer.value);
+    debounceTimer.value = setTimeout(emitValue, props.debounce);
+    return;
+  }
+
+  emitValue();
 }
 
 function handleClear() {
+  if (debounceTimer.value) clearTimeout(debounceTimer.value);
   if (touched.value) runRules("");
   emit("update:modelValue", "");
   emit("clear");
   inputRef.value?.focus();
 }
+
+onBeforeUnmount(() => {
+  if (debounceTimer.value) clearTimeout(debounceTimer.value);
+});
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {

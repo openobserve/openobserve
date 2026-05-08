@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import OInput from "./OInput.vue";
 
@@ -81,5 +81,21 @@ describe("OInput", () => {
       props: { maxlength: 20, modelValue: "hello" },
     });
     expect(wrapper.text()).toContain("5/20");
+  });
+
+  it("emits debounced update when debounce is set", async () => {
+    vi.useFakeTimers();
+
+    wrapper = mount(OInput, {
+      props: { modelValue: "", debounce: 200 },
+    });
+
+    await wrapper.find("input").setValue("hello");
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+
+    vi.advanceTimersByTime(200);
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("hello");
+
+    vi.useRealTimers();
   });
 });

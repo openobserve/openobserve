@@ -1,6 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { InjectionKey } from "vue";
+
 export type RadioSize = "sm" | "md";
+
+export const RADIO_VALUE_MAP_KEY: InjectionKey<
+  Map<string, string | number | boolean>
+> = Symbol("RadioValueMap");
 
 export interface RadioGroupProps {
   /** Currently selected value */

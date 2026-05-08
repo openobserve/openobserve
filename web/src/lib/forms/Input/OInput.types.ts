@@ -49,6 +49,8 @@ export interface InputProps {
   disabled?: boolean;
   /** Focuses the input on mount */
   autofocus?: boolean;
+  /** Debounce delay in milliseconds before emitting model updates */
+  debounce?: number;
   /** Maximum character length — shows a counter when set */
   maxlength?: number;
   /** Rows for textarea type */
