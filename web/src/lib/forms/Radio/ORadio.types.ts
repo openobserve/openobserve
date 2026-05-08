@@ -44,10 +44,6 @@ export interface RadioProps {
   label?: string;
   /** Control size */
   size?: RadioSize;
-  /** q-radio compatibility for tighter spacing */
-  dense?: boolean;
-  /** q-radio compatibility prop; visual tokens are handled internally */
-  color?: string;
   /** Prevents interaction */
   disabled?: boolean;
   /** HTML id — forwarded for label association */

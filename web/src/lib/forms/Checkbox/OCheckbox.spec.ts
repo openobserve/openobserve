@@ -82,8 +82,4 @@ describe("OCheckbox", () => {
     expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("Y");
   });
 
-  it("applies dense gap class", () => {
-    wrapper = mount(OCheckbox, { props: { dense: true } });
-    expect(wrapper.find("label").classes()).toContain("tw:gap-1");
-  });
 });

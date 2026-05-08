@@ -48,9 +48,6 @@ const labelSize: Record<NonNullable<ToggleProps["size"]>, string> = {
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
-const effectiveLabelPlacement = computed(() =>
-  props.leftLabel ? "start" : props.labelPlacement,
-);
 const thumbIcon = computed(() => {
   if (props.modelValue) {
     return props.checkedIcon ?? props.icon;
@@ -62,9 +59,8 @@ const thumbIcon = computed(() => {
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center',
-      dense ? 'tw:gap-1' : 'tw:gap-2',
-      effectiveLabelPlacement === 'start'
+      'tw:inline-flex tw:items-center tw:gap-2',
+      labelPlacement === 'start'
         ? 'tw:flex-row-reverse'
         : 'tw:flex-row',
       disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
