@@ -20,16 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height tw:h-full"
     data-test="trace-details-sidebar-no-error"
   >
-    No error present for this span
+    {{ t("traces.noErrorPresent") }}
   </div>
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
-    :style="{
-      background: 'var(--o2-status-error-bg)',
-      borderColor: 'var(--o2-status-error-text)',
-    }"
+    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid tw:bg-[var(--o2-status-error-bg)] tw:border-[var(--o2-status-error-text)]"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="tw:flex-col tw:items-center tw:gap-1">
@@ -58,19 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- DB Response Status Code -->
   <div
-    v-else-if="hasSpanError && spanDbResponseStatusCode"
-    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
-    :style="{
-      background: 'var(--o2-status-error-bg)',
-      borderColor: 'var(--o2-status-error-text)',
-    }"
+    v-if="hasSpanError && spanDbResponseStatusCode"
+    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid tw:bg-[var(--o2-status-error-bg)] tw:border-[var(--o2-status-error-text)]"
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="tw:flex-col tw:items-center tw:gap-1">
       <div
         class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
       >
-        DB RESPONSE STATUS CODE
+        DB Response Status Code
       </div>
       <div class="tw:flex tw:items-center tw:pl-[0.5rem]">
         <span
@@ -86,19 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Process Exit Code -->
   <div
-    v-else-if="hasSpanError && spanProcessExitCode"
-    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
-    :style="{
-      background: 'var(--o2-status-error-bg)',
-      borderColor: 'var(--o2-status-error-text)',
-    }"
+    v-if="hasSpanError && spanProcessExitCode"
+    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid tw:bg-[var(--o2-status-error-bg)] tw:border-[var(--o2-status-error-text)]"
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="tw:flex-col tw:items-center tw:gap-1">
       <div
         class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
       >
-        PROCESS EXIT CODE
+        Process Exit Code
       </div>
       <div class="tw:flex tw:items-center tw:pl-[0.5rem]">
         <span
@@ -117,11 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="
       hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)
     "
-    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid"
-    :style="{
-      background: 'var(--o2-status-error-bg)',
-      borderColor: 'var(--o2-status-error-text)',
-    }"
+    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid tw:bg-[var(--o2-status-error-bg)] tw:border-[var(--o2-status-error-text)]"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="tw:flex tw:items-center tw:gap-2 tw:mb-[0.25rem]">
@@ -153,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:text-[0.9rem] tw:pt-[0.325rem]! tw:font-semibold tw:pb-[0.325rem] tw:text-[var(--o2-text-secondary)]!"
     >
-      Exceptions ({{ hasExceptionEvents.length }})
+      {{ t("traces.exceptionsWithCount", { count: hasExceptionEvents.length }) }}
     </div>
     <q-table
       data-test="trace-details-sidebar-exceptions-table"
@@ -216,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="exception-field">
                 <span
                   class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                  >Type:</span
+                  >{{ t("traces.typeLabel") }}</span
                 >
                 <span class="exception-type">{{
                   props.row["exception.type"]
@@ -227,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="exception-field">
                 <span
                   class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                  >Message:</span
+                  >{{ t("traces.messageLabel") }}</span
                 >
                 <div class="exception-message">
                   {{ formatExceptionMessage(props.row["exception.message"]) }}
@@ -238,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="exception-field">
                 <span
                   class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                  >Escaped:</span
+                  >{{ t("traces.escapedLabel") }}</span
                 >
                 <span class="exception-value">{{
                   props.row["exception.escaped"]
@@ -250,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="stacktrace-header">
                   <span
                     class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                    >Stacktrace:</span
+                    >{{ t("traces.stacktraceLabel") }}</span
                   >
                   <q-btn
                     v-if="
@@ -265,9 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="
                       copyStackTrace(props.row['exception.stacktrace'])
                     "
-                    title="Copy stacktrace"
+                    :title="t('traces.copyStacktrace')"
                   >
-                    <q-tooltip>Copy stacktrace</q-tooltip>
+                    <q-tooltip>{{ t("traces.copyStacktrace") }}</q-tooltip>
                   </q-btn>
                 </div>
                 <div
@@ -288,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-else class="stacktrace-empty">
                   <q-icon name="info" size="16px" class="q-mr-xs" />
-                  <span>No stacktrace available</span>
+                  <span>{{ t("traces.noStacktraceAvailable") }}</span>
                 </div>
               </div>
             </div>
@@ -302,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
@@ -315,6 +300,7 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
+const { t } = useI18n();
 const $q = useQuasar();
 
 const spanRef = computed(() => props.span);
@@ -336,7 +322,7 @@ const timestampColumn = computed(() => store.state.zoConfig.timestamp_column);
 
 const expandedEvents: any = ref({});
 
-const exceptionEventColumns = ref([
+const exceptionEventColumns = computed(() => [
   {
     name: "@timestamp",
     field: "@timestamp",
@@ -345,7 +331,7 @@ const exceptionEventColumns = ref([
         Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
         "MMM DD, YYYY HH:mm:ss.SSS Z",
       ),
-    label: "Timestamp",
+    label: t("traces.timestamp"),
     align: "left" as const,
     sortable: true,
   },
@@ -353,7 +339,7 @@ const exceptionEventColumns = ref([
     name: "type",
     field: "exception.type",
     prop: (row: any) => row["exception.type"],
-    label: "Type",
+    label: t("traces.typeLabel"),
     align: "left" as const,
     sortable: true,
   },
@@ -622,7 +608,7 @@ function copyStackTrace(stacktrace: string) {
     .writeText(stacktrace)
     .then(() => {
       $q.notify({
-        message: "Stacktrace copied to clipboard",
+        message: t("traces.stacktraceCopied"),
         color: "positive",
         position: "top",
         timeout: 2000,
@@ -630,7 +616,7 @@ function copyStackTrace(stacktrace: string) {
     })
     .catch(() => {
       $q.notify({
-        message: "Failed to copy stacktrace",
+        message: t("traces.stacktraceCopyFailed"),
         color: "negative",
         position: "top",
         timeout: 2000,
