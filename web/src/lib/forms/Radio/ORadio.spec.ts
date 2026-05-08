@@ -75,6 +75,22 @@ describe("ORadioGroup", () => {
     expect(emitted![0][0]).toBe("a");
   });
 
+  it("preserves numeric value type on emit", async () => {
+    wrapper = mount(ORadioGroup, {
+      props: { modelValue: 0 },
+      slots: {
+        default: '<ORadio :value="2" label="Two" />',
+      },
+      global: { components: { ORadio } },
+    });
+
+    await wrapper.find("button").trigger("click");
+    const emitted = wrapper.emitted("update:modelValue");
+    expect(emitted).toBeTruthy();
+    expect(typeof emitted![0][0]).toBe("number");
+    expect(emitted![0][0]).toBe(2);
+  });
+
   it("renders vertical layout by default", () => {
     wrapper = mount(ORadioGroup);
     expect(wrapper.find("div[role]").classes()).toContain("tw:flex-col");

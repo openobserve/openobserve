@@ -74,4 +74,36 @@ describe("OSelect", () => {
     });
     expect(wrapper.text()).toContain("Selection required");
   });
+
+  it("renders mapped option labels for object options", () => {
+    wrapper = mount(OSelect, {
+      props: {
+        modelValue: 2,
+        options: [
+          { id: 1, title: "One" },
+          { id: 2, title: "Two" },
+        ] as any,
+        optionValue: "id",
+        optionLabel: "title",
+      },
+    });
+    expect(wrapper.text()).toContain("Two");
+  });
+
+  it("emits empty array when clear is clicked in multiple mode", async () => {
+    wrapper = mount(OSelect, {
+      props: {
+        clearable: true,
+        multiple: true,
+        modelValue: ["a", "b"],
+        options: [
+          { label: "Option A", value: "a" },
+          { label: "Option B", value: "b" },
+        ],
+      },
+    });
+    await wrapper.find('button[aria-label="Clear selection"]').trigger("click");
+    expect(wrapper.emitted("clear")).toBeTruthy();
+    expect(wrapper.emitted("update:modelValue")![0][0]).toEqual([]);
+  });
 });
