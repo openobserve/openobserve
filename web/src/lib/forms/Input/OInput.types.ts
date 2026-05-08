@@ -48,12 +48,6 @@ export interface InputProps {
   suffix?: string;
   /** Shows a ✕ button to clear the field */
   clearable?: boolean;
-  /** q-input compatibility prop; OInput uses outlined visuals by default */
-  outlined?: boolean;
-  /** q-input compatibility prop; accepted for migration parity */
-  filled?: boolean;
-  /** q-input compatibility prop; accepted for migration parity */
-  borderless?: boolean;
   /** Prevents value editing */
   readonly?: boolean;
   /** Prevents interaction */

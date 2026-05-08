@@ -78,12 +78,6 @@ export interface SelectProps {
   error?: boolean;
   /** Shows a ✕ button to clear the selection */
   clearable?: boolean;
-  /** q-select compatibility prop; OSelect uses outlined visuals by default */
-  outlined?: boolean;
-  /** q-select compatibility prop; accepted for migration parity */
-  filled?: boolean;
-  /** q-select compatibility prop; accepted for migration parity */
-  borderless?: boolean;
   /** Prevents value changes */
   disabled?: boolean;
   /** Control size */

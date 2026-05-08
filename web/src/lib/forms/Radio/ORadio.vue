@@ -55,8 +55,7 @@ const resolvedSize = computed(() => (size ?? "md") as "xs" | "sm" | "md");
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center',
-      dense ? 'tw:gap-1' : 'tw:gap-2',
+      'tw:inline-flex tw:items-center tw:gap-2',
       disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
     :for="id"
