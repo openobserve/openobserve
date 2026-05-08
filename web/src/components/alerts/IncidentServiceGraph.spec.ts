@@ -274,7 +274,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-        data: emptyGraphData,
+        emptyGraphData,
 
       wrapper = mountComponent();
       await flushPromises();
@@ -411,7 +411,7 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-        data: mixedData,
+        mixedData,
 
       wrapper = mountComponent();
       await flushPromises();

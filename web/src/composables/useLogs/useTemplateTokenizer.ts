@@ -34,10 +34,10 @@ export type TemplateToken =
   | { kind: "text"; value: string }
   | { kind: "wildcard"; value: string; position: number; sampleValues: string[] };
 
-// Matches <*>, <:IP>, <:TIMESTAMP>, <:IDENTIFIERS>, <:NUM>, etc.
+// Matches <*>, <:IP>, <:IPV4>, <:TIMESTAMP>, <:IDENTIFIERS>, <:NUM>, etc.
 // Must stay in sync with the Rust regex in pattern_extractor.rs:
-//   r"<(?:[*]|:[A-Z_]+)>"
-const WILDCARD_RE = /<(?:[*]|:[A-Z_]+)>/g;
+//   r"<(?:[*]|:[A-Z0-9_]+)>"
+const WILDCARD_RE = /<(?:[*]|:[A-Z0-9_]+)>/g;
 
 /**
  * Split a pattern template string into alternating text / wildcard tokens.

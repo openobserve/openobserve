@@ -138,11 +138,22 @@ const popoverStyle = computed(() => {
   if (!props.anchorEl) return { display: "none" };
   const rect = props.anchorEl.getBoundingClientRect();
   const gap = 4;
-  const top = flipUpward.value ? rect.top - gap : rect.bottom + gap;
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - 320));
+
+  // When flipped upward, use `bottom` so the popover extends UP from the
+  // anchor rather than down past the viewport. When below, use `top` so it
+  // extends DOWN from the anchor.
+  if (flipUpward.value) {
+    return {
+      position: "fixed" as const,
+      bottom: `${window.innerHeight - rect.top + gap}px`,
+      left: `${left}px`,
+      zIndex: 9999,
+    };
+  }
   return {
     position: "fixed" as const,
-    top: `${top}px`,
+    top: `${rect.bottom + gap}px`,
     left: `${left}px`,
     zIndex: 9999,
   };
@@ -152,9 +163,16 @@ function repositionPopover() {
   void nextTick().then(() => {
     if (!popoverRef.value || !props.anchorEl) return;
     const popoverRect = popoverRef.value.getBoundingClientRect();
-    if (popoverRect.bottom > window.innerHeight - 8) {
+
+    // If popover overflows bottom while positioned below, flip upward
+    if (!flipUpward.value && popoverRect.bottom > window.innerHeight - 8) {
       flipUpward.value = true;
     }
+    // If popover overflows top while positioned above, revert to below
+    if (flipUpward.value && popoverRect.top < 8) {
+      flipUpward.value = false;
+    }
+    // Horizontal overflow — pin to right edge with 8 px margin
     if (popoverRect.right > window.innerWidth - 8) {
       popoverRef.value.style.left = `${window.innerWidth - popoverRect.width - 8}px`;
     }
@@ -166,8 +184,17 @@ onMounted(repositionPopover);
 watch(
   () => props.visible,
   (isVisible) => {
-    if (isVisible) {
-      flipUpward.value = false;
+    if (isVisible && props.anchorEl) {
+      // Pre-decide direction before the popover renders so it never
+      // appears off-screen. Use a conservative height estimate (200 px —
+      // header + a handful of value rows). repositionPopover will correct
+      // if the actual popover height is very different.
+      const rect = props.anchorEl.getBoundingClientRect();
+      const estimatedHeight = 200;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      flipUpward.value =
+        spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
       repositionPopover();
     }
   },
