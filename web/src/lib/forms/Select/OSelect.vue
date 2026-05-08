@@ -28,7 +28,7 @@ import {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "reka-ui";
-import { computed, onBeforeUnmount, provide, ref, useSlots, watch } from "vue";
+import { computed, onBeforeUnmount, provide, ref, useSlots, watch, watchEffect } from "vue";
 
 type NormalizedOption = {
   label: string;
@@ -66,7 +66,7 @@ if (import.meta.env.DEV) {
   watchEffect(() => {
     if (
       slots.default &&
-      (props.multiple || props.searchable || props.useInput)
+      (props.multiple || props.searchable)
     ) {
       console.warn(
         "[OSelect] Slot-based options (OSelectItem/OSelectGroup) do not support " +
