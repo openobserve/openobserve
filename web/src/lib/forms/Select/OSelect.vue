@@ -11,7 +11,8 @@ import type {
 import { SELECT_VALUE_MAP_KEY } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import {
-  ListboxFilter,
+  ListboxGroup,
+  ListboxGroupLabel,
   ListboxItem,
   ListboxItemIndicator,
   ListboxRoot,
@@ -28,12 +29,21 @@ import {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "reka-ui";
-import { computed, onBeforeUnmount, provide, ref, useSlots, watch, watchEffect } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  provide,
+  ref,
+  useSlots,
+  watch,
+  watchEffect,
+} from "vue";
 
 type NormalizedOption = {
   label: string;
   value: SelectPrimitiveValue;
   disabled: boolean;
+  header: boolean;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -64,10 +74,7 @@ defineSlots<SelectSlots>();
 // mode, but listboxModeEnabled requires options prop. Guide the developer early.
 if (import.meta.env.DEV) {
   watchEffect(() => {
-    if (
-      slots.default &&
-      (props.multiple || props.searchable)
-    ) {
+    if (slots.default && (props.multiple || props.searchable)) {
       console.warn(
         "[OSelect] Slot-based options (OSelectItem/OSelectGroup) do not support " +
           "`multiple`, `searchable`, or `useInput`. Pass options via the `options` prop instead.",
@@ -92,6 +99,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
       label: String(raw),
       value: raw,
       disabled: false,
+      header: false,
     };
   }
 
@@ -99,6 +107,20 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
 
   const option = raw as Record<string, unknown>;
   const rawLabel = option[props.labelKey];
+
+  // Group header: items with header:true or isTab:true are non-selectable labels
+  const isHeader =
+    Boolean(option["header"]) || Boolean(option["isTab"]);
+  if (isHeader) {
+    return {
+      label:
+        rawLabel === undefined || rawLabel === null ? "" : String(rawLabel),
+      value: `__header__${String(rawLabel)}`,
+      disabled: true,
+      header: true,
+    };
+  }
+
   const rawValue = option[props.valueKey];
   if (!isPrimitiveSelectValue(rawValue)) return null;
 
@@ -109,6 +131,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
         : String(rawLabel),
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
+    header: false,
   };
 }
 
@@ -132,22 +155,43 @@ const filteredOptions = computed(() => {
 
   if (props.hideSelected && props.multiple && selectedValues.value.length > 0) {
     options = options.filter(
-      (opt) => !selectedValues.value.includes(opt.value),
+      (opt) => opt.header || !selectedValues.value.includes(opt.value),
     );
   }
 
   if (!term) return options;
-  return options.filter((opt) => opt.label.toLowerCase().includes(term));
+  // Keep headers visible if any of their following non-header items match
+  const result: NormalizedOption[] = [];
+  for (let i = 0; i < options.length; i++) {
+    const opt = options[i];
+    if (opt.header) {
+      // Include the header only if at least one subsequent non-header item matches
+      let j = i + 1;
+      while (j < options.length && !options[j].header) {
+        if (options[j].label.toLowerCase().includes(term)) {
+          result.push(opt);
+          break;
+        }
+        j++;
+      }
+    } else {
+      if (opt.label.toLowerCase().includes(term)) {
+        result.push(opt);
+      }
+    }
+  }
+  return result;
 });
 
 const listboxModeEnabled = computed(
   () =>
-    !!props.options?.length &&
     !slots.default &&
     (props.multiple ||
       props.searchable ||
-      props.labelKey !== DEFAULT_OPTION_LABEL ||
-      props.valueKey !== DEFAULT_OPTION_VALUE),
+      props.creatable ||
+      (!!props.options?.length &&
+        (props.labelKey !== DEFAULT_OPTION_LABEL ||
+          props.valueKey !== DEFAULT_OPTION_VALUE))),
 );
 
 const selectedValues = computed<SelectPrimitiveValue[]>(() => {
@@ -316,26 +360,25 @@ const fieldWidthClass = computed(() => {
         @update:open="(v) => emit(v ? 'open' : 'close')"
       >
         <div class="tw:relative tw:flex tw:items-center">
-          <PopoverTrigger as-child>
-            <button
-              type="button"
-              :id="id"
-              :name="name"
-              :disabled="disabled"
-              :class="[
-                'tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:ps-3',
-                'tw:bg-select-bg',
-                hasError
-                  ? 'tw:border-select-border-error'
-                  : 'tw:border-select-border tw:hover:border-select-border-hover',
-                'tw:focus:outline-none tw:focus:border-select-border-focus',
-                'tw:focus:ring-2 tw:focus:ring-select-focus-ring',
-                'tw:transition-colors tw:duration-150',
-                'tw:disabled:bg-select-disabled-bg tw:disabled:opacity-60 tw:disabled:cursor-not-allowed',
-                clearable && hasSelection ? 'tw:pe-7' : 'tw:pe-8',
-                heightClasses[size ?? 'md'],
-              ]"
-            >
+          <PopoverTrigger
+            type="button"
+            :id="id"
+            :name="name"
+            :disabled="disabled"
+            :class="[
+              'tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:ps-3',
+              'tw:bg-select-bg',
+              hasError
+                ? 'tw:border-select-border-error'
+                : 'tw:border-select-border tw:hover:border-select-border-hover',
+              'tw:focus:outline-none tw:focus:border-select-border-focus',
+              'tw:focus:ring-2 tw:focus:ring-select-focus-ring',
+              'tw:transition-colors tw:duration-150',
+              'tw:disabled:bg-select-disabled-bg tw:disabled:opacity-60 tw:disabled:cursor-not-allowed',
+              clearable && hasSelection ? 'tw:pe-7' : 'tw:pe-8',
+              heightClasses[size ?? 'md'],
+            ]"
+          >
               <slot name="trigger" :value="modelValue">
                 <template v-if="multiple && selectedLabels.length > 0">
                   <div
@@ -386,7 +429,6 @@ const fieldWidthClass = computed(() => {
                   />
                 </svg>
               </span>
-            </button>
           </PopoverTrigger>
 
           <button
@@ -419,8 +461,10 @@ const fieldWidthClass = computed(() => {
           <PopoverContent
             :side-offset="4"
             align="start"
+            :trap-focus="false"
+            :disable-outside-pointer-events="false"
             :class="[
-              'tw:z-50 tw:min-w-(--reka-popover-trigger-width)',
+              'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
               'tw:max-h-72 tw:overflow-hidden',
               'tw:rounded-md tw:border tw:shadow-md',
               'tw:bg-select-content-bg tw:border-select-content-border',
@@ -428,20 +472,19 @@ const fieldWidthClass = computed(() => {
             ]"
             :style="dropdownStyle"
           >
+            <input
+              v-if="inputEnabled"
+              v-model="searchTerm"
+              class="tw:w-full tw:h-9 tw:px-3 tw:mb-1 tw:rounded-md tw:border tw:bg-input-bg tw:border-input-border tw:text-input-text tw:placeholder:text-input-placeholder tw:outline-none tw:focus:ring-2 tw:focus:ring-input-focus-ring"
+              :placeholder="searchPlaceholder"
+              @keydown.enter.prevent="handleCreateFromInput"
+            />
             <ListboxRoot
               :model-value="listboxStringModelValue"
               :multiple="multiple"
               :disabled="disabled"
               @update:model-value="handleListboxUpdate"
             >
-              <ListboxFilter
-                v-if="inputEnabled"
-                v-model="searchTerm"
-                class="tw:w-full tw:h-9 tw:px-3 tw:mb-1 tw:rounded-md tw:border tw:bg-input-bg tw:border-input-border tw:text-input-text tw:placeholder:text-input-placeholder tw:outline-none tw:focus:ring-2 tw:focus:ring-input-focus-ring"
-                :placeholder="searchPlaceholder"
-                @keydown.enter.prevent="handleCreateFromInput"
-              />
-
               <div class="tw:max-h-60 tw:overflow-auto">
                 <div
                   v-if="filteredOptions.length === 0"
@@ -450,42 +493,58 @@ const fieldWidthClass = computed(() => {
                   <slot name="empty">No options found</slot>
                 </div>
 
-                <ListboxItem
-                  v-for="opt in filteredOptions"
-                  v-else
-                  :key="String(opt.value)"
-                  :value="String(opt.value)"
-                  :disabled="opt.disabled"
-                  :class="[
-                    'tw:relative tw:flex tw:items-center tw:w-full',
-                    'tw:ps-8 tw:pe-3 tw:py-1.5 tw:text-sm',
-                    'tw:text-select-item-text tw:rounded-sm',
-                    'tw:cursor-pointer tw:select-none tw:outline-none',
-                    'tw:transition-colors tw:duration-100',
-                    'tw:data-highlighted:bg-select-item-hover-bg',
-                    'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
-                    'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
-                  ]"
-                >
-                  <ListboxItemIndicator
-                    class="tw:absolute tw:start-2 tw:flex tw:items-center tw:justify-center"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 16 16"
-                      fill="currentColor"
-                      class="tw:size-3.5"
-                      aria-hidden="true"
+                <template v-if="filteredOptions.length > 0">
+                  <template v-for="opt in filteredOptions" :key="String(opt.value)">
+                    <!-- Group header — non-selectable label row -->
+                    <ListboxGroup v-if="opt.header">
+                      <ListboxGroupLabel
+                        :class="[
+                          'tw:flex tw:w-full tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
+                          'tw:text-select-placeholder tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
+                          'tw:select-none tw:pointer-events-none tw:sticky tw:top-0',
+                        ]"
+                      >
+                        {{ opt.label }}
+                      </ListboxGroupLabel>
+                    </ListboxGroup>
+
+                    <!-- Regular item -->
+                    <ListboxItem
+                      v-else
+                      :value="String(opt.value)"
+                      :disabled="opt.disabled"
+                      :class="[
+                        'tw:relative tw:flex tw:items-center tw:w-full',
+                        'tw:ps-8 tw:pe-3 tw:py-1.5 tw:text-sm',
+                        'tw:text-select-item-text tw:rounded-sm',
+                        'tw:cursor-pointer tw:select-none tw:outline-none',
+                        'tw:transition-colors tw:duration-100',
+                        'tw:data-highlighted:bg-select-item-hover-bg',
+                        'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
+                        'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
+                      ]"
                     >
-                      <path
-                        fill-rule="evenodd"
-                        d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  </ListboxItemIndicator>
-                  <span class="tw:truncate">{{ opt.label }}</span>
-                </ListboxItem>
+                      <ListboxItemIndicator
+                        class="tw:absolute tw:start-2 tw:flex tw:items-center tw:justify-center"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 16 16"
+                          fill="currentColor"
+                          class="tw:size-3.5"
+                          aria-hidden="true"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </ListboxItemIndicator>
+                      <span class="tw:truncate">{{ opt.label }}</span>
+                    </ListboxItem>
+                  </template>
+                </template>
               </div>
             </ListboxRoot>
           </PopoverContent>
@@ -580,7 +639,7 @@ const fieldWidthClass = computed(() => {
           position="popper"
           :side-offset="4"
           :class="[
-            'tw:z-50 tw:min-w-(--reka-select-trigger-width)',
+            'tw:z-[10001] tw:min-w-(--reka-select-trigger-width)',
             'tw:max-h-60 tw:overflow-hidden',
             'tw:rounded-md tw:border tw:shadow-md',
             'tw:bg-select-content-bg tw:border-select-content-border',
@@ -652,6 +711,13 @@ const fieldWidthClass = computed(() => {
       role="alert"
     >
       {{ effectiveError }}
+    </span>
+    <!-- Help text -->
+    <span
+      v-else-if="helpText"
+      class="tw:text-xs tw:text-input-help-text tw:leading-none"
+    >
+      {{ helpText }}
     </span>
   </div>
 </template>
