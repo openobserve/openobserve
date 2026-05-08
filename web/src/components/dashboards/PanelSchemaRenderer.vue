@@ -1486,7 +1486,7 @@ export default defineComponent({
       showErrorNotification,
     });
 
-    const { downloadDataAsCSV, downloadDataAsJSON } = usePanelDownload({
+    const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
       filteredData,
@@ -1579,6 +1579,23 @@ export default defineComponent({
       showPopupsAndOverlays,
       downloadDataAsCSV,
       downloadDataAsJSON,
+      getPanelCsvData: (title: string) => {
+        const csv = getPanelCsvString();
+        if (!csv) return null;
+        return {
+          title: title ?? panelSchema.value?.title ?? "panel",
+          csv,
+        };
+      },
+      logDataAsJSON: (title: string) => {
+        const chartData =
+          panelSchema.value?.queryType === "promql"
+            ? filteredData.value
+            : data.value;
+        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.log(chartData);
+        console.groupEnd();
+      },
       loadingProgressPercentage,
       isPartialData,
       contextMenuVisible,

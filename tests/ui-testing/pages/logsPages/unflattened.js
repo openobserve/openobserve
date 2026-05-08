@@ -1,3 +1,5 @@
+import { expect } from '@playwright/test';
+
 class UnflattenedPage {
     constructor(page) {
         this.page = page;
@@ -11,8 +13,19 @@ class UnflattenedPage {
         return this.page.getByPlaceholder('Search Stream');
     }
 
-    get streamDetailButton() {
-        return this.page.getByRole('button', { name: 'Stream Detail' }).first();
+    async openStreamDetail(streamName) {
+        // Wait for stream list to populate after search
+        await this.page.waitForTimeout(2000);
+
+        // The Stream Detail button is hidden until the row is hovered.
+        // Hover first to make it visible, then click with force as a fallback.
+        const row = this.page.getByRole('row').filter({ hasText: streamName }).first();
+        await row.hover();
+        const detailBtn = row.locator('[title="Stream Detail"]').first();
+        await detailBtn.click({ force: true, timeout: 15000 });
+
+        // Wait for the dialog to render — the Schema tab signals the dialog is ready
+        await this.page.getByRole('tab', { name: 'Schema' }).first().waitFor({ state: 'visible', timeout: 15000 });
     }
 
     get storeOriginalDataToggle() {
@@ -132,6 +145,17 @@ class UnflattenedPage {
         }
         console.log('DEBUG: Toggle is already disabled, no action needed');
         return false;
+    }
+
+    async clickInterestingFieldButton(fieldName) {
+        const btn = this.page.locator(`[data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`).first();
+        await btn.waitFor({ state: 'visible' });
+        await btn.click();
+    }
+
+    async expectQueryEditorContainsText(textOrRegex) {
+        await this.logsSearchBarQueryEditor.locator('.monaco-editor').last().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        await expect(this.logsSearchBarQueryEditor).toContainText(textOrRegex, { timeout: 10000 });
     }
 
     async ensureStoreOriginalDataEnabled() {

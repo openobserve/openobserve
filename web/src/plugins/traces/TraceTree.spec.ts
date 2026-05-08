@@ -1200,6 +1200,114 @@ describe("TraceTree", () => {
     });
   });
 
+  describe("hover-span / unhover-span emits", () => {
+    it("should emit hoverSpan when onHoverSpan is called with a spanId", () => {
+      wrapper.vm.onHoverSpan("d9603ec7f76eb499");
+
+      expect(wrapper.emitted("hoverSpan")).toBeTruthy();
+      expect(wrapper.emitted("hoverSpan")[0]).toEqual(["d9603ec7f76eb499"]);
+    });
+
+    it("should emit unhoverSpan when onUnhoverSpan is called", () => {
+      wrapper.vm.onUnhoverSpan();
+
+      expect(wrapper.emitted("unhoverSpan")).toBeTruthy();
+      expect(wrapper.emitted("unhoverSpan")[0]).toEqual([]);
+    });
+  });
+
+  describe("highlightedSpanId computed", () => {
+    it("should prefer hoveredSpanId over selectedSpanId when both are set", async () => {
+      await wrapper.setProps({
+        selectedSpanId: "d9603ec7f76eb499",
+        hoveredSpanId: "6702b0494b2b6e57",
+      });
+
+      expect(wrapper.vm.highlightedSpanId).toBe("6702b0494b2b6e57");
+    });
+
+    it("should fall back to selectedSpanId when hoveredSpanId is empty", async () => {
+      await wrapper.setProps({
+        selectedSpanId: "d9603ec7f76eb499",
+        hoveredSpanId: "",
+      });
+
+      expect(wrapper.vm.highlightedSpanId).toBe("d9603ec7f76eb499");
+    });
+
+    it("should return selectedSpanId when both are empty", async () => {
+      await wrapper.setProps({
+        selectedSpanId: "",
+        hoveredSpanId: "",
+      });
+
+      expect(wrapper.vm.highlightedSpanId).toBe("");
+    });
+  });
+
+  describe("connector segments for spans with depth > 0", () => {
+    const depthSpans = [
+      {
+        spanId: "parent-span",
+        operationName: "parent-operation",
+        serviceName: "parent-service",
+        spanStatus: "UNSET",
+        spanKind: "Server",
+        parentId: null,
+        hasChildSpans: false,
+        style: {
+          color: "#1ab8be",
+          backgroundColor: "#1ab8be33",
+          top: "0px",
+          left: "0px",
+        },
+        depth: 0,
+        index: 0,
+      },
+      {
+        spanId: "child-span",
+        operationName: "child-operation",
+        serviceName: "child-service",
+        spanStatus: "UNSET",
+        spanKind: "Client",
+        parentId: "parent-span",
+        hasChildSpans: false,
+        style: {
+          color: "#b7885e",
+          backgroundColor: "#b7885e33",
+          top: "30px",
+          left: "30px",
+        },
+        depth: 1,
+        index: 1,
+      },
+    ];
+
+    let depthWrapper: any;
+
+    beforeEach(() => {
+      depthWrapper = mountTraceTree({ spans: depthSpans });
+    });
+
+    afterEach(() => {
+      depthWrapper.unmount();
+    });
+
+    it("should render vertical connector segments for spans with depth > 0", () => {
+      const verticalSegments = depthWrapper.findAll(
+        '[data-test="vertical-segment"]',
+      );
+      expect(verticalSegments.length).toBeGreaterThan(0);
+    });
+
+    it("should render horizontal connector segments for spans with depth > 0", () => {
+      const horizontalSegment = depthWrapper.find(
+        '[data-test="horizontal-segment"]',
+      );
+      expect(horizontalSegment.exists()).toBe(true);
+    });
+  });
+
   describe("collapse badge title tooltip", () => {
     // collapseMapping[id]=true means the span is currently collapsed (children hidden)
     // The title describes what clicking WILL DO (action), not the current state

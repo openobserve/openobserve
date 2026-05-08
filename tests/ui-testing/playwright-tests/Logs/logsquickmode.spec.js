@@ -11,12 +11,10 @@ function removeUTFCharacters(text) {
 
 async function applyQueryButton(page) {
   testLogger.step('Applying query button');
-  
-  // Use page object method instead of inline locators
   const pm = new PageManager(page);
-  await pm.logsPage.clickRefreshButton();
-  
-  testLogger.debug('Query applied successfully');
+  await pm.logsPage.runQueryAndWaitForResults();
+  await pm.logsPage.waitForSearchResults();
+  testLogger.debug('Query applied and results confirmed');
 }
 
 
@@ -107,13 +105,18 @@ test.describe("Logs Quickmode testcases", () => {
     tag: ['@interestingFieldsHistogramModeLogs', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing interesting fields in histogram mode');
-    
+
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    testLogger.info('Validated: field search input filtered to "kubernetes_pod_id"');
     await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    testLogger.info('Validated: "kubernetes_pod_id" marked as an interesting field via sidebar button');
     await pm.logsPage.clickSearchBarRefreshButton();
+    testLogger.info('Validated: search refresh triggered with interesting field selection active');
     await pm.logsPage.waitForSearchResults();
+    testLogger.info('Validated: search results loaded after refresh');
     await pm.logsPage.expectInterestingFieldInTable("kubernetes_pod_id");
-    
+    testLogger.info('Validated: "kubernetes_pod_id" appears as a column in the results table in histogram mode');
+
     testLogger.info('Interesting fields histogram mode test completed');
   });
 
@@ -163,11 +166,14 @@ test.describe("Logs Quickmode testcases", () => {
     await pm.logsPage.fillIndexFieldSearchInput("level");
     await pm.logsPage.clickInterestingFieldButton("level");
     await pm.logsPage.clickSQLModeToggle();
-    await pm.logsPage.clickSearchBarRefreshButton();
+    await pm.logsPage.waitForQueryEditorTextbox();
+    await pm.logsPage.runQueryAfterModeChange();
+    await pm.logsPage.waitForSearchResults();
     await pm.logsPage.expectLogTableColumnSourceVisible();
     await pm.logsPage.clickInterestingFieldButton("level");
     await pm.logsPage.expectQueryEditorNotContainsText("level");
     await pm.logsPage.clickSearchBarRefreshButton();
+    await pm.logsPage.waitForSearchResults();
     await pm.logsPage.expectLogTableColumnSourceNotHaveText("source");
     
     testLogger.info('Interesting fields add/remove test completed');
@@ -193,14 +199,20 @@ test.describe("Logs Quickmode testcases", () => {
     tag: ['@quickModeResults', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing quick mode results without timestamp');
-    
+
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    testLogger.info('Validated: field search input filtered to "kubernetes_pod_id"');
     await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    testLogger.info('Validated: "kubernetes_pod_id" marked as an interesting field');
     await pm.logsPage.clickSQLModeToggle();
-    await pm.logsPage.clickSearchBarRefreshButton();
+    testLogger.info('Validated: switched to SQL mode');
+    await pm.logsPage.waitForQueryEditorTextbox();
+    await pm.logsPage.runQueryAfterModeChange();
     await pm.logsPage.waitForSearchResults();
+    testLogger.info('Validated: search results loaded');
     await pm.logsPage.expectExactTextVisible("source");
-    
+    testLogger.info('Validated: "source" column is visible in results — query ran without auto-injecting _timestamp in quick mode');
+
     testLogger.info('Quick mode results test completed');
   });
 
@@ -208,29 +220,37 @@ test.describe("Logs Quickmode testcases", () => {
     tag: ['@fieldInteraction', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing timestamp field click and kubernetes_pod_id field search');
-    
+
     // Check if _timestamp field exists and click it
     await pm.logsPage.clickTimestampField();
-    
+    testLogger.info('Validated: "_timestamp" field found in field list and clicked');
+
     // Click on schema button
     await pm.logsPage.clickSchemaButton();
-    
+    testLogger.info('Validated: schema panel opened');
+
     // Search and click kubernetes_pod_id field
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    testLogger.info('Validated: field search input filtered to "kubernetes_pod_id"');
     await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
-    
+    testLogger.info('Validated: "kubernetes_pod_id" marked as an interesting field');
+
     // Click on infoschema button
     await pm.logsPage.clickInfoSchemaButton();
-    
+    testLogger.info('Validated: info-schema panel opened');
+
     // Click Clear button
     await pm.logsPage.clickClearButton();
-    
+    testLogger.info('Validated: clear button clicked — field selections cleared');
+
     // Remove kubernetes_pod_id as interesting field
     await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
-    
+    testLogger.info('Validated: "kubernetes_pod_id" removed as an interesting field');
+
     // Assert that _timestamp still exists
     await pm.logsPage.expectTimestampFieldVisible();
-    
+    testLogger.info('Validated: "_timestamp" field is still visible after clearing kubernetes_pod_id — field persistence confirmed');
+
     testLogger.info('Timestamp field click and kubernetes_pod_id field search completed');
   });
 

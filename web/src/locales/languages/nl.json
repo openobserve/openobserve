@@ -123,7 +123,9 @@
     "create": "Creëren",
     "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
     "resources": "Hulpbronnen",
-    "updated_at": "Bijgewerkt op"
+    "updated_at": "Bijgewerkt op",
+    "error": "Fout",
+    "db": "Database"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -390,7 +392,8 @@
     "autoRunEnabled": "Automatisch uitvoeren ingeschakeld",
     "selectStreamFirst": "Selecteer eerst een stream",
     "traces": "Sporen",
-    "switchToLogs": "klik om terug te schakelen naar de logboeken"
+    "switchToLogs": "klik om terug te schakelen naar de logboeken",
+    "patternNoValuesAvailable": "Geen waarden beschikbaar"
   },
   "menu": {
     "home": "Home",
@@ -2924,7 +2927,21 @@
       "minutesAgo": "{n} m geleden",
       "hoursAgo": "{n} h geleden",
       "daysAgo": "{n} geleden"
-    }
+    },
+    "noErrorPresent": "Geen fout aanwezig voor deze reeks",
+    "httpStatusCode": "HTTP-statuscode",
+    "grpcStatusCode": "gRPC-statuscode",
+    "dbResponseStatusCode": "DB-responsstatuscode",
+    "processExitCode": "Exitcode verwerken",
+    "exceptionsWithCount": "Uitzonderingen ({count})",
+    "typeLabel": "Typ:",
+    "messageLabel": "Bericht:",
+    "escapedLabel": "Ontsnapt:",
+    "stacktraceLabel": "Stapelspoor:",
+    "copyStacktrace": "Stacktrace kopiëren",
+    "noStacktraceAvailable": "Geen stacktrace beschikbaar",
+    "stacktraceCopied": "Stacktrace gekopieerd naar het klembord",
+    "stacktraceCopyFailed": "Kopiëren van stacktrace is mislukt"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

@@ -123,7 +123,9 @@
     "create": "Crea",
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
-    "updated_at": "Aggiornato a"
+    "updated_at": "Aggiornato a",
+    "error": "Errore",
+    "db": "Banca dati"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -390,7 +392,8 @@
     "autoRunEnabled": "Esecuzione automatica abilitata",
     "selectStreamFirst": "Seleziona prima uno stream",
     "traces": "Tracce",
-    "switchToLogs": "clicca per tornare a Logs"
+    "switchToLogs": "clicca per tornare a Logs",
+    "patternNoValuesAvailable": "Nessun valore disponibile"
   },
   "menu": {
     "home": "Home",
@@ -2922,7 +2925,21 @@
       "minutesAgo": "{n} m fa",
       "hoursAgo": "{n} h fa",
       "daysAgo": "{n} d fa"
-    }
+    },
+    "noErrorPresent": "Nessun errore presente per questo intervallo",
+    "httpStatusCode": "Codice di stato HTTP",
+    "grpcStatusCode": "Codice di stato gRPC",
+    "dbResponseStatusCode": "Codice di stato della risposta DB",
+    "processExitCode": "Codice di uscita del processo",
+    "exceptionsWithCount": "Eccezioni ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Messaggio:",
+    "escapedLabel": "Fuggito:",
+    "stacktraceLabel": "Trace dello stack:",
+    "copyStacktrace": "Copia stacktrace",
+    "noStacktraceAvailable": "Nessuno stacktrace disponibile",
+    "stacktraceCopied": "Stacktrace copiato negli appunti",
+    "stacktraceCopyFailed": "Copia dello stacktrace non riuscita"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

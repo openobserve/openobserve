@@ -987,11 +987,13 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        // Find a numeric field (like 'code' which has HTTP status codes)
-        const codeFieldBtn = page.locator(pm.logsPage.fieldExpandButton('code'));
-        const codeFieldExists = await codeFieldBtn.count() > 0;
-        expect(codeFieldExists, 'Expected "code" field to exist for numeric quoting test').toBe(true);
+        // Search for the field in the field list search box first
+        await pm.logsPage.searchFieldByName('code');
+        await page.waitForTimeout(1000);
 
+        // Find the field expand button for 'code'
+        const codeFieldBtn = page.locator(pm.logsPage.fieldExpandButton('code'));
+        await codeFieldBtn.waitFor({ state: 'visible', timeout: 5000 });
         await codeFieldBtn.click();
         await page.waitForTimeout(2000);
 

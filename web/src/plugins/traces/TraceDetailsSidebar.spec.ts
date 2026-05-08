@@ -54,9 +54,17 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   }),
 }));
 
+vi.mock("@/composables/traces/useTraceDetails", () => ({
+  default: vi.fn(() => ({
+    hasSpanError: false,
+    hasExceptionEvents: [] as any[],
+  })),
+}));
+
 import componentSource from "@/plugins/traces/TraceDetailsSidebar.vue?raw";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
+import useTraceDetails from "@/composables/traces/useTraceDetails";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -207,61 +215,71 @@ const tabStubs = {
   },
   OTabPanel: {
     name: "OTabPanel",
-    // v-bind="$attrs" forwards data-test; renders only when active
-    template: '<div v-if="isActive" v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
+    // Always render content — activeTab is now parent-controlled via prop;
+    // the OTabPanel visibility is verified through the emit tests instead.
+    template: '<div v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
     props: ["name", "padding", "layout", "stretch"],
-    setup(props: any) {
-      const { inject, computed } = require("vue");
-      const ctx = inject("tabPanelsCtx", { value: { modelValue: null } });
-      const isActive = computed(() => {
-        const mv = ctx?.value?.modelValue ?? ctx?.modelValue ?? null;
-        return mv === props.name;
-      });
-      return { isActive };
-    },
   },
 };
+
+// Shared TraceErrorTab stub — the real component has its own error display logic
+// which is tested in TraceErrorTab.spec.ts. Here we only verify the sidebar renders
+// the child and passes props correctly.
+const traceErrorTabStub = {
+  template:
+    '<div data-test="trace-details-sidebar-no-error"><span data-test="trace-error-tab-span-id">{{ span?.span_id }}</span></div>',
+  props: ["span", "searchQuery", "showLlmMetrics"],
+};
+
+// Base stubs shared across all mount calls in this spec file
+const baseStubs = {
+  "q-resize-observer": true,
+  "q-virtual-scroll": {
+    template: `
+      <div>
+        <slot name="before"></slot>
+        <div v-for="(item, index) in items" :key="index">
+          <slot :item="item" :index="index"></slot>
+        </div>
+      </div>
+    `,
+    props: ["items"],
+  },
+  TraceErrorTab: traceErrorTabStub,
+  ...tabStubs,
+};
+
+// Mount factory — eliminates duplication of common mount options
+function mountSidebar(propsOverrides: Record<string, unknown> = {}) {
+  const w = mount(TraceDetailsSidebar, {
+    attachTo: "#app",
+    props: {
+      span: mockSpan,
+      baseTracePosition: mockBaseTracePosition,
+      searchQuery: "",
+      ...propsOverrides,
+    },
+    global: {
+      plugins: [i18n, router],
+      provide: { store: mockStore },
+      stubs: { ...baseStubs },
+    },
+  });
+
+  const el = w.find('[data-test="trace-details-sidebar-tabs"]').element;
+  Object.defineProperty(el, "clientHeight", {
+    configurable: true,
+    value: 1024,
+  });
+
+  return w;
+}
 
 describe("TraceDetailsSidebar", async () => {
   let wrapper: any;
 
   beforeEach(async () => {
-    wrapper = mount(TraceDetailsSidebar, {
-      attachTo: "#app",
-      props: {
-        span: mockSpan,
-        baseTracePosition: mockBaseTracePosition,
-        searchQuery: "",
-      },
-      global: {
-        plugins: [i18n, router],
-        provide: {
-          store: mockStore,
-        },
-        stubs: {
-          "q-resize-observer": true,
-          "q-virtual-scroll": {
-            template: `
-              <div>
-                <slot name="before"></slot>
-                <div v-for="(item, index) in items" :key="index">
-                  <slot :item="item" :index="index"></slot>
-                </div>
-              </div>
-            `,
-            props: ["items"],
-          },
-          ...tabStubs,
-        },
-      },
-    });
-
-    const el = wrapper.find('[data-test="trace-details-sidebar-tabs"]').element;
-    Object.defineProperty(el, "clientHeight", {
-      configurable: true,
-      value: 1024,
-    });
-
+    wrapper = mountSidebar();
     await wrapper.vm.$nextTick();
   });
 
@@ -421,7 +439,7 @@ describe("TraceDetailsSidebar", async () => {
       const tabs = wrapper.findAll('[data-test="trace-details-sidebar-tabs"]');
       expect(tabs.length).toBeGreaterThan(0);
 
-      const tabNames = ["attributes", "events", "exceptions", "links"];
+      const tabNames = ["attributes", "events", "error", "links"];
       tabNames.forEach((tabName) => {
         const tab = wrapper.find(
           `[data-test="trace-details-sidebar-tabs-${tabName}"]`,
@@ -430,8 +448,14 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
-    it("should switch to attributes tab by default", () => {
+    it("should switch to attributes tab by default when span has no db_ attributes", () => {
       expect(wrapper.vm.activeTab).toBe("attributes");
+    });
+
+    it("should not show database tab when span has no db_ attributes", () => {
+      expect(
+        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
+      ).toBe(false);
     });
 
     it("should switch tabs when clicked", async () => {
@@ -440,7 +464,28 @@ describe("TraceDetailsSidebar", async () => {
       );
       await eventsTab.trigger("click");
 
-      expect(wrapper.vm.activeTab).toBe("events");
+      expect(wrapper.emitted("update:activeTab")).toBeTruthy();
+      expect(wrapper.emitted("update:activeTab")![0]).toEqual(["events"]);
+    });
+
+    it("should show database tab when span has db_ attributes", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, db_system: "postgresql" },
+      });
+      expect(
+        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should report hasDbSpan as true when span has db_ attributes", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, db_system: "postgresql" },
+      });
+      expect(wrapper.vm.hasDbSpan).toBe(true);
+    });
+
+    it("should report hasDbSpan as false when span has no db_ attributes", () => {
+      expect(wrapper.vm.hasDbSpan).toBe(false);
     });
   });
 
@@ -597,104 +642,56 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
-  describe("Exceptions tab", () => {
+  describe("Error tab", () => {
     beforeEach(async () => {
       const exceptionsTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-exceptions"]',
+        '[data-test="trace-details-sidebar-tabs-error"]',
       );
       await exceptionsTab.trigger("click");
     });
 
-    it("should display events table", () => {
-      // When there are no exceptions, the table doesn't exist, only the no-exceptions message
-      const noExceptionsMsg = wrapper.find(
-        '[data-test="trace-details-sidebar-no-exceptions"]',
+    it("should pass span to TraceErrorTab stub", () => {
+      const spanIdEl = wrapper.find(
+        '[data-test="trace-error-tab-span-id"]',
       );
-      expect(noExceptionsMsg.exists()).toBe(true);
+      expect(spanIdEl.exists()).toBe(true);
+      expect(spanIdEl.text()).toBe(mockSpan.span_id);
     });
 
-    it("should display no exceptions message when no exception events", () => {
-      const noExceptionsMsg = wrapper.find(
-        '[data-test="trace-details-sidebar-no-exceptions"]',
-      );
-      expect(noExceptionsMsg.exists()).toBe(true);
-      expect(noExceptionsMsg.text()).toContain(
-        "No exceptions present for this span",
-      );
-    });
+    describe("when hasExceptionEvents returns entries", () => {
+      let errorWrapper: any;
 
-    describe("When exceptions exist", () => {
       beforeEach(async () => {
-        await wrapper.setProps({
-          span: {
-            ...mockSpan,
-            events: mockExceptions,
-          },
+        vi.mocked(useTraceDetails).mockReturnValue({
+          hasSpanError: true,
+          hasExceptionEvents: [
+            { name: "exception", "exception.type": "RuntimeError" },
+            { name: "exception", "exception.type": "ValueError" },
+          ],
         });
-        await flushPromises();
-        await wrapper.vm.$nextTick();
+
+        errorWrapper = mountSidebar();
+
+        const exceptionsTab = errorWrapper.find(
+          '[data-test="trace-details-sidebar-tabs-error"]',
+        );
+        await exceptionsTab.trigger("click");
       });
 
-      it("should display exceptions when exception events exist", () => {
-        const exceptionsTable = wrapper.find(
-          '[data-test="trace-details-sidebar-exceptions-table"]',
-        );
-        expect(exceptionsTable.exists()).toBe(true);
+      afterEach(() => {
+        vi.mocked(useTraceDetails).mockReturnValue({
+          hasSpanError: false,
+          hasExceptionEvents: [],
+        });
+        errorWrapper?.unmount();
       });
 
-      it("should display exception rows", async () => {
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        const exceptionRows = wrapper.findAll(
-          '[data-test^="trace-event-detail-"]',
+      it("should show error count badge on the tab", () => {
+        const badge = errorWrapper.find(
+          '[data-test="trace-details-sidebar-tabs-error-count"]',
         );
-        expect(exceptionRows.length).toBeGreaterThan(0);
-      });
-
-      it("should not display no exceptions message", () => {
-        const noExceptionsMsg = wrapper.find(
-          '[data-test="trace-details-sidebar-no-exceptions"]',
-        );
-        expect(noExceptionsMsg.exists()).toBe(false);
-      });
-
-      it("should expand exception when clicked", async () => {
-        const exceptionRow = wrapper.find(
-          '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-        );
-        await exceptionRow.trigger("click");
-        expect(
-          wrapper
-            .find(
-              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-            )
-            .exists(),
-        ).toBe(true);
-      });
-
-      it("should collapse exception when clicked again", async () => {
-        const exceptionRow = wrapper.find(
-          '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-        );
-        await exceptionRow.trigger("click");
-
-        expect(
-          wrapper
-            .find(
-              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-            )
-            .exists(),
-        ).toBe(true);
-
-        await exceptionRow.trigger("click");
-
-        expect(
-          wrapper
-            .find(
-              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-            )
-            .exists(),
-        ).toBe(false);
+        expect(badge.exists()).toBe(true);
+        expect(badge.text()).toBe("2");
       });
     });
   });
@@ -886,6 +883,115 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
+  describe("activeTab prop", () => {
+    it("should default to 'attributes'", () => {
+      expect(wrapper.vm.activeTab).toBe("attributes");
+    });
+
+    it("should emit update:activeTab when tab changes", async () => {
+      const eventsTab = wrapper.find(
+        '[data-test="trace-details-sidebar-tabs-events"]',
+      );
+      await eventsTab.trigger("click");
+      expect(wrapper.emitted("update:activeTab")).toBeTruthy();
+      expect(wrapper.emitted("update:activeTab")![0]).toEqual(["events"]);
+    });
+
+    it("should respect activeTab prop when provided", async () => {
+      wrapper.unmount();
+      wrapper = mountSidebar({ activeTab: "events" });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.activeTab).toBe("events");
+    });
+
+    it("should emit update:activeTab with the new tab value on click", async () => {
+      const errorTab = wrapper.find(
+        '[data-test="trace-details-sidebar-tabs-error"]',
+      );
+      await errorTab.trigger("click");
+      expect(wrapper.emitted("update:activeTab")).toBeTruthy();
+      const lastEmit =
+        wrapper.emitted("update:activeTab")![
+          wrapper.emitted("update:activeTab")!.length - 1
+        ];
+      expect(lastEmit).toEqual(["error"]);
+    });
+  });
+
+  describe("spanHttpResendCount", () => {
+    it("should return null when http_request_resend_count is not present", () => {
+      expect(wrapper.vm.spanHttpResendCount).toBeNull();
+    });
+
+    it("should return the count as number when http_request_resend_count is present", async () => {
+      const spanWithResend = { ...mockSpan, http_request_resend_count: "3" };
+      await wrapper.setProps({ span: spanWithResend });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.spanHttpResendCount).toBe(3);
+    });
+
+    it("should render resend count badge when count is greater than 0", async () => {
+      const spanWithResend = { ...mockSpan, http_request_resend_count: "2" };
+      await wrapper.setProps({ span: spanWithResend });
+      await wrapper.vm.$nextTick();
+      const resendBadge = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-resend-count"]',
+      );
+      expect(resendBadge.exists()).toBe(true);
+    });
+
+    it("should return null when http_request_resend_count is 0", async () => {
+      const spanWithResend = { ...mockSpan, http_request_resend_count: "0" };
+      await wrapper.setProps({ span: spanWithResend });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.spanHttpResendCount).toBeNull();
+    });
+
+    it("should return null when http_request_resend_count is an invalid string", async () => {
+      const spanWithResend = {
+        ...mockSpan,
+        http_request_resend_count: "not-a-number",
+      };
+      await wrapper.setProps({ span: spanWithResend });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.spanHttpResendCount).toBeNull();
+    });
+  });
+
+  describe("hasSpanError", () => {
+    it("should be false for a normal span (mock default)", () => {
+      expect(wrapper.vm.hasSpanError).toBe(false);
+    });
+
+    it("should show error icon in header when hasSpanError is true", async () => {
+      vi.mocked(useTraceDetails).mockReturnValue({
+        hasSpanError: true,
+        hasExceptionEvents: [],
+      });
+      wrapper.unmount();
+      wrapper = mountSidebar();
+      await wrapper.vm.$nextTick();
+
+      const errorIcon = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-status-code"]',
+      );
+      expect(errorIcon.exists()).toBe(true);
+
+      // Restore default mock
+      vi.mocked(useTraceDetails).mockReturnValue({
+        hasSpanError: false,
+        hasExceptionEvents: [],
+      });
+    });
+
+    it("should not show error icon in header when hasSpanError is false", () => {
+      const errorIcon = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-status-code"]',
+      );
+      expect(errorIcon.exists()).toBe(false);
+    });
+  });
+
   describe("Error handling", () => {
     it("should handle invalid events JSON gracefully", async () => {
       await wrapper.setProps({
@@ -942,37 +1048,8 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should force component update when props change", async () => {
       // Create a new wrapper with different props to force a complete re-render
-      const newWrapper = mount(TraceDetailsSidebar, {
-        attachTo: "#app",
-        props: {
-          span: {
-            ...mockSpan,
-            links: "invalid json",
-          },
-          baseTracePosition: mockBaseTracePosition,
-          searchQuery: "",
-        },
-        global: {
-          plugins: [i18n, router],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            "q-resize-observer": true,
-            "q-virtual-scroll": {
-              template: `
-                <div>
-                  <slot name="before"></slot>
-                  <div v-for="(item, index) in items" :key="index">
-                    <slot :item="item" :index="index"></slot>
-                  </div>
-                </div>
-              `,
-              props: ["items"],
-            },
-            ...tabStubs,
-          },
-        },
+      const newWrapper = mountSidebar({
+        span: { ...mockSpan, links: "invalid json" },
       });
 
       await flushPromises();
@@ -990,36 +1067,9 @@ describe("TraceDetailsSidebar", async () => {
     let correlationWrapper: any;
 
     beforeEach(async () => {
-      correlationWrapper = mount(TraceDetailsSidebar, {
-        attachTo: "#app",
-        props: {
-          span: mockSpan,
-          baseTracePosition: mockBaseTracePosition,
-          searchQuery: "",
-          streamName: "default",
-          serviceStreamsEnabled: true,
-        },
-        global: {
-          plugins: [i18n, router],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            "q-resize-observer": true,
-            "q-virtual-scroll": {
-              template: `
-                <div>
-                  <slot name="before"></slot>
-                  <div v-for="(item, index) in items" :key="index">
-                    <slot :item="item" :index="index"></slot>
-                  </div>
-                </div>
-              `,
-              props: ["items"],
-            },
-            ...tabStubs,
-          },
-        },
+      correlationWrapper = mountSidebar({
+        streamName: "default",
+        serviceStreamsEnabled: true,
       });
 
       await correlationWrapper.vm.$nextTick();
@@ -1035,7 +1085,8 @@ describe("TraceDetailsSidebar", async () => {
       );
       expect(metricsTab.exists()).toBe(true);
 
-      await metricsTab.trigger("click");
+      // activeTab is now a computed from props; set the prop to trigger the watcher
+      await correlationWrapper.setProps({ activeTab: "correlated-metrics" });
       await flushPromises();
 
       expect(correlationWrapper.vm.correlationError).toContain("No Data Found");
@@ -1096,25 +1147,7 @@ describe("TraceDetailsSidebar", async () => {
       // value can be returned rather than falling back to displayValue.
       const rawTsValue = 9_999_999_999_999;
       const spanWithTsCol = { ...mockSpan, "@timestamp": rawTsValue };
-      const tsWrapper = mount(TraceDetailsSidebar, {
-        attachTo: "#app",
-        props: {
-          span: spanWithTsCol,
-          baseTracePosition: mockBaseTracePosition,
-          searchQuery: "",
-        },
-        global: {
-          plugins: [i18n, router],
-          provide: { store: mockStore },
-          stubs: {
-            "q-resize-observer": true,
-            "q-virtual-scroll": {
-              template: "<div><slot /></div>",
-              props: ["items"],
-            },
-          },
-        },
-      });
+      const tsWrapper = mountSidebar({ span: spanWithTsCol });
       await tsWrapper.vm.$nextTick();
       const displayValue = "2025-07-14T10:14:52.843Z";
       expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(
@@ -1203,18 +1236,7 @@ describe("TraceDetailsSidebar", async () => {
           plugins: [i18n, router],
           provide: { store: mockStore },
           stubs: {
-            "q-resize-observer": true,
-            "q-virtual-scroll": {
-              template: `
-                <div>
-                  <slot name="before"></slot>
-                  <div v-for="(item, index) in items" :key="index">
-                    <slot :item="item" :index="index"></slot>
-                  </div>
-                </div>
-              `,
-              props: ["items"],
-            },
+            ...baseStubs,
             // Stub JsonPreview to render its #field-dropdown slot inline for each key
             // in `value`, so the q-item inside is immediately clickable without a popup.
             JsonPreview: {
@@ -1392,18 +1414,7 @@ describe("TraceDetailsSidebar", async () => {
           plugins: [i18n, router],
           provide: { store: mockStore },
           stubs: {
-            "q-resize-observer": true,
-            "q-virtual-scroll": {
-              template: `
-                <div>
-                  <slot name="before"></slot>
-                  <div v-for="(item, index) in items" :key="index">
-                    <slot :item="item" :index="index"></slot>
-                  </div>
-                </div>
-              `,
-              props: ["items"],
-            },
+            ...baseStubs,
             LLMContentRenderer: {
               template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId"><slot /></div>`,
               props: [
@@ -1430,8 +1441,12 @@ describe("TraceDetailsSidebar", async () => {
       llmWrapper?.unmount();
     });
 
-    it("should render the preview tab by default for an LLM span", () => {
-      expect(llmWrapper.vm.activeTab).toBe("preview");
+    it("should render the preview tab for an LLM span", () => {
+      // The preview tab appears in the tab bar for LLM spans (v-if="isLLMSpan")
+      const previewTab = llmWrapper.find(
+        '[data-test="trace-details-sidebar-tabs-preview"]',
+      );
+      expect(previewTab.exists()).toBe(true);
     });
 
     it("should render the input LLMContentRenderer when llm_input has content", () => {
@@ -1489,13 +1504,13 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
-  describe("CSS verification — .vjs-tree removal", () => {
-    it("should not reference .vjs-tree in component styles", () => {
-      // Verify that the removed .vjs-tree CSS selector is absent from the
-      // component's <style> blocks. The ?raw import returns the exact
-      // source content, so a regex scan confirms no style block targets
-      // .vjs-tree (the hover-suppression rules that were removed).
-      expect(componentSource).not.toMatch(/\.vjs-tree/);
+  describe("CSS verification — .vjs-tree presence", () => {
+    it("should reference .vjs-tree for LLM panel hover suppression", () => {
+      // The LLM preview panel now includes .vjs-tree hover-suppression
+      // rules to prevent unwanted hover effects on VueJsonPretty elements.
+      // This test verifies the selector is present in the component's
+      // <style> blocks via the ?raw source import.
+      expect(componentSource).toMatch(/\.vjs-tree/);
     });
   });
 });

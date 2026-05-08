@@ -34,10 +34,10 @@ export type TemplateToken =
   | { kind: "text"; value: string }
   | { kind: "wildcard"; value: string; position: number; sampleValues: string[] };
 
-// Matches <*>, <:IP>, <:TIMESTAMP>, <:IDENTIFIERS>, <:NUM>, etc.
+// Matches <*>, <:IP>, <:IPV4>, <:TIMESTAMP>, <:IDENTIFIERS>, <:NUM>, etc.
 // Must stay in sync with the Rust regex in pattern_extractor.rs:
-//   r"<(?:[*]|:[A-Z_]+)>"
-const WILDCARD_RE = /<(?:[*]|:[A-Z_]+)>/g;
+//   r"<(?:[*]|:[A-Z0-9_]+)>"
+const WILDCARD_RE = /<(?:[*]|:[A-Z0-9_]+)>/g;
 
 /**
  * Split a pattern template string into alternating text / wildcard tokens.
@@ -61,12 +61,28 @@ export function tokenizeTemplate(
       tokens.push({ kind: "text", value: template.slice(lastIndex, match.index) });
     }
 
-    const wv = wildcardValues.find((w) => w.position === wildcardIndex);
+    // Try to match by position first, fall back to array index
+    let wv = wildcardValues.find((w) => w.position === wildcardIndex);
+    if (!wv) {
+      wv = wildcardValues[wildcardIndex];
+    }
+    // Handle both snake_case and camelCase from the API
+    const rawValues: string[] =
+      (wv as any)?.sample_values ??
+      (wv as any)?.sampleValues ??
+      (wv as any)?.top_values ??
+      (wv as any)?.topValues ??
+      (wv as any)?.values ??
+      [];
+    if (rawValues.length === 0 && wv) {
+      // wildcard item present but values array is empty — API may not have
+      // returned sample values for this position
+    }
     tokens.push({
       kind: "wildcard",
       value: match[0],
       position: wildcardIndex,
-      sampleValues: wv?.sample_values ?? [],
+      sampleValues: rawValues,
     });
 
     wildcardIndex++;
