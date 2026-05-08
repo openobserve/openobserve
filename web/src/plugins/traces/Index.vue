@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :streamName="selectedStreamName"
               :startTime="insightsTimeRange.startTime"
               :endTime="insightsTimeRange.endTime"
+              :refreshTrigger="llmRefreshNonce"
               class="tw:h-full"
             />
           </div>
@@ -1907,19 +1908,23 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
 });
 
 const searchData = () => {
+  // LLM Insights uses its own (independent) stream selector and a refresh
+  // nonce. Bump on every searchdata signal — explicit Run query click and
+  // date-picker auto-triggers alike. The auto-trigger path itself is
+  // already gated by the user's "Auto-run on change" / live-mode toggle in
+  // SearchBar, so the toggle controls whether time changes propagate here
+  // (matching the behaviour of every other Traces sub-tab).
+  if (activeTab.value === "llm-insights") {
+    llmRefreshNonce.value++;
+    return;
+  }
+
   if (
     !(
       searchObj.data.stream.streamLists.length &&
       searchObj.data.stream.selectedStream?.label
     )
   ) {
-    return;
-  }
-
-  if (activeTab.value === "llm-insights") {
-    // Force the insightsTimeRange computed to re-evaluate so panels reload
-    // even when the relative range string ("Past 1 hour") hasn't changed.
-    llmRefreshNonce.value++;
     return;
   }
 

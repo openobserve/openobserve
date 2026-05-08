@@ -100,13 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else-if="errorMsg"
-      class="tw:flex-1 tw:flex tw:items-center tw:justify-center tw:min-h-[180px] tw:text-[0.75rem] tw:text-[var(--o2-text-3)]"
+      class="llm-trend-empty tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-[var(--o2-text-3)]"
+      :class="panel.type === 'table' ? 'llm-trend-empty--table' : ''"
     >
       {{ errorMsg }}
     </div>
     <div
       v-else-if="!hasData"
-      class="tw:flex-1 tw:flex tw:items-center tw:justify-center tw:min-h-[180px] tw:text-[0.75rem] tw:text-[var(--o2-text-3)]"
+      class="llm-trend-empty tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-[var(--o2-text-3)]"
+      :class="panel.type === 'table' ? 'llm-trend-empty--table' : ''"
     >
       {{ panel.emptyStateText || "No data" }}
     </div>
@@ -127,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <table class="tw:w-full tw:text-[0.75rem] tw:border-collapse">
         <thead>
-          <tr class="tw:bg-[var(--o2-bg-3)] tw:text-[0.65rem] tw:uppercase tw:tracking-[0.05rem] tw:text-[var(--o2-text-3)]">
+          <tr class="tw:bg-[var(--o2-bg-3)] tw:text-[0.7rem] tw:text-[var(--o2-text-3)]">
             <th
               v-for="col in panel.columns || []"
               :key="col.label || col.field"
@@ -766,6 +768,18 @@ onUnmounted(() => {
 .llm-trend-chart {
   height: 220px;
   width: 100%;
+}
+
+/* Empty / error states match the chart height so cards stay aligned in the
+   2-col grid even when one panel has no data. Table panels span both
+   columns so they get their own (shorter) empty-state height. */
+.llm-trend-empty {
+  height: 220px;
+  width: 100%;
+
+  &--table {
+    height: 140px;
+  }
 }
 
 .llm-trend-table {

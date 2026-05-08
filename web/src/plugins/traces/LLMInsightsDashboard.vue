@@ -18,7 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="llm-insights-dashboard tw:h-full tw:overflow-y-auto tw:px-[0.625rem] tw:pb-[0.625rem]"
   >
-    <!-- Toolbar: stream selector -->
+    <!-- Toolbar: stream selector. The page-level "Run query" button in the
+         top toolbar is the single source of refresh — picking a different
+         stream here auto-applies the change (same convention as the rest of
+         the Traces tabs), and changing the time range / clicking Run query
+         re-runs the panels via prop watchers below. -->
     <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]">
       <div
         data-test="llm-insights-stream-selector"
@@ -46,8 +50,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Loading state — same pattern as HomeView's HomeViewSkeleton -->
-    <LLMInsightsSkeleton v-if="loading || !hasLoadedOnce" />
+    <!-- Streams list loaded but no LLM streams exist for this org. -->
+    <div
+      v-if="streamsLoaded && availableStreams.length === 0"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[320px] tw:text-center"
+    >
+      <q-icon name="auto_awesome" size="3rem" color="grey-5" class="tw:mb-3" />
+      <div class="tw:text-base tw:text-[var(--o2-text-2)] tw:mb-2">
+        No LLM streams found
+      </div>
+      <div
+        class="tw:text-sm tw:text-[var(--o2-text-3)] tw:mb-3 tw:max-w-[30rem]"
+      >
+        LLM Insights aggregates spans from traces streams that capture
+        <code>gen_ai_*</code> attributes. Either no traces stream has been
+        marked as an LLM stream, or no spans have been ingested yet. Instrument
+        your service with the OpenTelemetry Gen-AI semantic conventions and
+        ingest at least one trace to populate this dashboard.
+      </div>
+    </div>
+
+    <!-- Skeleton shown only while a real request is in flight (initial
+         streams fetch or KPI/sparkline load). Prevents the post-tab-switch
+         "Failed to load" flash by not painting the error state until data
+         actually fails for the *current* mount. -->
+    <LLMInsightsSkeleton v-else-if="!streamsLoaded || loading" />
 
     <!-- Stream has no LLM (gen_ai_*) fields → friendly empty state -->
     <div
@@ -67,9 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Generic error state -->
+    <!-- Generic error state — only after at least one successful mount-load
+         attempt has resolved. -->
     <div
-      v-else-if="error"
+      v-else-if="error && hasLoadedOnce"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
     >
       <q-icon name="error_outline" size="3rem" color="negative" class="tw:mb-3" />
@@ -85,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Empty state -->
     <div
-      v-else-if="!hasData"
+      v-else-if="hasLoadedOnce && !hasData"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
     >
       <q-icon name="info" size="3rem" color="grey-5" class="tw:mb-3" />
@@ -149,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :streamName="activeStream"
             :startTime="startTime"
             :endTime="endTime"
+            @view-trace="onViewTrace"
           />
         </div>
       </div>
@@ -157,7 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import KpiSparkline from "./KpiSparkline.vue";
 import LLMTrendPanel from "./LLMTrendPanel.vue";
@@ -166,50 +197,26 @@ import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import useStreams from "@/composables/useStreams";
 
 const { getStreams } = useStreams();
+const router = useRouter();
+const store = useStore();
 
 interface Props {
   streamName: string;
   startTime: number; // microseconds
   endTime: number; // microseconds
+  /**
+   * Bumped by the parent whenever the page-level "Run query" button is
+   * clicked while this tab is active. We watch this value so the dashboard
+   * refreshes even when the time range itself didn't change (e.g. absolute
+   * range, or relative range producing identical timestamps).
+   */
+  refreshTrigger?: number;
 }
 
 const props = defineProps<Props>();
 
 // --- Stream selection (mirrors ServiceGraph's pattern) ---
 const STREAM_LS_KEY = "llmInsights_streamFilter";
-
-const availableStreams = ref<string[]>([]);
-const activeStream = ref<string>(
-  localStorage.getItem(STREAM_LS_KEY) || props.streamName || "default",
-);
-
-async function loadTraceStreams() {
-  try {
-    const res = await getStreams("traces", false, false);
-    if (res?.list?.length > 0) {
-      // Show every stream unless the backend has explicitly marked it as
-      // *not* an LLM stream. Legacy streams that pre-date `is_llm_stream`
-      // (field undefined) are still included — only an explicit `false`
-      // hides a stream from the LLM Insights selector.
-      const llmStreams = res.list.filter(
-        (stream: any) => stream?.settings?.is_llm_stream !== false,
-      );
-      availableStreams.value = llmStreams.map((stream: any) => stream.name);
-      // If the persisted/prop stream isn't in the list, fall back to the first one.
-      if (!availableStreams.value.includes(activeStream.value)) {
-        activeStream.value = availableStreams.value[0] || "";
-      }
-    }
-  } catch (e) {
-    console.error("Error loading trace streams:", e);
-  }
-}
-
-function onStreamChange(stream: string) {
-  activeStream.value = stream;
-  localStorage.setItem(STREAM_LS_KEY, stream);
-  loadData();
-}
 
 const {
   kpi,
@@ -219,7 +226,54 @@ const {
   error,
   fetchAll,
   reset: resetInsights,
+  lastFetchKey,
+  hasLoadedOnce,
+  fetchKey,
+  availableStreams,
+  streamsLoaded,
 } = useLLMInsights();
+
+// activeStream is component-local (drives the q-select v-model), but its
+// initial value falls back to localStorage / parent prop. Once the streams
+// list is reconciled, it's clamped to a valid option.
+const activeStream = ref<string>(
+  localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
+);
+
+function onViewTrace(traceId: string) {
+  if (!traceId) return;
+  router.push({
+    name: "traceDetails",
+    query: {
+      stream: activeStream.value,
+      trace_id: traceId,
+      from: props.startTime,
+      to: props.endTime,
+      org_identifier: store.state.selectedOrganization?.identifier,
+    },
+  });
+}
+
+async function loadTraceStreams() {
+  streamsLoaded.value = false;
+  try {
+    const res = await getStreams("traces", false, false);
+    const list = res?.list || [];
+    const llmStreams = list.filter(
+      (stream: any) => stream?.settings?.is_llm_stream !== false,
+    );
+    availableStreams.value = llmStreams.map((stream: any) => stream.name);
+    if (!availableStreams.value.includes(activeStream.value)) {
+      activeStream.value = availableStreams.value[0] || "";
+    }
+  } catch (e) {
+    console.error("Error loading trace streams:", e);
+    availableStreams.value = [];
+    activeStream.value = "";
+  } finally {
+    streamsLoaded.value = true;
+  }
+}
 
 const hasData = computed(() => kpi.value.requestCount > 0);
 
@@ -373,32 +427,60 @@ const kpiCards = computed<KpiCard[]>(() => {
   ];
 });
 
-const hasLoadedOnce = ref(false);
-
 async function loadData() {
+  // Don't fire a query without a stream or time range.
   if (!activeStream.value || !props.startTime || !props.endTime) return;
-  try {
-    await fetchAll(activeStream.value, props.startTime, props.endTime);
-  } finally {
-    hasLoadedOnce.value = true;
-  }
+  // Persist the chosen stream — picked up on next mount.
+  localStorage.setItem(STREAM_LS_KEY, activeStream.value);
+  await fetchAll(activeStream.value, props.startTime, props.endTime);
 }
 
+// Stream change is an explicit user action — auto-apply.
+function onStreamChange() {
+  loadData();
+}
+
+// Single watch covering both code paths that should refresh the panels:
+//
+//   1. User changes the time range → props.startTime / endTime change
+//      (same convention as every other Traces sub-tab).
+//   2. User clicks the page-level Run query → parent bumps refreshTrigger
+//      so we refresh even when an absolute range hasn't moved.
+//
+// Combining them into one watch keyed on the (start, end, trigger) tuple
+// means clicking Run query on a relative range — which both bumps the
+// trigger AND produces fresh timestamps — only fires loadData once.
 watch(
-  () => [activeStream.value, props.startTime, props.endTime],
-  () => {
+  () => `${props.startTime}|${props.endTime}|${props.refreshTrigger ?? 0}`,
+  (next, prev) => {
+    if (next === prev) return;
+    if (!streamsLoaded.value || !activeStream.value) return;
     loadData();
   },
 );
 
 onMounted(async () => {
-  await loadTraceStreams();
-  loadData();
+  // Streams list is also cached at module level — refetch only on first
+  // visit so subsequent tab switches don't trigger any network call at all.
+  if (!streamsLoaded.value) {
+    await loadTraceStreams();
+  } else if (!availableStreams.value.includes(activeStream.value)) {
+    // Cache exists from a prior mount but the persisted activeStream isn't
+    // valid for this org / availability list — clamp to first option.
+    activeStream.value = availableStreams.value[0] || "";
+  }
+
+  // First visit (no cached data) → auto-fetch once. Subsequent tab switches
+  // hit the singleton cache and render immediately. To refresh, the user
+  // clicks Run Query (or changes stream/time then clicks).
+  if (!hasLoadedOnce.value && activeStream.value) {
+    loadData();
+  }
 });
 
-onUnmounted(() => {
-  resetInsights();
-});
+// Intentionally NOT resetting on unmount — preserving the loaded data is
+// what makes tab-switching cheap. The composable's reset() is only called
+// on explicit user action (or on logout/org switch elsewhere).
 </script>
 
 <style lang="scss" scoped>

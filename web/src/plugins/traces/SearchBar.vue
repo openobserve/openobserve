@@ -157,7 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="
           searchObj.meta.searchMode !== 'service-graph' &&
-          searchObj.meta.searchMode !== 'services-catalog'
+          searchObj.meta.searchMode !== 'services-catalog' &&
+          searchObj.meta.searchMode !== 'llm-insights'
         "
         class="float-right col-auto tw:flex tw:items-center tw:gap-[0.375rem]"
       >
@@ -387,6 +388,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             class="tw:mr-[0.375rem]"
             @click="$emit('services-catalog-refresh')"
+          >
+            <q-icon name="refresh" size="16px" />
+            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+          </OButton>
+        </div>
+      </div>
+
+      <!-- LLM Insights right toolbar: DateTime, Refresh. Mirrors the
+           services-catalog pattern — no Run query button, just a manual
+           refresh that emits `searchdata` (parent bumps llmRefreshNonce). -->
+      <div
+        v-if="searchObj.meta.searchMode === 'llm-insights'"
+        class="float-right col-auto o2-input-full"
+      >
+        <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
+          <date-time
+            ref="dateTimeRef"
+            auto-apply
+            :default-type="searchObj.data.datetime.type"
+            :default-absolute-time="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+            data-test="llm-insights-date-time-picker"
+            class="tw:h-[2rem]!"
+            @on:date-change="updateDateTime"
+          />
+          <OButton
+            data-test="llm-insights-refresh-btn"
+            variant="outline"
+            size="icon-toolbar"
+            class="tw:mr-[0.375rem]"
+            @click="searchData"
           >
             <q-icon name="refresh" size="16px" />
             <q-tooltip>{{ t("common.refresh") }}</q-tooltip>

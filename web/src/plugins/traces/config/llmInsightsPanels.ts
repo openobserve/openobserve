@@ -260,13 +260,16 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     color: "#ef4444",
     gapFill: "zero",
     query: {
+      // No baseFilter: OTel SDKs typically propagate the failure to a deep
+      // child span (e.g. tool.<name>) which doesn't carry
+      // gen_ai_operation_name. The chosen stream is LLM-marked, so every
+      // error in it is relevant to the dashboard.
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
           COUNT(*) as count
         FROM {{stream}}
-        WHERE ${baseFilter}
-          AND span_status = 'ERROR'
+        WHERE span_status = 'ERROR'
         GROUP BY ts
         ORDER BY ts
       `,
@@ -327,17 +330,24 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     layout: { colSpan: 2 },
     emptyStateText: "No errors in this time range",
     query: {
+      // No baseFilter for the same reason as errors-over-time. Operation
+      // label uses `operation_name` (the actual OO traces column) — `span_name`
+      // does not exist in the schema and would fail at SQL parse time, which
+      // was producing the "Failed to fetch query data" error.
+      //
+      // We deliberately don't surface model/cost here: the failure usually
+      // lives on a deep child span (e.g. `tool.<name>`) which doesn't carry
+      // those attributes — the LLM call that triggered the tool does, but
+      // joining back up the trace is out of scope for this panel. The
+      // dedicated Cost / Tokens panels handle attribution.
       sql: `
         SELECT
           _timestamp,
           COALESCE(service_name, 'unknown') as service_name,
-          COALESCE(span_name, '—') as operation,
-          COALESCE(${MODEL_FIELD}, 'unknown') as model,
-          COALESCE(${COST_FIELD}, 0) as cost,
+          COALESCE(operation_name, '—') as operation,
           trace_id
         FROM {{stream}}
-        WHERE ${baseFilter}
-          AND span_status = 'ERROR'
+        WHERE span_status = 'ERROR'
         ORDER BY _timestamp DESC
         LIMIT 10
       `,
@@ -346,8 +356,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       { field: "_timestamp", label: "Time", format: "time" },
       { field: "service_name", label: "Service", format: "service-chip" },
       { field: "operation", label: "Operation", format: "error" },
-      { field: "model", label: "Model", format: "text" },
-      { field: "cost", label: "Cost", format: "cost", align: "right" },
+      { field: "trace_id", label: "Trace ID", format: "text" },
       { field: "trace_id", label: "", format: "view-link", align: "right" },
     ],
   },
