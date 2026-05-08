@@ -15,12 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    style="width: 55vw"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer
+    :open="open"
+    size="lg"
+    :show-close="false"
+    @update:open="emit('update:open', $event)"
   >
-    <!-- Header — matches Stream Detail (schema.vue) layout -->
-    <q-card-section class="q-ma-none">
+    <!-- #header override required: header contains alert name/type badges,
+         tab toggle, and datetime picker — too complex for title + sub-slots -->
+    <template #header>
       <div class="row items-center no-wrap">
         <div class="col">
           <div
@@ -129,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
           <OButton
-            @click="$emit('close')"
+            @click="emit('update:open', false)"
             variant="ghost"
             size="icon-circle-sm"
             data-test="alert-details-close-btn"
@@ -138,13 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-    </q-card-section>
-    <q-separator />
+    </template>
 
     <!-- Content -->
     <div
       class="tw:flex tw:flex-col"
-      style="height: calc(100vh - 60px); overflow: hidden"
       v-if="alertDetails"
     >
       <!-- Tab Panels -->
@@ -517,12 +518,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
       </OTabPanels>
     </div>
-  </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -548,6 +550,7 @@ interface Props {
   alertDetails: any;
   alertId: string;
   alertType?: string;
+  open?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -564,7 +567,9 @@ const anomalySql = computed(() => {
   return buildAnomalyPreviewSql(d);
 });
 
-const emit = defineEmits([]);
+const emit = defineEmits<{
+  'update:open': [value: boolean];
+}>();
 
 const resultTotal = ref(0);
 

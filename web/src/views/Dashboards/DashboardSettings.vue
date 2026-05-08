@@ -15,6 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <ODrawer
+    :open="open"
+    :width="73"
+    title="Dashboard Settings"
+    @update:open="$emit('update:open', $event)"
+  >
   <div
     class="q-pa-none"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
@@ -76,9 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-splitter>
   </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
@@ -95,12 +103,18 @@ import { getImageURL } from "../../utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel,
+    ODrawer, OTabs, OTab, OTabPanels, OTabPanel,
     VariableSettings,
     GeneralSettings,
     TabsSettings,
   },
-  emits: ["refresh", "close"],
+  emits: ["refresh", "close", "update:open"],
+  props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
+  },
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();

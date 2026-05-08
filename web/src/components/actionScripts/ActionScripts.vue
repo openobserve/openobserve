@@ -220,21 +220,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
     <template>
-      <ODialog v-model:open="showForm" persistent size="md" :show-close="false">
-        <template #header>
-          <div class="tw:flex tw:items-center tw:gap-3">
-            <div
-              data-test="add-action-back-btn"
-              class="flex justify-center items-center cursor-pointer"
-              style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
-              title="Go Back"
-              @click="showForm = false"
-            >
-              <q-icon name="arrow_back_ios_new" size="14px" />
-            </div>
-            <div class="text-h6" data-test="clone-alert-title">
-              {{ t("alerts.cloneTitle") }}
-            </div>
+      <ODialog
+        v-model:open="showForm"
+        persistent
+        size="md"
+        :show-close="false"
+        :title="t('alerts.cloneTitle')"
+        :secondary-button-label="t('alerts.cancel')"
+        :primary-button-label="t('alerts.save')"
+        :primary-button-disabled="isSubmitting"
+        @click:secondary="showForm = false"
+        @click:primary="submitForm"
+      >
+        <template #header-left>
+          <div
+            data-test="add-action-back-btn"
+            class="flex justify-center items-center cursor-pointer"
+            style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
+            title="Go Back"
+            @click="showForm = false"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
         </template>
             <q-form id="action-script-clone-form" @submit="submitForm">
@@ -265,26 +271,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :input-debounce="400"
               />
             </q-form>
-            <template #footer>
-              <div class="tw:flex tw:justify-end tw:gap-2">
-                <OButton
-                  data-test="clone-action-cancel-btn"
-                  variant="outline"
-                  size="sm-action"
-                  @click="showForm = false"
-                  >{{ t("alerts.cancel") }}</OButton
-                >
-                <OButton
-                  data-test="clone-action-submit-btn"
-                  variant="primary"
-                  size="sm-action"
-                  type="submit"
-                  form="action-script-clone-form"
-                  :disabled="isSubmitting"
-                  >{{ t("alerts.save") }}</OButton
-                >
-              </div>
-            </template>
         </ODialog>
       </template>
   </div>

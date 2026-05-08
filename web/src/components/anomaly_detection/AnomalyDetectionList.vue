@@ -169,46 +169,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-table>
 
     <!-- Confirm delete dialog -->
-    <ODialog v-model:open="showDeleteDialog" persistent size="xs" :title="t('alerts.delete')">
+    <ODialog
+      v-model:open="showDeleteDialog"
+      persistent
+      size="xs"
+      :title="t('alerts.delete')"
+      :secondary-button-label="t('alerts.cancel')"
+      :primary-button-label="t('alerts.delete')"
+      primary-button-variant="destructive"
+      :primary-button-loading="deleting"
+      @click:secondary="showDeleteDialog = false"
+      @click:primary="deleteConfig"
+    >
       <p>
         Are you sure you want to delete
         <strong>{{ pendingDeleteRow?.name }}</strong>?
         This will also delete the trained model.
       </p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showDeleteDialog = false">{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            :loading="deleting"
-            @click="deleteConfig"
-          >
-            {{ t('alerts.delete') }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
     <!-- Confirm cancel training dialog -->
-    <ODialog v-model:open="showCancelTrainingDialog" persistent size="xs" title="Stop Training">
+    <ODialog
+      v-model:open="showCancelTrainingDialog"
+      persistent
+      size="xs"
+      title="Stop Training"
+      :secondary-button-label="t('alerts.cancel')"
+      primary-button-label="Stop Training"
+      primary-button-variant="ghost-warning"
+      :primary-button-loading="cancellingId === pendingCancelRow?.anomaly_id"
+      @click:secondary="showCancelTrainingDialog = false"
+      @click:primary="cancelTraining"
+    >
       <p>
         Stop the ongoing training for <strong>{{ pendingCancelRow?.name }}</strong>?
         The model will not be updated. You can retrigger training afterwards.
       </p>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showCancelTrainingDialog = false">{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            variant="ghost-warning"
-            size="sm-action"
-            :loading="cancellingId === pendingCancelRow?.anomaly_id"
-            @click="cancelTraining"
-          >
-            Stop Training
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
     <!-- Confirm retrain dialog -->
@@ -217,6 +213,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       persistent
       size="sm"
       :title="pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
+      :secondary-button-label="t('alerts.cancel')"
+      :primary-button-label="pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
+      :primary-button-variant="pendingRetrainRow?.status === 'failed' ? 'destructive' : 'primary'"
+      :primary-button-loading="retrainingId === pendingRetrainRow?.anomaly_id"
+      @click:secondary="showRetrainDialog = false"
+      @click:primary="retrain"
     >
       <!-- Error detail for failed state -->
       <template v-if="pendingRetrainRow?.status === 'failed' && pendingRetrainRow?.last_error">
@@ -240,19 +242,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
         <div v-if="pendingRetrainRow?.training_completed_at" class="text-caption text-grey-6">
           Last trained: {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
-        </div>
-      </template>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="showRetrainDialog = false">{{ t('alerts.cancel') }}</OButton>
-          <OButton
-            :variant="pendingRetrainRow?.status === 'failed' ? 'destructive' : 'primary'"
-            size="sm-action"
-            :loading="retrainingId === pendingRetrainRow?.anomaly_id"
-            @click="retrain"
-          >
-            {{ pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining') }}
-          </OButton>
         </div>
       </template>
     </ODialog>

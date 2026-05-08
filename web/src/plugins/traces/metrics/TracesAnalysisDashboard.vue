@@ -19,110 +19,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="isOpen"
     :width="90"
     :show-close="false"
+    :title="drawerTitle"
     @update:open="(v) => !v && onClose()"
   >
-    <!-- Header -->
-    <template #header>
-      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-        <div class="tw:flex tw:items-center tw:gap-1 tw:flex-wrap">
-          <q-icon name="timeline" size="1.5rem" color="primary" />
-          <span
-            class="tw:text-[var(--o2-text-4)]! tw:text-lg tw:font-semibold tw:whitespace-nowrap"
+    <template #header-left>
+      <q-icon name="timeline" size="1.5rem" color="primary" />
+    </template>
+    <template #header-right>
+      <!-- Time Range Display: Inline chips -->
+      <div
+        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap"
+      >
+        <!-- Baseline Chip -->
+        <div
+          class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+          :style="{ '--chip-color': chipColors.baseline }"
+        >
+          <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
+            >Baseline:</span
           >
-            <template v-if="props.analysisType === 'duration'">{{
-              t("latencyInsights.title")
-            }}</template>
-            <template v-else-if="props.analysisType === 'volume'">{{
-              t("volumeInsights.title")
-            }}</template>
-            <template v-else-if="props.analysisType === 'error'">{{
-              t("errorInsights.title")
-            }}</template>
-          </span>
-
-          <!-- Time Range Display: Inline chips -->
-          <div
-            class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-[1rem]"
-          >
-            <!-- Baseline Chip -->
-            <div
-              class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
-              :style="{ '--chip-color': chipColors.baseline }"
-            >
-              <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
-                >Baseline:</span
-              >
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-                formatSmartTimestamp(
-                  baselineTimeRange.startTime,
-                  baselineTimeRange.endTime,
-                ).start
-              }}</span>
-              <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-                formatSmartTimestamp(
-                  baselineTimeRange.startTime,
-                  baselineTimeRange.endTime,
-                ).end
-              }}</span>
-            </div>
-
-            <!-- Selected Chip -->
-            <div
-              v-if="hasSelectedTimeRange"
-              class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
-              :style="{ '--chip-color': chipColors.selected }"
-            >
-              <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
-                >Selected:</span
-              >
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-                formatSmartTimestamp(
-                  selectedTimeRangeDisplay.startTime,
-                  selectedTimeRangeDisplay.endTime,
-                ).start
-              }}</span>
-              <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-                formatSmartTimestamp(
-                  selectedTimeRangeDisplay.startTime,
-                  selectedTimeRangeDisplay.endTime,
-                ).end
-              }}</span>
-            </div>
-
-            <!-- Additional filter info -->
-            <span
-              v-if="filterMetadata"
-              class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1"
-            >
-              {{ filterMetadata }}
-            </span>
-          </div>
+          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+            formatSmartTimestamp(
+              baselineTimeRange.startTime,
+              baselineTimeRange.endTime,
+            ).start
+          }}</span>
+          <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
+          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+            formatSmartTimestamp(
+              baselineTimeRange.startTime,
+              baselineTimeRange.endTime,
+            ).end
+          }}</span>
         </div>
 
-        <div class="tw:flex tw:items-center tw:gap-3">
-          <!-- Refresh button (shown when percentile changes on duration tab) -->
-          <OButton
-            v-if="showRefreshButton"
-            variant="primary"
-            size="icon-xs-sq"
-            @click="refreshAfterPercentileChange"
-            data-test="percentile-refresh-button"
+        <!-- Selected Chip -->
+        <div
+          v-if="hasSelectedTimeRange"
+          class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+          :style="{ '--chip-color': chipColors.selected }"
+        >
+          <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
+            >Selected:</span
           >
-            <RefreshCw class="tw:size-3.5 tw:shrink-0" />
-            <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
-          </OButton>
-
-          <OButton
-            variant="ghost"
-            size="icon-xs-sq"
-            @click="isOpen = false"
-            data-test="analysis-dashboard-close"
-          >
-            <X class="tw:size-3.5 tw:shrink-0" />
-          </OButton>
+          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+            formatSmartTimestamp(
+              selectedTimeRangeDisplay.startTime,
+              selectedTimeRangeDisplay.endTime,
+            ).start
+          }}</span>
+          <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
+          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+            formatSmartTimestamp(
+              selectedTimeRangeDisplay.startTime,
+              selectedTimeRangeDisplay.endTime,
+            ).end
+          }}</span>
         </div>
+
+        <!-- Additional filter info -->
+        <span
+          v-if="filterMetadata"
+          class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1"
+        >
+          {{ filterMetadata }}
+        </span>
+      </div>
+
+      <div class="tw:flex tw:items-center tw:gap-3 tw:ml-2">
+        <!-- Refresh button (shown when percentile changes on duration tab) -->
+        <OButton
+          v-if="showRefreshButton"
+          variant="primary"
+          size="icon-xs-sq"
+          @click="refreshAfterPercentileChange"
+          data-test="percentile-refresh-button"
+        >
+          <RefreshCw class="tw:size-3.5 tw:shrink-0" />
+          <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
+        </OButton>
+
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          @click="isOpen = false"
+          data-test="analysis-dashboard-close"
+        >
+          <X class="tw:size-3.5 tw:shrink-0" />
+        </OButton>
       </div>
     </template>
 
@@ -432,6 +416,14 @@ const { generateDashboard } = useLatencyInsightsDashboard();
 const variablesManager = ref(null);
 
 const isOpen = ref(true);
+
+// Computed title for the drawer header based on analysis type
+const drawerTitle = computed(() => {
+  if (props.analysisType === 'duration') return t('latencyInsights.title');
+  if (props.analysisType === 'volume') return t('volumeInsights.title');
+  if (props.analysisType === 'error') return t('errorInsights.title');
+  return '';
+});
 const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
 const showDimensionSelector = ref(true); // Changed to true - now controls sidebar visibility

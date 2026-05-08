@@ -843,15 +843,12 @@ size="14px"
     <ODrawer
       v-model:open="showFilterPopover"
       :width="30"
+      :title="t('traces.traceFilters')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="t('traces.showTraces')"
+      @click:secondary="showFilterPopover = false"
+      @click:primary="applyAndViewTraces"
     >
-      <template #header>
-        <div
-          class="tw:text-lg tw:font-semibold tw:text-[var(--o2-text-primary)]"
-        >
-          {{ t("traces.traceFilters") }}
-        </div>
-      </template>
-
       <div class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded">
         <CodeQueryEditor
           v-model:query="localEditorValue"
@@ -859,25 +856,6 @@ size="14px"
           class="tw:h-full tw:w-full"
         />
       </div>
-
-      <template #footer>
-        <div class="tw:flex tw:gap-2 tw:justify-end">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="showFilterPopover = false"
-          >
-            {{ t('common.cancel') }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="applyAndViewTraces"
-          >
-            {{ t('traces.showTraces') }}
-          </OButton>
-        </div>
-      </template>
     </ODrawer>
   </div>
 </template>

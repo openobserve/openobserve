@@ -277,13 +277,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- Group Details Dialog -->
-  <ODialog v-model:open="showGroupDialog" size="md">
-    <template #header>
-      <div>
-        <div class="tw:font-semibold tw:text-sm">{{ selectedGroup?.display }}</div>
-        <div class="tw:text-xs tw:text-gray-500">ID: {{ selectedGroup?.id }}</div>
-      </div>
-    </template>
+  <ODialog
+    v-model:open="showGroupDialog"
+    size="md"
+    :title="selectedGroup?.display"
+    :sub-title="`ID: ${selectedGroup?.id}`"
+    primary-button-label="Close"
+    @click:primary="showGroupDialog = false"
+  >
     <div>
       <div class="text-subtitle2 q-mb-sm">
         Fields ({{ selectedGroup?.fields.length }})
@@ -298,21 +299,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ field }}
       </q-chip>
     </div>
-    <template #footer>
-      <div class="tw:flex tw:justify-end">
-        <OButton variant="outline" size="sm-action" @click="showGroupDialog = false">Close</OButton>
-      </div>
-    </template>
   </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <ODialog v-model:open="showModificationDialog" size="lg">
-    <template #header>
-      <div>
-        <div class="tw:font-semibold tw:text-sm">{{ selectedModification?.proposed.display }}</div>
-        <div class="tw:text-xs tw:text-gray-500">Compare Changes</div>
-      </div>
-    </template>
+  <ODialog
+    v-model:open="showModificationDialog"
+    size="lg"
+    :title="selectedModification?.proposed.display"
+    sub-title="Compare Changes"
+    primary-button-label="Close"
+    @click:primary="showModificationDialog = false"
+  >
     <div class="row q-col-gutter-md">
       <div class="col-6">
         <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
@@ -356,11 +353,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <template #footer>
-      <div class="tw:flex tw:justify-end">
-        <OButton variant="outline" size="sm-action" @click="showModificationDialog = false">Close</OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

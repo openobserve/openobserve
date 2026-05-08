@@ -176,10 +176,7 @@
       <q-separator class="tw:bg-[#DBDBDB]" />
 
       <!-- History Panel -->
-      <ODrawer v-model:open="showHistory" size="sm">
-        <template #header>
-          <div class="text-h6">Chat History</div>
-        </template>
+      <ODrawer v-model:open="showHistory" size="sm" title="Chat History">
         <q-list separator>
           <q-item
             v-for="chat in chatHistory"
@@ -202,10 +199,15 @@
       </ODrawer>
 
       <!-- Edit Title Dialog -->
-      <ODialog v-model:open="showEditTitleDialog" size="sm">
-        <template #header>
-          <div class="text-h6">Edit Chat Title</div>
-        </template>
+      <ODialog
+        v-model:open="showEditTitleDialog"
+        size="sm"
+        title="Edit Chat Title"
+        secondary-button-label="Cancel"
+        primary-button-label="Save"
+        @click:secondary="showEditTitleDialog = false"
+        @click:primary="saveEditedTitle"
+      >
         <q-input
           v-model="editingTitle"
           dense
@@ -214,16 +216,6 @@
           @keyup.enter="saveEditedTitle"
           placeholder="Enter chat title"
         />
-        <template #footer>
-          <div class="flex justify-end tw:gap-2">
-            <OButton variant="outline" size="sm-action" @click="showEditTitleDialog = false"
-              >Cancel</OButton
-            >
-            <OButton variant="primary" size="sm-action" @click="saveEditedTitle"
-              >Save</OButton
-            >
-          </div>
-        </template>
       </ODialog>
 
       <!-- Delete Chat Confirmation Dialog -->
@@ -246,10 +238,7 @@
 
 
       <!-- Image Preview Dialog -->
-      <ODialog v-model:open="showImagePreview" @update:open="(v) => !v && closeImagePreview()" size="lg">
-        <template #header>
-          <div class="text-subtitle1">{{ previewImage?.filename }}</div>
-        </template>
+      <ODialog v-model:open="showImagePreview" @update:open="(v) => !v && closeImagePreview()" size="lg" :title="previewImage?.filename">
         <div class="tw:flex tw:justify-center">
           <img
             v-if="previewImage"

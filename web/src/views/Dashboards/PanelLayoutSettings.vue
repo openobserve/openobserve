@@ -15,6 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <ODrawer
+    :open="open"
+    size="sm"
+    :title="t('panel.layout')"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="submitForm()"
+  >
   <div
     class="q-pa-none tw:w-[300px]!"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
@@ -72,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-form>
   </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -80,16 +91,21 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: {},
+  components: { ODrawer },
   props: {
     layout: {
       type: Object,
       required: true,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["save:layout", "close"],
+  emits: ["save:layout", "close", "update:open"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();

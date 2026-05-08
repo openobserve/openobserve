@@ -15,7 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer v-model:open="show" side="right" size="lg" title="Add Dashboard from Gallery">
+  <ODrawer
+    v-model:open="show"
+    side="right"
+    size="lg"
+    title="Add Dashboard from Gallery"
+    secondary-button-label="Cancel"
+    :primary-button-label="`Next (${selectedDashboards.length})`"
+    :primary-button-disabled="selectedDashboards.length === 0"
+    @click:secondary="show = false"
+    @click:primary="handleNext"
+  >
         <!-- Loading State -->
         <div
           v-if="loading"
@@ -107,28 +117,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
           </q-list>
         </div>
-  <template #footer>
-    <div class="tw:flex tw:justify-end tw:gap-2">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="show = false"
-        data-test="add-dashboard-github-cancel"
-        >Cancel</OButton
-      >
-      <OButton
-        variant="primary"
-        size="sm-action"
-        :disabled="selectedDashboards.length === 0"
-        @click="handleNext"
-        data-test="add-dashboard-github-next"
-        >Next ({{ selectedDashboards.length }})</OButton
-      >
-    </div>
-  </template>
 
     <!-- Folder Selection Dialog -->
-    <ODialog v-model:open="showFolderSelection" persistent size="sm" title="Select Destination Folder">
+    <ODialog
+      v-model:open="showFolderSelection"
+      persistent
+      size="sm"
+      title="Select Destination Folder"
+      secondary-button-label="Back"
+      primary-button-label="Add Dashboard"
+      :primary-button-disabled="!selectedFolderObj"
+      :primary-button-loading="importing"
+      @click:secondary="showFolderSelection = false"
+      @click:primary="confirmAdd"
+    >
       <div class="tw:flex tw:items-center tw:gap-2">
         <q-select
           v-model="selectedFolderObj"
@@ -153,25 +155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left><q-icon name="add" /></template>
         </OButton>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="showFolderSelection = false"
-            >Back</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!selectedFolderObj"
-            :loading="importing"
-            @click="confirmAdd"
-            data-test="add-dashboard-github-confirm"
-            >Add Dashboard</OButton
-          >
-        </div>
-      </template>
     </ODialog>
 
     <!-- Add Folder Dialog -->

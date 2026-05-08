@@ -311,7 +311,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <ODialog v-model:open="detailsDialog" :width="55" title="Alert Execution Details">
+    <ODialog
+      v-model:open="detailsDialog"
+      :width="55"
+      title="Alert Execution Details"
+      primary-button-label="Close"
+      @click:primary="detailsDialog = false"
+    >
       <div v-if="selectedRow" class="q-gutter-sm">
             <!-- Basic Information -->
             <div class="detail-section">
@@ -504,26 +510,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end">
-          <OButton variant="outline" size="sm-action" @click="detailsDialog = false">Close</OButton>
-        </div>
-      </template>
     </ODialog>
 
     <!-- Error Dialog -->
-    <ODialog v-model:open="errorDialog" size="md">
-      <template #header>
-        <div class="tw:flex tw:flex-col tw:gap-1">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-icon name="error" size="18px" class="error-icon" />
-            <span class="pipeline-name tw:font-semibold tw:text-sm">{{ errorMessage.alert_name }}</span>
-          </div>
-          <div class="error-timestamp tw:text-xs">
-            <span class="tw:mr-1">Last error:</span>
-            <q-icon name="schedule" size="14px" class="tw:mr-1" />
-            {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
-          </div>
+    <ODialog
+      v-model:open="errorDialog"
+      size="md"
+      :title="errorMessage.alert_name"
+      primary-button-label="Close"
+      @click:primary="closeErrorDialog"
+    >
+      <template #header-left>
+        <q-icon name="error" size="18px" class="error-icon" />
+      </template>
+      <template #header-right>
+        <div class="error-timestamp tw:text-xs">
+          <span class="tw:mr-1">Last error:</span>
+          <q-icon name="schedule" size="14px" class="tw:mr-1" />
+          {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
         </div>
       </template>
 
@@ -533,12 +537,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ errorMessage.error }}
         </div>
       </div>
-
-      <template #footer>
-        <div class="tw:flex tw:justify-end">
-          <OButton variant="outline" size="sm-action" @click="closeErrorDialog">Close</OButton>
-        </div>
-      </template>
     </ODialog>
   </div>
 </template>
