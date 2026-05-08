@@ -250,23 +250,21 @@
   </q-card>
 
   <!-- Enhanced Settings Dialog -->
-  <ODialog v-model:open="showSettings" size="sm" title="Service Graph Settings">
+  <ODialog
+    v-model:open="showSettings"
+    size="sm"
+    title="Service Graph Settings"
+    secondary-button-label="Close"
+    primary-button-label="Reset"
+    @click:secondary="showSettings = false"
+    @click:primary="resetSettings"
+  >
     <div class="q-gutter-md">
       <div class="text-caption text-grey-7">
         Stream-based topology - all data persisted to storage
         <q-tooltip>Service graph uses stream-only architecture with zero in-memory state</q-tooltip>
       </div>
     </div>
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton variant="outline" size="sm-action" @click="showSettings = false">
-          Close
-        </OButton>
-        <OButton variant="primary" size="sm-action" @click="resetSettings">
-          Reset
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

@@ -15,29 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white', !isInPipeline ? 'q-pt-md' : '']"
+  <ODrawer
+    :open="open"
+    size="md"
+    :title="t('logStream.add')"
+    :secondary-button-label="t('logStream.cancel')"
+    :primary-button-label="t('common.save')"
+    @update:open="emits('update:open', $event)"
+    @click:secondary="emits('update:open', false)"
+    @click:primary="submitForm()"
   >
-    <div class="add-stream-header row items-center no-wrap q-px-md">
-      <div class="col">
-        <div style="font-size: 18px" data-test="add-stream-title">
-          {{ t("logStream.add") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <OButton
-          data-test="add-stream-close-btn"
-          @click="$emit('close')"
-          variant="ghost"
-          size="icon-sm"
-        >
-          <X :size="14" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
-    <div class="q-px-md  add-stream-inputs">
-      <q-form @submit="saveStream">
+    <div class="q-px-md add-stream-inputs">
+      <q-form ref="addStreamFormRef" @submit="saveStream">
         <div data-test="add-stream-name-input">
           <q-input
             v-model="streamInputs.name"
@@ -88,28 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add="addField"
           @remove="removeField"
         />
-
-        <div class="flex justify-start q-mt-md tw:gap-2">
-          <OButton
-            @click="$emit('close')"
-            data-test="add-stream-cancel-btn"
-            variant="outline"
-            size="sm-action"
-          >
-            {{ t('logStream.cancel') }}
-          </OButton>
-          <OButton
-            data-test="save-stream-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-          >
-            {{ t('common.save') }}
-          </OButton>
-        </div>
       </q-form>
     </div>
-  </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -124,6 +94,7 @@ import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { X } from "lucide-vue-next";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
@@ -135,15 +106,21 @@ const streamTypes = [
   { label: "Traces", value: "traces" },
 ];
 
-const emits = defineEmits(["streamAdded", "close","added:stream-added"]);
+const emits = defineEmits(["streamAdded", "close", "added:stream-added", "update:open"]);
 const props = defineProps<{
   isInPipeline: boolean;
+  open?: boolean;
 }>();
 
 
 const { addStream, getStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
+const addStreamFormRef = ref<any>(null);
+
+const submitForm = () => {
+  addStreamFormRef.value?.submit();
+};
 
 const store = useStore();
 

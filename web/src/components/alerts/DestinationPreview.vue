@@ -17,13 +17,11 @@ limitations under the License.
   <ODialog
     v-model:open="isOpen"
     :width="55"
+    :title="`${t('alerts.destinationPreview')} - ${getDestinationTypeName(type)}`"
     data-test="destination-preview-dialog"
+    primary-button-label="Close"
+    @click:primary="isOpen = false"
   >
-    <template #header>
-      <span class="tw:font-semibold tw:text-sm tw:truncate">
-        {{ t('alerts.destinationPreview') }} - {{ getDestinationTypeName(type) }}
-      </span>
-    </template>
 
     <div data-test="destination-preview-card" class="preview-card">
         <!-- Slack Preview -->
@@ -256,17 +254,6 @@ limitations under the License.
         </OButton>
       </div>
     </div>
-
-    <template #footer>
-      <div class="tw:flex tw:justify-end">
-        <OButton
-          data-test="preview-close-button"
-          variant="outline"
-          size="sm-action"
-          @click="isOpen = false"
-        >Close</OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

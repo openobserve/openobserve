@@ -290,46 +290,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:runId="updateRunId"
       />
 
-      <ODrawer
+      <DashboardSettings
         v-model:open="showDashboardSettingsDialog"
-        :width="73"
-        title="Dashboard Settings"
+        @refresh="loadDashboard"
         @close="showDashboardSettingsDialog = false"
-      >
-        <DashboardSettings @refresh="loadDashboard" @close="showDashboardSettingsDialog = false" />
-      </ODrawer>
+      />
 
-      <ODrawer
+      <PanelLayoutSettings
+        v-if="selectedPanelConfig.data"
         v-model:open="selectedPanelConfig.show"
-        size="sm"
-        :title="t('panel.layout')"
+        :layout="selectedPanelConfig.data.layout"
+        @save:layout="savePanelLayout"
         @close="selectedPanelConfig.show = false"
-      >
-        <PanelLayoutSettings
-          ref="panelLayoutSettingsRef"
-          :layout="selectedPanelConfig.data.layout"
-          @save:layout="savePanelLayout"
-          @close="selectedPanelConfig.show = false"
-        />
-        <template #footer>
-          <div class="tw:flex tw:justify-end tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="panel-layout-settings-cancel"
-              @click="selectedPanelConfig.show = false"
-              >{{ t("dashboard.cancel") }}</OButton
-            >
-            <OButton
-              variant="primary"
-              size="sm-action"
-              data-test="panel-layout-settings-save"
-              @click="panelLayoutSettingsRef?.submitForm()"
-              >{{ t("dashboard.save") }}</OButton
-            >
-          </div>
-        </template>
-      </ODrawer>
+      />
 
       <ScheduledDashboards
         v-model:open="showScheduledReportsDialog"
@@ -341,37 +314,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :tabs="currentDashboardData?.data?.tabs || []"
       />
 
-      <ODrawer
+      <DashboardJsonEditor
         v-model:open="showJsonEditorDialog"
-        :width="70"
-        title="Edit Dashboard JSON"
-      >
-        <DashboardJsonEditor
-          ref="jsonEditorRef"
-          :dashboard-data="currentDashboardData.data"
-          :save-json-dashboard="saveJsonDashboard"
-        />
-        <template #footer>
-          <div class="tw:flex tw:justify-end tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="json-editor-cancel"
-              @click="showJsonEditorDialog = false"
-              >{{ t("common.cancel") }}</OButton
-            >
-            <OButton
-              variant="primary"
-              size="sm-action"
-              :loading="saveJsonDashboard.isLoading.value"
-              :disabled="saveJsonDashboard.isLoading.value"
-              data-test="json-editor-save"
-              @click="jsonEditorRef?.saveChanges()"
-              >{{ t("common.save") }}</OButton
-            >
-          </div>
-        </template>
-      </ODrawer>
+        :dashboard-data="currentDashboardData.data"
+        :save-json-dashboard="saveJsonDashboard"
+      />
     </div>
   </q-page>
 </template>
@@ -426,7 +373,6 @@ import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -466,7 +412,6 @@ export default defineComponent({
     PanelLayoutSettings,
     DashboardJsonEditor,
     OButton,
-    ODrawer,
   },
   setup() {
     const { t } = useI18n();
@@ -518,7 +463,6 @@ export default defineComponent({
     const reportId = computed(() => route.query.tab);
 
     const renderDashboardChartsRef = ref(null);
-    const panelLayoutSettingsRef = ref(null);
 
     // Initialize dashboard run ID management
     const runId = ref(getUUID().replace(/-/g, ""));
@@ -1858,7 +1802,6 @@ export default defineComponent({
 
     // Add these new refs and methods
     const showJsonEditorDialog = ref(false);
-    const jsonEditorRef = ref(null);
 
     const openJsonEditor = () => {
       showJsonEditorDialog.value = true;
@@ -1953,12 +1896,10 @@ export default defineComponent({
       selectedPanelConfig,
       savePanelLayout,
       renderDashboardChartsRef,
-      panelLayoutSettingsRef,
       folderNameFromFolderId,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
-      jsonEditorRef,
       setTimeForVariables,
       runId,
       onVariablesManagerReady,

@@ -522,6 +522,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :width="30"
                 :title="isFolderEditMode ? t('dashboard.updateFolder') : t('dashboard.newFolder')"
                 data-test="dashboard-folder-dialog"
+                :secondary-button-label="t('dashboard.cancel')"
+                :primary-button-label="t('dashboard.save')"
+                @click:secondary="showAddFolderDialog = false"
+                @click:primary="addFolderRef?.submit()"
               >
                 <AddFolder
                   ref="addFolderRef"
@@ -529,29 +533,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :edit-mode="isFolderEditMode"
                   :folder-id="selectedFolderToEdit ?? 'default'"
                 />
-                <template #footer>
-                  <div class="tw:flex tw:justify-start tw:gap-2">
-                    <OButton variant="outline" size="sm-action" @click="showAddFolderDialog = false" data-test="dashboard-folder-add-cancel">{{ t('dashboard.cancel') }}</OButton>
-                    <OButton variant="primary" size="sm-action" data-test="dashboard-folder-add-save" @click="addFolderRef?.submit()">{{ t('dashboard.save') }}</OButton>
-                  </div>
-                </template>
               </ODrawer>
 
               <!-- move dashboard to another folder -->
-              <ODrawer
+              <MoveDashboardToAnotherFolder
                 v-model:open="showMoveDashboardDialog"
-                size="lg"
-                title="Move Dashboard"
-                @close="showMoveDashboardDialog = false"
+                @updated="handleDashboardMoved"
+                :dashboard-ids="selectedDashboardIdToMove"
+                :activeFolderId="activeFolderToMove"
                 data-test="dashboard-move-to-another-folder-dialog"
-              >
-                <MoveDashboardToAnotherFolder
-                  @updated="handleDashboardMoved"
-                  @close="showMoveDashboardDialog = false"
-                  :dashboard-ids="selectedDashboardIdToMove"
-                  :activeFolderId="activeFolderToMove"
-                />
-              </ODrawer>
+              />
 
               <!-- delete dashboard dialog -->
               <ConfirmDialog

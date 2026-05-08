@@ -267,28 +267,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <ODrawer
-      v-model:open="showIndexSchemaDialog"
-      size="lg"
-      @close="showIndexSchemaDialog = false"
-    >
-      <SchemaIndex v-model="schemaData" @close="showIndexSchemaDialog = false" />
-    </ODrawer>
+    <SchemaIndex v-model="schemaData" v-model:open="showIndexSchemaDialog" @close="showIndexSchemaDialog = false" />
 
-    <ODrawer
+    <AddStream
       v-model:open="addStreamDialog.show"
-      size="md"
-      :show-close="false"
-    >
-      <AddStream
-        :is-in-pipeline="false"
-        @close="addStreamDialog.show = false"
-        @streamAdded="getLogStream"
-      />
-    </ODrawer>
+      :is-in-pipeline="false"
+      @close="addStreamDialog.show = false"
+      @streamAdded="getLogStream"
+    />
 
-    <ODialog v-model:open="confirmDelete" size="sm">
-      <template #header>{{ t("logStream.confirmDeleteHead") }}</template>
+    <ODialog
+      v-model:open="confirmDelete"
+      size="sm"
+      :title="t('logStream.confirmDeleteHead')"
+      :secondary-button-label="t('logStream.cancel')"
+      :primary-button-label="t('logStream.ok')"
+      primary-button-variant="destructive"
+      @click:secondary="confirmDelete = false"
+      @click:primary="() => { deleteStream(); confirmDelete = false; }"
+    >
       <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
       <div
         class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
@@ -301,33 +298,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Delete all pipelines and alerts associated with the stream
         </span>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="confirmDelete = false"
-          >
-            {{ t("logStream.cancel") }}
-          </OButton>
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            @click="
-              () => {
-                deleteStream();
-                confirmDelete = false;
-              }
-            "
-          >
-            {{ t("logStream.ok") }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
 
-    <ODialog v-model:open="confirmBatchDelete" size="sm">
-      <template #header>{{ t("logStream.confirmBatchDeleteHead") }}</template>
+    <ODialog
+      v-model:open="confirmBatchDelete"
+      size="sm"
+      :title="t('logStream.confirmBatchDeleteHead')"
+      :secondary-button-label="t('logStream.cancel')"
+      :primary-button-label="t('logStream.ok')"
+      primary-button-variant="destructive"
+      @click:secondary="confirmBatchDelete = false"
+      @click:primary="() => { deleteBatchStream(); confirmBatchDelete = false; }"
+    >
       <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
       <div
         class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
@@ -340,29 +322,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Delete all pipelines and alerts associated with the selected streams
         </span>
       </div>
-      <template #footer>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="confirmBatchDelete = false"
-          >
-            {{ t("logStream.cancel") }}
-          </OButton>
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            @click="
-              () => {
-                deleteBatchStream();
-                confirmBatchDelete = false;
-              }
-            "
-          >
-            {{ t("logStream.ok") }}
-          </OButton>
-        </div>
-      </template>
     </ODialog>
   </div>
 </template>
@@ -397,7 +356,6 @@ import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import {
   Search,
@@ -418,7 +376,6 @@ export default defineComponent({
     NoData,
     AddStream,
     OButton,
-    ODrawer,
     ODialog,
     OToggleGroup,
     OToggleGroupItem,

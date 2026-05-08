@@ -15,12 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    style="width: 60vw"
-    class="column full-height no-wrap"
-    v-if="indexData.schema"
+  <ODrawer
+    :open="open"
+    size="lg"
+    :show-close="false"
+    @update:open="$emit('update:open', $event)"
   >
-    <q-card-section class="q-ma-none">
+    <!-- #header override: complex stream header with name badge, timeline info,
+         and close button — cannot be expressed with title + sub-slots -->
+    <template #header>
       <div class="row items-center no-wrap">
         <div class="col">
           <div
@@ -38,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
             >
               {{ indexData.name }}
-              <q-tooltip v-if="indexData.name.length > 35" class="tw:text-xs">
+              <q-tooltip v-if="indexData.name && indexData.name.length > 35" class="tw:text-xs">
                 {{ indexData.name }}
               </q-tooltip>
             </span>
@@ -75,14 +78,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
+          <OButton variant="ghost" size="icon-sm" @click="$emit('update:open', false)">
             <X :size="14" />
           </OButton>
         </div>
       </div>
-    </q-card-section>
-    <q-separator />
+    </template>
 
+    <div v-if="indexData.schema">
     <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <!-- we will show loading state here -->
@@ -1038,10 +1041,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </q-card-section>
-  </q-card>
-  <q-card v-else class="column q-pa-md full-height no-wrap">
-    <h5>Wait while loading...</h5>
-  </q-card>
+    </div>
+    <div v-else class="q-pa-md">
+      <h5>Wait while loading...</h5>
+    </div>
+  </ODrawer>
   <ODrawer v-model:open="patternAssociationDialog.show" size="lg" :show-close="false">
     <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
   </ODrawer>
@@ -1131,12 +1135,16 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SchemaIndex",
-  emits: ["close"],
+  emits: ["close", "update:open"],
   props: {
      
     modelValue: {
       type: Object,
       default: () => defaultValue(),
+    },
+    open: {
+      type: Boolean,
+      default: false,
     },
   },
   components: {
