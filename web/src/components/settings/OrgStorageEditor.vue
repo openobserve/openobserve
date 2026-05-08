@@ -62,6 +62,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isEditMode"
               class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
               :class="store.state.theme === 'dark'
+                ? 'tw:bg-amber-950/20 tw:border-amber-400/30'
+                : 'tw:bg-amber-50 tw:border-amber-300'"
+            >
+              <q-icon name="warning" size="18px" color="warning" class="tw:flex-shrink-0 tw:mt-px" />
+              <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
+                This action is <strong>irreversible</strong>. Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.
+              </div>
+            </div>
+            <div
+              v-if="!isEditMode"
+              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+              :class="store.state.theme === 'dark'
                 ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
                 : 'tw:bg-blue-50 tw:border-blue-200'"
             >
