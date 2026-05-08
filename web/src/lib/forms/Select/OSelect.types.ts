@@ -16,8 +16,10 @@ export type SelectSize = "sm" | "md";
 
 export interface SelectOption {
   label: string;
-  value: SelectValue;
+  value?: SelectValue;
   disabled?: boolean;
+  /** When true, renders the item as a non-selectable group header */
+  header?: boolean;
   [key: string]: unknown;
 }
 
@@ -68,6 +70,8 @@ export interface SelectProps {
   id?: string;
   /** HTML name */
   name?: string;
+  /** Helper text displayed below the field */
+  helpText?: string;
   /**
    * Semantic field width — controls how wide the component renders.
    * Defaults to "full" (fills the container).

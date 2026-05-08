@@ -94,6 +94,43 @@
     --color-refresh-dot-stale: var(--color-warning-500);
     --color-refresh-dot-critical: var(--color-error-400);
 
+    /* Input (OInput, OTextarea) */
+    --color-input-bg: var(--color-surface-panel);
+    --color-input-border: var(--color-border-strong);
+    --color-input-disabled-bg: var(--color-surface-subtle);
+    --color-input-placeholder: var(--color-text-disabled);
+    --color-input-error-text: var(--color-error-400);
+    --color-input-border-error: var(--color-error-400);
+
+    /* Select (OSelect) */
+    --color-select-bg: var(--color-surface-panel);
+    --color-select-border: var(--color-border-strong);
+    --color-select-disabled-bg: var(--color-surface-subtle);
+    --color-select-placeholder: var(--color-text-disabled);
+    --color-select-error-text: var(--color-error-400);
+    --color-select-border-error: var(--color-error-400);
+    --color-select-content-bg: var(--color-surface-overlay);
+    --color-select-content-border: var(--color-border-default);
+    --color-select-item-hover-bg: var(--color-primary-900);
+    --color-select-item-selected-bg: var(--color-primary-800);
+    --color-select-item-selected-text: var(--color-primary-200);
+    --color-select-item-disabled: var(--color-text-disabled);
+
+    /* Switch (OSwitch) */
+    --color-switch-track-off: var(--color-grey-600);
+    --color-switch-track-on: var(--color-primary-500);
+    --color-switch-disabled-track-off: var(--color-grey-700);
+    --color-switch-disabled-track-on: var(--color-primary-800);
+    --color-switch-disabled-thumb: var(--color-grey-600);
+
+    /* Checkbox (OCheckbox) */
+    --color-checkbox-bg: var(--color-surface-panel);
+    --color-checkbox-border: var(--color-border-strong);
+    --color-checkbox-checked-bg: var(--color-primary-500);
+    --color-checkbox-checked-border: var(--color-primary-500);
+    --color-checkbox-disabled-bg: var(--color-surface-subtle);
+    --color-checkbox-disabled-border: var(--color-border-default);
+
     /* Dialog */
     --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
     --color-dialog-bg: var(--color-grey-900);
