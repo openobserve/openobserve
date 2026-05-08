@@ -20,12 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="stream-routing-section full-width"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between ">
+    <div
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+    >
       {{ t("pipeline.conditionTitle") }}
       <div>
-          <q-btn round flat icon="cancel" @click="openCancelDialog">
-          </q-btn>
-        </div>
+        <OButton variant="ghost" size="icon" @click="openCancelDialog">
+          <q-icon name="cancel" size="14px" />
+        </OButton>
+      </div>
     </div>
     <q-separator />
 
@@ -35,12 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-pt-sm showLabelOnTop text-bold text-h7"
           data-test="add-condition-query-input-title"
         >
-        <div>
-  </div>
+          <div></div>
           <!-- Wrapper for FilterGroup with pipeline-specific styling -->
           <div class="pipeline-filter-group-wrapper" @submit.stop.prevent>
             <FilterGroup
-              v-if="conditionGroup && (conditionGroup.conditions || conditionGroup.items)"
+              v-if="
+                conditionGroup &&
+                (conditionGroup.conditions || conditionGroup.items)
+              "
               :key="filterGroupKey"
               :stream-fields="filteredColumns"
               :group="conditionGroup"
@@ -53,83 +58,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @remove-group="(groupId) => removeConditionGroup(groupId)"
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
-            <div v-else class="q-pa-md text-grey-7">
-              Loading conditions...
-            </div>
+            <div v-else class="q-pa-md text-grey-7">Loading conditions...</div>
           </div>
-          <q-card class="note-container " >
-
-          <q-card-section class="q-pa-sm ">
-            <div class="note-heading ">Condition value Guidelines:</div>
-            <q-banner  inline dense class="note-info " >
-              <div>
-                <q-icon name="info" color="orange" class="q-mr-sm" />
-                <span>To check for an empty value, use <span class="highlight">""</span>. Example:
-                  <span class="code">app_name != ""</span>
-                </span>
-              </div>
-              <div>
-                <q-icon name="info" color="orange"class="q-mr-sm" />
-                <span>To check for an Null value, use <span class="highlight">null</span>. Example:
-                  <span class="code">app_name != null</span>
-                </span>
-              </div>
-              <div>
-                <q-icon name="info" color="orange" class="q-mr-sm" />
-                <span>To add a custom column, type column name and press <span class="highlight">Enter</span>.</span>
-              </div>
-              <div>
-                <q-icon name="warning" color="red" class="q-mr-sm" />
-                <span>If conditions are not met, the record will be dropped.</span>
-              </div>
-              <div>
-                <q-icon name="warning" color="red" class="q-mr-sm" />
-                <span>If the record does not have the specified field, it will be dropped.</span>
-              </div>
-            </q-banner>
-          </q-card-section>
+          <q-card class="note-container">
+            <q-card-section class="q-pa-sm">
+              <div class="note-heading">Condition value Guidelines:</div>
+              <q-banner inline dense class="note-info">
+                <div>
+                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <span
+                    >To check for an empty value, use
+                    <span class="highlight">""</span>. Example:
+                    <span class="code">app_name != ""</span>
+                  </span>
+                </div>
+                <div>
+                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <span
+                    >To check for an Null value, use
+                    <span class="highlight">null</span>. Example:
+                    <span class="code">app_name != null</span>
+                  </span>
+                </div>
+                <div>
+                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <span
+                    >To add a custom column, type column name and press
+                    <span class="highlight">Enter</span>.</span
+                  >
+                </div>
+                <div>
+                  <q-icon name="warning" color="red" class="q-mr-sm" />
+                  <span
+                    >If conditions are not met, the record will be
+                    dropped.</span
+                  >
+                </div>
+                <div>
+                  <q-icon name="warning" color="red" class="q-mr-sm" />
+                  <span
+                    >If the record does not have the specified field, it will be
+                    dropped.</span
+                  >
+                </div>
+              </q-banner>
+            </q-card-section>
           </q-card>
-
-
         </div>
 
-        <div
-          class="flex justify-start full-width"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        >
-        <q-btn
-          v-if="pipelineObj.isEditNode"
+        <div class="tw:flex tw:gap-2">
+          <OButton
+            v-if="pipelineObj.isEditNode"
             data-test="add-condition-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            color="negative"
-            flat
+            variant="outline-destructive"
+            size="sm-action"
             type="button"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
             @click="openDeleteDialog"
-          >
-          <q-icon name="delete" class="q-mr-xs" />
-          {{ t('pipeline.deleteNode') }}
-        </q-btn>
-          <q-btn
+          >{{ t("pipeline.deleteNode") }}</OButton>
+          <OButton
             data-test="add-condition-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            flat
+            variant="outline"
+            size="sm-action"
             type="button"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
             @click="openCancelDialog"
-          />
-          <q-btn
+          >{{ t('alerts.cancel') }}</OButton>
+          <OButton
             data-test="add-condition-save-btn"
-            :label="t('alerts.save')"
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
+            variant="primary"
+            size="sm-action"
             type="submit"
-          />
+          >{{ t('alerts.save') }}</OButton>
         </div>
       </q-form>
     </div>
@@ -160,6 +158,7 @@ import {
   getTimezonesByOffset,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
@@ -179,7 +178,6 @@ import {
   type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
 
-
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );
@@ -195,12 +193,12 @@ interface FilterCondition {
 
 interface ConditionGroup {
   // V2 properties
-  filterType?: 'group';
-  logicalOperator?: 'AND' | 'OR';
+  filterType?: "group";
+  logicalOperator?: "AND" | "OR";
   conditions?: (FilterCondition | ConditionGroup)[];
   // V1 properties (legacy)
   groupId?: string;
-  label?: 'and' | 'or';
+  label?: "and" | "or";
   items?: (FilterCondition | ConditionGroup)[];
 }
 
@@ -247,11 +245,11 @@ const routeFormRef = ref<any>(null);
 
 const showTimezoneWarning = ref(false);
 
-const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
 const selected = ref(null);
-watch(selected, (newValue:any) => {
-      pipelineObj.userSelectedNode = newValue; 
+watch(selected, (newValue: any) => {
+  pipelineObj.userSelectedNode = newValue;
 });
 let parser: any;
 
@@ -309,10 +307,15 @@ const getDefaultStreamRoute: any = () => {
 // - V1: Tree-based structure with {and: [...]} or {or: [...]} or {label, items, groupId}
 // - V2: Linear structure with filterType, logicalOperator per condition
 const getDefaultConditionGroup = (): ConditionGroup => {
-  if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData?.data?.conditions) {
+  if (
+    pipelineObj.isEditNode &&
+    pipelineObj.currentSelectedNodeData?.data?.conditions
+  ) {
     try {
       // Create a deep copy to avoid mutating the original pipelineObj data
-      const conditions = JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData.data.conditions));
+      const conditions = JSON.parse(
+        JSON.stringify(pipelineObj.currentSelectedNodeData.data.conditions),
+      );
       const version = detectConditionsVersion(conditions);
 
       if (version === 0) {
@@ -341,18 +344,20 @@ const getDefaultConditionGroup = (): ConditionGroup => {
   }
   // Default empty V2 group
   return {
-    filterType: 'group',
-    logicalOperator: 'AND',
+    filterType: "group",
+    logicalOperator: "AND",
     groupId: getUUID(),
-    conditions: [{
-      filterType: 'condition',
-      column: '',
-      operator: '=',
-      value: '',
-      values: [],
-      logicalOperator: 'AND',
-      id: getUUID(),
-    }]
+    conditions: [
+      {
+        filterType: "condition",
+        column: "",
+        operator: "=",
+        value: "",
+        values: [],
+        logicalOperator: "AND",
+        id: getUUID(),
+      },
+    ],
   } as any;
 };
 
@@ -373,7 +378,7 @@ onMounted(async () => {
     }
   }, 100);
 
-  if(pipelineObj.userSelectedNode){
+  if (pipelineObj.userSelectedNode) {
     pipelineObj.userSelectedNode = {};
   }
 });
@@ -393,15 +398,20 @@ const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
 
 // Create a deep copy to preserve the original state for comparison
-const originalConditionGroup: Ref<ConditionGroup> = ref(JSON.parse(JSON.stringify(getDefaultConditionGroup())));
+const originalConditionGroup: Ref<ConditionGroup> = ref(
+  JSON.parse(JSON.stringify(getDefaultConditionGroup())),
+);
 
 // Simple incrementing key to force re-render when needed
 const filterGroupKey = ref(0);
 
 // Watch for label changes specifically to force re-render
-watch(() => conditionGroup.value.label, () => {
-  filterGroupKey.value++;
-});
+watch(
+  () => conditionGroup.value.label,
+  () => {
+    filterGroupKey.value++;
+  },
+);
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
@@ -430,7 +440,7 @@ const isValidStreamName = computed(() => {
   return roleNameRegex.test(streamRoute.value?.name);
 });
 
-const updateStreamFields = async (streamName : any, streamType : any) => {
+const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];
 
   // Fetch stream details including schema and settings
@@ -457,7 +467,8 @@ const updateStreamFields = async (streamName : any, streamType : any) => {
 
     // Get special system field names from config
     // These are OpenObserve internal fields that should always be available
-    const timestampColumn = store.state.zoConfig?.timestamp_column || '_timestamp';
+    const timestampColumn =
+      store.state.zoConfig?.timestamp_column || "_timestamp";
     const allFieldsName = store.state.zoConfig?.all_fields_name;
 
     // Filter the columns to include:
@@ -485,40 +496,50 @@ const getFields = async () => {
   try {
     const allNodes = pipelineObj.currentSelectedPipeline?.nodes || [];
 
-    const inputStreamNode : any = allNodes.find(
-      (node: any) => node.io_type === "input" && node.data.node_type === "stream",
+    const inputStreamNode: any = allNodes.find(
+      (node: any) =>
+        node.io_type === "input" && node.data.node_type === "stream",
     );
 
-    const inputQueryNode :any = allNodes.find(
-      (node: any) => node.io_type === "input" && node.data.node_type === "query",
+    const inputQueryNode: any = allNodes.find(
+      (node: any) =>
+        node.io_type === "input" && node.data.node_type === "query",
     );
 
     const anyStreamNode: any = allNodes.find(
-      (node: any) => node.data?.node_type === "stream" && node.data?.stream_name
+      (node: any) =>
+        node.data?.node_type === "stream" && node.data?.stream_name,
     );
 
     if (inputStreamNode) {
       await updateStreamFields(
-        inputStreamNode.data?.stream_name.value || inputStreamNode.data?.stream_name,
+        inputStreamNode.data?.stream_name.value ||
+          inputStreamNode.data?.stream_name,
         inputStreamNode.data?.stream_type,
       );
     } else if (inputQueryNode) {
       const filteredQuery: any = inputQueryNode?.data?.query_condition.sql
         .split("\n")
-        .filter((line: string) => line.length > 0 && !line.trim().startsWith("--"))
+        .filter(
+          (line: string) => line.length > 0 && !line.trim().startsWith("--"),
+        )
         .join("\n");
-        if(filteredQuery){
-          const parsedSql = parser.astify(filteredQuery);
-          if (parsedSql && parsedSql.from) {
-            const streamNames = parsedSql.from.map((item : any) => item.table);
-            for (const streamName of streamNames) {
-              await updateStreamFields(streamName, inputQueryNode?.data?.stream_type);
-            }
+      if (filteredQuery) {
+        const parsedSql = parser.astify(filteredQuery);
+        if (parsedSql && parsedSql.from) {
+          const streamNames = parsedSql.from.map((item: any) => item.table);
+          for (const streamName of streamNames) {
+            await updateStreamFields(
+              streamName,
+              inputQueryNode?.data?.stream_type,
+            );
           }
         }
+      }
     } else if (anyStreamNode) {
       await updateStreamFields(
-        anyStreamNode.data?.stream_name.value || anyStreamNode.data?.stream_name,
+        anyStreamNode.data?.stream_name.value ||
+          anyStreamNode.data?.stream_name,
         anyStreamNode.data?.stream_type,
       );
     } else {
@@ -539,9 +560,9 @@ const updateGroup = (updatedGroup: any) => {
   const tempContext = {
     formData: {
       query_condition: {
-        conditions: conditionGroup.value
-      }
-    }
+        conditions: conditionGroup.value,
+      },
+    },
   };
 
   // Call the shared utility
@@ -556,13 +577,17 @@ const removeConditionGroup = (targetGroupId: string) => {
   const tempContext = {
     formData: {
       query_condition: {
-        conditions: conditionGroup.value
-      }
-    }
+        conditions: conditionGroup.value,
+      },
+    },
   };
 
   // Call the shared utility
-  removeConditionGroupUtil(targetGroupId, conditionGroup.value, tempContext as any);
+  removeConditionGroupUtil(
+    targetGroupId,
+    conditionGroup.value,
+    tempContext as any,
+  );
 
   // Extract the updated value back
   conditionGroup.value = tempContext.formData.query_condition.conditions;
@@ -574,7 +599,9 @@ const onInputUpdate = (name: string, field: any) => {
 
 const closeDialog = () => {
   // Restore the original condition group when canceling
-  conditionGroup.value = JSON.parse(JSON.stringify(originalConditionGroup.value));
+  conditionGroup.value = JSON.parse(
+    JSON.stringify(originalConditionGroup.value),
+  );
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
   emit("cancel:hideform");
@@ -609,7 +636,7 @@ const saveCondition = async () => {
     const conditionsArray = (conditionGroup.value as any).conditions || [];
     const hasValidConditions = conditionsArray.some((item: any) => {
       // Check for nested groups (V2 format)
-      if (item.filterType === 'group' && item.conditions) return true;
+      if (item.filterType === "group" && item.conditions) return true;
       // Check for valid conditions
       return item.column && item.operator;
     });
@@ -637,7 +664,10 @@ const saveCondition = async () => {
     }
 
     // Fix userClickedNode if it's an object instead of string ID
-    if (pipelineObj.userClickedNode && typeof pipelineObj.userClickedNode === 'object') {
+    if (
+      pipelineObj.userClickedNode &&
+      typeof pipelineObj.userClickedNode === "object"
+    ) {
       if (pipelineObj.userClickedNode.id) {
         pipelineObj.userClickedNode = pipelineObj.userClickedNode.id;
       } else {
@@ -647,7 +677,9 @@ const saveCondition = async () => {
 
     addNode(conditionData);
     // Update originalConditionGroup to the newly saved state
-    originalConditionGroup.value = JSON.parse(JSON.stringify(conditionGroup.value));
+    originalConditionGroup.value = JSON.parse(
+      JSON.stringify(conditionGroup.value),
+    );
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);
@@ -697,7 +729,7 @@ const validateSqlQuery = () => {
 
   delete query.aggs;
 
-  query.query.sql = streamRoute.value.query_condition?.sql || '';
+  query.query.sql = streamRoute.value.query_condition?.sql || "";
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService
@@ -724,7 +756,8 @@ const validateSqlQuery = () => {
         resolve("");
       });
   });
-};</script>
+};
+</script>
 
 <style scoped>
 .stream-routing-title {
@@ -741,14 +774,14 @@ const validateSqlQuery = () => {
 .stream-routing-section {
   min-height: 100%;
 }
-.previous-drop-down{
+.previous-drop-down {
   width: 600px;
 }
 
 .note-container {
-  background-color: #F9F290 ;
+  background-color: #f9f290;
   border-radius: 4px;
-  border: 1px solid #F5A623;
+  border: 1px solid #f5a623;
   color: #865300;
   width: 100%;
   margin-bottom: 20px;
@@ -770,18 +803,16 @@ const validateSqlQuery = () => {
   padding: 2px 4px;
   border-radius: 3px;
   color: #d63384; /* Soft pinkish-red for code */
-
-
 }
 
-.note-heading{
+.note-heading {
   font-size: medium;
 }
 
-.note-info{
+.note-info {
   font-size: small;
   color: #865300;
-  background-color: #F9F290 ;
+  background-color: #f9f290;
   display: flex;
   flex-direction: column;
   align-items: start;
@@ -854,5 +885,4 @@ const validateSqlQuery = () => {
 .pipeline-filter-group-wrapper :deep(.q-tabs) {
   pointer-events: auto;
 }
-
 </style>

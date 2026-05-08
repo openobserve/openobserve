@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -41,13 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
-              round
-              flat
-              icon="cancel"
+            <OButton
+              variant="ghost"
+              size="icon-circle"
               data-test="close-pattern-dialog"
-            />
+              @click="$emit('update:modelValue', false)"
+            >
+              <q-icon name="cancel" />
+            </OButton>
           </div>
         </div>
       </q-card-section>
@@ -280,15 +281,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="tw:px-[0.625rem] tw:py-[0.375rem]">
         <div class="row items-center no-wrap justify-between">
           <div class="col-auto">
-            <q-btn
+            <OButton
+              variant="outline"
+              size="sm"
               data-test="pattern-detail-previous-btn"
-              class="o2-secondary-button tw:h-[36px]"
-              no-caps
               :disabled="selectedPattern.index === 0"
               @click="$emit('navigate', false, true)"
-              icon="navigate_before"
-              :label="t('search.patternNavPrevious')"
-            />
+            >
+              <template #icon-left><q-icon name="navigate_before" /></template>
+              {{ t('search.patternNavPrevious') }}
+            </OButton>
           </div>
           <div class="col-auto text-center">
             <span class="text-caption text-grey-7">
@@ -296,15 +298,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
           <div class="col-auto">
-            <q-btn
+            <OButton
+              variant="outline"
+              size="sm"
               data-test="pattern-detail-next-btn"
-              class="o2-secondary-button tw:h-[36px]"
-              no-caps
               :disabled="selectedPattern.index >= totalPatterns - 1"
               @click="$emit('navigate', true, false)"
-              icon-right="navigate_next"
-              :label="t('search.patternNavNext')"
-            />
+            >
+              {{ t('search.patternNavNext') }}
+              <template #icon-right><q-icon name="navigate_next" /></template>
+            </OButton>
           </div>
         </div>
       </q-card-section>
@@ -313,10 +316,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { computed } from "vue";
 import { useStore } from "vuex";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,

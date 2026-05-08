@@ -18,14 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="showDialog" @hide="onDialogHide">
     <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
       <!-- Close Button -->
-      <q-btn
-        icon="cancel"
-        flat
-        round
-        dense
-        v-close-popup
-        class="close-btn-top-right"
-      />
+      <div class="close-btn-top-right">
+        <OButton
+          variant="ghost"
+          size="icon"
+          v-close-popup
+        >
+          <q-icon name="cancel" size="16px" />
+        </OButton>
+      </div>
 
       <div class="dialog-split-layout" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
@@ -106,33 +107,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="hero-actions">
-              <q-btn
+              <OButton
                 v-if="dialogConfig.showPrimaryButton"
-                unelevated
-                :label="dialogConfig.primaryButtonText"
+                variant="on-dark-primary"
+                size="lg"
                 @click="handlePrimaryButtonClick"
-                :icon-right="dialogConfig.primaryButtonIcon"
-                no-caps
                 class="download-btn"
-              />
-              <q-btn
+              >
+                {{ dialogConfig.primaryButtonText }}
+                <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
+                  <q-icon :name="dialogConfig.primaryButtonIcon" />
+                </template>
+              </OButton>
+              <OButton
                 v-if="dialogConfig.showContactSales"
-                flat
-                :label="t('about.enterprise_offer.buttons.contact_sales')"
+                variant="on-dark-ghost"
+                size="lg"
                 @click="contactSales"
-                no-caps
                 class="learn-more-btn"
-                color="white"
-              />
-              <q-btn
+              >
+                {{ t('about.enterprise_offer.buttons.contact_sales') }}
+              </OButton>
+              <OButton
                 v-else
-                flat
-                :label="t('about.enterprise_offer.buttons.learn_more')"
+                variant="on-dark-ghost"
+                size="lg"
                 @click="openDocsLink"
-                no-caps
                 class="learn-more-btn"
-                color="white"
-              />
+              >
+                {{ t('about.enterprise_offer.buttons.learn_more') }}
+              </OButton>
             </div>
           </div>
         </div>
@@ -231,6 +235,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -280,6 +285,7 @@ export default defineComponent({
   name: "EnterpriseUpgradeDialog",
   components: {
     ChartRenderer,
+    OButton,
   },
   props: {
     modelValue: {

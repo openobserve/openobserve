@@ -15,15 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
+  <OButton
     data-cy="syntax-guide-button"
-    size="sm"
-    dense
-    flat
-    class="q-pa-xs tw:cursor-pointer tw:border tw:border-[var(--o2-border-color)] tw:border-solid tw:bg-transparent! tw:w-[2rem] tw:min-h-[2rem] tw:h-[2rem] tw:rounded-[0.375rem] syntax-guide-button"
+    variant="outline"
+    size="icon-sm"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    icon="help"
   >
+    <HelpCircle :size="14" />
     <q-tooltip>{{ t("search.syntaxGuideLabel") }}</q-tooltip>
     <q-menu
       data-test="syntax-guide-menu"
@@ -136,16 +134,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
       </q-card>
     </q-menu>
-  </q-btn>
+  </OButton>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { HelpCircle } from "lucide-vue-next";
 
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
+  components: { OButton, HelpCircle },
   props: {
     sqlmode: {
       type: Boolean,

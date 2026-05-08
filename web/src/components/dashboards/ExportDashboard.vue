@@ -14,21 +14,20 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-btn
-    class="dashboard-icons q-px-sm q-ml-sm"
-    size="sm"
-    outline
-    no-caps
-    icon="download"
+  <OButton
+    variant="outline"
+    size="icon-xs"
     @click="downloadDashboard()"
     data-test="export-dashboard"
   >
+    <template #icon-left><q-icon name="download" /></template>
     <q-tooltip>{{ t("dashboard.export") }}</q-tooltip>
-  </q-btn>
+  </OButton>
 </template>
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { getDashboard } from "../../utils/commons.ts";
 import { useStore } from "vuex";
@@ -36,6 +35,7 @@ import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "ExportDashboard",
+  components: { OButton },
   props: ["dashboardId"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -46,7 +46,7 @@ export default defineComponent({
       const dashboard = await getDashboard(
         store,
         props.dashboardId,
-        route.query.folder
+        route.query.folder,
       );
       dashboard.owner = "";
 
@@ -68,9 +68,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.dashboard-icons {
-  height: 30px;
-}
-</style>

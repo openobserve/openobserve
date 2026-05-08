@@ -101,27 +101,25 @@
       />
 
       <div
-        class="flex justify-start q-mt-lg q-py-sm full-width"
+        class="flex justify-start q-mt-lg q-py-sm full-width tw:gap-2"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       >
-        <q-btn
+        <OButton
           data-test="add-report-cancel-btn"
-          class="text-bold"
-          :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
+          variant="outline"
+          size="sm-action"
           @click="openCancelDialog"
-        />
-        <q-btn
+        >
+          {{ t('alerts.cancel') }}
+        </OButton>
+        <OButton
           data-test="add-report-save-btn"
-          :label="t('alerts.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
+          variant="primary"
+          size="sm-action"
           @click="saveRouting"
-        />
+        >
+          {{ t('alerts.save') }}
+        </OButton>
       </div>
     </div>
   </div>
@@ -140,6 +138,7 @@ import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface RouteCondition {
   column: string;

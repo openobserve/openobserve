@@ -171,11 +171,19 @@ describe("TransformSelector.vue", () => {
             },
             "q-icon": true,
             "q-tooltip": true,
+            OButton: {
+              name: 'OButton',
+              template: '<button class="save-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+              props: ['variant', 'size', 'disabled'],
+              emits: ['click'],
+            },
+            OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>', props: ['open'], emits: ['update:open'] },
           },
         },
       });
 
-      expect(wrapper.find(".save-btn").exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-save-transform-btn"]').exists()).toBe(true);
     });
   });
 
@@ -285,6 +293,19 @@ describe("TransformSelector.vue", () => {
             "q-item-label": { template: "<div><slot /></div>" },
             "q-select": true,
             "q-input": true,
+            OButton: {
+              name: 'OButton',
+              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+              props: ['variant', 'size', 'disabled'],
+              emits: ['click'],
+            },
+            OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
+            // ODropdown stub renders content directly (no portal/teleport)
+            ODropdown: {
+              template: '<div><slot name="trigger" /><slot /></div>',
+              props: ['open', 'side', 'align', 'sideOffset'],
+              emits: ['update:open'],
+            },
           },
         },
       });
@@ -345,13 +366,25 @@ describe("TransformSelector.vue", () => {
             },
             "q-icon": true,
             "q-tooltip": true,
+            OButton: {
+              name: 'OButton',
+              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+              props: ['variant', 'size', 'disabled'],
+              emits: ['click'],
+            },
+            OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
+            ODropdown: {
+              template: '<div><slot name="trigger" /><slot /></div>',
+              props: ['open'],
+              emits: ['update:open'],
+            },
           },
         },
       });
 
-      const buttons = wrapper.findAll("button");
-      if (buttons.length > 0) {
-        await buttons[0].trigger("click");
+      const saveBtn = wrapper.find('[data-test="logs-search-bar-save-transform-btn"]');
+      if (saveBtn.exists()) {
+        await saveBtn.trigger("click");
         expect(wrapper.emitted("save:function")).toBeTruthy();
       }
     });
@@ -724,6 +757,20 @@ describe("TransformSelector.vue", () => {
             "q-btn": true,
             "q-icon": true,
             "q-tooltip": true,
+            OButton: {
+              name: 'OButton',
+              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+              props: ['variant', 'size', 'disabled'],
+              emits: ['click'],
+            },
+            OButtonGroup: {
+              template: '<div class="btn-group" :class="$attrs.class"><slot /></div>',
+            },
+            ODropdown: {
+              template: '<div><slot name="trigger" /><slot /></div>',
+              props: ['open'],
+              emits: ['update:open'],
+            },
           },
         },
       });
@@ -878,7 +925,7 @@ describe("TransformSelector.vue", () => {
         },
       });
 
-      // Save button tooltip should show "Save" not "Not supported for visualization"
+      // Save button tooltip should show "Save" not "Not supported for timechart"
       // The ternary check for logsVisualizeToggle === 'visualize' was removed
       expect(wrapper.exists()).toBe(true);
     });

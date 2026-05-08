@@ -1,44 +1,313 @@
 /* ============================================================
    COMPONENT TOKENS — per-component design decisions
    Each section is owned exclusively by one component.
+   ============================================================
+   ARCHITECTURE (required for dark-mode + Tailwind prefix):
+   1. Plain `:root` block defines light-mode default values.
+   2. `@theme inline` with self-references registers tokens for
+      Tailwind utility generation. `inline` keeps `var()` refs
+      unprefixed, so dark.css overrides apply correctly.
    ============================================================ */
 
-@theme inline {
-  /* ---- Button ------------------------------------------------ */
+/* ── Light-mode defaults ─────────────────────────────────── */
+:root {
+  /* Separator */
+  --spacing-separator: var(--spacing-px);
+  --color-separator: var(--color-border-default);
+  --color-separator-strong: var(--color-border-strong);
 
-  /* primary */
-  --color-button-primary:              var(--color-primary-600);
-  --color-button-primary-hover:        var(--color-primary-700);
-  --color-button-primary-active:       var(--color-primary-800);
-  --color-button-primary-disabled:     var(--color-primary-300);
-  --color-button-primary-foreground:   var(--color-white);
-  --color-button-primary-focus-ring:   var(--color-primary-400);
+  /* Button — primary */
+  --color-button-primary: var(--color-primary-600);
+  --color-button-primary-hover: var(--color-primary-700);
+  --color-button-primary-active: var(--color-primary-800);
+  --color-button-primary-disabled: var(--color-primary-300);
+  --color-button-primary-foreground: var(--color-white);
+  --color-button-primary-focus-ring: var(--color-primary-400);
 
-  /* secondary */
-  --color-button-secondary:            var(--color-grey-100);
-  --color-button-secondary-hover:      var(--color-grey-200);
-  --color-button-secondary-active:     var(--color-grey-300);
-  --color-button-secondary-disabled:   var(--color-grey-100);
-  --color-button-secondary-foreground: var(--color-grey-800);
-  --color-button-secondary-focus-ring: var(--color-grey-400);
+  /* Button — secondary */
+  --color-button-secondary: var(--color-surface-panel);
+  --color-button-secondary-hover: var(--color-primary-50);
+  --color-button-secondary-active: var(--color-primary-100);
+  --color-button-secondary-disabled: var(--color-surface-panel);
+  --color-button-secondary-foreground: var(--color-text-primary);
+  --color-button-secondary-focus-ring: var(--color-primary-400);
 
-  /* outline */
-  --color-button-outline-text:         var(--color-grey-800);
-  --color-button-outline-border:       var(--color-grey-300);
-  --color-button-outline-hover-bg:     var(--color-grey-50);
-  --color-button-outline-hover-border: var(--color-grey-400);
-  --color-button-outline-active-bg:    var(--color-grey-100);
-  --color-button-outline-focus-ring:   var(--color-grey-400);
+  /* Button — outline */
+  --color-button-outline-text: var(--color-text-primary);
+  --color-button-outline-border: var(--color-primary-300);
+  --color-button-outline-hover-bg: var(--o2-hover-accent);
+  --color-button-outline-hover-border: var(--color-primary-400);
+  --color-button-outline-active-bg: var(--color-primary-100);
+  --color-button-outline-focus-ring: var(--color-primary-400);
 
-  /* ghost */
-  --color-button-ghost-text:           var(--color-grey-700);
-  --color-button-ghost-hover-bg:       var(--color-grey-100);
-  --color-button-ghost-active-bg:      var(--color-grey-200);
-  --color-button-ghost-focus-ring:     var(--color-grey-400);
+  /* Button — ghost */
+  --color-button-ghost-text: var(--color-text-primary);
+  --color-button-ghost-hover-bg: var(--color-primary-50);
+  --color-button-ghost-active-bg: var(--color-primary-100);
+  --color-button-ghost-hover-ring: var(--color-primary-300);
+  --color-button-ghost-focus-ring: var(--color-primary-400);
 
-  /* destructive */
-  --color-button-destructive:          var(--color-error-600);
-  --color-button-destructive-hover:    var(--color-error-700);
+  /* Button — ghost-primary (flat + primary color text) */
+  --color-button-ghost-primary-text: var(--color-primary-600);
+  --color-button-ghost-primary-hover-bg: var(--color-primary-50);
+  --color-button-ghost-primary-active-bg: var(--color-primary-100);
+  --color-button-ghost-primary-focus-ring: var(--color-primary-400);
+
+  /* Button — ghost-destructive (flat + destructive color text) */
+  --color-button-ghost-destructive-text: var(--color-error-600);
+  --color-button-ghost-destructive-hover-bg: var(--color-error-50);
+  --color-button-ghost-destructive-active-bg: var(--color-error-100);
+  --color-button-ghost-destructive-focus-ring: var(--color-error-400);
+
+  /* Button — ghost-muted (secondary text at rest → primary text + bg on hover) */
+  --color-button-ghost-muted-text: var(--color-text-secondary);
+  --color-button-ghost-muted-hover-text: var(--color-primary-600);
+  --color-button-ghost-muted-hover-bg: var(--color-primary-50);
+  --color-button-ghost-muted-active-bg: var(--color-primary-100);
+  --color-button-ghost-muted-focus-ring: var(--color-primary-400);
+
+  /* Button — ghost-subtle (secondary text, 60 % opacity at rest, full on hover) */
+  --color-button-ghost-subtle-text: var(--color-text-secondary);
+  --color-button-ghost-subtle-hover-bg: var(--color-primary-50);
+  --color-button-ghost-subtle-active-bg: var(--color-primary-100);
+  --color-button-ghost-subtle-focus-ring: var(--color-primary-400);
+
+  /* Button — ghost-warning (yellow-600 text for contrast on white, faint yellow tint on hover) */
+  --color-button-ghost-warning-text: var(--color-warning-600);
+  --color-button-ghost-warning-hover-bg: color-mix(in srgb, var(--color-warning-400) 12%, transparent);
+  --color-button-ghost-warning-active-bg: color-mix(in srgb, var(--color-warning-400) 22%, transparent);
+  --color-button-ghost-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+
+  /* Button — outline-warning (transparent bg, yellow-600 border + text) */
+  --color-button-outline-warning-text: var(--color-warning-600);
+  --color-button-outline-warning-border: var(--color-warning-600);
+  --color-button-outline-warning-hover-bg: color-mix(in srgb, var(--color-warning-400) 12%, transparent);
+  --color-button-outline-warning-active-bg: color-mix(in srgb, var(--color-warning-400) 22%, transparent);
+  --color-button-outline-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+
+  /* Button — warning (bright yellow-400 bg, yellow-500 hover — never goes brown) */
+  --color-button-warning: var(--color-warning-400);
+  --color-button-warning-hover: var(--color-warning-500);
+  --color-button-warning-active: var(--color-warning-600);
+  --color-button-warning-foreground: var(--color-grey-900);
+  --color-button-warning-border: var(--color-warning-400);
+  --color-button-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+
+  /* Button — destructive */
+  --color-button-destructive: var(--color-error-600);
+  --color-button-destructive-hover: var(--color-error-700);
   --color-button-destructive-disabled: var(--color-error-300);
   --color-button-destructive-foreground: var(--color-white);
+  --color-button-destructive-focus-ring: var(--color-error-400);
+
+  /* ButtonGroup */
+  --color-button-group-divider: var(--color-border-default);
+
+  /* ToggleGroup */
+  --color-toggle-track-bg: var(--color-surface-subtle);
+  --color-toggle-item-bg: transparent;
+  --color-toggle-item-text: var(--color-text-primary);
+  --color-toggle-item-hover-bg: var(--color-primary-50);
+  --color-toggle-item-active-bg: var(--color-primary-100);
+  --color-toggle-item-active-text: var(--color-primary-700);
+  --color-toggle-item-disabled: var(--color-text-disabled);
+  --color-toggle-border: var(--color-border-default);
+  --color-toggle-focus-ring: var(--color-primary-400);
+
+  /* Dropdown */
+  --color-dropdown-bg: var(--color-surface-overlay);
+  --color-dropdown-border: var(--color-border-default);
+  --color-dropdown-item-text: var(--color-text-primary);
+  --color-dropdown-item-hover-bg: var(--color-primary-50);
+  --color-dropdown-item-active-bg: var(--color-primary-100);
+  --color-dropdown-item-disabled: var(--color-text-disabled);
+  --color-dropdown-label: var(--color-text-secondary);
+  --color-dropdown-separator: var(--color-border-default);
+  /* Dropdown item — destructive */
+  --color-dropdown-item-destructive-text: var(--color-error-600);
+  --color-dropdown-item-destructive-hover-bg: var(--color-error-50);
+
+  /* Icon sizes */
+  --text-icon-xs: var(--spacing-3);
+  /* 12px */
+  --text-icon-sm: var(--spacing-4);
+  /* 16px */
+  --text-icon-md: var(--spacing-5);
+  /* 20px */
+  --text-icon-lg: var(--spacing-6);
+  /* 24px */
+  --text-icon-xl: var(--spacing-8);
+  /* 32px */
+
+  /* RefreshButton — staleness dot */
+  --color-refresh-dot-idle: var(--color-text-disabled);
+  --color-refresh-dot-fresh: var(--color-success-500);
+  --color-refresh-dot-stale: var(--color-warning-500);
+  --color-refresh-dot-critical: var(--color-error-500);
+
+  /* Tabs */
+  --color-tabs-indicator: var(--color-primary-600);
+  --color-tabs-active-text: var(--color-primary-600);
+  --color-tabs-active-bg: var(--color-primary-100);
+  --color-tabs-inactive-text: var(--color-text-primary);
+  --color-tabs-hover-text: var(--color-text-primary);
+  --color-tabs-hover-bg: var(--color-primary-50);
+  --color-tabs-disabled-text: var(--color-text-disabled);
+  --color-tabs-bar-border: var(--color-border-default);
+  --color-tabs-focus-ring: var(--color-primary-400);
+  --spacing-tabs-height: var(--spacing-10);
+  --spacing-tabs-height-dense: var(--spacing-8);
+}
+
+/* ToggleGroup — primary variant (colored tray) */
+[data-variant="primary"] {
+  --color-toggle-track-bg: var(--color-primary-200);
+  --color-toggle-border: var(--color-primary-300);
+  --color-toggle-item-hover-bg: var(--color-primary-100);
+  --color-toggle-item-active-bg: var(--color-surface-base);
+  --color-toggle-item-active-text: var(--color-primary-700);
+}
+
+/* ── Register ALL tokens for Tailwind utility generation ── */
+@theme inline {
+  /* Separator */
+  --spacing-separator: var(--spacing-separator);
+  --color-separator: var(--color-separator);
+  --color-separator-strong: var(--color-separator-strong);
+
+  /* Button — primary */
+  --color-button-primary: var(--color-button-primary);
+  --color-button-primary-hover: var(--color-button-primary-hover);
+  --color-button-primary-active: var(--color-button-primary-active);
+  --color-button-primary-disabled: var(--color-button-primary-disabled);
+  --color-button-primary-foreground: var(--color-button-primary-foreground);
+  --color-button-primary-focus-ring: var(--color-button-primary-focus-ring);
+
+  /* Button — secondary */
+  --color-button-secondary: var(--color-button-secondary);
+  --color-button-secondary-hover: var(--color-button-secondary-hover);
+  --color-button-secondary-active: var(--color-button-secondary-active);
+  --color-button-secondary-disabled: var(--color-button-secondary-disabled);
+  --color-button-secondary-foreground: var(--color-button-secondary-foreground);
+  --color-button-secondary-focus-ring: var(--color-button-secondary-focus-ring);
+
+  /* Button — outline */
+  --color-button-outline-text: var(--color-button-outline-text);
+  --color-button-outline-border: var(--color-button-outline-border);
+  --color-button-outline-hover-bg: var(--color-button-outline-hover-bg);
+  --color-button-outline-hover-border: var(--color-button-outline-hover-border);
+  --color-button-outline-active-bg: var(--color-button-outline-active-bg);
+  --color-button-outline-focus-ring: var(--color-button-outline-focus-ring);
+
+  /* Button — ghost */
+  --color-button-ghost-text: var(--color-button-ghost-text);
+  --color-button-ghost-hover-bg: var(--color-button-ghost-hover-bg);
+  --color-button-ghost-active-bg: var(--color-button-ghost-active-bg);
+  --color-button-ghost-hover-ring: var(--color-button-ghost-hover-ring);
+  --color-button-ghost-focus-ring: var(--color-button-ghost-focus-ring);
+
+  /* Button — ghost-primary */
+  --color-button-ghost-primary-text: var(--color-button-ghost-primary-text);
+  --color-button-ghost-primary-hover-bg: var(--color-button-ghost-primary-hover-bg);
+  --color-button-ghost-primary-active-bg: var(--color-button-ghost-primary-active-bg);
+  --color-button-ghost-primary-focus-ring: var(--color-button-ghost-primary-focus-ring);
+
+  /* Button — ghost-destructive */
+  --color-button-ghost-destructive-text: var(--color-button-ghost-destructive-text);
+  --color-button-ghost-destructive-hover-bg: var(--color-button-ghost-destructive-hover-bg);
+  --color-button-ghost-destructive-active-bg: var(--color-button-ghost-destructive-active-bg);
+  --color-button-ghost-destructive-focus-ring: var(--color-button-ghost-destructive-focus-ring);
+
+  /* Button — ghost-muted */
+  --color-button-ghost-muted-text: var(--color-button-ghost-muted-text);
+  --color-button-ghost-muted-hover-text: var(--color-button-ghost-muted-hover-text);
+  --color-button-ghost-muted-hover-bg: var(--color-button-ghost-muted-hover-bg);
+  --color-button-ghost-muted-active-bg: var(--color-button-ghost-muted-active-bg);
+  --color-button-ghost-muted-focus-ring: var(--color-button-ghost-muted-focus-ring);
+
+  /* Button — ghost-subtle */
+  --color-button-ghost-subtle-text: var(--color-button-ghost-subtle-text);
+  --color-button-ghost-subtle-hover-bg: var(--color-button-ghost-subtle-hover-bg);
+  --color-button-ghost-subtle-active-bg: var(--color-button-ghost-subtle-active-bg);
+  --color-button-ghost-subtle-focus-ring: var(--color-button-ghost-subtle-focus-ring);
+
+  /* Button — ghost-warning */
+  --color-button-ghost-warning-text: var(--color-button-ghost-warning-text);
+  --color-button-ghost-warning-hover-bg: var(--color-button-ghost-warning-hover-bg);
+  --color-button-ghost-warning-active-bg: var(--color-button-ghost-warning-active-bg);
+  --color-button-ghost-warning-focus-ring: var(--color-button-ghost-warning-focus-ring);
+
+  /* Button — outline-warning */
+  --color-button-outline-warning-text: var(--color-button-outline-warning-text);
+  --color-button-outline-warning-border: var(--color-button-outline-warning-border);
+  --color-button-outline-warning-hover-bg: var(--color-button-outline-warning-hover-bg);
+  --color-button-outline-warning-active-bg: var(--color-button-outline-warning-active-bg);
+  --color-button-outline-warning-focus-ring: var(--color-button-outline-warning-focus-ring);
+
+  /* Button — warning */
+  --color-button-warning: var(--color-button-warning);
+  --color-button-warning-hover: var(--color-button-warning-hover);
+  --color-button-warning-active: var(--color-button-warning-active);
+  --color-button-warning-foreground: var(--color-button-warning-foreground);
+  --color-button-warning-border: var(--color-button-warning-border);
+  --color-button-warning-focus-ring: var(--color-button-warning-focus-ring);
+
+  /* Button — destructive */
+  --color-button-destructive: var(--color-button-destructive);
+  --color-button-destructive-hover: var(--color-button-destructive-hover);
+  --color-button-destructive-disabled: var(--color-button-destructive-disabled);
+  --color-button-destructive-foreground: var(--color-button-destructive-foreground);
+  --color-button-destructive-focus-ring: var(--color-button-destructive-focus-ring);
+
+  /* ButtonGroup */
+  --color-button-group-divider: var(--color-button-group-divider);
+
+  /* ToggleGroup */
+  --color-toggle-track-bg: var(--color-toggle-track-bg);
+  --color-toggle-item-bg: var(--color-toggle-item-bg);
+  --color-toggle-item-text: var(--color-toggle-item-text);
+  --color-toggle-item-hover-bg: var(--color-toggle-item-hover-bg);
+  --color-toggle-item-active-bg: var(--color-toggle-item-active-bg);
+  --color-toggle-item-active-text: var(--color-toggle-item-active-text);
+  --color-toggle-item-disabled: var(--color-toggle-item-disabled);
+  --color-toggle-border: var(--color-toggle-border);
+  --color-toggle-focus-ring: var(--color-toggle-focus-ring);
+
+  /* Dropdown */
+  --color-dropdown-bg: var(--color-dropdown-bg);
+  --color-dropdown-border: var(--color-dropdown-border);
+  --color-dropdown-item-text: var(--color-dropdown-item-text);
+  --color-dropdown-item-hover-bg: var(--color-dropdown-item-hover-bg);
+  --color-dropdown-item-active-bg: var(--color-dropdown-item-active-bg);
+  --color-dropdown-item-disabled: var(--color-dropdown-item-disabled);
+  --color-dropdown-label: var(--color-dropdown-label);
+  --color-dropdown-separator: var(--color-dropdown-separator);
+  --color-dropdown-item-destructive-text: var(--color-dropdown-item-destructive-text);
+  --color-dropdown-item-destructive-hover-bg: var(--color-dropdown-item-destructive-hover-bg);
+
+  /* Icon sizes */
+  --text-icon-xs: var(--text-icon-xs);
+  --text-icon-sm: var(--text-icon-sm);
+  --text-icon-md: var(--text-icon-md);
+  --text-icon-lg: var(--text-icon-lg);
+  --text-icon-xl: var(--text-icon-xl);
+
+  /* RefreshButton — staleness dot */
+  --color-refresh-dot-idle: var(--color-refresh-dot-idle);
+  --color-refresh-dot-fresh: var(--color-refresh-dot-fresh);
+  --color-refresh-dot-stale: var(--color-refresh-dot-stale);
+  --color-refresh-dot-critical: var(--color-refresh-dot-critical);
+
+  /* Tabs */
+  --color-tabs-indicator: var(--color-tabs-indicator);
+  --color-tabs-active-text: var(--color-tabs-active-text);
+  --color-tabs-active-bg: var(--color-tabs-active-bg);
+  --color-tabs-inactive-text: var(--color-tabs-inactive-text);
+  --color-tabs-hover-text: var(--color-tabs-hover-text);
+  --color-tabs-hover-bg: var(--color-tabs-hover-bg);
+  --color-tabs-disabled-text: var(--color-tabs-disabled-text);
+  --color-tabs-bar-border: var(--color-tabs-bar-border);
+  --color-tabs-focus-ring: var(--color-tabs-focus-ring);
+  --spacing-tabs-height: var(--spacing-tabs-height);
+  --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
 }

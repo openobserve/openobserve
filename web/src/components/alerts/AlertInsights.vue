@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -23,15 +23,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="insights-header flex justify-between items-center"
         >
           <div class="flex items-center">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
+            <OButton
+              variant="outline"
+              size="icon-sm"
               class="hideOnPrintMode el-border"
               @click="goBack"
               data-test="alert-insights-back-btn"
-            />
+            >
+              <q-icon name="arrow_back_ios_new" />
+            </OButton>
             <div class="q-table__title tw:font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
           </div>
 
@@ -51,43 +51,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-insights-datetime"
             />
 
-            <q-btn
-              icon="refresh"
+            <OButton
               @click="refreshDashboard"
               :loading="isLoading"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
-              size="sm"
+              variant="ghost"
+              size="icon-sm"
+              class="q-mr-xs el-border"
               data-test="alert-insights-refresh-btn"
             >
+              <q-icon name="refresh" />
               <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
         </div>
 
         <!-- Tabs -->
-        <q-tabs
+        <OTabs
           v-model="currentTab"
           dense
           class="alert-insights-tabs q-ml-sm"
-          indicator-color="primary"
           align="left"
           data-test="alert-insights-tabs"
         >
-          <q-tab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
-          <q-tab
+          <OTab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
+          <OTab
             v-if="isEnterprise"
             name="frequency"
             :label="t('alerts.insights.tabs.frequency')"
             data-test="tab-frequency"
           />
-          <q-tab
+          <OTab
             v-if="isEnterprise"
             name="correlation"
             :label="t('alerts.insights.tabs.correlation')"
             data-test="tab-correlation"
           />
-          <q-tab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
-        </q-tabs>
+          <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
+        </OTabs>
 
         <!-- Filters Section -->
         <div
@@ -153,17 +153,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Clear All Filters -->
-          <q-btn
+          <OButton
             v-if="hasActiveFilters"
-            flat
-            dense
+            variant="ghost"
             size="sm"
             class="clear-filters-btn"
-            :label="t('alerts.insights.filters.clearAll')"
-            icon="clear"
             @click="clearAllFilters"
             data-test="clear-all-filters-btn"
-          />
+          >
+            <template #icon-left><q-icon name="clear" /></template>
+            {{ t('alerts.insights.filters.clearAll') }}
+          </OButton>
         </div>
       </div>
     </div>
@@ -179,54 +179,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
       >
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="settings"
-        :label="t('alerts.insights.actions.configureDedup')"
+      <OButton
+        variant="ghost-primary"
+        size="sm"
         @click="openDedupConfig"
         data-test="configure-dedup-btn"
       >
+        <template #icon-left><q-icon name="settings" /></template>
+        {{ t("alerts.insights.actions.configureDedup") }}
         <q-tooltip>{{ t("alerts.insights.actions.configureDedupTooltip") }}</q-tooltip>
-      </q-btn>
+      </OButton>
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="edit"
-        :label="t('alerts.insights.actions.editAlert')"
+      <OButton
+        variant="ghost-primary"
+        size="sm"
         @click="editAlert"
         data-test="edit-alert-btn"
       >
+        <template #icon-left><q-icon name="edit" /></template>
+        {{ t("alerts.insights.actions.editAlert") }}
         <q-tooltip>{{ t("alerts.insights.actions.editAlertTooltip") }}</q-tooltip>
-      </q-btn>
+      </OButton>
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="history"
-        :label="t('alerts.insights.actions.viewHistory')"
+      <OButton
+        variant="ghost-primary"
+        size="sm"
         @click="viewHistory"
         data-test="view-history-btn"
       >
+        <template #icon-left><q-icon name="history" /></template>
+        {{ t("alerts.insights.actions.viewHistory") }}
         <q-tooltip>{{ t("alerts.insights.actions.viewHistoryTooltip") }}</q-tooltip>
-      </q-btn>
+      </OButton>
 
       <q-space />
 
-      <q-btn
-        flat
-        dense
-        round
-        icon="close"
+      <OButton
+        variant="ghost"
+        size="icon-circle-sm"
         @click="selectedAlertForAction = null"
         data-test="close-actions-btn"
       >
+        <q-icon name="close" />
         <q-tooltip>Close actions</q-tooltip>
-      </q-btn>
+      </OButton>
     </div>
 
     <!-- Dashboard Content -->
@@ -282,6 +278,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OButton from '@/lib/core/Button/OButton.vue';
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -777,7 +776,7 @@ onMounted(async () => {
 }
 
 .alert-insights-tabs {
-  :deep(.q-tab__label) {
+  :deep(.o-tab__label) {
     text-transform: none !important;
   }
 }

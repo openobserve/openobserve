@@ -5,6 +5,7 @@ import { JobSchedulerPage } from '../../pages/logsPages/jobScheduler.js';
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 import { LogsPageEP } from '../../pages/logsPages/logsPageEP.js';
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -24,7 +25,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
 
     });
 
-    test("Create Job Search for schedule query", async ({ page }) => {
+    test("Create Job Search for schedule query", { tag: ['@jobSearch', '@smoke', '@P0'] }, async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPageEP.selectStreamDropDown();
@@ -33,13 +34,13 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
         await logsPage.selectRunQuery();
         await logsPageEP.searchSchedulerDropdown();
         await logsPageEP.searchSchedulerCreate();
-        await logsPageEP.searchSchedulerSubmit();
-        await logsPageEP.validateAddJob();
+        const jobId = await logsPageEP.searchSchedulerSubmit();
+        await logsPageEP.validateAddJob(jobId);
 
     });
 
 
-    test("Create Job Search for schedule query with invalid data", async ({ page }) => {
+    test("Create Job Search for schedule query with invalid data", { tag: ['@jobSearch', '@validation', '@P1'] }, async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPageEP.selectStreamDropDown();
@@ -53,61 +54,61 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
 
     });
 
-    test("Create and Delete Job Search for schedule query", async ({ page }) => {
+    test("Create and Delete Job Search for schedule query", { tag: ['@jobSearch', '@crud', '@P1'] }, async ({ page }) => {
 
 
         await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
-        console.log(`Job ID: ${jobId}`);
+        testLogger.info(`Job ID: ${jobId}`);
         expect(jobId).not.toBeNull();
         const traceId = await jobSchedulerPage.getTraceIdByJobId(jobId);
-        console.log(`Trace ID: ${traceId}`);
+        testLogger.info(`Trace ID: ${traceId}`);
         await jobSchedulerPage.deleteJobSearch(traceId);
 
 
     });
 
-    test("Create and restart Job Search for schedule query", async ({ page }) => {
+    test("Create and restart Job Search for schedule query", { tag: ['@jobSearch', '@crud', '@P1'] }, async ({ page }) => {
 
 
         await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
-        console.log(`Job ID: ${jobId}`);
+        testLogger.info(`Job ID: ${jobId}`);
         expect(jobId).not.toBeNull();
         const traceId = await jobSchedulerPage.getTraceIdByJobId(jobId);
-        console.log(`Trace ID: ${traceId}`);
+        testLogger.info(`Trace ID: ${traceId}`);
         await page.waitForTimeout(10000);
         await jobSchedulerPage.restartJobSearch(traceId);
 
 
     });
 
-    test("Create and cancel Job Search for schedule query", async ({ page }) => {
+    test("Create and cancel Job Search for schedule query", { tag: ['@jobSearch', '@crud', '@P1'] }, async ({ page }) => {
 
 
         await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
-        console.log(`Job ID: ${jobId}`);
+        testLogger.info(`Job ID: ${jobId}`);
         expect(jobId).not.toBeNull();
         const traceId = await jobSchedulerPage.getTraceIdByJobId(jobId);
-        console.log(`Trace ID: ${traceId}`);
+        testLogger.info(`Trace ID: ${traceId}`);
         await jobSchedulerPage.cancelJobSearch(traceId);
 
 
     });
 
-    test("Create and explore Job Search for schedule query", async ({ page }) => {
+    test("Create and explore Job Search for schedule query", { tag: ['@jobSearch', '@crud', '@P1'] }, async ({ page }) => {
 
         await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
-        console.log(`Job ID: ${jobId}`);
+        testLogger.info(`Job ID: ${jobId}`);
         expect(jobId).not.toBeNull();
         const traceId = await jobSchedulerPage.getTraceIdByJobId(jobId);
-        console.log(`Trace ID: ${traceId}`);
+        testLogger.info(`Trace ID: ${traceId}`);
         await page.waitForTimeout(10000);
         await jobSchedulerPage.exploreJob(traceId);
 
@@ -115,15 +116,15 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
 
 
 
-    test("Create and view Job Search for schedule query details", async ({ page }) => {
+    test("Create and view Job Search for schedule query details", { tag: ['@jobSearch', '@crud', '@P1'] }, async ({ page }) => {
 
         await page.goto((process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"]) + `/web/logs?action=search_scheduler&org_identifier=${getOrgIdentifier()}&type=search_scheduler_list`);
         await page.waitForTimeout(10000);
         const jobId = await jobSchedulerPage.submitSearchJob();
-        console.log(`Job ID: ${jobId}`);
+        testLogger.info(`Job ID: ${jobId}`);
         expect(jobId).not.toBeNull();
         const traceId = await jobSchedulerPage.getTraceIdByJobId(jobId);
-        console.log(`Trace ID: ${traceId}`);
+        testLogger.info(`Trace ID: ${traceId}`);
         await jobSchedulerPage.viewJobDetails(traceId);
 
     });
@@ -134,7 +135,7 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
      * pre-filled in the Monaco editor after lazy loading.
      */
     test("Explore Job Search should pre-fill Monaco editor with scheduled query", {
-        tag: ['@monacoLazyLoad', '@queryPrefill', '@scheduleSearch']
+        tag: ['@jobSearch', '@monacoLazyLoad', '@queryPrefill', '@scheduleSearch', '@P1']
     }, async ({ page }) => {
 
         // Step 1: Navigate to search scheduler list
@@ -143,35 +144,31 @@ test.describe("Job Search for schedule query", { tag: '@enterprise' }, () => {
 
         // Step 2: Submit a search job via API
         const jobId = await jobSchedulerPage.submitSearchJob();
-        console.log(`Job ID: ${jobId}`);
+        testLogger.info(`Job ID: ${jobId}`);
         expect(jobId).not.toBeNull();
 
         // Step 3: Get trace ID for the job
         const traceId = await jobSchedulerPage.getTraceIdByJobId(jobId);
-        console.log(`Trace ID: ${traceId}`);
+        testLogger.info(`Trace ID: ${traceId}`);
         await page.waitForTimeout(10000);
 
         // Step 4: Click explore to navigate to logs with the job's query
         await jobSchedulerPage.exploreJob(traceId);
 
         // Step 5: Wait for Monaco editor to load (lazy loading)
-        await page.locator('[data-test="logs-search-bar-query-editor"]').waitFor({
-            state: 'visible',
-            timeout: 30000
-        });
+        await logsPage.waitForQueryEditorVisible(30000);
         await page.waitForTimeout(2000);
 
         // Step 6: Verify Monaco editor contains the job's SQL query
         // The job query is: SELECT * FROM "e2e_automate"
-        const monacoEditor = page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor .view-lines');
-        const editorContent = await monacoEditor.textContent();
-        console.log(`Monaco editor content: ${editorContent}`);
+        const editorContent = await logsPage.getQueryEditorText();
+        testLogger.info(`Monaco editor content: ${editorContent}`);
 
         // Verify the query structure is present
         expect(editorContent).toContain('SELECT');
         expect(editorContent).toContain('e2e_automate');
 
-        console.log('Monaco editor pre-fill verification completed successfully');
+        testLogger.info('Monaco editor pre-fill verification completed successfully');
     });
 
 

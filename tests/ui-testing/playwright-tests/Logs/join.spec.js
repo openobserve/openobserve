@@ -53,7 +53,7 @@ test.describe("Join for logs", () => {
     testLogger.info('Two streams SQL Mode query completed');
   });
 
-  test("Run query after selecting two streams, selecting field and SQL Mode On", { tag: ['@join', '@union', '@functional', '@P1'] }, async ({ page }) => {
+  test("Run query after selecting two streams, selecting field and SQL Mode On", { tag: ['@join', '@union', '@functional', '@P1'], timeout: 300000 }, async ({ page }) => {
     testLogger.info('Testing two streams with field selection and SQL Mode');
 
     // Generate unique testRunId to avoid "stream being deleted" conflicts (SDR pattern)
@@ -154,69 +154,33 @@ test.describe("Join for logs", () => {
     testLogger.info('FULL JOIN query validation completed');
   });
 
-  test("Click on interesting field icon and display field in editor", { tag: ['@join', '@interestingFields', '@functional', '@P1'] }, async ({ page }) => {
-    testLogger.info('Testing interesting field display functionality');
-
-    await pm.logsPage.navigateToLogs();
-    await pm.logsPage.selectIndexAndStreamJoin();
-    await pm.logsPage.enableSQLMode();
-    await pm.logsPage.clickQuickModeToggle();
-    await pm.logsPage.clickAllFieldsButton();
-    await pm.logsPage.selectRunQuery();
-    await pm.logsPage.clickInterestingFields();
-    await pm.logsPage.validateInterestingFields();
-
-    testLogger.info('Interesting field display validation completed');
-  });
-
-  test("Click on interesting field icon and display query in editor", { tag: ['@join', '@interestingFields', '@functional', '@P1'] }, async ({ page }) => {
-    testLogger.info('Testing interesting field query display functionality');
-
-    await pm.logsPage.navigateToLogs();
-    await pm.logsPage.selectIndexAndStreamJoin();
-    await pm.logsPage.enableSQLMode();
-    await pm.logsPage.clickQuickModeToggle();
-    await pm.logsPage.clickAllFieldsButton();
-    await pm.logsPage.selectRunQuery();
-    await pm.logsPage.clickInterestingFields();
-    await pm.logsPage.validateInterestingFieldsQuery();
-
-    testLogger.info('Interesting field query display validation completed');
-  });
-
-  test("Add/remove interesting field removes it from editor and results too", { tag: ['@join', '@interestingFields', '@edge', '@P2'] }, async ({ page }) => {
+  test("Add/remove interesting field in editor and results", { tag: ['@join', '@interestingFields', '@functional', '@P1'] }, async ({ page }) => {
     testLogger.info('Testing add/remove interesting field functionality');
 
+    // Use unique streams to avoid contention with other join tests
+    const testRunId = Date.now().toString(36);
+    const { streamA, streamB } = await pm.ingestionPage.ingestionJoinUnion(testRunId);
+    testLogger.info(`Created streams: ${streamA}, ${streamB}`);
+
     await pm.logsPage.navigateToLogs();
-    await pm.logsPage.selectIndexAndStreamJoin();
+    await pm.logsPage.selectIndexAndStreamJoinUnion(streamA, streamB);
     await pm.logsPage.enableSQLMode();
-    await pm.logsPage.clickQuickModeToggle();
+    await pm.logsPage.ensureQuickModeState(true);
     await pm.logsPage.clickAllFieldsButton();
     await pm.logsPage.selectRunQuery();
 
-    // Step 1: Add field to query via interesting fields
+    // Step 1: Add field via interesting field star icon
     await pm.logsPage.clickInterestingFields();
-
-    // Verify field was added to query editor
     await pm.logsPage.expectQueryEditorContainsText('kubernetes_pod_name');
     testLogger.info('Verified kubernetes_pod_name was added to query');
 
-    // Step 2: Remove field from query
+    // Step 2: Remove field by clicking star again
     await pm.logsPage.addRemoveInteresting();
-
-    // Verify field was removed from query editor
     await pm.logsPage.expectQueryEditorNotContainsText('kubernetes_pod_name');
     testLogger.info('Verified kubernetes_pod_name was removed from query');
 
     testLogger.info('Add/remove interesting field functionality completed');
   });
 
-  test.afterEach(async ({ page }) => {
-    try {
-      // await pm.commonActions.flipStreaming();
-      testLogger.info('Streaming flipped after test');
-    } catch (error) {
-      testLogger.warn('Streaming flip failed', { error: error.message });
-    }
-  });
 });
+

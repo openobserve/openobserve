@@ -27,13 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
+          <OButton
             v-close-popup="true"
-            round
-            flat
-            icon="cancel"
+            variant="ghost"
+            size="icon-circle"
             data-test="dashboard-add-cancel"
-          />
+          >
+            <template #icon-left><q-icon name="cancel" /></template>
+          </OButton>
         </div>
       </div>
     </q-card-section>
@@ -80,27 +81,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @folder-selected="selectedFolder = $event"
         />
 
-        <div class="flex justify-start q-mt-sm">
-          <q-btn
+        <div class="flex justify-start q-mt-md tw:gap-3">
+          <OButton
             v-close-popup="true"
-            :label="t('dashboard.cancel')"
-            no-caps
-            flat
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            variant="outline"
+            size="sm-action"
             data-test="dashboard-add-cancel"
-          />
-          <q-btn
+            >{{ t("dashboard.cancel") }}</OButton
+          >
+          <OButton
             data-test="dashboard-add-submit"
-            :disable="dashboardData.name.trim() === ''"
+            :disabled="dashboardData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
-            :label="t('dashboard.save')"
-            flat
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            variant="primary"
+            size="sm-action"
             type="submit"
-            no-caps
-          />
+            >{{ t("dashboard.save") }}</OButton
+          >
         </div>
       </q-form>
     </q-card-section>
@@ -118,6 +115,7 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
 import { useQuasar } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 
@@ -159,7 +157,7 @@ export default defineComponent({
       useNotifications();
 
     const activeFolder: any = store.state.organizationData.folders.find(
-      (item: any) => item.folderId === props.activeFolderId
+      (item: any) => item.folderId === props.activeFolderId,
     );
     const selectedFolder = ref({
       label: activeFolder.name,
@@ -216,14 +214,14 @@ export default defineComponent({
           callDashboard = dashboardService.create(
             store.state.selectedOrganization.identifier,
             baseObj,
-            selectedFolder.value.value ?? "default"
+            selectedFolder.value.value ?? "default",
           );
         }
         try {
           const res = await callDashboard;
 
           const data = convertDashboardSchemaVersion(
-            res?.data["v" + res?.data?.version]
+            res?.data["v" + res?.data?.version],
           );
 
           //update store
@@ -267,7 +265,7 @@ export default defineComponent({
       });
     },
   },
-  components: { SelectFolderDropdown },
+  components: { SelectFolderDropdown, OButton },
 });
 </script>
 <style lang="scss">

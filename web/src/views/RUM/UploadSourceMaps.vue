@@ -115,14 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="text-caption text-grey-6">{{ formatFileSize(formData.file.size) }}</div>
                   </div>
                 </div>
-                <q-btn
-                  flat
-                  round
-                  dense
-                  icon="close"
-                  color="grey-7"
+                <OButton
+                  variant="ghost"
+                  size="icon"
                   @click.stop="removeFile"
-                />
+                >
+                  <q-icon name="close" size="16px" />
+                </OButton>
               </div>
             </div>
           </div>
@@ -133,25 +132,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Bottom Action Bar -->
     <div class="action-bar card-container tw:flex tw:items-center tw:justify-end tw:gap-3 tw:py-3 tw:pr-3"
       style="position: sticky; z-index: 2">
-      <q-btn
-        label="Cancel"
-        unelevated
-        no-caps
-        class="o2-secondary-button"
-        style="min-width: 100px"
+      <OButton
+        variant="outline"
+        size="sm-action"
         @click="navigateBack"
-        :disable="isUploading"
-      />
-      <q-btn
-        label="Upload"
-        unelevated
-        no-caps
-        class="o2-primary-button"
-        style="min-width: 100px"
+        :disabled="isUploading"
+      >Cancel</OButton>
+      <OButton
+        variant="primary"
+        size="sm-action"
         :loading="isUploading"
-        :disable="isUploading"
+        :disabled="isUploading"
         @click="uploadSourceMaps"
-      />
+      >Upload</OButton>
     </div>
   </div>
 </template>
@@ -162,6 +155,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const store = useStore();
 const router = useRouter();

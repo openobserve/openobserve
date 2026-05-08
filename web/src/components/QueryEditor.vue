@@ -15,18 +15,16 @@
         <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
         <q-spinner-dots color="primary" size="1.2em" />
         <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
-        <q-btn
-          round
-          flat
-          dense
-          icon="stop"
-          size="sm"
+        <OButton
+          variant="ghost-destructive"
+          size="icon-circle-sm"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
           class="ai-stop-button"
         >
+          <q-icon name="stop" />
           <q-tooltip>{{ t('common.stopGenerating') }}</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
       <!-- Normal input when not generating -->
       <div v-else class="tw:flex tw:items-center tw:gap-2">
@@ -44,37 +42,33 @@
           </template>
         </q-input>
         <!-- Send Button -->
-        <q-btn
-          round
-          flat
-          dense
-          icon="send"
-          color="primary"
-          :disable="!aiInputText.trim() || props.disableAi"
+        <OButton
+          variant="ai-gradient"
+          size="icon-xs-sq"
+          :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
           class="ai-send-button"
         >
+          <q-icon name="send" />
           <q-tooltip v-if="props.disableAi && props.disableAiReason">
             {{ props.disableAiReason }}
           </q-tooltip>
           <q-tooltip v-else-if="!aiInputText.trim()">
             {{ props.aiTooltip || t("search.enterPrompt") }}
           </q-tooltip>
-        </q-btn>
+        </OButton>
         <!-- Close Button -->
-        <q-btn
-          round
-          flat
-          dense
-          icon="close"
-          size="sm"
+        <OButton
+          variant="ghost-muted"
+          size="icon-circle-sm"
           :data-test="`${dataTestPrefix}-ai-close-btn`"
           @click="dismissAIMode"
           class="ai-close-button"
         >
+          <q-icon name="close" />
           <q-tooltip>{{ t('common.close') }}</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
     </div>
 
@@ -103,19 +97,18 @@
       />
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
-      <q-btn
+      <OButton
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && !hideNlToggle && !isAIMode"
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
-        round
-        unelevated
-        size="sm"
-        :disable="props.disableAi"
+        variant="ghost"
+        size="icon-toolbar"
+        :disabled="props.disableAi"
         @click="nlpMode = true"
         class="ai-floating-button"
       >
         <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
         <q-tooltip>{{ props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle') }}</q-tooltip>
-      </q-btn>
+      </OButton>
     </div>
   </div>
 </template>
@@ -125,6 +118,7 @@ import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
+import OButton from '@/lib/core/Button/OButton.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/ts/interfaces/chat';
@@ -631,16 +625,7 @@ defineExpose({
 
 /* AI Close Button */
 .ai-close-button {
-  color: #999 !important;
   transition: color 0.2s ease !important;
-}
-
-.ai-close-button:hover {
-  color: #333 !important;
-}
-
-.q-dark .ai-close-button:hover {
-  color: #fff !important;
 }
 
 /* AI Input Bar Styling */

@@ -56,55 +56,43 @@
           class="viewpanel-icons"
           data-test="dashboard-viewpanel-refresh-interval"
         />
-        <q-btn
+        <OButton
           v-if="
             config.isEnterprise == 'true' &&
             searchRequestTraceIds.length &&
             disable
           "
-          class="viewpanel-icons el-border"
-          outline
-          padding="xs"
-          no-caps
-          icon="cancel"
+          variant="outline-destructive"
+          size="icon-xs"
           @click="cancelViewPanelQuery"
           data-test="dashboard-viewpanel-cancel-btn"
-          color="negative"
         >
-          <q-tooltip>
-            {{ t("panel.cancel") }}
-          </q-tooltip>
-        </q-btn>
-        <q-btn
+          <template #icon-left><q-icon name="cancel" /></template>
+          <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+        </OButton>
+        <OButton
           v-else
-          class="viewpanel-icons el-border"
-          :outline="isVariablesChanged ? true : false"
-          padding="xs"
-          no-caps
-          icon="refresh"
+          :variant="isVariablesChanged ? 'outline' : 'warning'"
+          size="icon-xs"
           @click="refreshData"
+          :disabled="disable"
           data-test="dashboard-viewpanel-refresh-data-btn"
-          :disable="disable"
-          :color="isVariablesChanged ? '' : 'warning'"
-          :text-color="store.state.theme == 'dark' ? 'white' : 'black'"
         >
-          <q-tooltip>
-            {{
-              isVariablesChanged
-                ? "Refresh"
-                : "Refresh to apply latest variable changes"
-            }}
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          no-caps
+          <template #icon-left><q-icon name="refresh" /></template>
+          <q-tooltip>{{
+            isVariablesChanged
+              ? "Refresh"
+              : "Refresh to apply latest variable changes"
+          }}</q-tooltip>
+        </OButton>
+        <OButton
+          variant="outline"
+          size="icon-xs"
           @click="goBack"
-          padding="xs"
-          class="viewpanel-icons el-border"
-          flat
-          icon="close"
           data-test="dashboard-viewpanel-close-btn"
-        />
+        >
+          <template #icon-left><q-icon name="close" /></template>
+        </OButton>
       </div>
     </div>
     <q-separator></q-separator>
@@ -243,6 +231,7 @@ import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlin
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -263,6 +252,7 @@ export default defineComponent({
     RelativeTime,
     ShowLegendsPopup,
     PanelErrorButtons,
+    OButton,
   },
   props: {
     panelId: {

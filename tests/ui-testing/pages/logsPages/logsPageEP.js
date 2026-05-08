@@ -30,58 +30,61 @@ async searchSchedulerCreate() {
 }
 
 async searchSchedulerSubmit() {
-  // Wait for the input field to be visible
   await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
 
-  // Click and fill the input field
   const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]');
   await inputField.click();
   await inputField.fill('1000');
-  await inputField.press('Enter');
 
-  // Wait for the submit button to be visible and click it
   await this.page.waitForSelector('[data-test="search-scheduler-max-records-submit-btn"]');
-  const submitButton = this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]');
-  await submitButton.click();
 
-  // Wait for the "Go To Job Scheduler" button to be visible and enabled
-  const goToJobSchedulerButtonSelector = { name: 'Go To Job Scheduler' };
-  const maxRetries = 500;
-  let attempts = 0;
+  // Intercept the POST response BEFORE clicking to capture the created job ID
+  const jobResponsePromise = this.page.waitForResponse(
+    resp => resp.url().includes('/search_jobs') && resp.request().method() === 'POST',
+    { timeout: 15000 }
+  );
+  await this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]').click();
 
-  while (attempts < maxRetries) {
-      const goToJobSchedulerButton = this.page.getByRole('button', goToJobSchedulerButtonSelector);
-
-      // Wait for the button to be visible
-      await this.page.waitForTimeout(100); // Small delay before checking
-      const isVisible = await goToJobSchedulerButton.isVisible();
-      const isEnabled = await goToJobSchedulerButton.isEnabled();
-
-      if (isVisible && isEnabled) {
-          await goToJobSchedulerButton.click();
-          return; // Exit the function if the button is clicked successfully
-      } else {
-          console.warn(`"Go To Job Scheduler" button is not visible or enabled. Retrying...`);
-          attempts++;
-          await this.page.waitForTimeout(100); // Wait before retrying
-      }
-  }
-
-  throw new Error(`"Go To Job Scheduler" button remained invisible or disabled after ${maxRetries} attempts.`);
+  const jobResponse = await jobResponsePromise;
+  const body = await jobResponse.json();
+  const match = body.message?.match(/\[Job_Id: (.+?)\]/);
+  return match ? match[1] : null;
 }
 
+async validateAddJob(jobId) {
+  // Wait for the notification — it fires only after the job creation API call succeeds
+  await expect(this.page.locator('#q-notify')).toContainText('Job Added Succesfully', { timeout: 15000 });
 
+  // Navigate to the scheduler list
+  await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+  await this.page.locator('[data-test="search-scheduler-list-btn"]').click();
+  await this.page.getByRole('button', { name: 'Get Jobs' }).click();
 
-async validateAddJob() {
-  await expect(this.page.locator('#q-notify')).toContainText('Job Added Succesfully');
+  // Resolve trace_id for the specific job we created, then assert that exact row
+  const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+  const orgId = getOrgIdentifier();
+  const listResponse = await this.page.request.get(
+    `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
+    { headers: getAuthHeaders() }
+  );
+  const jobs = await listResponse.json();
+  const job = jobs.find(j => j.id === jobId);
+  if (!job?.trace_id) throw new Error(`Job with id "${jobId}" not found in scheduler list`);
+  await expect(this.page.locator(`[data-test="search-scheduler-table-${job.trace_id}-row"]`)).toBeVisible({ timeout: 15000 });
 }
 
 async queryJobSearch() {
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox');
-  // Fill with the new query
-  await queryEditor.fill('SELECT * FROM "e2e_automate"');
-  // Optional: Wait for any processing or loading after filling the query
-  await this.page.waitForTimeout(5000); // Adjust the timeout as needed
+  const queryEditorLocator = this.page.locator('[data-test="logs-search-bar-query-editor"]');
+  await queryEditorLocator.waitFor({ state: 'visible', timeout: 10000 });
+  await this.page.waitForTimeout(1000);
+  await queryEditorLocator.click();
+  await this.page.waitForTimeout(500);
+  await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await this.page.waitForTimeout(300);
+  const inputArea = queryEditorLocator.locator('.inputarea');
+  await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+  await inputArea.fill('SELECT * FROM "e2e_automate"');
+  await this.page.waitForTimeout(2000);
 }
 
 

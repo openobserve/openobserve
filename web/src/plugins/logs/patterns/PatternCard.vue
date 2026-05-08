@@ -107,10 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center tw:justify-center tw:gap-[2px]"
       :class="wrap ? 'tw:pt-1' : ''"
     >
-      <q-btn
-        size="6px"
-        flat
-        round
+      <OButton
+        variant="ghost"
+        size="icon"
         @click.stop="$emit('include', pattern)"
         :title="t('search.includePatternInSearch')"
         :data-test="`pattern-card-${index}-include-btn`"
@@ -118,11 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon style="height: 8px; width: 8px">
           <EqualIcon />
         </q-icon>
-      </q-btn>
-      <q-btn
-        size="6px"
-        flat
-        round
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon"
         @click.stop="$emit('exclude', pattern)"
         :title="t('search.excludePatternFromSearch')"
         :data-test="`pattern-card-${index}-exclude-btn`"
@@ -130,18 +128,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon style="height: 8px; width: 8px">
           <NotEqualIcon />
         </q-icon>
-      </q-btn>
-      <q-btn
-        size="6px"
-        flat
-        round
-        color="warning"
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon"
         @click.stop="$emit('create-alert', pattern)"
         :data-test="`pattern-card-${index}-create-alert-btn`"
       >
         <q-icon name="notifications" size="15px" />
         <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
-      </q-btn>
+      </OButton>
     </div>
   </div>
 </template>
@@ -152,6 +148,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,

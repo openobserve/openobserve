@@ -130,7 +130,7 @@ describe("ShareButton", () => {
     });
 
     const button = wrapper.find("button");
-    expect(button.attributes("disable")).toBeDefined();
+    expect(button.attributes("disabled")).toBeDefined();
   });
 
   it("should copy URL to clipboard on click (Chrome)", async () => {
@@ -250,18 +250,13 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
-            template: '<button :class="buttonClass" :size="buttonSize"><slot /></button>',
-            props: ['dataTest', 'buttonClass', 'buttonSize', 'loading', 'disable', 'icon'],
-          },
           QTooltip: { template: '<div><slot /></div>' },
         },
       },
     });
 
     const button = wrapper.find("button");
-    expect(button.attributes("class")).toBe("custom-class");
-    expect(button.attributes("size")).toBe("md");
+    expect(button.classes()).toContain("custom-class");
   });
 
   it("should show label when showLabel is true", () => {
@@ -304,7 +299,7 @@ describe("ShareButton", () => {
     });
 
     const button = wrapper.find("button");
-    expect(button.attributes("disable")).toBeDefined();
+    expect(button.attributes("disabled")).toBeDefined();
   });
 
   it("should disable button when web_url is not configured", () => {
@@ -343,7 +338,7 @@ describe("ShareButton", () => {
     });
 
     const button = wrapper.find("button");
-    expect(button.attributes("disable")).toBeDefined();
+    expect(button.attributes("disabled")).toBeDefined();
   });
 
   it("should show warning tooltip when web_url is not configured", () => {

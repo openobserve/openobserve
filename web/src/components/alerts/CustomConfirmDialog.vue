@@ -33,22 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Actions -->
       <q-card-actions data-test="dialog-actions" class="dialog-actions tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:pb-4">
-        <q-btn
+        <OButton
           data-test="custom-cancel-button"
-          label="Cancel"
-          unelevated
-          no-caps
-          class="o2-secondary-button"
+          variant="outline"
+          size="sm-action"
           @click="onCancel"
-        />
-        <q-btn
+        >Cancel</OButton>
+        <OButton
           data-test="custom-confirm-button"
-          label="Clear & Continue"
-          unelevated
-          no-caps
-          class="o2-primary-button"
+          variant="primary"
+          size="sm-action"
           @click="onConfirm"
-        />
+        >Clear &amp; Continue</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -57,9 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 import { useStore } from "vuex";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 export default defineComponent({
   name: "CustomConfirmDialog",
+  components: { OButton },
   props: {
     modelValue: {
       type: Boolean,

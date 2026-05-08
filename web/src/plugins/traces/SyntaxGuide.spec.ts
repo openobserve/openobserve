@@ -63,20 +63,15 @@ describe("SyntaxGuide", () => {
       );
     });
 
-    it("should render button with help icon text", () => {
-      const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // Button text comes from the icon name
-      expect(button.text()).toBe("help");
-    });
-
     it("should render button with help icon", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.find(".q-icon").exists()).toBe(true);
+      // HelpCircle (lucide) renders as an SVG inside the button
+      expect(button.find("svg").exists()).toBe(true);
     });
 
     it("should have correct button classes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain("syntax-guide-button");
+      // traces SyntaxGuide uses OButton with only mode class (no syntax-guide-button class)
       expect(button.classes()).toContain("normal-mode");
     });
   });
@@ -219,12 +214,9 @@ describe("SyntaxGuide", () => {
   describe("Styling and Classes", () => {
     it("should have correct button styling classes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // Button classes have been updated to use Tailwind CSS
-      // q-ml-xs has been removed, but q-pa-xs and syntax-guide-button remain
-      expect(button.classes()).toContain("q-pa-xs");
-      expect(button.classes()).toContain("syntax-guide-button");
-      // Verify Tailwind classes are present
-      expect(button.classes()).toContain("tw:cursor-pointer");
+      // OButton uses Tailwind CSS classes; mode class is applied via :class binding
+      expect(button.exists()).toBe(true);
+      expect(button.classes()).toContain("normal-mode");
     });
   });
 

@@ -24,30 +24,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Set up AWS monitoring in one click or configure individual services for granular control.
       </p>
 
-      <q-tabs
+      <OTabs
         v-model="activeTab"
         dense
         class="aws-tabs"
-        active-color="primary"
-        indicator-color="primary"
         align="left"
       >
-        <q-tab name="quick-setup" label="Quick Setup" data-test="aws-quick-setup-tab" />
-        <q-tab name="individual-services" label="Individual Services" data-test="aws-individual-services-tab" />
-      </q-tabs>
+        <OTab name="quick-setup" label="Quick Setup" data-test="aws-quick-setup-tab" />
+        <OTab name="individual-services" label="Individual Services" data-test="aws-individual-services-tab" />
+      </OTabs>
     </div>
 
     <q-separator class="tw:mb-6" />
 
-    <q-tab-panels v-model="activeTab" animated>
-      <q-tab-panel name="quick-setup" class="tw:p-0">
+    <OTabPanels v-model="activeTab" animated>
+      <OTabPanel name="quick-setup">
         <AWSQuickSetup />
-      </q-tab-panel>
+      </OTabPanel>
 
-      <q-tab-panel name="individual-services" class="tw:p-0">
+      <OTabPanel name="individual-services">
         <AWSIndividualServices :initialSearch="searchQuery" />
-      </q-tab-panel>
-    </q-tab-panels>
+      </OTabPanel>
+    </OTabPanels>
 
     <div class="tw:mt-8">
       <div class="tw:mb-3">
@@ -64,6 +62,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { defineComponent, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import config from "../../../aws-exports";
@@ -88,6 +90,7 @@ export default defineComponent({
     },
   },
   components: {
+    OTabs, OTab, OTabPanels, OTabPanel,
     CopyContent,
     AWSQuickSetup,
     AWSIndividualServices,

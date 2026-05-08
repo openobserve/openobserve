@@ -2283,7 +2283,8 @@
       "addNewDestination": "Neues Ziel hinzufügen",
       "destinationRequired": "Es ist mindestens ein Ziel erforderlich!",
       "disabledNotificationsInfo": "Die Anomalieerkennung wird weiterhin ausgeführt und die Ergebnisse werden in den _anomalies-Stream geschrieben. Aktivieren Sie Benachrichtigungen, um Benachrichtigungen zu erhalten, wenn Anomalien erkannt werden."
-    }
+    },
+    "anomalyName": "Name der Anomalie"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -3314,7 +3315,9 @@
     "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden.",
     "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten.",
     "serviceGroupProtected": "Die Dienstgruppe kann nicht entfernt werden. Sie können nur die zugewiesenen Felder ändern.",
-    "noDataFound": "Keine Daten gefunden"
+    "noDataFound": "Keine Daten gefunden",
+    "isWorkloadType": "Dienstkennzeichnung",
+    "isWorkloadTypeTooltip": "Wenn diese Gruppe aktiviert ist, wird sie verwendet, um einen Dienst eindeutig zu identifizieren (z. B. Cluster, Namespace, Deployment). Deaktiviert für Gruppen, die Operationen über einen Dienst beschreiben, z. B. eine HTTP-Methode oder einen Datenbanknamen."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

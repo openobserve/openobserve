@@ -30,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 External Destination
                 <div>
-                  <q-btn v-close-popup="true" round flat icon="cancel"> </q-btn>
+                  <OButton variant="ghost" size="icon" v-close-popup>
+                    <q-icon name="cancel" size="14px" />
+                  </OButton>
                 </div>
               </div>
             </div>
@@ -52,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <div v-if="createNewDestination" class="q-mt-sm q-mb-md col-12">
-              
             <!-- Create New Destination Form -->
             <CreateDestinationForm
               @created="handleDestinationCreated"
@@ -94,51 +95,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Action buttons for existing destination selection -->
-            <div class="flex justify-start q-mt-md q-mb-md">
-              <q-btn
+            <div class="tw:flex tw:gap-2 q-mt-md q-mb-md">
+              <OButton
                 v-if="pipelineObj.isEditNode"
                 data-test="add-destination-delete-btn"
-                class="o2-secondary-button tw:h-[36px] q-mr-sm"
-                color="negative"
-                flat
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
-                no-caps
+                variant="outline-destructive"
+                size="sm-action"
                 @click="openDeleteDialog"
-              >
-                <q-icon name="delete" class="q-mr-xs" />
-                {{ t("pipeline.deleteNode") }}
-              </q-btn>
-              <q-btn
+              >{{ t("pipeline.deleteNode") }}</OButton>
+              <OButton
                 data-test="add-destination-cancel-btn"
-                v-close-popup="true"
-                class="o2-secondary-button tw:h-[36px]"
-                :label="t('alerts.cancel')"
-                flat
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
-                no-caps
+                variant="outline"
+                size="sm-action"
                 @click="handleCancel"
-              />
-              <q-btn
+              >{{ t('alerts.cancel') }}</OButton>
+              <OButton
                 data-test="add-destination-save-btn"
-                :label="t('alerts.save')"
-                class="no-border q-ml-sm o2-primary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
-                flat
-                no-caps
+                variant="primary"
+                size="sm-action"
                 @click="saveDestination"
-              />
+              >{{ t('alerts.save') }}</OButton>
             </div>
           </div>
         </div>
@@ -160,6 +136,7 @@ import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

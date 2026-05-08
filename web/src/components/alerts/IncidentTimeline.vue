@@ -36,30 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:relative">
       <!-- Scroll buttons -->
       <div class="tw:absolute tw:top-2 tw:right-3 tw:flex tw:flex-col tw:gap-1 tw:z-10">
-        <q-btn
-          round
-          unelevated
-          dense
-          size="xs"
-          icon="keyboard_arrow_up"
-          color="grey-6"
+        <OButton
+          variant="ghost-muted"
+          size="icon-circle-sm"
           @click="scrollToTop"
           data-test="incident-timeline-scroll-top"
-        >
-          <q-tooltip>Scroll to top</q-tooltip>
-        </q-btn>
-        <q-btn
-          round
-          unelevated
-          dense
-          size="xs"
-          icon="keyboard_arrow_down"
-          color="grey-6"
+        ><q-icon name="keyboard_arrow_up" size="18px" /><q-tooltip>Scroll to top</q-tooltip></OButton>
+        <OButton
+          variant="ghost-muted"
+          size="icon-circle-sm"
           @click="scrollToBottom"
           data-test="incident-timeline-scroll-bottom"
-        >
-          <q-tooltip>Scroll to bottom</q-tooltip>
-        </q-btn>
+        ><q-icon name="keyboard_arrow_down" size="18px" /><q-tooltip>Scroll to bottom</q-tooltip></OButton>
       </div>
 
       <div ref="timelineContainer" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-3 tw:pt-2 tw:pb-4">
@@ -315,20 +303,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Send button inside textarea -->
           <div class="tw:absolute tw:bottom-3 tw:right-3">
-            <q-btn
-              icon="send"
-              round
-              unelevated
-              color="primary"
-              size="sm"
-              :disable="!commentText.trim() || submitting"
+            <OButton
+              variant="primary"
+              size="icon-circle-sm"
+              :disabled="!commentText.trim() || submitting"
               :loading="submitting"
               @click="submitComment"
-              class="tw:shadow-sm"
               data-test="incident-timeline-comment-send"
-            >
-              <q-tooltip>Send comment</q-tooltip>
-            </q-btn>
+            ><q-icon name="send" size="16px" /><q-tooltip>Send comment</q-tooltip></OButton>
           </div>
         </div>
       </div>
@@ -343,6 +325,7 @@ import { useQuasar } from "quasar";
 import { date } from "quasar";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface Props {
   orgId: string;

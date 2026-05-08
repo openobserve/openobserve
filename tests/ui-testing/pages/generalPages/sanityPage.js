@@ -175,16 +175,16 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click();
         await searchPromise;
 
-        await expect(this.page.getByText("Showing 1 to 50")).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="logs-search-result-title"]')).toContainText(/Showing 1 to/, { timeout: 15000 });
         await this.page.waitForTimeout(1000);
 
         try {
-            await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+            await expect(this.page.locator('[data-test="logs-search-result-pagination"]')).toBeVisible({ timeout: 10000 });
         } catch (error) {
             testLogger.warn('Pagination element not found, retrying with refresh button click');
             await this.page.locator(this.refreshButton).click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+            await expect(this.page.locator('[data-test="logs-search-result-pagination"]')).toBeVisible({ timeout: 10000 });
         }
     }
 
@@ -196,7 +196,7 @@ export class SanityPage {
 
     async toggleHistogramOffAndOn() {
         await this.clickHistogramToggle();
-        await this.page.getByText("Showing 1").click();
+        await this.page.locator('[data-test="logs-search-result-title"]').click();
         expect(
             await this.page.locator('[data-test="logs-search-result-bar-chart"]').isVisible()
         ).toBe(false);
@@ -285,8 +285,8 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click();
         await initialSearchPromise;
         
-        await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).locator('div').nth(2).click();
-        
+        await this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click();
+
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 10000 });
 
@@ -300,7 +300,7 @@ export class SanityPage {
         await this.page.locator(this.refreshButton).click({ force: true });
         await limitSearchPromise;
 
-        await expect(this.page.getByText(/Showing 1 to 5/)).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="logs-search-result-title"]')).toContainText(/Showing 1 to 5/, { timeout: 15000 });
 
         // Reset filters button is now directly on the toolbar
         await this.page.locator(this.resetFiltersButton).click();
@@ -629,12 +629,12 @@ export class SanityPage {
         await this.page.locator(this.closeDialog).click();
         await this.page.waitForTimeout(2000);
 
-        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after clicking result summary and retrying run query');
             }
@@ -708,7 +708,6 @@ export class SanityPage {
             throw error;
         }
 
-        // Wait for data to be indexed using smart wait
         await waitUtils.smartWait(this.page, 3000, 'data indexing after 70 fields ingestion');
         testLogger.info('70 fields data ingestion completed');
     }
@@ -716,69 +715,15 @@ export class SanityPage {
     async displayPaginationForSchema() {
         testLogger.step('Testing schema pagination with 70 fields');
 
-        // Ingest 70 fields data first to ensure pagination is available
+        // Ingest 70 fields data. Stream is already selected from beforeEach — no reload needed.
         await this.ingest70FieldsData();
 
-        // Reload the page to load the new data
-        testLogger.debug('Reloading page to refresh schema');
-        await this.page.reload();
-        await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-        // Select stream again after reload using the search-and-filter approach
-        testLogger.debug('Selecting e2e_automate stream after reload');
-        const streamSelectInput = this.page.locator(this.streamSelectDropdown);
-        await this.page.waitHelpers.waitForElementVisible(streamSelectInput, {
-            description: 'stream select input after reload',
-            timeout: 15000
-        });
-
-        // Click the input to open/focus the dropdown
-        await streamSelectInput.click();
-        // Wait for any stream toggle to appear (indicates dropdown has opened and populated)
-        // Using data-test attribute with starts-with selector for robustness
-        await this.page.waitForSelector('[data-test^="log-search-index-list-stream-toggle-"]', { state: 'visible', timeout: 10000 });
-
-        // Fill the input to filter streams - this is critical for finding the stream quickly
-        await streamSelectInput.fill('e2e_automate');
-
-        // Wait for the specific stream toggle to become visible after filtering (condition-based wait)
-        const streamToggleSelector = '[data-test="log-search-index-list-stream-toggle-e2e_automate"]';
-        try {
-            await this.page.waitForSelector(`${streamToggleSelector} div`, { state: 'visible', timeout: 10000 });
-            await this.page.locator(`${streamToggleSelector} div`).first().click();
-            testLogger.info('Stream e2e_automate selected successfully via toggle');
-        } catch (error) {
-            testLogger.warn(`First stream selection method failed: ${error.message}, trying alternate approaches`);
-            // Try clicking the toggle itself
-            try {
-                await this.page.locator(streamToggleSelector).click({ timeout: 5000 });
-                testLogger.info('Stream selected via toggle element');
-            } catch (toggleError) {
-                // Last resort: try by text
-                try {
-                    await this.page.getByText('e2e_automate', { exact: true }).first().click({ timeout: 5000 });
-                    testLogger.info('Stream selected via text');
-                } catch (textError) {
-                    testLogger.error(`Stream selection failed after reload: ${textError.message}`);
-                    throw new Error('Failed to select e2e_automate stream - pagination test cannot proceed');
-                }
-            }
-        }
-
-        // Clear the filter input to prevent state persistence issues for subsequent operations
-        await streamSelectInput.clear();
-
-        // Wait for stream selection to complete
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-        // Ensure data is loaded by clicking the refresh button
-        testLogger.debug('Refreshing to load data with 70 fields');
+        // Refresh to pick up the new schema fields in the field list
+        testLogger.info('Refreshing to load field data with 70+ fields');
         const refreshButton = this.page.locator(this.refreshButton);
         await this.page.waitHelpers.waitForElementClickable(refreshButton, {
             description: 'refresh button for schema pagination'
         });
-
         await refreshButton.click({ timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
 
@@ -876,12 +821,12 @@ export class SanityPage {
         await this.page.waitForTimeout(2000);
 
         // Check if pagination is visible, if not click run query again
-        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after histogram off and retrying run query');
             }
@@ -894,7 +839,7 @@ export class SanityPage {
         await this.page.waitForTimeout(1000);
 
         // Enable SQL mode
-        await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+        await this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]').click();
         await this.page.waitForTimeout(1000);
 
         // Click run query button
@@ -913,12 +858,12 @@ export class SanityPage {
         await this.page.waitForTimeout(2000);
 
         // Check if pagination is visible, if not click run query again
-        const paginationVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+        const paginationVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
         if (!paginationVisible) {
             await this.page.locator(this.refreshButton).click();
             await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
-            const retryVisible = await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").isVisible({ timeout: 5000 }).catch(() => false);
+            const retryVisible = await this.page.locator('[data-test="logs-search-result-pagination"]').isVisible({ timeout: 5000 }).catch(() => false);
             if (!retryVisible) {
                 throw new Error('Pagination not visible after SQL mode on and retrying run query');
             }
@@ -961,9 +906,9 @@ export class SanityPage {
         }
         
         // Enable SQL mode with error handling
-        const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
+        const sqlModeSwitch = this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
         await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
-        
+
         try {
             await sqlModeSwitch.click({ timeout: 10000 });
         } catch (error) {
@@ -971,7 +916,7 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await sqlModeSwitch.click({ timeout: 10000 });
         }
-        
+
         // Click refresh button with waits
         const refreshButton = this.page.locator(this.refreshButton);
         await expect(refreshButton).toBeVisible({ timeout: 15000 });
@@ -1059,16 +1004,16 @@ export class SanityPage {
         }
         
         // Enable SQL mode with error handling
-        const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
-        await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
+        const sqlModeSwitch2 = this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+        await expect(sqlModeSwitch2).toBeVisible({ timeout: 15000 });
 
         try {
-            await sqlModeSwitch.click({ timeout: 10000 });
+            await sqlModeSwitch2.click({ timeout: 10000 });
             await this.page.waitForTimeout(1000); // Brief wait for mode switch
         } catch (error) {
             console.warn('SQL mode switch click failed, retrying:', error.message);
             await this.page.waitForTimeout(2000);
-            await sqlModeSwitch.click({ timeout: 10000 });
+            await sqlModeSwitch2.click({ timeout: 10000 });
         }
 
         // Wait for query editor to be ready

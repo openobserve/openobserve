@@ -22,15 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex justify-between items-center">
         <div class="text-bold text-h6">Resource Details</div>
-        <q-btn
-          flat
-          dense
-          round
-          icon="close"
+        <OButton
+          variant="ghost"
+          size="icon-sm"
           data-test="close-drawer-btn"
           @click="closeDrawer"
-          class="hover:tw:text-[var(--o2-primary-btn-bg)]"
-        />
+        >
+          <X class="tw:size-4" />
+        </OButton>
       </div>
     </div>
 
@@ -144,27 +143,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tags-title text-bold q-ml-xs q-mb-sm">
             Session Context
           </div>
-          <div class="row q-gutter-sm">
-            <q-btn
-              outline
-              no-caps
-              color="primary"
-              label="View Session Replay"
-              icon="play_circle"
+        <div class="row q-gutter-sm">
+            <OButton
+              variant="outline"
+              size="sm-action"
               data-test="view-session-replay-btn"
               @click="viewSessionReplay"
-              class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
-            />
-            <q-btn
-              flat
-              no-caps
-              color="primary"
-              label="View All Session Events"
-              icon="list"
+            >
+              <PlayCircle class="tw:size-4 tw:mr-1" />
+              View Session Replay
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="sm-action"
               data-test="view-session-events-btn"
               @click="viewSessionEvents"
-              class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
-            />
+            >
+              <List class="tw:size-4 tw:mr-1" />
+              View All Session Events
+            </OButton>
           </div>
         </div>
       </template>
@@ -178,6 +175,8 @@ import { date, useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { X, PlayCircle, List } from 'lucide-vue-next';
 
 const props = defineProps({
   modelValue: {

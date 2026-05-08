@@ -106,13 +106,13 @@ pub(crate) async fn create_tantivy_index(
         return Ok(0);
     };
 
+    let buf = Bytes::from(puffin_bytes);
     let cfg = get_config();
     if cfg.cache_latest_files.enabled
         && cfg.cache_latest_files.cache_index
         && cfg.cache_latest_files.download_from_node
     {
-        infra::cache::file_data::disk::set(&idx_file_name, Bytes::from(puffin_bytes.clone()))
-            .await?;
+        infra::cache::file_data::disk::set(&idx_file_name, buf.clone()).await?;
         log::info!("file: {idx_file_name} file_data::disk::set success");
     }
 
@@ -417,7 +417,7 @@ mod tests {
         // Create stream from the buffer using the new API
         let bytes = bytes::Bytes::from(buffer);
         let (_schema, stream) =
-            config::utils::parquet::get_recordbatch_reader_from_bytes(FileFormat::Parquet, &bytes)
+            config::utils::parquet::get_recordbatch_reader_from_bytes(FileFormat::Parquet, bytes)
                 .await
                 .unwrap();
         stream

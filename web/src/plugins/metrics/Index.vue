@@ -57,35 +57,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state?.zoConfig?.min_auto_refresh_interval || 5
             "
             @trigger="runQuery"
-            class="q-mr-xs q-px-none dashboards-icon dashboards-auto-refresh-interval"
+            class="q-px-none dashboards-icon dashboards-auto-refresh-interval"
             data-test="metrics-auto-refresh"
           />
           <div
             v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
             class="dashboard-icons tw:mx-2"
           >
-            <q-btn
+            <OButton
               v-if="
                 config.isEnterprise == 'true' && searchRequestTraceIds.length
               "
-              class="tw:text-xs tw:font-bold no-border"
+              variant="outline-destructive"
+              size="sm-toolbar"
               data-test="metrics-cancel"
-              padding="xs lg"
-              color="negative"
-              no-caps
-              :label="t('panel.cancel')"
               @click="cancelAddPanelQuery"
-            />
-            <q-btn
+            >
+              <span
+                class="tw:relative tw:flex tw:items-center tw:justify-center"
+              >
+                <span class="tw:invisible">{{ t("metrics.runQuery") }}</span>
+                <span class="tw:absolute">{{ t("panel.cancel") }}</span>
+              </span>
+            </OButton>
+            <OButton
               v-else
-              class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
+              variant="primary"
+              size="sm-toolbar"
               data-test="metrics-apply"
               :loading="disable"
-              :disable="disable"
-              no-caps
-              :label="t('metrics.runQuery')"
+              :disabled="disable"
               @click="runQuery"
-            />
+            >
+              {{ t("metrics.runQuery") }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -113,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <add-to-dashboard
         @save="addPanelToDashboard"
+        @cancel="showAddToDashboardDialog = false"
         :dashboardPanelData="dashboardPanelData"
       />
     </q-dialog>
@@ -151,6 +157,7 @@ import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "Metrics",
@@ -163,6 +170,7 @@ export default defineComponent({
     AddToDashboard,
     AutoRefreshInterval,
     PanelEditor,
+    OButton,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");

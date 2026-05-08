@@ -92,12 +92,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-if="showSSO" class="flex justify-center">
-          <q-btn
+          <OButton
             data-test="sso-login-btn"
-            class="text-bold no-border"
-            padding="sm lg"
-            color="primary"
-            no-caps
+            variant="primary"
+            size="sm-action"
             style="width: 400px"
             @click="loginWithSSo"
           >
@@ -111,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <span class="text-center"> Login with SSO</span>
             </div>
-          </q-btn>
+          </OButton>
         </div>
 
         <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
@@ -158,18 +156,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div class="q-mt-lg q-mb-xl">
-              <q-btn
+              <OButton
                 data-cy="login-sign-in"
-                unelevated
-                class="full-width text-bold no-border"
-                color="primary"
+                variant="primary"
+                size="sm-action"
+                block
                 type="submit"
-                padding="sm lg"
-                :label="t('login.login')"
                 :loading="submitting"
-                no-caps
                 @click="onSignIn()"
-              />
+              >
+                {{ t('login.login') }}
+              </OButton>
             </div>
           </q-form>
         </div>
@@ -198,11 +195,13 @@ import {
 import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
 import config from "@/aws-exports";
+import OButton from '@/lib/core/Button/OButton.vue';
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "PageLogin",
+  components: { OButton },
 
   setup() {
     const store = useStore();

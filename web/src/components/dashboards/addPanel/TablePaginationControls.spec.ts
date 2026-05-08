@@ -91,19 +91,19 @@ describe("TablePaginationControls", () => {
 
     it("should render navigation buttons when pagination is enabled and pages > 1", () => {
       wrapper = createWrapper({ showPagination: true, pagesNumber: 5 });
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       expect(buttons.length).toBeGreaterThan(0);
     });
 
     it("should not render navigation buttons when pagination is disabled", () => {
       wrapper = createWrapper({ showPagination: false, pagesNumber: 5 });
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       expect(buttons.length).toBe(0);
     });
 
     it("should not render navigation buttons when pagesNumber is 1", () => {
       wrapper = createWrapper({ showPagination: true, pagesNumber: 1 });
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       expect(buttons.length).toBe(0);
     });
   });
@@ -230,24 +230,24 @@ describe("TablePaginationControls", () => {
       wrapper = createWrapper({ showPagination: true, pagesNumber: 5 });
 
       const firstPageBtn = wrapper
-        .findAll(".q-btn")
+        .findAll("button")
         .find(
           (btn) =>
             btn.attributes("aria-label")?.includes("first") ||
             btn.html().includes("first_page"),
         );
       const lastPageBtn = wrapper
-        .findAll(".q-btn")
+        .findAll("button")
         .find(
           (btn) =>
             btn.attributes("aria-label")?.includes("last") ||
             btn.html().includes("last_page"),
         );
       const prevBtn = wrapper
-        .findAll(".q-btn")
+        .findAll("button")
         .find((btn) => btn.html().includes("chevron_left"));
       const nextBtn = wrapper
-        .findAll(".q-btn")
+        .findAll("button")
         .find((btn) => btn.html().includes("chevron_right"));
 
       expect(firstPageBtn).toBeTruthy();
@@ -264,7 +264,7 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const firstPageBtn = buttons.find((btn) =>
         btn.html().includes("first_page"),
       );
@@ -284,7 +284,7 @@ describe("TablePaginationControls", () => {
         isLastPage: true,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const lastPageBtn = buttons.find((btn) =>
         btn.html().includes("last_page"),
       );
@@ -304,7 +304,7 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       buttons.forEach((btn) => {
         expect(btn.attributes("disabled")).toBeUndefined();
       });
@@ -317,7 +317,7 @@ describe("TablePaginationControls", () => {
         isFirstPage: false,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const firstPageBtn = buttons.find((btn) =>
         btn.html().includes("first_page"),
       );
@@ -335,7 +335,7 @@ describe("TablePaginationControls", () => {
         isFirstPage: false,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const prevBtn = buttons.find((btn) =>
         btn.html().includes("chevron_left"),
       );
@@ -353,7 +353,7 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const nextBtn = buttons.find((btn) =>
         btn.html().includes("chevron_right"),
       );
@@ -371,7 +371,7 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const lastPageBtn = buttons.find((btn) =>
         btn.html().includes("last_page"),
       );
@@ -389,7 +389,7 @@ describe("TablePaginationControls", () => {
         isFirstPage: true,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const firstPageBtn = buttons.find((btn) =>
         btn.html().includes("first_page"),
       );
@@ -408,7 +408,7 @@ describe("TablePaginationControls", () => {
         isLastPage: true,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const lastPageBtn = buttons.find((btn) =>
         btn.html().includes("last_page"),
       );
@@ -639,7 +639,7 @@ describe("TablePaginationControls", () => {
         isLastPage: false,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       expect(buttons.length).toBeGreaterThan(0);
 
       buttons.forEach((btn) => {
@@ -656,7 +656,7 @@ describe("TablePaginationControls", () => {
         isFirstPage: true,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       const firstPageBtn = buttons.find((btn) =>
         btn.html().includes("first_page"),
       );
@@ -749,7 +749,7 @@ describe("TablePaginationControls", () => {
         pagesNumber: 5,
       });
 
-      const buttons = wrapper.findAll(".q-btn");
+      const buttons = wrapper.findAll("button");
       buttons.forEach((btn) => {
         const html = btn.html();
         expect(html).toBeTruthy();

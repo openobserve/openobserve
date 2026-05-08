@@ -2281,7 +2281,8 @@
       "addNewDestination": "Yeni Hedef Ekle",
       "destinationRequired": "En az bir varış noktası gereklidir!",
       "disabledNotificationsInfo": "Anomali algılama çalışmaya devam edecek ve sonuçları _anomaliler akışına yazacaktır. Anormallikler tespit edildiğinde uyarı almak için bildirimleri etkinleştirin."
-    }
+    },
+    "anomalyName": "Anomali Adı"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -3325,7 +3326,9 @@
     "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı.",
     "errorRetrievingTraces": "İzler alınırken hata oluştu.",
     "serviceGroupProtected": "Hizmet grubu kaldırılamaz. Yalnızca eşlenen alanları değiştirebilirsiniz.",
-    "noDataFound": "Veri Bulunamadı"
+    "noDataFound": "Veri Bulunamadı",
+    "isWorkloadType": "Hizmet tanımlayıcısı",
+    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

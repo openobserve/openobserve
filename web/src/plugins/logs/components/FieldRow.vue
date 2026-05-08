@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <div
-    v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
+    v-if="
+      (field.ftsKey && !showFtsFieldValues) ||
+      !field.isSchemaField ||
+      !field.showValues
+    "
     class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     :title="field.name"
   >
@@ -51,16 +55,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="field_overlay tw:rounded-[0.25rem] tw:overflow-hidden"
       v-if="field.name !== timestampColumn"
     >
-      <q-btn
+      <span
         v-if="field.isSchemaField && field.name != timestampColumn"
-        :icon="outlinedAdd"
-        :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
         style="margin-right: 0.375rem"
-        size="0.4rem"
-        class="q-mr-sm"
-        @click.stop="$emit('add-to-filter', `${field.name}=''`)"
-        round
-      />
+      >
+        <OButton
+          :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
+          variant="ghost"
+          size="icon-xs-circle"
+          @click.stop="$emit('add-to-filter', `${field.name}=''`)"
+        >
+          <q-icon :name="outlinedAdd" size="12px" />
+        </OButton>
+      </span>
       <q-icon
         :data-test="`log-search-index-list-add-${field.name}-field-btn`"
         v-if="!isFieldSelected && field.name !== timestampColumn"
@@ -89,7 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'Remove from interesting fields'
             : 'Add to interesting fields'
         "
-        @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
+        @click.stop="
+          $emit('toggle-interesting', field, field.isInterestingField)
+        "
       />
     </div>
   </div>
@@ -105,7 +114,7 @@ import {
   outlinedVisibility,
   outlinedVisibilityOff,
 } from "@quasar/extras/material-icons-outlined";
-
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface Props {
   field: any;

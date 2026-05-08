@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -30,15 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="card-container tw:h-[calc(100vh-50px)]"
               :class="{ 'compact-sidebar': isCompactSidebar }"
             >
-              <q-tabs
+              <OTabs
                 v-model="activeTab"
-                indicator-color="transparent"
-                :inline-label="!isCompactSidebar"
-                vertical
-                class="card-container"
+                orientation="vertical"
                 :class="{ 'compact-tabs': isCompactSidebar }"
               >
-                <q-route-tab
+                <ORouteTab
                   v-if="
                     !store.state.zoConfig?.custom_hide_menus
                       ?.split(',')
@@ -54,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   :label="isCompactSidebar ? undefined : t('function.streamPipeline')"
                   :icon="isCompactSidebar ? 'lan' : undefined"
-                  content-class="tab_content"
                 >
                   <q-tooltip
                     v-if="isCompactSidebar"
@@ -64,10 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t('function.streamPipeline') }}
                   </q-tooltip>
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
                   data-test="function-stream-tab"
-                  default
                   name="functions"
                   :to="{
                     name: 'functionList',
@@ -77,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   :label="isCompactSidebar ? undefined : t('function.header')"
                   :icon="isCompactSidebar ? functionIcon : undefined"
-                  content-class="tab_content"
                 >
                   <q-tooltip
                     v-if="isCompactSidebar"
@@ -87,8 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t('function.header') }}
                   </q-tooltip>
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
                   data-test="function-enrichment-table-tab"
                   name="enrichmentTables"
                   :to="{
@@ -99,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   :label="isCompactSidebar ? undefined : t('function.enrichmentTables')"
                   :icon="isCompactSidebar ? 'dataset' : undefined"
-                  content-class="tab_content"
                 >
                   <q-tooltip
                     v-if="isCompactSidebar"
@@ -109,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t('function.enrichmentTables') }}
                   </q-tooltip>
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
                   v-if="config.isEnterprise == 'true'"
                   data-test="eval-templates-tab"
                   name="evalTemplates"
@@ -122,7 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   :label="isCompactSidebar ? undefined : t('pipeline.evalTemplates')"
                   :icon="isCompactSidebar ? 'rule' : undefined"
-                  content-class="tab_content"
                 >
                   <q-tooltip
                     v-if="isCompactSidebar"
@@ -132,23 +124,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ t('pipeline.evalTemplates') }}
                   </q-tooltip>
-                </q-route-tab>
-              </q-tabs>
+                </ORouteTab>
+              </OTabs>
             </div>
           </div>
         </template>
         <template #separator>
-          <q-btn
+          <OButton
             data-test="logs-search-field-list-collapse-btn"
-            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
             :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+            variant="sidebar-button"
+            size="sidebar-button"
             :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
             @click="collapseSidebar"
-          />
+          >
+            <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" size="12px" />
+          </OButton>
         </template>
         <template v-slot:after>
           <!-- :templates="templates"
@@ -167,6 +158,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OButton from '@/lib/core/Button/OButton.vue'
 import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -176,6 +171,7 @@ import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
+  components: { OTabs, OTab, ORouteTab, OButton },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();
@@ -318,7 +314,7 @@ export default defineComponent({
 .compact-tabs {
   width: 100%;
 
-  :deep(.q-tabs__content) {
+  :deep(.o-tabs__content) {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -326,15 +322,14 @@ export default defineComponent({
     padding: 0.5rem 0;
   }
 
-  :deep(.q-tab) {
+  :deep(.o-tab) {
     min-height: 2.5rem;
     min-width: 2.5rem;
     width: 2.5rem;
     padding: 0;
-    border-radius: 0.5rem;
     transition: background-color 0.2s ease, color 0.2s ease;
 
-    .q-tab__icon {
+    .o-tab__icon {
       font-size: 1.25rem;
 
       img {
@@ -347,7 +342,7 @@ export default defineComponent({
       background-color: var(--o2-hover-accent);
     }
 
-    &.q-tab--active {
+    &.o-tab--active {
       background: color-mix(
         in srgb,
         var(--o2-primary-btn-bg) 20%,
@@ -355,7 +350,7 @@ export default defineComponent({
       );
       color: var(--o2-text-primary);
 
-      .q-tab__icon {
+      .o-tab__icon {
         color: var(--o2-text-primary);
       }
     }
