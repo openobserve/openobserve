@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import type { OTabPanelProps, OTabPanelSlots, TabPanelPadding, TabPanelLayout } from './OTabPanel.types'
-import { computed, inject, useAttrs, type ComputedRef } from 'vue'
+import { computed, inject, type ComputedRef } from 'vue'
 import { TAB_PANELS_CONTEXT_KEY } from './OTabPanels.types'
 import type { TabPanelsContext } from './OTabPanels.types'
-
-defineOptions({ inheritAttrs: false })
-const attrs = useAttrs()
 
 const props = withDefaults(defineProps<OTabPanelProps>(), {
   padding: 'none',
@@ -47,27 +44,24 @@ const panelClasses = computed<string[]>(() => {
     keepAlive=false (default): unmount inactive panels entirely (v-if).
     keepAlive=true: keep DOM alive, just hide with v-show.
     animated: wrap visible panel in CSS <Transition>.
-    NOTE: inheritAttrs is disabled. attrs (data-test, etc.) are bound
-    explicitly to every rendered <div> because <Transition> does not
-    render a DOM element and would otherwise swallow fallthrough attrs.
   -->
   <template v-if="keepAlive">
     <Transition v-if="animated" name="o-tab-panel">
-      <div v-show="isActive" v-bind="attrs" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+      <div v-show="isActive" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
         <slot />
       </div>
     </Transition>
-    <div v-else v-show="isActive" v-bind="attrs" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+    <div v-else v-show="isActive" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
       <slot />
     </div>
   </template>
   <template v-else>
     <Transition v-if="animated && isActive" name="o-tab-panel">
-      <div v-bind="attrs" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+      <div role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
         <slot />
       </div>
     </Transition>
-    <div v-else-if="isActive" v-bind="attrs" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+    <div v-else-if="isActive" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
       <slot />
     </div>
   </template>

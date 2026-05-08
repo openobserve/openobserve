@@ -42,7 +42,8 @@ export class ServiceGraphPage {
     this.operationsTab = '[data-test="service-graph-node-panel-tab-operations"]';
     this.nodesTab = '[data-test="service-graph-node-panel-tab-nodes"]';
     this.podsTab = '[data-test="service-graph-node-panel-tab-pods"]';
-    this.recentOperations = '[data-test="service-graph-side-panel-recent-operations"]';
+    // data-test on OTabPanel is swallowed by <Transition> — target slot content instead
+    this.recentOperations = '[data-test="service-graph-side-panel-operations-table"]';
     this.operationsTable = '[data-test="service-graph-side-panel-operations-table"]';
     this.nodesPanel = '[data-test="service-graph-side-panel-nodes"]';
     this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
