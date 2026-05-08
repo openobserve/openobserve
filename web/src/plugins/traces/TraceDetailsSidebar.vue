@@ -304,7 +304,7 @@ class="q-mr-xs" />
         <OTab
           name="error"
           style="text-transform: capitalize"
-          data-test="trace-details-sidebar-tabs-exceptions"
+          data-test="trace-details-sidebar-tabs-error"
                     class="tw:font-normal!"
 
         >
@@ -322,7 +322,7 @@ class="q-mr-xs" />
           :label="t('common.db')"
           style="text-transform: capitalize"
           class="tw:font-normal!"
-          data-test="trace-details-sidebar-tabs-exceptions"
+          data-test="trace-details-sidebar-tabs-database"
         />
         <OTab
           name="events"

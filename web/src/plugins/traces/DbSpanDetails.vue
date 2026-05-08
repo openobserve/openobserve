@@ -66,7 +66,7 @@ const metadataRows = computed(() =>
     },
     {
       label: "Database",
-      value: String(props.span.db_namespace ?? props.span.db_name),
+      value: String(props.span.db_namespace ?? props.span.db_name ?? ""),
       key: "namespace",
     },
     {
