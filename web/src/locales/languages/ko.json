@@ -123,7 +123,12 @@
     "create": "작성",
     "redirectingHome": "{countdown} 초 내에 홈으로 리디렉션하는 중...",
     "resources": "리소스",
-    "updated_at": "업데이트 날짜"
+    "updated_at": "업데이트 날짜",
+    "enable": "활성화",
+    "disable": "비활성화",
+    "download": "다운로드",
+    "enabled": "활성화됨",
+    "disabled": "장애인"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -1126,7 +1131,33 @@
     "apache": "아파치",
     "iis": "입니다",
     "pubsub": "게시/구독 로그",
-    "aiLabel": "AI 통합"
+    "aiLabel": "AI 통합",
+    "manageTokensBtnLabel": "토큰 관리",
+    "orgLevelExplanation": "조직 수준의 통합 토큰입니다.토큰은 개별 사용자에 국한되지 않으며 토큰을 생성한 사용자가 조직을 떠나도 계속 작동합니다.토큰은 통합 엔드포인트에서만 사용할 수 있습니다.",
+    "resetDefaultTokenLabel": "토큰 재설정",
+    "tokenManagementTitle": "인제스트 토큰 관리",
+    "defaultTokenBadge": "디폴트",
+    "createTokenBtn": "새 토큰 생성",
+    "createTokenTitle": "토큰 생성",
+    "tokenNameLabel": "이름",
+    "tokenDescriptionLabel": "설명",
+    "rotateTokenBtn": "회전",
+    "deleteTokenBtn": "삭제",
+    "copyTokenBtn": "복사",
+    "copyTokenWarning": "지금 이 토큰을 복사하세요.다시 표시되지 않을 것입니다.",
+    "newTokenRevealed": "새 토큰 생성",
+    "deleteTokenConfirm": "“{name}” 토큰을 삭제하시겠습니까?이 토큰을 사용하는 파이프라인은 작동을 멈춥니다.",
+    "rotateTokenConfirm": "토큰 “{name}”을 회전하시겠습니까?이 토큰을 사용하는 모든 파이프라인을 새 값으로 업데이트해야 합니다.",
+    "tokenCreatedSuccess": "토큰이 성공적으로 생성되었습니다.",
+    "tokenRotatedSuccess": "토큰이 성공적으로 회전했습니다.",
+    "tokenDeletedSuccess": "토큰이 성공적으로 삭제되었습니다.",
+    "resetDefaultConfirm": "기본 통합 토큰을 재설정하시겠습니까?이 토큰을 사용하는 모든 파이프라인을 업데이트해야 합니다.",
+    "tokenFetchError": "토큰을 로드하지 못했습니다.",
+    "tokenCreateError": "토큰을 만들지 못했습니다.",
+    "tokenRotateError": "토큰 회전에 실패했습니다.",
+    "tokenDeleteError": "토큰을 삭제하지 못했습니다.",
+    "noTokensFound": "통합 토큰을 찾을 수 없습니다.",
+    "createdBy": "만든 사람"
   },
   "dashboard": {
     "selectField": "필드",
@@ -2594,7 +2625,8 @@
     "systemDefault": "시스템 기본값",
     "usageStreamEnabledLabel": "사용 스트림 활성화",
     "aiToolsets": "AI 툴셋",
-    "llmModelPricing": "LLM 모델 가격 책정"
+    "llmModelPricing": "LLM 모델 가격 책정",
+    "ingestionTokens": "인제스트 토큰"
   },
   "iam": {
     "users": "유저",
@@ -2625,7 +2657,8 @@
     "quota": "할당량",
     "externalUserWarningTitle": "외부 사용자 경고",
     "externalUserWarningMessage": "외부 사용자를 역할에 직접 추가해도 권한이 부여되지 않습니다.대신 사용자 그룹에 추가하세요.",
-    "invitations": "초대장"
+    "invitations": "초대장",
+    "ingestionTokens": "인제스트 토큰"
   },
   "pipeline": {
     "header": "파이프라인",

@@ -123,7 +123,12 @@
     "version": "Versión",
     "create": "Crear",
     "resources": "Recursos",
-    "updated_at": "Actualizado en"
+    "updated_at": "Actualizado en",
+    "enable": "Habilitar",
+    "disable": "Desactivar",
+    "download": "Descargar",
+    "enabled": "Habilitado",
+    "disabled": "Discapacitado"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -1126,7 +1131,33 @@
     "apache": "apache",
     "iis": "IIS",
     "pubsub": "Registros de Pub/Sub",
-    "aiLabel": "Integraciones de IA"
+    "aiLabel": "Integraciones de IA",
+    "manageTokensBtnLabel": "Administrar los tokens",
+    "orgLevelExplanation": "Se trata de tokens de ingestión a nivel de organización. No están vinculados a usuarios individuales y seguirán funcionando aunque el usuario que los creó abandone la organización. Los tokens solo se pueden usar en los puntos finales de ingestión.",
+    "resetDefaultTokenLabel": "Token de restablecimiento",
+    "tokenManagementTitle": "Gestione los tokens de ingestión",
+    "defaultTokenBadge": "PREDETERMINADO",
+    "createTokenBtn": "Crear un token nuevo",
+    "createTokenTitle": "Crear token",
+    "tokenNameLabel": "Nombre",
+    "tokenDescriptionLabel": "Descripción",
+    "rotateTokenBtn": "Rotar",
+    "deleteTokenBtn": "Borrar",
+    "copyTokenBtn": "Copiar",
+    "copyTokenWarning": "Copia este token ahora. No se volverá a mostrar.",
+    "newTokenRevealed": "Nuevo token generado",
+    "deleteTokenConfirm": "¿Eliminar el token «{name}»? Las tuberías que utilicen este token dejarán de funcionar.",
+    "rotateTokenConfirm": "¿Rotar el token «{name}»? Todas las canalizaciones que utilizan este token deben actualizarse con el nuevo valor.",
+    "tokenCreatedSuccess": "El token se creó correctamente.",
+    "tokenRotatedSuccess": "El token ha rotado correctamente.",
+    "tokenDeletedSuccess": "El token se ha eliminado correctamente.",
+    "resetDefaultConfirm": "¿Restablecer el token de ingesta predeterminado? Todas las canalizaciones que utilizan este token deben actualizarse.",
+    "tokenFetchError": "No se pudieron cargar los tokens.",
+    "tokenCreateError": "No se pudo crear el token.",
+    "tokenRotateError": "No se pudo rotar el token.",
+    "tokenDeleteError": "No se pudo eliminar el token.",
+    "noTokensFound": "No se ha encontrado ningún token de ingestión.",
+    "createdBy": "Creado por"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2581,7 +2612,8 @@
     "systemDefault": "predeterminado del sistema",
     "usageStreamEnabledLabel": "Habilitar flujo de uso",
     "aiToolsets": "Conjuntos de herramientas de IA",
-    "llmModelPricing": "Precios del modelo LLM"
+    "llmModelPricing": "Precios del modelo LLM",
+    "ingestionTokens": "Tokens de ingestión"
   },
   "iam": {
     "users": "Usuarios",
@@ -2612,7 +2644,8 @@
     "quota": "Cuotas",
     "externalUserWarningTitle": "Advertencia de usuario externo",
     "externalUserWarningMessage": "Agregar usuarios externos directamente a los roles no otorgará permisos. En su lugar, agréguelos a los grupos de usuarios.",
-    "invitations": "Invitaciones"
+    "invitations": "Invitaciones",
+    "ingestionTokens": "Tokens de ingestión"
   },
   "pipeline": {
     "header": "Tuberías",

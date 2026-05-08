@@ -123,7 +123,12 @@
     "create": "Oluştur",
     "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
     "resources": "Kaynaklar",
-    "updated_at": "Güncellendi:"
+    "updated_at": "Güncellendi:",
+    "enable": "Etkinleştir",
+    "disable": "devre dışı bırak",
+    "download": "İndir",
+    "enabled": "Etkin",
+    "disabled": "Engelli"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -1126,7 +1131,33 @@
     "apache": "Apaçi",
     "iis": "IIS",
     "pubsub": "Pub/Alt Günlükleri",
-    "aiLabel": "Yapay Zeka Entegrasyonları"
+    "aiLabel": "Yapay Zeka Entegrasyonları",
+    "manageTokensBtnLabel": "Belirteçleri Yönet",
+    "orgLevelExplanation": "Bunlar kuruluş düzeyinde alım belirteçleridir. Bireysel kullanıcılara bağlı değildirler ve onları oluşturan kullanıcı kuruluştan ayrılsa bile çalışmaya devam edeceklerdir. Belirteçler yalnızca alım uç noktalarında kullanılabilir.",
+    "resetDefaultTokenLabel": "Simgeyi Sıfırla",
+    "tokenManagementTitle": "Yutma Belirteçlerini Yönetme",
+    "defaultTokenBadge": "VARSAYILAN",
+    "createTokenBtn": "Yeni Token Oluştur",
+    "createTokenTitle": "Token Oluştur",
+    "tokenNameLabel": "İsim",
+    "tokenDescriptionLabel": "Açıklama",
+    "rotateTokenBtn": "Döndür",
+    "deleteTokenBtn": "Sil",
+    "copyTokenBtn": "Kopyalama",
+    "copyTokenWarning": "Şimdi bu belirteci kopyalayın. Bir daha gösterilmeyecek.",
+    "newTokenRevealed": "Yeni Token Oluşturuldu",
+    "deleteTokenConfirm": "“{name}” belirtecini silin mi? Bu belirteci kullanan boru hatları çalışmayı durduracaktır.",
+    "rotateTokenConfirm": "“{name}” belirtecini döndürmek mi? Bu belirteci kullanan tüm boru hatları yeni değerle güncellenmelidir.",
+    "tokenCreatedSuccess": "Token başarıyla oluşturuldu.",
+    "tokenRotatedSuccess": "Token başarıyla döndürüldü.",
+    "tokenDeletedSuccess": "Token başarıyla silindi.",
+    "resetDefaultConfirm": "Varsayılan alım belirtecini sıfırlıyor musunuz? Bu belirteci kullanan tüm boru hatları güncellenmelidir.",
+    "tokenFetchError": "Belirteçler yüklenemedi.",
+    "tokenCreateError": "Belirteç oluşturulamadı.",
+    "tokenRotateError": "Belirteç döndürülemedi.",
+    "tokenDeleteError": "Belirteç silinemedi.",
+    "noTokensFound": "Yutma belirteci bulunamadı.",
+    "createdBy": "Tarafından oluşturuldu"
   },
   "dashboard": {
     "selectField": "Tarla",
@@ -2594,7 +2625,8 @@
     "systemDefault": "sistem varsayılan",
     "usageStreamEnabledLabel": "Kullanım Akışını Etkinleştir",
     "aiToolsets": "Yapay Zeka Araç Setleri",
-    "llmModelPricing": "LLM Model Fiyatlandırması"
+    "llmModelPricing": "LLM Model Fiyatlandırması",
+    "ingestionTokens": "Yutma Jetonları"
   },
   "iam": {
     "users": "Kullanıcılar",
@@ -2625,7 +2657,8 @@
     "quota": "Kontenjanlar",
     "externalUserWarningTitle": "Harici kullanıcı uyarısı",
     "externalUserWarningMessage": "Harici kullanıcıları doğrudan rollere eklemek izin vermez. Bunun yerine Kullanıcı Gruplarına ekleyin.",
-    "invitations": "Davetiyeler"
+    "invitations": "Davetiyeler",
+    "ingestionTokens": "Yutma Jetonları"
   },
   "pipeline": {
     "header": "Boru hatları",

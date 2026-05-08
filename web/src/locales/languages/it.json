@@ -123,7 +123,12 @@
     "create": "Crea",
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
-    "updated_at": "Aggiornato a"
+    "updated_at": "Aggiornato a",
+    "enable": "Attivare",
+    "disable": "Disabilita",
+    "download": "Scarica",
+    "enabled": "Abilitato",
+    "disabled": "Disabili"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -1126,7 +1131,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Registri Pub/Sub",
-    "aiLabel": "Integrazioni AI"
+    "aiLabel": "Integrazioni AI",
+    "manageTokensBtnLabel": "Gestisci i token",
+    "orgLevelExplanation": "Si tratta di token di ingestione a livello di organizzazione. Non sono legati ai singoli utenti e continueranno a funzionare anche se l'utente che li ha creati lascia l'organizzazione. I token possono essere utilizzati solo sugli endpoint di ingestione.",
+    "resetDefaultTokenLabel": "Token di ripristino",
+    "tokenManagementTitle": "Gestisci i token di ingestione",
+    "defaultTokenBadge": "IMPOSTAZIONE PREDEFINITA",
+    "createTokenBtn": "Crea nuovo token",
+    "createTokenTitle": "Crea token",
+    "tokenNameLabel": "Nome",
+    "tokenDescriptionLabel": "Descrizione",
+    "rotateTokenBtn": "Ruota",
+    "deleteTokenBtn": "Elimina",
+    "copyTokenBtn": "Copia",
+    "copyTokenWarning": "Copia questo token adesso. Non verrà più mostrato.",
+    "newTokenRevealed": "Nuovo token generato",
+    "deleteTokenConfirm": "Eliminare il token «{name}»? Le pipeline che utilizzano questo token smetteranno di funzionare.",
+    "rotateTokenConfirm": "Ruotare il token «{name}»? Tutte le pipeline che utilizzano questo token devono essere aggiornate con il nuovo valore.",
+    "tokenCreatedSuccess": "Token creato con successo.",
+    "tokenRotatedSuccess": "Il token è stato ruotato con successo.",
+    "tokenDeletedSuccess": "Token eliminato con successo.",
+    "resetDefaultConfirm": "Reimpostare il token di inserimento predefinito? Tutte le pipeline che utilizzano questo token devono essere aggiornate.",
+    "tokenFetchError": "Caricamento dei token non riuscito.",
+    "tokenCreateError": "Creazione del token non riuscita.",
+    "tokenRotateError": "Ruotazione del token non riuscita.",
+    "tokenDeleteError": "Eliminazione del token non riuscita.",
+    "noTokensFound": "Nessun token di ingestione trovato.",
+    "createdBy": "Creato da"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2592,7 +2623,8 @@
     "systemDefault": "impostazione predefinita del sistema",
     "usageStreamEnabledLabel": "Abilita flusso di utilizzo",
     "aiToolsets": "Set di strumenti AI",
-    "llmModelPricing": "Prezzi del modello LLM"
+    "llmModelPricing": "Prezzi del modello LLM",
+    "ingestionTokens": "Token di ingestione"
   },
   "iam": {
     "users": "Utenti",
@@ -2623,7 +2655,8 @@
     "quota": "Quote",
     "externalUserWarningTitle": "Avviso per l'utente esterno",
     "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti.",
-    "invitations": "Inviti"
+    "invitations": "Inviti",
+    "ingestionTokens": "Token di ingestione"
   },
   "pipeline": {
     "header": "Oleodotti",

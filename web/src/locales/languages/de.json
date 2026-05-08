@@ -123,7 +123,12 @@
     "version": "Version",
     "create": "Erstellen",
     "resources": "Ressourcen",
-    "updated_at": "Aktualisiert am"
+    "updated_at": "Aktualisiert am",
+    "enable": "Aktiviere",
+    "disable": "Deaktiviert",
+    "download": "Herunterladen",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -1126,7 +1131,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Sub-Protokolle",
-    "aiLabel": "KI-Integrationen"
+    "aiLabel": "KI-Integrationen",
+    "manageTokensBtnLabel": "Tokens verwalten",
+    "orgLevelExplanation": "Dabei handelt es sich um Erfassungs-Token auf Organisationsebene. Sie sind nicht an einzelne Benutzer gebunden und funktionieren auch dann weiter, wenn der Benutzer, der sie erstellt hat, die Organisation verlässt. Tokens können nur auf Datenerfassungsendpunkten verwendet werden.",
+    "resetDefaultTokenLabel": "Token zurücksetzen",
+    "tokenManagementTitle": "Erfassungs-Tokens verwalten",
+    "defaultTokenBadge": "STANDARD",
+    "createTokenBtn": "Neues Token erstellen",
+    "createTokenTitle": "Token erstellen",
+    "tokenNameLabel": "Name",
+    "tokenDescriptionLabel": "Beschreibung",
+    "rotateTokenBtn": "Rotieren",
+    "deleteTokenBtn": "Löschen",
+    "copyTokenBtn": "Kopieren",
+    "copyTokenWarning": "Kopieren Sie dieses Token jetzt. Es wird nicht erneut angezeigt.",
+    "newTokenRevealed": "Neues Token generiert",
+    "deleteTokenConfirm": "Token „{name}“ löschen? Pipelines, die dieses Token verwenden, funktionieren nicht mehr.",
+    "rotateTokenConfirm": "Token „{name}“ drehen? Alle Pipelines, die dieses Token verwenden, müssen mit dem neuen Wert aktualisiert werden.",
+    "tokenCreatedSuccess": "Das Token wurde erfolgreich erstellt.",
+    "tokenRotatedSuccess": "Das Token wurde erfolgreich gedreht.",
+    "tokenDeletedSuccess": "Das Token wurde erfolgreich gelöscht.",
+    "resetDefaultConfirm": "Das Standard-Aufnahme-Token zurücksetzen? Alle Pipelines, die dieses Token verwenden, müssen aktualisiert werden.",
+    "tokenFetchError": "Tokens konnten nicht geladen werden.",
+    "tokenCreateError": "Das Token konnte nicht erstellt werden.",
+    "tokenRotateError": "Das Token konnte nicht gedreht werden.",
+    "tokenDeleteError": "Das Token konnte nicht gelöscht werden.",
+    "noTokensFound": "Es wurden keine Aufnahme-Token gefunden.",
+    "createdBy": "Erstellt von"
   },
   "dashboard": {
     "selectField": "Feld",
@@ -2583,7 +2614,8 @@
     "systemDefault": "Systemstandard",
     "usageStreamEnabledLabel": "Nutzungsstream aktivieren",
     "aiToolsets": "KI-Toolsets",
-    "llmModelPricing": "LLM-Modellpreisgestaltung"
+    "llmModelPricing": "LLM-Modellpreisgestaltung",
+    "ingestionTokens": "Tokens für die Aufnahme"
   },
   "iam": {
     "users": "Nutzer",
@@ -2614,7 +2646,8 @@
     "quota": "Kontingente",
     "externalUserWarningTitle": "Warnung für externe Benutzer",
     "externalUserWarningMessage": "Wenn Sie externe Benutzer direkt zu Rollen hinzufügen, werden keine Berechtigungen erteilt. Fügen Sie sie stattdessen zu Benutzergruppen hinzu.",
-    "invitations": "Einladungen"
+    "invitations": "Einladungen",
+    "ingestionTokens": "Tokens für die Aufnahme"
   },
   "pipeline": {
     "header": "Rohrleitungen",

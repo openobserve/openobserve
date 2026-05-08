@@ -123,7 +123,12 @@
     "version": "[バージョン]",
     "create": "作成",
     "resources": "リソース",
-    "updated_at": "更新日"
+    "updated_at": "更新日",
+    "enable": "有効にする",
+    "disable": "無効",
+    "download": "[ダウンロード]",
+    "enabled": "有効",
+    "disabled": "無効"
   },
   "search": {
     "metrics": "メトリクス",
@@ -1143,7 +1148,33 @@
     "iis": "IIS",
     "pubsub": "Pub/Subログ",
     "oracle": "オラクル",
-    "aiLabel": "AI インテグレーション"
+    "aiLabel": "AI インテグレーション",
+    "manageTokensBtnLabel": "トークンの管理",
+    "orgLevelExplanation": "これらは組織レベルの取り込みトークンです。これらは個々のユーザーに関連付けられることはなく、作成したユーザーが組織を離れても引き続き機能します。トークンは取り込みエンドポイントでのみ使用できます。",
+    "resetDefaultTokenLabel": "トークンをリセット",
+    "tokenManagementTitle": "取り込みトークンの管理",
+    "defaultTokenBadge": "デフォルト",
+    "createTokenBtn": "新しいトークンを作成",
+    "createTokenTitle": "トークンを作成",
+    "tokenNameLabel": "[名前]",
+    "tokenDescriptionLabel": "[説明]",
+    "rotateTokenBtn": "回転",
+    "deleteTokenBtn": "[削除]",
+    "copyTokenBtn": "[コピー]",
+    "copyTokenWarning": "このトークンを今すぐコピーしてください。今後は表示されません。",
+    "newTokenRevealed": "新しいトークンが生成されました",
+    "deleteTokenConfirm": "トークン「{name}」を削除しますか?このトークンを使用するパイプラインは動作しなくなります。",
+    "rotateTokenConfirm": "ローテーショントークン「{name}」？このトークンを使用するすべてのパイプラインは、新しい値で更新する必要があります。",
+    "tokenCreatedSuccess": "トークンは正常に作成されました。",
+    "tokenRotatedSuccess": "トークンは正常にローテーションされました。",
+    "tokenDeletedSuccess": "トークンは正常に削除されました。",
+    "resetDefaultConfirm": "デフォルトの取り込みトークンをリセットしますか?このトークンを使用するすべてのパイプラインを更新する必要があります。",
+    "tokenFetchError": "トークンを読み込めませんでした。",
+    "tokenCreateError": "トークンの作成に失敗しました。",
+    "tokenRotateError": "トークンをローテーションできませんでした。",
+    "tokenDeleteError": "トークンを削除できませんでした。",
+    "noTokensFound": "取り込みトークンが見つかりません。",
+    "createdBy": "作成者"
   },
   "dashboard": {
     "selectField": "フィールド",
@@ -2604,7 +2635,8 @@
     "systemDefault": "システムデフォルト",
     "usageStreamEnabledLabel": "使用ストリームを有効にする",
     "aiToolsets": "AI ツールセット",
-    "llmModelPricing": "LLM モデルの価格設定"
+    "llmModelPricing": "LLM モデルの価格設定",
+    "ingestionTokens": "インジェストトークン"
   },
   "iam": {
     "users": "ユーザー",
@@ -2635,7 +2667,8 @@
     "basicUsers": "ユーザ",
     "externalUserWarningTitle": "外部ユーザー警告",
     "externalUserWarningMessage": "外部ユーザーをロールに直接追加しても権限は付与されません。代わりにユーザーグループに追加してください。",
-    "invitations": "招待状"
+    "invitations": "招待状",
+    "ingestionTokens": "インジェストトークン"
   },
   "pipeline": {
     "header": "パイプライン",

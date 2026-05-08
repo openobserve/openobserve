@@ -123,7 +123,12 @@
     "version": "Versão",
     "create": "Criar",
     "resources": "Recursos",
-    "updated_at": "Atualizado em"
+    "updated_at": "Atualizado em",
+    "enable": "Habilitar",
+    "disable": "Desabilitar",
+    "download": "Baixar",
+    "enabled": "Ativado",
+    "disabled": "Desativado"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -1126,7 +1131,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Registros do Pub/Sub",
-    "aiLabel": "Integrações de IA"
+    "aiLabel": "Integrações de IA",
+    "manageTokensBtnLabel": "Gerenciar tokens",
+    "orgLevelExplanation": "Esses são tokens de ingestão no nível da organização. Eles não estão vinculados a usuários individuais e continuarão funcionando mesmo que o usuário que os criou deixe a organização. Os tokens só podem ser usados em terminais de ingestão.",
+    "resetDefaultTokenLabel": "Token de redefinição",
+    "tokenManagementTitle": "Gerenciar tokens de ingestão",
+    "defaultTokenBadge": "PADRÃO",
+    "createTokenBtn": "Criar novo token",
+    "createTokenTitle": "Criar token",
+    "tokenNameLabel": "Nome",
+    "tokenDescriptionLabel": "Descrição",
+    "rotateTokenBtn": "Girar",
+    "deleteTokenBtn": "Excluir",
+    "copyTokenBtn": "Copiar",
+    "copyTokenWarning": "Copie esse token agora. Não será exibido novamente.",
+    "newTokenRevealed": "Novo token gerado",
+    "deleteTokenConfirm": "Excluir o token “{name}”? Os pipelines que usam esse token deixarão de funcionar.",
+    "rotateTokenConfirm": "Girar o token “{name}”? Todos os pipelines que usam esse token devem ser atualizados com o novo valor.",
+    "tokenCreatedSuccess": "Token criado com sucesso.",
+    "tokenRotatedSuccess": "O token foi girado com sucesso.",
+    "tokenDeletedSuccess": "Token excluído com sucesso.",
+    "resetDefaultConfirm": "Redefinir o token de ingestão padrão? Todos os pipelines que usam esse token devem ser atualizados.",
+    "tokenFetchError": "Falha ao carregar tokens.",
+    "tokenCreateError": "Falha ao criar o token.",
+    "tokenRotateError": "Falha ao girar o token.",
+    "tokenDeleteError": "Falha ao excluir o token.",
+    "noTokensFound": "Nenhum token de ingestão foi encontrado.",
+    "createdBy": "Criado por"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2583,7 +2614,8 @@
     "systemDefault": "padrão do sistema",
     "usageStreamEnabledLabel": "Ativar fluxo de uso",
     "aiToolsets": "Conjuntos de ferramentas de IA",
-    "llmModelPricing": "Preços do modelo LLM"
+    "llmModelPricing": "Preços do modelo LLM",
+    "ingestionTokens": "Tokens de ingestão"
   },
   "iam": {
     "users": "Usuários",
@@ -2614,7 +2646,8 @@
     "quota": "Cotas",
     "externalUserWarningTitle": "Aviso de usuário externo",
     "externalUserWarningMessage": "Adicionar usuários externos diretamente às funções não concederá permissões. Em vez disso, adicione-os aos grupos de usuários.",
-    "invitations": "Convites"
+    "invitations": "Convites",
+    "ingestionTokens": "Tokens de ingestão"
   },
   "pipeline": {
     "header": "Oleodutos",

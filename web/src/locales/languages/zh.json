@@ -123,7 +123,12 @@
     "version": "版本",
     "create": "创建",
     "resources": "资源",
-    "updated_at": "更新于"
+    "updated_at": "更新于",
+    "enable": "启用",
+    "disable": "禁用",
+    "download": "下载",
+    "enabled": "已启用",
+    "disabled": "已禁用"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -1126,7 +1131,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Sub Logs",
-    "aiLabel": "人工智能集成"
+    "aiLabel": "人工智能集成",
+    "manageTokensBtnLabel": "管理代币",
+    "orgLevelExplanation": "这些是组织级别的摄取令牌。它们与个人用户无关，即使创建它们的用户离开组织，它们也将继续工作。令牌只能在摄取端点上使用。",
+    "resetDefaultTokenLabel": "重置代币",
+    "tokenManagementTitle": "管理摄取令牌",
+    "defaultTokenBadge": "默认",
+    "createTokenBtn": "创建新代币",
+    "createTokenTitle": "创建代币",
+    "tokenNameLabel": "姓名",
+    "tokenDescriptionLabel": "描述",
+    "rotateTokenBtn": "旋转",
+    "deleteTokenBtn": "删除",
+    "copyTokenBtn": "复制",
+    "copyTokenWarning": "立即复制此令牌。它不会再次显示。",
+    "newTokenRevealed": "新代币生成",
+    "deleteTokenConfirm": "删除令牌 “{name}”？使用此代币的管道将停止运行。",
+    "rotateTokenConfirm": "轮换代币 “{name}”？所有使用此令牌的管道都必须使用新值进行更新。",
+    "tokenCreatedSuccess": "已成功创建代币。",
+    "tokenRotatedSuccess": "代币成功轮换。",
+    "tokenDeletedSuccess": "令牌已成功删除。",
+    "resetDefaultConfirm": "重置默认摄取令牌？所有使用此令牌的管道都必须更新。",
+    "tokenFetchError": "加载令牌失败。",
+    "tokenCreateError": "创建令牌失败。",
+    "tokenRotateError": "轮换令牌失败。",
+    "tokenDeleteError": "删除令牌失败。",
+    "noTokensFound": "未找到摄取令牌。",
+    "createdBy": "由... 创建"
   },
   "dashboard": {
     "selectField": "字段",
@@ -2587,7 +2618,8 @@
     "systemDefault": "系统默认",
     "usageStreamEnabledLabel": "启用使用流",
     "aiToolsets": "AI 工具集",
-    "llmModelPricing": "LLM 模型定价"
+    "llmModelPricing": "LLM 模型定价",
+    "ingestionTokens": "摄取代币"
   },
   "iam": {
     "users": "用户",
@@ -2618,7 +2650,8 @@
     "quota": "配额",
     "externalUserWarningTitle": "外部用户警告",
     "externalUserWarningMessage": "将外部用户直接添加到角色不会授予权限。改为将它们添加到用户组。",
-    "invitations": "邀请"
+    "invitations": "邀请",
+    "ingestionTokens": "摄取代币"
   },
   "pipeline": {
     "header": "流水线",

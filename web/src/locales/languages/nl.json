@@ -123,7 +123,12 @@
     "create": "Creëren",
     "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
     "resources": "Hulpbronnen",
-    "updated_at": "Bijgewerkt op"
+    "updated_at": "Bijgewerkt op",
+    "enable": "Inschakelen",
+    "disable": "Uitschakelen",
+    "download": "Downloaden",
+    "enabled": "Ingeschakeld",
+    "disabled": "Uitgeschakeld"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -1126,7 +1131,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Sub-logboeken",
-    "aiLabel": "AI-integraties"
+    "aiLabel": "AI-integraties",
+    "manageTokensBtnLabel": "Tokens beheren",
+    "orgLevelExplanation": "Dit zijn innametokens op organisatieniveau. Ze zijn niet gebonden aan individuele gebruikers en blijven werken, zelfs als de gebruiker die ze heeft aangemaakt de organisatie verlaat. Tokens kunnen alleen worden gebruikt op eindpunten voor inname.",
+    "resetDefaultTokenLabel": "Token opnieuw instellen",
+    "tokenManagementTitle": "Innametokens beheren",
+    "defaultTokenBadge": "STANDAARD",
+    "createTokenBtn": "Maak een nieuw token",
+    "createTokenTitle": "Token aanmaken",
+    "tokenNameLabel": "Naam",
+    "tokenDescriptionLabel": "Omschrijving",
+    "rotateTokenBtn": "Roteren",
+    "deleteTokenBtn": "Verwijderen",
+    "copyTokenBtn": "Kopiëren",
+    "copyTokenWarning": "Kopieer dit token nu. Het wordt niet opnieuw getoond.",
+    "newTokenRevealed": "Nieuw token gegenereerd",
+    "deleteTokenConfirm": "Token „{name}” verwijderen? Pijpleidingen die dit token gebruiken, werken niet meer.",
+    "rotateTokenConfirm": "Token „{name}” roteren? Alle pipelines die dit token gebruiken, moeten worden bijgewerkt met de nieuwe waarde.",
+    "tokenCreatedSuccess": "Token is succesvol aangemaakt.",
+    "tokenRotatedSuccess": "Token is succesvol geroteerd.",
+    "tokenDeletedSuccess": "Token is succesvol verwijderd.",
+    "resetDefaultConfirm": "Het standaard opnametoken opnieuw instellen? Alle pijplijnen die dit token gebruiken, moeten worden bijgewerkt.",
+    "tokenFetchError": "Het laden van tokens is mislukt.",
+    "tokenCreateError": "Het aanmaken van een token is mislukt.",
+    "tokenRotateError": "Het roteren van het token is mislukt.",
+    "tokenDeleteError": "Het verwijderen van het token is mislukt.",
+    "noTokensFound": "Geen innametokens gevonden.",
+    "createdBy": "Gemaakt door"
   },
   "dashboard": {
     "selectField": "Veld",
@@ -2594,7 +2625,8 @@
     "systemDefault": "standaardinstelling van het systeem",
     "usageStreamEnabledLabel": "Usage Stream inschakelen",
     "aiToolsets": "AI-toolsets",
-    "llmModelPricing": "Prijzen van het LLM-model"
+    "llmModelPricing": "Prijzen van het LLM-model",
+    "ingestionTokens": "Tokens voor inname"
   },
   "iam": {
     "users": "Gebruikers",
@@ -2625,7 +2657,8 @@
     "quota": "Quota",
     "externalUserWarningTitle": "Waarschuwing voor externe gebruikers",
     "externalUserWarningMessage": "Als u externe gebruikers rechtstreeks aan rollen toevoegt, worden geen machtigingen verleend. Voeg ze in plaats daarvan toe aan gebruikersgroepen.",
-    "invitations": "Uitnodigingen"
+    "invitations": "Uitnodigingen",
+    "ingestionTokens": "Tokens voor inname"
   },
   "pipeline": {
     "header": "Pijpleidingen",
