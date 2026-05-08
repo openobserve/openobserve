@@ -131,11 +131,20 @@ pub async fn search(
                         stream_name,
                     )
                     .await;
+                    let elapsed = bloom_start.elapsed();
                     log::info!(
                         "[trace_id {trace_id}] search->storage: bloom prune {before} -> {} in {} ms",
                         files.len(),
-                        bloom_start.elapsed().as_millis()
+                        elapsed.as_millis()
                     );
+                    config::metrics::BLOOM_PRUNE_DURATION
+                        .with_label_values(&[org_id.as_str(), stream_type.as_str()])
+                        .observe(elapsed.as_secs_f64());
+                    if before > 0 {
+                        config::metrics::BLOOM_PRUNE_KEEP_RATIO
+                            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
+                            .observe(files.len() as f64 / before as f64);
+                    }
                     if files.is_empty() {
                         return Ok((vec![], ScanStats::default(), HashSet::new()));
                     }

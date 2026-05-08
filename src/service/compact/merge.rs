@@ -1035,6 +1035,9 @@ pub async fn merge_files(
                         for f in &mut new_files {
                             f.meta.bloom_ver = bloom_ver;
                         }
+                        config::metrics::BLOOM_FILE_BUILT_TOTAL
+                            .with_label_values(&[org_id, stream_type.as_str()])
+                            .inc();
                         log::info!(
                             "[COMPACTOR:WORKER:{thread_id}] uploaded bloom filter file: {bf_path}, covering {} new parquet(s)",
                             new_files.len()
