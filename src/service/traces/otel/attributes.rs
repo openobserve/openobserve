@@ -176,9 +176,11 @@ impl GenAiAttributes {
 pub struct GenAiExtensions;
 
 impl GenAiExtensions {
-    /// Input-side cost (Float64). OO extension — spec only defines a single total `gen_ai.usage.cost`.
+    /// Input-side cost (Float64). OO extension — spec only defines a single total
+    /// `gen_ai.usage.cost`.
     pub const USAGE_COST_INPUT: &'static str = "gen_ai.usage.cost.input";
-    /// Output-side cost (Float64). OO extension — spec only defines a single total `gen_ai.usage.cost`.
+    /// Output-side cost (Float64). OO extension — spec only defines a single total
+    /// `gen_ai.usage.cost`.
     pub const USAGE_COST_OUTPUT: &'static str = "gen_ai.usage.cost.output";
 }
 

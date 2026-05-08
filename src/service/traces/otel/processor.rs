@@ -23,7 +23,9 @@ use std::collections::HashMap;
 use config::utils::{json, time::parse_timestamp_micro_from_value};
 
 use super::{
-    attributes::{GenAiAttributes, GenAiExtensions, LangfuseAttributes, O2Attributes, OtelAttributes},
+    attributes::{
+        GenAiAttributes, GenAiExtensions, LangfuseAttributes, O2Attributes, OtelAttributes,
+    },
     extractors::{
         EvaluationExtractor, InputOutputExtractor, MetadataExtractor, ModelExtractor,
         ParametersExtractor, PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor,
@@ -723,15 +725,21 @@ mod tests {
         // 500 tokens output = 500/1M * $10.00 = $0.005
         // Total = $0.0075
         assert_eq!(
-            span_attrs.get(GenAiExtensions::USAGE_COST_INPUT).and_then(|v| v.as_f64()),
+            span_attrs
+                .get(GenAiExtensions::USAGE_COST_INPUT)
+                .and_then(|v| v.as_f64()),
             Some(0.0025)
         );
         assert_eq!(
-            span_attrs.get(GenAiExtensions::USAGE_COST_OUTPUT).and_then(|v| v.as_f64()),
+            span_attrs
+                .get(GenAiExtensions::USAGE_COST_OUTPUT)
+                .and_then(|v| v.as_f64()),
             Some(0.005)
         );
         assert_eq!(
-            span_attrs.get(GenAiAttributes::USAGE_COST).and_then(|v| v.as_f64()),
+            span_attrs
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64()),
             Some(0.0075)
         );
     }
@@ -860,7 +868,9 @@ mod tests {
 
         // Existing cost should be preserved (not recalculated)
         assert_eq!(
-            span_attrs.get(GenAiAttributes::USAGE_COST).and_then(|v| v.as_f64()),
+            span_attrs
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64()),
             Some(0.999)
         );
     }
@@ -893,7 +903,9 @@ mod tests {
 
         // No pricing definition matched for unknown model — total cost should be zero.
         assert_eq!(
-            span_attrs.get(GenAiAttributes::USAGE_COST).and_then(|v| v.as_f64()),
+            span_attrs
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64()),
             Some(0.0)
         );
     }

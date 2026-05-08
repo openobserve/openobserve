@@ -176,7 +176,11 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
         Field::new("gen_ai_usage_output_tokens", DataType::Int64, true),
         Field::new("gen_ai_usage_total_tokens", DataType::Int64, true),
         // Float fields
-        Field::new("gen_ai_response_time_to_first_chunk", DataType::Float64, true),
+        Field::new(
+            "gen_ai_response_time_to_first_chunk",
+            DataType::Float64,
+            true,
+        ),
         Field::new("gen_ai_usage_cost", DataType::Float64, true),
         Field::new("gen_ai_usage_cost_input", DataType::Float64, true),
         Field::new("gen_ai_usage_cost_output", DataType::Float64, true),
@@ -285,8 +289,7 @@ async fn list_stream_schemas(
                         // `created_at`, etc.) so downstream consumers can read
                         // properties like `is_llm_stream` from the cached
                         // schema. The fields list itself is omitted.
-                        Schema::empty()
-                            .with_metadata(val.schema().metadata().clone())
+                        Schema::empty().with_metadata(val.schema().metadata().clone())
                     },
                 }
             })
