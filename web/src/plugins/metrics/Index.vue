@@ -326,13 +326,17 @@ export default defineComponent({
           );
         }
 
-        // When stream changes while in SQL mode, reset defaults and regenerate query
+        // When stream changes while in SQL builder mode and query is empty,
+        // apply defaults and regenerate query. Skip for custom mode.
+        const query = dashboardPanelData.data.queries[0];
         if (
           isPanelConfigWatcherActivated &&
           stream &&
           oldStream &&
           stream !== oldStream &&
-          dashboardPanelData.data.queryType === "sql"
+          dashboardPanelData.data.queryType === "sql" &&
+          !query?.customQuery &&
+          !query?.query
         ) {
           await updateGroupedFields();
           applyMetricsDefaults();
@@ -344,16 +348,18 @@ export default defineComponent({
     // Handle query type switches on metrics page.
     // We use nextTick() to ensure this runs AFTER changeToggle's removeXYFilters()
     // has completed, so the defaults we apply here don't get immediately cleared.
+    // Only applies for builder mode (not custom mode).
     watch(
       () => dashboardPanelData.data.queryType,
       async (newType: string, oldType: string) => {
         if (!isPanelConfigWatcherActivated) return;
 
-        const stream =
-          dashboardPanelData.data.queries[0]?.fields?.stream;
+        const query = dashboardPanelData.data.queries[0];
+        const stream = query?.fields?.stream;
+        const isCustomMode = query?.customQuery;
 
-        if (newType === "sql" && oldType === "promql") {
-          // Switching to SQL: load stream fields first so applyMetricsDefaults
+        if (newType === "sql" && oldType === "promql" && !isCustomMode) {
+          // Switching to SQL builder: load stream fields first so applyMetricsDefaults
           // can check whether the current stream has a "value" field
           await nextTick();
           if (stream) {
@@ -364,11 +370,42 @@ export default defineComponent({
           if (stream) {
             await makeAutoSQLQuery();
           }
-        } else if (newType === "promql" && oldType === "sql") {
-          // Switching to PromQL: set default builder query (streamName{})
+        } else if (newType === "promql" && oldType === "sql" && !isCustomMode) {
+          // Switching to PromQL builder: set default builder query (streamName{})
           await nextTick();
           if (stream) {
-            dashboardPanelData.data.queries[0].query = `${stream}{}`;
+            query.query = `${stream}{}`;
+          }
+        }
+      },
+    );
+
+    // When switching from custom to builder mode, apply defaults.
+    // changeToggle's removeXYFilters() wipes the builder fields, so we
+    // always need to re-apply defaults regardless of whether query text is empty.
+    watch(
+      () => dashboardPanelData.data.queries[0]?.customQuery,
+      async (isCustom: boolean, wasCustom: boolean) => {
+        if (!isPanelConfigWatcherActivated) return;
+        // Only act when switching from custom (true) to builder (false)
+        if (wasCustom && !isCustom) {
+          await nextTick();
+          const query = dashboardPanelData.data.queries[0];
+          const stream = query?.fields?.stream;
+
+          if (dashboardPanelData.data.queryType === "sql") {
+            if (stream) {
+              await updateGroupedFields();
+            }
+            applyMetricsDefaults();
+            if (stream) {
+              await makeAutoSQLQuery();
+            }
+          } else if (
+            dashboardPanelData.data.queryType === "promql" &&
+            stream
+          ) {
+            query.query = `${stream}{}`;
           }
         }
       },
