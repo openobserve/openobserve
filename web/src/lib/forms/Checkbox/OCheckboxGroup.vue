@@ -6,6 +6,7 @@ import type {
   CheckboxGroupEmits,
   CheckboxGroupSlots,
   CheckboxGroupValue,
+  CheckboxPrimitive,
 } from "./OCheckbox.types";
 import { CHECKBOX_GROUP_KEY } from "./OCheckbox.types";
 import { provide } from "vue";
@@ -19,7 +20,7 @@ const emit = defineEmits<CheckboxGroupEmits>();
 
 defineSlots<CheckboxGroupSlots>();
 
-function toggle(value: string | number | boolean) {
+function toggle(value: CheckboxPrimitive) {
   const current: CheckboxGroupValue = props.modelValue ?? [];
   const next = current.includes(value)
     ? current.filter((v) => v !== value)
@@ -27,7 +28,7 @@ function toggle(value: string | number | boolean) {
   emit("update:modelValue", next);
 }
 
-function isChecked(value: string | number | boolean): boolean {
+function isChecked(value: CheckboxPrimitive): boolean {
   return (props.modelValue ?? []).includes(value);
 }
 

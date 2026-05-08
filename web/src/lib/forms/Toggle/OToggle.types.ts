@@ -9,8 +9,22 @@ export interface ToggleProps {
   label?: string;
   /** Whether the label appears before (start) or after (end) the switch */
   labelPlacement?: "start" | "end";
+  /** q-toggle compatibility alias; when true places label on the left */
+  leftLabel?: boolean;
   /** Control size */
   size?: ToggleSize;
+  /** q-toggle compatibility for tighter spacing */
+  dense?: boolean;
+  /** q-toggle compatibility prop; visual tokens are handled internally */
+  color?: string;
+  /** q-toggle compatibility prop; kept for migration parity */
+  flat?: boolean;
+  /** Icon shown for both states when state-specific icons are absent */
+  icon?: string;
+  /** Icon shown when checked */
+  checkedIcon?: string;
+  /** Icon shown when unchecked */
+  uncheckedIcon?: string;
   /** Prevents interaction */
   disabled?: boolean;
   /** HTML id */

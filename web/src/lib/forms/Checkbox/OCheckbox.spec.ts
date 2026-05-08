@@ -47,8 +47,43 @@ describe("OCheckbox", () => {
     expect(wrapper.find("button").classes()).toContain("tw:size-3.5");
   });
 
+  it("applies xs size classes", () => {
+    wrapper = mount(OCheckbox, { props: { size: "xs" } });
+    expect(wrapper.find("button").classes()).toContain("tw:size-3");
+  });
+
   it("applies md size classes by default", () => {
     wrapper = mount(OCheckbox);
     expect(wrapper.find("button").classes()).toContain("tw:size-4");
+  });
+
+  it("supports val alias with array model", async () => {
+    wrapper = mount(OCheckbox, {
+      props: {
+        modelValue: ["a"],
+        val: "b",
+      },
+    });
+
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toEqual(["a", "b"]);
+  });
+
+  it("supports custom true/false values", async () => {
+    wrapper = mount(OCheckbox, {
+      props: {
+        modelValue: "N",
+        trueValue: "Y",
+        falseValue: "N",
+      },
+    });
+
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("Y");
+  });
+
+  it("applies dense gap class", () => {
+    wrapper = mount(OCheckbox, { props: { dense: true } });
+    expect(wrapper.find("label").classes()).toContain("tw:gap-1");
   });
 });
