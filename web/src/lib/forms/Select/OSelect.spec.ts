@@ -83,8 +83,8 @@ describe("OSelect", () => {
           { id: 1, title: "One" },
           { id: 2, title: "Two" },
         ] as any,
-        optionValue: "id",
-        optionLabel: "title",
+        valueKey: "id",
+        labelKey: "title",
       },
     });
     expect(wrapper.text()).toContain("Two");

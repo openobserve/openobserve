@@ -1,29 +1,45 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type { ToggleProps, ToggleEmits, ToggleSlots } from "./OToggle.types";
+import type { SwitchProps, SwitchEmits, SwitchSlots } from "./OSwitch.types";
 import { SwitchRoot, SwitchThumb } from "reka-ui";
 import { computed } from "vue";
 
-const props = withDefaults(defineProps<ToggleProps>(), {
+const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
   disabled: false,
-  labelPlacement: "end",
+  labelPosition: "right",
 });
 
-const emit = defineEmits<ToggleEmits>();
+const emit = defineEmits<SwitchEmits>();
 
-defineSlots<ToggleSlots>();
+defineSlots<SwitchSlots>();
+
+// ── Checked state with optional custom values ──────────────────────────────
+const isChecked = computed((): boolean => {
+  if (props.checkedValue !== undefined) {
+    return props.modelValue === props.checkedValue;
+  }
+  return Boolean(props.modelValue);
+});
 
 function handleUpdate(value: boolean) {
-  emit("update:modelValue", value);
-  emit("change", value);
+  let emitValue;
+  if (props.checkedValue !== undefined || props.uncheckedValue !== undefined) {
+    emitValue = value
+      ? (props.checkedValue ?? true)
+      : (props.uncheckedValue ?? false);
+  } else {
+    emitValue = value;
+  }
+  emit("update:modelValue", emitValue);
+  emit("change", emitValue);
 }
 
 // ── Track sizes ────────────────────────────────────────────────────────────
 type TrackSize = { track: string; thumb: string; thumbTranslate: string };
 
-const trackSizes: Record<NonNullable<ToggleProps["size"]>, TrackSize> = {
+const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
   sm: {
     track: "tw:w-7 tw:h-4",
     thumb: "tw:size-3",
@@ -41,28 +57,20 @@ const trackSizes: Record<NonNullable<ToggleProps["size"]>, TrackSize> = {
   },
 };
 
-const labelSize: Record<NonNullable<ToggleProps["size"]>, string> = {
+const labelSize: Record<NonNullable<SwitchProps["size"]>, string> = {
   sm: "tw:text-xs",
   md: "tw:text-sm",
   lg: "tw:text-base",
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
-const thumbIcon = computed(() => {
-  if (props.modelValue) {
-    return props.checkedIcon ?? props.icon;
-  }
-  return props.uncheckedIcon ?? props.icon;
-});
 </script>
 
 <template>
   <label
     :class="[
       'tw:inline-flex tw:items-center tw:gap-2',
-      labelPlacement === 'start'
-        ? 'tw:flex-row-reverse'
-        : 'tw:flex-row',
+      labelPosition === 'left' ? 'tw:flex-row-reverse' : 'tw:flex-row',
       disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
     :for="id"
@@ -70,7 +78,7 @@ const thumbIcon = computed(() => {
     <SwitchRoot
       :id="id"
       :name="name"
-      :checked="modelValue ?? false"
+      :checked="isChecked"
       :disabled="disabled"
       :class="[
         // Layout
@@ -105,15 +113,7 @@ const thumbIcon = computed(() => {
           'tw:translate-x-0',
           currentSizes.thumbTranslate,
         ]"
-      >
-        <span
-          v-if="thumbIcon"
-          class="tw:text-[0.5rem] tw:leading-none tw:text-switch-label"
-          aria-hidden="true"
-        >
-          {{ thumbIcon }}
-        </span>
-      </SwitchThumb>
+      />
     </SwitchRoot>
 
     <span

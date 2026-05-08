@@ -158,7 +158,7 @@
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
 
-  /* Field semantic widths (OInput, OInputDisplay, OSelect) */
+  /* Field semantic widths (OInput, OTextarea, OSelect) */
   /* xs  ~120px — zip codes, CVV, short numbers          */
   /* sm  ~200px — dates, narrow labels                   */
   /* md  ~280px — names, phone numbers (default narrow)  */
@@ -359,7 +359,7 @@
   --spacing-tabs-height: var(--spacing-tabs-height);
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
 
-  /* Field semantic widths (used by OInput, OInputDisplay, OSelect) */
+  /* Field semantic widths (used by OInput, OTextarea, OSelect) */
   --spacing-field-width-xs: var(--spacing-field-width-xs);
   --spacing-field-width-sm: var(--spacing-field-width-sm);
   --spacing-field-width-md: var(--spacing-field-width-md);

@@ -125,28 +125,28 @@ export default [
         },
         // {
         //   element: 'q-checkbox',
-        //   message: 'Use <OCheckbox> from "@/lib/forms/Checkbox/OCheckbox.vue" instead of <q-checkbox>.'
+        //   message: 'Use <OCheckbox> / <OCheckboxGroup> from "@/lib/forms/Checkbox/OCheckbox.vue" instead of <q-checkbox>. For form-bound fields use <OFormCheckbox>.'
         // },
         // {
         //   element: 'q-input',
-        //   message: 'Use <OInput> from "@/lib/forms/Input/OInput.vue" instead of <q-input>.'
+        //   message: 'Use <OInput> from "@/lib/forms/Input/OInput.vue" instead of <q-input>. For textarea use <OTextarea>. For form-bound fields use <OFormInput> / <OFormTextarea>.'
         // },
         // {
         //   element: 'q-radio',
-        //   message: 'Use <ORadio> inside <ORadioGroup> from "@/lib/forms/Radio/" instead of <q-radio>.'
+        //   message: 'Use <ORadio> inside <ORadioGroup> from "@/lib/forms/Radio/" instead of <q-radio>. Wrap items in <ORadioGroup v-model="...">.'
         // },
         // {
         //   element: 'q-select',
-        //   message: 'Use <OSelect> from "@/lib/forms/Select/OSelect.vue" instead of <q-select>.'
+        //   message: 'Use <OSelect> from "@/lib/forms/Select/OSelect.vue" instead of <q-select>. For form-bound fields use <OFormSelect>.'
         // },
         // {
         //   element: 'q-toggle',
-        //   message: 'Use <OToggle> from "@/lib/forms/Toggle/OToggle.vue" instead of <q-toggle>.'
-        },
+        //   message: 'Use <OSwitch> from "@/lib/forms/Switch/OSwitch.vue" instead of <q-toggle>. For form-bound fields use <OFormSwitch>.'
+        // },
         {
           element: 'q-dialog',
           message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.'
-        // }
+        }
         // {
         //   element: 'q-drawer',
         //   message: 'Use <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" instead of <q-drawer>.'

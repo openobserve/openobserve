@@ -34,40 +34,22 @@ export interface SelectProps {
   options?: SelectOption[];
   /** Allows selecting multiple options */
   multiple?: boolean;
-  /** q-select compatibility prop; normalized options are always supported */
-  mapOptions?: boolean;
-  /** q-select compatibility prop; OSelect always emits value model */
-  emitValue?: boolean;
-  /** Enables editable input behavior similar to q-select use-input */
-  useInput?: boolean;
-  /** Fills input area with selected value label when supported */
-  fillInput?: boolean;
-  /** Enables local text filtering for options mode */
+  /** Enables local text filtering / combobox mode */
   searchable?: boolean;
-  /** Debounce (ms) before emitting filter events */
-  inputDebounce?: number;
+  /** Debounce (ms) before emitting search events */
+  searchDebounce?: number;
   /** Hides already selected options in multiple mode */
   hideSelected?: boolean;
-  /** Renders multiple selected values as chips in the trigger */
-  useChips?: boolean;
-  /** Strategy for values created by typing into the input */
-  newValueMode?: "add" | "add-unique";
-  /** Optional popup content style passthrough */
-  popupContentStyle?: string | Record<string, string | number>;
-  /** Compatibility prop with q-select; currently no-op */
-  popupNoRouteDismiss?: boolean;
-  /** Compatibility prop with q-select; currently no-op */
-  behavior?: "menu" | "dialog";
+  /** Allows creating new values by typing — emits @create event */
+  creatable?: boolean;
+  /** Optional dropdown content style passthrough */
+  dropdownStyle?: string | Record<string, string | number>;
   /** Placeholder text shown in the internal search input */
   searchPlaceholder?: string;
-  /** Empty-state text when no options match */
-  emptyText?: string;
   /** Key to read label from each option object */
-  optionLabel?: string;
+  labelKey?: string;
   /** Key to read value from each option object */
-  optionValue?: string;
-  /** Key to read disabled state from each option object */
-  optionDisabled?: string;
+  valueKey?: string;
   /** Floating label rendered above the trigger */
   label?: string;
   /** Placeholder text shown when no value is selected */
@@ -88,37 +70,26 @@ export interface SelectProps {
   name?: string;
   /**
    * Semantic field width — controls how wide the component renders.
-   * Defaults to `"full"` (fills the container).
+   * Defaults to "full" (fills the container).
    * @see FieldWidth
    */
   width?: FieldWidth;
-  /**
-   * Validation rules run on value change.
-   * Each function receives the current value and must return `true` when valid
-   * or an error string when invalid. The first failing rule's message is shown.
-   *
-   * @example
-   * :rules="[(v) => v !== undefined || 'Required']"
-   */
-  rules?: Array<(val: SelectModelValue) => true | string>;
 }
 
 export interface SelectEmits {
   (_e: "update:modelValue", _value: SelectModelValue): void;
   (_e: "clear"): void;
-  /** q-select-compatible filter callback trigger */
-  (
-    _e: "filter",
-    _value: string,
-    _update: (_cb?: () => void) => void,
-    _abort: () => void,
-  ): void;
-  /** q-select-compatible new value callback trigger */
-  (
-    _e: "new-value",
-    _value: string,
-    _done: (_value?: SelectValue, _mode?: "add" | "add-unique") => void,
-  ): void;
+  /** Fired when the user types into the search input */
+  (_e: "search", _value: string): void;
+  /** Fired when a new value is created (requires creatable) */
+  (_e: "create", _value: string): void;
+  /** Fired when the dropdown opens */
+  (_e: "open"): void;
+  /** Fired when the dropdown closes */
+  (_e: "close"): void;
+  (_e: "blur", _event: FocusEvent): void;
+  (_e: "change", _value: SelectModelValue): void;
+  (_e: "keydown", _event: KeyboardEvent): void;
 }
 
 export interface SelectSlots {
@@ -126,6 +97,16 @@ export interface SelectSlots {
   default?: () => unknown;
   /** Custom trigger content — overrides the default value display */
   trigger?: (_scope: { value: SelectModelValue }) => unknown;
+  /** Custom chip content for each selected item (multiple mode) */
+  chip?: (_scope: { label: string; value: SelectValue }) => unknown;
+  /** Empty state — shown when no options match the search */
+  empty?: () => unknown;
+  /** Content before the options list */
+  "before-options"?: () => unknown;
+  /** Prepend content inside the trigger (left) */
+  prepend?: () => unknown;
+  /** Append content inside the trigger (right) */
+  append?: () => unknown;
 }
 
 // ── Item ─────────────────────────────────────────────────────────────────
