@@ -302,17 +302,9 @@ class="q-mr-xs" />
           class="tw:font-normal!"
         />
         <OTab
-          name="events"
-          :label="t('common.events')"
-          style="text-transform: capitalize"
-          data-test="trace-details-sidebar-tabs-events"
-                    class="tw:font-normal!"
-
-        />
-        <OTab
           name="error"
           style="text-transform: capitalize"
-          data-test="trace-details-sidebar-tabs-exceptions"
+          data-test="trace-details-sidebar-tabs-error"
                     class="tw:font-normal!"
 
         >
@@ -324,6 +316,22 @@ class="q-mr-xs" />
             data-test="trace-details-sidebar-tabs-error-count"
           />
         </OTab>
+        <OTab
+          v-if="hasDbSpan"
+          name="database"
+          :label="t('common.db')"
+          style="text-transform: capitalize"
+          class="tw:font-normal!"
+          data-test="trace-details-sidebar-tabs-database"
+        />
+        <OTab
+          name="events"
+          :label="t('common.events')"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-events"
+                    class="tw:font-normal!"
+
+        />
         <OTab
           name="links"
           :label="t('common.links')"
@@ -714,6 +722,10 @@ class="tw:h-5! tw:text-[0.75rem]!">
           />
         </OTabPanel>
 
+        <OTabPanel name="database" class="tw:p-0 tw:h-full">
+          <DbSpanDetails :span="span" />
+        </OTabPanel>
+
         <OTabPanel name="links">
           <div v-if="spanLinks.length">
             <q-virtual-scroll
@@ -939,6 +951,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
+import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
 
 export default defineComponent({
@@ -995,7 +1008,8 @@ export default defineComponent({
     NotEqualIcon,
     AttributeValueCell,
     DeployedCode,
-    TraceErrorTab,
+    DbSpanDetails,
+    TraceErrorTab
   },
   emits: [
     "close",
@@ -1130,6 +1144,10 @@ export default defineComponent({
     const RAW_VALUE_FILTER_FIELDS = new Set([
       store.state?.zoConfig?.timestamp_column || "_timestamp",
     ]);
+
+    const hasDbSpan = computed(() =>
+      Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),
+    );
 
     const filterActions = [
       { operator: "=" as const, iconComponent: EqualIcon },
@@ -2025,6 +2043,7 @@ export default defineComponent({
       config,
       // LLM
       isLLMSpan,
+      hasDbSpan,
       llmMetrics,
       copyContent,
       formatModelParams,

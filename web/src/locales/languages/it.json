@@ -124,7 +124,8 @@
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
     "updated_at": "Aggiornato a",
-    "error": "Errore"
+    "error": "Errore",
+    "db": "Banca dati"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
