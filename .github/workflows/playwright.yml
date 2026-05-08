@@ -321,6 +321,7 @@ jobs:
                 "alerts-stream-switching-regression.spec.js",
                 "metrics-regression.spec.js",
                 "traces-regression.spec.js",
+                "dashboard-regression.spec.js",
               ]
           - testfolder: "Metrics"
             browser: "chrome"
