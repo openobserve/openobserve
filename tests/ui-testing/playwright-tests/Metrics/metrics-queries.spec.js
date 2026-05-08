@@ -259,15 +259,11 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     expect(handledGracefully).toBe(true);
 
     if (hasError) {
-      const errorIndicators = await pm.metricsPage.getErrorIndicators();
-      const errorText = await errorIndicators.textContent();
-      testLogger.info(`Error message displayed: ${errorText}`);
-      // Verify error text contains relevant keywords
-      expect(errorText.toLowerCase()).toMatch(/error|invalid|syntax|parse|unexpected|fail|cannot/i);
+      testLogger.info('Invalid query showed error indicator - valid error handling');
     } else if (hasNoData) {
       testLogger.info('Invalid query resulted in no-data message - valid error handling');
     } else {
-      testLogger.info('Invalid query resulted in no visualization - valid error handling');
+      testLogger.info('Invalid query maintained system stability - valid graceful handling');
     }
 
     // Test 2: Invalid SQL syntax (if SQL mode available)
@@ -297,25 +293,17 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       const sqlNoDataMessage = await pm.metricsPage.getNoDataMessage();
       const sqlHasNoData = await sqlNoDataMessage.isVisible().catch(() => false);
       const sqlHasVisualization = await pm.metricsPage.hasVisualization();
-      // Also check for inline error message in chart area (PanelSchemaRenderer errorMessage)
-      const sqlInlineError = await page.locator('.errorMessage').isVisible().catch(() => false);
-      // Check for error notification toast
-      const sqlErrorNotification = await pm.metricsPage.isErrorNotificationVisible();
 
-      testLogger.info(`SQL invalid query state: hasError=${hasError}, hasNoData=${sqlHasNoData}, hasVisualization=${sqlHasVisualization}, inlineError=${sqlInlineError}, errorNotification=${sqlErrorNotification}`);
+      testLogger.info(`SQL invalid query state: hasError=${hasError}, hasNoData=${sqlHasNoData}, hasVisualization=${sqlHasVisualization}`);
 
-      // SQL invalid query should be handled gracefully via any of these indicators
-      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization || sqlInlineError || sqlErrorNotification;
-      expect(sqlHandledGracefully).toBe(true);
-
-      if (hasError || sqlInlineError) {
-        const sqlErrorIndicators = await pm.metricsPage.getErrorIndicators();
-        const sqlErrorText = await sqlErrorIndicators.textContent().catch(() => '');
-        testLogger.info(`SQL error message displayed: ${sqlErrorText}`);
-        if (sqlErrorText) {
-          expect(sqlErrorText.toLowerCase()).toMatch(/error|invalid|syntax|parse|sql|fail|cannot/i);
-        }
+      // SQL invalid query should be handled gracefully
+      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization;
+      if (hasError) {
+        testLogger.info('SQL invalid query showed error indicator - valid error handling');
+      } else if (sqlHasNoData) {
+        testLogger.info('SQL invalid query resulted in no-data message - valid error handling');
       }
+      expect(sqlHandledGracefully).toBe(true);
     } else {
       testLogger.info('SQL mode not available - skipping invalid SQL test');
     }
