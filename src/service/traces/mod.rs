@@ -1272,8 +1272,8 @@ mod tests {
         assert_eq!(
             record
                 .get("gen_ai_response_time_to_first_chunk")
-                .and_then(|v| v.as_i64()),
-            Some(123456789)
+                .and_then(|v| v.as_f64()),
+            Some(123456789.0)
         );
         assert_eq!(
             record
