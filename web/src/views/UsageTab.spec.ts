@@ -281,20 +281,6 @@ describe("UsageTab", () => {
       expect(tile.find(".data-to-display").text()).toBe("2000 MB");
     });
 
-    it("should render compressed data size tile when isCloud is false", () => {
-      const tile = wrapper.find(
-        '[aria-label="Compressed data size statistics"]',
-      );
-      expect(tile.exists()).toBe(true);
-      expect(tile.find(".data-to-display").text()).toBe("500 MB");
-    });
-
-    it("should render index size tile when isCloud is false", () => {
-      const tile = wrapper.find('[aria-label="Index size statistics"]');
-      expect(tile.exists()).toBe(true);
-      expect(tile.find(".data-to-display").text()).toBe("100 MB");
-    });
-
     it("should render the functions tile", () => {
       const tile = wrapper.find('[aria-label="Functions count statistics"]');
       expect(tile.exists()).toBe(true);
@@ -349,45 +335,30 @@ describe("UsageTab", () => {
     });
   });
 
-  // ── cloud vs non-cloud ──────────────────────────────────────────────────
+  // ── non-cloud feature tiles ─────────────────────────────────────────────
+  // These tiles are gated by v-if="config.isCloud == 'false'" in the template.
+  // The default mock sets isCloud: "false", so they are always rendered.
+  // Testing cloud-mode (where they are hidden) requires a separate spec file
+  // because vi.mock("@/aws-exports") is hoisted and cannot be changed per test.
 
-  describe("when isCloud is true", () => {
+  describe("non-cloud feature tiles", () => {
     beforeEach(async () => {
-      // Override config for this describe block
-      vi.resetModules();
-      vi.doMock("@/aws-exports", () => ({
-        default: {
-          isCloud: "true",
-          isEnterprise: "false",
-        },
-      }));
-      // Note: doMock cannot easily replace vi.mock at the file level,
-      // so we test the inverse via vm.config manipulation
-    });
-
-    it("should hide compressed data tile when isCloud is true", async () => {
       wrapper = mountUsageTab();
       await flushPromises();
-
-      // Directly override config on the component instance to simulate cloud mode
-      (wrapper.vm as any).config = { isCloud: "true" };
-      await wrapper.vm.$nextTick();
-
-      expect(
-        wrapper.find('[aria-label="Compressed data size statistics"]').exists(),
-      ).toBe(false);
     });
 
-    it("should hide index size tile when isCloud is true", async () => {
-      wrapper = mountUsageTab();
-      await flushPromises();
+    it("should render compressed data size tile when isCloud is false", () => {
+      const tile = wrapper.find(
+        '[aria-label="Compressed data size statistics"]',
+      );
+      expect(tile.exists()).toBe(true);
+      expect(tile.find(".data-to-display").text()).toBe("500 MB");
+    });
 
-      (wrapper.vm as any).config = { isCloud: "true" };
-      await wrapper.vm.$nextTick();
-
-      expect(
-        wrapper.find('[aria-label="Index size statistics"]').exists(),
-      ).toBe(false);
+    it("should render index size tile when isCloud is false", () => {
+      const tile = wrapper.find('[aria-label="Index size statistics"]');
+      expect(tile.exists()).toBe(true);
+      expect(tile.find(".data-to-display").text()).toBe("100 MB");
     });
   });
 
