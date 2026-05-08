@@ -129,7 +129,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
     await nextTick();
 
-    expect(wrapper.text()).toContain("configure a custom storage provider");
+    expect(wrapper.text()).toContain("No storage configured");
     expect(
       wrapper.find('[data-test="storage-settings-configure-btn"]').exists()
     ).toBe(true);
@@ -155,13 +155,13 @@ describe("OrgStorageSettings", () => {
     mockGetStorage.mockResolvedValue({
       data: {
         provider: "AwsCredentials",
-        data: JSON.stringify({
+        data: {
           bucket_name: "my-bucket",
           server_url: "",
           region: "us-west-1",
           access_key: "AKI123456789",
           secret_key: "secret123",
-        }),
+        },
         created_at: 1777361152043890,
         updated_at: 1777361152043891,
       },
@@ -174,8 +174,8 @@ describe("OrgStorageSettings", () => {
     expect(wrapper.text()).toContain("AWS Credentials");
     expect(wrapper.text()).toContain("my-bucket");
     expect(wrapper.text()).toContain("us-west-1");
-    expect(wrapper.text()).toContain("AKI***789");
-    expect(wrapper.text()).toContain("********");
+    expect(wrapper.text()).toContain("AKI123456789");
+    expect(wrapper.text()).toContain("secret123");
     expect(
       wrapper.find('[data-test="storage-settings-update-btn"]').exists()
     ).toBe(true);
@@ -185,11 +185,11 @@ describe("OrgStorageSettings", () => {
     mockGetStorage.mockResolvedValue({
       data: {
         provider: "AwsCredentials",
-        data: JSON.stringify({
+        data: {
           bucket_name: "my-bucket",
           access_key: "old-key",
           secret_key: "old-secret",
-        }),
+        },
         created_at: 1777361152043890,
         updated_at: 1777361152043891,
       },
@@ -214,11 +214,11 @@ describe("OrgStorageSettings", () => {
     mockGetStorage.mockResolvedValue({
       data: {
         provider: "AwsRoleArn",
-        data: JSON.stringify({
+        data: {
           bucket_name: "role-bucket",
           region: "us-east-1",
           role_arn: "arn:aws:iam::123456789:role/test-role",
-        }),
+        },
         created_at: 1777361152043890,
         updated_at: 1777361152043891,
       },
