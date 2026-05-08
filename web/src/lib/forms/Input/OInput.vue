@@ -2,7 +2,15 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
-import { computed, onBeforeUnmount, ref, useId } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  useId,
+  watch,
+} from "vue";
 
 const props = withDefaults(defineProps<InputProps>(), {
   type: "text",
@@ -11,6 +19,7 @@ const props = withDefaults(defineProps<InputProps>(), {
   readonly: false,
   clearable: false,
   autofocus: false,
+  autogrow: false,
   rows: 3,
 });
 
@@ -81,13 +90,73 @@ const charCount = computed(() => {
   return val !== undefined && val !== null ? String(val).length : 0;
 });
 
+function applyMask(raw: string): string {
+  if (!props.mask) return raw;
+
+  const digits = raw.replace(/\D/g, "");
+
+  if (props.mask === "time") {
+    const hh = digits.slice(0, 2);
+    const mm = digits.slice(2, 4);
+    return [hh, mm].filter(Boolean).join(":");
+  }
+
+  if (props.mask === "fulltime") {
+    const hh = digits.slice(0, 2);
+    const mm = digits.slice(2, 4);
+    const ss = digits.slice(4, 6);
+    return [hh, mm, ss].filter(Boolean).join(":");
+  }
+
+  if (props.mask === "DD-MM-YYYY") {
+    const dd = digits.slice(0, 2);
+    const mm = digits.slice(2, 4);
+    const yyyy = digits.slice(4, 8);
+    return [dd, mm, yyyy].filter(Boolean).join("-");
+  }
+
+  return raw;
+}
+
+function normalizeByModifiers(value: string): string | number {
+  let normalized = value;
+
+  if (props.modelModifiers?.trim) {
+    normalized = normalized.trim();
+  }
+
+  if (props.modelModifiers?.number) {
+    if (normalized === "") return "";
+    const parsed = Number(normalized);
+    return Number.isNaN(parsed) ? normalized : parsed;
+  }
+
+  return normalized;
+}
+
+function resizeTextarea() {
+  if (!isTextarea.value || !props.autogrow) return;
+  const el = inputRef.value;
+  if (!el || !(el instanceof HTMLTextAreaElement)) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement | HTMLTextAreaElement;
-  const val = target.value;
+  let val = target.value;
+
+  if (props.mask) {
+    val = applyMask(val);
+    if (val !== target.value) {
+      target.value = val;
+    }
+  }
 
   const emitValue = () => {
-    if (touched.value) runRules(val);
-    emit("update:modelValue", val);
+    const normalized = normalizeByModifiers(val);
+    if (touched.value) runRules(normalized);
+    emit("update:modelValue", normalized);
   };
 
   if ((props.debounce ?? 0) > 0) {
@@ -97,6 +166,9 @@ function handleInput(event: Event) {
   }
 
   emitValue();
+  if (props.autogrow && isTextarea.value) {
+    nextTick(resizeTextarea);
+  }
 }
 
 function handleClear() {
@@ -110,6 +182,21 @@ function handleClear() {
 onBeforeUnmount(() => {
   if (debounceTimer.value) clearTimeout(debounceTimer.value);
 });
+
+onMounted(() => {
+  if (props.autogrow && isTextarea.value) {
+    nextTick(resizeTextarea);
+  }
+});
+
+watch(
+  () => props.modelValue,
+  () => {
+    if (props.autogrow && isTextarea.value) {
+      nextTick(resizeTextarea);
+    }
+  },
+);
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
@@ -165,8 +252,9 @@ const wrapperClasses = computed(() => [
         :readonly="readonly"
         :autofocus="autofocus"
         :maxlength="maxlength"
-        :rows="rows"
+        :rows="autogrow ? 1 : rows"
         :autocomplete="autocomplete"
+        :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
           'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none',
           'tw:text-input-text tw:placeholder:text-input-placeholder',
@@ -174,7 +262,8 @@ const wrapperClasses = computed(() => [
           'tw:py-2',
           $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
           $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
-          'tw:text-sm tw:resize-y',
+          'tw:text-sm',
+          autogrow ? 'tw:resize-none' : 'tw:resize-y',
         ]"
         @input="handleInput"
         @blur="handleBlur"

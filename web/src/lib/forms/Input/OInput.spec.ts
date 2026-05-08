@@ -98,4 +98,28 @@ describe("OInput", () => {
 
     vi.useRealTimers();
   });
+
+  it("applies model number modifier on emit", async () => {
+    wrapper = mount(OInput, {
+      props: {
+        modelValue: "",
+        modelModifiers: { number: true },
+      },
+    });
+
+    await wrapper.find("input").setValue("42");
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe(42);
+  });
+
+  it("formats time mask before emitting value", async () => {
+    wrapper = mount(OInput, {
+      props: {
+        modelValue: "",
+        mask: "time",
+      },
+    });
+
+    await wrapper.find("input").setValue("1234");
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("12:34");
+  });
 });
