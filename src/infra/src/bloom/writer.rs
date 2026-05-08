@@ -27,6 +27,7 @@ use sbbf_rs_safe::Filter;
 use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION, sbbf_hash};
 
 /// One bloom for a single (file, field) pair, fully built in memory.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldBloom {
     pub field: String,
     pub file_id: u64,

@@ -80,9 +80,10 @@ pub(crate) async fn create_tantivy_index(
     parquet_file_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
+    bloom_filter_fields: &[String],
     schema: Arc<Schema>,
     reader: RecordBatchStream,
-) -> Result<usize, anyhow::Error> {
+) -> Result<(usize, Vec<infra::bloom::FieldBloom>), anyhow::Error> {
     let start = std::time::Instant::now();
     let caller = format!("[{caller}:JOB]");
 
@@ -95,15 +96,45 @@ pub(crate) async fn create_tantivy_index(
         schema,
     )
     .await?;
-    if index.is_none() {
-        return Ok(0);
-    }
+    let Some(index) = index else {
+        return Ok((0, Vec::new()));
+    };
+
+    // Build per-(file, field) blooms by iterating tantivy's term dict for
+    // each field that's both a SecondaryIndex and a BloomFilter target.
+    // We do this *before* `to_puffin_bytes()` consumes the directory so
+    // the index reader has live access.
+    let bloom_targets: Vec<String> = bloom_filter_fields
+        .iter()
+        .filter(|f| index_fields.iter().any(|x| x == *f))
+        .cloned()
+        .collect();
+    let blooms = if bloom_targets.is_empty() {
+        Vec::new()
+    } else {
+        let file_id = infra::bloom::file_id_from_path(parquet_file_name);
+        match crate::service::tantivy::bloom_builder::build_blooms_from_index(
+            &index,
+            file_id,
+            &bloom_targets,
+            10, // bits per key, ~ 1% FPR
+        ) {
+            Ok(b) => b,
+            Err(e) => {
+                // bloom is a perf optimization — never fail the index path.
+                log::warn!("{caller} bloom build failed for {parquet_file_name}: {e}");
+                Vec::new()
+            }
+        }
+    };
+    drop(index);
+
     let puffin_bytes = dir.to_puffin_bytes()?;
     let index_size = puffin_bytes.len();
 
     // write fst bytes into disk
     let Some(idx_file_name) = convert_parquet_file_name_to_tantivy_file(parquet_file_name) else {
-        return Ok(0);
+        return Ok((0, Vec::new()));
     };
 
     let buf = Bytes::from(puffin_bytes);
@@ -130,7 +161,7 @@ pub(crate) async fn create_tantivy_index(
             return Err(e.into());
         }
     }
-    Ok(index_size)
+    Ok((index_size, blooms))
 }
 
 /// Create a tantivy index in the given directory for the record batch
@@ -730,13 +761,16 @@ mod tests {
             "test_file.parquet",
             &["content".to_string()],
             &["status".to_string()],
+            &[],
             empty_batch.schema(),
             stream,
         )
         .await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 0); // Should return 0 for empty data
+        let (size, blooms) = result.unwrap();
+        assert_eq!(size, 0); // Should return 0 for empty data
+        assert!(blooms.is_empty());
     }
 
     #[tokio::test]
@@ -750,13 +784,16 @@ mod tests {
             "test_file.parquet",
             &[], // No FTS fields
             &[], // No index fields
+            &[],
             batch.schema(),
             stream,
         )
         .await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 0); // Should return 0 when no fields to index
+        let (size, blooms) = result.unwrap();
+        assert_eq!(size, 0); // Should return 0 when no fields to index
+        assert!(blooms.is_empty());
     }
 
     #[tokio::test]
@@ -770,13 +807,16 @@ mod tests {
             "invalid_filename", // This won't convert to a valid tantivy filename
             &["content".to_string()],
             &["status".to_string()],
+            &[],
             batch.schema(),
             stream,
         )
         .await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 0); // Should return 0 when filename conversion fails
+        let (size, blooms) = result.unwrap();
+        assert_eq!(size, 0); // Should return 0 when filename conversion fails
+        assert!(blooms.is_empty());
     }
 
     #[tokio::test]

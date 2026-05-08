@@ -839,6 +839,9 @@ pub async fn merge_files(
 
     let merge_result = {
         let stream_name = stream_name.to_string();
+        // Clone for the spawn — we still need bloom_filter_fields below to
+        // drive the per-file `.bf` build path after the merge completes.
+        let bloom_fields_for_merge = bloom_filter_fields.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
@@ -846,7 +849,7 @@ pub async fn merge_files(
                     &stream_name,
                     schema,
                     tables,
-                    &bloom_filter_fields,
+                    &bloom_fields_for_merge,
                     new_file_meta,
                     false,
                 )
@@ -881,6 +884,15 @@ pub async fn merge_files(
     }
 
     let mut new_files = Vec::new();
+    // Accumulate per-(file, field) blooms across every new parquet produced
+    // by this merge call. After all uploads succeed, we serialize them into
+    // a single hour-bucket `.bf`, upload it, and stamp `bloom_ver` on each
+    // new FileKey so the file_list write picks it up.
+    let mut bloom_filter_blooms: Vec<infra::bloom::FieldBloom> = Vec::new();
+    // Whether to build blooms at all. Gated by the same flag that used to
+    // drive parquet's per-column bloom filter writer.
+    let bloom_enabled = cfg.common.bloom_filter_enabled
+        && !bloom_filter_fields.is_empty();
     match buf {
         MergeParquetResult::Single(buf, mut new_file_meta) => {
             if new_file_meta.compressed_size == 0 {
@@ -918,17 +930,19 @@ pub async fn merge_files(
             }
 
             if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                // generate inverted index
-                generate_inverted_index(
+                // generate inverted index (and per-file blooms when enabled)
+                let blooms = generate_inverted_index(
                     &new_file_key,
                     &full_text_search_fields,
                     &index_fields,
+                    if bloom_enabled { &bloom_filter_fields } else { &[] },
                     &retain_file_list,
                     &mut new_file_meta,
                     latest_schema.clone(),
                     buf,
                 )
                 .await?;
+                bloom_filter_blooms.extend(blooms);
             }
             new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
         }
@@ -964,17 +978,19 @@ pub async fn merge_files(
                 }
 
                 if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                    // generate inverted index
-                    generate_inverted_index(
+                    // generate inverted index (and per-file blooms when enabled)
+                    let blooms = generate_inverted_index(
                         &new_file_key,
                         &full_text_search_fields,
                         &index_fields,
+                        if bloom_enabled { &bloom_filter_fields } else { &[] },
                         &retain_file_list,
                         &mut new_file_meta,
                         latest_schema.clone(),
                         buf,
                     )
                     .await?;
+                    bloom_filter_blooms.extend(blooms);
                 }
 
                 new_files.push(FileKey::new(0, account, new_file_key, new_file_meta, false));
@@ -993,6 +1009,52 @@ pub async fn merge_files(
         }
     };
 
+    // Write the `.bf` blob covering this merge's new files (if any blooms
+    // were collected). Failure here is non-fatal — the new parquets are
+    // already on disk; leaving `bloom_ver = 0` just means the search side
+    // skips bloom pruning for these files and falls through to the
+    // existing tantivy path.
+    if !bloom_filter_blooms.is_empty() && !new_files.is_empty() {
+        let bloom_ver = config::utils::time::now_micros();
+        let any_key = &new_files[0].key;
+        match config::utils::parquet::parse_file_key_columns(any_key) {
+            Ok((_, date_key, _)) => {
+                let blob = infra::bloom::BloomWriter::serialize(std::mem::take(
+                    &mut bloom_filter_blooms,
+                ));
+                let bf_path = infra::bloom::path::bloom_path(
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    &date_key,
+                    bloom_ver,
+                );
+                let bf_account = storage::get_account(&bf_path).unwrap_or_default();
+                match storage::put(&bf_account, &bf_path, Bytes::from(blob)).await {
+                    Ok(_) => {
+                        for f in &mut new_files {
+                            f.meta.bloom_ver = bloom_ver;
+                        }
+                        log::info!(
+                            "[COMPACTOR:WORKER:{thread_id}] uploaded bloom filter file: {bf_path}, covering {} new parquet(s)",
+                            new_files.len()
+                        );
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "[COMPACTOR:WORKER:{thread_id}] bloom filter upload failed for {bf_path}: {e} — proceeding without bloom for this batch"
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!(
+                    "[COMPACTOR:WORKER:{thread_id}] cannot derive date for bloom path from {any_key}: {e}"
+                );
+            }
+        }
+    }
+
     Ok((new_files, retain_file_list))
 }
 
@@ -1000,18 +1062,20 @@ async fn generate_inverted_index(
     new_file_key: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
+    bloom_filter_fields: &[String],
     retain_file_list: &[FileKey],
     new_file_meta: &mut FileMeta,
     latest_schema: Arc<Schema>,
     buf: Bytes,
-) -> Result<(), anyhow::Error> {
+) -> Result<Vec<infra::bloom::FieldBloom>, anyhow::Error> {
     let file_format = get_config().common.file_format;
     let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
-    let index_size = create_tantivy_index(
+    let (index_size, blooms) = create_tantivy_index(
         "COMPACTOR",
         new_file_key,
         full_text_search_fields,
         index_fields,
+        bloom_filter_fields,
         latest_schema, // Use stream schema to include all configured fields
         reader,
     )
@@ -1023,7 +1087,7 @@ async fn generate_inverted_index(
     })?;
     new_file_meta.index_size = index_size as i64;
 
-    Ok(())
+    Ok(blooms)
 }
 
 async fn write_file_list(

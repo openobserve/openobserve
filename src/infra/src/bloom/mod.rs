@@ -73,3 +73,19 @@ pub const ALGO_SBBF_XXHASH64: u8 = 0x01;
 pub fn sbbf_hash(bytes: &[u8]) -> u64 {
     twox_hash::XxHash64::oneshot(0, bytes)
 }
+
+/// Stable per-file identifier used to key blooms inside a `.bf` footer.
+///
+/// We can't use the `file_list.id` (i64) here because compactor builds
+/// the bloom *before* the file_list row is inserted. Hashing the
+/// parquet object-store key gives us an identifier that is:
+/// - known immediately on the write path,
+/// - stable across processes / restarts (deterministic from path),
+/// - cheap to compute on the search path (`FileKey::key` is what
+///   file_list returns to the querier anyway).
+///
+/// Collision risk is ~1/2^64 — far below the bucket sizes we care about.
+#[inline]
+pub fn file_id_from_path(parquet_key: &str) -> u64 {
+    twox_hash::XxHash64::oneshot(0xFE_15_F1_1E_FE_15_F1_1E, parquet_key.as_bytes())
+}
