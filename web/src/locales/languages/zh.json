@@ -123,7 +123,8 @@
     "version": "版本",
     "create": "创建",
     "resources": "资源",
-    "updated_at": "更新于"
+    "updated_at": "更新于",
+    "error": "错误"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -390,7 +391,8 @@
     "autoRunEnabled": "自动运行已启用",
     "selectStreamFirst": "先选择一个直播",
     "traces": "痕迹",
-    "switchToLogs": "点击切换回日志"
+    "switchToLogs": "点击切换回日志",
+    "patternNoValuesAvailable": "没有可用值"
   },
   "menu": {
     "home": "主页",
@@ -2917,7 +2919,21 @@
       "minutesAgo": "{n} 我之前",
       "hoursAgo": "{n} 小时前",
       "daysAgo": "{n} d 之前"
-    }
+    },
+    "noErrorPresent": "此跨度没有错误",
+    "httpStatusCode": "HTTP 状态码",
+    "grpcStatusCode": "gRPC 状态码",
+    "dbResponseStatusCode": "数据库响应状态码",
+    "processExitCode": "进程退出代码",
+    "exceptionsWithCount": "异常 ({count})",
+    "typeLabel": "类型：",
+    "messageLabel": "消息：",
+    "escapedLabel": "逃脱了：",
+    "stacktraceLabel": "堆栈跟踪：",
+    "copyStacktrace": "复制堆栈跟踪",
+    "noStacktraceAvailable": "没有可用的堆栈跟踪",
+    "stacktraceCopied": "Stacktrace 已复制到剪贴板",
+    "stacktraceCopyFailed": "无法复制堆栈跟踪"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

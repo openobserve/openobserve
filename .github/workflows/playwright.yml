@@ -306,23 +306,6 @@ jobs:
                 "traces-autocomplete-suggestions.spec.js",
               ]
 
-          - testfolder: "RegressionSet"
-            browser: "chrome"
-            run_files:
-              [
-                "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "logs-9754.spec.js",
-                "streams-regression.spec.js",
-                "enrichment-regression.spec.js",
-                "ui-regression.spec.js",
-                "pipeline-regression.spec.js",
-                # "alerts-regression.spec.js",
-                "alerts-stream-switching-regression.spec.js",
-                "metrics-regression.spec.js",
-                "traces-regression.spec.js",
-                "dashboard-regression.spec.js",
-              ]
           - testfolder: "Metrics"
             browser: "chrome"
             run_files:

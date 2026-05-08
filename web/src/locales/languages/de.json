@@ -123,7 +123,8 @@
     "version": "Version",
     "create": "Erstellen",
     "resources": "Ressourcen",
-    "updated_at": "Aktualisiert am"
+    "updated_at": "Aktualisiert am",
+    "error": "Fehler"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -390,7 +391,8 @@
     "autoRunEnabled": "Automatischer Lauf aktiviert",
     "selectStreamFirst": "Wähle zuerst einen Stream",
     "traces": "Spuren",
-    "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln"
+    "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln",
+    "patternNoValuesAvailable": "Keine Werte verfügbar"
   },
   "menu": {
     "home": "Startseite",
@@ -2913,7 +2915,21 @@
       "minutesAgo": "vor {n} m",
       "hoursAgo": "vor {n} h",
       "daysAgo": "vor {n} d"
-    }
+    },
+    "noErrorPresent": "Für diese Spanne ist kein Fehler vorhanden",
+    "httpStatusCode": "HTTP-Statuscode",
+    "grpcStatusCode": "gRPC-Statuscode",
+    "dbResponseStatusCode": "DB-Antwortstatuscode",
+    "processExitCode": "Exit-Code verarbeiten",
+    "exceptionsWithCount": "Ausnahmen ({count})",
+    "typeLabel": "Typ:",
+    "messageLabel": "Nachricht:",
+    "escapedLabel": "Entkommen:",
+    "stacktraceLabel": "Stacktrace:",
+    "copyStacktrace": "Stacktrace kopieren",
+    "noStacktraceAvailable": "Kein Stacktrace verfügbar",
+    "stacktraceCopied": "Stacktrace wurde in die Zwischenablage kopiert",
+    "stacktraceCopyFailed": "Stacktrace konnte nicht kopiert werden"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

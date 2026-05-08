@@ -442,6 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @open-details="openPatternDetails"
             @add-to-search="addPatternToSearch"
             @create-alert="createAlertFromPattern"
+            @filter-value="addWildcardValueToSearch"
           />
         </div>
       </div>
@@ -502,6 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selectedPattern="selectedPattern"
         :totalPatterns="patternsState?.patterns?.patterns?.length || 0"
         @navigate="navigatePatternDetail"
+        @filter-value="addWildcardValueToSearch"
       />
 
       <!-- Volume Analysis Dashboard -->
@@ -867,6 +869,7 @@ export default defineComponent({
       openPatternDetails,
       navigatePatternDetail,
       addPatternToSearch,
+      addWildcardValueToSearch,
       createAlertFromPattern,
     } = usePatternActions();
 
@@ -1728,6 +1731,7 @@ export default defineComponent({
       openPatternDetails,
       navigatePatternDetail,
       addPatternToSearch,
+      addWildcardValueToSearch,
       createAlertFromPattern,
       extractConstantsFromPattern,
       openVolumeAnalysisDashboard,

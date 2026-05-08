@@ -124,6 +124,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+
+    <!-- Wildcard hover popover (outside q-virtual-scroll to avoid DOM recycling conflicts) -->
+    <WildcardValuePopover
+      :visible="!!hoveredToken"
+      :token="hoveredToken?.token ?? ''"
+      :displayValues="hoveredToken?.displayValues ?? []"
+      :anchorEl="hoveredToken?.anchorEl ?? null"
+      @popoverEnter="onPopoverEnter"
+      @popoverLeave="onPopoverLeave"
+      @filter-value="(value, action) => $emit('filter-value', value, action)"
+    />
   </div>
 </template>
 
@@ -131,6 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
+import WildcardValuePopover from "./WildcardValuePopover.vue";
+import useWildcardHover from "./useWildcardHover";
 
 defineProps<{
   patterns: any[];
@@ -145,8 +158,15 @@ defineEmits<{
   (e: "open-details", pattern: any, index: number): void;
   (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
   (e: "create-alert", pattern: any): void;
+  (e: "filter-value", value: string, action: "include" | "exclude"): void;
 }>();
 
 const store = useStore();
 const { t } = useI18n();
+
+const {
+  hoveredToken,
+  onPopoverEnter,
+  onPopoverLeave,
+} = useWildcardHover();
 </script>
