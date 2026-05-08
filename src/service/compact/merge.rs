@@ -999,6 +999,7 @@ pub async fn merge_files(
     Ok((new_files, retain_file_list))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn generate_inverted_index(
     org_id: &str,
     new_file_key: &str,

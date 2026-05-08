@@ -35,7 +35,7 @@ pub fn enforce_checks(provider: ProviderType, data: String) -> Result<String, an
                 ));
             }
             creds.server_url = cfg.org_storage.server_url.clone();
-            return Ok(serde_json::to_string(&creds)?);
+            Ok(serde_json::to_string(&creds)?)
         }
         ProviderType::AwsRoleArn => {
             let creds: AwsRoleArn = serde_json::from_str(&data)?;
@@ -46,17 +46,17 @@ pub fn enforce_checks(provider: ProviderType, data: String) -> Result<String, an
                     cfg.org_storage.region
                 ));
             }
-            return Ok(serde_json::to_string(&creds)?);
+            Ok(serde_json::to_string(&creds)?)
         }
         ProviderType::GcpCredentials => {
             let mut creds: GcpCredentials = serde_json::from_str(&data)?;
             creds.server_url = cfg.org_storage.server_url.clone();
-            return Ok(serde_json::to_string(&creds)?);
+            Ok(serde_json::to_string(&creds)?)
         }
         ProviderType::AzureCredentials => {
             let mut creds: AzureCredentials = serde_json::from_str(&data)?;
             creds.server_url = cfg.org_storage.server_url.clone();
-            return Ok(serde_json::to_string(&creds)?);
+            Ok(serde_json::to_string(&creds)?)
         }
     }
 }

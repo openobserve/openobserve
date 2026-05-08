@@ -91,7 +91,7 @@ pub fn get_gcp(
     builder.build()
 }
 
-pub async fn test_provider(provider: &Box<dyn ObjectStore>) -> Result<(), anyhow::Error> {
+pub async fn test_provider(provider: &dyn ObjectStore) -> Result<(), anyhow::Error> {
     // Test upload
     let path = object_store::path::Path::parse(TEST_FILE)?;
     let data = Bytes::from("Hello, OpenObserve!");

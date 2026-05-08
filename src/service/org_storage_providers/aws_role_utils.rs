@@ -70,7 +70,7 @@ impl object_store::CredentialProvider for CredentialProvider {
                     self.org_id
                 );
                 let (expiry, credentials) =
-                    get_sts_credentials(&self.org_id, &self.region, &self.role_arn)
+                    get_sts_credentials(&self.org_id, self.region, &self.role_arn)
                         .await
                         .map_err(|e| {
                             log::info!(
