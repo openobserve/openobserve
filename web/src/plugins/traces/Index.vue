@@ -339,6 +339,7 @@ import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { computeInsightsTimeRange } from "./tracesIndex.utils";
 import { cloneDeep, debounce } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
@@ -475,28 +476,10 @@ const selectedStreamName = computed(
 const insightsTimeRange = ref({ startTime: 0, endTime: 0 });
 
 function recomputeInsightsTimeRange() {
-  const dt = searchObj.data.datetime;
-  if (!dt) {
-    insightsTimeRange.value = { startTime: 0, endTime: 0 };
-    return;
-  }
-  if (dt.type === "relative") {
-    const relativePeriod: any = dt.relativeTimePeriod;
-    insightsTimeRange.value = relativePeriod
-      ? getConsumableRelativeTime(relativePeriod) || { startTime: 0, endTime: 0 }
-      : { startTime: 0, endTime: 0 };
-    return;
-  }
-  insightsTimeRange.value = {
-    startTime:
-      typeof dt.startTime === "number"
-        ? dt.startTime
-        : new Date(dt.startTime).getTime() * 1000,
-    endTime:
-      typeof dt.endTime === "number"
-        ? dt.endTime
-        : new Date(dt.endTime).getTime() * 1000,
-  };
+  insightsTimeRange.value = computeInsightsTimeRange(
+    searchObj.data.datetime,
+    getConsumableRelativeTime,
+  );
 }
 
 const isLLMSpanPresent = ref(false);

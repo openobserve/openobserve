@@ -47,6 +47,26 @@ const EMPTY_KPI: LLMKPI = {
   p95DurationMicros: 0,
 };
 
+/**
+ * Composable that owns the LLM Insights dashboard's state + fetch flow.
+ *
+ * Returns a bag of refs (KPI numbers for current + previous window,
+ * sparkline series, loading/error flags, the discovered list of LLM
+ * streams) plus two methods (`fetchAll`, `cancelAll`).
+ *
+ * State is per-mount: a fresh component instance gets a fresh set of
+ * refs. The dashboard's `onMounted` is the single trigger for the
+ * initial fetch, and `fetchAll` is also invoked on Refresh / stream
+ * change. There's no caching layer — the dashboard always pulls fresh
+ * numbers when asked (the parent's `Index.vue → searchData` decides
+ * when to ask).
+ *
+ * @example
+ *   const { kpi, kpiPrev, sparklines, loading, error, fetchAll } =
+ *     useLLMInsights();
+ *   await fetchAll("default", 1700000000000000, 1700001000000000);
+ *   console.log(kpi.value.totalCost, kpi.value.totalTokens);
+ */
 export function useLLMInsights() {
   const store = useStore();
   const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
@@ -69,6 +89,15 @@ export function useLLMInsights() {
 
   let activeTraceIds: string[] = [];
 
+  /**
+   * Cancel every in-flight query started by THIS composable instance.
+   * Called from the parent on org switch / unmount paths to free up
+   * server-side resources and prevent stale results from arriving
+   * after the user has moved on.
+   *
+   * @example
+   *   onUnmounted(() => cancelAll());
+   */
   function cancelAll() {
     activeTraceIds.forEach((id) => {
       cancelStreamQueryBasedOnRequestId({
@@ -79,6 +108,21 @@ export function useLLMInsights() {
     activeTraceIds = [];
   }
 
+  /**
+   * Internal — fire one SQL query against the streaming search endpoint.
+   *
+   * Differs from `useLLMStreamQuery.executeQuery` in that this one drives
+   * an `onData` callback as hits arrive (so we can update KPI / sparkline
+   * series in-place) instead of accumulating + returning at completion.
+   *
+   * Resolves on `complete`. Rejects with an `Error` enriched with
+   * `.status`, `.code`, `.raw` on the streaming endpoint's error event.
+   *
+   * @example (internal usage)
+   *   await executeQuery("SELECT count(*) ...", "default", 100, 200, (hits) => {
+   *     target.value.requestCount = Number(hits[0].count);
+   *   });
+   */
   function executeQuery(
     sql: string,
     streamName: string,
@@ -137,6 +181,20 @@ export function useLLMInsights() {
     });
   }
 
+  /**
+   * Internal — fetch one KPI summary into the given ref. Used twice per
+   * `fetchAll` call: once for the current window (→ `kpi`) and once for
+   * the immediately preceding window of the same length (→ `kpiPrev`).
+   * The "prev" numbers feed the "% vs prev" trend chips on the cards.
+   *
+   * Writes `{ ...EMPTY_KPI }` first so a partial response (server returns
+   * 0 hits) leaves the target at a clean zero state instead of stale
+   * values from a previous fetch.
+   *
+   * @example (internal)
+   *   await fetchKPIInto(kpi, "default", 100, 200);          // current window
+   *   await fetchKPIInto(kpiPrev, "default", 0, 100);        // previous window
+   */
   async function fetchKPIInto(
     target: Ref<LLMKPI>,
     streamName: string,
@@ -179,6 +237,16 @@ export function useLLMInsights() {
     });
   }
 
+  /**
+   * Pick a histogram bucket width that yields ~30 buckets across the
+   * given window. Local copy of the same logic in
+   * `config/llmInsightsPanels.ts → pickInterval` — duplicated so this
+   * composable has zero coupling to the panels config (the sparkline
+   * fetch needs the same alignment, but doesn't render any panel).
+   *
+   * @example (internal)
+   *   bucketInterval(60 * 60 * 1_000_000) // "5 minutes" (1 hr window)
+   */
   function bucketInterval(durationMicros: number): string {
     const seconds = durationMicros / 1_000_000;
     const target = seconds / 30;
@@ -192,6 +260,26 @@ export function useLLMInsights() {
     return "1 day";
   }
 
+  /**
+   * Internal — fetch the bucketed time-series powering the sparklines
+   * under each KPI card. One SQL query produces all 5 series (cost,
+   * tokens, traces, p95 latency, error rate) so we don't pay for 5
+   * round-trips per render.
+   *
+   * The error-rate series is computed client-side as
+   * `error_count / request_count` per bucket — keeps the SQL simple and
+   * lets a future frontend tweak (e.g. "errors per trace" instead) ship
+   * without a backend change.
+   *
+   * Buckets are ordered by their `histogram()` timestamp string. We
+   * keep an `ensureBucket` helper to materialise zero-filled positions
+   * the first time a row arrives for a new bucket — guarantees all 5
+   * series have the same length / x-coordinates.
+   *
+   * @example (internal)
+   *   await fetchSparklines("default", 100, 200);
+   *   // sparklines.value.cost is now an array of per-bucket cost values
+   */
   async function fetchSparklines(
     streamName: string,
     startTime: number,
@@ -256,6 +344,25 @@ export function useLLMInsights() {
     sparklines.value = series;
   }
 
+  /**
+   * The single public fetch entry point. Kicks off (in parallel):
+   *   - KPI summary for the current window     → `kpi`
+   *   - KPI summary for the previous window    → `kpiPrev` (for trend chips)
+   *   - bucketed sparkline series              → `sparklines`
+   *
+   * Manages `loading` (true while any sub-query is in flight) and
+   * `error` (cleared on entry, populated on rejection). Catches errors
+   * itself so callers don't have to wrap in try/catch — they read
+   * `error.value` after `await fetchAll(...)` resolves.
+   *
+   * Bails out as a no-op for missing/zero arguments — the dashboard
+   * renders the streamLoaded skeleton until a real window is in props.
+   *
+   * @example
+   *   await fetchAll("default", 1700000000000000, 1700001000000000);
+   *   if (error.value) console.error(error.value);
+   *   else console.log(kpi.value.totalCost);
+   */
   async function fetchAll(
     streamName: string,
     startTime: number,

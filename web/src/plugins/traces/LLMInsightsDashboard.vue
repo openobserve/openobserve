@@ -276,14 +276,14 @@ const streamHasNoLLMFields = computed(() => {
   return /No field named\s+gen_ai_/i.test(msg);
 });
 
-type TrendDirection = "up" | "down" | "flat";
-type TrendSentiment = "good" | "bad" | "neutral";
-
-interface KpiTrend {
-  direction: TrendDirection;
-  sentiment: TrendSentiment;
-  deltaPct: number; // absolute %
-}
+import {
+  computeTrend,
+  trendArrow,
+  splitNumberWithUnit,
+  splitDuration,
+  splitCost,
+  type KpiTrend,
+} from "./llmInsightsDashboard.utils";
 
 interface KpiCard {
   label: string;
@@ -292,57 +292,6 @@ interface KpiCard {
   trend?: KpiTrend | null;
   sparkData?: number[];
   sparkColor?: string;
-}
-
-const FLAT_THRESHOLD = 1; // percent
-
-function computeTrend(
-  curr: number,
-  prev: number,
-  upIsBad: boolean,
-): KpiTrend | null {
-  if (!isFinite(curr) || !isFinite(prev)) return null;
-  if (prev <= 0 && curr <= 0) return null;
-  if (prev <= 0) {
-    return { direction: "up", sentiment: upIsBad ? "bad" : "good", deltaPct: 100 };
-  }
-  const deltaPct = ((curr - prev) / prev) * 100;
-  const abs = Math.abs(deltaPct);
-  if (abs < FLAT_THRESHOLD) {
-    return { direction: "flat", sentiment: "neutral", deltaPct: abs };
-  }
-  const direction: TrendDirection = deltaPct > 0 ? "up" : "down";
-  const sentiment: TrendSentiment =
-    direction === "up" ? (upIsBad ? "bad" : "good") : upIsBad ? "good" : "bad";
-  return { direction, sentiment, deltaPct: abs };
-}
-
-
-function splitNumberWithUnit(n: number): { value: string; unit: string } {
-  if (n >= 1_000_000_000) return { value: (n / 1_000_000_000).toFixed(1), unit: "B" };
-  if (n >= 1_000_000) return { value: (n / 1_000_000).toFixed(1), unit: "M" };
-  if (n >= 10_000) return { value: (n / 1_000).toFixed(1), unit: "K" };
-  return { value: n.toLocaleString(), unit: "" };
-}
-
-function splitDuration(micros: number): { value: string; unit: string } {
-  if (!micros || micros === 0) return { value: "0", unit: "ms" };
-  const ms = micros / 1000;
-  if (ms < 1000) return { value: Math.round(ms).toString(), unit: "ms" };
-  if (ms < 60_000) return { value: (ms / 1000).toFixed(1), unit: "s" };
-  return { value: (ms / 60_000).toFixed(1), unit: "min" };
-}
-
-function trendArrow(direction: TrendDirection): string {
-  if (direction === "up") return "▲";
-  if (direction === "down") return "▼";
-  return "→";
-}
-
-function splitCost(cost: number): { value: string; unit: string } {
-  if (cost >= 1_000_000) return { value: `$${(cost / 1_000_000).toFixed(2)}`, unit: "M" };
-  if (cost >= 1_000) return { value: `$${(cost / 1_000).toFixed(1)}`, unit: "K" };
-  return { value: `$${cost.toFixed(2)}`, unit: "" };
 }
 
 const kpiCards = computed<KpiCard[]>(() => {

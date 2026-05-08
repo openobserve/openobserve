@@ -470,6 +470,7 @@ import {
   replaceExistingFieldCondition,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
+import { isDatetimeChanged } from "./tracesSearchBar.utils";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -723,24 +724,10 @@ export default defineComponent({
         }
       }
 
-      // Snapshot prior datetime so we can detect whether this emit is a
-      // mount-time replay (same user intent) vs a real user-driven change.
-      //
-      // For RELATIVE ranges, comparing raw startTime/endTime is unreliable:
-      // the DateTime component recomputes them from `Date.now()` on every
-      // mount, so a tab switch that remounts the picker produces a "new"
-      // timestamp even though the user's intent ("Past 12 Hours") is
-      // unchanged. We compare `relativeTimePeriod` instead.
-      // For ABSOLUTE ranges, the user-set boundaries are the source of
-      // truth — compare them directly.
-      const prev = searchObj.data.datetime;
-      const isRelative = !!value.relativeTimePeriod;
-      const datetimeChanged = !prev
-        ? true
-        : isRelative
-          ? prev.relativeTimePeriod !== value.relativeTimePeriod
-          : prev.startTime !== value.startTime ||
-            prev.endTime !== value.endTime;
+      // See `tracesSearchBar.utils.ts → isDatetimeChanged` for the
+      // mount-replay filter rationale (relative ranges compare by period,
+      // absolute by raw start/end).
+      const datetimeChanged = isDatetimeChanged(searchObj.data.datetime, value);
 
       searchObj.data.datetime = {
         startTime: value.startTime,

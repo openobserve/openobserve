@@ -204,17 +204,15 @@ import {
   pickInterval,
 } from "./config/llmInsightsPanels";
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
-
-function intervalToMs(interval: string): number {
-  const m = interval.match(/^(\d+)\s+(second|minute|hour|day)s?$/i);
-  if (!m) return 60_000;
-  const n = parseInt(m[1], 10);
-  const unit = m[2].toLowerCase();
-  if (unit === "second") return n * 1000;
-  if (unit === "minute") return n * 60_000;
-  if (unit === "hour") return n * 3_600_000;
-  return n * 86_400_000;
-}
+import {
+  intervalToMs,
+  formatCompact,
+  formatLatencyMs,
+  formatTimeCell,
+  formatCostCell,
+  chipColor,
+  formatTimeLabel,
+} from "./llmTrendPanel.utils";
 
 interface Props {
   panel: LLMPanelDef;
@@ -652,74 +650,6 @@ function getMutedColor(): string {
 }
 function getBorderColor(): string {
   return $q.dark.isActive ? "#1e293b" : "#e2e8f0";
-}
-
-function formatCompact(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  if (n >= 100) return n.toFixed(0);
-  if (n >= 1) return n.toFixed(1);
-  return n.toString();
-}
-
-function formatLatencyMs(ms: number): string {
-  if (ms >= 1000) return (ms / 1000).toFixed(1) + "s";
-  return Math.round(ms) + "ms";
-}
-
-function formatTimeCell(ts: any): string {
-  if (ts == null) return "";
-  let ms: number;
-  if (typeof ts === "number") {
-    ms = ts > 1e15 ? ts / 1000 : ts > 1e12 ? ts : ts * 1000;
-  } else {
-    const str = String(ts);
-    const isoLike = str.includes(" ") && !str.includes("T")
-      ? str.replace(" ", "T") + "Z"
-      : str;
-    const d = new Date(isoLike);
-    ms = d.getTime();
-  }
-  if (!isFinite(ms)) return String(ts);
-  const d = new Date(ms);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const ss = String(d.getSeconds()).padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
-}
-
-function formatCostCell(row: any): string {
-  const c = Number(row?.cost);
-  if (!isFinite(c)) return "—";
-  if (c <= 0) return "$0";
-  if (c >= 1) return `$${c.toFixed(2)}`;
-  if (c >= 0.01) return `$${c.toFixed(3)}`;
-  return `$${c.toFixed(4)}`;
-}
-
-const CHIP_PALETTE = [
-  "#6366f1",
-  "#10b981",
-  "#f97316",
-  "#ec4899",
-  "#0ea5e9",
-  "#a855f7",
-  "#eab308",
-  "#14b8a6",
-];
-function chipColor(value: any): string {
-  const s = String(value || "");
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
-  return CHIP_PALETTE[Math.abs(hash) % CHIP_PALETTE.length];
-}
-
-function formatTimeLabel(ts: string): string {
-  const d = new Date(ts.replace(" ", "T"));
-  if (isNaN(d.getTime())) return ts;
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
 }
 
 // ChartRenderer expects: { options, notMerge?, lazyUpdate?, extras? }

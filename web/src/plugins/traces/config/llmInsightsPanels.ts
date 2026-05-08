@@ -363,7 +363,22 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
 ];
 
 /**
- * Substitute the standard placeholders in a SQL template.
+ * Substitute the standard placeholders in a SQL template with concrete values.
+ *
+ * Replaces (globally, all occurrences):
+ *   {{stream}}     → `"streamName"` (always quoted — DataFusion treats unquoted
+ *                                    identifiers as case-insensitive)
+ *   {{startTime}}  → numeric microseconds, unquoted
+ *   {{endTime}}    → numeric microseconds, unquoted
+ *   {{interval}}   → bucket width string ("5 minutes", "1 hour", etc.) — used
+ *                                    only inside `histogram(_timestamp, '…')`
+ *
+ * @example
+ *   renderPanelSql(
+ *     `SELECT histogram(_timestamp, '{{interval}}') FROM {{stream}}`,
+ *     { stream: "default", startTime: 1700000000000000, endTime: 1700001000000000, interval: "1 minute" },
+ *   )
+ *   // => `SELECT histogram(_timestamp, '1 minute') FROM "default"`
  */
 export function renderPanelSql(
   sql: string,
@@ -384,9 +399,37 @@ export function renderPanelSql(
 /**
  * Choose a histogram bucket width that yields roughly 30 buckets across the
  * given window. Mirrors the helper used by KPI sparklines so panels remain
- * visually aligned.
+ * visually aligned (same bucket → same x-axis ticks → same tooltips).
+ *
+ * The breakpoints are chosen so that "Past 15 minutes" → 30 × 30s = 15 min,
+ * "Past 1 hour" → 30 × ~2min = ~60 min (rounded to "1 minute" buckets), etc.
+ *
+ * @param durationMicros window duration in microseconds (endTime - startTime)
+ * @returns interval string accepted by DataFusion's `histogram()` function
+ *
+ * Branch boundaries (strict `<` at each threshold):
+ *   duration <  15 min  → "10 seconds"
+ *   duration <   1 hr   → "1 minute"
+ *   duration <   5 hr   → "5 minutes"
+ *   duration <  15 hr   → "15 minutes"
+ *   duration <  30 hr   → "30 minutes"
+ *   duration <   7.5 d  → "1 hour"
+ *   duration <  30 d    → "6 hours"
+ *   else                → "1 day"
+ *
+ * @example
+ *   pickInterval(10 * 60 * 1_000_000)     // "10 seconds" (10 min window)
+ *   pickInterval(30 * 60 * 1_000_000)     // "1 minute"   (30 min window)
+ *   pickInterval(3 * 3600 * 1_000_000)    // "5 minutes"  (3 hr window)
+ *   pickInterval(12 * 3600 * 1_000_000)   // "15 minutes" (12 hr window)
+ *   pickInterval(24 * 3600 * 1_000_000)   // "30 minutes" (24 hr window)
+ *   pickInterval(5 * 86400 * 1_000_000)   // "1 hour"     (5 day window)
+ *   pickInterval(14 * 86400 * 1_000_000)  // "6 hours"    (14 day window)
+ *   pickInterval(60 * 86400 * 1_000_000)  // "1 day"      (60 day window)
  */
 export function pickInterval(durationMicros: number): string {
+  // Target ~30 buckets across the window — the histogram() arg is chosen
+  // by checking which "round" interval slot the per-bucket width falls in.
   const seconds = durationMicros / 1_000_000;
   const target = seconds / 30;
   if (target < 30) return "10 seconds";

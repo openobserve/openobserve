@@ -902,6 +902,7 @@ import {
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
+import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import {
   SPAN_KIND_MAP,
@@ -2494,16 +2495,9 @@ export default defineComponent({
       copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
-    const sessionId = computed<string>(() => {
-      // Prefer the new OTEL gen_ai semantic-convention field, fall back to
-      // the legacy session_id so older traces still surface a Session ID.
-      const s: any = spanList.value?.find(
-        (sp: any) => sp?.gen_ai_conversation_id || sp?.session_id,
-      );
-      return s
-        ? String(s.gen_ai_conversation_id || s.session_id || "")
-        : "";
-    });
+    const sessionId = computed<string>(() =>
+      resolveSessionId(spanList.value),
+    );
 
     const copySessionId = () => {
       if (!sessionId.value) return;

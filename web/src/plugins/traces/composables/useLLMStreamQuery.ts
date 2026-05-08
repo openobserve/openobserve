@@ -21,6 +21,28 @@ import { useStore } from "vuex";
  * Minimal SQL query runner against the traces stream search endpoint.
  * Used by LLM Insights panels and composables — accumulates hits across
  * streamed pages and resolves once the request completes.
+ *
+ * Returns:
+ *   - `executeQuery(sql, startTime, endTime)` → `Promise<any[]>` of all
+ *     hits collected from the streamed response. Rejects with an `Error`
+ *     enriched with `.status`, `.code`, `.raw` if the server signals
+ *     failure.
+ *   - `cancelAll()` → cancels every in-flight query started by this
+ *     composable instance (by their generated trace IDs).
+ *
+ * Uses the org's `sql_base64_enabled` config to decide whether to send
+ * SQL as base64 or plain text — matches the convention used elsewhere
+ * in the codebase.
+ *
+ * @example
+ *   const { executeQuery, cancelAll } = useLLMStreamQuery();
+ *   const rows = await executeQuery(
+ *     `SELECT count(*) FROM "default"`,
+ *     1700000000000000,
+ *     1700001000000000,
+ *   );
+ *   // ... later, on unmount:
+ *   cancelAll();
  */
 export function useLLMStreamQuery() {
   const store = useStore();
