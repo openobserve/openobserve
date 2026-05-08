@@ -18,15 +18,11 @@ test.describe("Metrics testcases", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Navigate to metrics page (defaults to SQL mode now)
+    // Navigate to metrics page
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Switch to PromQL mode (page defaults to SQL)
-    await pm.metricsBuilderPage.switchToPromQLMode();
-    await page.waitForTimeout(1000);
-
-    testLogger.info('Test setup completed - navigated to metrics page in PromQL mode');
+    testLogger.info('Test setup completed - navigated to metrics page');
   });
 
   test.afterEach(async ({ page }, testInfo) => {
@@ -85,19 +81,12 @@ test.describe("Metrics testcases", () => {
     // Wait a moment for time range to be applied
     await page.waitForTimeout(1000);
 
-    // Switch to Custom mode so we can type the query (editor is read-only in Builder mode)
-    const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
-    if (await customBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await customBtn.click();
-      await page.waitForTimeout(500);
-    }
-
     // Enter a simple metrics query using cpu_usage which has guaranteed data
     // cpu_usage is ingested with values between 25-75%
     await pm.metricsPage.enterMetricsQuery('cpu_usage');
 
-    // Wait for query to sync to data model
-    await page.waitForTimeout(1000);
+    // Wait briefly to ensure query is entered
+    await page.waitForTimeout(500);
 
     // Click Apply button to run query
     await pm.metricsPage.expectApplyButtonEnabled();
@@ -113,8 +102,9 @@ test.describe("Metrics testcases", () => {
     const hasError = await pm.metricsPage.isErrorNotificationVisible();
     if (hasError) {
       const errorText = await pm.metricsPage.getErrorNotificationText();
-      testLogger.warn(`Query returned error notification: ${errorText}`);
+      testLogger.error(`Query returned error: ${errorText}`);
     }
+    expect(hasError).toBe(false);
 
     // Check for "No data" message using page object
     const noDataMessage = await pm.metricsPage.getNoDataMessage();
@@ -375,18 +365,10 @@ test.describe("Metrics testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing Add to Dashboard cancel flow');
 
-    // Switch to Custom mode so we can type the query
-    const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
-    if (await customBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await customBtn.click();
-      await page.waitForTimeout(500);
-    }
-
-    // Run a query to have something to add
+    // First run a query to have something to add
     await pm.metricsPage.enterMetricsQuery('up');
-    await page.waitForTimeout(1000);
     await pm.metricsPage.clickApplyButton();
-    await page.waitForTimeout(3000);
+    await pm.metricsPage.waitForMetricsResults();
 
     // Look for Add to Dashboard button using page object
     const addToDashboardBtn = await pm.metricsPage.getAddToDashboardButton();
@@ -420,13 +402,6 @@ test.describe("Metrics testcases", () => {
     tag: ['@metrics', '@edge', '@P2', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing empty query validation');
-
-    // Switch to Custom mode so we can type queries
-    const customBtn1 = page.locator('[data-test="dashboard-custom-query-type"]');
-    if (await customBtn1.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await customBtn1.click();
-      await page.waitForTimeout(500);
-    }
 
     // First, run a valid query to establish baseline state
     await pm.metricsPage.enterMetricsQuery('up');
@@ -486,13 +461,6 @@ test.describe("Metrics testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing invalid PromQL syntax handling');
 
-    // Switch to Custom mode so we can type queries
-    const customBtn2 = page.locator('[data-test="dashboard-custom-query-type"]');
-    if (await customBtn2.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await customBtn2.click();
-      await page.waitForTimeout(500);
-    }
-
     // First, run a valid query to establish baseline state
     await pm.metricsPage.enterMetricsQuery('up');
     await pm.metricsPage.clickApplyButton();
@@ -545,13 +513,6 @@ test.describe("Metrics testcases", () => {
     tag: ['@metrics', '@edge', '@P2', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing query for non-existent metric');
-
-    // Switch to Custom mode so we can type queries
-    const customBtn3 = page.locator('[data-test="dashboard-custom-query-type"]');
-    if (await customBtn3.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await customBtn3.click();
-      await page.waitForTimeout(500);
-    }
 
     // Enter query for non-existent metric
     await pm.metricsPage.enterMetricsQuery('non_existent_metric_xyz123');

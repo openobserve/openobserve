@@ -18,21 +18,11 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Navigate to metrics page (defaults to SQL mode now)
+    // Navigate to metrics page
     await pm.metricsPage.gotoMetricsPage();
-    // Wait for initial SQL auto-query and any error notifications to auto-dismiss
-    await page.waitForTimeout(6000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Switch to PromQL Custom mode (page defaults to SQL Builder)
-    await pm.metricsBuilderPage.switchToPromQLMode();
-    await page.waitForTimeout(1000);
-    const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
-    if (await customBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await customBtn.click();
-      await page.waitForTimeout(500);
-    }
-
-    testLogger.info('Test setup completed - navigated to metrics page in PromQL Custom mode');
+    testLogger.info('Test setup completed - navigated to metrics page');
   });
 
   test.afterEach(async ({ page }, testInfo) => {
@@ -82,13 +72,12 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     for (const q of queries) {
       testLogger.info(`Testing ${q.name}: ${q.query}`);
 
-      // Enter query and wait for model sync
+      // Enter query
       await pm.metricsPage.enterMetricsQuery(q.query);
-      await page.waitForTimeout(1000);
 
       // Execute query
       await pm.metricsPage.clickApplyButton();
-      await page.waitForTimeout(3000);
+      await pm.metricsPage.waitForMetricsResults();
 
       // Assert: Query must execute without errors
       const hasError = await pm.metricsPage.hasErrorIndicator();
@@ -151,12 +140,6 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
         // Test SQL mode switch
         await sqlToggle.click();
         await page.waitForTimeout(500);
-        // Switch to Custom mode so editor is editable
-        const cBtn1 = page.locator('[data-test="dashboard-custom-query-type"]');
-        if (await cBtn1.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await cBtn1.click();
-          await page.waitForTimeout(300);
-        }
 
         const sqlIndicator = await pm.metricsPage.getSqlIndicator();
         const isSqlMode = await sqlIndicator.isVisible().catch(() => false);
@@ -175,12 +158,6 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
         if (!currentlyInSqlMode) {
           await sqlToggle.click();
           await page.waitForTimeout(500);
-          // Switch to Custom mode so editor is editable
-          const cBtn2 = page.locator('[data-test="dashboard-custom-query-type"]');
-          if (await cBtn2.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await cBtn2.click();
-            await page.waitForTimeout(300);
-          }
         }
 
         // Enter and execute SQL query
@@ -230,10 +207,14 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await pm.metricsPage.clickApplyButton();
       await pm.metricsPage.waitForMetricsResults();
 
-      testLogger.info(`${q.name} executed`);
+      // Assert: Advanced queries must execute without errors
+      const hasError = await pm.metricsPage.hasErrorIndicator();
+      expect(hasError).toBe(false);
+
+      testLogger.info(`${q.name} executed successfully`);
     }
 
-    testLogger.info('All advanced PromQL features tested');
+    testLogger.info('All advanced PromQL features tested successfully');
   });
 
   // CONSOLIDATED TEST 4: Error handling for invalid queries (2 tests → 1 test)
@@ -299,13 +280,6 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await sqlToggle.click();
       await page.waitForTimeout(500);
 
-      // Switch to Custom mode so we can type in the editor
-      const sqlCustomBtn = page.locator('[data-test="dashboard-custom-query-type"]');
-      if (await sqlCustomBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await sqlCustomBtn.click();
-        await page.waitForTimeout(500);
-      }
-
       await pm.metricsPage.enterMetricsQuery('SELECT FROM WHERE');
       await pm.metricsPage.clickApplyButton();
       await page.waitForTimeout(3000);
@@ -317,12 +291,9 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
 
       testLogger.info(`SQL invalid query state: hasError=${hasError}, hasNoData=${sqlHasNoData}, hasVisualization=${sqlHasVisualization}`);
 
-      // SQL invalid query should be handled gracefully.
-      // Note: With SQL-default mode, the editor may retain the previous auto-generated query
-      // if enterMetricsQuery couldn't overwrite it. Log the state for debugging.
-      const sqlErrorNotification = await pm.metricsPage.isErrorNotificationVisible();
-      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization || sqlErrorNotification;
-      testLogger.info(`SQL error handling result: graceful=${sqlHandledGracefully}`);
+      // Same validation logic for SQL
+      const sqlHandledGracefully = hasError || sqlHasNoData || !sqlHasVisualization;
+      expect(sqlHandledGracefully).toBe(true);
 
       if (hasError) {
         const sqlErrorIndicators = await pm.metricsPage.getErrorIndicators();

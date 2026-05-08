@@ -156,6 +156,7 @@ import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import {
   DEFAULT_METRICS_X_FIELD,
   DEFAULT_METRICS_Y_FIELD,
+  DEFAULT_METRICS_Y_FIELD_COUNT,
 } from "@/utils/metrics/constants";
 
 const AddToDashboard = defineAsyncComponent(() => {
@@ -226,12 +227,25 @@ export default defineComponent({
       resetDashboardPanelData();
     });
 
-    /** Apply default SQL builder fields for metrics (histogram + avg) */
+    /** Apply default SQL builder fields for metrics.
+     *  Uses avg(value) if the stream has a "value" field, otherwise count(_timestamp). */
     const applyMetricsDefaults = () => {
       const query = dashboardPanelData.data.queries[0];
       query.customQuery = false;
       query.fields.x = [DEFAULT_METRICS_X_FIELD()];
-      query.fields.y = [DEFAULT_METRICS_Y_FIELD()];
+
+      // Check if the current stream has a "value" field
+      const streamFields =
+        dashboardPanelData.meta?.streamFields?.groupedFields ?? [];
+      const hasValueField = streamFields.some((stream: any) =>
+        stream?.schema?.some((field: any) => field?.name === "value"),
+      );
+
+      query.fields.y = [
+        hasValueField
+          ? DEFAULT_METRICS_Y_FIELD()
+          : DEFAULT_METRICS_Y_FIELD_COUNT(),
+      ];
       query.fields.breakdown = [];
       query.fields.filter = {
         filterType: "group",
@@ -263,11 +277,9 @@ export default defineComponent({
 
       // set default chart type as line
       dashboardPanelData.data.type = "line";
-      // set default query type as SQL with builder (auto) mode
-      dashboardPanelData.data.queryType = "sql";
-
-      // apply default histogram(_timestamp) + avg(value) fields
-      applyMetricsDefaults();
+      // set the default query type as promql for metrics
+      dashboardPanelData.data.queryType = "promql";
+      dashboardPanelData.data.queries[0].customQuery = false;
 
       // set the show query bar by default for metrics page
       dashboardPanelData.layout.showQueryBar = true;
@@ -278,17 +290,6 @@ export default defineComponent({
     onMounted(async () => {
       // DateTimePicker is now mounted; safe to read its value
       updateDateTime(selectedDate.value);
-
-      // If a stream was persisted, load its fields and run the initial query.
-      // This must happen in onMounted (not the stream watcher) because
-      // updateDateTime needs DateTimePicker to be mounted first.
-      const stream =
-        dashboardPanelData.data.queries[0].fields.stream;
-      if (stream && dashboardPanelData.data.queryType === "sql") {
-        await updateGroupedFields();
-        await makeAutoSQLQuery();
-        runQuery();
-      }
 
       // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
@@ -325,26 +326,50 @@ export default defineComponent({
           );
         }
 
+        // When stream changes while in SQL mode, reset defaults and regenerate query
         if (
           isPanelConfigWatcherActivated &&
           stream &&
-          dashboardPanelData.data.queryType === "sql" &&
-          dashboardPanelData.data.queries[0]?.fields?.stream_type === "metrics"
+          oldStream &&
+          stream !== oldStream &&
+          dashboardPanelData.data.queryType === "sql"
         ) {
-          // On stream change, reset to default SQL builder fields.
-          // On first stream selection (oldStream empty), fields are already
-          // set from onBeforeMount so only reset on actual change.
-          if (oldStream && stream !== oldStream) {
-            applyMetricsDefaults();
-          }
-
-          // Load stream fields, generate the SQL query, and run it.
-          // PanelEditor's field watcher can't generate the query on its own
-          // here because the x/y fields haven't changed (defaults were set
-          // in onBeforeMount).
           await updateGroupedFields();
+          applyMetricsDefaults();
           await makeAutoSQLQuery();
-          runQuery();
+        }
+      },
+    );
+
+    // Handle query type switches on metrics page.
+    // We use nextTick() to ensure this runs AFTER changeToggle's removeXYFilters()
+    // has completed, so the defaults we apply here don't get immediately cleared.
+    watch(
+      () => dashboardPanelData.data.queryType,
+      async (newType: string, oldType: string) => {
+        if (!isPanelConfigWatcherActivated) return;
+
+        const stream =
+          dashboardPanelData.data.queries[0]?.fields?.stream;
+
+        if (newType === "sql" && oldType === "promql") {
+          // Switching to SQL: load stream fields first so applyMetricsDefaults
+          // can check whether the current stream has a "value" field
+          await nextTick();
+          if (stream) {
+            await updateGroupedFields();
+          }
+          applyMetricsDefaults();
+
+          if (stream) {
+            await makeAutoSQLQuery();
+          }
+        } else if (newType === "promql" && oldType === "sql") {
+          // Switching to PromQL: set default builder query (streamName{})
+          await nextTick();
+          if (stream) {
+            dashboardPanelData.data.queries[0].query = `${stream}{}`;
+          }
         }
       },
     );

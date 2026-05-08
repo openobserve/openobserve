@@ -43,3 +43,17 @@ export const DEFAULT_METRICS_Y_FIELD = () => ({
   isDerived: false,
   havingConditions: [],
 });
+
+/** Fallback y-axis field for streams without a "value" column: count(_timestamp) */
+export const DEFAULT_METRICS_Y_FIELD_COUNT = () => ({
+  label: "_timestamp",
+  alias: "y_axis_1",
+  column: "_timestamp",
+  color: "#5960b2",
+  type: "build",
+  functionName: "count",
+  args: [{ type: "field", value: { field: "_timestamp" } }],
+  sortBy: null,
+  isDerived: false,
+  havingConditions: [],
+});

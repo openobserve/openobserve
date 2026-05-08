@@ -11,17 +11,12 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   });
 
   /** Create a fresh PageManager per test — avoids data races in parallel workers. */
-  async function setupTest(page, testInfo, { switchToPromQL = true } = {}) {
+  async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
-    await page.waitForTimeout(6000);
-    // Metrics page now defaults to SQL mode; switch to PromQL for PromQL builder tests
-    if (switchToPromQL) {
-      await pm.metricsBuilderPage.switchToPromQLMode();
-      await page.waitForTimeout(1000);
-    }
+    await page.waitForTimeout(2000);
     testLogger.info('Test setup completed - navigated to metrics page');
     return pm;
   }
@@ -37,8 +32,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
   test("P0: Builder mode tabs, UI elements, and mode switching", {
     tag: ['@metrics', '@builder', '@smoke', '@P0', '@all']
   }, async ({ page }, testInfo) => {
-    // Don't auto-switch to PromQL — this test verifies default state first
-    const pm = await setupTest(page, testInfo, { switchToPromQL: false });
+    const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
     // 1. Verify all mode buttons visible
@@ -48,23 +42,18 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await expect(page.locator(builder.customModeButton)).toBeVisible();
     testLogger.info('All mode buttons visible');
 
-    // 2. Verify default mode is SQL + Builder (changed from PromQL)
-    expect(await builder.isModeSelected('sql')).toBe(true);
-    expect(await builder.isModeSelected('builder')).toBe(true);
-    testLogger.info('Default mode: SQL + Builder');
-
-    // 3. Switch to PromQL mode for PromQL Builder UI verification
-    await builder.switchToPromQLMode();
-    await page.waitForTimeout(1000);
+    // 2. Verify default mode is PromQL + Builder
     expect(await builder.isModeSelected('promql')).toBe(true);
+    expect(await builder.isModeSelected('builder')).toBe(true);
+    testLogger.info('Default mode: PromQL + Builder');
 
-    // 4. Verify PromQL Builder UI elements visible
+    // 3. Verify Builder UI elements visible
     expect(await builder.isMetricSelectorVisible()).toBe(true);
     expect(await builder.isAddLabelFilterVisible()).toBe(true);
     expect(await builder.isAddOperationVisible()).toBe(true);
     expect(await builder.isOptionsVisible()).toBe(true);
     await expect(page.locator(builder.runQueryButton).first()).toBeVisible();
-    testLogger.info('All PromQL Builder UI elements visible');
+    testLogger.info('All Builder UI elements visible');
 
     // 4. Switch SQL -> PromQL -> Custom -> Builder
     await builder.switchToSQLMode();
@@ -111,8 +100,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 2. Open dropdown and verify metrics listed
     await streamSelector.click();
-    await page.waitForTimeout(1000);
-    const menuItems = page.locator('[data-test^="index-dropdown-stream-option-"]');
+    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    const menuItems = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
     const menuCount = await menuItems.count();
     expect(menuCount).toBeGreaterThan(0);
     testLogger.info(`Dropdown shows ${menuCount} metrics`);
@@ -120,27 +109,27 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 3. Search and filter metrics
     await streamSelector.click();
-    await page.waitForTimeout(500);
+    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
     await streamSelector.clear();
     await streamSelector.fill('cpu');
     await page.waitForTimeout(1000);
-    const filtered = page.locator('[data-test^="index-dropdown-stream-option-"]');
+    const filtered = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
     const filteredCount = await filtered.count();
     expect(filteredCount).toBeGreaterThan(0);
     testLogger.info(`Filtered to ${filteredCount} metrics matching "cpu"`);
 
     // Select first filtered item
     await filtered.first().click();
-    await page.waitForTimeout(500);
+    await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
-    // 4. Set time range and run query
-    await pm.metricsPage.openDatePicker();
-    await pm.metricsPage.selectLast15Minutes();
-    await page.waitForTimeout(1000);
-
+    // 4. Run query and verify visualization
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
-    testLogger.info('Default query executed');
+    const hasError = await pm.metricsPage.isErrorNotificationVisible();
+    expect(hasError).toBe(false);
+    const hasVis = await pm.metricsPage.hasVisualization();
+    expect(hasVis).toBe(true);
+    testLogger.info('Default query executed with visualization');
   });
 
   // =========================================================================
@@ -347,33 +336,6 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // Page now defaults to SQL mode — switch to PromQL so builder Options
-    // (legend, step value, query type) become visible.
-    await builder.switchToPromQLMode();
-    await page.waitForTimeout(1000);
-
-    // Explicitly pick a metric so the builder forms a valid PromQL query
-    // (after the SQL-default refactor, the pre-selected stream label does
-    // not auto-populate the query expression).
-    const streamSelector = page.locator(builder.streamSelector);
-    await expect(streamSelector).toBeVisible({ timeout: 5000 });
-    await streamSelector.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-    await streamSelector.clear();
-    await streamSelector.fill('cpu');
-    await page.waitForTimeout(1000);
-    const cpuOptions = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
-    if (await cpuOptions.count() > 0) {
-      await cpuOptions.first().click();
-    } else {
-      // Fallback: clear search and pick any available metric
-      await streamSelector.clear();
-      await page.waitForTimeout(500);
-      await page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').first().click();
-    }
-    await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    await page.waitForTimeout(1000);
-
     // 1. Set legend
     const legendField = page.locator(builder.legendInput);
     await expect(legendField).toBeVisible({ timeout: 5000 });
@@ -399,13 +361,15 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(qtRange).toBe(true);
     testLogger.info('Query type: Range');
 
-    // 4. Set time range and run query (metric already selected at the top of this test)
+    // 4. Run query with Range type, verify visualization
     await pm.metricsPage.openDatePicker();
     await pm.metricsPage.selectLast15Minutes();
     await page.waitForTimeout(1000);
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
-    testLogger.info('Range query executed');
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+    expect(await pm.metricsPage.hasVisualization()).toBe(true);
+    testLogger.info('Range query succeeded with visualization');
 
     // 5. Switch to Instant and run
     await builder.selectQueryType('instant');
@@ -429,22 +393,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // Select a known metric, set time range, and run query first to enable Add to Dashboard
-    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
-    await streamSelector.click();
-    await page.waitForTimeout(500);
-    await streamSelector.clear();
-    await streamSelector.fill('cpu');
-    await page.waitForTimeout(1000);
-    const cpuOption = page.locator('[data-test^="index-dropdown-stream-option-"]').first();
-    if (await cpuOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await cpuOption.click();
-    }
-    await page.waitForTimeout(500);
-
-    await pm.metricsPage.openDatePicker();
-    await pm.metricsPage.selectLast15Minutes();
-    await page.waitForTimeout(1000);
+    // Run query first to enable Add to Dashboard
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
 
@@ -572,25 +521,14 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // 1. Select a known metric stream, set time range, and run query
-    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
-    await streamSelector.click();
-    await page.waitForTimeout(500);
-    await streamSelector.clear();
-    await streamSelector.fill('cpu');
-    await page.waitForTimeout(1000);
-    const firstOption = page.locator('[data-test^="index-dropdown-stream-option-"]').first();
-    if (await firstOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await firstOption.click();
-    }
-    await page.waitForTimeout(500);
-
+    // 1. Set time range and run default query first
     await pm.metricsPage.openDatePicker();
     await pm.metricsPage.selectLast15Minutes();
     await page.waitForTimeout(1000);
 
     await builder.clickRunQuery();
     await page.waitForTimeout(3000);
+    expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
     testLogger.info('Default line chart query executed');
 
     // 2. Switch to table chart type
@@ -601,7 +539,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       // 3. Run query again with table chart
       await builder.clickRunQuery();
       await page.waitForTimeout(3000);
-      testLogger.info('Table chart query executed');
+
+      // 4. Verify no errors
+      expect(await pm.metricsPage.isErrorNotificationVisible()).toBe(false);
+      testLogger.info('Table chart query executed without errors');
 
       // 5. Verify table or chart rendered
       const rendered = await builder.isChartRendered();
@@ -1467,147 +1408,5 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info(`Cleanup: dashboard "${dashboardName}" deleted`);
 
     testLogger.info('Save → edit → verify → cleanup complete');
-  });
-});
-
-// ============================================================================
-// Metrics — Default SQL Builder Mode
-// ============================================================================
-
-test.describe("Metrics — Default SQL Builder Mode", () => {
-  test.beforeAll(async () => {
-    await ensureMetricsIngested();
-  });
-
-  async function setupTest(page, testInfo) {
-    testLogger.testStart(testInfo.title, testInfo.file);
-    await navigateToBase(page);
-    const pm = new PageManager(page);
-    await pm.metricsPage.gotoMetricsPage();
-    await page.waitForTimeout(2000);
-    testLogger.info('Metrics SQL default test setup completed');
-    return pm;
-  }
-
-  test.afterEach(async ({}, testInfo) => {
-    testLogger.testEnd(testInfo.title, testInfo.status);
-  });
-
-  test("Metrics page defaults to SQL mode on load", {
-    tag: ['@metrics', '@metricsSqlDefault', '@smoke', '@P0', '@all']
-  }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
-
-    const isSql = await pm.metricsBuilderPage.isModeSelected('sql');
-    expect(isSql).toBeTruthy();
-
-    testLogger.info('Metrics defaults to SQL mode - PASSED');
-  });
-
-  test("Metrics page defaults to Builder mode (not Custom)", {
-    tag: ['@metrics', '@metricsSqlDefault', '@smoke', '@P0', '@all']
-  }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
-
-    const isBuilder = await pm.metricsBuilderPage.isModeSelected('builder');
-    expect(isBuilder).toBeTruthy();
-
-    testLogger.info('Metrics defaults to Builder mode - PASSED');
-  });
-
-  test("Selecting a metric stream populates default histogram and avg fields", {
-    tag: ['@metrics', '@metricsSqlDefault', '@P0', '@all']
-  }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
-
-    // Select a metric stream
-    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
-    await streamSelector.waitFor({ state: 'visible', timeout: 15000 });
-    await streamSelector.click();
-    const firstOption = page.locator('[data-test^="index-dropdown-stream-option-"]').first();
-    await firstOption.waitFor({ state: 'visible', timeout: 10000 });
-    await firstOption.click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Verify X-axis has histogram(_timestamp)
-    const xAxisItems = page.locator('[data-test="dashboard-x-layout"] [data-test="dashboard-x-item-x_axis_1"]');
-    await expect(xAxisItems.first()).toBeVisible({ timeout: 15000 });
-    const xText = await xAxisItems.first().innerText();
-    expect(xText).toContain('histogram');
-
-    // Verify Y-axis has avg(value)
-    const yAxisItems = page.locator('[data-test="dashboard-y-layout"] [data-test="dashboard-y-item-y_axis_1"]');
-    await expect(yAxisItems.first()).toBeVisible({ timeout: 15000 });
-    const yText = await yAxisItems.first().innerText();
-    expect(yText).toContain('avg');
-
-    testLogger.info('Default histogram + avg fields populated - PASSED');
-  });
-
-  test("Selecting a metric stream generates SQL query with histogram and avg", {
-    tag: ['@metrics', '@metricsSqlDefault', '@P1', '@all']
-  }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
-
-    // Select a stream
-    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
-    await streamSelector.waitFor({ state: 'visible', timeout: 15000 });
-    await streamSelector.click();
-    const firstOption = page.locator('[data-test^="index-dropdown-stream-option-"]').first();
-    await firstOption.waitFor({ state: 'visible', timeout: 10000 });
-    await firstOption.click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Verify query preview contains histogram and avg
-    const queryText = await pm.metricsBuilderPage.getQueryPreviewText();
-    expect(queryText).toContain('histogram');
-    expect(queryText).toContain('avg');
-    expect(queryText).toContain('SELECT');
-
-    testLogger.info('SQL query generated with histogram + avg - PASSED');
-  });
-
-  test("Changing metric stream resets fields to defaults", {
-    tag: ['@metrics', '@metricsSqlDefault', '@P1', '@all']
-  }, async ({ page }, testInfo) => {
-    const pm = await setupTest(page, testInfo);
-
-    const streamSelector = page.locator('[data-test="index-dropdown-stream"]');
-    await streamSelector.waitFor({ state: 'visible', timeout: 15000 });
-
-    // Select first stream
-    await streamSelector.click();
-    const options = page.locator('[data-test^="index-dropdown-stream-option-"]');
-    await options.first().waitFor({ state: 'visible', timeout: 10000 });
-    const optionCount = await options.count();
-
-    if (optionCount < 2) {
-      testLogger.warn('Only one metric stream available, skipping stream change test');
-      test.skip();
-      return;
-    }
-
-    await options.first().click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Change to second stream
-    await streamSelector.click();
-    await page.waitForTimeout(500);
-    const secondOptions = page.locator('[data-test^="index-dropdown-stream-option-"]');
-    await secondOptions.nth(1).click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Verify defaults re-applied
-    const xAxisItems = page.locator('[data-test="dashboard-x-layout"] [data-test="dashboard-x-item-x_axis_1"]');
-    await expect(xAxisItems.first()).toBeVisible({ timeout: 15000 });
-    const xText = await xAxisItems.first().innerText();
-    expect(xText).toContain('histogram');
-
-    const yAxisItems = page.locator('[data-test="dashboard-y-layout"] [data-test="dashboard-y-item-y_axis_1"]');
-    await expect(yAxisItems.first()).toBeVisible({ timeout: 15000 });
-    const yText = await yAxisItems.first().innerText();
-    expect(yText).toContain('avg');
-
-    testLogger.info('Stream change resets to defaults - PASSED');
   });
 });

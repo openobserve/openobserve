@@ -17,20 +17,11 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Navigate to metrics page (defaults to SQL mode now)
+    // Navigate to metrics page
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Switch to PromQL Custom mode (page defaults to SQL Builder)
-    await pm.metricsBuilderPage.switchToPromQLMode();
-    await page.waitForTimeout(1000);
-    const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
-    if (await customBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await customBtn.click();
-      await page.waitForTimeout(500);
-    }
-
-    testLogger.info('Test setup completed - navigated to metrics page in PromQL Custom mode');
+    testLogger.info('Test setup completed - navigated to metrics page');
   });
 
   test.afterEach(async ({ page }, testInfo) => {

@@ -71,14 +71,6 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
   async function setupTableChart(page, tableMode = 'all') {
     testLogger.info(`Setting up table chart with mode: ${tableMode}`);
 
-    // Switch to PromQL mode - Column Order button requires promqlMode
-    const promqlBtn = page.locator('[data-test="dashboard-promql-query-type"]');
-    if (await promqlBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await promqlBtn.click();
-      await page.waitForTimeout(1000);
-      testLogger.info('Switched to PromQL mode');
-    }
-
     // Set time range to Last 15 minutes
     testLogger.info('Setting time range to Last 15 minutes');
     await pm.metricsPage.openDatePicker();
@@ -91,12 +83,8 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     }
     await page.waitForTimeout(1000);
 
-    // Switch to Custom mode so we can type the query
-    const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
-    await customBtn.click();
-    await page.waitForTimeout(500);
-
-    // Enter and run query
+    // Execute a query that will produce multiple columns
+    // Using a query with labels to get multiple columns in the table
     const query = 'cpu_usage';
     testLogger.info(`Executing query: ${query}`);
     await pm.metricsPage.enterMetricsQuery(query);
@@ -712,7 +700,6 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     // NOTE: Timestamp is always in position 0 (first column)
     // The reordered column should appear in position 1 (second column)
     let tableHeaders = page.locator('table thead th');
-    await tableHeaders.first().waitFor({ state: 'visible', timeout: 30000 });
     const timestampColumn = extractColumnName(await tableHeaders.nth(0).textContent());
     testLogger.info(`First column (always Timestamp): "${timestampColumn}"`);
 
@@ -736,8 +723,6 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     // The reordered column should still be in position 1 (second column after Timestamp)
     testLogger.info('Verifying column order persists after re-running query');
     tableHeaders = page.locator('table thead th');
-    // Wait for table headers to render after query re-run
-    await tableHeaders.first().waitFor({ state: 'visible', timeout: 30000 });
     const timestampAfterRerun = extractColumnName(await tableHeaders.nth(0).textContent());
     const secondColumnAfterRerun = extractColumnName(await tableHeaders.nth(1).textContent());
     testLogger.info(`First column after re-run (Timestamp): "${timestampAfterRerun}"`);
