@@ -172,7 +172,7 @@ describe("TraceErrorTab", () => {
         wrapper.find('[data-test="trace-details-sidebar-error-summary"]')
           .exists(),
       ).toBe(true);
-      expect(wrapper.text()).toContain("HTTP STATUS CODE");
+      expect(wrapper.text()).toContain("HTTP Status Code");
     });
 
     it("should display the status code title", () => {
@@ -225,7 +225,7 @@ describe("TraceErrorTab", () => {
         wrapper.find('[data-test="trace-details-sidebar-error-summary"]')
           .exists(),
       ).toBe(true);
-      expect(wrapper.text()).toContain("GRPC STATUS CODE");
+      expect(wrapper.text()).toContain("gRPC Status Code");
     });
 
     it("should display the gRPC status code title", () => {
@@ -427,7 +427,7 @@ describe("TraceErrorTab", () => {
       const summaryBanners = wrapper.findAll(
         '[data-test="trace-details-sidebar-error-summary"]',
       );
-      expect(summaryBanners[0].text()).toContain("HTTP STATUS CODE");
+      expect(summaryBanners[0].text()).toContain("HTTP Status Code");
     });
 
     it("should show the status code title in the first banner", () => {
@@ -530,7 +530,16 @@ describe("TraceErrorTab", () => {
         );
       });
 
-      it("should expand a row when its expand button is clicked", async () => {
+      it("should have the row auto-expanded on mount", () => {
+        wrapper = mountTraceErrorTab();
+
+        const expandedRow = wrapper.find(
+          '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
+        );
+        expect(expandedRow.exists()).toBe(true);
+      });
+
+      it("should collapse the row when expand button is clicked", async () => {
         wrapper = mountTraceErrorTab();
 
         await wrapper
@@ -542,40 +551,34 @@ describe("TraceErrorTab", () => {
         const expandedRow = wrapper.find(
           '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
         );
-        expect(expandedRow.exists()).toBe(true);
+        expect(expandedRow.exists()).toBe(false);
       });
 
-      it("should collapse an expanded row on second click", async () => {
+      it("should re-expand a collapsed row on second click", async () => {
         wrapper = mountTraceErrorTab();
         const expandBtn = wrapper.find(
           '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
         );
 
-        // First click — expand
-        await expandBtn.trigger("click");
-        expect(
-          wrapper.find(
-            '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-          ).exists(),
-        ).toBe(true);
-
-        // Second click — collapse
+        // First click — collapse (row is auto-expanded)
         await expandBtn.trigger("click");
         expect(
           wrapper.find(
             '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
           ).exists(),
         ).toBe(false);
+
+        // Second click — re-expand
+        await expandBtn.trigger("click");
+        expect(
+          wrapper.find(
+            '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
+          ).exists(),
+        ).toBe(true);
       });
 
-      it("should show exception type in the expanded row", async () => {
+      it("should show exception type in the expanded row", () => {
         wrapper = mountTraceErrorTab();
-
-        await wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-          )
-          .trigger("click");
 
         const expandedRow = wrapper.find(
           '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
@@ -584,14 +587,8 @@ describe("TraceErrorTab", () => {
         expect(expandedRow.text()).toContain("ValueError");
       });
 
-      it("should show exception message in the expanded row", async () => {
+      it("should show exception message in the expanded row", () => {
         wrapper = mountTraceErrorTab();
-
-        await wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-          )
-          .trigger("click");
 
         const expandedRow = wrapper.find(
           '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
@@ -600,14 +597,8 @@ describe("TraceErrorTab", () => {
         expect(expandedRow.text()).toContain("Something went wrong");
       });
 
-      it("should show escaped value in the expanded row", async () => {
+      it("should show escaped value in the expanded row", () => {
         wrapper = mountTraceErrorTab();
-
-        await wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-          )
-          .trigger("click");
 
         const expandedRow = wrapper.find(
           '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
@@ -616,14 +607,8 @@ describe("TraceErrorTab", () => {
         expect(expandedRow.text()).toContain("false");
       });
 
-      it("should show stacktrace in the expanded row", async () => {
+      it("should show stacktrace in the expanded row", () => {
         wrapper = mountTraceErrorTab();
-
-        await wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-          )
-          .trigger("click");
 
         const expandedRow = wrapper.find(
           '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
@@ -649,14 +634,8 @@ describe("TraceErrorTab", () => {
           );
         });
 
-        it("should show 'No stacktrace available' when stacktrace is empty", async () => {
+        it("should show 'No stacktrace available' when stacktrace is empty", () => {
           wrapper = mountTraceErrorTab();
-
-          await wrapper
-            .find(
-              '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-            )
-            .trigger("click");
 
           const expandedRow = wrapper.find(
             '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
@@ -664,14 +643,8 @@ describe("TraceErrorTab", () => {
           expect(expandedRow.text()).toContain("No stacktrace available");
         });
 
-        it("should not show a copy button when stacktrace is missing", async () => {
+        it("should not show a copy button when stacktrace is missing", () => {
           wrapper = mountTraceErrorTab();
-
-          await wrapper
-            .find(
-              '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-            )
-            .trigger("click");
 
           // The copy-btn is `v-if` gated on stacktrace existing and being non-empty
           const expandedRow = wrapper.find(
@@ -695,13 +668,7 @@ describe("TraceErrorTab", () => {
       it("should call clipboard.writeText with the stacktrace text", async () => {
         wrapper = mountTraceErrorTab();
 
-        // Expand row first
-        await wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-          )
-          .trigger("click");
-
+        // Row is auto-expanded on mount — copy button is already visible
         const copyBtn = wrapper.find(".copy-btn");
         expect(copyBtn.exists()).toBe(true);
 
@@ -716,13 +683,7 @@ describe("TraceErrorTab", () => {
       it("should show a success notification after copying", async () => {
         wrapper = mountTraceErrorTab();
 
-        // Expand row first
-        await wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-          )
-          .trigger("click");
-
+        // Row is auto-expanded on mount — copy button is already visible
         const copyBtn = wrapper.find(".copy-btn");
         await copyBtn.trigger("click");
         await flushPromises();
