@@ -123,8 +123,12 @@ export class ServicesCatalogPage {
 
   async getFilteredCount() {
     const text = await this.page.locator(this.statusPill).textContent().catch(() => '0/0');
-    const match = text.match(/^(\d+)\//);
-    return match ? parseInt(match[1]) : 0;
+    // Match "N/M" (filtered) or just "N" (unfiltered total)
+    const filteredMatch = text.match(/^(\d+)\//);
+    if (filteredMatch) return parseInt(filteredMatch[1]);
+    // Unfiltered state — pill shows just the total, so "filtered" equals total
+    const totalMatch = text.match(/^(\d+)/);
+    return totalMatch ? parseInt(totalMatch[1]) : 0;
   }
 
   async getCriticalCount() {
@@ -243,7 +247,7 @@ export class ServicesCatalogPage {
     const count = await pageBtns.count();
     const texts = [];
     for (let i = 0; i < count; i++) {
-      const t = (await pageBtns.nth(i).textContent()).trim();
+      const t = (await pageBtns.nth(i).textContent() ?? '').trim();
       texts.push(t);
     }
     return texts.filter(t => /^\d+$/.test(t)).length;
@@ -337,17 +341,4 @@ export class ServicesCatalogPage {
     return await this.page.locator(this.emptyState).isVisible().catch(() => false);
   }
 
-  // ===== CONSOLE ERRORS =====
-
-  async expectNoTypeError() {
-    const errors = [];
-    this.page.on('console', msg => {
-      if (msg.type() === 'error' && msg.text().includes('Cannot read properties of null')) {
-        errors.push(msg.text());
-      }
-    });
-    // Give time for any error to surface
-    await this.page.waitForTimeout(1000);
-    expect(errors).toHaveLength(0);
-  }
 }

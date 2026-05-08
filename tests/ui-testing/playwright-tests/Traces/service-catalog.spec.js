@@ -140,11 +140,7 @@ test.describe("Service Catalog testcases", () => {
     const panelVisible = await pm.servicesCatalogPage.isSidePanelVisible();
     testLogger.info(`Side panel visible after click: ${panelVisible}`);
 
-    if (!panelVisible) {
-      testLogger.info('Side panel not visible — virtualized table click limitation, skipping');
-      return;
-    }
-
+    test.skip(!panelVisible, 'Side panel not visible — virtualized table click limitation');
     await pm.servicesCatalogPage.expectSidePanelVisible();
     testLogger.info('Side panel is visible after row click');
   });
@@ -433,14 +429,12 @@ test.describe("Service Catalog testcases", () => {
 
     const criticalErrors = consoleErrors.filter(e =>
       e.includes('Cannot read properties') ||
-      e.includes('TypeError') ||
-      e.includes('undefined')
+      e.includes('TypeError')
     );
 
     if (criticalErrors.length > 0) {
       testLogger.warn(`Console errors found: ${criticalErrors.join('; ')}`);
     }
-    // Don't hard-fail — some errors may be from third-party scripts
-    testLogger.info(`Critical console errors: ${criticalErrors.length}`);
+    expect(criticalErrors, `Found ${criticalErrors.length} critical console errors`).toHaveLength(0);
   });
 });
