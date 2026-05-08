@@ -560,32 +560,8 @@ export default defineComponent({
       }
     };
 
-    const handleAiPrompt = (e: CustomEvent) => {
-      const prompt = e.detail?.prompt;
-      if (!prompt) return;
-
-      const isHomePage =
-        router.currentRoute.value.name === "home" ||
-        router.currentRoute.value.path === "/";
-
-      if (isHomePage) {
-        // Switch to AI tab on home page and send prompt
-        window.dispatchEvent(
-          new CustomEvent("o2:home-switch-tab", { detail: { tab: "ai" } }),
-        );
-        // Small delay to ensure tab switch and component mount
-        nextTick(() => {
-          sendToAiChat(prompt, false);
-        });
-      } else {
-        // Open AI sidebar and send prompt
-        sendToAiChat(prompt, false);
-      }
-    };
-
     onMounted(async () => {
       window.addEventListener("keydown", handleCommandPaletteShortcut);
-      window.addEventListener("o2:ai-prompt", handleAiPrompt as EventListener);
       filterMenus();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
@@ -611,7 +587,6 @@ export default defineComponent({
 
     onBeforeUnmount(() => {
       window.removeEventListener("keydown", handleCommandPaletteShortcut);
-      window.removeEventListener("o2:ai-prompt", handleAiPrompt as EventListener);
     });
 
     const updateIncidentsMenu = () => {

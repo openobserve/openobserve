@@ -21,12 +21,11 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-vi.mock("@/composables/useAutoNavigation", () => ({
-  default: () => ({ navigate: vi.fn() }),
-}));
-
+// vi.mock is hoisted — must be at the top before any component imports.
+// The factory uses require() for vue because top-level imports are not yet
+// evaluated when hoisted factories run.
 vi.mock("@/composables/useCommandPalette", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
+  const actual = await importOriginal() as any;
   return {
     ...actual,
     default: vi.fn(() => {
@@ -35,13 +34,8 @@ vi.mock("@/composables/useCommandPalette", async (importOriginal) => {
         query: ref(""),
         activeIndex: ref(0),
         visibleItems: ref([]),
-        recentPages: ref([]),
-        groupedResults: computed(() => []),
         hasResults: computed(() => false),
-        isDefaultView: computed(() => true),
         isOpen: computed(() => false),
-        isSearching: ref(false),
-        activeSlashCommand: computed(() => null),
         close: vi.fn(),
         moveUp: vi.fn(),
         moveDown: vi.fn(),
@@ -56,9 +50,6 @@ vi.mock("@/composables/useCommandPalette", async (importOriginal) => {
 import GlobalCommandPalette from "@/components/GlobalCommandPalette.vue";
 import useCommandPalette, {
   scoreItem,
-  detectSlashCommand,
-  extractAiPrompt,
-  SLASH_COMMANDS,
   type PaletteItem,
 } from "@/composables/useCommandPalette";
 
@@ -74,41 +65,22 @@ function makePaletteItem(overrides: Partial<PaletteItem> = {}): PaletteItem {
     icon: "storage",
     section: "Observability",
     keywords: ["log", "search", "stream"],
-    type: "page",
     ...overrides,
   };
 }
-
-const defaultMockReturn = () => ({
-  query: ref(""),
-  activeIndex: ref(0),
-  visibleItems: ref([]),
-  recentPages: ref([]),
-  groupedResults: computed(() => []),
-  hasResults: computed(() => false),
-  isDefaultView: computed(() => true),
-  isOpen: ref(true),
-  isSearching: ref(false),
-  activeSlashCommand: computed(() => null),
-  close: vi.fn(),
-  moveUp: vi.fn(),
-  moveDown: vi.fn(),
-  resetActiveIndex: vi.fn(),
-  navigateTo: vi.fn(),
-  navigateSelected: vi.fn(),
-});
 
 function mountPalette() {
   return mount(GlobalCommandPalette, {
     global: {
       plugins: [store, router],
       stubs: {
+        // q-dialog renders via Quasar teleport (outside wrapper DOM).
+        // Stub it to render the slot inline so wrapper.find() works.
         "q-dialog": {
           props: ["modelValue"],
           template: '<div v-if="modelValue"><slot /></div>',
         },
         "q-icon": true,
-        "q-spinner-dots": true,
       },
     },
   });
@@ -138,7 +110,8 @@ describe("scoreItem", () => {
     expect(scoreItem(item, "metr")).toBe(2);
   });
 
-  it("should return 1 when title includes query but does not start with it", () => {
+  it("should return 1 (not 2) when title includes query but does not start with it", () => {
+    // "dashboard" includes "board" but does not start with "board"
     const item = makePaletteItem({ title: "Dashboard", keywords: [] });
     expect(scoreItem(item, "board")).toBe(1);
   });
@@ -156,6 +129,7 @@ describe("scoreItem", () => {
       title: "Logs",
       keywords: ["log", "stream"],
     });
+    // title.startsWith("log") → +2, keyword "log" includes "log" → +0.5
     expect(scoreItem(item, "log")).toBe(2.5);
   });
 
@@ -164,6 +138,7 @@ describe("scoreItem", () => {
       title: "Dashboard",
       keywords: ["board", "widget"],
     });
+    // title includes "board" (not startsWith) → +1, keyword "board" → +0.5
     expect(scoreItem(item, "board")).toBe(1.5);
   });
 
@@ -189,73 +164,19 @@ describe("scoreItem", () => {
   });
 
   it("should only add keyword bonus once regardless of how many keywords match", () => {
+    // The function breaks after the first keyword hit so bonus is at most 0.5
     const item = makePaletteItem({
       title: "Traces",
       keywords: ["trace", "span", "trace-id"],
     });
+    // title does not start with "trace" — actually it does: "traces".startsWith("trace") → true
+    // So score = 2 (startsWith) + 0.5 (keyword) = 2.5
     const score = scoreItem(item, "trace");
     expect(score).toBe(2.5);
   });
 });
 
-// ─── 2. Slash commands ─────────────────────────────────────────────────────
-
-describe("detectSlashCommand", () => {
-  it("should return null for non-slash queries", () => {
-    expect(detectSlashCommand("logs")).toBeNull();
-  });
-
-  it("should return null for unknown slash commands", () => {
-    expect(detectSlashCommand("/unknown")).toBeNull();
-  });
-
-  it("should detect /ai command", () => {
-    const result = detectSlashCommand("/ai");
-    expect(result).not.toBeNull();
-    expect(result!.pattern).toBe("/ai");
-    expect(result!.label).toBe("AI Assistant");
-  });
-
-  it("should detect /ai followed by a prompt", () => {
-    const result = detectSlashCommand("/ai what are the errors?");
-    expect(result).not.toBeNull();
-    expect(result!.pattern).toBe("/ai");
-  });
-
-  it("should be case-insensitive", () => {
-    const result = detectSlashCommand("/AI help me");
-    expect(result).not.toBeNull();
-    expect(result!.pattern).toBe("/ai");
-  });
-});
-
-describe("extractAiPrompt", () => {
-  it("should extract prompt after /ai", () => {
-    expect(extractAiPrompt("/ai what are errors?")).toBe("what are errors?");
-  });
-
-  it("should return empty string when no prompt follows /ai", () => {
-    expect(extractAiPrompt("/ai")).toBe("");
-  });
-
-  it("should return empty string for non-ai queries", () => {
-    expect(extractAiPrompt("/unknown command")).toBe("");
-  });
-
-  it("should trim whitespace from prompt", () => {
-    expect(extractAiPrompt("/ai   help me   ")).toBe("help me");
-  });
-});
-
-describe("SLASH_COMMANDS", () => {
-  it("should include /ai command", () => {
-    const aiCmd = SLASH_COMMANDS.find((c) => c.pattern === "/ai");
-    expect(aiCmd).toBeDefined();
-    expect(aiCmd!.icon).toBe("psychology");
-  });
-});
-
-// ─── 3. commandPalette Vuex store module ──────────────────────────────────────
+// ─── 2. commandPalette Vuex store module ──────────────────────────────────────
 
 import commandPaletteModule from "@/stores/commandPalette";
 
@@ -281,6 +202,7 @@ describe("commandPalette Vuex store module", () => {
 
   it("should set isOpen to false when close mutation is committed", () => {
     const localStore = createLocalStore();
+    // Open first, then close
     localStore.commit("commandPalette/open");
     localStore.commit("commandPalette/close");
     expect(localStore.state.commandPalette.isOpen).toBe(false);
@@ -307,7 +229,7 @@ describe("commandPalette Vuex store module", () => {
   });
 });
 
-// ─── 4. GlobalCommandPalette.vue component tests ──────────────────────────────
+// ─── 3. GlobalCommandPalette.vue component tests ──────────────────────────────
 
 describe("GlobalCommandPalette.vue", () => {
   let wrapper: VueWrapper;
@@ -315,14 +237,26 @@ describe("GlobalCommandPalette.vue", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    // Reset the store's commandPalette state back to closed between tests
     store.commit("commandPalette/close");
   });
 
   describe("when palette is closed (isOpen = false)", () => {
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
-        ...defaultMockReturn(),
+        query: ref(""),
+        activeIndex: ref(0),
+        visibleItems: ref([]),
+        recentPages: ref([]),
+        hasResults: computed(() => false),
+        isDefaultView: computed(() => true),
         isOpen: ref(false),
+        close: vi.fn(),
+        moveUp: vi.fn(),
+        moveDown: vi.fn(),
+        resetActiveIndex: vi.fn(),
+        navigateTo: vi.fn(),
+        navigateSelected: vi.fn(),
       } as any);
       wrapper = mountPalette();
     });
@@ -349,8 +283,19 @@ describe("GlobalCommandPalette.vue", () => {
   describe("when palette is open (isOpen = true)", () => {
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
-        ...defaultMockReturn(),
+        query: ref(""),
+        activeIndex: ref(0),
+        visibleItems: ref([]),
+        recentPages: ref([]),
+        hasResults: computed(() => false),
+        isDefaultView: computed(() => true),
         isOpen: ref(true),
+        close: vi.fn(),
+        moveUp: vi.fn(),
+        moveDown: vi.fn(),
+        resetActiveIndex: vi.fn(),
+        navigateTo: vi.fn(),
+        navigateSelected: vi.fn(),
       } as any);
       wrapper = mountPalette();
     });
@@ -387,13 +332,19 @@ describe("GlobalCommandPalette.vue", () => {
 
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
-        ...defaultMockReturn(),
-        isOpen: ref(true),
         query: ref("log"),
+        activeIndex: ref(0),
         visibleItems: ref(mockItems),
-        groupedResults: computed(() => [{ label: "Pages", items: mockItems }]),
+        recentPages: ref([]),
         hasResults: computed(() => true),
         isDefaultView: computed(() => false),
+        isOpen: ref(true),
+        close: vi.fn(),
+        moveUp: vi.fn(),
+        moveDown: vi.fn(),
+        resetActiveIndex: vi.fn(),
+        navigateTo: vi.fn(),
+        navigateSelected: vi.fn(),
       } as any);
       wrapper = mountPalette();
     });
@@ -424,10 +375,19 @@ describe("GlobalCommandPalette.vue", () => {
   describe("when palette is open with no matching results and a query", () => {
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
-        ...defaultMockReturn(),
-        isOpen: ref(true),
         query: ref("zzznomatch"),
+        activeIndex: ref(0),
+        visibleItems: ref([]),
+        recentPages: ref([]),
+        hasResults: computed(() => false),
         isDefaultView: computed(() => false),
+        isOpen: ref(true),
+        close: vi.fn(),
+        moveUp: vi.fn(),
+        moveDown: vi.fn(),
+        resetActiveIndex: vi.fn(),
+        navigateTo: vi.fn(),
+        navigateSelected: vi.fn(),
       } as any);
       wrapper = mountPalette();
     });
@@ -454,103 +414,6 @@ describe("GlobalCommandPalette.vue", () => {
       const emptyEl = wrapper.find('[data-test="command-palette-empty"]');
       expect(emptyEl.exists()).toBe(true);
       expect(emptyEl.text()).toContain("zzznomatch");
-    });
-  });
-
-  describe("when searching entities (loading state)", () => {
-    beforeEach(() => {
-      vi.mocked(useCommandPalette).mockReturnValue({
-        ...defaultMockReturn(),
-        isOpen: ref(true),
-        query: ref("stream"),
-        isSearching: ref(true),
-        hasResults: computed(() => false),
-        isDefaultView: computed(() => false),
-      } as any);
-      wrapper = mountPalette();
-    });
-
-    it("should show loading state when searching", async () => {
-      await flushPromises();
-      await nextTick();
-      expect(
-        wrapper.find('[data-test="command-palette-loading"]').exists(),
-      ).toBe(true);
-    });
-  });
-
-  describe("when palette is open with create items", () => {
-    const createItems: PaletteItem[] = [
-      makePaletteItem({
-        name: "addAlert",
-        title: "New Alert",
-        path: "/default/alerts/add",
-        icon: "notifications",
-        section: "Create",
-        keywords: ["new alert", "create alert"],
-        type: "create",
-      }),
-      makePaletteItem({
-        name: "createPipeline",
-        title: "New Pipeline",
-        path: "/default/pipeline/pipelines/add",
-        icon: "account_tree",
-        section: "Create",
-        keywords: ["new pipeline", "add pipeline"],
-        type: "create",
-      }),
-    ];
-
-    beforeEach(() => {
-      vi.mocked(useCommandPalette).mockReturnValue({
-        ...defaultMockReturn(),
-        isOpen: ref(true),
-        visibleItems: ref(createItems),
-        groupedResults: computed(() => [{ label: "Create", items: createItems }]),
-        hasResults: computed(() => true),
-      } as any);
-      wrapper = mountPalette();
-    });
-
-    it("should render create items in results", async () => {
-      await flushPromises();
-      await nextTick();
-      const items = wrapper.findAll('[data-test="command-palette-result-item"]');
-      expect(items.length).toBe(createItems.length);
-    });
-
-    it("should show Create section label", async () => {
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.text()).toContain("Create");
-    });
-  });
-
-  describe("with slash command active", () => {
-    beforeEach(() => {
-      vi.mocked(useCommandPalette).mockReturnValue({
-        ...defaultMockReturn(),
-        isOpen: ref(true),
-        query: ref("/ai"),
-        activeSlashCommand: computed(() => ({
-          pattern: "/ai",
-          label: "AI Assistant",
-          description: "Ask the AI assistant anything",
-          icon: "psychology",
-          section: "AI Actions",
-        })),
-        hasResults: computed(() => false),
-        isDefaultView: computed(() => false),
-      } as any);
-      wrapper = mountPalette();
-    });
-
-    it("should show slash command hint when active", async () => {
-      await flushPromises();
-      await nextTick();
-      expect(
-        wrapper.find('[data-test="command-palette-slash-hint"]').exists(),
-      ).toBe(true);
     });
   });
 });

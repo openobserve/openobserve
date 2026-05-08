@@ -828,7 +828,7 @@ export default defineComponent({
     };
 
     // Detect macOS for correct shortcut label
-     
+    // eslint-disable-next-line no-undef
     const isMac = computed(() => /mac/i.test(navigator.platform));
 
     // Open command palette
