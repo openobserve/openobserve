@@ -70,6 +70,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t(`ingestion.generateRUMTokenLabel`)"
             @click="generateRUMToken"
           />
+          <q-select
+            v-if="!isRUMPage"
+            v-model="selectedTokenName"
+            :options="tokenOptions"
+            :dark="store.state.theme === 'dark'"
+            outlined
+            dense
+            emit-value
+            map-options
+            class="tw:max-w-xs q-ml-md q-mb-xs right float-right"
+            style="min-width: 220px"
+            @update:model-value="onTokenSelected"
+          >
+            <template #prepend>
+              <q-icon name="vpn_key" />
+            </template>
+          </q-select>
           <q-input
             v-model="globalSearchQuery"
             :placeholder="t('common.search')"
@@ -288,6 +305,28 @@ export default defineComponent({
     );
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
+
+    // Token selector — pick which ingestion token the curl examples use
+    const selectedTokenName = ref("default");
+    const tokenOptions = computed(() => {
+      const tokens = store.state.organizationData.orgTokens || [];
+      const enabled = tokens.filter((t: any) => t.enabled);
+      if (enabled.length === 0) {
+        return [{ label: "default", value: "default" }];
+      }
+      return enabled.map((t: any) => ({
+        label: t.name,
+        value: t.name,
+      }));
+    });
+    const onTokenSelected = (name: string) => {
+      const tokens = store.state.organizationData.orgTokens || [];
+      const token = tokens.find((t: any) => t.name === name);
+      if (token?.token) {
+        store.dispatch("setOrganizationPasscode", token.token);
+      }
+      // Fallback: if tokens haven't loaded yet, keep passcode from getOrganizationPasscode()
+    };
 
     const activeTab = ref("recommended");
     const metricRoutes = [
@@ -698,6 +737,9 @@ export default defineComponent({
       generateRUMToken,
       updateRUMToken,
       globalSearchQuery,
+      selectedTokenName,
+      tokenOptions,
+      onTokenSelected,
     };
   },
 });

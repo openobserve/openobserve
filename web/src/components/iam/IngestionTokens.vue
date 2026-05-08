@@ -24,19 +24,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="position: sticky; top: 0; z-index: 1000;"
         >
           <div
-            class="q-table__title full-width tw:font-[600]"
+            class="q-table__title full-width tw:font-[600] tw:flex tw:items-center"
             data-test="ingestion-tokens-title-text"
           >
             {{ t("ingestion.tokenManagementTitle") }}
+            <q-icon
+              name="info"
+              size="18px"
+              class="q-ml-sm cursor-pointer"
+              color="grey-6"
+            >
+              <q-tooltip max-width="400px">
+                {{ t("ingestion.orgLevelExplanation") }}
+              </q-tooltip>
+            </q-icon>
           </div>
           <div class="full-width tw:flex tw:justify-end">
             <q-btn
-              v-if="isAdmin"
               class="q-ml-sm o2-primary-button tw:h-[36px]"
               flat
               no-caps
-              icon="add"
               :label="t('ingestion.createTokenBtn')"
+              data-test="add-ingestion-token"
               @click="showCreateForm = true"
             />
           </div>
@@ -49,16 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="card-container"
             style="height: calc(100vh - var(--navbar-height) - 92px)"
           >
-            <!-- Info banner -->
-            <q-banner
-              class="bg-info text-white rounded-borders"
-            >
-              <template #avatar>
-                <q-icon name="info" color="white" />
-              </template>
-              {{ t("ingestion.orgLevelExplanation") }}
-            </q-banner>
-
             <q-table
               ref="qTable"
               :rows="tokens"
@@ -69,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
               style="overflow-y: auto;"
               :style="tokens.length > 0
-                ? 'height: calc(100vh - var(--navbar-height) - 156px); overflow-y: auto;'
+                ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;'
                 : ''"
             >
               <template #no-data>
@@ -90,15 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #body-cell-name="props">
                 <q-td :props="props">
-                  <div class="row items-center q-gutter-xs">
-                    <span class="text-weight-medium">{{ props.row.name }}</span>
-                    <q-badge
-                      v-if="props.row.is_default"
-                      color="primary"
-                      :label="t('ingestion.defaultTokenBadge')"
-                      class="text-caption"
-                    />
-                  </div>
+                  <span class="text-weight-medium">{{ props.row.name }}</span>
                 </q-td>
               </template>
 
@@ -139,7 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="props.row.enabled"
                     :label="t('common.disable')"
                     class="o2-primary-button tw:h-[28px]"
-                    flat
                     no-caps
                     size="sm"
                     :disable="loading"
@@ -149,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     :label="t('common.enable')"
                     class="o2-primary-button tw:h-[28px]"
-                    flat
                     no-caps
                     size="sm"
                     :disable="loading"
@@ -241,10 +230,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="font-size: 0.9rem"
             >{{ revealedToken?.token }}</code>
           </div>
-          <div class="q-mt-sm text-caption text-warning">
-            <q-icon name="info" size="16px" class="q-mr-xs" />
-            {{ t("ingestion.copyTokenWarning") }}
-          </div>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn
@@ -267,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, computed, defineComponent, onBeforeMount } from "vue";
+import { ref, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, copyToClipboard, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -316,7 +301,6 @@ export default defineComponent({
         label: t("serviceAccounts.token"),
         align: "left",
         sortable: false,
-        style: "width: 300px;",
       },
       {
         name: "created_by",
@@ -336,11 +320,6 @@ export default defineComponent({
         style: "width: 120px;",
       },
     ];
-
-    const isAdmin = computed(() => {
-      const role = store.state.userInfo?.role;
-      return role === "admin" || role === "root";
-    });
 
     const fetchTokens = async () => {
       loading.value = true;
@@ -459,7 +438,6 @@ export default defineComponent({
       newTokenName,
       newTokenDescription,
       revealedToken,
-      isAdmin,
       fetchTokens,
       createToken,
       toggleEnabled,
