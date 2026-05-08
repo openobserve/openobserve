@@ -1,5 +1,11 @@
 <template>
-  <ODialog v-model:open="dialogVisible" persistent size="md" :show-close="false">
+  <ODialog v-model:open="dialogVisible" persistent size="md" :show-close="false"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
+    :primary-button-disabled="!form.name || !form.url"
+    @click:secondary="onCancel"
+    @click:primary="onSubmit"
+  >
     <template #header>
       <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
         <div class="text-h6">
@@ -111,27 +117,6 @@
             </div>
           </div>
         </q-form>
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-          data-test="cross-link-cancel-btn"
-        >
-          {{ t('common.cancel') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="!form.name || !form.url"
-          @click="onSubmit"
-          data-test="cross-link-save-btn"
-        >
-          {{ isEditing ? t('crossLinks.update') : t('crossLinks.add') }}
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

@@ -17,7 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <ODialog v-model:open="open" size="sm" :title="title">
+  <ODialog v-model:open="open" size="sm" :title="title"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    primary-button-label="Move"
+    :primary-button-disabled="selectedMoveTabId === null"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
     <div>
       <p class="text-body2">{{ message }}</p>
       <div class="tw:flex tw:items-center tw:gap-2">
@@ -72,27 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODrawer>
       </div>
     </div>
-    <template #footer>
-      <div class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-          data-test="cancel-button"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="onConfirm"
-          data-test="confirm-button"
-          :disabled="selectedMoveTabId === null"
-        >
-          Move
-        </OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 

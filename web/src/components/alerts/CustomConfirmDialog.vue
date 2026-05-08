@@ -21,37 +21,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="title"
     persistent
     :show-close="false"
+    secondary-button-label="Cancel"
+    primary-button-label="Clear & Continue"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
   >
     <div data-test="custom-confirm-card">
       <p data-test="dialog-message" class="tw:text-sm tw:leading-relaxed">{{ message }}</p>
     </div>
-    <template #footer>
-      <div data-test="dialog-actions" class="tw:flex tw:justify-end tw:gap-2">
-        <OButton
-          data-test="custom-cancel-button"
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-        >Cancel</OButton>
-        <OButton
-          data-test="custom-confirm-button"
-          variant="primary"
-          size="sm-action"
-          @click="onConfirm"
-        >Clear &amp; Continue</OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
-import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "CustomConfirmDialog",
-  components: { OButton, ODialog },
+  components: { ODialog },
   props: {
     modelValue: {
       type: Boolean,

@@ -18,6 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="show"
     :width="47"
+    secondary-button-label="Cancel"
+    primary-button-label="Create Backfill Job"
+    :primary-button-loading="loading"
+    @click:secondary="onCancel"
+    @click:primary="onSubmit"
     data-test="create-backfill-job-dialog"
   >
     <template #header>
@@ -213,31 +218,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <template #footer>
-          <div class="tw:flex tw:justify-end tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="onCancel"
-              data-test="cancel-btn"
-            >Cancel</OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              :loading="loading"
-              :disabled="loading"
-              @click="onSubmit"
-              data-test="create-btn"
-            >Create Backfill Job</OButton>
-          </div>
-        </template>
-    </ODrawer>
+        </ODrawer>
 
   <!-- Confirmation Dialog for Delete Before Backfill -->
-  <ODialog v-model:open="showDeleteConfirmation" persistent size="sm">
-    <template #header>
-      <div class="text-h6">Confirm Data Deletion</div>
-    </template>
+  <ODialog v-model:open="showDeleteConfirmation" persistent size="sm"
+    title="Confirm Data Deletion"
+    secondary-button-label="Cancel"
+    primary-button-label="Yes, Delete and Backfill"
+    primary-button-variant="destructive"
+    @click:secondary="showDeleteConfirmation = false"
+    @click:primary="confirmDelete"
+  >
     <p class="tw:mb-4">
       You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range.
     </p>
@@ -245,23 +236,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       This action CANNOT be undone or cancelled once the job is created.
     </p>
     <p class="tw:mt-4">Are you sure you want to proceed?</p>
-    <template #footer>
-      <div class="flex justify-end tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="showDeleteConfirmation = false"
-          data-test="delete-confirm-cancel-btn"
-          autofocus
-        >Cancel</OButton>
-        <OButton
-          variant="destructive"
-          size="sm-action"
-          @click="confirmDelete"
-          data-test="delete-confirm-yes-btn"
-        >Yes, Delete and Backfill</OButton>
-      </div>
-    </template>
   </ODialog>
 </template>
 
