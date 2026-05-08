@@ -127,9 +127,23 @@ export interface DrawerSlots {
 
   /**
    * Header section at the top of the drawer, above the scrollable body.
-   * When provided, the `title` prop is ignored.
+   * When provided, the `title` prop is ignored and sub-slots are also ignored.
    */
   header?: () => unknown;
+
+  /**
+   * Optional left sub-slot in the header row.
+   * Rendered between the title/subtitle block and `#header-right`.
+   * Ignored when the `#header` full-override slot is provided.
+   */
+  "header-left"?: () => unknown;
+
+  /**
+   * Optional right sub-slot in the header row.
+   * Rendered between `#header-left` (or the title block) and the close button.
+   * Ignored when the `#header` full-override slot is provided.
+   */
+  "header-right"?: () => unknown;
 
   /**
    * Body / content — the main scrollable area.

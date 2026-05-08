@@ -15,10 +15,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="scheduled-dashboards"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  <ODrawer
+    :open="open"
+    :width="60"
+    :title="t('dashboard.scheduledDashboards')"
+    @update:open="emit('update:open', $event)"
   >
+    <template #header-right>
+      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+        <div class="app-tabs-container tw:h-[36px]">
+          <AppTabs
+            class="tabs-selection-container"
+            :tabs="scheduledReportTypeTabs"
+            v-model:active-tab="scheduledActiveTab"
+          />
+        </div>
+
+        <q-input
+          data-test="alert-list-search-input"
+          v-model="scheduledFilterQuery"
+          borderless
+          dense
+          class="no-border tw:border tw:border-[var(--q-color-button-border,#d1d5db)] tw:rounded-md tw:px-2 tw:h-9"
+          :placeholder="t('reports.search')"
+          hide-bottom-space
+        >
+          <template #prepend>
+            <q-icon name="search" class="cursor-pointer" />
+          </template>
+        </q-input>
+
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="alert-list-add-alert-btn"
+          @click="createScheduledReport"
+          >{{ t("dashboard.newReport") }}</OButton
+        >
+      </div>
+    </template>
+
+    <div
+      class="scheduled-dashboards"
+      :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+    >
     <q-table
       data-test="scheduled-dashboard-table"
       ref="scheduledDashboardTableRef"
@@ -26,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       row-key="id"
       :pagination="pagination"
-      :filter="filterQuery"
+      :filter="scheduledFilterQuery"
       :filter-method="filterData"
       style="width: 100%"
       class="q-px-md"
@@ -64,21 +104,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </q-table>
-  </div>
+    </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
 import { QTable } from "quasar";
-import { onMounted, ref, watch } from "vue";
+import { onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
+import AppTabs from "@/components/common/AppTabs.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Database, CalendarClock } from "lucide-vue-next";
 
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   reports: {
     type: Array,
     required: true,
@@ -103,17 +153,34 @@ const props = defineProps({
     type: Array,
     required: true,
   },
-  filterQuery: {
-    type: String,
-    required: true,
-  },
-  activeTab: {
-    type: String,
-    required: true,
-  },
 });
 
+const emit = defineEmits<{
+  "update:open": [value: boolean];
+}>();
+
 const { t } = useI18n();
+
+const router = useRouter();
+
+const scheduledFilterQuery = ref("");
+const scheduledActiveTab = ref("cached");
+const scheduledReportTypeTabs = reactive([
+  { label: t("reports.cached"), value: "cached", icon: Database },
+  { label: t("reports.scheduled"), value: "shared", icon: CalendarClock },
+]);
+
+const createScheduledReport = () => {
+  router.push({
+    name: "createReport",
+    query: {
+      folderId: props.folderId,
+      dashboardId: props.dashboardId,
+      tabId: props.tabId,
+      type: "cached",
+    },
+  });
+};
 
 const scheduledReports = ref<ScheduledDashboardReport[]>(
   props.reports as ScheduledDashboardReport[],
@@ -136,7 +203,7 @@ watch(
 );
 
 watch(
-  () => props.activeTab,
+  scheduledActiveTab,
   () => {
     filterReports();
   },
@@ -178,7 +245,7 @@ const getTabName = (tabId: string) => {
 const filterReports = () => {
   // filter reports based on the selected tab
   // If reports are cached, show only cached reports
-  if (props.activeTab === "cached") {
+  if (scheduledActiveTab.value === "cached") {
     formattedReports.value = (
       scheduledReports.value as ScheduledDashboardReport[]
     ).filter((report) => report.isCached);
@@ -270,8 +337,6 @@ const changePagination = (val: { label: string; value: any }) => {
   pagination.value.rowsPerPage = val.value;
   scheduledDashboardTableRef.value?.setPagination(pagination.value);
 };
-
-const filterQuery = ref("");
 
 const filterData = (rows: any, terms: string) => {
   return rows.filter((row: any) => {
