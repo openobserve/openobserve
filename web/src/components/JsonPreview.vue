@@ -33,10 +33,10 @@
             data-test="json-preview-field-dropdown-btn"
             size="icon-xs"
             variant="ghost"
-            class="q-ml-sm"
+            class="q-ml-sm log-json-field-dropdown-btn"
             aria-label="Add icon"
           >
-            <q-icon :name="dropdownOpenMap[key] ? 'expand_less' : 'expand_more'" size="14px" />
+            <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
           </OButton>
         </template>
         <div class="logs-table-list tw:min-w-[180px]">

@@ -34,7 +34,7 @@ defineSlots<ToggleGroupSlots>();
     ]"
     @update:model-value="
       (v) => {
-        if (type === 'single' && !v) return;
+        if (type === 'single' && (v === null || v === undefined || v === '')) return;
         emit('update:modelValue', v);
       }
     "

@@ -407,4 +407,18 @@ describe("PatternList", () => {
       expect(text).toContain("Only 50 logs were analyzed");
     });
   });
+
+  describe("WildcardValuePopover integration", () => {
+    it("should render WildcardValuePopover component", () => {
+      expect(wrapper.findComponent({ name: "WildcardValuePopover" }).exists()).toBe(true);
+    });
+
+    it("should forward filter-value event from WildcardValuePopover", async () => {
+      const popover = wrapper.findComponent({ name: "WildcardValuePopover" });
+      expect(popover.exists()).toBe(true);
+      await popover.vm.$emit("filter-value", "test-value", "exclude");
+      expect(wrapper.emitted("filter-value")).toBeTruthy();
+      expect(wrapper.emitted("filter-value")![0]).toEqual(["test-value", "exclude"]);
+    });
+  });
 });

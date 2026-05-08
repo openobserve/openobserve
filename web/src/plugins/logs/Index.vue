@@ -2731,7 +2731,7 @@ export default defineComponent({
           searchObj?.data?.stream?.selectedStream?.length === 0
         ) {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2740,7 +2740,7 @@ export default defineComponent({
         // check if query is empty
         if (logsPageQuery === "") {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2753,7 +2753,7 @@ export default defineComponent({
           logsPageQuery.length > 1
         ) {
           showErrorNotification(
-            "Multiple SQL queries are not allowed to visualize",
+            t("search.multipleSqlNotAllowed"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2823,7 +2823,7 @@ export default defineComponent({
 
         if (!finalQuery) {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2836,7 +2836,7 @@ export default defineComponent({
         const allFieldsHaveAlias = allSelectionFieldsHaveAlias(finalQuery);
         if (!allFieldsHaveAlias) {
           showAliasErrorForVisualization(
-            "Fields using aggregation functions must have aliases to visualize.",
+            t("search.aggregationFieldsNeedAlias"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;

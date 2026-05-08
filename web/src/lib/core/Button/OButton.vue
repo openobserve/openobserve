@@ -217,6 +217,9 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // Compact labeled size for inline field chips (axis items) — ~28px, matches Quasar dense button
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "tw:h-6 tw:ps-2 tw:pe-1.5 tw:text-xs tw:gap-1 tw:rounded tw:leading-none",
+  // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
+  // (needed because Quasar sets html font-size to 14px, making text-xs = 10.5px instead of 12px)
+  "chip-12": "tw:h-6 tw:ps-2 tw:pe-1.5 tw:!text-[12px] tw:gap-1 tw:rounded tw:leading-none",
   "sm-action":
     "tw:h-9 tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-md",
   md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",

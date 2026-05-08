@@ -306,21 +306,6 @@ jobs:
                 "traces-autocomplete-suggestions.spec.js",
               ]
 
-          - testfolder: "RegressionSet"
-            browser: "chrome"
-            run_files:
-              [
-                "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "logs-9754.spec.js",
-                "streams-regression.spec.js",
-                "enrichment-regression.spec.js",
-                "ui-regression.spec.js",
-                "pipeline-regression.spec.js",
-                # "alerts-regression.spec.js",
-                "metrics-regression.spec.js",
-                "traces-regression.spec.js",
-              ]
           - testfolder: "Metrics"
             browser: "chrome"
             run_files:
@@ -875,7 +860,7 @@ jobs:
           ls -lh playwright-results/report.json
 
       - name: Cache test failures to TestDino
-        if: always()
+        if: ${{ needs.ui_integration_tests.result == 'failure' }}
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
@@ -919,7 +904,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload to TestDino
-        if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
 

@@ -100,8 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   variant="primary"
-                  size="chip"
-                  class="tw:!text-[12px]"
+                  size="chip-12"
                   :data-test="`dashboard-x-item-${itemX?.alias}`"
                 >
                   {{ xLabel[index] }}
@@ -282,8 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   variant="primary"
-                  size="chip"
-                  class="tw:!text-[12px]"
+                  size="chip-12"
                   :data-test="`dashboard-b-item-${itemB?.alias}`"
                 >
                   {{ bLabel[index] }}
@@ -429,8 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="primary"
-              size="chip"
-              class="tw:!text-[12px]"
+              size="chip-12"
               :data-test="`dashboard-y-item-${itemY?.alias}`"
             >
               {{ yLabel[index] }}
@@ -580,8 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="primary"
-                size="chip"
-                class="tw:!text-[12px]"
+                size="chip-12"
                 :data-test="`dashboard-z-item-${itemZ?.alias}`"
               >
                 {{ zLabel[index] }}

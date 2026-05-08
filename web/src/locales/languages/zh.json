@@ -390,7 +390,8 @@
     "autoRunEnabled": "自动运行已启用",
     "selectStreamFirst": "先选择一个直播",
     "traces": "痕迹",
-    "switchToLogs": "点击切换回日志"
+    "switchToLogs": "点击切换回日志",
+    "patternNoValuesAvailable": "没有可用值"
   },
   "menu": {
     "home": "主页",
@@ -3319,7 +3320,9 @@
     "noMetricsDescription": "在所选时间范围内未找到此关联的指标。",
     "errorRetrievingTraces": "检索跟踪时出错。",
     "serviceGroupProtected": "无法删除服务组。您只能修改映射的字段。",
-    "noDataFound": "未找到任何数据"
+    "noDataFound": "未找到任何数据",
+    "isWorkloadType": "服务标识符",
+    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

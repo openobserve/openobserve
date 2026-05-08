@@ -42,6 +42,7 @@ export interface FieldAlias {
   display: string;
   fields: string[];
   group?: string;
+  is_workload_type?: boolean;
 }
 
 export interface StreamInfo {
