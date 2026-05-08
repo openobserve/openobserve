@@ -173,6 +173,10 @@ describe("UsageTab", () => {
     vi.mocked(orgService.get_organization_summary).mockResolvedValue({
       data: mockSummaryData,
     });
+    // Prevent requestAnimationFrame from firing callbacks so animated
+    // counters stay at 0 and the || fallback uses summary values.
+    window.requestAnimationFrame = vi.fn(() => 1) as any;
+    window.cancelAnimationFrame = vi.fn() as any;
   });
 
   afterEach(() => {
@@ -249,9 +253,10 @@ describe("UsageTab", () => {
 
       const panel = wrapper.find(".home-no-data-panel");
       expect(panel.exists()).toBe(true);
-      // i18n keys are rendered as-is with the stub
-      expect(panel.text()).toContain("home.noData");
-      expect(panel.text()).toContain("home.ingestionMsg");
+      expect(panel.text()).toContain("No Data Ingested");
+      expect(panel.text()).toContain(
+        "It appears you have not ingested any data",
+      );
     });
   });
 

@@ -205,6 +205,7 @@ export default defineComponent({
       activeHomeTab,
       tabOrder,
       draggingTab,
+      dragOverTab,
       onTabDragStart,
       onTabDragEnter,
       onTabDragEnd,
