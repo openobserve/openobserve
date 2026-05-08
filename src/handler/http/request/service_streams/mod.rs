@@ -368,7 +368,7 @@ pub async fn save_identity_config(
         use std::collections::HashSet;
         // Defaults from bundled JSON
         let mut known_ids: HashSet<String> =
-            o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file()
+            o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()
                 .into_iter()
                 .map(|g| g.id)
                 .collect();
