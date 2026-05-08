@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @sort-change="handleSortChange"
                     @click:data-row="
                       (row: any) =>
-                        navigateToTraces({ operationName: row._name })
+                        navigateToTraces({ operationName: row.operation })
                     "
                   >
                     <template #cell-errors="{ item }">
@@ -353,16 +353,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="service-graph-side-panel-view-traces-btn"
                         @click.stop="
                           navigateToTraces({
-                            operationName: row._name,
+                            operationName: row.operation,
                             errorsOnly: column.id === 'errors',
-                            minDurationMicros:
-                              column.id === 'p99'
-                                ? row._p99
-                                : column.id === 'p95'
-                                  ? row._p95
-                                  : column.id === 'p75'
-                                    ? row._p75
-                                    : undefined,
+                            minDurationMicros: row[column.id]
                           })
                         "
                       >
@@ -432,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         navigateToTraces({
                           resourceFilter: {
                             field: cfg.groupField,
-                            value: row._name,
+                            value: row[cfg.colId],
                           },
                         })
                     "
@@ -448,17 +441,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           navigateToTraces({
                             resourceFilter: {
                               field: cfg.groupField,
-                              value: row._name,
+                              value: row[cfg.colId],
                             },
                             errorsOnly: column.id === 'errors',
-                            minDurationMicros:
-                              column.id === 'p99'
-                                ? row._p99
-                                : column.id === 'p95'
-                                  ? row._p95
-                                  : column.id === 'p75'
-                                    ? row._p75
-                                    : undefined,
+                            minDurationMicros: row[cfg.colId]
                           })
                         "
                       >
