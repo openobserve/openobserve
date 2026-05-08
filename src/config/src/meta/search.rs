@@ -616,8 +616,11 @@ pub struct SearchPartitionResponse {
     pub is_histogram_eligible: bool,
     #[serde(default)]
     pub is_non_ts_order_by: bool,
+    /// Primary ORDER BY column for non-ts queries; only valid when `is_non_ts_order_by` is true.
+    /// Only the first ORDER BY column is stored — ties from secondary columns are not preserved.
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub order_by_col: Option<String>,
+    pub non_ts_order_by_col: Option<String>,
+    /// Sort direction for `non_ts_order_by_col`; true = DESC, false = ASC.
     #[serde(default)]
     pub order_by_desc: bool,
 }
@@ -2938,7 +2941,7 @@ mod tests {
             streaming_id: Some("stream123".to_string()),
             is_histogram_eligible: false,
             is_non_ts_order_by: false,
-            order_by_col: None,
+            non_ts_order_by_col: None,
             order_by_desc: true,
         };
 
