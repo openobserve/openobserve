@@ -445,8 +445,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </div>
 
-  </div>
-
   <ODrawer
     v-model:open="showJsonEditorDialog"
     size="lg"
@@ -462,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :isEditing="beingUpdated"
     />
   </ODrawer>
-</div>
+  </div>
 </template>
 
 <script lang="ts">
