@@ -2238,6 +2238,8 @@
     "importedFromAnomalyPattern": "비정상적인 로그 패턴으로 미리 채워진 경고 — 긴급 설정 검토",
     "additional_settings": "추가 설정",
     "alertNamePlaceholder": "알림 이름",
+    "nameRequired": "알림 이름은 필수입니다.",
+    "nameNoSpecialChars": "알림 이름에 ':', '#', '?', '&', '%', 따옴표 또는 공백을 사용할 수 없습니다. 대신 밑줄 (_)을 사용하세요.",
     "anomalyNamePlaceholder": "예외 항목 이름",
     "folder": "폴더",
     "selectStreamTypeFirst": "먼저 스트림 유형을 선택합니다.",

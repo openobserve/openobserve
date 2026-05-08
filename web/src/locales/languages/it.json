@@ -2238,6 +2238,8 @@
     "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza",
     "additional_settings": "Impostazioni aggiuntive",
     "alertNamePlaceholder": "Nome dell'avviso",
+    "nameRequired": "Il nome dell'avviso è obbligatorio.",
+    "nameNoSpecialChars": "Il nome dell'avviso non può contenere ':', '#', '?', '&', '%', virgolette o spazi. Usare invece i trattini bassi (_).",
     "anomalyNamePlaceholder": "Nome dell'anomalia",
     "folder": "Cartella",
     "selectStreamTypeFirst": "Seleziona prima un tipo di stream",
