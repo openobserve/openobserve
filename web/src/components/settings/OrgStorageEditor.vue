@@ -268,14 +268,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="!isCloud"
                   data-test="storage-settings-server-url-input"
                   v-model="formData.server_url"
-                  label="Server URL *"
+                  label="Server URL"
                   class="no-border showLabelOnTop"
                   borderless
                   dense
                   flat
                   stack-label
                   :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.serverURLRequired')]"
                 />
               </template>
 
