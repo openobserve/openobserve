@@ -530,9 +530,11 @@ mod tests {
 
     use super::{super::db::sourcemaps::*, *};
 
+    const ORG_ID: &str = "default";
+
     async fn upload_zip(svc: &str, env: &str, version: &str) {
         delete_group(
-            "default",
+            ORG_ID,
             Some(svc.into()),
             Some(env.into()),
             Some(version.into()),
@@ -541,7 +543,7 @@ mod tests {
         .unwrap();
         let f = std::fs::read("tests/sourcemaps.zip").unwrap();
         process_zip(
-            "default",
+            ORG_ID,
             Some(svc.into()),
             Some(env.into()),
             Some(version.into()),
@@ -554,11 +556,14 @@ mod tests {
     // tests extraction and processing of zip works fine
     #[tokio::test]
     async fn test_zip_processing() {
-        upload_zip("svc1", "env1", "v1").await;
+        upload_zip("svc_zip_processing", "env_zip_processing", "v1").await;
     }
 
     #[tokio::test]
     async fn test_list_files() {
+        let svc = "svc_list_files";
+        let env = "env_list_files";
+        let version = "v1";
         let expected = HashSet::from_iter([
             "AboutView-RC3okFHd.js.map".to_string(),
             "index-BO6PqLMi.js.map".to_string(),
@@ -566,12 +571,12 @@ mod tests {
             "startRecording-DDLxttnr.js.map".to_string(),
         ]);
 
-        upload_zip("svc1", "env1", "v1").await;
+        upload_zip(svc, env, version).await;
         let res = list_files(
-            "default",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            ORG_ID,
+            Some(svc.into()),
+            Some(env.into()),
+            Some(version.into()),
         )
         .await
         .unwrap();
@@ -584,15 +589,15 @@ mod tests {
 
         let res = list_files(
             "org2",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            Some(svc.into()),
+            Some(env.into()),
+            Some(version.into()),
         )
         .await
         .unwrap();
         assert!(res.is_empty());
 
-        let res = list_files("default", Some("svc1".into()), None, Some("v1".into()))
+        let res = list_files(ORG_ID, Some(svc.into()), None, Some(version.into()))
             .await
             .unwrap();
         assert_eq!(res.len(), 4);
@@ -603,7 +608,7 @@ mod tests {
             .collect();
         assert_eq!(t, expected);
 
-        let res = list_files("default", None, Some("env1".into()), Some("v1".into()))
+        let res = list_files(ORG_ID, None, Some(env.into()), Some(version.into()))
             .await
             .unwrap();
         assert_eq!(res.len(), 4);
@@ -613,7 +618,7 @@ mod tests {
             .collect();
         assert_eq!(t, expected);
 
-        let res = list_files("default", Some("svc1".into()), Some("env1".into()), None)
+        let res = list_files(ORG_ID, Some(svc.into()), Some(env.into()), None)
             .await
             .unwrap();
         assert_eq!(res.len(), 4);
@@ -626,20 +631,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_files() {
+        let svc = "svc_delete_files";
+        let env = "env_delete_files";
+        let version = "v1";
         let expected = HashSet::from_iter([
             "AboutView-RC3okFHd.js.map".to_string(),
             "index-BO6PqLMi.js.map".to_string(),
             "profiler-Dq395iFC.js.map".to_string(),
             "startRecording-DDLxttnr.js.map".to_string(),
         ]);
-        upload_zip("svc1", "env1", "v1").await;
+        upload_zip(svc, env, version).await;
         // for deletion the filters much match exactly, so nothing should be deleted here
-        delete_group("default", None, Some("env1".into()), Some("v1".into()))
+        delete_group(ORG_ID, None, Some(env.into()), Some(version.into()))
             .await
             .unwrap();
 
         // list matches filter approximately, so we should still get list here
-        let res = list_files("default", None, Some("env1".into()), Some("v1".into()))
+        let res = list_files(ORG_ID, None, Some(env.into()), Some(version.into()))
             .await
             .unwrap();
         assert_eq!(res.len(), 4);
@@ -650,14 +658,14 @@ mod tests {
         assert_eq!(t, expected);
 
         delete_group(
-            "default",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            ORG_ID,
+            Some(svc.into()),
+            Some(env.into()),
+            Some(version.into()),
         )
         .await
         .unwrap();
-        let res = list_files("default", None, Some("env1".into()), Some("v1".into()))
+        let res = list_files(ORG_ID, None, Some(env.into()), Some(version.into()))
             .await
             .unwrap();
         assert!(res.is_empty());
@@ -665,16 +673,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate() {
+        let svc = "svc_translate";
+        let env = "env_translate";
+        let version = "v1";
         let stack1 = "TypeError: can't access property \"nonExistent\", e is undefined\n  at setup/b/< @ http://localhost:4173/assets/AboutView-RC3okFHd.js:1:338\n  at setup/b/< @ http://localhost:4173/assets/AboutView-RC3okFHd.js:1:538\n  at b @ http://localhost:4173/assets/AboutView-RC3okFHd.js:1:542\n  at i @ http://localhost:4173/assets/AboutView-RC3okFHd.js:1:210\n  at Oe @ http://localhost:4173/assets/index-BO6PqLMi.js:2:18838\n  at Ie @ http://localhost:4173/assets/index-BO6PqLMi.js:2:18910\n  at n @ http://localhost:4173/assets/index-BO6PqLMi.js:2:56810";
 
-        upload_zip("svc1", "env1", "v1").await;
+        upload_zip(svc, env, version).await;
 
         // valid stack and smap
         let res = translate_stacktrace(
-            "default",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            ORG_ID,
+            Some(svc.into()),
+            Some(env.into()),
+            Some(version.into()),
             stack1.into(),
         )
         .await
@@ -717,7 +728,7 @@ mod tests {
 
         // valid stack but no smap for given params
         let res = translate_stacktrace(
-            "default",
+            ORG_ID,
             Some("svc2".into()),
             Some("env2".into()),
             Some("v2".into()),
@@ -752,10 +763,10 @@ mod tests {
 
         // stack is incorrect
         let res = translate_stacktrace(
-            "default",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            ORG_ID,
+            Some(svc.into()),
+            Some(env.into()),
+            Some(version.into()),
             stack2.into(),
         )
         .await

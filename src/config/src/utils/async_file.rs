@@ -90,6 +90,8 @@ pub async fn put_file_contents(
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file).await?;
     file_handle.write_all(contents).await?;
+    file_handle.flush().await?;
+    drop(file_handle);
 
     // Atomically rename the temp file to the target file
     // This ensures we either have the old file or the new file, never a partially written file

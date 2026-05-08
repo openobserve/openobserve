@@ -1072,7 +1072,11 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
         ));
     }
     let tmp_path = tokio::fs::canonicalize(&tmp_path).await.unwrap();
-    let tmp_file = tmp_path.join(format!("{}.tmp", config::ider::generate()));
+    let tmp_file = tmp_path.join(format!(
+        "{}_{}.tmp",
+        gxhash::new().sum64(file),
+        config::ider::generate()
+    ));
     let tmp_file = tmp_file.to_str().unwrap();
     if let Err(e) = config::utils::async_file::put_file_contents(tmp_file, &data).await {
         return Err(anyhow::anyhow!(
@@ -1086,10 +1090,24 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
 
 #[cfg(test)]
 mod tests {
+    use tokio::sync::{Mutex, MutexGuard};
+
     use super::*;
+
+    static TEST_DISK_CACHE_LOCK: tokio::sync::OnceCell<Mutex<()>> =
+        tokio::sync::OnceCell::const_new();
+
+    async fn disk_cache_test_guard() -> MutexGuard<'static, ()> {
+        TEST_DISK_CACHE_LOCK
+            .get_or_init(|| async { Mutex::new(()) })
+            .await
+            .lock()
+            .await
+    }
 
     #[tokio::test]
     async fn test_disk_lru_cache_set_file() {
+        let _guard = disk_cache_test_guard().await;
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
         let data_size = content.len();
@@ -1106,6 +1124,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_lru_cache_get_file() {
+        let _guard = disk_cache_test_guard().await;
         let mut file_data = FileData::with_capacity_and_cache_strategy(
             FileType::Data,
             get_config().disk_cache.max_size,
@@ -1133,6 +1152,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_lru_cache_miss() {
+        let _guard = disk_cache_test_guard().await;
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 10, "lru");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
@@ -1158,6 +1178,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_fifo_cache_set_file() {
+        let _guard = disk_cache_test_guard().await;
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
@@ -1178,6 +1199,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_fifo_cache_get_file() {
+        let _guard = disk_cache_test_guard().await;
         let mut file_data = FileData::with_capacity_and_cache_strategy(
             FileType::Data,
             get_config().disk_cache.max_size,
@@ -1205,6 +1227,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_fifo_cache_miss() {
+        let _guard = disk_cache_test_guard().await;
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 10, "fifo");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
@@ -1230,6 +1253,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_multi_dir() {
+        let _guard = disk_cache_test_guard().await;
         let multi_dir: Vec<String> = "dir1 , dir2 , dir3"
             .split(',')
             .filter(|s| !s.trim().is_empty())
@@ -1266,6 +1290,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_parse_result_cache_key() {
+        let _guard = disk_cache_test_guard().await;
         let file_key = "results/default/logs/default/16042959487540176184_30_zo_sql_key/1744081170000000_1744081170000000_1_0.json";
         let Some((org_id, stream_type, query_key, meta)) = parse_result_cache_key(file_key) else {
             panic!("parse result cache key error");
@@ -1284,6 +1309,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_aggregation_cache_key() {
+        let _guard = disk_cache_test_guard().await;
         let file_key = "aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
         let Some((org_id, stream_type, query_key, meta)) = parse_aggregation_cache_key(file_key)
         else {
@@ -1298,6 +1324,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_write_tmp_file() {
+        let _guard = disk_cache_test_guard().await;
         let file_key = "files/default/logs/disk/2022/10/03/10/test_file.parquet";
         let test_data = Bytes::from("test content for temporary file");
 
@@ -1323,6 +1350,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_write_tmp_file_with_empty_data() {
+        let _guard = disk_cache_test_guard().await;
         let file_key = "files/default/logs/disk/2022/10/03/10/empty_file.parquet";
         let empty_data = Bytes::new();
 
@@ -1343,6 +1371,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disk_write_tmp_file_with_large_data() {
+        let _guard = disk_cache_test_guard().await;
         let file_key = "files/default/logs/disk/2022/10/03/10/large_file.parquet";
         let large_data = Bytes::from(vec![b'a'; 1024 * 1024]); // 1MB of data
 
@@ -1367,6 +1396,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stats_data_file_type() {
+        let _guard = disk_cache_test_guard().await;
         // Test that stats function returns correct tuple structure for Data type
         let (total_size, used_size, _item_len) = stats(FileType::Data).await;
 
@@ -1376,6 +1406,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stats_result_file_type() {
+        let _guard = disk_cache_test_guard().await;
         // Test that stats function returns correct tuple structure for Result type
         let (total_size, used_size, _item_len) = stats(FileType::Result).await;
 
@@ -1385,6 +1416,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stats_aggregation_file_type() {
+        let _guard = disk_cache_test_guard().await;
         // Test that stats function returns correct tuple structure for Aggregation type
         let (total_size, used_size, _item_len) = stats(FileType::Aggregation).await;
 
@@ -1394,6 +1426,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stats_with_data() {
+        let _guard = disk_cache_test_guard().await;
         // Create a unique test key to avoid conflicts with other tests
         let test_id = now_micros();
         let file_key = format!(
@@ -1429,6 +1462,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stats_aggregates_across_buckets() {
+        let _guard = disk_cache_test_guard().await;
         // This test verifies that stats correctly aggregates data across all bucket files
         let test_id = now_micros();
         let content = Bytes::from("Test content for aggregation");
@@ -1462,6 +1496,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stats_empty_cache() {
+        let _guard = disk_cache_test_guard().await;
         // Test stats on an empty cache type (using a fresh FileData)
         let file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
 
@@ -1476,6 +1511,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stats_consistency() {
+        let _guard = disk_cache_test_guard().await;
         // Verify that stats returns valid values across multiple calls
         // Note: In a concurrent test environment, values may change due to other tests
         let (total1, used1, len1) = stats(FileType::Aggregation).await;
