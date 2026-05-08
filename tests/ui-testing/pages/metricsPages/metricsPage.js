@@ -372,11 +372,12 @@ export class MetricsPage {
     async enterMetricsQuery(query) {
         // Ensure we are in Custom mode so the editor is fully editable
         const customBtn = this.page.locator('[data-test="dashboard-custom-query-type"]');
-        const isCustomSelected = await customBtn.getAttribute('data-state').catch(() => null) === 'on'
-            || await customBtn.evaluate(el => el.getAttribute('aria-pressed') === 'true').catch(() => false);
-        if (!isCustomSelected && await customBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await customBtn.click();
-            await this.page.waitForTimeout(500);
+        if (await customBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const dataState = await customBtn.getAttribute('data-state').catch(() => '');
+            if (dataState !== 'on') {
+                await customBtn.click();
+                await this.page.waitForTimeout(500);
+            }
         }
 
         // Use the same pattern as logsPage.js which works reliably with Monaco editor
