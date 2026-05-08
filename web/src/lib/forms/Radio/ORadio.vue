@@ -15,7 +15,7 @@ import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupItem, RadioGroupIndicator } from "reka-ui";
 import { computed, inject, watchEffect } from "vue";
 
-withDefaults(defineProps<RadioProps>(), {
+const props = withDefaults(defineProps<RadioProps>(), {
   size: "md",
   disabled: false,
 });
@@ -23,7 +23,7 @@ withDefaults(defineProps<RadioProps>(), {
 defineSlots<RadioSlots>();
 
 const valueMap = inject(RADIO_VALUE_MAP_KEY, null);
-const resolvedValue = computed(() => value ?? val);
+const resolvedValue = computed(() => props.value ?? props.val);
 
 watchEffect(() => {
   if (resolvedValue.value !== undefined) {
@@ -49,16 +49,16 @@ const labelSize: Record<"xs" | "sm" | "md", string> = {
   md: "tw:text-sm",
 };
 
-const resolvedSize = computed(() => (size ?? "md") as "xs" | "sm" | "md");
+const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
 </script>
 
 <template>
   <label
     :class="[
       'tw:inline-flex tw:items-center tw:gap-2',
-      disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
+      props.disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
-    :for="id"
+    :for="props.id"
   >
     <!--
       RadioGroupItem is the ARIA-focusable radio button.
@@ -66,9 +66,9 @@ const resolvedSize = computed(() => (size ?? "md") as "xs" | "sm" | "md");
       to render the inner dot when checked.
     -->
     <RadioGroupItem
-      :id="id"
+      :id="props.id"
       :value="String(resolvedValue ?? '')"
-      :disabled="disabled"
+      :disabled="props.disabled"
       :class="[
         'tw:shrink-0 tw:rounded-full tw:border tw:flex tw:items-center tw:justify-center',
         'tw:transition-colors tw:duration-150',
@@ -92,14 +92,14 @@ const resolvedSize = computed(() => (size ?? "md") as "xs" | "sm" | "md");
 
     <!-- Label -->
     <span
-      v-if="$slots.label || label"
+      v-if="$slots.label || props.label"
       :class="[
         labelSize[resolvedSize],
         'tw:select-none tw:leading-none',
-        disabled ? 'tw:text-radio-label-disabled' : 'tw:text-radio-label',
+        props.disabled ? 'tw:text-radio-label-disabled' : 'tw:text-radio-label',
       ]"
     >
-      <slot name="label">{{ label }}</slot>
+      <slot name="label">{{ props.label }}</slot>
     </span>
   </label>
 </template>

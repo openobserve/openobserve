@@ -28,7 +28,7 @@ import {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "reka-ui";
-import { computed, onBeforeUnmount, provide, ref, useSlots, watch } from "vue";
+import { computed, onBeforeUnmount, provide, ref, useSlots, watch, watchEffect } from "vue";
 
 type NormalizedOption = {
   label: string;
@@ -69,6 +69,22 @@ const emit = defineEmits<SelectEmits>();
 const slots = useSlots();
 
 defineSlots<SelectSlots>();
+
+// Dev-time warning: slot-based options with multiple/searchable require listbox
+// mode, but listboxModeEnabled requires options prop. Guide the developer early.
+if (import.meta.env.DEV) {
+  watchEffect(() => {
+    if (
+      slots.default &&
+      (props.multiple || props.searchable || props.useInput)
+    ) {
+      console.warn(
+        "[OSelect] Slot-based options (OSelectItem/OSelectGroup) do not support " +
+          "`multiple`, `searchable`, or `useInput`. Pass options via the `options` prop instead.",
+      );
+    }
+  });
+}
 
 // Value map populated by OSelectItem children to preserve original types
 // (Reka UI requires string values; this lets us recover number originals)
@@ -208,7 +224,10 @@ watch(
 const ruleError = ref<string | null>(null);
 
 function runRules(val: SelectModelValue): void {
-  if (!props.rules?.length) return;
+  if (!props.rules?.length) {
+    ruleError.value = null;
+    return;
+  }
   for (const rule of props.rules) {
     const result = rule(val);
     if (result !== true) {
