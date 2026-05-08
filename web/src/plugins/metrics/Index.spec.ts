@@ -273,10 +273,10 @@ describe("Metrics Index — component initialization", () => {
     expect(mockDashboardPanelData.data.type).toBe("line");
   });
 
-  it("sets queryType to 'sql' on mounted", async () => {
+  it("sets queryType to 'promql' on mounted", async () => {
     createWrapper();
     await flushPromises();
-    expect(mockDashboardPanelData.data.queryType).toBe("sql");
+    expect(mockDashboardPanelData.data.queryType).toBe("promql");
   });
 
   it("sets customQuery to false on mounted", async () => {
