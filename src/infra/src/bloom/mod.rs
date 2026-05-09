@@ -28,7 +28,9 @@
 //!       MAGIC      4B   "O2BF"
 //!       VERSION    1B   0x01
 //! ────────────────────────────────────────────
-//!       BODY            (concat of bloom byte arrays)
+//!       BODY            (concat of `parquet::bloom_filter::Sbbf::write`
+//!                        outputs — each is a thrift-encoded
+//!                        BloomFilterHeader followed by the bitset)
 //! ────────────────────────────────────────────
 //!       FOOTER          (thrift-free, hand-rolled)
 //!         field_count   u32 LE
@@ -48,9 +50,11 @@
 //! EOF   ────────────────────────────────────
 //! ```
 //!
-//! Hash function: `XxHash64::oneshot(0, bytes)` to match the Parquet SBBF
-//! spec — so existing bloom bytes (e.g. extracted from a Parquet column
-//! chunk) could be embedded directly if needed.
+//! Each per-(file, field) bloom is a `parquet::bloom_filter::Sbbf` written
+//! via `Sbbf::write` and read back via `Sbbf::from_bytes`. We rely on the
+//! Parquet bloom filter spec for the on-disk format — no custom block
+//! layout, no custom hash. `Sbbf::insert` / `check` apply XxHash64
+//! internally per spec.
 
 pub mod path;
 pub mod reader;
@@ -67,12 +71,6 @@ pub const VERSION: u8 = 0x01;
 
 /// Algorithm tag for SBBF + XxHash64 (matches Parquet spec).
 pub const ALGO_SBBF_XXHASH64: u8 = 0x01;
-
-/// Hash a value the same way Parquet's SBBF does (XxHash64, seed 0).
-#[inline]
-pub fn sbbf_hash(bytes: &[u8]) -> u64 {
-    twox_hash::XxHash64::oneshot(0, bytes)
-}
 
 /// Stable per-file identifier used to key blooms inside a `.bf` footer.
 ///

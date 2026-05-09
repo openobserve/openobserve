@@ -17,16 +17,17 @@
 //!
 //! Whole-blob reader: parses the footer, exposes `(file_id, field) ->
 //! contains(value)` lookups. Built for the search hot path — once the
-//! footer is parsed, every check is one xxhash + one cache-line load.
+//! footer is parsed, every check is one xxhash + one cache-line load
+//! through `parquet::bloom_filter::Sbbf::check`.
 //!
 //! Failure mode is "treat-as-missing": malformed bytes return
 //! `Err(ReadError::*)`. Callers (the search prune layer) downgrade any
 //! error to "no pruning" to keep query correctness.
 
 use hashbrown::HashMap;
-use sbbf_rs_safe::Filter;
+use parquet::bloom_filter::Sbbf;
 
-use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION, sbbf_hash};
+use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReadError {
@@ -42,21 +43,19 @@ pub enum ReadError {
     BadFooter(u32, usize),
     #[error("truncated field section")]
     Truncated,
-    #[error("invalid sbbf bytes for field '{0}', file_id={1}")]
-    InvalidBloom(String, u64),
+    #[error("invalid sbbf bytes for field '{0}', file_id={1}: {2}")]
+    InvalidBloom(String, u64, String),
 }
 
 /// One indexed bloom for a particular file_id, lazily materialized.
-#[derive(Debug)]
 struct FileEntry {
     body_offset: u64,
     body_size: u32,
-    /// Built lazily on first lookup, then memoized via `entry_filter`.
+    /// Built lazily on first lookup, then memoized.
     bloom_built: bool,
-    bloom: Option<Filter>,
+    bloom: Option<Sbbf>,
 }
 
-#[derive(Debug)]
 struct FieldSection {
     /// `file_id` → entry index inside `entries`.
     by_file: HashMap<u64, usize>,
@@ -64,11 +63,19 @@ struct FieldSection {
 }
 
 /// Parsed `.bf` blob ready for membership lookups.
-#[derive(Debug)]
 pub struct BloomReader {
     blob: Vec<u8>,
     /// `field_name` → section
     by_field: HashMap<String, FieldSection>,
+}
+
+impl std::fmt::Debug for BloomReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BloomReader")
+            .field("blob_len", &self.blob.len())
+            .field("field_count", &self.by_field.len())
+            .finish()
+    }
 }
 
 impl BloomReader {
@@ -170,13 +177,20 @@ impl BloomReader {
             entry.bloom_built = true;
             let start = entry.body_offset as usize;
             let end = start + entry.body_size as usize;
-            entry.bloom = Filter::from_bytes(&self.blob[start..end]);
+            entry.bloom = Sbbf::from_bytes(&self.blob[start..end]).ok().or_else(|| {
+                log::warn!("bloom: invalid Sbbf bytes for field '{field}', file_id={file_id}");
+                None
+            });
             if entry.bloom.is_none() {
-                return Err(ReadError::InvalidBloom(field.to_string(), file_id));
+                return Err(ReadError::InvalidBloom(
+                    field.to_string(),
+                    file_id,
+                    "Sbbf::from_bytes failed".to_string(),
+                ));
             }
         }
         let bloom = entry.bloom.as_ref().unwrap();
-        Ok(bloom.contains_hash(sbbf_hash(value)))
+        Ok(bloom.check(value))
     }
 }
 
@@ -317,9 +331,9 @@ mod tests {
 
     #[test]
     fn test_observed_fpr_within_bounds() {
-        // Sanity check: our bits_per_key=10 default should give FPR ≈ 1%.
-        // Build a bloom with 1k unique strings, query 10k absent strings,
-        // expect << 5% false positives.
+        // Sanity check: default fpp 0.01 should give FPR ≈ 1%. Build a bloom
+        // with 1k unique strings, query 10k absent strings, expect << 5%
+        // false positives.
         let mut b = BloomBuilder::new();
         let idx = b.begin(7, "trace_id", 1000);
         for i in 0..1000u32 {
@@ -339,5 +353,29 @@ mod tests {
             fp < 500,
             "false positive count {fp} > 500 for 10k absent queries (FPR > 5%)"
         );
+    }
+
+    /// The bytes inside a `.bf` body for one (file, field) entry must be a
+    /// valid stand-alone Parquet column-chunk bloom filter (thrift header +
+    /// bitset). Confirm by feeding the slice back through `Sbbf::from_bytes`
+    /// and checking membership.
+    #[test]
+    fn test_per_entry_bytes_are_parquet_compatible() {
+        let blob = build_two_field_blob();
+        let r = BloomReader::parse(blob.clone()).unwrap();
+        // Pull body slice for (trace_id, file 101) by re-walking the footer.
+        // Simpler: use the parsed reader via a fresh check call.
+        let section = r.by_field.get("trace_id").unwrap();
+        let idx = *section.by_file.get(&101).unwrap();
+        let entry = &section.entries[idx];
+        let start = entry.body_offset as usize;
+        let end = start + entry.body_size as usize;
+        let standalone = parquet::bloom_filter::Sbbf::from_bytes(&blob[start..end])
+            .expect("valid standalone Sbbf");
+        // Sbbf::check wants `T: AsBytes`; that's impl'd for `[u8]` (not for
+        // fixed-size array literals), so deref `b"..."` to a slice.
+        assert!(standalone.check(&b"abc"[..]));
+        assert!(standalone.check(&b"def"[..]));
+        assert!(!standalone.check(&b"NOT_PRESENT_xx"[..]));
     }
 }

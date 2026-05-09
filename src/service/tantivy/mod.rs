@@ -117,7 +117,7 @@ pub(crate) async fn create_tantivy_index(
             &index,
             file_id,
             &bloom_targets,
-            10, // bits per key, ~ 1% FPR
+            0.01, // target false-positive rate
         ) {
             Ok(b) => b,
             Err(e) => {

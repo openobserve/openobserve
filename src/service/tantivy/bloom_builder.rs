@@ -40,7 +40,7 @@ pub fn build_blooms_from_index(
     index: &Index,
     file_id: u64,
     fields: &[String],
-    bits_per_key: usize,
+    fpp: f64,
 ) -> anyhow::Result<Vec<FieldBloom>> {
     if fields.is_empty() {
         return Ok(Vec::new());
@@ -55,7 +55,7 @@ pub fn build_blooms_from_index(
         .context("open tantivy reader")?;
     let searcher = reader.searcher();
 
-    let mut builder = BloomBuilder::new().with_bits_per_key(bits_per_key);
+    let mut builder = BloomBuilder::new().with_fpp(fpp);
 
     for field_name in fields {
         let Ok(field) = schema.get_field(field_name) else {
@@ -169,7 +169,7 @@ mod tests {
                 "level".to_string(),
                 "missing_field".to_string(),
             ],
-            10,
+            0.01,
         )
         .unwrap();
 
@@ -227,7 +227,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        let blooms = build_blooms_from_index(&index, 1, &[], 10).unwrap();
+        let blooms = build_blooms_from_index(&index, 1, &[], 0.01).unwrap();
         assert!(blooms.is_empty());
     }
 }

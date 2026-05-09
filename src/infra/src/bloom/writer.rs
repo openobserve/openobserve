@@ -19,12 +19,21 @@
 //! Single-shot — does not stream. Hour buckets are bounded enough in size
 //! (≈100MB even for high-cardinality fields) that streaming would just add
 //! complexity without saving meaningful memory.
+//!
+//! Each per-(file, field) bloom is a `parquet::bloom_filter::Sbbf`. We
+//! call `Sbbf::write` to produce the on-disk bytes (thrift header +
+//! bitset, exactly the Parquet column-bloom format) and store those
+//! bytes verbatim in our `.bf` body. The reader reverses with
+//! `Sbbf::from_bytes`.
 
 use std::io::Write;
 
-use sbbf_rs_safe::Filter;
+use parquet::bloom_filter::Sbbf;
 
-use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION, sbbf_hash};
+use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION};
+
+/// Default false-positive probability for new SBBFs.
+const DEFAULT_FPP: f64 = 0.01;
 
 /// One bloom for a single (file, field) pair, fully built in memory.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,13 +41,16 @@ pub struct FieldBloom {
     pub field: String,
     pub file_id: u64,
     pub n_items: u32,
+    /// Output of `Sbbf::write` — thrift `BloomFilterHeader` followed by
+    /// the bitset. Round-trips through `Sbbf::from_bytes`.
     pub bytes: Vec<u8>,
 }
 
 /// Builder that accumulates `(field, file)` blooms before serialization.
 pub struct BloomBuilder {
-    /// Bits per element. 10 ≈ 1% FPR for an SBBF; 14 ≈ 0.1%. Default 10.
-    bits_per_key: usize,
+    /// False-positive probability target for newly-created SBBFs.
+    /// 0.01 ≈ 10 bits/elem; 0.001 ≈ 14 bits/elem. Default 0.01.
+    fpp: f64,
     /// Per (field, file_id) → in-progress filter + insert count.
     filters: Vec<PerFieldFile>,
 }
@@ -46,20 +58,21 @@ pub struct BloomBuilder {
 struct PerFieldFile {
     field: String,
     file_id: u64,
-    filter: Filter,
+    sbbf: Sbbf,
     n_items: u32,
 }
 
 impl BloomBuilder {
     pub fn new() -> Self {
         Self {
-            bits_per_key: 10,
+            fpp: DEFAULT_FPP,
             filters: Vec::new(),
         }
     }
 
-    pub fn with_bits_per_key(mut self, bits_per_key: usize) -> Self {
-        self.bits_per_key = bits_per_key;
+    /// Override the target FPR. Cheap — only affects newly-created blooms.
+    pub fn with_fpp(mut self, fpp: f64) -> Self {
+        self.fpp = fpp;
         self
     }
 
@@ -68,22 +81,27 @@ impl BloomBuilder {
     /// the actual unique count is best, but a reasonable upper bound also
     /// works at the cost of slightly larger bytes.
     pub fn begin(&mut self, file_id: u64, field: &str, expected_items: usize) -> usize {
-        let filter = Filter::new(self.bits_per_key, expected_items.max(1));
+        let ndv = expected_items.max(1) as u64;
+        let sbbf = Sbbf::new_with_ndv_fpp(ndv, self.fpp).expect("valid fpp");
         self.filters.push(PerFieldFile {
             field: field.to_string(),
             file_id,
-            filter,
+            sbbf,
             n_items: 0,
         });
         self.filters.len() - 1
     }
 
+    /// Insert raw bytes — `Sbbf::insert` applies XxHash64(seed=0) per
+    /// the Parquet bloom filter spec, so callers don't pre-hash.
     pub fn insert(&mut self, idx: usize, value: &[u8]) {
         let entry = &mut self.filters[idx];
-        let added = entry.filter.insert_hash(sbbf_hash(value));
-        if !added {
-            entry.n_items = entry.n_items.saturating_add(1);
-        }
+        entry.sbbf.insert(value);
+        // `Sbbf::insert` is silent about duplicates, so we count every
+        // call. Duplicates are rare in practice (callers feed unique
+        // tantivy term-dict entries) and `n_items` is only used for
+        // diagnostics, not capacity decisions.
+        entry.n_items = entry.n_items.saturating_add(1);
     }
 
     /// Number of `(file, field)` blooms collected so far.
@@ -95,16 +113,22 @@ impl BloomBuilder {
         self.filters.is_empty()
     }
 
-    /// Freeze into an immutable list of `FieldBloom`s, bytes already
-    /// extracted. Consumes the builder.
+    /// Freeze into an immutable list of `FieldBloom`s, with each Sbbf
+    /// already serialized via `Sbbf::write`. Consumes the builder.
     pub fn finish(self) -> Vec<FieldBloom> {
         self.filters
             .into_iter()
-            .map(|p| FieldBloom {
-                field: p.field,
-                file_id: p.file_id,
-                n_items: p.n_items,
-                bytes: p.filter.as_bytes().to_vec(),
+            .map(|p| {
+                let mut buf = Vec::new();
+                p.sbbf
+                    .write(&mut buf)
+                    .expect("write Sbbf to in-memory buffer");
+                FieldBloom {
+                    field: p.field,
+                    file_id: p.file_id,
+                    n_items: p.n_items,
+                    bytes: buf,
+                }
             })
             .collect()
     }
@@ -225,42 +249,14 @@ mod tests {
         assert_eq!(blooms.len(), 1);
         assert_eq!(blooms[0].file_id, 42);
         assert_eq!(blooms[0].field, "trace_id");
-        // n_items counts only NEW insertions (dup returned true → not counted)
-        assert_eq!(blooms[0].n_items, 2);
+        // n_items counts every insert call (parquet's Sbbf::insert is silent
+        // about whether a value was already present).
+        assert_eq!(blooms[0].n_items, 3);
         assert!(!blooms[0].bytes.is_empty());
     }
 
     #[test]
-    fn test_writer_groups_by_field_in_insert_order() {
-        let bytes = BloomWriter::serialize(vec![
-            FieldBloom {
-                field: "trace_id".into(),
-                file_id: 1,
-                n_items: 0,
-                bytes: vec![0u8; 32],
-            },
-            FieldBloom {
-                field: "user_id".into(),
-                file_id: 1,
-                n_items: 0,
-                bytes: vec![0u8; 32],
-            },
-            FieldBloom {
-                field: "trace_id".into(),
-                file_id: 2,
-                n_items: 0,
-                bytes: vec![0u8; 32],
-            },
-        ]);
-        // Header + 64B body for trace_id (file 1 + file 2) + 32B body for user_id
-        // (insertion order groups field_order = [trace_id, user_id])
-        // We can't easily assert exact offsets, but we can assert magic + tail magic
-        assert_eq!(&bytes[..4], MAGIC);
-        assert_eq!(&bytes[bytes.len() - 4..], MAGIC);
-    }
-
-    #[test]
-    fn test_serialized_blob_starts_and_ends_with_magic() {
+    fn test_writer_keeps_magic_at_both_ends() {
         let mut b = BloomBuilder::new();
         let idx = b.begin(1, "f", 10);
         b.insert(idx, b"x");
@@ -270,17 +266,20 @@ mod tests {
     }
 
     #[test]
-    fn test_n_items_grows_with_unique_inserts() {
+    fn test_multiple_blooms_serialize_independently() {
         let mut b = BloomBuilder::new();
-        let i = b.begin(1, "f", 1024);
-        for v in 0..100u32 {
-            b.insert(i, &v.to_le_bytes());
-        }
-        // re-insert all → none are new
-        for v in 0..100u32 {
-            b.insert(i, &v.to_le_bytes());
-        }
+        let i_a = b.begin(1, "trace_id", 64);
+        let i_b = b.begin(1, "user_id", 64);
+        let i_c = b.begin(2, "trace_id", 64);
+        b.insert(i_a, b"a");
+        b.insert(i_b, b"u");
+        b.insert(i_c, b"c");
         let blooms = b.finish();
-        assert_eq!(blooms[0].n_items, 100);
+        assert_eq!(blooms.len(), 3);
+        // Each bloom carries its own thrift header + bitset, so all three
+        // should have non-trivial size.
+        for fb in &blooms {
+            assert!(fb.bytes.len() > 32);
+        }
     }
 }

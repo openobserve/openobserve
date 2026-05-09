@@ -29,7 +29,6 @@ async-nats.workspace = true
 object_store.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
-sbbf-rs-safe.workspace = true
 twox-hash.workspace = true
 serde.workspace = true
 serde_json.workspace = true
