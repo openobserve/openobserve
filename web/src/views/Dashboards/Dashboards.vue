@@ -502,8 +502,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :width="30"
                 :title="t('dashboard.createdashboard')"
                 data-test="dashboard-add-dialog"
+                :secondary-button-label="t('dashboard.cancel')"
+                :primary-button-label="t('dashboard.save')"
+                @click:secondary="showAddDashboardDialog = false"
+                @click:primary="addDashboardRef?.submit()"
               >
                 <AddDashboard
+                  ref="addDashboardRef"
                   @close="showAddDashboardDialog = false"
                   @updated="updateDashboardList"
                   :activeFolderId="activeFolderId"
@@ -670,6 +675,7 @@ export default defineComponent({
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
     const showAddFolderDialog = ref(false);
+    const addDashboardRef: any = ref(null);
     const addFolderRef: any = ref(null);
     const qTable: any = ref(null);
     const router = useRouter();
@@ -1469,6 +1475,7 @@ export default defineComponent({
       activeFolderId,
       addFolder,
       showAddFolderDialog,
+      addDashboardRef,
       addFolderRef,
       isFolderEditMode,
       updateFolderList,
