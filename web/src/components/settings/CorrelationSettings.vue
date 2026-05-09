@@ -76,14 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="`field-aliases-${fieldAliasesEditorKey}`"
         :semantic-field-groups="draftSemanticGroups"
         :scroll-to-group-id="aliasScrollToGroup"
-        @update:semantic-field-groups="onDraftSemanticGroupsChange"
+        @update:semanticFieldGroups="onDraftSemanticGroupsChange"
       >
         <template #header-actions>
           <OButton
             data-test="correlation-semanticfieldgroup-save-btn"
-            variant="primary"
+            :variant="isFieldAliasesDirty ? 'primary' : 'outline'"
             size="sm"
-            :disabled="!isFieldAliasesDirty"
             :loading="savingFieldAliases"
             @click="saveSemanticGroups"
           >
@@ -122,6 +121,7 @@ export default defineComponent({
     SemanticFieldGroupsConfig,
     OTabs,
     OTab,
+    OButton,
   },
   setup() {
     const store = useStore();
@@ -290,6 +290,7 @@ export default defineComponent({
 
     const saveSemanticGroups = async () => {
       if (savingFieldAliases.value) return;
+      if (!isFieldAliasesDirty.value) return;
       savingFieldAliases.value = true;
       try {
         const orgId = store.state.selectedOrganization.identifier;
