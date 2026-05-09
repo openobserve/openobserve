@@ -37,8 +37,10 @@ export class ServicesCatalogPage {
     this.legendDegraded = '[data-test="services-catalog-legend-degraded"]';
     this.legendHealthy = '[data-test="services-catalog-legend-healthy"]';
 
-    // Side panel
-    this.sidePanel = '[data-test="services-catalog-node-side-panel"]';
+    // Side panel (uses component's own data-test; parent's "services-catalog-node-side-panel"
+    // is overridden by Vue 3 attribute inheritance — the root <div> renders with
+    // data-test="service-graph-side-panel" from ServiceGraphNodeSidePanel.vue)
+    this.sidePanel = '[data-test="service-graph-side-panel"]';
   }
 
   // ===== NAVIGATION =====
@@ -211,9 +213,11 @@ export class ServicesCatalogPage {
   // ===== ROW CLICK / SIDE PANEL =====
 
   async clickServiceRow(serviceName) {
-    // Click the status badge — a plain <span> in the row that reliably triggers
-    // TenstackTable's @click:dataRow handler (unlike TraceServiceCell which is a child component)
-    await this.page.locator(`[data-test="services-catalog-status-${serviceName}"]`).click();
+    // Click the service name cell which has a direct @click.stop="handleRowClick(item)"
+    // handler on the <TraceServiceCell> — this bypasses TenstackTable's row-level
+    // emission layer (ServicesCatalog.vue:279). The status badge is also clickable
+    // (bubbles to @click:dataRow on <tr>) but the direct cell handler is more reliable.
+    await this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`).click();
     await this.page.waitForTimeout(300);
   }
 
@@ -304,10 +308,12 @@ export class ServicesCatalogPage {
   // ===== COLUMN SORTING =====
 
   async sortByColumn(columnKey) {
-    const header = this.page.locator(`[data-test="o2-table-th-${columnKey}"]`);
-    // Use evaluate(el.click()) to dispatch a native click directly on the header,
-    // bypassing child-element interception in virtualized table headers.
-    await header.evaluate(el => el.click());
+    // Click the sortable inner div which has @click="handleHeaderSortClick",
+    // NOT the <th> — TenstackTable's sort handler is on the child div with
+    // data-test="o2-table-th-sort-{id}" (TenstackTable.vue:228-236).
+    // JavaScript's el.click() on the <th> dispatches a click that bubbles UP
+    // to ancestors and never reaches the child div's handler.
+    await this.page.locator(`[data-test="o2-table-th-sort-${columnKey}"]`).click();
     await this.page.waitForTimeout(300);
   }
 
