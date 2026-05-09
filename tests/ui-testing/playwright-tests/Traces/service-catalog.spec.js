@@ -82,17 +82,19 @@ test.describe("Service Catalog testcases", () => {
     const rowCountBefore = await pm.servicesCatalogPage.getRowCount();
     testLogger.info(`Total services before filter: ${totalBefore}, rows before: ${rowCountBefore}`);
 
+    test.skip(totalBefore === 0 && rowCountBefore === 0, 'no data in default stream — environment may be empty');
+
     await pm.servicesCatalogPage.filterByServiceName('api');
     const totalAfter = await pm.servicesCatalogPage.getServiceCount();
     testLogger.info(`Total services after filter "api": ${totalAfter}`);
 
     // Filtering should reduce or keep the same count
-    expect(totalAfter).toBeLessThanOrEqual(Math.max(totalBefore, 1));
+    expect(totalAfter).toBeLessThanOrEqual(totalBefore);
 
     // Visible rows should not exceed rows before filter
     const rowCount = await pm.servicesCatalogPage.getRowCount();
     testLogger.info(`Visible rows after filter: ${rowCount}`);
-    expect(rowCount).toBeLessThanOrEqual(Math.max(rowCountBefore, 1));
+    expect(rowCount).toBeLessThanOrEqual(rowCountBefore);
   });
 
   test("P0: Clear filter — regression test for bug #11689 (null filterText)", {
@@ -271,8 +273,9 @@ test.describe("Service Catalog testcases", () => {
     const afterSecondClick = await pm.servicesCatalogPage.getSortIcon('status');
     testLogger.info(`After second click status icon: "${afterSecondClick}"`);
 
-    // Icon must change between clicks (e.g. arrow_downward ↔ arrow_upward)
-    expect(afterFirstClick).not.toBe(defaultIcon);
+    // First click must change from default (even if default was unfold_more, it must become an arrow)
+    expect(afterFirstClick, 'status column sort did not respond to click').not.toBe(defaultIcon);
+    // Second click must toggle direction
     expect(afterSecondClick).toBe(defaultIcon);
   });
 
@@ -289,8 +292,9 @@ test.describe("Service Catalog testcases", () => {
     const icon2 = await pm.servicesCatalogPage.getSortIcon('total_requests');
     testLogger.info(`Requests sort icon (click 2): "${icon2}"`);
 
-    test.skip(icon1 === 'unfold_more' && icon2 === 'unfold_more',
-      'total_requests column not sortable (stuck at unfold_more)');
+    // If column was unsorted (unfold_more), first click must apply a sort direction.
+    // If it was already sorted, second click must toggle direction.
+    expect(icon1, 'total_requests column sort did not respond to clicks').not.toBe('unfold_more');
     expect(icon1).not.toBe(icon2);
   });
 
@@ -307,8 +311,7 @@ test.describe("Service Catalog testcases", () => {
     const icon2 = await pm.servicesCatalogPage.getSortIcon('error_rate');
     testLogger.info(`Error rate sort icon (click 2): "${icon2}"`);
 
-    test.skip(icon1 === 'unfold_more' && icon2 === 'unfold_more',
-      'error_rate column not sortable (stuck at unfold_more)');
+    expect(icon1, 'error_rate column sort did not respond to clicks').not.toBe('unfold_more');
     expect(icon1).not.toBe(icon2);
   });
 
@@ -325,8 +328,7 @@ test.describe("Service Catalog testcases", () => {
     const icon2 = await pm.servicesCatalogPage.getSortIcon('service_name');
     testLogger.info(`Service name sort icon (click 2): "${icon2}"`);
 
-    test.skip(icon1 === 'unfold_more' && icon2 === 'unfold_more',
-      'service_name column not sortable (stuck at unfold_more)');
+    expect(icon1, 'service_name column sort did not respond to clicks').not.toBe('unfold_more');
     expect(icon1).not.toBe(icon2);
   });
 
@@ -343,8 +345,7 @@ test.describe("Service Catalog testcases", () => {
     const icon2 = await pm.servicesCatalogPage.getSortIcon('p95_latency_ns');
     testLogger.info(`P95 sort icon (click 2): "${icon2}"`);
 
-    test.skip(icon1 === 'unfold_more' && icon2 === 'unfold_more',
-      'p95_latency_ns column not sortable (stuck at unfold_more)');
+    expect(icon1, 'p95_latency_ns column sort did not respond to clicks').not.toBe('unfold_more');
     expect(icon1).not.toBe(icon2);
   });
 
@@ -361,15 +362,14 @@ test.describe("Service Catalog testcases", () => {
     const rowCount = await pm.servicesCatalogPage.getRowCount();
     testLogger.info(`Total service count from pill: ${count}, rows: ${rowCount}`);
 
-    // At least one of pill or table should report data
-    expect(Math.max(count, rowCount)).toBeGreaterThan(0);
+    test.skip(count === 0 && rowCount === 0, 'no data in default stream — environment may be empty');
+    expect(count).toBeGreaterThan(0);
 
     // Filter should update pill to show filtered/total
     await pm.servicesCatalogPage.filterByServiceName('api');
     const filteredCount = await pm.servicesCatalogPage.getFilteredCount();
     testLogger.info(`Filtered count: ${filteredCount}`);
-    const refTotal = Math.max(count, 1);
-    expect(filteredCount).toBeLessThanOrEqual(refTotal);
+    expect(filteredCount).toBeLessThanOrEqual(count);
   });
 
   test("P1: Critical / Warning / Degraded pills visible when services have those statuses", {
@@ -395,14 +395,14 @@ test.describe("Service Catalog testcases", () => {
 
     const total = await pm.servicesCatalogPage.getServiceCount();
     const rowCount = await pm.servicesCatalogPage.getRowCount();
-    const refTotal = Math.max(total, rowCount, 1);
     const critical = await pm.servicesCatalogPage.getCriticalCount();
     const warning = await pm.servicesCatalogPage.getWarningCount();
     const degraded = await pm.servicesCatalogPage.getDegradedCount();
 
     testLogger.info(`Counts — Total pill: ${total}, Rows: ${rowCount}, Critical: ${critical}, Warning: ${warning}, Degraded: ${degraded}`);
 
-    expect(critical + warning + degraded).toBeLessThanOrEqual(refTotal);
+    test.skip(total === 0 && rowCount === 0, 'no data in default stream — environment may be empty');
+    expect(critical + warning + degraded).toBeLessThanOrEqual(Math.max(total, rowCount));
   });
 
   // =========================================================================
