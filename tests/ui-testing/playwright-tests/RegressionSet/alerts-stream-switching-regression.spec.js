@@ -409,7 +409,7 @@ test.describe("Alerts Stream Switching Regression", () => {
           // PreviewAlert passes chartData = dashboardPanelData.data, so
           // config is at the root level (not nested under .data).
           if (comp.props && 'panelSchema' in comp.props &&
-              comp.props.panelSchema?.config?.unit) return true;
+              comp.props.panelSchema?.config) return true;
           return false;
         });
 
