@@ -62,7 +62,7 @@ export class ServicesCatalogPage {
     await Promise.race([
       this.page.locator(this.table).waitFor({ state: 'visible', timeout: 10000 }),
       this.page.locator(this.emptyState).waitFor({ state: 'visible', timeout: 10000 }),
-    ]).catch(() => {});
+    ]);
   }
 
   // ===== TOOLBAR =====

@@ -99,6 +99,13 @@ test.describe("Service Catalog testcases", () => {
     const rowCount = await pm.servicesCatalogPage.getRowCount();
     testLogger.info(`Visible rows after filter: ${rowCount}`);
     expect(rowCount).toBeLessThanOrEqual(rowCountBefore);
+
+    // Verify visible rows actually contain "api" in their names
+    const visibleNames = await page.locator('[data-test^="services-catalog-service-link-"]').allTextContents();
+    testLogger.info(`Visible service names after filter: ${JSON.stringify(visibleNames)}`);
+    for (const name of visibleNames) {
+      expect(name.toLowerCase()).toContain('api');
+    }
   });
 
   test("P0: Clear filter — regression test for bug #11689 (null filterText)", {
@@ -143,15 +150,7 @@ test.describe("Service Catalog testcases", () => {
     const firstService = await pm.servicesCatalogPage.getFirstServiceName();
     testLogger.info(`Clicking service: ${firstService}`);
 
-    // Try clicking the row — the virtualized table may not propagate clicks
-    // through to Vue handlers. If the side panel doesn't appear, the test
-    // is skipped rather than failed (known virtual-table limitation).
     await pm.servicesCatalogPage.clickServiceRow(firstService);
-
-    const panelVisible = await pm.servicesCatalogPage.isSidePanelVisible();
-    testLogger.info(`Side panel visible after click: ${panelVisible}`);
-
-    test.skip(!panelVisible, 'Side panel not visible — virtualized table click limitation');
     await pm.servicesCatalogPage.expectSidePanelVisible();
     testLogger.info('Side panel is visible after row click');
   });
