@@ -125,7 +125,9 @@
     "resources": "Kaynaklar",
     "updated_at": "Güncellendi:",
     "error": "Hata",
-    "db": "Veritabanı"
+    "db": "Veritabanı",
+    "discardChanges": "Değişiklikleri iptal et",
+    "unsavedChanges": "Kaydedilmemiş değişiklikler"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

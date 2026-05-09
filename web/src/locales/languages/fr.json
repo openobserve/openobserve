@@ -125,7 +125,9 @@
     "resources": "Ressources",
     "updated_at": "Mis à jour à",
     "error": "Erreur",
-    "db": "Base de données"
+    "db": "Base de données",
+    "discardChanges": "Ignorer les modifications",
+    "unsavedChanges": "Modifications non enregistrées"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",

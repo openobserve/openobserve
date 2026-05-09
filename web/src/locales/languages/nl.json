@@ -125,7 +125,9 @@
     "resources": "Hulpbronnen",
     "updated_at": "Bijgewerkt op",
     "error": "Fout",
-    "db": "Database"
+    "db": "Database",
+    "discardChanges": "Wijzigingen negeren",
+    "unsavedChanges": "Niet opgeslagen wijzigingen"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

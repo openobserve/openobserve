@@ -125,7 +125,9 @@
     "resources": "リソース",
     "updated_at": "更新日",
     "error": "[エラー]",
-    "db": "[データベース]"
+    "db": "[データベース]",
+    "discardChanges": "変更を破棄",
+    "unsavedChanges": "未保存の変更"
   },
   "search": {
     "metrics": "メトリクス",
