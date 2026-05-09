@@ -508,9 +508,7 @@ pub static BLOOM_PRUNE_KEEP_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
             "bloom_prune_keep_ratio",
-            "Search-side bloom prune kept-file ratio (kept / candidate)."
-                .to_owned()
-                + HELP_SUFFIX,
+            "Search-side bloom prune kept-file ratio (kept / candidate).".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .buckets(vec![
@@ -543,9 +541,7 @@ pub static BLOOM_FILE_BUILT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "bloom_file_built_total",
-            "Number of bloom filter (.bf) files built by the compactor."
-                .to_owned()
-                + HELP_SUFFIX,
+            "Number of bloom filter (.bf) files built by the compactor.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),

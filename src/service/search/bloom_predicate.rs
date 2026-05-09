@@ -72,13 +72,11 @@ pub fn extract(
             }
             // Everything else is invisible to bloom pruning.
             // - NotEqual/Not: bloom can't refute "not X"
-            // - StrMatch / Regex / MatchAll / FuzzyMatchAll: tokenized,
-            //   bloom is keyed by exact term
-            // - And: top-level conditions are already AND'd; nested And
-            //   we punt on for simplicity
-            // - Or: a single OR breaks pruning — we'd need every branch
-            //   to be bloom-prunable, and joining branch results with OR
-            //   weakens the filter
+            // - StrMatch / Regex / MatchAll / FuzzyMatchAll: tokenized, bloom is keyed by exact
+            //   term
+            // - And: top-level conditions are already AND'd; nested And we punt on for simplicity
+            // - Or: a single OR breaks pruning — we'd need every branch to be bloom-prunable, and
+            //   joining branch results with OR weakens the filter
             _ => {}
         }
     }
@@ -89,8 +87,10 @@ pub fn extract(
 mod tests {
     use std::collections::HashSet;
 
-    use super::super::index::{Condition, IndexCondition};
-    use super::*;
+    use super::{
+        super::index::{Condition, IndexCondition},
+        *,
+    };
 
     fn fields(names: &[&str]) -> HashSet<String> {
         names.iter().map(|s| s.to_string()).collect()
@@ -163,11 +163,7 @@ mod tests {
     fn test_skip_regex_and_str_match() {
         let mut c = IndexCondition::new();
         c.add_condition(Condition::Regex("trace_id".into(), "^abc.*".into()));
-        c.add_condition(Condition::StrMatch(
-            "trace_id".into(),
-            "abc".into(),
-            true,
-        ));
+        c.add_condition(Condition::StrMatch("trace_id".into(), "abc".into(), true));
         let p = extract(&c, &fields(&["trace_id"]));
         assert!(p.is_empty());
     }

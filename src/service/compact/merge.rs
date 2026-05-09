@@ -891,8 +891,7 @@ pub async fn merge_files(
     let mut bloom_filter_blooms: Vec<infra::bloom::FieldBloom> = Vec::new();
     // Whether to build blooms at all. Gated by the same flag that used to
     // drive parquet's per-column bloom filter writer.
-    let bloom_enabled = cfg.common.bloom_filter_enabled
-        && !bloom_filter_fields.is_empty();
+    let bloom_enabled = cfg.common.bloom_filter_enabled && !bloom_filter_fields.is_empty();
     match buf {
         MergeParquetResult::Single(buf, mut new_file_meta) => {
             if new_file_meta.compressed_size == 0 {
@@ -935,7 +934,11 @@ pub async fn merge_files(
                     &new_file_key,
                     &full_text_search_fields,
                     &index_fields,
-                    if bloom_enabled { &bloom_filter_fields } else { &[] },
+                    if bloom_enabled {
+                        &bloom_filter_fields
+                    } else {
+                        &[]
+                    },
                     &retain_file_list,
                     &mut new_file_meta,
                     latest_schema.clone(),
@@ -983,7 +986,11 @@ pub async fn merge_files(
                         &new_file_key,
                         &full_text_search_fields,
                         &index_fields,
-                        if bloom_enabled { &bloom_filter_fields } else { &[] },
+                        if bloom_enabled {
+                            &bloom_filter_fields
+                        } else {
+                            &[]
+                        },
                         &retain_file_list,
                         &mut new_file_meta,
                         latest_schema.clone(),
@@ -1019,9 +1026,8 @@ pub async fn merge_files(
         let any_key = &new_files[0].key;
         match config::utils::parquet::parse_file_key_columns(any_key) {
             Ok((_, date_key, _)) => {
-                let blob = infra::bloom::BloomWriter::serialize(std::mem::take(
-                    &mut bloom_filter_blooms,
-                ));
+                let blob =
+                    infra::bloom::BloomWriter::serialize(std::mem::take(&mut bloom_filter_blooms));
                 let bf_path = infra::bloom::path::bloom_path(
                     org_id,
                     stream_type,
@@ -1061,6 +1067,7 @@ pub async fn merge_files(
     Ok((new_files, retain_file_list))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn generate_inverted_index(
     new_file_key: &str,
     full_text_search_fields: &[String],

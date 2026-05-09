@@ -19,15 +19,15 @@
 //! bloom-prunable predicates extracted by [`super::bloom_predicate`],
 //! this module:
 //!
-//! 1. Splits files into "has bloom" (`bloom_ver != 0`) and "no bloom"
-//!    (`bloom_ver == 0`). The latter pass through untouched.
-//! 2. Groups "has bloom" files by `(date, bloom_ver)` so that all
-//!    files sharing a `.bf` are tested with one fetch.
-//! 3. Fetches each `.bf` (memory → disk → remote, via the existing
-//!    `infra::cache::file_data` ladder).
-//! 4. For each file, evaluates the predicates: a file is kept iff
-//!    **every** predicate's bloom returns *maybe* for **at least one**
-//!    of its values (OR within a predicate, AND across predicates).
+//! 1. Splits files into "has bloom" (`bloom_ver != 0`) and "no bloom" (`bloom_ver == 0`). The
+//!    latter pass through untouched.
+//! 2. Groups "has bloom" files by `(date, bloom_ver)` so that all files sharing a `.bf` are tested
+//!    with one fetch.
+//! 3. Fetches each `.bf` (memory → disk → remote, via the existing `infra::cache::file_data`
+//!    ladder).
+//! 4. For each file, evaluates the predicates: a file is kept iff **every** predicate's bloom
+//!    returns *maybe* for **at least one** of its values (OR within a predicate, AND across
+//!    predicates).
 //!
 //! Any failure (fetch, parse, schema mismatch) **falls back to "keep
 //! all"** for the affected group — bloom is performance, not correctness.
@@ -67,8 +67,8 @@ pub async fn prune(
         return without_bloom;
     }
 
-    // 2. Group by (date, bloom_ver). The date is the YYYY/MM/DD/HH bucket
-    //    embedded in the parquet key.
+    // 2. Group by (date, bloom_ver). The date is the YYYY/MM/DD/HH bucket embedded in the parquet
+    //    key.
     type Group = (String, i64); // (date, bloom_ver)
     let mut groups: HashMap<Group, Vec<usize>> = HashMap::new();
     let mut date_for: Vec<Option<String>> = vec![None; with_bloom.len()];
@@ -78,14 +78,11 @@ pub async fn prune(
             Err(_) => continue, // unparseable key → keep file (handled below)
         };
         date_for[i] = Some(date.clone());
-        groups
-            .entry((date, f.meta.bloom_ver))
-            .or_default()
-            .push(i);
+        groups.entry((date, f.meta.bloom_ver)).or_default().push(i);
     }
 
-    // 3. Fetch all .bf files in parallel (bounded by underlying cache /
-    //    object_store concurrency; typical bucket counts are << 1k).
+    // 3. Fetch all .bf files in parallel (bounded by underlying cache / object_store concurrency;
+    //    typical bucket counts are << 1k).
     let bf_paths: Vec<(Group, String)> = groups
         .keys()
         .map(|(date, ver)| {
@@ -108,9 +105,7 @@ pub async fn prune(
         let bytes = match bytes {
             Ok(b) => b,
             Err(e) => {
-                log::warn!(
-                    "[bloom-prune] fetch {path} failed: {e}; keeping its files"
-                );
+                log::warn!("[bloom-prune] fetch {path} failed: {e}; keeping its files");
                 continue;
             }
         };
@@ -119,15 +114,13 @@ pub async fn prune(
                 readers.insert(group, r);
             }
             Err(e) => {
-                log::warn!(
-                    "[bloom-prune] parse {path} failed: {e:?}; keeping its files"
-                );
+                log::warn!("[bloom-prune] parse {path} failed: {e:?}; keeping its files");
             }
         }
     }
 
-    // 4. Evaluate. Default = keep. Only drop if every predicate of the file
-    //    is definitively excluded by the bloom.
+    // 4. Evaluate. Default = keep. Only drop if every predicate of the file is definitively
+    //    excluded by the bloom.
     let mut kept = without_bloom;
     for (idx, f) in with_bloom.into_iter().enumerate() {
         let date = match date_for[idx].as_ref() {
@@ -249,14 +242,8 @@ mod tests {
     async fn test_files_without_bloom_pass_through() {
         // bloom_ver = 0 → never touched, never dropped.
         let files = vec![
-            fk(
-                "files/o/logs/s/2026/05/08/14/a.parquet",
-                0,
-            ),
-            fk(
-                "files/o/logs/s/2026/05/08/14/b.parquet",
-                0,
-            ),
+            fk("files/o/logs/s/2026/05/08/14/a.parquet", 0),
+            fk("files/o/logs/s/2026/05/08/14/b.parquet", 0),
         ];
         let preds = vec![BloomPredicate {
             field: "trace_id".into(),
@@ -268,10 +255,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_predicates_keeps_everything() {
-        let files = vec![fk(
-            "files/o/logs/s/2026/05/08/14/a.parquet",
-            123,
-        )];
+        let files = vec![fk("files/o/logs/s/2026/05/08/14/a.parquet", 123)];
         let kept = prune(files.clone(), &[], "o", StreamType::Logs, "s").await;
         assert_eq!(kept.len(), 1);
     }
@@ -279,22 +263,12 @@ mod tests {
     #[tokio::test]
     async fn test_missing_bf_keeps_all_files_in_group() {
         // bloom_ver = nonzero but the .bf doesn't exist in storage → degrade.
-        let files = vec![fk(
-            "files/o/logs/missing/2026/05/08/14/a.parquet",
-            9_999,
-        )];
+        let files = vec![fk("files/o/logs/missing/2026/05/08/14/a.parquet", 9_999)];
         let preds = vec![BloomPredicate {
             field: "trace_id".into(),
             values: vec!["x".into()],
         }];
-        let kept = prune(
-            files.clone(),
-            &preds,
-            "o",
-            StreamType::Logs,
-            "missing",
-        )
-        .await;
+        let kept = prune(files.clone(), &preds, "o", StreamType::Logs, "missing").await;
         assert_eq!(kept.len(), 1);
     }
 

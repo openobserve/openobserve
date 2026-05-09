@@ -1077,7 +1077,7 @@ mod tests {
                 compressed_size: 5000,
                 index_size: 500,
                 bloom_ver: 0,
-            updated_at: 1100,
+                updated_at: 1100,
             },
             FileRecord {
                 id: 2,
@@ -1095,7 +1095,7 @@ mod tests {
                 compressed_size: 10000,
                 index_size: 1000,
                 bloom_ver: 0,
-            updated_at: 2100,
+                updated_at: 2100,
             },
             FileRecord {
                 id: 3,
@@ -1113,7 +1113,7 @@ mod tests {
                 compressed_size: 15000,
                 index_size: 1500,
                 bloom_ver: 0,
-            updated_at: 3100,
+                updated_at: 3100,
             },
         ];
 
@@ -1348,7 +1348,7 @@ mod tests {
                 compressed_size: 512,
                 index_size: 64,
                 bloom_ver: 0,
-            updated_at: i * 1000 + 1000,
+                updated_at: i * 1000 + 1000,
             })
             .collect();
 
@@ -1386,7 +1386,7 @@ mod tests {
                 compressed_size: 1024,
                 index_size: 128,
                 bloom_ver: 0,
-            updated_at: 3000,
+                updated_at: 3000,
             })
             .collect();
 
@@ -1552,7 +1552,7 @@ mod tests {
                 compressed_size: i * 500,
                 index_size: i * 50,
                 bloom_ver: 0,
-            updated_at: i * 100 + 100,
+                updated_at: i * 100 + 100,
             })
             .collect();
 
@@ -1626,7 +1626,7 @@ mod tests {
                 compressed_size: i * 50,
                 index_size: i * 5,
                 bloom_ver: 0,
-            updated_at: i * 1000 + 1000,
+                updated_at: i * 1000 + 1000,
             })
             .collect();
 

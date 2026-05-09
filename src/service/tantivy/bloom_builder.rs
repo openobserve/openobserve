@@ -31,12 +31,11 @@ use tantivy::Index;
 /// `file_id` (the file_list row id of the originating parquet file).
 ///
 /// Behavior:
-/// - Fields not present in the schema are silently skipped — the
-///   compactor passes the union of `index_fields ∩ bloom_filter_fields`
-///   over potentially many streams, and not every field exists everywhere.
-/// - Terms across all segments of the index are merged into one bloom
-///   per field. Today `create_tantivy_index` produces a single segment,
-///   but this is robust to that changing.
+/// - Fields not present in the schema are silently skipped — the compactor passes the union of
+///   `index_fields ∩ bloom_filter_fields` over potentially many streams, and not every field exists
+///   everywhere.
+/// - Terms across all segments of the index are merged into one bloom per field. Today
+///   `create_tantivy_index` produces a single segment, but this is robust to that changing.
 pub fn build_blooms_from_index(
     index: &Index,
     file_id: u64,
@@ -219,16 +218,10 @@ mod tests {
     async fn test_empty_field_list_returns_empty() {
         // No fields requested → no work, no error.
         let dir = RamDirectory::create();
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "f",
-            DataType::Utf8,
-            false,
-        )]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(StringArray::from(vec!["x"]))],
-        )
-        .unwrap();
+        let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Utf8, false)]));
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(vec!["x"]))])
+                .unwrap();
         let reader = batches_to_stream(vec![batch]);
         let index = generate_tantivy_index(dir, reader, &[], &["f".to_string()], schema)
             .await

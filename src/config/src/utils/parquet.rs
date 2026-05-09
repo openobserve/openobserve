@@ -575,10 +575,9 @@ mod tests {
         // Even when bloom_filter_fields requests bloom on a column, the writer
         // should ignore it now.
         let bloom_fields = vec!["id".to_string(), "name".to_string()];
-        let buf =
-            write_recordbatch_to_parquet(schema.clone(), &[batch], &bloom_fields, &metadata)
-                .await
-                .expect("write parquet");
+        let buf = write_recordbatch_to_parquet(schema.clone(), &[batch], &bloom_fields, &metadata)
+            .await
+            .expect("write parquet");
 
         // Read metadata back from the buffer: every row group / column must
         // report no bloom filter offset.

@@ -53,8 +53,8 @@
 //! chunk) could be embedded directly if needed.
 
 pub mod path;
-pub mod writer;
 pub mod reader;
+pub mod writer;
 
 pub use reader::{BloomReader, ReadError};
 pub use writer::{BloomBuilder, BloomWriter, FieldBloom};
@@ -81,8 +81,8 @@ pub fn sbbf_hash(bytes: &[u8]) -> u64 {
 /// parquet object-store key gives us an identifier that is:
 /// - known immediately on the write path,
 /// - stable across processes / restarts (deterministic from path),
-/// - cheap to compute on the search path (`FileKey::key` is what
-///   file_list returns to the querier anyway).
+/// - cheap to compute on the search path (`FileKey::key` is what file_list returns to the querier
+///   anyway).
 ///
 /// Collision risk is ~1/2^64 — far below the bucket sizes we care about.
 #[inline]

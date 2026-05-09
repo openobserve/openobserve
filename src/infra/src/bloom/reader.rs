@@ -87,8 +87,7 @@ impl BloomReader {
             return Err(ReadError::BadMagic);
         }
 
-        let footer_len =
-            u32::from_le_bytes(blob[n - 8..n - 4].try_into().unwrap()) as usize;
+        let footer_len = u32::from_le_bytes(blob[n - 8..n - 4].try_into().unwrap()) as usize;
         if footer_len + 8 > n {
             return Err(ReadError::BadFooter(footer_len as u32, n));
         }
@@ -97,8 +96,7 @@ impl BloomReader {
         let mut p = footer_start;
         let field_count = read_u32(&blob, &mut p)? as usize;
 
-        let mut by_field: HashMap<String, FieldSection> =
-            HashMap::with_capacity(field_count);
+        let mut by_field: HashMap<String, FieldSection> = HashMap::with_capacity(field_count);
         for _ in 0..field_count {
             let name_len = read_u16(&blob, &mut p)? as usize;
             if p + name_len > n {
@@ -158,12 +156,7 @@ impl BloomReader {
     /// Returns `Ok(true)` when the file or field is unknown to this `.bf`
     /// — callers decide what to do with that (typically: keep the file
     /// because we lack info to rule it out).
-    pub fn check(
-        &mut self,
-        field: &str,
-        file_id: u64,
-        value: &[u8],
-    ) -> Result<bool, ReadError> {
+    pub fn check(&mut self, field: &str, file_id: u64, value: &[u8]) -> Result<bool, ReadError> {
         let section = match self.by_field.get_mut(field) {
             Some(s) => s,
             None => return Ok(true),
@@ -229,8 +222,10 @@ fn read_u64(buf: &[u8], p: &mut usize) -> Result<u64, ReadError> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::writer::{BloomBuilder, BloomWriter};
-    use super::*;
+    use super::{
+        super::writer::{BloomBuilder, BloomWriter},
+        *,
+    };
 
     fn build_two_field_blob() -> Vec<u8> {
         let mut b = BloomBuilder::new();

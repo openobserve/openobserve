@@ -173,13 +173,16 @@ impl BloomWriter {
 
         // footer
         let footer_start = out.len();
-        out.write_all(&(sections.len() as u32).to_le_bytes()).unwrap();
+        out.write_all(&(sections.len() as u32).to_le_bytes())
+            .unwrap();
         for sec in &sections {
             let name_bytes = sec.name.as_bytes();
-            out.write_all(&(name_bytes.len() as u16).to_le_bytes()).unwrap();
+            out.write_all(&(name_bytes.len() as u16).to_le_bytes())
+                .unwrap();
             out.write_all(name_bytes).unwrap();
             out.push(ALGO_SBBF_XXHASH64);
-            out.write_all(&(sec.files.len() as u32).to_le_bytes()).unwrap();
+            out.write_all(&(sec.files.len() as u32).to_le_bytes())
+                .unwrap();
             for f in &sec.files {
                 out.write_all(&f.file_id.to_le_bytes()).unwrap();
                 out.write_all(&f.body_offset.to_le_bytes()).unwrap();
