@@ -101,7 +101,7 @@ export class TracesPage {
     // Monaco editor container uses class .monaco-editor; no parent data-test attr.
     // SQL mode toggle is data-test="logs-search-bar-sql-mode-toggle-btn" (confirmed in traces SearchBar.vue:140)
     this.sqlModeButton = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
-    this.queryEditor = '.monaco-editor';
+    this.queryEditor = '.code-query-editor-container';
     this.queryErrorMessage = '[data-test="logs-search-error-message"]';
     this.viewLines = '.view-lines';
 
