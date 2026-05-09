@@ -40,15 +40,14 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
 
     // Click "Add Alert" button
     const addAlertBtn = page.locator('[data-test="alert-list-add-alert-btn"]');
-    if (await addAlertBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await addAlertBtn.click();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      testLogger.info('✓ Clicked Add Alert button');
-    } else {
+    if (!(await addAlertBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
       testLogger.warn('Add Alert button not visible — skipping');
       test.skip(true, 'Add Alert button not available');
       return;
     }
+    await addAlertBtn.click();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('✓ Clicked Add Alert button');
 
     // Fill alert name
     const uniqueId = Date.now();
@@ -65,7 +64,6 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
       await streamDropdown.click();
       await page.waitForTimeout(500);
 
-      // Try selecting "default" or first available stream
       const defaultOption = page.getByRole('option', { name: 'default' }).first();
       const firstOption = page.getByRole('option').first();
 
@@ -88,11 +86,9 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     }
 
     // Navigate through wizard steps to reach template override
-    // Look for "Continue" or "Next" buttons
     const continueBtn = page.locator('button').filter({ hasText: /Continue|Next|Save/i }).first();
     let stepsAdvanced = 0;
 
-    // Try advancing to reach the template override step
     while (stepsAdvanced < 5) {
       if (await continueBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await continueBtn.click();
@@ -105,68 +101,66 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     }
 
     // Look for template override select/input
-    // The override template field uses the '.template-select-field' class
     const templateOverrideSelect = page.locator('.template-select-field, [data-test*="template-override"], [data-test*="template-select"]').first();
     const templateOverrideInput = page.locator('.template-select-field input, [data-test*="template-override"] input').first();
 
     const overrideFieldVisible = await templateOverrideSelect.isVisible({ timeout: 3000 }).catch(() => false) ||
                                  await templateOverrideInput.isVisible({ timeout: 3000 }).catch(() => false);
 
-    if (overrideFieldVisible) {
-      testLogger.info('✓ Template override field found');
+    // The template override field is the surface under test — its absence means
+    // we cannot verify the bug fix, so this is a hard failure.
+    expect(overrideFieldVisible,
+      'Bug #10110: Template override field must be present to verify the fix'
+    ).toBeTruthy();
 
-      // If it's a select dropdown, try opening it and picking a template
-      if (await templateOverrideSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await templateOverrideSelect.click();
+    testLogger.info('✓ Template override field found');
+
+    // If it's a select dropdown, try opening it and picking a template
+    let templateSelected = false;
+    if (await templateOverrideSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await templateOverrideSelect.click();
+      await page.waitForTimeout(500);
+
+      const templateOption = page.getByRole('option').first();
+      if (await templateOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const templateText = await templateOption.textContent();
+        await templateOption.click();
         await page.waitForTimeout(500);
-
-        // Select a template option if available
-        const templateOption = page.getByRole('option').first();
-        if (await templateOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          const templateText = await templateOption.textContent();
-          await templateOption.click();
-          await page.waitForTimeout(500);
-          testLogger.info(`✓ Selected template: ${templateText?.trim()}`);
-        }
+        templateSelected = true;
+        testLogger.info(`✓ Selected template: ${templateText?.trim()}`);
       }
-
-      // PRIMARY ASSERTION: Check that the selected template is NOT duplicated
-      // Get the displayed/selected value
-      const selectedText = await templateOverrideSelect.textContent().catch(() => '');
-      const inputValue = await templateOverrideInput.inputValue().catch(() => '');
-
-      testLogger.info(`Template override display text: "${selectedText?.trim()}"`);
-      testLogger.info(`Template override input value: "${inputValue}"`);
-
-      // Check for duplication pattern: the same name appearing twice consecutively
-      // e.g., "template_nametemplate_name" or "template_name, template_name"
-      const displayValue = selectedText?.trim() || inputValue;
-
-      if (displayValue) {
-        // Split by common separators and check for duplicates
-        const parts = displayValue.split(/[,;\s]+/).filter(Boolean);
-        const uniqueParts = [...new Set(parts)];
-
-        testLogger.info(`Template parts: ${JSON.stringify(parts)}, unique: ${JSON.stringify(uniqueParts)}`);
-
-        // PRIMARY ASSERTION: No duplicate template entries
-        expect(parts.length,
-          'Bug #10110: Template should not appear twice in override input'
-        ).toBe(uniqueParts.length);
-        testLogger.info('✓ PASSED: Template not duplicated in override input');
-      } else {
-        testLogger.info('No template selected — checking input field for duplication');
-        // Even without a selection, we verified the field exists and is functional
-        expect(overrideFieldVisible,
-          'Bug #10110: Template override field should exist and function correctly'
-        ).toBeTruthy();
-      }
-    } else {
-      testLogger.info('Template override field not found on current step — may need more wizard navigation');
-      testLogger.info('✓ Test completed: override field presence verified as not broken');
     }
 
-    testLogger.info('✓ PASSED: Template override duplication test completed');
+    // A template MUST be selected to exercise the duplication bug;
+    // otherwise the test isn't actually checking anything.
+    expect(templateSelected,
+      'Bug #10110: A template must be selected to verify it is not duplicated in the input'
+    ).toBeTruthy();
+
+    // Get the displayed/selected value
+    const selectedText = await templateOverrideSelect.textContent().catch(() => '');
+    const inputValue = await templateOverrideInput.inputValue().catch(() => '');
+
+    testLogger.info(`Template override display text: "${selectedText?.trim()}"`);
+    testLogger.info(`Template override input value: "${inputValue}"`);
+
+    const displayValue = selectedText?.trim() || inputValue;
+
+    expect(displayValue,
+      'Bug #10110: Template override must show a selected value'
+    ).toBeTruthy();
+
+    // Check for duplication — split by common separators and verify no repeats
+    const parts = displayValue.split(/[,;\s]+/).filter(Boolean);
+    const uniqueParts = [...new Set(parts)];
+
+    testLogger.info(`Template parts: ${JSON.stringify(parts)}, unique: ${JSON.stringify(uniqueParts)}`);
+
+    expect(parts.length,
+      'Bug #10110: Template should not appear twice in override input'
+    ).toBe(uniqueParts.length);
+
+    testLogger.info('✓ PASSED: Template not duplicated in override input');
   });
 
   // ==========================================================================
@@ -224,7 +218,6 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     }
 
     // Navigate through wizard to reach preview step
-    // Look for "Continue"/"Next"/"Save" buttons
     const navButtons = page.locator('button').filter({ hasText: /Continue|Next|Save|Preview/i });
     let stepsAdvanced = 0;
     while (stepsAdvanced < 6) {
@@ -240,8 +233,6 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     }
 
     // Look for preview chart with y-axis values
-    // The alert preview chart uses ECharts or similar charting library
-    // Y-axis labels should contain numeric values
     const chartSelectors = [
       '[data-test*="chart"]',
       '[data-test*="preview"] canvas',
@@ -252,34 +243,34 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     ];
 
     let chartFound = false;
+    let yAxisContent = '';
     for (const sel of chartSelectors) {
       const chart = page.locator(sel).first();
       if (await chart.isVisible({ timeout: 3000 }).catch(() => false)) {
         chartFound = true;
         testLogger.info(`✓ Found preview chart via: ${sel}`);
 
-        // Check for numeric y-axis labels
-        // ECharts renders y-axis labels as SVG text or canvas elements
-        // Look for text elements containing numbers near the y-axis
         const yAxisTexts = page.locator('svg text, canvas').first();
-        const yAxisContent = await yAxisTexts.textContent().catch(() => '');
-        testLogger.info(`Chart text content sample: "${yAxisContent?.substring(0, 100)}"`);
-
-        // PRIMARY ASSERTION: Chart should be present (y-axis values would be rendered inside it)
-        expect(chartFound,
-          'Bug #11577: Alert preview should show a chart with numeric y-axis values'
-        ).toBeTruthy();
+        yAxisContent = await yAxisTexts.textContent().catch(() => '') || '';
+        testLogger.info(`Chart text content sample: "${yAxisContent.substring(0, 100)}"`);
         break;
       }
     }
 
-    if (!chartFound) {
-      testLogger.info('No preview chart found on current step — alert preview may be on a different step');
-      // The preview might be available after saving or on a specific tab
-      testLogger.info('✓ Test completed: alert creation wizard navigated successfully');
-    }
+    // The chart is the surface under test — its absence means the bug cannot
+    // be verified and the test should fail, not silently pass.
+    expect(chartFound,
+      'Bug #11577: Alert preview must show a chart with numeric y-axis values'
+    ).toBeTruthy();
 
-    testLogger.info('✓ PASSED: Alert preview chart verification completed');
+    // Bug #11577 specifically: y-axis labels must be numbers, not raw strings.
+    // Check that chart text content contains at least one numeric value.
+    const hasNumericValue = /\d/.test(yAxisContent);
+    expect(hasNumericValue,
+      'Bug #11577: Alert preview chart y-axis must contain numeric values, not raw strings'
+    ).toBeTruthy();
+
+    testLogger.info('✓ PASSED: Alert preview chart y-axis verified');
   });
 
   test.afterEach(async () => {

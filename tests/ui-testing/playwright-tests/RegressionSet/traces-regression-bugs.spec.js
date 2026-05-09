@@ -94,7 +94,6 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
   });
 
   // ==========================================================================
-  // ==========================================================================
   // Bug #11580: PromQL selection persists after switching Metrics → Logs
   // https://github.com/openobserve/openobserve/issues/11580
   // ==========================================================================
@@ -117,7 +116,9 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       testLogger.info('✓ Switched to PromQL mode in metrics');
       await page.waitForTimeout(1000);
     } else {
-      testLogger.info('PromQL mode not directly available — proceeding with default metrics mode');
+      testLogger.warn('PromQL mode not available — cannot verify bug #11580 without PromQL state');
+      test.skip(true, 'PromQL mode not available in current environment');
+      return;
     }
 
     // Step 2: Switch to logs page
@@ -173,42 +174,44 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
 
     // Find the query editor and type to trigger suggestions
     const queryEditor = page.locator('[data-test="query-editor"], .monaco-editor').first();
-    if (await queryEditor.isVisible({ timeout: 5000 }).catch(() => false)) {
-      // Dismiss any open q-menu popups (e.g. from stream selection) that
-      // would intercept pointer events on the Monaco editor
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(300);
 
-      // Click the visible text surface to focus Monaco, then type
-      await queryEditor.locator('.view-lines').first().click({ force: true });
-      await page.waitForTimeout(300);
-      await page.keyboard.type('select ', { delay: 50 });
-      await page.waitForTimeout(1500);
-
-      // Check for autocomplete suggestion widget and editor content
-      const suggestionsVisible = await pm.tracesPage.isSuggestionWidgetVisible();
-      const editorContent = await pm.tracesPage.getQueryEditorContent();
-      testLogger.info(`Suggestions widget: ${suggestionsVisible}, Editor content: "${editorContent?.trim()}"`);
-
-      if (!editorContent || editorContent.trim() === '') {
-        testLogger.warn('Editor did not receive input — Monaco inputarea may be hidden');
-        test.skip(true, 'Query editor inputarea not accessible in this environment');
-        return;
-      }
-      testLogger.info('Editor accepted input — inline/intellisense suggestions may be used instead of widget');
-
-      // PRIMARY ASSERTION: Editor must be functional and accept keyboard input
-      // Bug #11217 was that no text appeared under suggestions — the editor was broken.
-      // If the editor shows typed text, the fix is verified.
-      expect(editorContent.trim().length > 0,
-        'Bug #11217: Query editor must accept keyboard input and display text'
-      ).toBeTruthy();
-
-      testLogger.info('✓ PASSED: Trace editor autocomplete verified');
-    } else {
-      testLogger.warn('Query editor not found — skipping');
-      test.skip(true, 'SQL query editor not available');
+    // The editor is the surface under test — its absence means the bug surface
+    // cannot be reached, so skip rather than fail.
+    if (!(await queryEditor.isVisible({ timeout: 5000 }).catch(() => false))) {
+      testLogger.warn('Query editor not found — cannot verify bug #11217');
+      test.skip(true, 'SQL query editor not available in this environment');
+      return;
     }
+
+    // Dismiss any open q-menu popups (e.g. from stream selection) that
+    // would intercept pointer events on the Monaco editor
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // Click the visible text surface to focus Monaco, then type
+    await queryEditor.locator('.view-lines').first().click({ force: true });
+    await page.waitForTimeout(300);
+    await page.keyboard.type('select ', { delay: 50 });
+    await page.waitForTimeout(1500);
+
+    // Check for autocomplete suggestion widget and editor content
+    const suggestionsVisible = await pm.tracesPage.isSuggestionWidgetVisible();
+    const editorContent = await pm.tracesPage.getQueryEditorContent();
+    testLogger.info(`Suggestions widget: ${suggestionsVisible}, Editor content: "${editorContent?.trim()}"`);
+
+    // Bug #11217 was that the editor displayed no text under suggestions.
+    // The editor MUST accept keyboard input (text visible under/alongside suggestions).
+    expect(editorContent && editorContent.trim().length > 0,
+      'Bug #11217: Query editor must accept keyboard input and display text'
+    ).toBeTruthy();
+
+    // Additionally, the autocomplete suggestion widget must appear —
+    // that is the specific regression #11217 describes.
+    expect(suggestionsVisible,
+      'Bug #11217: Autocomplete suggestion widget must appear when typing in the query editor'
+    ).toBeTruthy();
+
+    testLogger.info('✓ PASSED: Trace editor autocomplete verified');
   });
 
   test.afterEach(async () => {

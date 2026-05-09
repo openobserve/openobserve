@@ -50,44 +50,34 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
 
     // Use page object to find the quick/SQL mode toggle
     const quickModeToggle = await pm.logsPage.findQueryModeToggle();
-    const histogramToggleVisible = await pm.logsPage.isHistogramToggleVisible();
 
+    // Bug #10821 is about this toggle not responding to clicks —
+    // if the toggle doesn't exist at all, the bug check is inconclusive.
     if (!quickModeToggle) {
       testLogger.warn('Quick mode toggle not found with any known selector');
-      // Verify histogram toggle at least works (was the comparison in the bug)
-      expect(histogramToggleVisible,
-        'Bug #10821: Histogram toggle should be visible (quick mode toggle may have been renamed)'
-      ).toBeTruthy();
-
-      if (histogramToggleVisible) {
-        await pm.logsPage.clickHistogramToggle();
-        testLogger.info('✓ Clicked histogram toggle successfully');
-
-        const histogramActive = await pm.logsPage.isToggleActive(
-          page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
-        );
-
-        expect(histogramActive !== null,
-          'Bug #10821: Histogram toggle should respond to click interaction'
-        ).toBeTruthy();
-      }
-      testLogger.info('✓ PASSED: Histogram toggle works; quick mode selector may need update');
+      test.skip(true, 'Quick mode toggle selector not available — cannot verify bug #10821');
       return;
     }
 
-    // Click the found quick/SQL mode toggle
+    // Capture pre-click state to verify the toggle actually changed
+    const isActiveBefore = await pm.logsPage.isToggleActive(quickModeToggle);
+    testLogger.info(`Mode toggle state before click: ${isActiveBefore}`);
+
+    // Click the toggle
     await quickModeToggle.click();
     await page.waitForTimeout(1000);
     testLogger.info('✓ Clicked quick/SQL mode toggle');
 
-    // Verify the toggle responded using page object method
-    const isActive = await pm.logsPage.isToggleActive(quickModeToggle);
-    testLogger.info(`Mode toggle active state: ${isActive}`);
-    expect(isActive !== null,
-      'Bug #10821: Mode toggle should respond to click interaction'
+    const isActiveAfter = await pm.logsPage.isToggleActive(quickModeToggle);
+    testLogger.info(`Mode toggle state after click: ${isActiveAfter}`);
+
+    // Bug #10821: the toggle should change state on click
+    expect(isActiveBefore !== null && isActiveAfter !== null && isActiveBefore !== isActiveAfter,
+      'Bug #10821: Quick mode toggle should change state on click'
     ).toBeTruthy();
 
     // Verify histogram toggle also works independently
+    const histogramToggleVisible = await pm.logsPage.isHistogramToggleVisible();
     if (histogramToggleVisible) {
       await pm.logsPage.clickHistogramToggle();
       testLogger.info('✓ Clicked histogram toggle');
@@ -219,14 +209,11 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
       testLogger.info('✓ PASSED: Decimal value rejected in datetime picker');
     } else {
       // Time input not in absolute tab — check if the time is entered via Quasar time picker buttons instead
-      // The absolute tab might use Quasar QTime component with up/down increment buttons
       const timePickerVisible = await page.locator('.q-time, [data-test*="time-picker"], [class*="time-picker"]')
         .isVisible({ timeout: 2000 }).catch(() => false);
 
       if (timePickerVisible) {
         testLogger.info('Quasar time picker component found — decimal entry not possible via button UI');
-        // The bug #9049 is about typed decimal input; if the UI uses button-based time picker,
-        // the bug may not apply to this version
         testLogger.info('✓ PASSED: Time picker uses button UI — decimal entry is naturally prevented');
       } else {
         testLogger.warn('Time input not found — skipping');
@@ -254,24 +241,20 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
 
     // PRIMARY ASSERTION: No search results should be visible before clicking run query
     const tableRows = pm.logsPage.getLogsTableRows();
-    const rowCount = await tableRows.count();
+    const rowsBeforeRun = await tableRows.count();
 
     // Check for empty state messages using page object
     const noDataVisible = await pm.logsPage.isNoDataVisible();
     const noResultsVisible = await pm.logsPage.isNoResultsVisible();
 
-    testLogger.info(`Before run query — rowCount: ${rowCount}, noData: ${noDataVisible}, noResults: ${noResultsVisible}`);
+    testLogger.info(`Before run query — rowCount: ${rowsBeforeRun}, noData: ${noDataVisible}, noResults: ${noResultsVisible}`);
 
     // If rows are present, verify they're not actual loaded data
-    // (some UIs show placeholder rows or header-only table)
-    if (rowCount > 0) {
-      // Check if rows contain actual data or are just skeleton/placeholder
+    let hasActualData = false;
+    if (rowsBeforeRun > 0) {
       const firstRowText = await tableRows.first().textContent().catch(() => '');
       testLogger.info(`First row content: "${firstRowText?.substring(0, 100)}"`);
-
-      // Rows may exist but should not have loaded log data
-      // If they have actual timestamps or log content, that's the bug
-      const hasActualData = firstRowText && firstRowText.length > 5 &&
+      hasActualData = firstRowText && firstRowText.length > 5 &&
         !firstRowText.includes('loading') && !firstRowText.includes('No data');
 
       if (hasActualData) {
@@ -292,10 +275,14 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
     const rowsAfterRun = await tableRows.count();
     testLogger.info(`After run query — rowCount: ${rowsAfterRun}`);
 
-    // PRIMARY ASSERTION 2: Data should load after clicking run query
-    // This confirms the page is working, just shouldn't auto-load
-    expect(rowsAfterRun >= 0,
-      'Bug #9796: Page should function correctly — data loads only after run query click'
+    // Bug #9796: data must not appear before clicking Run Query
+    expect(rowsBeforeRun === 0 || !hasActualData,
+      'Bug #9796: Logs should not auto-load data before clicking Run Query'
+    ).toBeTruthy();
+
+    // After clicking Run Query, data must load
+    expect(rowsAfterRun > 0,
+      'Bug #9796: Data should load after clicking Run Query'
     ).toBeTruthy();
 
     testLogger.info('✓ PASSED: Auto-load behavior verified');
