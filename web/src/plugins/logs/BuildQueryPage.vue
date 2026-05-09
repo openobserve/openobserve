@@ -31,16 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <ODrawer
+    <add-to-dashboard
       v-model:open="showAddToDashboardDialog"
-      :width="40"
-    >
-      <add-to-dashboard
-        @save="addPanelToDashboard"
-        @cancel="showAddToDashboardDialog = false"
-        :dashboardPanelData="dashboardPanelData"
-      />
-    </ODrawer>
+      :dashboardPanelData="dashboardPanelData"
+      @save="addPanelToDashboard"
+    />
   </div>
 </template>
 
@@ -74,7 +69,6 @@ import PanelEditor from "@/components/dashboards/PanelEditor/PanelEditor.vue";
 const AddToDashboard = defineAsyncComponent(
   () => import("@/plugins/metrics/AddToDashboard.vue"),
 );
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 // ============================================================================
 // Default Builder Fields

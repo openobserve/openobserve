@@ -192,20 +192,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </div>
   </div>
-    <ODrawer
+    <add-service-account
       v-model:open="showAddUserDialog"
-      side="right"
-      size="lg"
-      :show-close="false"
-      @close="hideForm"
-    >
-      <add-service-account
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        @updated="addMember"
-        @cancel:hideform="hideForm"
-      />
-    </ODrawer>
+      v-model="selectedUser"
+      :isUpdated="isUpdated"
+      @updated="addMember"
+    />
 
     <ODialog
       v-model:open="confirmRefresh"
@@ -293,7 +285,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -320,7 +311,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination, NoData, AddServiceAccount, OButton, ODialog, ODrawer },
+  components: { QTablePagination, NoData, AddServiceAccount, OButton, ODialog },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

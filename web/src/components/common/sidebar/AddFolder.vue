@@ -15,31 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <q-card class="column full-height">
-      <q-card-section class="q-px-md q-py-sm">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <div v-if="editMode" class="text-body1 text-bold">
-              {{ t("dashboard.updateFolder") }}
-            </div>
-            <div v-else class="text-body1 text-bold">
-              {{ t("common.addFolder") }}
-            </div>
-          </div>
-          <div class="col-auto">
-            <OButton
-              @click="$emit('close')"
-              variant="ghost"
-              size="icon-circle-sm"
-              data-test="dashboard-folder-cancel"
-            >
-              <q-icon name="cancel" />
-            </OButton>
-          </div>
-        </div>
-      </q-card-section>
-      <q-separator />
-      <q-card-section>
+    <ODrawer
+      :open="open"
+      :width="30"
+      :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
+      secondary-button-label="Cancel"
+      primary-button-label="Save"
+      :primary-button-loading="onSubmit.isLoading.value"
+      data-test="dashboard-folder-dialog"
+      @update:open="$emit('update:open', $event)"
+      @click:secondary="$emit('update:open', false)"
+      @click:primary="submit()"
+    >
+      <div class="tw:p-4">
         <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
           <q-input
             v-model="folderData.name"
@@ -64,16 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             dense
           />
-  
-
         </q-form>
-      </q-card-section>
-    </q-card>
+      </div>
+    </ODrawer>
   </template>
   
   <script lang="ts">
   import { defineComponent, ref } from "vue";
   import OButton from '@/lib/core/Button/OButton.vue';
+  import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
   import { createFolder, createFolderByType, updateFolder, updateFolderByType } from "@/utils/commons";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
@@ -92,8 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   export default defineComponent({
     name: "CommonAddFolder",
-    components: { OButton },
+    components: { ODrawer },
     props: {
+      open: {
+        type: Boolean,
+        default: false,
+      },
       folderId: {
         type: String,
         default: "default",
@@ -107,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         default: "alerts",
       },
     },
-    emits: ["update:modelValue", "close"],
+    emits: ["update:modelValue", "update:open"],
     setup(props, { emit }) {
       const store: any = useStore();
       const addFolderForm: any = ref(null);
@@ -148,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 timeout: 2000,
               });
               emit("update:modelValue", folderData.value);
+              emit("update:open", false);
             }
             //else new folder
             else {
@@ -155,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               folderData.value.name = folderData.value.name.trim();
               const newFolder: any = await createFolderByType(store, folderData.value, props.type);
               emit("update:modelValue", newFolder);
+              emit("update:open", false);
               showPositiveNotification("Folder added successfully", {
                 timeout: 2000,
               });

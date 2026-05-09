@@ -19,29 +19,13 @@
 
 
     <template>
-        <q-card
-        style="width: 60vw"
-        class="column full-height no-wrap"
+        <ODrawer
+        :open="open"
+        size="lg"
+        :title="t('logStream.schemaHeader')"
+        @update:open="$emit('update:open', $event)"
     >
-        <q-card-section class="q-ma-none">
-        <div class="row items-center no-wrap">
-            <div class="col">
-            <div
-                class="text-body1 tw:font-semibold tw:text-xl"
-                data-test="schema-title-text"
-            >
-                {{ t("logStream.schemaHeader") }}
-            </div>
-            </div>
-            <div class="col-auto">
-            <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
-              <X :size="14" />
-            </OButton>
-            </div>
-        </div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-ma-none q-pa-none">
+        <div>
         <div
           v-if="loadingState"
           class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
@@ -148,8 +132,8 @@
         </div>
 
       <br /><br /><br />
-    </q-card-section>
-    </q-card>
+        </div>
+    </ODrawer>
     </template>
 
     <script lang="ts">
@@ -185,7 +169,7 @@
     } from "@quasar/extras/material-icons-outlined";
     import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
-    import { X } from "lucide-vue-next";
+    import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
     const defaultStreamData = {
         name: '',
         schema: [],
@@ -200,6 +184,10 @@
     export default defineComponent({
     name: "SchemaEnrichment",
     props: {
+        open: {
+        type: Boolean,
+        default: false,
+        },
          
         selectedEnrichmentTable: {
         type: String,
@@ -211,9 +199,9 @@
         StreamFieldsInputs,
         AppTabs,
         QTablePagination,
-        OButton,
-        X,
+        ODrawer,
     },
+    emits: ['update:open'],
     setup({ selectedEnrichmentTable }) {
         const { t } = useI18n();
         const store = useStore();

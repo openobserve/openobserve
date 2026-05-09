@@ -298,14 +298,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-    <ODrawer
+    <EnrichmentSchema
       v-model:open="showEnrichmentSchema"
-      size="lg"
-      :show-close="false"
-      @close="showEnrichmentSchema = false"
-    >
-      <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" @close="showEnrichmentSchema = false" />
-    </ODrawer>
+      :selectedEnrichmentTable="selectedEnrichmentTable"
+    />
 
     <!-- URL Jobs Dialog -->
     <ODrawer

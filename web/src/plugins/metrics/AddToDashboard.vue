@@ -1,83 +1,49 @@
 <template>
-  <q-card class="column full-height no-wrap">
-    <div style="width: 40vw" class="q-px-sm q-py-md">
-      <q-card-section class="q-pb-sm q-px-sm q-pt-none">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <div class="text-body1 text-bold" data-test="schema-title-text">
-              {{ t("dashboard.addDashboard") }}
-            </div>
-          </div>
-          <div class="col-auto">
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              data-test="metrics-schema-cancel"
-              @click="$emit('cancel')"
-            >
-              <X class="tw:size-4" />
-            </OButton>
-          </div>
-        </div>
-      </q-card-section>
-      <q-separator />
-      <q-card-section class="q-px-md q-py-sm add-dashboard-form-card-section">
-        <q-form ref="addToDashboardForm" @submit.stop="onSubmit.execute">
-          <!-- select folder or create new folder and select -->
-          <select-folder-dropdown @folder-selected="updateActiveFolderId" />
+  <ODialog
+    :open="open"
+    :title="t('dashboard.addDashboard')"
+    secondary-button-label="Cancel"
+    :primary-button-label="t('metrics.add')"
+    :primary-button-loading="onSubmit.isLoading.value"
+    :primary-button-disabled="!panelTitle.trim()"
+    data-test="add-to-dashboard-dialog"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="onSubmit.execute()"
+  >
+    <q-form ref="addToDashboardForm" @submit.stop="onSubmit.execute" class="add-dashboard-form-card-section">
+      <!-- select folder or create new folder and select -->
+      <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
-          <!-- select folder or create new folder and select -->
-          <select-dashboard-dropdown
-            v-if="activeFolderId"
-            :folder-id="activeFolderId"
-            @dashboard-selected="updateSelectedDashboard"
-          />
+      <!-- select folder or create new folder and select -->
+      <select-dashboard-dropdown
+        v-if="activeFolderId"
+        :folder-id="activeFolderId"
+        @dashboard-selected="updateSelectedDashboard"
+      />
 
-          <!-- select tab or create new tab and select -->
-          <select-tab-dropdown
-            v-if="activeFolderId && selectedDashboard"
-            :folder-id="activeFolderId"
-            :dashboard-id="selectedDashboard"
-            @tab-selected="updateActiveTabId"
-          />
-          <span>&nbsp;</span>
-          <q-input
-            v-model.trim="panelTitle"
-            :label="t('dashboard.panelTitle') + '*'"
-            class="showLabelOnTop"
-            stack-label
-            hide-bottom-space
-            borderless
-            dense
-            :rules="[(val: any) => !!val.trim() || 'Panel Title required']"
-            :lazy-rules="true"
-            data-test="metrics-new-dashboard-panel-title"
-          />
-
-          <div class="flex justify-start q-mt-sm tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="metrics-schema-cancel-button"
-              @click="$emit('cancel')"
-            >
-              {{ t('metrics.cancel') }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              data-test="metrics-schema-update-settings-button"
-              :loading="onSubmit.isLoading.value"
-              :disabled="!panelTitle.trim()"
-            >
-              {{ t('metrics.add') }}
-            </OButton>
-          </div>
-        </q-form>
-      </q-card-section>
-    </div>
-  </q-card>
+      <!-- select tab or create new tab and select -->
+      <select-tab-dropdown
+        v-if="activeFolderId && selectedDashboard"
+        :folder-id="activeFolderId"
+        :dashboard-id="selectedDashboard"
+        @tab-selected="updateActiveTabId"
+      />
+      <span>&nbsp;</span>
+      <q-input
+        v-model.trim="panelTitle"
+        :label="t('dashboard.panelTitle') + '*'"
+        class="showLabelOnTop"
+        stack-label
+        hide-bottom-space
+        borderless
+        dense
+        :rules="[(val: any) => !!val.trim() || 'Panel Title required']"
+        :lazy-rules="true"
+        data-test="metrics-new-dashboard-panel-title"
+      />
+    </q-form>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -91,8 +57,7 @@ import { useQuasar } from "quasar";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import { X } from 'lucide-vue-next';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
@@ -103,16 +68,19 @@ export default defineComponent({
     SelectFolderDropdown,
     SelectDashboardDropdown,
     SelectTabDropdown,
-    OButton,
-    X,
+    ODialog,
   },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     dashboardPanelData: {
       type: Object,
       required: true,
     },
   },
-  emits: ["save", "cancel"],
+  emits: ["save", "update:open"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();

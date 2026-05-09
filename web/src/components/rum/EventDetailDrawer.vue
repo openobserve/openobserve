@@ -15,26 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
-    v-model:open="isOpen"
-    size="lg"
-    @update:open="(v) => !v && closeDrawer()"
-  >
-    <EventDetailDrawerContent
-      :event="event"
-      :raw-event="rawEvent"
-      :session-id="sessionId"
-      :session-details="sessionDetails"
-      @close="closeDrawer"
-      @resource-selected="$emit('resource-selected', $event)"
-    />
-  </ODrawer>
+  <EventDetailDrawerContent
+    :open="modelValue"
+    :event="event"
+    :raw-event="rawEvent"
+    :session-id="sessionId"
+    :session-details="sessionDetails"
+    @update:open="$emit('update:modelValue', $event)"
+    @resource-selected="$emit('resource-selected', $event)"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
 import EventDetailDrawerContent from "./EventDetailDrawerContent.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 const props = defineProps({
   modelValue: {
@@ -67,24 +60,5 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["update:modelValue", "resource-selected"]);
-
-const isOpen = ref(props.modelValue);
-
-watch(
-  () => props.modelValue,
-  (val) => {
-    isOpen.value = val;
-  },
-);
-
-watch(isOpen, (val) => {
-  emit("update:modelValue", val);
-});
-
-const closeDrawer = () => {
-  isOpen.value = false;
-};
+defineEmits(["update:modelValue", "resource-selected"]);
 </script>
-
-<style lang="scss" scoped></style>
