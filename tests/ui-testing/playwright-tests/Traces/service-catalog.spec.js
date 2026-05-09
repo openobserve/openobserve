@@ -101,8 +101,9 @@ test.describe("Service Catalog testcases", () => {
     expect(rowCount).toBeLessThanOrEqual(rowCountBefore);
 
     // Verify visible rows actually contain "api" in their names
-    const visibleNames = await page.locator('[data-test^="services-catalog-service-link-"]').allTextContents();
+    const visibleNames = await pm.servicesCatalogPage.getVisibleServiceNames();
     testLogger.info(`Visible service names after filter: ${JSON.stringify(visibleNames)}`);
+    expect(visibleNames.length).toBeGreaterThan(0);
     for (const name of visibleNames) {
       expect(name.toLowerCase()).toContain('api');
     }
@@ -393,7 +394,10 @@ test.describe("Service Catalog testcases", () => {
 
     testLogger.info(`Critical pill: ${hasCritical}, Warning pill: ${hasWarning}, Degraded pill: ${hasDegraded}`);
 
-    // At least the main status pill should be visible
+    // At least one sub-pill should be visible when services have statuses
+    expect(hasCritical || hasWarning || hasDegraded).toBeTruthy();
+
+    // Main status pill should also be visible
     const hasPill = await pm.servicesCatalogPage.isStatusPillVisible();
     expect(hasPill).toBeTruthy();
   });

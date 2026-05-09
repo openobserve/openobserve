@@ -175,6 +175,10 @@ export class ServicesCatalogPage {
     return await this.page.locator('[data-test^="services-catalog-service-link-"]').count();
   }
 
+  async getVisibleServiceNames() {
+    return await this.page.locator('[data-test^="services-catalog-service-link-"]').allTextContents();
+  }
+
   async getServiceCellText(serviceName) {
     return await this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`).textContent();
   }
