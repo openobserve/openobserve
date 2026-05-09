@@ -231,21 +231,49 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Verify no auto-load without run query (Bug #9796)');
 
-    // Navigate to logs with a fresh page (no cached state)
+    // Navigate to logs with a fresh page (no cached state).
+    // Do NOT use selectStream() — it calls page.goto(logsUrl) which
+    // auto-triggers a query and would defeat the purpose of this test.
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Select a stream but do NOT click run query
-    await pm.logsPage.selectStream("e2e_automate");
-    await page.waitForTimeout(3000);
+    // Manually open the stream dropdown and select the stream via the
+    // inline toggle, without navigating away from the current page.
+    const dropdownArrow = page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+    if (await dropdownArrow.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await dropdownArrow.click();
+      await page.waitForTimeout(1500);
 
-    // PRIMARY ASSERTION: No search results should be visible before clicking run query
-    const tableRows = pm.logsPage.getLogsTableRows();
-    const rowsBeforeRun = await tableRows.count();
+      // Search for the stream in the dropdown filter
+      const searchInput = page.locator('[data-test="log-search-index-list-select-stream"]');
+      if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await searchInput.click();
+        await searchInput.fill('e2e_automate');
+        await page.waitForTimeout(1500);
+      }
+
+      // Click the stream toggle
+      const streamToggle = page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"]');
+      if (await streamToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await streamToggle.click();
+        testLogger.info('✓ Selected stream via toggle');
+        await page.waitForTimeout(1000);
+
+        // Close the dropdown by pressing Escape
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(500);
+      }
+    }
+
+    // Wait for any auto-triggered query and check state before manual run
+    await page.waitForTimeout(3000);
 
     // Check for empty state messages using page object
     const noDataVisible = await pm.logsPage.isNoDataVisible();
     const noResultsVisible = await pm.logsPage.isNoResultsVisible();
+
+    const tableRows = pm.logsPage.getLogsTableRows();
+    const rowsBeforeRun = await tableRows.count();
 
     testLogger.info(`Before run query — rowCount: ${rowsBeforeRun}, noData: ${noDataVisible}, noResults: ${noResultsVisible}`);
 

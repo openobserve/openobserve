@@ -2042,28 +2042,18 @@ export class TracesPage {
   }
 
   /**
-   * Check if autocomplete/suggestion widget is visible in the Monaco editor
+   * Check if autocomplete/suggestion widget is visible in the Monaco editor.
+   * Uses page.evaluate() to check Monaco's internal `visible` CSS class,
+   * because the app CSS forces display:flex !important on .suggest-widget,
+   * which makes Playwright's .isVisible() always return true.
    * @returns {Promise<boolean>}
    */
   async isSuggestionWidgetVisible() {
-    const suggestionSelectors = [
-      '.monaco-editor .suggest-widget',
-      '.monaco-editor .suggest-details',
-      '.suggest-widget',
-      '[class*="suggest"]',
-      '[class*="completion"]',
-      '[data-test*="suggestion"]',
-      '[data-test*="autocomplete"]',
-      '.monaco-list-row',
-      '[widgetid*="editor.widget.suggest"]',
-    ];
-
-    for (const sel of suggestionSelectors) {
-      if (await this.page.locator(sel).first().isVisible({ timeout: 2000 }).catch(() => false)) {
-        return true;
-      }
-    }
-    return false;
+    return await this.page.evaluate(() => {
+      const widget = document.querySelector('.monaco-editor .suggest-widget');
+      if (!widget) return false;
+      return widget.classList.contains('visible') || widget.classList.contains('focused');
+    });
   }
 
   /**

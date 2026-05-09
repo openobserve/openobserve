@@ -94,7 +94,7 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
   });
 
   // ==========================================================================
-  // Bug #11580: PromQL selection persists after switching Metrics → Logs
+  // Bug #11580: PromQL selection persists after switching Metrics — Logs
   // https://github.com/openobserve/openobserve/issues/11580
   // ==========================================================================
   test("Query editor should not display PromQL after switching from metrics to logs", {
@@ -172,11 +172,9 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       testLogger.info('✓ Switched to SQL mode');
     }
 
-    // Find the query editor and type to trigger suggestions
+    // Find the query editor
     const queryEditor = page.locator('[data-test="query-editor"], .monaco-editor').first();
 
-    // The editor is the surface under test — its absence means the bug surface
-    // cannot be reached, so skip rather than fail.
     if (!(await queryEditor.isVisible({ timeout: 5000 }).catch(() => false))) {
       testLogger.warn('Query editor not found — cannot verify bug #11217');
       test.skip(true, 'SQL query editor not available in this environment');
@@ -192,7 +190,11 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await queryEditor.locator('.view-lines').first().click({ force: true });
     await page.waitForTimeout(300);
     await page.keyboard.type('select ', { delay: 50 });
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(500);
+
+    // Explicitly trigger autocomplete suggestions (Ctrl+Space in Monaco)
+    await page.keyboard.press('Control+Space');
+    await page.waitForTimeout(2000);
 
     // Check for autocomplete suggestion widget and editor content
     const suggestionsVisible = await pm.tracesPage.isSuggestionWidgetVisible();
