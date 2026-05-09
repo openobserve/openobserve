@@ -28,36 +28,31 @@
           : t("dashboard.addValueMapping")
       }}
     </OButton>
-    <ODialog v-model:open="showValueMappingPopUp" :show-close="false" :width="90">
-      <ValueMappingPopUp
-        :value-mapping="
-          JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))
-        "
-        @close="showValueMappingPopUp = false"
-        @save="saveValueMappingConfig"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-    </ODialog>
+    <ValueMappingPopUp
+      :open="showValueMappingPopUp"
+      :value-mapping="
+        JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))
+      "
+      @close="showValueMappingPopUp = false"
+      @save="saveValueMappingConfig"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
 import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ValueMapping",
-  components: { ValueMappingPopUp, OButton, ODialog },
+  components: { ValueMappingPopUp, OButton },
   props: [],
   setup() {
     const { t } = useI18n();
-    const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -86,7 +81,6 @@ export default defineComponent({
 
     return {
       t,
-      store,
       dashboardPanelData,
       showValueMappingPopUp,
       openValueMappingPopUp,
