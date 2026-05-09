@@ -330,7 +330,10 @@ test.describe("Alerts Stream Switching Regression", () => {
   // Bug #11577: Preview alert y-axis should show numeric values (e.g. "10K")
   // https://github.com/openobserve/openobserve/issues/11577
   // The fix sets config.unit = "numbers" in PreviewAlert.vue, enabling SI-prefix
-  // axis label formatting. We validate the chart renders properly with data.
+  // axis label formatting. We validate the fix by:
+  //   1. Walking the Vue component tree to verify config.unit = "numbers"
+  //   2. Verifying the chart renders (not blank, no errors)
+  //   3. Performing a full save/verify/delete flow
   // ============================================================================
   test("Bug #11577: Alert preview chart y-axis displays numeric values", {
     tag: ['@bug-11577', '@P1', '@regression', '@alertsRegression', '@alertsRegressionAlertPreview']
@@ -358,34 +361,79 @@ test.describe("Alerts Stream Switching Regression", () => {
       `Bug #11577: Chart should render without error, got: "${chartError}"`
     ).toBeNull();
 
-    testLogger.info('Bug #11577: Preview chart renders with data and no errors (fix confirmed)');
+    testLogger.info('Bug #11577: Preview chart renders with data and no errors');
 
-    // Bug #11577 requires config.unit = "numbers" on the y-axis for SI-prefix
-    // formatting (10K, 20K instead of "10000", "20000").
-    // Since echarts is bundled (not on window), verify by scanning the y-axis
-    // area of the canvas for rendered text pixels. A chart with properly formatted
-    // y-axis will have dense non-white pixels in the left margin area.
-    const yAxisHasLabels = await page.evaluate(() => {
-      const canvas = document.querySelector('.preview-alert-chart canvas');
-      if (!canvas || canvas.width < 50) return false;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return false;
-      // Sample the y-axis label area: left 60px of the chart canvas
-      const { data } = ctx.getImageData(0, 0, 60, canvas.height);
-      let coloredPixels = 0;
-      for (let i = 0; i < data.length; i += 16) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-        // Count non-white, non-transparent pixels (text is typically dark)
-        if (a > 200 && !(r > 230 && g > 230 && b > 230)) {
-          coloredPixels++;
+    // === VERIFY config.unit = "numbers" ===
+    // The fix (PreviewAlert.vue:240) sets config.unit = "numbers" which tells the
+    // y-axis formatter (axisBuilder.ts buildYAxis) to use SI-prefix labels like
+    // "10K" instead of "10000". We walk the Vue 3 component tree to read this
+    // config directly from the PanelSchemaRenderer's panelSchema prop.
+    const unitConfig = await page.evaluate(() => {
+      try {
+        const appEl = document.getElementById('app');
+        const vueApp = appEl?.__vue_app__;
+        if (!vueApp) return { error: 'Vue app not found' };
+        // In Vue 3.5+ production builds, app._instance is null but
+        // container._vnode.component holds the root component instance.
+        const rootInstance = vueApp._instance || vueApp._container?._vnode?.component;
+        if (!rootInstance) return { error: 'Root instance not found' };
+
+        // Recursively walk the VNode tree to find a component by predicate
+        function findComponent(root, predicate) {
+          const queue = [root];
+          const seen = new Set();
+          while (queue.length) {
+            const inst = queue.shift();
+            if (!inst || seen.has(inst)) continue;
+            seen.add(inst);
+            if (predicate(inst)) return inst;
+            const subTree = inst.subTree;
+            if (!subTree) continue;
+            const walk = (vnode) => {
+              if (!vnode) return;
+              if (vnode.component) queue.push(vnode.component);
+              if (vnode.children && Array.isArray(vnode.children))
+                vnode.children.forEach(walk);
+              if (vnode.dynamicChildren)
+                vnode.dynamicChildren.forEach(walk);
+            };
+            walk(subTree);
+          }
+          return null;
         }
+
+        const renderer = findComponent(rootInstance, (comp) => {
+          const name = comp.type?.name || comp.type?.__name || '';
+          if (name === 'PanelSchemaRenderer') return true;
+          // Fallback: match by prop shape (works even if name is minified).
+          // PreviewAlert passes chartData = dashboardPanelData.data, so
+          // config is at the root level (not nested under .data).
+          if (comp.props && 'panelSchema' in comp.props &&
+              comp.props.panelSchema?.config?.unit) return true;
+          return false;
+        });
+
+        if (!renderer) return { error: 'PanelSchemaRenderer not found' };
+        const schema = renderer.props?.panelSchema;
+        // chartData = cloneDeep(dashboardPanelData.data), so config is at
+        // the root level, not nested under .data (PreviewAlert.vue:555-556).
+        if (!schema?.config) return { error: 'panelSchema config not found' };
+        return {
+          unit: schema.config.unit,
+          unit_custom: schema.config.unit_custom,
+        };
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
       }
-      return coloredPixels > 5; // At least some text rendered in the axis area
     });
-    expect(yAxisHasLabels,
-      'Bug #11577: Y-axis area must have rendered label text (config.unit = "numbers" provides SI-prefix formatting)'
-    ).toBe(true);
-    testLogger.info(`Bug #11577: Y-axis has rendered labels (config.unit = "numbers" confirmed)`);
+
+    expect(unitConfig.error,
+      `Bug #11577: Vue tree walk should find panelSchema config (${unitConfig.error})`
+    ).toBeUndefined();
+    expect(unitConfig.unit,
+      'Bug #11577: config.unit must be "numbers" (SI-prefix y-axis formatting)'
+    ).toBe('numbers');
+    testLogger.info(`Bug #11577: config.unit = "${unitConfig.unit}" (fix confirmed via Vue component tree)`);
 
     // === SAVE + VERIFY: Full alert creation flow ===
 
