@@ -117,9 +117,10 @@ export class ServicesCatalogPage {
 
   async getServiceCount() {
     const text = await this.page.locator(this.statusPill).textContent().catch(() => '0');
-    // Text is "N/M" when filter active, "N" when unfiltered — always return total (last number)
-    const match = text.match(/(\d+)$/);
-    return match ? parseInt(match[1]) : 0;
+    // Match all numbers; return the last one (total in "N/M", "N of M", "N services", etc.)
+    const matches = text.match(/\d+/g);
+    if (!matches || matches.length === 0) return 0;
+    return parseInt(matches[matches.length - 1]);
   }
 
   async getFilteredCount() {
@@ -259,25 +260,25 @@ export class ServicesCatalogPage {
   }
 
   async goToPage(n) {
-    // Quasar q-pagination sets aria-label="Page N" on page number buttons.
-    // We also try a fallback for other rendering modes.
+    // Try aria-label first
     const pageBtn = this.page.locator(`${this.pagination} button[aria-label="Page ${n}"]`);
-    const count = await pageBtn.count();
-    if (count > 0) {
+    if (await pageBtn.count() > 0) {
       await pageBtn.click();
-    } else {
-      // Fallback: click button with exact text (avoids "2" matching "12" or "20")
-      const allBtns = this.page.locator(`${this.pagination} button`);
-      const btnCount = await allBtns.count();
-      for (let i = 0; i < btnCount; i++) {
-        const text = (await allBtns.nth(i).textContent()).trim();
-        if (text === String(n)) {
-          await allBtns.nth(i).click();
-          break;
-        }
+      await this.page.waitForTimeout(500);
+      return;
+    }
+    // Fallback: click button whose trimmed text matches the page number exactly
+    const allBtns = this.page.locator(`${this.pagination} button`);
+    const btnCount = await allBtns.count();
+    for (let i = 0; i < btnCount; i++) {
+      const text = (await allBtns.nth(i).textContent() ?? '').trim();
+      if (text === String(n)) {
+        await allBtns.nth(i).click();
+        await this.page.waitForTimeout(500);
+        return;
       }
     }
-    await this.page.waitForTimeout(500);
+    throw new Error(`goToPage(${n}): could not find page button among ${btnCount} buttons`);
   }
 
   async isPrevDisabled() {
