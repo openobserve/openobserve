@@ -2000,6 +2000,91 @@ export class TracesPage {
     return this.page.locator('[data-test*="stream-toggle-"][class*="truthy"], [data-test*="stream-chip"], [data-test="log-search-index-list-select-stream"][aria-label]:not([aria-label=""])');
   }
 
+  // ===== Regression Test Helper Methods =====
+
+  /**
+   * Get PromQL tab/mode element on the current page
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPromQLTab() {
+    return this.page.locator('[data-test*="promql" i], button:has-text("PromQL"), [data-test*="prom-ql" i]').first();
+  }
+
+  /**
+   * Check if PromQL tab is visible
+   * @returns {Promise<boolean>}
+   */
+  async isPromQLTabVisible() {
+    return await this.getPromQLTab().isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Get logs-specific query mode toggles (Quick/SQL mode)
+   * @returns {{ quickMode: import('@playwright/test').Locator, sqlMode: import('@playwright/test').Locator }}
+   */
+  getLogsQueryModeToggles() {
+    return {
+      quickMode: this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]'),
+      sqlMode: this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]'),
+    };
+  }
+
+  /**
+   * Check if any logs query mode toggle is visible
+   * @returns {Promise<{quickMode: boolean, sqlMode: boolean}>}
+   */
+  async isAnyLogsQueryToggleVisible() {
+    const toggles = this.getLogsQueryModeToggles();
+    return {
+      quickMode: await toggles.quickMode.isVisible({ timeout: 5000 }).catch(() => false),
+      sqlMode: await toggles.sqlMode.isVisible({ timeout: 5000 }).catch(() => false),
+    };
+  }
+
+  /**
+   * Check if autocomplete/suggestion widget is visible in the Monaco editor
+   * @returns {Promise<boolean>}
+   */
+  async isSuggestionWidgetVisible() {
+    const suggestionSelectors = [
+      '.monaco-editor .suggest-widget',
+      '.monaco-editor .suggest-details',
+      '.suggest-widget',
+      '[class*="suggest"]',
+      '[class*="completion"]',
+      '[data-test*="suggestion"]',
+      '[data-test*="autocomplete"]',
+      '.monaco-list-row',
+      '[widgetid*="editor.widget.suggest"]',
+    ];
+
+    for (const sel of suggestionSelectors) {
+      if (await this.page.locator(sel).first().isVisible({ timeout: 2000 }).catch(() => false)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Focus the Monaco query editor and type text using keyboard.
+   * Dismisses open q-menu popups first to avoid pointer interception.
+   * @param {string} text - Text to type
+   * @param {number} delay - Delay between keystrokes in ms
+   */
+  async typeInQueryEditor(text, delay = 50) {
+    const queryEditor = this.page.locator('[data-test="query-editor"], .monaco-editor').first();
+    if (await queryEditor.isVisible({ timeout: 5000 }).catch(() => false)) {
+      // Dismiss any open q-menu popups that would intercept clicks on the editor
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(300);
+      // Click the visible text surface to focus Monaco
+      await queryEditor.locator('.view-lines').first().click({ force: true });
+      await this.page.waitForTimeout(300);
+      await this.page.keyboard.type(text, { delay });
+    }
+  }
+
 }
 
 

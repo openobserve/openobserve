@@ -7474,4 +7474,129 @@ export class LogsPage {
         }
     }
 
+    // ===== Regression Test Helper Methods =====
+
+    /**
+     * Get logs table body element
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLogsTableBody() {
+        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody');
+    }
+
+    /**
+     * Get table rows in the logs result table
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLogsTableRows() {
+        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
+    }
+
+    /**
+     * Get first row expand menu button
+     * @returns {import('@playwright/test').Locator}
+     */
+    getFirstRowExpandMenu() {
+        return this.page.locator('[data-test="table-row-expand-menu"]').first();
+    }
+
+    /**
+     * Find the visible query mode toggle (Quick/SQL mode)
+     * Returns the first matching locator or null if none visible
+     * @returns {Promise<import('@playwright/test').Locator|null>}
+     */
+    async findQueryModeToggle() {
+        const selectors = [
+            this.quickModeToggle,
+            this.sqlModeToggle,
+            '[data-test="logs-search-bar-quick-mode-toggle-btn"]',
+            '[data-test="logs-search-bar-sql-mode-toggle-btn"]',
+            '[data-test="logs-search-bar-ui-mode-btn"]',
+            '[data-test="logs-search-ui-mode-btn"]',
+            'button:has-text("UI Mode")',
+            '[data-test*="quick-mode"]',
+            '[data-test*="sql-mode"]',
+        ];
+
+        for (const sel of selectors) {
+            const loc = this.page.locator(sel).first();
+            if (await loc.isVisible({ timeout: 2000 }).catch(() => false)) {
+                return loc;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if a toggle element is in active/checked state
+     * @param {import('@playwright/test').Locator} toggle - The toggle locator
+     * @returns {Promise<boolean|null>}
+     */
+    async isToggleActive(toggle) {
+        return await toggle.evaluate(el => {
+            return el.classList.contains('q-toggle--checked') ||
+                   el.getAttribute('aria-checked') === 'true' ||
+                   el.querySelector('.q-toggle__inner--truthy') !== null;
+        }).catch(() => null);
+    }
+
+    /**
+     * Check if histogram toggle is visible
+     * @returns {Promise<boolean>}
+     */
+    async isHistogramToggleVisible() {
+        return await this.page.locator(this.histogramToggle).isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click histogram toggle
+     */
+    async clickHistogramToggle() {
+        await this.page.locator(this.histogramToggle).click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Find the absolute time input field in the datetime picker
+     * @returns {Promise<import('@playwright/test').Locator|null>}
+     */
+    async findTimeInput() {
+        const timeInputSelectors = [
+            '[data-test="start-time-input"]',
+            '[data-test="end-time-input"]',
+            '[data-test="start-time-field"] input',
+            '[data-test="end-time-field"] input',
+            'input[type="time"]',
+            '.q-time input',
+            '[aria-label*="time" i] input',
+            '[aria-label*="Time" i]',
+        ];
+
+        for (const sel of timeInputSelectors) {
+            const loc = this.page.locator(sel).first();
+            if (await loc.isVisible({ timeout: 2000 }).catch(() => false)) {
+                return loc;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if no data or empty state is visible
+     * @returns {Promise<boolean>}
+     */
+    async isNoDataVisible() {
+        return await this.page.locator('[data-test="no-data"], [class*="no-data"], text="No data"')
+            .isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    /**
+     * Check if no results message is visible
+     * @returns {Promise<boolean>}
+     */
+    async isNoResultsVisible() {
+        return await this.page.locator('[data-test="logs-search-result-not-found-text"]')
+            .isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
 }

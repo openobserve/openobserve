@@ -164,6 +164,21 @@ jobs:
               [
                 "ui-regression.spec.js",
               ]
+          - testfolder: "Traces-RegressionBugs"
+            run_files:
+              [
+                "traces-regression-bugs.spec.js",
+              ]
+          - testfolder: "Logs-RegressionBugs2"
+            run_files:
+              [
+                "logs-regression-bugs-2.spec.js",
+              ]
+          - testfolder: "Alerts-RegressionBugs"
+            run_files:
+              [
+                "alerts-regression-bugs.spec.js",
+              ]
 
     steps:
       - name: Clone the current repo
