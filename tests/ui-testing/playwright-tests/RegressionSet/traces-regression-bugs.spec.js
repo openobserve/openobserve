@@ -115,7 +115,7 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       await promqlTab.click();
       await page.waitForTimeout(500);
       // Verify PromQL mode is actually active before navigating to logs
-      const promqlActive = await promqlTab.getAttribute('class').then(c => c?.includes('active')).catch(() => false);
+      const promqlActive = await promqlTab.getAttribute('data-state').then(s => s === 'on').catch(() => false);
       expect(promqlActive,
         'Bug #11580: PromQL tab must be active after clicking (premise for switching test)'
       ).toBe(true);

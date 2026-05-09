@@ -101,7 +101,6 @@ export class TracesPage {
     // Monaco editor container uses class .monaco-editor; no parent data-test attr.
     // SQL mode toggle is data-test="logs-search-bar-sql-mode-toggle-btn" (confirmed in traces SearchBar.vue:140)
     this.sqlModeButton = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
-    this.uiModeButton = '.monaco-editor';
     this.queryEditor = '.monaco-editor';
     this.queryErrorMessage = '[data-test="logs-search-error-message"]';
     this.viewLines = '.view-lines';
@@ -424,15 +423,6 @@ export class TracesPage {
       await sqlButton.click();
       // Wait for query editor to be visible after mode switch
       await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    }
-  }
-
-  async switchToUIMode() {
-    const uiButton = this.page.locator(this.uiModeButton);
-    if (await uiButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await uiButton.click();
-      // Wait for UI mode elements to be visible after mode switch
-      await this.page.locator(this.searchBar).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   }
 
