@@ -15,28 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height tw:w-full">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div v-if="beingUpdated" style="font-size: 18px">
-            {{ t("user.editUser") }}
-          </div>
-          <div v-else style="font-size: 18px">{{ t("user.add") }}</div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-user-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="$emit('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
-      <div>
+  <ODrawer
+    :open="open"
+    size="lg"
+    :title="beingUpdated ? t('user.editUser') : t('user.add')"
+    persistent
+    @update:open="$emit('update:open', $event)"
+  >
+    <div class="tw:p-4 tw:w-full">
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
           <!-- <p class="q-pt-sm tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
@@ -261,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              @click="$emit('cancel:hideform')"
+            @click="$emit('update:open', false)"
               data-test="cancel-user-button"
             >
               {{ t('user.cancel') }}
@@ -276,9 +262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </q-form>
-      </div>
-    </q-card-section>
-  </q-card>
+    </div>
+  </ODrawer>
   <ODialog
     v-model:open="logout_confirm"
     persistent
@@ -300,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -331,8 +317,12 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODialog },
+  components: { OButton, ODialog, ODrawer },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
@@ -359,7 +349,7 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["update:modelValue", "updated", "cancel:hideform"],
+  emits: ["update:modelValue", "updated", "update:open"],
   setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
@@ -507,6 +497,7 @@ export default defineComponent({
               dismiss();
               this.formData.email = userEmail;
               this.$emit("updated", res.data, this.formData, "updated");
+              this.$emit("update:open", false);
             }
           })
           .catch((err: any) => {
@@ -540,6 +531,7 @@ export default defineComponent({
               this.formData.email = userEmail;
               this.existingUser = true;
               this.$emit("updated", res.data, this.formData, "created");
+              this.$emit("update:open", false);
               // }
             })
             .catch((err: any) => {
@@ -573,6 +565,7 @@ export default defineComponent({
             .then((res: any) => {
               dismiss();
               this.$emit("updated", res.data, this.formData, "created");
+              this.$emit("update:open", false);
             })
             .catch((err: any) => {
               this.q.notify({

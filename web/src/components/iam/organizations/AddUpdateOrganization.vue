@@ -15,35 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="o2-side-dialog column full-height">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div
-            v-if="beingUpdated"
-            data-test="update-org"
-            style="font-size: 18px"
-          >
-            {{ t("organization.updateOrganization") }}
-          </div>
-          <div v-else style="font-size: 18px" data-test="create-org">
-            {{ t("organization.createOrganization") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-org-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="$emit('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
-      <div>
-        <q-form ref="addOrganizationForm" @submit="onSubmit">
+  <ODrawer
+    :open="open"
+    size="lg"
+    :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
+    @update:open="$emit('update:open', $event)"
+  >
+    <div class="tw:p-4">
+      <q-form ref="addOrganizationForm" @submit="onSubmit">
           <q-input
             v-if="beingUpdated"
             v-model="organizationData.id"
@@ -86,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              @click="$emit('cancel:hideform')"
+              @click="$emit('update:open', false)"
               data-test="cancel-organizations-modal"
             >
               {{ t('organization.cancel') }}
@@ -113,14 +92,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </q-form>
-      </div>
-    </q-card-section>
-  </q-card>
+    </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -140,8 +119,12 @@ let callOrganization: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton },
+  components: { OButton, ODrawer },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
@@ -154,7 +137,7 @@ export default defineComponent({
       newOrgIdentifier: "",
     };
   },
-  emits: ["update:modelValue", "updated", "finish", "cancel:hideform"],
+  emits: ["update:modelValue", "updated", "finish", "update:open"],
   setup() {
     const store: any = useStore();
     const router: any = useRouter();
@@ -261,6 +244,7 @@ export default defineComponent({
 
               // this.$emit("update:modelValue", data);
               this.$emit("updated");
+              this.$emit("update:open", false);
               this.addOrganizationForm.resetValidation();
               dismiss();
             } else {

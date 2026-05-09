@@ -37,16 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <ODrawer
+    <add-to-dashboard
       v-model:open="showAddToDashboardDialog"
-      :width="40"
-    >
-      <add-to-dashboard
-        @save="addPanelToDashboard"
-        @cancel="showAddToDashboardDialog = false"
-        :dashboardPanelData="dashboardPanelData"
-      />
-    </ODrawer>
+      :dashboardPanelData="dashboardPanelData"
+      @save="addPanelToDashboard"
+    />
   </div>
 </template>
 
@@ -67,7 +62,6 @@ import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -107,7 +101,6 @@ export default defineComponent({
   components: {
     AddToDashboard,
     PanelEditor,
-    ODrawer,
   },
   emits: ["handleChartApiError", "searchRequestTraceIdsUpdated"],
   setup(props, { emit }) {

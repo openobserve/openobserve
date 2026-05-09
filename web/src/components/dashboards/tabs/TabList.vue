@@ -67,23 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #icon-left><q-icon name="add" /></template>
       <q-tooltip>Add Tab</q-tooltip>
     </OButton>
-    <ODrawer
+    <AddTab
       v-model:open="showAddTabDialog"
-      size="md"
-      :show-close="false"
-      @close="showAddTabDialog = false"
-      secondary-button-label="Cancel"
-      primary-button-label="Save"
-      @click:secondary="showAddTabDialog = false"
-      @click:primary="addTabRef?.submit()"
-    >
-      <AddTab
-        ref="addTabRef"
-        :dashboard-id="dashboardData?.dashboardId"
-        @refresh="refreshDashboard"
-        @close="showAddTabDialog = false"
-      />
-    </ODrawer>
+      :dashboard-id="dashboardData?.dashboardId"
+      @refresh="refreshDashboard"
+    />
   </div>
 </template>
 
@@ -94,7 +82,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useRoute } from "vue-router";
 
@@ -106,7 +93,6 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
-    ODrawer,
   },
   props: {
     dashboardData: {
@@ -122,7 +108,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const route = useRoute();
     const showAddTabDialog = ref(false);
-    const addTabRef: any = ref(null);
     const isHovered = ref(false);
 
     // inject selected tab, default will be default tab
@@ -139,7 +124,6 @@ export default defineComponent({
 
     return {
       showAddTabDialog,
-      addTabRef,
       refreshDashboard,
       tabs,
       route,

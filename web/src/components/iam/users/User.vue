@@ -184,35 +184,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
 
-    <ODrawer
+    <update-user-role
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
-      side="right"
-      size="lg"
-      persistent
-      :show-close="false"
-    >
-      <update-user-role v-model="selectedUser" @updated="updateMember" @close="showUpdateUserDialog = false" />
-    </ODrawer>
+      v-model="selectedUser"
+      @updated="updateMember"
+    />
 
-    <ODrawer
+    <add-user
       v-model:open="showAddUserDialog"
-      side="right"
-      size="lg"
-      persistent
-      :show-close="false"
-    >
-      <add-user
-        v-if="config.isCloud == 'false'"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        :userRole="currentUserRole"
-        :roles="options"
-        :customRoles="customRoles"
-        @updated="addMember"
-        @cancel:hideform="hideForm"
-      />
-    </ODrawer>
+      v-if="config.isCloud == 'false'"
+      v-model="selectedUser"
+      :isUpdated="isUpdated"
+      :userRole="currentUserRole"
+      :roles="options"
+      :customRoles="customRoles"
+      @updated="addMember"
+    />
 
     <ODialog
       v-model:open="confirmDelete"
@@ -257,7 +245,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -293,7 +280,6 @@ export default defineComponent({
     MemberInvitation,
     OButton,
     ODialog,
-    ODrawer,
   },
   emits: [
     "updated:fields",
