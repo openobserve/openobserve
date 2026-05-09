@@ -438,12 +438,12 @@ test.describe("Alerts Stream Switching Regression", () => {
     // === SAVE + VERIFY: Full alert creation flow ===
 
     // Capture the alert name that setupToQueryConfig filled
-    const alertNameInput = page.locator('[data-test="add-alert-name-input"]');
+    const alertNameInput = page.locator(pm.alertsPage.alertNameInput);
     const alertName = await alertNameInput.inputValue();
     testLogger.info(`Saving alert: ${alertName}`);
 
-    // Select destination using v3 data-test locator (same pattern as createScheduledAlertWithSQL)
-    const destDropdown = page.locator('[data-test="alert-destinations-select"]');
+    // Select destination using POM locator
+    const destDropdown = page.locator(pm.alertsPage.alertDestinationsSelect);
     await destDropdown.waitFor({ state: 'visible', timeout: 10000 });
     await destDropdown.click();
     await page.waitForTimeout(1000);
@@ -465,9 +465,9 @@ test.describe("Alerts Stream Switching Regression", () => {
     await page.waitForTimeout(300);
 
     // Submit — button is clipped in scroll container, use evaluate() same as createScheduledAlertWithSQL
-    await page.locator('[data-test="add-alert-submit-btn"]').waitFor({ state: 'attached', timeout: 10000 });
+    await page.locator(pm.alertsPage.alertSubmitButton).waitFor({ state: 'attached', timeout: 10000 });
     await page.evaluate(() => {
-      const btn = document.querySelector('[data-test="add-alert-submit-btn"]');
+      const btn = document.querySelector(`[data-test="add-alert-submit-btn"]`);
       if (btn) btn.click();
     });
     testLogger.info('Clicked Save button via evaluate()');

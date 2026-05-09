@@ -171,15 +171,16 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Switch to SQL mode to access the editor with autocomplete
-    const sqlToggle = page.locator('[data-test="logs-search-sql-mode-btn"], [data-test="logs-search-bar-sql-mode-toggle-btn"]').first();
+    // Uses POM locator: validates against traces SearchBar data-test attributes
+    const sqlToggle = page.locator(pm.tracesPage.sqlModeButton).first();
     if (await sqlToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
       await sqlToggle.click();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
       testLogger.info('✓ Switched to SQL mode');
     }
 
-    // Find the query editor
-    const queryEditor = page.locator('[data-test="query-editor"], .monaco-editor').first();
+    // Find the query editor using POM locator (.monaco-editor for traces)
+    const queryEditor = page.locator(pm.tracesPage.queryEditor).first();
 
     if (!(await queryEditor.isVisible({ timeout: 5000 }).catch(() => false))) {
       testLogger.warn('Query editor not found — cannot verify bug #11217');
@@ -193,7 +194,7 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await page.waitForTimeout(300);
 
     // Click the visible text surface to focus Monaco, then type
-    await queryEditor.locator('.view-lines').first().click({ force: true });
+    await queryEditor.locator(pm.tracesPage.viewLines).first().click({ force: true });
     await page.waitForTimeout(300);
     await page.keyboard.type('select ', { delay: 50 });
     await page.waitForTimeout(500);

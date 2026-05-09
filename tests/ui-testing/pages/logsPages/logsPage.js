@@ -7607,4 +7607,20 @@ export class LogsPage {
             .isVisible({ timeout: 2000 }).catch(() => false);
     }
 
+    /**
+     * Get the date-time button locator (confirmed: data-test="date-time-btn")
+     * @returns {import('@playwright/test').Locator}
+     */
+    getDateTimeButton() {
+        return this.page.locator('[data-test="date-time-btn"]').first();
+    }
+
+    /**
+     * Get the logs search error message locator (confirmed: logs/Index.vue)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLogsSearchErrorMessage() {
+        return this.page.locator('[data-test="logs-search-error-message"]').first();
+    }
+
 }

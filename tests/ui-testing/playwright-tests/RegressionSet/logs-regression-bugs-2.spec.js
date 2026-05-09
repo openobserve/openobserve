@@ -43,7 +43,7 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream("e2e_automate");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Run query first so search bar controls are fully rendered
     await pm.logsPage.clickRefreshButton();
@@ -124,7 +124,7 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
       testLogger.info('✓ Clicked expand menu on first row');
       await page.waitForTimeout(1000);
 
-      const expandButton = page.locator('[data-test*="expand"], [aria-label*="expand" i]').first();
+      const expandButton = pm.logsPage.getFirstRowExpandMenu();
       if (await expandButton.isVisible({ timeout: 2000 }).catch(() => false)) {
         await expandButton.click();
         await page.waitForTimeout(500);
@@ -188,7 +188,7 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
       await page.waitForTimeout(500);
 
       // Click outside to trigger validation
-      await page.locator('[data-test="logs-search-bar-datetime-dropdown"], [data-test="date-time-btn"]').first().click().catch(() => {});
+      await pm.logsPage.getDateTimeButton().click().catch(() => {});
       await page.waitForTimeout(500);
 
       // Get the value to check if decimal was accepted
@@ -197,7 +197,7 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
 
       // PRIMARY ASSERTION: Decimal value should be rejected or corrected
       const hasDecimalInValue = inputValue.includes('.');
-      const errorVisible = await page.locator('[data-test="logs-search-error-message"], .q-field--error, [class*="error"], [data-test*="error"]')
+      const errorVisible = await pm.logsPage.getLogsSearchErrorMessage()
         .isVisible({ timeout: 2000 }).catch(() => false);
 
       testLogger.info(`Decimal in value: ${hasDecimalInValue}, Error visible: ${errorVisible}`);
@@ -210,7 +210,8 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
       testLogger.info('✓ PASSED: Decimal value rejected in datetime picker');
     } else {
       // Time input not in absolute tab — check if the time is entered via Quasar time picker buttons instead
-      const timePickerVisible = await page.locator('.q-time, [data-test*="time-picker"], [class*="time-picker"]')
+      // Uses class-based selector as fallback (Quasar QTime component has no data-test attr)
+      const timePickerVisible = await page.locator('.q-time')
         .isVisible({ timeout: 2000 }).catch(() => false);
 
       if (timePickerVisible) {

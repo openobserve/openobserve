@@ -97,9 +97,12 @@ export class TracesPage {
     this.errorMessage = '[data-test="logs-search-error-message"]';
 
     // Query Editor
-    this.sqlModeButton = '[data-test="logs-search-sql-mode-btn"]';
-    this.uiModeButton = '[data-test="logs-search-ui-mode-btn"]';
-    this.queryEditor = '[data-test="query-editor"]';
+    // The traces SearchBar.vue renders <code-query-editor editor-id="traces-query-editor">
+    // Monaco editor container uses class .monaco-editor; no parent data-test attr.
+    // SQL mode toggle is data-test="logs-search-bar-sql-mode-toggle-btn" (confirmed in traces SearchBar.vue:140)
+    this.sqlModeButton = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+    this.uiModeButton = '.monaco-editor';
+    this.queryEditor = '.monaco-editor';
     this.queryErrorMessage = '[data-test="logs-search-error-message"]';
     this.viewLines = '.view-lines';
 
@@ -2003,11 +2006,14 @@ export class TracesPage {
   // ===== Regression Test Helper Methods =====
 
   /**
-   * Get PromQL tab/mode element on the current page
+   * Get PromQL tab/mode element on the current page.
+   * Targets the QueryTypeSelector button (used in metrics page and PanelEditor):
+   *   data-test="dashboard-promql-query-type"
+   * Falls back to text matching for other contexts.
    * @returns {import('@playwright/test').Locator}
    */
   getPromQLTab() {
-    return this.page.locator('[data-test*="promql" i], button:has-text("PromQL"), [data-test*="prom-ql" i]').first();
+    return this.page.locator('[data-test="dashboard-promql-query-type"], button:has-text("PromQL")').first();
   }
 
   /**

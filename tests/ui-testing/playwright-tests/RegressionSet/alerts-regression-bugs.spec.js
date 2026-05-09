@@ -44,46 +44,40 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('✓ Navigated to alerts page');
 
     // Click "Add Alert" button
-    const addAlertBtn = page.locator('[data-test="alert-list-add-alert-btn"]');
-    if (!(await addAlertBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
+    const addAlertBtnVisible = await page.locator(pm.alertsPage.addAlertButton).isVisible({ timeout: 5000 }).catch(() => false);
+    if (!addAlertBtnVisible) {
       testLogger.warn('Add Alert button not visible — skipping');
       test.skip(true, 'Add Alert button not available');
       return;
     }
-    await addAlertBtn.click();
-    await page.waitForTimeout(2000);
+    await pm.alertsPage.clickAddAlertButton();
     testLogger.info('✓ Clicked Add Alert button');
 
     // Fill alert name
     const uniqueId = Date.now();
     const alertName = `test_alert_override_${uniqueId}`;
-    const alertNameInput = page.locator('[data-test="add-alert-name-input"]');
-    if (await alertNameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await alertNameInput.fill(alertName);
-      testLogger.info(`✓ Filled alert name: ${alertName}`);
-    }
+    await pm.alertsPage.fillAlertName(alertName);
 
     // Select stream type first (enables stream name dropdown)
-    const streamTypeDropdown = page.locator('[data-test="add-alert-stream-type-select-dropdown"]');
+    const streamTypeDropdown = page.locator(pm.alertsPage.streamTypeDropdown);
     if (await streamTypeDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
       await streamTypeDropdown.click();
-      await page.waitForTimeout(500);
       const logsOption = page.getByRole('option', { name: 'Logs' }).first();
       if (await logsOption.isVisible({ timeout: 3000 }).catch(() => false)) {
         await logsOption.click();
         testLogger.info('✓ Selected stream type: Logs');
       }
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
     }
 
     // Select stream name (enabled after stream type is chosen).
     // Type into the q-select to filter, then pick e2e_automate.
-    const streamNameDropdown = page.locator('[data-test="add-alert-stream-name-select-dropdown"]');
+    const streamNameDropdown = page.locator(pm.alertsPage.streamNameDropdown);
     if (await streamNameDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
       await streamNameDropdown.click();
-      await page.waitForTimeout(500);
       await streamNameDropdown.fill('e2e_automate');
-      await page.waitForTimeout(1500);
+      // Wait for options to filter
+      await page.waitForTimeout(1000);
 
       const e2eOption = page.getByRole('option', { name: 'e2e_automate' }).first();
       if (await e2eOption.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -96,32 +90,27 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
           testLogger.info('✓ Selected first available stream');
         }
       }
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
     }
 
     // Add a condition
-    const addConditionBtn = page.locator('[data-test="alert-conditions-add-condition-btn"]');
+    const addConditionBtn = page.locator(pm.alertsPage.addConditionButton);
     if (await addConditionBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await addConditionBtn.click();
-      await page.waitForTimeout(500);
       testLogger.info('✓ Added condition');
     }
 
-    // Switch to the Advanced tab to access Template Override.
-    // The v3 layout uses an OToggleGroup with buttons — find the Advanced tab.
-    const advancedTab = page.locator('button').filter({ hasText: 'Advanced' }).first();
-    if (!(await advancedTab.isVisible({ timeout: 3000 }).catch(() => false))) {
+    // Switch to the Advanced tab
+    if (!(await page.locator(pm.alertsPage.advancedTabBtn).first().isVisible({ timeout: 3000 }).catch(() => false))) {
       testLogger.warn('Advanced tab not found — skipping');
       test.skip(true, 'Advanced tab not available in current UI');
       return;
     }
-    await advancedTab.click();
-    await page.waitForTimeout(1000);
+    await pm.alertsPage.clickAdvancedTab();
     testLogger.info('✓ Switched to Advanced tab');
 
-    // Template Override is a q-select with class alert-v3-select inside the Advanced tab.
-    // The select uses emit-value and has options filtered via @filter.
-    const templateOverrideSelect = page.locator('.alert-v3-select').first();
+    // Template Override in Advanced tab
+    const templateOverrideSelect = pm.alertsPage.getAdvancedTemplateOverrideSelect();
     if (!(await templateOverrideSelect.isVisible({ timeout: 3000 }).catch(() => false))) {
       testLogger.warn('Template override select not found — skipping');
       test.skip(true, 'Template override field not available in current UI');
@@ -141,7 +130,6 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     }
     const templateText = await templateOption.textContent();
     await templateOption.click();
-    await page.waitForTimeout(500);
     testLogger.info(`✓ Selected template: ${templateText?.trim()}`);
 
     // Get the displayed value from the select
