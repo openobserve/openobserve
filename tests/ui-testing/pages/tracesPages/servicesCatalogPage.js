@@ -50,7 +50,7 @@ export class ServicesCatalogPage {
       timeout: 60000,
     });
     // Use load instead of networkidle — networkidle hangs on SPAs with websockets
-    await this.page.waitForLoadState('load', { timeout: 15000 }).catch(() => {});
+    await this.page.waitForLoadState('load', { timeout: 15000 });
   }
 
   async waitForLoad() {
@@ -120,35 +120,35 @@ export class ServicesCatalogPage {
     // Match all numbers; return the last one (total in "N/M", "N of M", "N services", etc.)
     const matches = text.match(/\d+/g);
     if (!matches || matches.length === 0) return 0;
-    return parseInt(matches[matches.length - 1]);
+    return parseInt(matches[matches.length - 1], 10);
   }
 
   async getFilteredCount() {
     const text = await this.page.locator(this.statusPill).textContent().catch(() => '0/0');
     // Match "N/M" (filtered) or just "N" (unfiltered total)
     const filteredMatch = text.match(/^(\d+)\//);
-    if (filteredMatch) return parseInt(filteredMatch[1]);
+    if (filteredMatch) return parseInt(filteredMatch[1], 10);
     // Unfiltered state — pill shows just the total, so "filtered" equals total
     const totalMatch = text.match(/^(\d+)/);
-    return totalMatch ? parseInt(totalMatch[1]) : 0;
+    return totalMatch ? parseInt(totalMatch[1], 10) : 0;
   }
 
   async getCriticalCount() {
     const text = await this.page.locator(this.pillCritical).textContent().catch(() => '0');
     const match = text.match(/^(\d+)/);
-    return match ? parseInt(match[1]) : 0;
+    return match ? parseInt(match[1], 10) : 0;
   }
 
   async getWarningCount() {
     const text = await this.page.locator(this.pillWarning).textContent().catch(() => '0');
     const match = text.match(/^(\d+)/);
-    return match ? parseInt(match[1]) : 0;
+    return match ? parseInt(match[1], 10) : 0;
   }
 
   async getDegradedCount() {
     const text = await this.page.locator(this.pillDegraded).textContent().catch(() => '0');
     const match = text.match(/^(\d+)/);
-    return match ? parseInt(match[1]) : 0;
+    return match ? parseInt(match[1], 10) : 0;
   }
 
   async isStatusPillVisible() {
@@ -221,21 +221,13 @@ export class ServicesCatalogPage {
     await expect(this.page.locator(this.sidePanel)).toBeVisible({ timeout: 30000 });
   }
 
-  async closeSidePanel() {
-    // Click the close button inside the side panel
-    const closeBtn = this.page.locator(`${this.sidePanel} button[aria-label="Close"]`);
-    await closeBtn.click().catch(() => {});
-    await this.page.locator(this.sidePanel)
-      .waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-  }
-
   // ===== PAGINATION =====
 
   async getRowsPerPage() {
     const el = this.page.locator(this.rowsPerPage);
     await el.waitFor({ state: 'attached', timeout: 5000 });
     const text = await el.textContent();
-    const val = parseInt(text);
+    const val = parseInt(text, 10);
     if (Number.isNaN(val)) throw new Error(`getRowsPerPage: could not parse "${text}"`);
     return val;
   }
@@ -296,7 +288,7 @@ export class ServicesCatalogPage {
     const el = this.page.locator(`${this.pagination} button[aria-current="true"]`);
     await el.waitFor({ state: 'attached', timeout: 5000 });
     const text = await el.textContent();
-    const val = parseInt(text);
+    const val = parseInt(text, 10);
     if (Number.isNaN(val)) throw new Error(`getCurrentPage: could not parse "${text}"`);
     return val;
   }
@@ -338,7 +330,7 @@ export class ServicesCatalogPage {
     const el = this.page.locator(`[data-test="services-catalog-legend-${status}"]`);
     const text = await el.textContent().catch(() => '0');
     const match = text.match(/(\d+)/);
-    return match ? parseInt(match[1]) : 0;
+    return match ? parseInt(match[1], 10) : 0;
   }
 
   // ===== EMPTY STATE =====

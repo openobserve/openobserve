@@ -103,13 +103,8 @@ test.describe("Service Catalog testcases", () => {
     // Type something first
     await pm.servicesCatalogPage.filterByServiceName('api');
 
-    // Capture console errors before clearing
-    const consoleErrors = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
-      }
-    });
+    // Snapshot errors captured so far (listener attached in beforeEach)
+    const errorCountBefore = pm._consoleErrors.length;
 
     // Clear the filter
     await pm.servicesCatalogPage.clearFilter();
@@ -119,8 +114,9 @@ test.describe("Service Catalog testcases", () => {
     expect(hasTable).toBeTruthy();
     testLogger.info('Table is still visible after clearing filter');
 
-    // Verify no "Cannot read properties of null" TypeError
-    const nullErrors = consoleErrors.filter(e => e.includes('Cannot read properties of null'));
+    // Verify no new "Cannot read properties of null" TypeError since clear
+    const newErrors = pm._consoleErrors.slice(errorCountBefore);
+    const nullErrors = newErrors.filter(e => e.includes('Cannot read properties of null'));
     if (nullErrors.length > 0) {
       testLogger.error(`TypeError found: ${nullErrors.join('; ')}`);
     }
