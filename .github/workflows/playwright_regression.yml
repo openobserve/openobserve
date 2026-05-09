@@ -126,12 +126,15 @@ jobs:
               [
                 "logs-regression.spec.js",
                 "logs-regression-bugs.spec.js",
+                "logs-regression-bugs-2.spec.js",
                 "logs-9754.spec.js",
               ]
           - testfolder: "Alerts-Regression"
             run_files:
               [
+                "alerts-regression.spec.js",
                 "alerts-stream-switching-regression.spec.js",
+                "alerts-regression-bugs.spec.js",
               ]
           - testfolder: "Dashboard-Regression"
             run_files:
@@ -153,6 +156,7 @@ jobs:
             run_files:
               [
                 "traces-regression.spec.js",
+                "traces-regression-bugs.spec.js",
               ]
           - testfolder: "Metrics-Regression"
             run_files:
@@ -163,21 +167,6 @@ jobs:
             run_files:
               [
                 "ui-regression.spec.js",
-              ]
-          - testfolder: "Traces-RegressionBugs"
-            run_files:
-              [
-                "traces-regression-bugs.spec.js",
-              ]
-          - testfolder: "Logs-RegressionBugs2"
-            run_files:
-              [
-                "logs-regression-bugs-2.spec.js",
-              ]
-          - testfolder: "Alerts-RegressionBugs"
-            run_files:
-              [
-                "alerts-regression-bugs.spec.js",
               ]
 
     steps:
