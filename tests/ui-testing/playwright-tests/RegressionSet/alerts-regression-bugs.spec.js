@@ -250,7 +250,9 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
         chartFound = true;
         testLogger.info(`✓ Found preview chart via: ${sel}`);
 
-        const yAxisTexts = page.locator('svg text, canvas').first();
+        // Scope inside the chart container — page-wide 'svg text'
+        // could match unrelated icons, and canvas has no textContent.
+        const yAxisTexts = chart.locator('svg text, [class*="echarts-text"], [class*="axis-label"]').first();
         yAxisContent = await yAxisTexts.textContent().catch(() => '') || '';
         testLogger.info(`Chart text content sample: "${yAxisContent.substring(0, 100)}"`);
         break;
