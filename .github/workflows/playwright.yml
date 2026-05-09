@@ -297,6 +297,7 @@ jobs:
             browser: "chrome"
             run_files:
               [
+                "service-catalog.spec.js",
                 "tracesSearch.spec.js",
                 "traceQueryEditor.spec.js",
                 "traceErrorFilter.spec.js",
