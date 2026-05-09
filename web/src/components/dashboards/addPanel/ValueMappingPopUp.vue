@@ -15,27 +15,18 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div
+  <ODialog
+    :open="open"
+    @update:open="(v) => { if (!v) cancelEdit() }"
+    :title="t('dashboard.valueMappingsTitle')"
+    :width="70"
+    :neutral-button-label="t('dashboard.valueMappingAddNew')"
+    neutral-button-variant="outline"
+    :primary-button-label="t('dashboard.valueMappingApply')"
+    @click:neutral="addValueMapping"
+    @click:primary="applyValueMapping"
     data-test="dashboard-value-mapping-popup"
-    style="padding: 0px 10px; min-width: min(1200px, 90vw)"
   >
-    <div
-      class="flex justify-between items-center q-pa-md header tw:sticky tw:top-0 tw:bg-dialog-bg tw:z-[1]"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span>{{ t("dashboard.valueMappingsTitle") }}</span>
-      </div>
-      <OButton
-        variant="ghost"
-        size="icon"
-        :title="t('dashboard.cancel')"
-        @click.stop="cancelEdit"
-        data-test="dashboard-tab-settings-tab-name-edit-cancel"
-      >
-        <template #icon-left><q-icon name="close" /></template>
-      </OButton>
-    </div>
     <div class="tw:mb-4">
       <draggable
         v-model="editedValueMapping"
@@ -183,23 +174,7 @@
         </div>
       </draggable>
     </div>
-    <div class="flex justify-between tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:pt-2 tw:z-[1]">
-      <OButton
-        variant="outline"
-        size="sm"
-        @click="addValueMapping"
-        data-test="dashboard-addpanel-config-value-mapping-add-btn"
-        >{{ t("dashboard.valueMappingAddNew") }}</OButton
-      >
-      <OButton
-        variant="primary"
-        size="sm"
-        @click="applyValueMapping"
-        data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-        >{{ t("dashboard.valueMappingApply") }}</OButton
-      >
-    </div>
-  </div>
+  </ODialog>
 </template>
 <script lang="ts">
 import { ref, computed } from "vue";
@@ -209,11 +184,16 @@ import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: { draggable: VueDraggableNext as any, OButton },
+  components: { draggable: VueDraggableNext as any, OButton, ODialog },
   props: {
+    open: {
+      type: Boolean,
+      required: true,
+    },
     valueMapping: {
       type: Array,
       default: () => [],
@@ -304,6 +284,10 @@ export default defineComponent({
   justify-content: space-between;
   border-bottom: 1px solid #cccccc70;
   margin-bottom: 8px;
+
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .draggable-handle {

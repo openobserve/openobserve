@@ -495,19 +495,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <!-- Column Order Popup Dialog -->
-        <ODialog
-          v-model:open="showColumnOrderPopup"
-          :show-close="false"
-          size="lg"
-          data-test="column-order-dialog"
-        >
-          <ColumnOrderPopUp
-            :column-order="columnOrder"
-            :available-columns="filteredAvailableColumns"
-            @cancel="closeColumnOrderPopup"
-            @save="saveColumnOrder"
-          />
-        </ODialog>
+        <ColumnOrderPopUp
+          :open="showColumnOrderPopup"
+          :column-order="columnOrder"
+          :available-columns="filteredAvailableColumns"
+          @cancel="closeColumnOrderPopup"
+          @save="saveColumnOrder"
+        />
       </template>
     </div>
   </div>
@@ -519,14 +513,12 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "PromQLChartConfig",
   components: {
     ColumnOrderPopUp,
     OButton,
-    ODialog,
   },
   props: {
     chartType: {
