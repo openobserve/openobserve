@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-  <div class="q-w-md q-mx-lg" data-test="dashboard-folder-move-body">
+  <div class="q-px-md q-py-sm" data-test="dashboard-folder-move-body">
       <q-form
         ref="moveFolderForm"
         @submit.stop="onSubmit.execute()"
@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @folder-selected="selectedFolder = $event"
           :activeFolderId="activeFolderId"
         />
+        <span>&nbsp;</span>
       </q-form>
   </div>
   </ODrawer>
