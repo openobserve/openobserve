@@ -22,7 +22,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   width: undefined,
   seamless: false,
   primaryButtonVariant: "primary",
-  secondaryButtonVariant: "secondary",
+  secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
   primaryButtonDisabled: false,
   secondaryButtonDisabled: false,

@@ -57,24 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @folder-selected="selectedFolder = $event"
         />
 
-        <div class="flex justify-start q-mt-md tw:gap-3">
-          <OButton
-            @click="$emit('close')"
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-add-cancel"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            data-test="dashboard-add-submit"
-            :disabled="dashboardData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            >{{ t("dashboard.save") }}</OButton
-          >
-        </div>
+
       </q-form>
   </div>
 </template>
@@ -90,7 +73,6 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
 import { useQuasar } from "quasar";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 
@@ -230,6 +212,7 @@ export default defineComponent({
       getImageURL,
       selectedFolder,
       onSubmit,
+      submit: () => onSubmit.execute(),
     };
   },
   methods: {
@@ -240,7 +223,7 @@ export default defineComponent({
       });
     },
   },
-  components: { SelectFolderDropdown, OButton },
+  components: { SelectFolderDropdown },
 });
 </script>
 <style lang="scss">
