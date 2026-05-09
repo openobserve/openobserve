@@ -336,10 +336,7 @@ test.describe("Service Catalog testcases", () => {
     const icon2 = await pm.servicesCatalogPage.getSortIcon('service_name');
     testLogger.info(`Service name sort icon (click 2): "${icon2}"`);
 
-    // If the column header click doesn't register (both icons stayed unfold_more),
-    // the virtualized table isn't propagating clicks to this column's sort handler.
-    test.skip(icon1 === 'unfold_more' && icon2 === 'unfold_more',
-      'service_name column sort handler unreachable via click in virtualized table');
+    expect(icon1, 'service_name column sort did not respond to clicks').not.toBe('unfold_more');
     expect(icon1).not.toBe(icon2);
   });
 

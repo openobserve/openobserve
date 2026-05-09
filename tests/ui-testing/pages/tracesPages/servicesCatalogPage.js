@@ -305,8 +305,9 @@ export class ServicesCatalogPage {
 
   async sortByColumn(columnKey) {
     const header = this.page.locator(`[data-test="o2-table-th-${columnKey}"]`);
-    await header.scrollIntoViewIfNeeded();
-    await header.click();
+    // Use evaluate(el.click()) to dispatch a native click directly on the header,
+    // bypassing child-element interception in virtualized table headers.
+    await header.evaluate(el => el.click());
     await this.page.waitForTimeout(300);
   }
 
