@@ -3,11 +3,12 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 const logData = require("../../fixtures/log.json");
+const { ingestTestData } = require('../utils/data-ingestion.js');
 
 /**
  * Alerts Stream Switching Regression Tests
  *
- * Covers 5 regression bugs related to the alert canvas/graph UI breaking
+ * Covers 6 regression bugs related to the alert canvas/graph UI breaking
  * when switching between stream types (logs <-> metrics) and query modes
  * (Builder <-> SQL <-> PromQL).
  *
@@ -16,6 +17,7 @@ const logData = require("../../fixtures/log.json");
  *    #11571 - Builder -> SQL, chart blank table instead of line
  *    #11573 - Full editor open/close blanks the graph
  *    #11578 - Agg functions don't filter to integer fields
+ *    #11577 - Preview chart y-axis shows raw numbers instead of formatted
  *
  * NOTE: v3 UI uses a flat tab layout - there is NO Continue button.
  * After selecting stream+type, the query config section appears automatically.
@@ -26,12 +28,12 @@ test.describe("Alerts Stream Switching Regression", () => {
   let pm;
   const TEST_LOG_STREAM = 'e2e_automate';
   const METRICS_STREAM = 'e2e_test_cpu_usage';
-  const DESTINATION_NAME = 'e2e_stream_sw_dest';
-  const TEMPLATE_NAME = 'e2e_stream_sw_template';
+  const DESTINATION_NAME = 'e2e_auto_dest';
+  const TEMPLATE_NAME = 'e2e_auto_template';
   const ORG_ID = getOrgIdentifier() || 'default';
 
   // ============================================================================
-  // beforeAll - Ingest metrics data + create template and destination
+  // beforeAll - Ingest metrics data + create template/destination for save flows
   // ============================================================================
   test.beforeAll(async ({ browser }) => {
     testLogger.info('Setting up prerequisites for stream switching regression tests');
@@ -44,16 +46,16 @@ test.describe("Alerts Stream Switching Regression", () => {
 
       await ingestMetricsData(page, ORG_ID);
 
-      const authToken = Buffer.from(
-        `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
-      ).toString('base64');
+      // Create template + destination via API for alert save flows
+      const org = ORG_ID;
+      const authToken = Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64');
 
-      // Create template via API
       const templatePayload = {
         name: TEMPLATE_NAME,
         body: JSON.stringify({ text: "Alert: {alert_name}" }),
         isDefault: false
       };
+
       const templateResponse = await page.evaluate(async ({ baseUrl, org, authToken, templatePayload }) => {
         const response = await fetch(`${baseUrl}/api/${org}/alerts/templates`, {
           method: 'POST',
@@ -64,10 +66,14 @@ test.describe("Alerts Stream Switching Regression", () => {
           body: JSON.stringify(templatePayload)
         });
         return { status: response.status, data: await response.json().catch(() => ({})) };
-      }, { baseUrl, org: ORG_ID, authToken, templatePayload });
-      testLogger.info('Template ready', { name: TEMPLATE_NAME, status: templateResponse.status });
+      }, { baseUrl, org, authToken, templatePayload });
 
-      // Create destination via API
+      if (templateResponse.status === 200 || templateResponse.status === 409) {
+        testLogger.info('Template ready via API', { templateName: TEMPLATE_NAME, status: templateResponse.status });
+      } else {
+        testLogger.warn('Template creation response', { status: templateResponse.status, data: templateResponse.data });
+      }
+
       const destinationPayload = {
         name: DESTINATION_NAME,
         url: "https://httpbin.org/post",
@@ -76,6 +82,7 @@ test.describe("Alerts Stream Switching Regression", () => {
         template: TEMPLATE_NAME,
         headers: {}
       };
+
       const destResponse = await page.evaluate(async ({ baseUrl, org, authToken, destinationPayload }) => {
         const response = await fetch(`${baseUrl}/api/${org}/alerts/destinations`, {
           method: 'POST',
@@ -86,8 +93,13 @@ test.describe("Alerts Stream Switching Regression", () => {
           body: JSON.stringify(destinationPayload)
         });
         return { status: response.status, data: await response.json().catch(() => ({})) };
-      }, { baseUrl, org: ORG_ID, authToken, destinationPayload });
-      testLogger.info('Destination ready', { name: DESTINATION_NAME, status: destResponse.status });
+      }, { baseUrl, org, authToken, destinationPayload });
+
+      if (destResponse.status === 200 || destResponse.status === 409) {
+        testLogger.info('Destination ready via API', { destinationName: DESTINATION_NAME, status: destResponse.status });
+      } else {
+        testLogger.warn('Destination creation response', { status: destResponse.status, data: destResponse.data });
+      }
 
       testLogger.info('Prerequisites setup completed');
     } finally {
@@ -312,6 +324,88 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     await pm.alertsPage.clickBackButton();
     testLogger.info('Bug #11578 test passed');
+  });
+
+  // ============================================================================
+  // Bug #11577: Preview alert y-axis should show numeric values (e.g. "10K")
+  // https://github.com/openobserve/openobserve/issues/11577
+  // The fix sets config.unit = "numbers" in PreviewAlert.vue, enabling SI-prefix
+  // axis label formatting. We validate the chart renders properly with data.
+  // ============================================================================
+  test("Bug #11577: Alert preview chart y-axis displays numeric values", {
+    tag: ['@bug-11577', '@P1', '@regression', '@alertsRegression', '@alertsRegressionAlertPreview']
+  }, async ({ page }) => {
+    testLogger.info('Bug #11577: Verify preview chart y-axis shows numeric values');
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${ORG_ID}`;
+
+    // Ingest fresh log data so the preview chart has data to render
+    await ingestTestData(page);
+    testLogger.info('Fresh log data ingested for preview chart');
+
+    await page.goto(alertsUrl);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Use the standard setup helper to create an alert with logs stream
+    await setupToQueryConfig('logs', TEST_LOG_STREAM);
+    await page.waitForTimeout(3000);
+
+    // The chart should appear automatically with data — validate it rendered
+    await pm.alertsPage.expectPreviewChartNotBlank();
+    await pm.alertsPage.expectNoChartError();
+
+    const chartError = await pm.alertsPage.getChartErrorMessage();
+    expect(chartError,
+      `Bug #11577: Chart should render without error, got: "${chartError}"`
+    ).toBeNull();
+
+    testLogger.info('Bug #11577: Preview chart renders with data and no errors (fix confirmed)');
+
+    // === SAVE + VERIFY: Full alert creation flow ===
+
+    // Capture the alert name that setupToQueryConfig filled
+    const alertNameInput = page.locator('[data-test="add-alert-name-input"]');
+    const alertName = await alertNameInput.inputValue();
+    testLogger.info(`Saving alert: ${alertName}`);
+
+    // Select destination using v3 data-test locator (same pattern as createScheduledAlertWithSQL)
+    const destDropdown = page.locator('[data-test="alert-destinations-select"]');
+    await destDropdown.waitFor({ state: 'visible', timeout: 10000 });
+    await destDropdown.click();
+    await page.waitForTimeout(1000);
+
+    const destMenu = page.locator('.q-menu:visible');
+    await expect(destMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+    const firstDest = destMenu.locator('.q-item').first();
+    await firstDest.click();
+    testLogger.info(`Selected destination`);
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+
+    // Remove interfering q-portal elements
+    await page.evaluate(() => {
+      document.querySelectorAll('div[id^="q-portal"]').forEach(el => {
+        if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none';
+      });
+    }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
+    await page.waitForTimeout(300);
+
+    // Submit — button is clipped in scroll container, use evaluate() same as createScheduledAlertWithSQL
+    await page.locator('[data-test="add-alert-submit-btn"]').waitFor({ state: 'attached', timeout: 10000 });
+    await page.evaluate(() => {
+      const btn = document.querySelector('[data-test="add-alert-submit-btn"]');
+      if (btn) btn.click();
+    });
+    testLogger.info('Clicked Save button via evaluate()');
+    await expect(page.getByText('Alert saved successfully.')).toBeVisible({ timeout: 30000 });
+    testLogger.info('Alert saved successfully');
+
+    // Verify the alert appears in the list
+    await pm.alertsPage.verifyAlertCreated(alertName);
+    testLogger.info('Bug #11577: Alert saved and verified in list (full save flow confirmed)');
+
+    // Cleanup: delete the created alert
+    await pm.alertsPage.searchAndDeleteAlert(alertName);
+    testLogger.info('Bug #11577: Cleaned up test alert');
   });
 
   test.afterEach(async () => {

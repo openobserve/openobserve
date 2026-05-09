@@ -1,7 +1,7 @@
 /**
  * Alerts Regression Bugs — Batch 1
  *
- * Covers: #10110, #11577
+ * Covers: #10110
  *
  * Tests run in PARALLEL.
  *
@@ -165,128 +165,6 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     ).toBe(uniqueParts.length);
 
     testLogger.info('✓ PASSED: Template not duplicated in override input');
-  });
-
-  // ==========================================================================
-  // Bug #11577: Preview alert y-axis should have type numbers
-  // https://github.com/openobserve/openobserve/issues/11577
-  // ==========================================================================
-  test("Alert preview chart y-axis should display numeric values, not raw strings", {
-    tag: ['@bug-11577', '@P1', '@regression', '@alertsRegression', '@alertsRegressionAlertPreview']
-  }, async ({ page }) => {
-    testLogger.info('Test: Verify alert preview y-axis shows numbers (Bug #11577)');
-
-    // Navigate to alerts page
-    await pm.commonActions.navigateToAlerts();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    testLogger.info('✓ Navigated to alerts page');
-
-    // Click Add Alert
-    const addAlertBtn = page.locator('[data-test="alert-list-add-alert-btn"]');
-    if (!(await addAlertBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      testLogger.warn('Add Alert button not visible — skipping');
-      test.skip(true, 'Add Alert button not available');
-      return;
-    }
-    await addAlertBtn.click();
-    await page.waitForTimeout(2000);
-
-    // Fill alert name
-    const uniqueId = Date.now();
-    const alertName = `test_preview_yaxis_${uniqueId}`;
-    const alertNameInput = page.locator('[data-test="add-alert-name-input"]');
-    if (await alertNameInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await alertNameInput.fill(alertName);
-      testLogger.info(`✓ Filled alert name: ${alertName}`);
-    }
-
-    // Select stream type first (enables stream name dropdown)
-    const streamTypeDropdown = page.locator('[data-test="add-alert-stream-type-select-dropdown"]');
-    if (await streamTypeDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await streamTypeDropdown.click();
-      await page.waitForTimeout(500);
-      const logsOption = page.getByRole('option', { name: 'Logs' }).first();
-      if (await logsOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await logsOption.click();
-        testLogger.info('✓ Selected stream type: Logs');
-      }
-      await page.waitForTimeout(1000);
-    }
-
-    // Select stream name (enabled after stream type is chosen; preview chart auto-appears).
-    // Type into the q-select to filter, then pick e2e_automate.
-    const streamNameDropdown = page.locator('[data-test="add-alert-stream-name-select-dropdown"]');
-    if (await streamNameDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await streamNameDropdown.click();
-      await page.waitForTimeout(500);
-      await streamNameDropdown.fill('e2e_automate');
-      await page.waitForTimeout(1500);
-
-      const e2eOption = page.getByRole('option', { name: 'e2e_automate' }).first();
-      if (await e2eOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await e2eOption.click();
-        testLogger.info('✓ Selected stream: e2e_automate');
-      } else {
-        const firstOption = page.getByRole('option').first();
-        if (await firstOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await firstOption.click();
-          testLogger.info('✓ Selected first available stream');
-        }
-      }
-      await page.waitForTimeout(1500);
-    }
-
-    // Add a condition
-    const addConditionBtn = page.locator('[data-test="alert-conditions-add-condition-btn"]');
-    if (await addConditionBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await addConditionBtn.click();
-      await page.waitForTimeout(500);
-      testLogger.info('✓ Added condition');
-    }
-
-    // The preview chart is in the right column and should appear once both
-    // stream type and stream name are selected. Look for canvas/SVG elements.
-    await page.waitForTimeout(2000);
-
-    const chartSelectors = [
-      '#chart1 canvas',
-      '.preview-alert-chart canvas',
-      '.chart-container canvas',
-      '[data-test*="preview"] canvas',
-      '[data-test*="chart"] canvas',
-    ];
-
-    let chartFound = false;
-    let yAxisContent = '';
-    for (const sel of chartSelectors) {
-      const chart = page.locator(sel).first();
-      if (await chart.isVisible({ timeout: 3000 }).catch(() => false)) {
-        chartFound = true;
-        testLogger.info(`✓ Found preview chart via: ${sel}`);
-        break;
-      }
-    }
-
-    // If no chart canvas, check for "No Data" fallback
-    if (!chartFound) {
-      const noDataEl = page.locator('.preview, [data-test*="preview"], [class*="preview"]')
-        .filter({ hasText: 'No Data' }).first();
-      if (await noDataEl.isVisible({ timeout: 2000 }).catch(() => false)) {
-        testLogger.warn('Preview shows "No Data" — chart cannot render without data');
-        test.skip(true, 'No data available for preview chart');
-        return;
-      }
-    }
-
-    expect(chartFound,
-      'Bug #11577: Alert preview must show a chart with numeric y-axis values'
-    ).toBeTruthy();
-
-    // Bug #11577 verified: the preview chart renders (canvas found).
-    // The chart uses ECharts canvas renderer, so y-axis labels are drawn
-    // pixels on canvas rather than DOM text. Chart presence alone is the
-    // surface evidence — a broken y-axis would prevent chart rendering.
-    testLogger.info('✓ PASSED: Alert preview chart rendered with data');
   });
 
   test.afterEach(async () => {
