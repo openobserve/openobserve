@@ -7592,8 +7592,10 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isNoDataVisible() {
-        return await this.page.locator('[data-test="no-data"], [class*="no-data"], text="No data"')
-            .isVisible({ timeout: 2000 }).catch(() => false);
+        const sel = this.page.locator('[data-test="no-data"], [class*="no-data"]').first();
+        const txt = this.page.getByText('No data').first();
+        return await sel.isVisible({ timeout: 2000 }).catch(() => false)
+            || await txt.isVisible({ timeout: 1000 }).catch(() => false);
     }
 
     /**

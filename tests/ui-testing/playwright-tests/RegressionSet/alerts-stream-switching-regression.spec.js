@@ -28,8 +28,8 @@ test.describe("Alerts Stream Switching Regression", () => {
   let pm;
   const TEST_LOG_STREAM = 'e2e_automate';
   const METRICS_STREAM = 'e2e_test_cpu_usage';
-  const DESTINATION_NAME = 'e2e_auto_dest';
-  const TEMPLATE_NAME = 'e2e_auto_template';
+  const DESTINATION_NAME = 'e2e_stream_sw_dest';
+  const TEMPLATE_NAME = 'e2e_stream_sw_template';
   const ORG_ID = getOrgIdentifier() || 'default';
 
   // ============================================================================

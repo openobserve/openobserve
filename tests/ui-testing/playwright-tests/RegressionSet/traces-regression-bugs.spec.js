@@ -113,8 +113,14 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
 
     if (promqlVisible) {
       await promqlTab.click();
-      testLogger.info('✓ Switched to PromQL mode in metrics');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
+      // Verify PromQL mode is actually active before navigating to logs
+      const promqlActive = await promqlTab.getAttribute('class').then(c => c?.includes('active')).catch(() => false);
+      expect(promqlActive,
+        'Bug #11580: PromQL tab must be active after clicking (premise for switching test)'
+      ).toBe(true);
+      testLogger.info('✓ PromQL mode is verified active');
+      await page.waitForTimeout(500);
     } else {
       testLogger.warn('PromQL mode not available — cannot verify bug #11580 without PromQL state');
       test.skip(true, 'PromQL mode not available in current environment');

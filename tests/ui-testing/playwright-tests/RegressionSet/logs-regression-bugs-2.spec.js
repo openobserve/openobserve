@@ -146,8 +146,8 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
     testLogger.info(`Expanded table rows after run query: ${expandedCount}`);
 
     expect(expandedCount,
-      'Bug #10595: At most 1 row should be expanded after run query (bug caused 2+ rows to expand)'
-    ).toBeLessThanOrEqual(1);
+      'Bug #10595: Exactly 1 row must remain expanded after re-run (bug caused 2+ rows to expand)'
+    ).toBe(1);
 
     testLogger.info('✓ PASSED: Single row expansion verified after run query');
   });

@@ -2056,25 +2056,6 @@ export class TracesPage {
     });
   }
 
-  /**
-   * Focus the Monaco query editor and type text using keyboard.
-   * Dismisses open q-menu popups first to avoid pointer interception.
-   * @param {string} text - Text to type
-   * @param {number} delay - Delay between keystrokes in ms
-   */
-  async typeInQueryEditor(text, delay = 50) {
-    const queryEditor = this.page.locator('[data-test="query-editor"], .monaco-editor').first();
-    if (await queryEditor.isVisible({ timeout: 5000 }).catch(() => false)) {
-      // Dismiss any open q-menu popups that would intercept clicks on the editor
-      await this.page.keyboard.press('Escape');
-      await this.page.waitForTimeout(300);
-      // Click the visible text surface to focus Monaco
-      await queryEditor.locator('.view-lines').first().click({ force: true });
-      await this.page.waitForTimeout(300);
-      await this.page.keyboard.type(text, { delay });
-    }
-  }
-
 }
 
 
