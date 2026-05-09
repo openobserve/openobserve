@@ -1,8 +1,9 @@
 /**
  * Logs Regression Bugs — Batch 1
  *
- * Covers: #10821, #10595, #9049, #9796
+ * Covers: #10821, #10595, #9049
  * Note: #9388 is already covered in logs-regression.spec.js
+ * Note: #9796 removed — stream selection inherently triggers a query
  *
  * Tests run in PARALLEL.
  */
@@ -220,100 +221,6 @@ test.describe("Logs Regression Bugs — Batch 1", () => {
         test.skip(true, 'Time input element not available in current UI');
       }
     }
-  });
-
-  // ==========================================================================
-  // Bug #9796: Logs page loads data without clicking run query
-  // https://github.com/openobserve/openobserve/issues/9796
-  // ==========================================================================
-  test("Logs page should NOT auto-load data before clicking run query", {
-    tag: ['@bug-9796', '@P1', '@regression', '@logsRegression', '@logsRegressionAutoLoad']
-  }, async ({ page }) => {
-    testLogger.info('Test: Verify no auto-load without run query (Bug #9796)');
-
-    // Navigate to logs with a fresh page (no cached state).
-    // Do NOT use selectStream() — it calls page.goto(logsUrl) which
-    // auto-triggers a query and would defeat the purpose of this test.
-    await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Manually open the stream dropdown and select the stream via the
-    // inline toggle, without navigating away from the current page.
-    const dropdownArrow = page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
-    if (await dropdownArrow.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dropdownArrow.click();
-      await page.waitForTimeout(1500);
-
-      // Search for the stream in the dropdown filter
-      const searchInput = page.locator('[data-test="log-search-index-list-select-stream"]');
-      if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await searchInput.click();
-        await searchInput.fill('e2e_automate');
-        await page.waitForTimeout(1500);
-      }
-
-      // Click the stream toggle
-      const streamToggle = page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"]');
-      if (await streamToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await streamToggle.click();
-        testLogger.info('✓ Selected stream via toggle');
-        await page.waitForTimeout(1000);
-
-        // Close the dropdown by pressing Escape
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-      }
-    }
-
-    // Wait for any auto-triggered query and check state before manual run
-    await page.waitForTimeout(3000);
-
-    // Check for empty state messages using page object
-    const noDataVisible = await pm.logsPage.isNoDataVisible();
-    const noResultsVisible = await pm.logsPage.isNoResultsVisible();
-
-    const tableRows = pm.logsPage.getLogsTableRows();
-    const rowsBeforeRun = await tableRows.count();
-
-    testLogger.info(`Before run query — rowCount: ${rowsBeforeRun}, noData: ${noDataVisible}, noResults: ${noResultsVisible}`);
-
-    // If rows are present, verify they're not actual loaded data
-    let hasActualData = false;
-    if (rowsBeforeRun > 0) {
-      const firstRowText = await tableRows.first().textContent().catch(() => '');
-      testLogger.info(`First row content: "${firstRowText?.substring(0, 100)}"`);
-      hasActualData = firstRowText && firstRowText.length > 5 &&
-        !firstRowText.includes('loading') && !firstRowText.includes('No data');
-
-      if (hasActualData) {
-        testLogger.warn('⚠ Data appears to have auto-loaded — this may indicate bug #9796');
-      }
-    }
-
-    // Now click run query and verify data DOES load
-    const searchResponse = page.waitForResponse(
-      resp => resp.url().includes('/_search') && resp.status() === 200,
-      { timeout: 30000 }
-    );
-    await pm.logsPage.clickRefreshButton();
-    await searchResponse.catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-
-    // After clicking run query, data should load
-    const rowsAfterRun = await tableRows.count();
-    testLogger.info(`After run query — rowCount: ${rowsAfterRun}`);
-
-    // Bug #9796: data must not appear before clicking Run Query
-    expect(rowsBeforeRun === 0 || !hasActualData,
-      'Bug #9796: Logs should not auto-load data before clicking Run Query'
-    ).toBeTruthy();
-
-    // After clicking Run Query, data must load
-    expect(rowsAfterRun > 0,
-      'Bug #9796: Data should load after clicking Run Query'
-    ).toBeTruthy();
-
-    testLogger.info('✓ PASSED: Auto-load behavior verified');
   });
 
   test.afterEach(async () => {

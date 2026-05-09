@@ -649,10 +649,10 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 5, apiWaitMs = null) {
+    async selectStream(stream, maxRetries = 5, apiWaitMs = null, skipNavigation = false) {
         // Cloud environments need longer for streams to be indexed after ingestion
         const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 120000 : 30000);
-        testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms)`);
+        testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms, skipNavigation: ${skipNavigation})`);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
         if (effectiveApiWaitMs > 0) {
@@ -666,12 +666,18 @@ export class LogsPage {
             testLogger.info(`selectStream: Skipping API wait (apiWaitMs=0)`);
         }
 
-        // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
-        const orgId = getOrgIdentifier();
-        const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
-        testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
-        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-        await this.page.waitForTimeout(3000);
+        // Navigate to logs page via URL to ensure fresh stream list.
+        // skipNavigation=true bypasses page.goto when the caller is already
+        // on the logs page and wants to avoid auto-triggering a query.
+        if (!skipNavigation) {
+            const orgId = getOrgIdentifier();
+            const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
+            testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
+            await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+            await this.page.waitForTimeout(3000);
+        } else {
+            testLogger.info('selectStream: Skipping page navigation (skipNavigation=true)');
+        }
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
