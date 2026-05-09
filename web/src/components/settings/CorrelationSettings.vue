@@ -79,21 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:semantic-field-groups="onDraftSemanticGroupsChange"
       >
         <template #header-actions>
-          <q-btn
+          <OButton
             data-test="correlation-semanticfieldgroup-save-btn"
-            class="text-bold o2-primary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            no-caps
-            color="primary"
-            :label="t('common.save')"
-            :disable="!isFieldAliasesDirty"
+            variant="primary"
+            size="sm"
+            :disabled="!isFieldAliasesDirty"
             :loading="savingFieldAliases"
             @click="saveSemanticGroups"
-          />
+          >
+            {{ t("common.save") }}
+          </OButton>
         </template>
       </SemanticFieldGroupsConfig>
     </div>
@@ -114,6 +109,7 @@ import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue
 import AppTabs from "@/components/common/AppTabs.vue";
 import { Server, ScanSearch, Bell, Link2 } from "lucide-vue-next";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import serviceStreamsService from "@/services/service_streams";
 
 export default defineComponent({
