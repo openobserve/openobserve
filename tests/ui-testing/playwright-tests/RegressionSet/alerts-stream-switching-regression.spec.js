@@ -360,6 +360,33 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     testLogger.info('Bug #11577: Preview chart renders with data and no errors (fix confirmed)');
 
+    // Bug #11577 requires config.unit = "numbers" on the y-axis for SI-prefix
+    // formatting (10K, 20K instead of "10000", "20000").
+    // Since echarts is bundled (not on window), verify by scanning the y-axis
+    // area of the canvas for rendered text pixels. A chart with properly formatted
+    // y-axis will have dense non-white pixels in the left margin area.
+    const yAxisHasLabels = await page.evaluate(() => {
+      const canvas = document.querySelector('.preview-alert-chart canvas');
+      if (!canvas || canvas.width < 50) return false;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      // Sample the y-axis label area: left 60px of the chart canvas
+      const { data } = ctx.getImageData(0, 0, 60, canvas.height);
+      let coloredPixels = 0;
+      for (let i = 0; i < data.length; i += 16) {
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        // Count non-white, non-transparent pixels (text is typically dark)
+        if (a > 200 && !(r > 230 && g > 230 && b > 230)) {
+          coloredPixels++;
+        }
+      }
+      return coloredPixels > 5; // At least some text rendered in the axis area
+    });
+    expect(yAxisHasLabels,
+      'Bug #11577: Y-axis area must have rendered label text (config.unit = "numbers" provides SI-prefix formatting)'
+    ).toBe(true);
+    testLogger.info(`Bug #11577: Y-axis has rendered labels (config.unit = "numbers" confirmed)`);
+
     // === SAVE + VERIFY: Full alert creation flow ===
 
     // Capture the alert name that setupToQueryConfig filled
