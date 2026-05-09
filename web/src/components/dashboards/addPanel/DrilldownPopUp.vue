@@ -15,33 +15,27 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div
-    style="padding: 0px 10px; min-width: 30%"
-    class="scroll o2-input"
+  <ODialog
+    :open="open"
+    :title="isEditMode ? t('dashboard.editDrilldown') : t('dashboard.createDrilldown')"
+    :primary-button-label="isEditMode ? t('dashboard.update') : t('common.add')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-disabled="isFormValid"
+    size="md"
     data-test="dashboard-drilldown-popup"
+    @update:open="(v) => { if (!v) $emit('close') }"
+    @click:primary="saveDrilldown"
+    @click:secondary="$emit('close')"
   >
-    <div
-      class="flex justify-between items-center q-pa-md"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span data-test="dashboard-drilldown-title" v-if="isEditMode"
-          >{{ t("dashboard.editDrilldown") }}
-        </span>
-        <span data-test="dashboard-drilldown-title" v-else>{{
-          t("dashboard.createDrilldown")
-        }}</span>
-      </div>
-      <div class="flex q-gutter-sm items-center">
-        <DrilldownUserGuide />
-      </div>
-    </div>
+    <template #header-right>
+      <DrilldownUserGuide />
+    </template>
     <q-input
       v-model="drilldownData.name"
       :label="t('dashboard.nameOfVariable') + ' * ' + ' : '"
       color="input-border"
       bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
+      class="q-py-md q-mb-lg showLabelOnTop"
       stack-label
       borderless
       data-test="dashboard-config-panel-drilldown-name"
@@ -338,24 +332,7 @@
       />
     </div>
 
-    <q-card-actions class="confirmActions tw:gap-2">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="$emit('close')"
-        data-test="cancel-button"
-        >{{ t("confirmDialog.cancel") }}</OButton
-      >
-      <OButton
-        variant="primary"
-        size="sm-action"
-        @click="saveDrilldown"
-        data-test="confirm-button"
-        :disabled="isFormValid"
-        >{{ isEditMode ? t("dashboard.update") : t("common.add") }}</OButton
-      >
-    </q-card-actions>
-  </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -382,6 +359,7 @@ import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGu
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import { useLoading } from "@/composables/useLoading";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
@@ -389,6 +367,7 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {
+    ODialog,
     OButtonGroup,
     DrilldownUserGuide,
     CommonAutoComplete,
@@ -396,6 +375,10 @@ export default defineComponent({
     OButton,
   },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     isEditMode: {
       type: Boolean,
       default: false,
