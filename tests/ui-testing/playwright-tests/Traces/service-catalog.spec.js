@@ -63,14 +63,18 @@ test.describe("Service Catalog testcases", () => {
     testLogger.info('=== Verifying default sort ===');
 
     const firstService = await pm.servicesCatalogPage.getFirstServiceName();
-    testLogger.info(`First service (should be highest severity): ${firstService}`);
+    testLogger.info(`First service: ${firstService}`);
     expect(firstService).toBeTruthy();
 
-    // Sort icon should indicate descending
+    // Default sort is status descending (Critical first) — icon must be arrow_downward
     const icon = await pm.servicesCatalogPage.getSortIcon('status');
     testLogger.info(`Status column sort icon: "${icon}"`);
-    // Default is desc — icon should be arrow_downward or similar
-    expect(icon).toBeTruthy();
+    expect(icon).toBe('arrow_downward');
+
+    // First row should have a non-empty status badge (highest severity)
+    const firstStatus = await pm.servicesCatalogPage.getStatusBadge(firstService);
+    testLogger.info(`First service status: "${firstStatus}"`);
+    expect(firstStatus).toBeTruthy();
   });
 
   test("P0: Search filter — type partial name, matching rows shown, count updates", {
@@ -175,19 +179,17 @@ test.describe("Service Catalog testcases", () => {
     const totalServices = await pm.servicesCatalogPage.getServiceCount();
     testLogger.info(`Total services: ${totalServices}`);
 
+    test.skip(totalServices <= 10, `need >10 services for pagination, got ${totalServices}`);
+
     await pm.servicesCatalogPage.setRowsPerPage(10);
 
-    if (totalServices > 10) {
-      const paginationVisible = await pm.servicesCatalogPage.isPaginationVisible();
-      expect(paginationVisible).toBeTruthy();
-      testLogger.info('Pagination is visible with 10 rows/page');
+    const paginationVisible = await pm.servicesCatalogPage.isPaginationVisible();
+    expect(paginationVisible).toBeTruthy();
+    testLogger.info('Pagination is visible with 10 rows/page');
 
-      const pageCount = await pm.servicesCatalogPage.getPageCount();
-      testLogger.info(`Page count: ${pageCount}`);
-      expect(pageCount).toBeGreaterThanOrEqual(2);
-    } else {
-      testLogger.info(`Only ${totalServices} services — pagination may not appear`);
-    }
+    const pageCount = await pm.servicesCatalogPage.getPageCount();
+    testLogger.info(`Page count: ${pageCount}`);
+    expect(pageCount).toBeGreaterThanOrEqual(2);
   });
 
   test("P1: Navigate between pages using page number buttons", {
