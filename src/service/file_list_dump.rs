@@ -489,7 +489,7 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
-            Field::new("created_at", DataType::Int64, false),
+            Field::new("bloom_ver", DataType::Int64, false),
             Field::new("updated_at", DataType::Int64, false),
         ]));
 
@@ -515,7 +515,7 @@ mod tests {
         let original_size_array = Arc::new(Int64Array::from(vec![1000, 2000, 3000]));
         let compressed_size_array = Arc::new(Int64Array::from(vec![500, 1000, 1500]));
         let index_size_array = Arc::new(Int64Array::from(vec![50, 100, 150]));
-        let created_at_array = Arc::new(Int64Array::from(vec![1000, 2000, 3000]));
+        let bloom_ver_array = Arc::new(Int64Array::from(vec![0, 0, 0]));
         let updated_at_array = Arc::new(Int64Array::from(vec![1100, 2100, 3100]));
 
         RecordBatch::try_new(
@@ -535,7 +535,7 @@ mod tests {
                 original_size_array,
                 compressed_size_array,
                 index_size_array,
-                created_at_array,
+                bloom_ver_array,
                 updated_at_array,
             ],
         )
@@ -589,7 +589,7 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
-            Field::new("created_at", DataType::Int64, false),
+            Field::new("bloom_ver", DataType::Int64, false),
             Field::new("updated_at", DataType::Int64, false),
         ]));
 
@@ -614,7 +614,7 @@ mod tests {
                 Arc::new(Int64Array::from(vec![1000, 1000, 2000])),
                 Arc::new(Int64Array::from(vec![500, 500, 1000])),
                 Arc::new(Int64Array::from(vec![50, 50, 100])),
-                Arc::new(Int64Array::from(vec![1000, 1000, 2000])),
+                Arc::new(Int64Array::from(vec![0, 0, 0])), // bloom_ver
                 Arc::new(Int64Array::from(vec![1100, 1100, 2100])),
             ],
         )
@@ -752,7 +752,9 @@ mod tests {
 
     #[test]
     fn test_empty_record_batch_conversion() {
-        // Test with empty record batches
+        // Test with empty record batches. Schema must match what
+        // `record_batch_to_file_record` expects to read by name (incl.
+        // `bloom_ver`); the historical `created_at` column is gone.
         let schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("account", DataType::Utf8, false),
@@ -768,7 +770,7 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
-            Field::new("created_at", DataType::Int64, false),
+            Field::new("bloom_ver", DataType::Int64, false),
             Field::new("updated_at", DataType::Int64, false),
         ]));
 
@@ -825,7 +827,8 @@ mod tests {
         // Verify the schema has the expected fields
         let schema = FILE_LIST_SCHEMA.clone();
 
-        assert_eq!(schema.fields().len(), 15);
+        // 14 historical fields + bloom_ver + updated_at = 16
+        assert_eq!(schema.fields().len(), 16);
 
         // Check key field names and types
         assert_eq!(schema.field(0).name(), "id");
@@ -962,7 +965,9 @@ mod tests {
     fn test_file_list_schema_field_ordering() {
         let schema = FILE_LIST_SCHEMA.clone();
 
-        // Verify the exact order of fields
+        // Verify the exact order of fields. `bloom_ver` was inserted
+        // between `index_size` and `updated_at` when the bloom-filter
+        // pruning layer landed.
         let expected_fields = vec![
             ("id", DataType::Int64),
             ("account", DataType::Utf8),
@@ -978,6 +983,7 @@ mod tests {
             ("original_size", DataType::Int64),
             ("compressed_size", DataType::Int64),
             ("index_size", DataType::Int64),
+            ("bloom_ver", DataType::Int64),
             ("updated_at", DataType::Int64),
         ];
 
