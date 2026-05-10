@@ -190,7 +190,7 @@ mod tests {
         bb.insert(i_a, b"present-A");
         let i_b = bb.begin(id_b, "trace_id", 100);
         bb.insert(i_b, b"present-B");
-        let blob = BloomWriter::serialize(bb.finish());
+        let blob = BloomWriter::serialize(bb.finish()).unwrap();
         let mut r = BloomReader::parse(blob).unwrap();
 
         // Predicate matching only file A

@@ -250,7 +250,7 @@ mod tests {
         b.insert(i2, b"ghi");
         let i3 = b.begin(101, "user_id", 100);
         b.insert(i3, b"u-1");
-        BloomWriter::serialize(b.finish())
+        BloomWriter::serialize(b.finish()).expect("write succeeds")
     }
 
     #[test]
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_empty_blob_writer_round_trips() {
-        let blob = BloomWriter::serialize(vec![]);
+        let blob = BloomWriter::serialize(vec![]).unwrap();
         let r = BloomReader::parse(blob).unwrap();
         assert_eq!(r.field_count(), 0);
     }
@@ -339,7 +339,7 @@ mod tests {
         for i in 0..1000u32 {
             b.insert(idx, format!("present-{i}").as_bytes());
         }
-        let blob = BloomWriter::serialize(b.finish());
+        let blob = BloomWriter::serialize(b.finish()).unwrap();
         let mut r = BloomReader::parse(blob).unwrap();
         let mut fp = 0;
         for i in 0..10_000u32 {

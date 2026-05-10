@@ -35,6 +35,21 @@ use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION};
 /// Default false-positive probability for new SBBFs.
 const DEFAULT_FPP: f64 = 0.01;
 
+/// Bounds-check errors caught when packing a `.bf` footer. Returned
+/// instead of silently wrapping a `usize` cast — a corrupted footer
+/// would parse incorrectly on read with no signal at write time.
+#[derive(Debug, thiserror::Error)]
+pub enum WriteError {
+    #[error("field name '{name}' is too long: {len} bytes (max u16::MAX)")]
+    FieldNameTooLong { name: String, len: usize },
+    #[error("too many fields: {0} (max u32::MAX)")]
+    TooManyFields(usize),
+    #[error("too many files for field '{field}': {count} (max u32::MAX)")]
+    TooManyFiles { field: String, count: usize },
+    #[error("bloom body too large for file_id {file_id}: {len} bytes (max u32::MAX)")]
+    BloomBodyTooLarge { file_id: u64, len: usize },
+}
+
 /// One bloom for a single (file, field) pair, fully built in memory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldBloom {
@@ -147,7 +162,13 @@ pub struct BloomWriter;
 impl BloomWriter {
     /// Serialize a complete `.bf` blob from the given blooms. Order in the
     /// footer follows insertion order (group by field first, then by file).
-    pub fn serialize(blooms: Vec<FieldBloom>) -> Vec<u8> {
+    ///
+    /// Returns `WriteError` if any footer field would overflow its on-disk
+    /// width (u16 for name length, u32 for counts and per-bloom byte size).
+    /// Practical bounds are far above realistic inputs (16-bit field
+    /// names, 4 GiB single-bloom size); this is a defensive check rather
+    /// than an expected failure mode.
+    pub fn serialize(blooms: Vec<FieldBloom>) -> Result<Vec<u8>, WriteError> {
         // group by field, preserving first-seen order
         let mut field_order: Vec<String> = Vec::new();
         let mut by_field: hashbrown::HashMap<String, Vec<FieldBloom>> = hashbrown::HashMap::new();
@@ -156,6 +177,10 @@ impl BloomWriter {
                 field_order.push(b.field.clone());
             }
             by_field.entry(b.field.clone()).or_default().push(b);
+        }
+
+        if field_order.len() > u32::MAX as usize {
+            return Err(WriteError::TooManyFields(field_order.len()));
         }
 
         let mut out = Vec::with_capacity(1024);
@@ -178,14 +203,25 @@ impl BloomWriter {
         let mut sections: Vec<FieldSection> = Vec::with_capacity(field_order.len());
         for field in &field_order {
             let files_in = by_field.remove(field).unwrap();
+            if files_in.len() > u32::MAX as usize {
+                return Err(WriteError::TooManyFiles {
+                    field: field.clone(),
+                    count: files_in.len(),
+                });
+            }
             let mut files = Vec::with_capacity(files_in.len());
             for fb in files_in {
+                let body_size =
+                    u32::try_from(fb.bytes.len()).map_err(|_| WriteError::BloomBodyTooLarge {
+                        file_id: fb.file_id,
+                        len: fb.bytes.len(),
+                    })?;
                 let body_offset = out.len() as u64;
                 out.extend_from_slice(&fb.bytes);
                 files.push(FileEntry {
                     file_id: fb.file_id,
                     body_offset,
-                    body_size: fb.bytes.len() as u32,
+                    body_size,
                     n_items: fb.n_items,
                 });
             }
@@ -201,10 +237,15 @@ impl BloomWriter {
             .unwrap();
         for sec in &sections {
             let name_bytes = sec.name.as_bytes();
-            out.write_all(&(name_bytes.len() as u16).to_le_bytes())
-                .unwrap();
+            let name_len =
+                u16::try_from(name_bytes.len()).map_err(|_| WriteError::FieldNameTooLong {
+                    name: sec.name.clone(),
+                    len: name_bytes.len(),
+                })?;
+            out.write_all(&name_len.to_le_bytes()).unwrap();
             out.write_all(name_bytes).unwrap();
             out.push(ALGO_SBBF_XXHASH64);
+            // checked above when building `files`
             out.write_all(&(sec.files.len() as u32).to_le_bytes())
                 .unwrap();
             for f in &sec.files {
@@ -220,7 +261,7 @@ impl BloomWriter {
         out.write_all(&footer_len.to_le_bytes()).unwrap();
         out.extend_from_slice(MAGIC);
 
-        out
+        Ok(out)
     }
 }
 
@@ -230,12 +271,33 @@ mod tests {
 
     #[test]
     fn test_empty_bloom_serializes_to_minimal_blob() {
-        let bytes = BloomWriter::serialize(vec![]);
+        let bytes = BloomWriter::serialize(vec![]).unwrap();
         // 4B magic + 1B version + 4B field_count + 4B footer_len + 4B magic = 17B
         assert_eq!(bytes.len(), 17);
         assert_eq!(&bytes[..4], MAGIC);
         assert_eq!(bytes[4], VERSION);
         assert_eq!(&bytes[bytes.len() - 4..], MAGIC);
+    }
+
+    #[test]
+    fn test_field_name_too_long_rejected() {
+        // Build a name that overflows u16 to confirm we surface the
+        // overflow as an error instead of silently truncating.
+        let huge_name = "x".repeat(u16::MAX as usize + 1);
+        let blooms = vec![FieldBloom {
+            field: huge_name.clone(),
+            file_id: 1,
+            n_items: 0,
+            bytes: vec![0u8; 32],
+        }];
+        let err = BloomWriter::serialize(blooms).unwrap_err();
+        match err {
+            WriteError::FieldNameTooLong { name, len } => {
+                assert_eq!(name, huge_name);
+                assert!(len > u16::MAX as usize);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 
     #[test]
@@ -260,7 +322,7 @@ mod tests {
         let mut b = BloomBuilder::new();
         let idx = b.begin(1, "f", 10);
         b.insert(idx, b"x");
-        let bytes = BloomWriter::serialize(b.finish());
+        let bytes = BloomWriter::serialize(b.finish()).unwrap();
         assert_eq!(&bytes[..4], MAGIC);
         assert_eq!(&bytes[bytes.len() - 4..], MAGIC);
     }

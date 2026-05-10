@@ -182,7 +182,7 @@ mod tests {
 
         // Round-trip via the .bf format and verify positives match.
         use infra::bloom::{BloomReader, BloomWriter};
-        let blob = BloomWriter::serialize(blooms);
+        let blob = BloomWriter::serialize(blooms).unwrap();
         let mut reader = BloomReader::parse(blob).unwrap();
 
         for tid in &trace_ids {

@@ -142,7 +142,13 @@ pub async fn build_for_bucket(
 
     // Pack + upload.
     let bloom_ver = now_micros();
-    let blob = BloomWriter::serialize(all_blooms);
+    let blob = match BloomWriter::serialize(all_blooms) {
+        Ok(b) => b,
+        Err(e) => {
+            log::warn!("[BLOOM_BUILD] serialize failed for {org_id}/{stream_type}/{stream_name}/{date_key}: {e}");
+            return Ok(());
+        }
+    };
     let bf_path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
     let bf_account = storage::get_account(&bf_path).unwrap_or_default();
     if let Err(e) = storage::put(&bf_account, &bf_path, Bytes::from(blob)).await {
