@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.addCustomGroup')"
           @click="addGroup"
         />
+        <slot name="header-actions" />
       </div>
     </div>
 
