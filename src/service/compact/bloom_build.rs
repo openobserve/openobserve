@@ -151,7 +151,12 @@ pub async fn build_for_bucket(
     let blob = match BloomWriter::serialize(all_blooms) {
         Ok(b) => b,
         Err(e) => {
-            log::warn!("[BLOOM_BUILD] serialize failed for {org_id}/{stream_type}/{stream_name}/{date_key}: {e}");
+            log::warn!(
+                "[BLOOM_BUILD] serialize failed for {org_id}/{stream_type}/{stream_name}/{date_key}: {e}"
+            );
+            config::metrics::BLOOM_FILE_BUILD_FAILED_TOTAL
+                .with_label_values(&[org_id, stream_type.as_str(), "serialize"])
+                .inc();
             return Ok(());
         }
     };
@@ -159,6 +164,9 @@ pub async fn build_for_bucket(
     let bf_account = storage::get_account(&bf_path).unwrap_or_default();
     if let Err(e) = storage::put(&bf_account, &bf_path, Bytes::from(blob)).await {
         log::warn!("[BLOOM_BUILD] upload {bf_path} failed: {e}");
+        config::metrics::BLOOM_FILE_BUILD_FAILED_TOTAL
+            .with_label_values(&[org_id, stream_type.as_str(), "upload"])
+            .inc();
         return Ok(());
     }
 
@@ -173,10 +181,18 @@ pub async fn build_for_bucket(
         .filter(|v| *v != 0 && *v != bloom_ver)
         .collect();
     let covered = contributing_ids.len();
+    debug_assert!(
+        contributing_ids.iter().all(|id| *id > 0),
+        "bloom builder must only stamp file_list rows with assigned ids; \
+         a 0 here means we ran the build before write_file_list — caller bug"
+    );
     if let Err(e) = infra_file_list::update_bloom_ver(&contributing_ids, bloom_ver).await {
         log::warn!(
             "[BLOOM_BUILD] update_bloom_ver failed for {org_id}/{stream_type}/{stream_name}/{date_key}: {e}"
         );
+        config::metrics::BLOOM_FILE_BUILD_FAILED_TOTAL
+            .with_label_values(&[org_id, stream_type.as_str(), "update_file_list"])
+            .inc();
         return Ok(());
     }
 

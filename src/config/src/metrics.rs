@@ -567,6 +567,23 @@ pub static BLOOM_FILE_BUILT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Counts compactor bloom-build attempts that failed at any stage
+// (`stage` is one of: serialize, upload, update_file_list). Failures
+// are non-fatal — the counter exists so the asymmetry between
+// BUILT_TOTAL and BUILD_FAILED_TOTAL is visible on dashboards.
+pub static BLOOM_FILE_BUILD_FAILED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bloom_file_build_failed_total",
+            "Number of compactor bloom-build attempts that failed.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "stage"],
+    )
+    .expect("Metric created")
+});
+
 // compactor stats
 pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
@@ -1843,6 +1860,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(BLOOM_FILE_BUILT_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BLOOM_FILE_BUILD_FAILED_TOTAL.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(BLOOM_CHECK_ERRORS_TOTAL.clone()))

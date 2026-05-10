@@ -189,9 +189,7 @@ impl BloomReader {
             let start = entry.body_offset as usize;
             let end = start + entry.body_size as usize;
             Sbbf::from_bytes(&self.blob[start..end]).map_err(|e| {
-                log::warn!(
-                    "bloom: invalid Sbbf bytes for field '{field}', file_id={file_id}: {e}"
-                );
+                log::warn!("bloom: invalid Sbbf bytes for field '{field}', file_id={file_id}: {e}");
                 ReadError::InvalidBloom(field.to_string(), file_id, e.to_string())
             })
         });

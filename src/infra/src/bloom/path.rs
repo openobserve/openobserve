@@ -37,7 +37,11 @@ pub fn bloom_path(
     date: &str,
     bloom_ver: i64,
 ) -> String {
-    debug_assert!(bloom_ver > 0, "bloom_ver=0 means no .bf — caller bug");
+    // `bloom_ver == 0` is the "no .bf" sentinel and must never appear in
+    // a path. Hard-assert in all builds — silently emitting `.../0.bf`
+    // in release would produce a path that 404s on read and confuses
+    // diagnostics.
+    assert!(bloom_ver > 0, "bloom_ver=0 means no .bf — caller bug");
     format!("files/{org}/bloom/{stream_type}/{stream}/{date}/{bloom_ver}.bf")
 }
 
@@ -84,7 +88,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "bloom_ver=0 means no .bf")]
-    fn test_zero_bloom_ver_panics_in_debug() {
+    fn test_zero_bloom_ver_panics() {
         let _ = bloom_path("o", StreamType::Logs, "s", "2026/05/08/14", 0);
     }
 }
