@@ -180,11 +180,31 @@ pub async fn prune(
         let mut all_match = true;
         for pred in predicates {
             // OR within predicate values: any value's bloom-maybe keeps it.
-            let any_match = pred.values.iter().any(|v| {
-                reader
-                    .check(&pred.field, file_id, v.as_bytes())
-                    .unwrap_or(true)
-            });
+            let mut any_match = false;
+            for v in &pred.values {
+                match reader.check(&pred.field, file_id, v.as_bytes()) {
+                    Ok(true) => {
+                        any_match = true;
+                        break;
+                    }
+                    Ok(false) => {} // try next value
+                    Err(e) => {
+                        // Corrupt bloom for this (field, file_id). Bump
+                        // a counter once per occurrence and conservatively
+                        // keep — the alternative would silently drop a
+                        // file that might really match.
+                        log::warn!(
+                            "[bloom-prune] check failed field={} file_id={file_id}: {e:?}; keeping file conservatively",
+                            pred.field
+                        );
+                        config::metrics::BLOOM_CHECK_ERRORS_TOTAL
+                            .with_label_values(&[org_id, stream_type.as_str()])
+                            .inc();
+                        any_match = true;
+                        break;
+                    }
+                }
+            }
             if !any_match {
                 all_match = false;
                 break;

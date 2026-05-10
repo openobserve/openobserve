@@ -115,13 +115,19 @@ pub async fn build_for_bucket(
     // Iterate term dicts for every file. Each `.ttv` open is one object-
     // store fetch (cached on disk after the first hit). Errors per file
     // are logged and skipped — partial bloom is better than no bloom.
+    //
+    // Track the file_list ids that *actually contributed* blooms; only
+    // those get their `bloom_ver` stamped. Files we couldn't build for
+    // (or that produced no blooms because the field isn't in their
+    // schema) keep `bloom_ver = 0` so search doesn't pay a wasted
+    // `.bf` fetch only to find them missing from the footer.
     let mut all_blooms: Vec<FieldBloom> = Vec::new();
-    let mut covered: usize = 0;
+    let mut contributing_ids: Vec<i64> = Vec::new();
     for f in &files {
         match build_blooms_for_file(f, &target_fields).await {
             Ok(mut blooms) if !blooms.is_empty() => {
                 all_blooms.append(&mut blooms);
-                covered += 1;
+                contributing_ids.push(f.id);
             }
             Ok(_) => {
                 // No blooms produced (no index, or fields not in this file's
@@ -157,15 +163,17 @@ pub async fn build_for_bucket(
     }
 
     // Bulk update file_list. Capture the *previous* distinct bloom_vers
-    // (excluding 0 and the new value) so we can enqueue the now-orphaned
-    // `.bf`s for delete.
-    let ids: Vec<i64> = files.iter().map(|f| f.id).collect();
+    // of contributing files (excluding 0 and the new value) so we can
+    // enqueue the now-orphaned `.bf`s for delete.
+    let contributing: HashSet<i64> = contributing_ids.iter().copied().collect();
     let old_bloom_vers: HashSet<i64> = files
         .iter()
+        .filter(|f| contributing.contains(&f.id))
         .map(|f| f.meta.bloom_ver)
         .filter(|v| *v != 0 && *v != bloom_ver)
         .collect();
-    if let Err(e) = infra_file_list::update_bloom_ver(&ids, bloom_ver).await {
+    let covered = contributing_ids.len();
+    if let Err(e) = infra_file_list::update_bloom_ver(&contributing_ids, bloom_ver).await {
         log::warn!(
             "[BLOOM_BUILD] update_bloom_ver failed for {org_id}/{stream_type}/{stream_name}/{date_key}: {e}"
         );

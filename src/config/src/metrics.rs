@@ -536,6 +536,23 @@ pub static BLOOM_PRUNE_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Counts bloom-check errors at the search side. A non-zero value means
+// at least one `.bf` is corrupt (failed `Sbbf::from_bytes`) and pruning
+// silently degrades to "keep" for the affected entries — investigate.
+pub static BLOOM_CHECK_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bloom_check_errors_total",
+            "Number of bloom membership-check errors (e.g. corrupt .bf bytes).".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
 // Counts every .bf file uploaded by the compactor.
 pub static BLOOM_FILE_BUILT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -1826,6 +1843,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(BLOOM_FILE_BUILT_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BLOOM_CHECK_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
 
     // stream stats aggregation metrics
