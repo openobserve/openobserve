@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <ODrawer
     v-model:open="pipelineObj.dialog.show"
-    size="full"
+    size="xl"
     :show-close="false"
     @keydown.stop
   >
