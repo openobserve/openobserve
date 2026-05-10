@@ -336,7 +336,7 @@ impl super::FileList for PostgresFileList {
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, file, date
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, file, date
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -458,7 +458,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#
@@ -471,7 +471,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             let (date_from, date_to) = derive_date_range(time_start, time_end);
             let sql = r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;
                 "#;
@@ -515,7 +515,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let cfg = get_config();
         let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let sql = r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#;
@@ -614,7 +614,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids})"
             );
             DB_QUERY_NUMS
                 .with_label_values(&["query_by_ids", "file_list"])

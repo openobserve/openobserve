@@ -53,6 +53,7 @@ pub static FILE_LIST_SCHEMA: Lazy<Arc<Schema>> = Lazy::new(|| {
         Field::new("original_size", DataType::Int64, false),
         Field::new("compressed_size", DataType::Int64, false),
         Field::new("index_size", DataType::Int64, false),
+        Field::new("bloom_ver", DataType::Int64, false),
         Field::new("updated_at", DataType::Int64, false),
     ]))
 });
@@ -88,6 +89,7 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(original_size_col, "original_size", Int64Array, rb);
     get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
     get_col!(index_size_col, "index_size", Int64Array, rb);
+    get_col!(bloom_ver_col, "bloom_ver", Int64Array, rb);
     get_col!(updated_at_col, "updated_at", Int64Array, rb);
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
@@ -106,7 +108,7 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
-            bloom_ver: 0,
+            bloom_ver: bloom_ver_col.value(idx),
             updated_at: updated_at_col.value(idx),
         };
         ret.push(t);

@@ -831,6 +831,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
     let mut field_original_size = Int64Builder::with_capacity(batch_size);
     let mut field_compressed_size = Int64Builder::with_capacity(batch_size);
     let mut field_index_size = Int64Builder::with_capacity(batch_size);
+    let mut field_bloom_ver = Int64Builder::with_capacity(batch_size);
     let mut field_flattened = BooleanBuilder::with_capacity(batch_size);
     let mut field_updated_at = Int64Builder::with_capacity(batch_size);
 
@@ -848,6 +849,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
         field_original_size.append_value(file.original_size);
         field_compressed_size.append_value(file.compressed_size);
         field_index_size.append_value(file.index_size);
+        field_bloom_ver.append_value(file.bloom_ver);
         field_flattened.append_value(file.flattened);
         field_updated_at.append_value(file.updated_at);
     }
@@ -869,6 +871,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, errors::Er
             Arc::new(field_original_size.finish()),
             Arc::new(field_compressed_size.finish()),
             Arc::new(field_index_size.finish()),
+            Arc::new(field_bloom_ver.finish()),
             Arc::new(field_updated_at.finish()),
         ],
     )?;
@@ -996,7 +999,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 0);
-        assert_eq!(batch.num_columns(), 15);
+        assert_eq!(batch.num_columns(), 16);
     }
 
     #[test]
@@ -1026,7 +1029,7 @@ mod tests {
         assert!(result.is_ok());
         let batch = result.unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 15);
+        assert_eq!(batch.num_columns(), 16);
 
         // Verify column values
         let id_col = batch
@@ -1237,6 +1240,7 @@ mod tests {
             "original_size",
             "compressed_size",
             "index_size",
+            "bloom_ver",
             "updated_at",
         ];
 
@@ -1524,8 +1528,9 @@ mod tests {
             .unwrap();
         assert_eq!(idx_col.value(0), 5_000);
 
+        // bloom_ver was inserted at index 14 between index_size (13) and updated_at (15).
         let upd_col = batch
-            .column(14)
+            .column(15)
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap();
