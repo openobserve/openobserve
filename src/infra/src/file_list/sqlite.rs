@@ -336,6 +336,28 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         Ok(())
     }
 
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        // Chunk in case of very long lists; SQLite caps placeholders at 999
+        // and we'd rather not blow it up unexpectedly.
+        for chunk in ids.chunks(900) {
+            let placeholders = std::iter::repeat_n("?", chunk.len())
+                .collect::<Vec<_>>()
+                .join(",");
+            let sql = format!("UPDATE file_list SET bloom_ver = ? WHERE id IN ({placeholders});");
+            let mut q = sqlx::query(&sql).bind(bloom_ver);
+            for id in chunk {
+                q = q.bind(*id);
+            }
+            q.execute(&*client).await?;
+        }
+        Ok(())
+    }
+
     async fn list(&self) -> Result<Vec<FileKey>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(

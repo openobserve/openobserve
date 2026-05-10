@@ -69,6 +69,10 @@ pub trait FileList: Sync + Send + 'static {
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
+    /// Bulk-set `bloom_ver` for the given file_list ids. Used by the
+    /// post-merge bloom builder (see `service::compact::bloom_build`).
+    /// Empty `ids` is a no-op.
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()>;
     async fn list(&self) -> Result<Vec<FileKey>>;
     async fn query(
         &self,
@@ -279,6 +283,15 @@ pub async fn update_flattened(file: &str, flattened: bool) -> Result<()> {
 }
 
 #[inline]
+pub async fn update_bloom_ver(ids: &[i64], bloom_ver: i64) -> Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    CLIENT.update_bloom_ver(ids, bloom_ver).await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:update_compressed_size")]
 pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
     CLIENT.update_compressed_size(file, size).await
 }

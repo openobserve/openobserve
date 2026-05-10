@@ -416,6 +416,25 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         Ok(())
     }
 
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let pool = CLIENT.clone();
+        // Use ANY($2) with a bigint array — postgres handles arbitrary length
+        // without needing chunking, and the partition pruning works on the
+        // file_list_*_pkey index.
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "file_list"])
+            .inc();
+        sqlx::query("UPDATE file_list SET bloom_ver = $1 WHERE id = ANY($2)")
+            .bind(bloom_ver)
+            .bind(ids)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
     async fn list(&self) -> Result<Vec<FileKey>> {
         return Ok(vec![]); // disallow list all data
     }

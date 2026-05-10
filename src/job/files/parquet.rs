@@ -921,15 +921,11 @@ async fn merge_files(
     // generate tantivy inverted index and write to storage
     let file_format = config::get_config().common.file_format;
     let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
-    // Bloom filter is built only by the compactor (single-writer per hour),
-    // not by ingesters (many concurrent producers). Pass an empty target
-    // field list here — `create_tantivy_index` will return no blooms.
-    let (index_size, _) = create_tantivy_index(
+    let index_size = create_tantivy_index(
         "INGESTER",
         &new_file_key,
         &full_text_search_fields,
         &index_fields,
-        &[],
         latest_schema.clone(), // Use stream schema to include all configured fields
         reader,
     )
