@@ -52,25 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add/edit tab -->
-  <ODrawer
+  <AddTab
     v-model:open="showAddTabDialog"
-    size="md"
-    :show-close="false"
+    :edit-mode="false"
+    :dashboard-id="dashboardId"
+    :folder-id="folderId"
     data-test="dashboard-tab-add-dialog"
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('dashboard.save')"
-    @click:secondary="showAddTabDialog = false"
-    @click:primary="addTabRef?.submit()"
-  >
-    <AddTab
-      ref="addTabRef"
-      :edit-mode="false"
-      :dashboard-id="dashboardId"
-      :folder-id="folderId"
-      @refresh="updateTabList"
-      @close="showAddTabDialog = false"
-    />
-  </ODrawer>
+    @refresh="updateTabList"
+  />
 </template>
 
 <script lang="ts">
@@ -79,7 +68,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
@@ -87,7 +75,7 @@ import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectTabDropdown",
-  components: { AddTab, OButton, ODrawer },
+  components: { AddTab, OButton },
   emits: ["tab-selected", "tab-list-updated"],
   props: {
     folderId: {
@@ -107,7 +95,6 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddTabDialog: any = ref(false);
-    const addTabRef: any = ref(null);
     const tabList: any = ref([]);
 
     //dropdown selected folder index
@@ -181,7 +168,6 @@ export default defineComponent({
       selectedTab,
       updateTabList,
       showAddTabDialog,
-      addTabRef,
       tabList,
       getTabList,
     };
