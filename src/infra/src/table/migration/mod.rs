@@ -116,7 +116,6 @@ mod m20260415_000001_create_model_pricing_table;
 mod m20260415_000002_add_source_to_model_pricing;
 mod m20260504_000001_add_anomaly_detection_config_folder_fk;
 mod m20260506_000001_create_org_ingestion_tokens_table;
-mod m20260506_000002_add_enabled_to_org_ingestion_tokens;
 
 pub struct Migrator;
 
@@ -222,7 +221,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20260415_000002_add_source_to_model_pricing::Migration),
             Box::new(m20260504_000001_add_anomaly_detection_config_folder_fk::Migration),
             Box::new(m20260506_000001_create_org_ingestion_tokens_table::Migration),
-            Box::new(m20260506_000002_add_enabled_to_org_ingestion_tokens::Migration),
         ]
     }
 }

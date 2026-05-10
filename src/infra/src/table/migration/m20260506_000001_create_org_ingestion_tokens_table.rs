@@ -109,6 +109,12 @@ fn create_org_ingestion_tokens_table_statement() -> TableCreateStatement {
                 .default(SimpleExpr::Value(Value::Bool(Some(false)))),
         )
         .col(
+            ColumnDef::new(OrgIngestionTokens::Enabled)
+                .boolean()
+                .not_null()
+                .default(SimpleExpr::Value(Value::Bool(Some(true)))),
+        )
+        .col(
             ColumnDef::new(OrgIngestionTokens::CreatedBy)
                 .string_len(256)
                 .not_null(),
@@ -164,6 +170,7 @@ enum OrgIngestionTokens {
     Token,
     Description,
     IsDefault,
+    Enabled,
     CreatedBy,
     CreatedAt,
     UpdatedAt,
@@ -187,6 +194,7 @@ mod tests {
                 "token" varchar(256) NOT NULL,
                 "description" text,
                 "is_default" bool NOT NULL DEFAULT FALSE,
+                "enabled" bool NOT NULL DEFAULT TRUE,
                 "created_by" varchar(256) NOT NULL,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL
@@ -218,6 +226,7 @@ mod tests {
                 "token" varchar(256) NOT NULL,
                 "description" text,
                 "is_default" boolean NOT NULL DEFAULT FALSE,
+                "enabled" boolean NOT NULL DEFAULT TRUE,
                 "created_by" varchar(256) NOT NULL,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL
