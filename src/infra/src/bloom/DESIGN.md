@@ -363,17 +363,192 @@ A 30-day high-cardinality query: ≈ 720 hours × 2 avg = ~1440 `.bf` fetches, b
 
 ---
 
-## 12. Future work
+## 12. Known weak spots & potential issues
 
-- **Backfill CLI** for hours that were dumped at `bloom_ver = 0` (rebuild + write a new dump parquet with updated rows).
-- **Cross-query `Arc<BloomReader>` cache** at the search side. The reader is already `&self` (interior `OnceLock`), so this is a small follow-up — drop-in `Arc` cache by `(date, bloom_ver)` keyed on the path.
-- **Hour-level summary bloom** (hierarchical) for queries that span thousands of buckets, to skip whole hours with one bloom check before fetching per-file blooms. Only worth it if real query traces show the per-file fetch dominates.
-- **`fpp` per stream** via `StreamSettings` for users who want tighter FPR on hot streams.
-- **Coverage tracking metric**: gauge of `(files with bloom_ver != 0) / total files` per stream, to spot streams whose ingest rate outpaces catchup.
+Things that work today but we know aren't ideal. Listed here so we
+remember to come back to them — none are blocking.
+
+### 12.1 Operational risks
+
+#### `.bf` orphans from partial-failure builds
+
+If `storage::put` succeeds but the subsequent `update_bloom_ver` fails,
+the `.bf` is uploaded with no row referencing it. The append-only
+invariant means we never re-encounter the bucket in a way that would
+fix this — the next `build_for_bucket` sees the same `bloom_ver = 0`
+rows and writes a *new* `.bf` with a fresh timestamp.
+
+**Impact:** bounded storage waste. The orphan is at most one `.bf` per
+bucket per failure event, and `bloom_file_build_failed_total{stage=
+"update_file_list"}` tracks the rate. Eventually deleted when the
+date partition ages out.
+
+**Fix later:** if rate is non-trivial, retry the UPDATE before giving
+up, or pre-allocate `bloom_ver` and write the UPDATE first
+(makes it possible to roll back the `.bf` upload).
+
+#### Settling window vs. slow compaction
+
+`run_catchup` excludes buckets whose newest `updated_at` is within
+`compact.interval × 4` (default ≈ 40 s). If a real compaction round
+takes longer than that — e.g. backed-up queue, slow object store —
+catchup could fire on a bucket compactor was still about to touch.
+
+**Impact with append-only writes:** redundant work, not incorrectness.
+Catchup builds for the `bloom_ver = 0` rows it sees; compactor's
+later round sees no `bloom_ver = 0` rows and skips. The `.bf`
+catchup wrote is valid and referenced.
+
+**Fix later:** make the multiplier configurable; or have catchup look
+at compactor pending-job count and back off when it's high.
+
+#### Multi-`.bf`-per-hour growth on hot streams
+
+Each compaction round on an hour produces a new `.bf` for whatever
+files arrived since the last build. A hot stream with many small
+ingest-flushes per hour (lots of compaction rounds before settling)
+can accumulate 10+ `.bf` per hour. Search has to fetch every distinct
+`bloom_ver` for the bucket.
+
+**Impact:** more fetches per query (currently capped at
+`buffer_unordered(32)`); more storage in the `bloom/` subtree.
+
+**Fix later:** a periodic **compact-bloom** pass that, for stable
+hours (settled long enough that no `bloom_ver = 0` will appear
+again), reads every `.bf` in the bucket, merges them by OR-ing
+each (file, field) bitset, writes one combined `.bf`, and atomically
+re-points file_list rows. This is safe for live data but breaks the
+"never re-stamp" invariant for dumped rows — would need to either
+skip hours that have been partially dumped, or run before dump.
+
+### 12.2 Performance gaps
+
+#### No cross-query `BloomReader` cache
+
+`BloomReader::check` is `&self` (interior `OnceLock<Sbbf>`), so we
+*can* share via `Arc` across queries — but we don't yet. Every prune
+call re-parses each `.bf` footer it touches.
+
+**Impact:** the parse is cheap (dozens of microseconds for a typical
+footer) but it's pure waste on a hot bucket queried thousands of
+times per second.
+
+**Fix later:** add an LRU `HashMap<(org, stream, date, bloom_ver),
+Arc<BloomReader>>` next to the file_data cache. The cache key is
+unique per `.bf` and the reader is immutable, so eviction is a pure
+LRU concern.
+
+#### Hardcoded concurrency / FPP / settling window
+
+Three constants that should probably be env-configurable:
+
+- `BLOOM_PREFETCH_CONCURRENCY = 32` (search prune)
+- `DEFAULT_FPP = 0.01` (build)
+- `compact.interval × 4` settling window (catchup)
+
+**Impact:** users can't tune without recompiling.
+
+**Fix later:** add `ZO_BLOOM_PREFETCH_CONCURRENCY`,
+`ZO_BLOOM_DEFAULT_FPP`, `ZO_BLOOM_SETTLING_WINDOW_SECS` env vars.
+
+#### `query_pending_bloom_dates` cost on huge `file_list`
+
+The distinct-date scan with `stream = ? AND bloom_ver = 0 AND
+updated_at < ?` runs once per stream per catchup tick. On Postgres
+this hits the partition for the relevant date and is fast; on SQLite
+it's a full-table scan filtered by index.
+
+**Impact:** linear in the size of `file_list` per stream. Fine for
+typical deployments, possibly slow for users with multi-million-row
+file_lists per stream.
+
+**Fix later:** add a covering index `(stream, bloom_ver, updated_at)`
+if profiling shows this query dominating; or have ingest write
+`bloom_ver = 0` rows to a sidecar "pending bloom" queue table that
+catchup reads instead.
+
+### 12.3 Semantic / coverage gaps
+
+#### Frozen `bloom_ver` on dumped rows
+
+If a row is dumped while at `bloom_ver = 0` (catchup hadn't reached
+it yet, or dump retention is shorter than the settling window), its
+`bloom_ver` stays 0 forever. Search for those rows degrades to the
+original tantivy path.
+
+**Impact:** correctness preserved, perf benefit lost for that data.
+
+**Fix later:** a backfill CLI that reads a dump parquet, builds
+blooms for its rows, writes a `.bf`, and rewrites the dump with
+updated `bloom_ver`s. Tractable but mechanically tricky (rewriting a
+dump means atomically swapping the parquet object).
+
+Alternative: have the dump path **wait for catchup** on a hour
+before dumping it, instead of relying on the global settling window.
+
+#### Predicate extraction limited to top-level AND
+
+Nested `And`, top-level `Or`, and any combination involving
+`NotEqual` / `Regex` / `MatchAll` are all skipped by
+`bloom_predicate::extract`.
+
+**Impact:** queries with these shapes get no bloom pruning.
+
+**Fix later:** for nested `And`, recurse into the predicate tree —
+trivial. For `Or`, only useful if every branch is bloom-prunable AND
+combined with bloom-OR (each predicate keeps the file if *any*
+branch's bloom says maybe). Adding this widens applicability but
+the implementation is non-trivial enough that it should wait until
+we see real queries that need it.
+
+### 12.4 Observability gaps
+
+#### No bloom-coverage metric
+
+We don't expose a "what fraction of file_list has `bloom_ver != 0`"
+gauge per stream. If catchup falls behind ingest, you'd find out by
+seeing low `bloom_prune_keep_ratio` improvement, not by seeing
+coverage directly.
+
+**Fix later:** a periodic gauge `bloom_coverage_ratio{org,stream}`
+populated from a cheap `COUNT(*) FILTER (WHERE bloom_ver = 0) /
+COUNT(*)` aggregate. Could share the same scheduler tick as catchup.
+
+### 12.5 Test gaps
+
+#### No end-to-end integration test
+
+The unit tests cover format round-trip, predicate extraction, prune
+on a synthetic in-memory `.bf`, and the SBBF compatibility check.
+But there's no test that wires ingest → compact → bloom_build →
+search through a real (in-memory) object store + tantivy + parquet
+pipeline.
+
+**Impact:** regressions in the wiring (like the `bloom_ver` SELECT
+list bug we hit in review) only surface in CI runs against real
+infra, sometimes only in production.
+
+**Fix later:** an integration test under `tests/` using
+`InMemory` object store, `RamDirectory` tantivy, and an in-memory
+SQLite. Build a small parquet, ingest, run compact, run a search,
+assert the prune metric moved.
 
 ---
 
-## 13. File map
+## 13. Future work
+
+Capabilities we **don't have yet** but might want, separate from the
+§12 known weak spots which are about improving things we already do.
+
+- **Hour-level summary bloom** (hierarchical) for queries that span thousands of buckets, to skip whole hours with one bloom check before fetching per-file blooms. Only worth it if real query traces show the per-file fetch dominates.
+- **Per-stream `fpp`** via `StreamSettings` for users who want tighter FPR on hot streams (e.g. 0.001 for a billion-trace-id-per-day stream at the cost of ~1.4× more `.bf` bytes).
+- **Bloom on tokenized fields** (Loki BBF 2.0 style) — would handle full-text queries, but requires re-thinking term enumeration since FTS term dicts can be huge. Currently full-text goes through tantivy directly with no bloom prune.
+- **`Arc<BloomReader>` cross-query cache** — moved here from §12.2 since it's a *new capability* (the reader is `&self`-ready, but the cache itself is new code).
+- **Backfill CLI** for hours that were dumped at `bloom_ver = 0` — moved here from §12.3 since it's a new tool, not a fix to existing behavior.
+
+---
+
+## 14. File map
 
 | File | Role |
 |---|---|
@@ -381,6 +556,7 @@ A 30-day high-cardinality query: ≈ 720 hours × 2 avg = ~1440 `.bf` fetches, b
 | `src/infra/src/bloom/path.rs` | `bloom_path` / `bloom_dir` helpers |
 | `src/infra/src/bloom/writer.rs` | `BloomBuilder`, `FieldBloom`, `BloomWriter::serialize`, `WriteError` |
 | `src/infra/src/bloom/reader.rs` | `BloomReader::parse / check`, `ReadError` |
+| `src/infra/src/bloom/DESIGN.md` | This document |
 | `src/infra/src/file_list/mod.rs` | `FileList::update_bloom_ver`, `query_pending_bloom_dates` traits |
 | `src/infra/src/file_list/{sqlite,postgres}.rs` | DB impls + DDL + migrations |
 | `src/service/tantivy/bloom_builder.rs` | `build_blooms_from_index` (term-dict iteration) |
@@ -393,11 +569,11 @@ A 30-day high-cardinality query: ≈ 720 hours × 2 avg = ~1440 `.bf` fetches, b
 | `src/service/compact/dump.rs` | dump-parquet writer with `bloom_ver` column |
 | `src/job/compactor.rs` | `run_bloom_catchup` scheduler entry |
 | `src/proto/proto/cluster/common.proto` | gRPC `FileMeta.bloom_ver` (tag 7) |
-| `src/config/src/metrics.rs` | three Prometheus metrics |
+| `src/config/src/metrics.rs` | five Prometheus metrics |
 
 ---
 
-## 14. Open questions
+## 15. Open questions
 
 (none blocking; documented for future readers)
 
