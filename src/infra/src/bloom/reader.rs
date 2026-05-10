@@ -24,12 +24,14 @@
 //! `Err(ReadError::*)`. Callers (the search prune layer) downgrade any
 //! error to "no pruning" to keep query correctness.
 
+use std::sync::OnceLock;
+
 use hashbrown::HashMap;
 use parquet::bloom_filter::Sbbf;
 
 use super::{ALGO_SBBF_XXHASH64, MAGIC, VERSION};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum ReadError {
     #[error("blob too short: {0} bytes")]
     TooShort(usize),
@@ -48,21 +50,28 @@ pub enum ReadError {
 }
 
 /// One indexed bloom for a particular file_id, lazily materialized.
+///
+/// `bloom` is wrapped in `OnceLock` rather than `Option<Sbbf>` so that
+/// `check` only needs `&self` (interior init) — this is the contract
+/// that lets a single `Arc<BloomReader>` be shared across queries
+/// without a `Mutex` on the hot path. The OnceLock stores
+/// `Result<Sbbf, ReadError>` to memoize parse failures too.
+#[derive(Debug)]
 struct FileEntry {
     body_offset: u64,
     body_size: u32,
-    /// Built lazily on first lookup, then memoized.
-    bloom_built: bool,
-    bloom: Option<Sbbf>,
+    bloom: OnceLock<Result<Sbbf, ReadError>>,
 }
 
+#[derive(Debug)]
 struct FieldSection {
     /// `file_id` → entry index inside `entries`.
     by_file: HashMap<u64, usize>,
     entries: Vec<FileEntry>,
 }
 
-/// Parsed `.bf` blob ready for membership lookups.
+/// Parsed `.bf` blob ready for membership lookups. Lookups take `&self`
+/// (no `&mut`) so the reader can be shared via `Arc` across queries.
 pub struct BloomReader {
     blob: Vec<u8>,
     /// `field_name` → section
@@ -136,8 +145,7 @@ impl BloomReader {
                 entries.push(FileEntry {
                     body_offset,
                     body_size,
-                    bloom_built: false,
-                    bloom: None,
+                    bloom: OnceLock::new(),
                 });
                 by_file.insert(file_id, idx);
             }
@@ -163,8 +171,12 @@ impl BloomReader {
     /// Returns `Ok(true)` when the file or field is unknown to this `.bf`
     /// — callers decide what to do with that (typically: keep the file
     /// because we lack info to rule it out).
-    pub fn check(&mut self, field: &str, file_id: u64, value: &[u8]) -> Result<bool, ReadError> {
-        let section = match self.by_field.get_mut(field) {
+    ///
+    /// Takes `&self` (interior init via `OnceLock`) so the same
+    /// `BloomReader` can be shared via `Arc` across queries without
+    /// per-check locking.
+    pub fn check(&self, field: &str, file_id: u64, value: &[u8]) -> Result<bool, ReadError> {
+        let section = match self.by_field.get(field) {
             Some(s) => s,
             None => return Ok(true),
         };
@@ -172,25 +184,21 @@ impl BloomReader {
             Some(i) => *i,
             None => return Ok(true),
         };
-        let entry = &mut section.entries[idx];
-        if !entry.bloom_built {
-            entry.bloom_built = true;
+        let entry = &section.entries[idx];
+        let bloom_result = entry.bloom.get_or_init(|| {
             let start = entry.body_offset as usize;
             let end = start + entry.body_size as usize;
-            entry.bloom = Sbbf::from_bytes(&self.blob[start..end]).ok().or_else(|| {
-                log::warn!("bloom: invalid Sbbf bytes for field '{field}', file_id={file_id}");
-                None
-            });
-            if entry.bloom.is_none() {
-                return Err(ReadError::InvalidBloom(
-                    field.to_string(),
-                    file_id,
-                    "Sbbf::from_bytes failed".to_string(),
-                ));
-            }
+            Sbbf::from_bytes(&self.blob[start..end]).map_err(|e| {
+                log::warn!(
+                    "bloom: invalid Sbbf bytes for field '{field}', file_id={file_id}: {e}"
+                );
+                ReadError::InvalidBloom(field.to_string(), file_id, e.to_string())
+            })
+        });
+        match bloom_result {
+            Ok(bloom) => Ok(bloom.check(value)),
+            Err(e) => Err(e.clone()),
         }
-        let bloom = entry.bloom.as_ref().unwrap();
-        Ok(bloom.check(value))
     }
 }
 
@@ -256,7 +264,7 @@ mod tests {
     #[test]
     fn test_round_trip_membership_yes_and_no() {
         let blob = build_two_field_blob();
-        let mut r = BloomReader::parse(blob).unwrap();
+        let r = BloomReader::parse(blob).unwrap();
         assert_eq!(r.field_count(), 2);
 
         // present items
@@ -273,7 +281,7 @@ mod tests {
     fn test_unknown_field_or_file_returns_true() {
         // "no information" is conservative — keep the file in the candidate set.
         let blob = build_two_field_blob();
-        let mut r = BloomReader::parse(blob).unwrap();
+        let r = BloomReader::parse(blob).unwrap();
         assert!(r.check("nonexistent_field", 101, b"x").unwrap());
         assert!(r.check("trace_id", 999_999, b"x").unwrap());
     }
@@ -340,7 +348,7 @@ mod tests {
             b.insert(idx, format!("present-{i}").as_bytes());
         }
         let blob = BloomWriter::serialize(b.finish()).unwrap();
-        let mut r = BloomReader::parse(blob).unwrap();
+        let r = BloomReader::parse(blob).unwrap();
         let mut fp = 0;
         for i in 0..10_000u32 {
             if r.check("trace_id", 7, format!("absent-{i}").as_bytes())

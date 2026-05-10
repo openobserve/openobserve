@@ -138,6 +138,9 @@ pub async fn prune(
             .await;
 
     let mut readers: HashMap<Group, BloomReader> = HashMap::new();
+    // (`OnceLock` interior init in `BloomReader::check` means we don't need
+    // mutable access on the lookup hot path — kept owned here only for
+    // collection convenience.)
     for (group, path, bytes) in fetched {
         let bytes = match bytes {
             Ok(b) => b,
@@ -168,7 +171,7 @@ pub async fn prune(
             }
         };
         let group = (date, f.meta.bloom_ver);
-        let reader = match readers.get_mut(&group) {
+        let reader = match readers.get(&group) {
             Some(r) => r,
             None => {
                 kept.push(f);
@@ -248,7 +251,7 @@ mod tests {
         let i_b = bb.begin(id_b, "trace_id", 100);
         bb.insert(i_b, b"present-B");
         let blob = BloomWriter::serialize(bb.finish()).unwrap();
-        let mut r = BloomReader::parse(blob).unwrap();
+        let r = BloomReader::parse(blob).unwrap();
 
         // Predicate matching only file A
         let pred = BloomPredicate {
