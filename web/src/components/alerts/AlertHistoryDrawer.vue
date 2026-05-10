@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    :width="55"
     :show-close="false"
     @update:open="emit('update:open', $event)"
   >
