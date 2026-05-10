@@ -103,12 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-icon name="error_outline" size="3rem" color="negative" class="tw:mb-3" />
       <div class="tw:text-base tw:mb-2">Failed to load LLM Insights</div>
       <div class="tw:text-sm tw:text-gray-500 tw:mb-3">{{ error }}</div>
-      <q-btn
-        outline
-        color="primary"
-        label="Retry"
-        @click="loadData"
-      />
+      <OButton
+        variant="outline"
+        size="sm"
+        data-test="llm-insights-retry-btn"
+        @click="load()"
+      >
+        Retry
+      </OButton>
     </div>
 
     <!-- Empty state -->
@@ -193,6 +195,7 @@ import { useLLMInsights } from "./composables/useLLMInsights";
 import KpiSparkline from "./KpiSparkline.vue";
 import LLMTrendPanel from "./LLMTrendPanel.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import useStreams from "@/composables/useStreams";
 
