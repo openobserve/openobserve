@@ -181,7 +181,7 @@
           @update:cancel="confirmBulkDelete = false"
           v-model="confirmBulkDelete"
         />
-        <ODrawer v-model:open="showAddRegexPatternDialog.show" size="lg" :show-close="false">
+        <ODrawer v-model:open="showAddRegexPatternDialog.show" :width="store.state.isAiChatEnabled ? 70 : 40" :show-close="false">
           <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
         </ODrawer>
       </q-page>
