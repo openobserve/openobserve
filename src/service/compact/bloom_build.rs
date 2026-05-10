@@ -42,7 +42,7 @@ use config::{
     utils::{inverted_index::convert_parquet_file_name_to_tantivy_file, time::now_micros},
 };
 use infra::{
-    bloom::{BloomWriter, FieldBloom, file_id_from_path, path::bloom_path},
+    bloom::{BloomWriter, FieldBloom, path::bloom_path},
     file_list as infra_file_list, storage,
 };
 
@@ -201,7 +201,10 @@ async fn build_blooms_for_file(
     .await
     .context("open puffin dir")?;
     let index = tantivy::Index::open(dir).context("open tantivy index")?;
-    let file_id = file_id_from_path(&file.key);
+    // file.id is the file_list row id, assigned by the INSERT that
+    // happened in `write_file_list` before this build runs. Always > 0
+    // by the time we get here.
+    let file_id = file.id as u64;
     build_blooms_from_index(&index, file_id, target_fields, 0.01)
 }
 

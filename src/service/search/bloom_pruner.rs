@@ -36,7 +36,7 @@ use std::collections::HashMap;
 
 use config::meta::stream::{FileKey, StreamType};
 use futures::future::join_all;
-use infra::bloom::{BloomReader, file_id_from_path, path::bloom_path};
+use infra::bloom::{BloomReader, path::bloom_path};
 
 use super::bloom_predicate::BloomPredicate;
 
@@ -138,7 +138,8 @@ pub async fn prune(
                 continue;
             }
         };
-        let file_id = file_id_from_path(&f.key);
+        // file_list.id is what the compactor stamped into the .bf footer.
+        let file_id = f.id as u64;
         let mut all_match = true;
         for pred in predicates {
             // OR within predicate values: any value's bloom-maybe keeps it.
@@ -162,7 +163,7 @@ pub async fn prune(
 #[cfg(test)]
 mod tests {
     use config::meta::stream::{FileKey, FileMeta};
-    use infra::bloom::{BloomBuilder, BloomReader, BloomWriter, file_id_from_path};
+    use infra::bloom::{BloomBuilder, BloomReader, BloomWriter};
 
     use super::*;
 
@@ -172,17 +173,17 @@ mod tests {
         k
     }
 
-    /// Builds a `.bf` blob with two parquet files and one indexed field,
+    /// Builds a `.bf` blob with two file_list ids and one indexed field,
     /// then evaluates the predicates directly against the parsed reader
     /// the same way `prune()` does (without going through the
     /// `file_data::get` ladder, which would need an object-store backend).
     /// This nails down the writer→reader→predicate-evaluation contract.
     #[test]
     fn test_writer_reader_predicate_contract() {
-        let key_a = "files/o/logs/s/2026/05/08/14/a.parquet";
-        let key_b = "files/o/logs/s/2026/05/08/14/b.parquet";
-        let id_a = file_id_from_path(key_a);
-        let id_b = file_id_from_path(key_b);
+        // Pretend these are the file_list row ids the compactor stamped
+        // into the .bf footer.
+        let id_a: u64 = 101;
+        let id_b: u64 = 102;
 
         let mut bb = BloomBuilder::new();
         let i_a = bb.begin(id_a, "trace_id", 100);
