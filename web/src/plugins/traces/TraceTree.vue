@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span
                         v-if="
-                          (spans as any[])[virtualRow.index].llm_usage?.total >
+                          (spans as any[])[virtualRow.index].genAiUsage?.total >
                           0
                         "
                         class="q-mr-sm"
@@ -295,19 +295,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-icon name="functions" size="10px" />
                         {{
                           formatTokens(
-                            (spans as any[])[virtualRow.index].llm_usage.total,
+                            (spans as any[])[virtualRow.index].genAiUsage.total,
                           )
                         }}
                       </span>
                       <span
                         v-if="
-                          (spans as any[])[virtualRow.index].llm_cost?.total > 0
+                          (spans as any[])[virtualRow.index].genAiCost?.total > 0
                         "
                       >
                         <q-icon name="attach_money" size="10px" />
                         {{
                           formatCost(
-                            (spans as any[])[virtualRow.index].llm_cost.total,
+                            (spans as any[])[virtualRow.index].genAiCost.total,
                           )
                         }}
                       </span>

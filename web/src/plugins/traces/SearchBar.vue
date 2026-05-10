@@ -64,13 +64,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
+          <OToggleGroupItem
+            data-test="traces-search-mode-llm-insights-btn"
+            value="llm-insights"
+            size="sm"
+          >
+            <template #icon-left
+              ><Sparkles class="tw:size-3.5 tw:shrink-0"
+            /></template>
+            LLM Insights
+          </OToggleGroupItem>
         </OToggleGroup>
 
         <!-- Show search controls only when not on Service Graph or Services Catalog -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
-            searchObj.meta.searchMode !== 'services-catalog'
+            searchObj.meta.searchMode !== 'services-catalog' &&
+            searchObj.meta.searchMode !== 'llm-insights'
           "
         >
           <div
@@ -382,11 +393,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+
     </div>
     <div
       v-if="
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.searchMode !== 'services-catalog' &&
+        searchObj.meta.searchMode !== 'llm-insights' &&
         searchObj.meta.showQuery
       "
       class="row tw:h-[calc(100%-3.1rem)]!"
@@ -441,7 +454,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { Layers, Network, GitBranch, Share2, BookOpen } from "lucide-vue-next";
+import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -457,6 +470,7 @@ import {
   replaceExistingFieldCondition,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
+import { isDatetimeChanged } from "./tracesSearchBar.utils";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -473,6 +487,7 @@ export default defineComponent({
     GitBranch,
     Share2,
     BookOpen,
+    Sparkles,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -497,6 +512,10 @@ export default defineComponent({
     // so have added as prop
     // Run query btn was not getting disabled while loading
     isLoading: {
+      type: Boolean,
+      default: false,
+    },
+    isLLMSpanPresent: {
       type: Boolean,
       default: false,
     },
@@ -705,6 +724,11 @@ export default defineComponent({
         }
       }
 
+      // See `tracesSearchBar.utils.ts → isDatetimeChanged` for the
+      // mount-replay filter rationale (relative ranges compare by period,
+      // absolute by raw start/end).
+      const datetimeChanged = isDatetimeChanged(searchObj.data.datetime, value);
+
       searchObj.data.datetime = {
         startTime: value.startTime,
         endTime: value.endTime,
@@ -744,8 +768,18 @@ export default defineComponent({
         });
       }
 
-      // Live mode: auto-trigger search on any time range change
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+      // Live mode: auto-trigger search on a real time-range change.
+      // The DateTime component also fires `on:date-change` once on its own
+      // mount with the current value (no actual change). The `prev`
+      // comparison above filters out that mount-time replay so a tab
+      // switch that remounts the picker doesn't fire a redundant search
+      // (visible in LLM Insights as a duplicate fetchAll right after the
+      // dashboard's own initial load).
+      if (
+        store.state.zoConfig?.auto_query_enabled &&
+        searchObj.meta.liveMode &&
+        datetimeChanged
+      ) {
         emit("searchdata");
       }
     };

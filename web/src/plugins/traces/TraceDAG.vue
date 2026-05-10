@@ -54,15 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="custom-node"
             :class="[
-              getObservationTypeClass(data.llm_observation_type),
+              getObservationTypeClass(data.gen_ai_operation_name),
               {
                 'node-error': data.span_status === 'ERROR',
-                'node-ok': data.span_status === 'OK' && !data.llm_observation_type,
+                'node-ok': data.span_status === 'OK' && !data.gen_ai_operation_name,
               }
             ]"
             @click="handleNodeClick(data.span_id)"
           >
-            <div class="node-operation" :class="getObservationTypeTextClass(data.llm_observation_type)">{{ data.operation_name }}</div>
+            <div class="node-operation" :class="getObservationTypeTextClass(data.gen_ai_operation_name)">{{ data.operation_name }}</div>
             <q-chip
               v-if="data.span_status === 'ERROR'"
               dense
@@ -102,7 +102,7 @@ interface SpanNode {
   span_status: string;
   start_time: number;
   end_time: number;
-  llm_observation_type: string | null;
+  gen_ai_operation_name: string | null;
 }
 
 interface SpanEdge {

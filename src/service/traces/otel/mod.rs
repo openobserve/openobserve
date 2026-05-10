@@ -113,7 +113,12 @@ mod tests {
     use config::utils::json;
 
     use super::*;
-    use crate::{common::meta::traces::Event, service::traces::otel::attributes::O2Attributes};
+    use crate::{
+        common::meta::traces::Event,
+        service::traces::otel::attributes::{
+            GenAiAttributes, GenAiExtensions, O2Attributes, OtelAttributes,
+        },
+    };
 
     /// Test that simulates the complete OpenObserve traces ingestion flow
     /// with OTEL processor integration
@@ -172,7 +177,7 @@ mod tests {
         // 1. Observation type should be GENERATION
         assert_eq!(
             span_attributes
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
@@ -180,27 +185,37 @@ mod tests {
         // 2. Model name should be extracted
         assert_eq!(
             span_attributes
-                .get(O2Attributes::MODEL_NAME)
+                .get(GenAiAttributes::RESPONSE_MODEL)
                 .and_then(|v| v.as_str()),
             Some("gpt-4o-2024-08-06")
         );
 
-        // 3. Usage details should be present
-        assert!(span_attributes.contains_key(O2Attributes::USAGE_DETAILS));
-        let usage = span_attributes.get(O2Attributes::USAGE_DETAILS).unwrap();
-        assert!(usage.is_object());
-        assert_eq!(usage.get("input").and_then(|v| v.as_i64()), Some(12));
-        assert_eq!(usage.get("output").and_then(|v| v.as_i64()), Some(8));
+        // 3. Usage tokens emitted as individual scalar attributes
+        assert_eq!(
+            span_attributes
+                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(12)
+        );
+        assert_eq!(
+            span_attributes
+                .get(GenAiAttributes::USAGE_OUTPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(8)
+        );
 
-        // 4. Cost details should be present
-        assert!(span_attributes.contains_key(O2Attributes::COST_DETAILS));
-        let cost = span_attributes.get(O2Attributes::COST_DETAILS).unwrap();
-        assert_eq!(cost.get("total").and_then(|v| v.as_f64()), Some(0.00042));
+        // 4. Cost total emitted as scalar at gen_ai.usage.cost
+        assert_eq!(
+            span_attributes
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64()),
+            Some(0.00042)
+        );
 
         // 5. User ID should be extracted
         assert_eq!(
             span_attributes
-                .get(O2Attributes::USER_ID)
+                .get(OtelAttributes::USER_ID)
                 .and_then(|v| v.as_str()),
             Some("user-789")
         );
@@ -208,7 +223,7 @@ mod tests {
         // 6. Session ID should be extracted
         assert_eq!(
             span_attributes
-                .get(O2Attributes::SESSION_ID)
+                .get(GenAiAttributes::CONVERSATION_ID)
                 .and_then(|v| v.as_str()),
             Some("conv-123")
         );
@@ -221,8 +236,8 @@ mod tests {
         assert!(params.get("max_tokens").is_some());
 
         // 9. LLM input/output should be present
-        assert!(span_attributes.contains_key(O2Attributes::INPUT));
-        assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
+        assert!(span_attributes.contains_key(GenAiAttributes::INPUT_MESSAGES));
+        assert!(span_attributes.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
     }
 
     #[test]
@@ -260,30 +275,30 @@ mod tests {
         // Verify Vercel AI SDK specific enrichment
         assert_eq!(
             span_attributes
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
         assert_eq!(
             span_attributes
-                .get(O2Attributes::MODEL_NAME)
+                .get(GenAiAttributes::RESPONSE_MODEL)
                 .and_then(|v| v.as_str()),
             Some("gpt-4")
         );
         assert_eq!(
             span_attributes
-                .get(O2Attributes::USER_ID)
+                .get(OtelAttributes::USER_ID)
                 .and_then(|v| v.as_str()),
             Some("user-456")
         );
         assert_eq!(
             span_attributes
-                .get(O2Attributes::SESSION_ID)
+                .get(GenAiAttributes::CONVERSATION_ID)
                 .and_then(|v| v.as_str()),
             Some("session-789")
         );
-        assert!(span_attributes.contains_key(O2Attributes::INPUT));
-        assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
+        assert!(span_attributes.contains_key(GenAiAttributes::INPUT_MESSAGES));
+        assert!(span_attributes.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
     }
 
     #[test]
@@ -316,12 +331,12 @@ mod tests {
         // Verify tool call enrichment
         assert_eq!(
             span_attributes
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("TOOL")
         );
-        assert!(span_attributes.contains_key(O2Attributes::INPUT));
-        assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
+        assert!(span_attributes.contains_key(GenAiAttributes::INPUT_MESSAGES));
+        assert!(span_attributes.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
     }
 
     #[test]
@@ -347,13 +362,13 @@ mod tests {
         // Verify embedding enrichment
         assert_eq!(
             span_attributes
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("EMBEDDING")
         );
         assert_eq!(
             span_attributes
-                .get(O2Attributes::MODEL_NAME)
+                .get(GenAiAttributes::RESPONSE_MODEL)
                 .and_then(|v| v.as_str()),
             Some("text-embedding-ada-002")
         );
@@ -410,8 +425,8 @@ mod tests {
         processor.process_span(&mut span_attributes, &resource_attributes, None, &events);
 
         // Verify event-based input/output extraction
-        assert!(span_attributes.contains_key(O2Attributes::INPUT));
-        assert!(span_attributes.contains_key(O2Attributes::OUTPUT));
+        assert!(span_attributes.contains_key(GenAiAttributes::INPUT_MESSAGES));
+        assert!(span_attributes.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
     }
 
     #[test]
@@ -431,11 +446,19 @@ mod tests {
 
         processor.process_span(&mut span_attributes, &resource_attributes, None, &events);
 
-        // Verify backward compatibility with legacy names
-        assert!(span_attributes.contains_key(O2Attributes::USAGE_DETAILS));
-        let usage = span_attributes.get(O2Attributes::USAGE_DETAILS).unwrap();
-        assert_eq!(usage.get("input").and_then(|v| v.as_i64()), Some(100));
-        assert_eq!(usage.get("output").and_then(|v| v.as_i64()), Some(50));
+        // Verify backward-compat token names map to Gen-AI scalar attributes
+        assert_eq!(
+            span_attributes
+                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(100)
+        );
+        assert_eq!(
+            span_attributes
+                .get(GenAiAttributes::USAGE_OUTPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(50)
+        );
     }
 
     #[test]
@@ -471,28 +494,29 @@ mod tests {
         // Verify enriched attributes
         assert_eq!(
             span_attrs
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
         assert_eq!(
             span_attrs
-                .get(O2Attributes::MODEL_NAME)
+                .get(GenAiAttributes::RESPONSE_MODEL)
                 .and_then(|v| v.as_str()),
             Some("gpt-4o-2024-08-06")
         );
         assert!(span_attrs.contains_key(O2Attributes::MODEL_PARAMETERS));
-        assert!(span_attrs.contains_key(O2Attributes::USAGE_DETAILS));
-        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        assert!(span_attrs.contains_key(GenAiAttributes::USAGE_INPUT_TOKENS));
+        assert!(span_attrs.contains_key(GenAiAttributes::USAGE_OUTPUT_TOKENS));
+        assert!(span_attrs.contains_key(GenAiAttributes::USAGE_COST));
         assert_eq!(
             span_attrs
-                .get(O2Attributes::USER_ID)
+                .get(OtelAttributes::USER_ID)
                 .and_then(|v| v.as_str()),
             Some("user-123")
         );
         assert_eq!(
             span_attrs
-                .get(O2Attributes::SESSION_ID)
+                .get(GenAiAttributes::CONVERSATION_ID)
                 .and_then(|v| v.as_str()),
             Some("conv-456")
         );
@@ -523,12 +547,12 @@ mod tests {
 
         assert_eq!(
             span_attrs
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("TOOL")
         );
-        assert!(span_attrs.contains_key(O2Attributes::INPUT));
-        assert!(span_attrs.contains_key(O2Attributes::OUTPUT));
+        assert!(span_attrs.contains_key(GenAiAttributes::INPUT_MESSAGES));
+        assert!(span_attrs.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
     }
 
     #[test]
@@ -552,7 +576,7 @@ mod tests {
 
         assert_eq!(
             span_attrs
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("EMBEDDING")
         );
@@ -586,24 +610,24 @@ mod tests {
 
         assert_eq!(
             span_attrs
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
         assert_eq!(
             span_attrs
-                .get(O2Attributes::MODEL_NAME)
+                .get(GenAiAttributes::RESPONSE_MODEL)
                 .and_then(|v| v.as_str()),
             Some("gpt-4")
         );
         assert_eq!(
             span_attrs
-                .get(O2Attributes::USER_ID)
+                .get(OtelAttributes::USER_ID)
                 .and_then(|v| v.as_str()),
             Some("user-789")
         );
-        assert!(span_attrs.contains_key(O2Attributes::INPUT));
-        assert!(span_attrs.contains_key(O2Attributes::OUTPUT));
+        assert!(span_attrs.contains_key(GenAiAttributes::INPUT_MESSAGES));
+        assert!(span_attrs.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
     }
 
     #[test]
@@ -625,11 +649,11 @@ mod tests {
         // OpenInference has higher priority than model-based detection
         assert_eq!(
             span_attrs
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("GENERATION")
         );
-        assert!(span_attrs.contains_key(O2Attributes::USAGE_DETAILS));
+        assert!(span_attrs.contains_key(GenAiAttributes::USAGE_INPUT_TOKENS));
     }
 
     /// Full E2E integration test simulating what the o2-sre-agent sends:
@@ -713,7 +737,7 @@ mod tests {
         // 1. Observation type
         assert_eq!(
             span_attrs
-                .get(O2Attributes::OBSERVATION_TYPE)
+                .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("GENERATION"),
             "Should detect GENERATION from gen_ai.operation.name=chat"
@@ -722,7 +746,7 @@ mod tests {
         // 2. Model name (response model takes precedence)
         assert_eq!(
             span_attrs
-                .get(O2Attributes::MODEL_NAME)
+                .get(GenAiAttributes::RESPONSE_MODEL)
                 .and_then(|v| v.as_str()),
             Some("claude-3-5-sonnet"),
             "Should extract model name from gen_ai.response.model"
@@ -731,42 +755,56 @@ mod tests {
         // 3. Provider name (from gen_ai.system)
         assert_eq!(
             span_attrs
-                .get(O2Attributes::PROVIDER_NAME)
+                .get(GenAiAttributes::PROVIDER_NAME)
                 .and_then(|v| v.as_str()),
             Some("anthropic"),
             "Should extract provider from gen_ai.system"
         );
 
-        // 4. Usage details
-        assert!(
-            span_attrs.contains_key(O2Attributes::USAGE_DETAILS),
-            "Should have usage details"
-        );
-        let usage = span_attrs.get(O2Attributes::USAGE_DETAILS).unwrap();
-        assert_eq!(usage.get("input").and_then(|v| v.as_i64()), Some(1250));
-        assert_eq!(usage.get("output").and_then(|v| v.as_i64()), Some(340));
+        // 4. Usage tokens emitted as scalar attributes
         assert_eq!(
-            usage.get("total").and_then(|v| v.as_i64()),
+            span_attrs
+                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(1250)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_OUTPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(340)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_TOTAL_TOKENS)
+                .and_then(|v| v.as_i64()),
             Some(1590),
             "Total should be input + output"
         );
 
-        // 5. Cost details (calculated from model pricing)
+        // 5. Cost emitted as scalar attributes (calculated from model pricing)
         assert!(
-            span_attrs.contains_key(O2Attributes::COST_DETAILS),
-            "Should have cost details calculated from token counts"
-        );
-        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
-        assert!(
-            cost.get("input").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0,
+            span_attrs
+                .get(GenAiExtensions::USAGE_COST_INPUT)
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0)
+                > 0.0,
             "Input cost should be > 0 for known model"
         );
         assert!(
-            cost.get("output").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0,
+            span_attrs
+                .get(GenAiExtensions::USAGE_COST_OUTPUT)
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0)
+                > 0.0,
             "Output cost should be > 0 for known model"
         );
         assert!(
-            cost.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0,
+            span_attrs
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0)
+                > 0.0,
             "Total cost should be > 0"
         );
 
@@ -792,34 +830,28 @@ mod tests {
         // 7. User/session metadata
         assert_eq!(
             span_attrs
-                .get(O2Attributes::USER_ID)
+                .get(OtelAttributes::USER_ID)
                 .and_then(|v| v.as_str()),
             Some("admin@example.com")
         );
         assert_eq!(
             span_attrs
-                .get(O2Attributes::SESSION_ID)
+                .get(GenAiAttributes::CONVERSATION_ID)
                 .and_then(|v| v.as_str()),
             Some("01936b7a-8c4f-7d00-a000-deadbeef1234")
         );
 
-        // 8. Input/output (moved from gen_ai.* to O2 fields)
+        // 8. Input/output enriched at canonical Gen-AI keys.
+        // Note: the processor now emits the OO-condensed string form back to the
+        // same gen_ai.input.messages / gen_ai.output.messages keys (overwriting
+        // the original structured value), so they remain present after enrichment.
         assert!(
-            span_attrs.contains_key(O2Attributes::INPUT),
+            span_attrs.contains_key(GenAiAttributes::INPUT_MESSAGES),
             "Should have enriched input"
         );
         assert!(
-            span_attrs.contains_key(O2Attributes::OUTPUT),
+            span_attrs.contains_key(GenAiAttributes::OUTPUT_MESSAGES),
             "Should have enriched output"
-        );
-        // Original gen_ai.input/output should be removed
-        assert!(
-            !span_attrs.contains_key("gen_ai.input.messages"),
-            "Original input messages should be removed after enrichment"
-        );
-        assert!(
-            !span_attrs.contains_key("gen_ai.output.messages"),
-            "Original output messages should be removed after enrichment"
         );
 
         // 9. Evaluation scores (the new feature!)
@@ -873,12 +905,25 @@ mod tests {
             "Evaluation duration should be enriched"
         );
 
-        // 10. Verify the nested usage object has all fields for frontend consumption
-        let usage_obj = span_attrs.get(O2Attributes::USAGE_DETAILS).unwrap();
-        assert!(usage_obj.is_object());
-        assert_eq!(usage_obj.get("input").and_then(|v| v.as_i64()), Some(1250));
-        assert_eq!(usage_obj.get("output").and_then(|v| v.as_i64()), Some(340));
-        assert_eq!(usage_obj.get("total").and_then(|v| v.as_i64()), Some(1590));
+        // 10. Usage tokens scalar attributes are present for frontend consumption
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_INPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(1250)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_OUTPUT_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(340)
+        );
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_TOTAL_TOKENS)
+                .and_then(|v| v.as_i64()),
+            Some(1590)
+        );
     }
 
     /// Integration test: span with NO evaluation data should NOT have evaluation fields
@@ -907,7 +952,7 @@ mod tests {
         assert!(!span_attrs.contains_key(O2Attributes::EVALUATION_GROUNDEDNESS));
         assert!(!span_attrs.contains_key(O2Attributes::EVALUATION_SAFETY));
 
-        // But should still have usage/cost
-        assert!(span_attrs.contains_key(O2Attributes::USAGE_DETAILS));
+        // But should still have usage tokens
+        assert!(span_attrs.contains_key(GenAiAttributes::USAGE_INPUT_TOKENS));
     }
 }
