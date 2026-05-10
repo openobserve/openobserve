@@ -97,9 +97,11 @@ export class TracesPage {
     this.errorMessage = '[data-test="logs-search-error-message"]';
 
     // Query Editor
-    this.sqlModeButton = '[data-test="logs-search-sql-mode-btn"]';
-    this.uiModeButton = '[data-test="logs-search-ui-mode-btn"]';
-    this.queryEditor = '[data-test="query-editor"]';
+    // The traces SearchBar.vue renders <code-query-editor editor-id="traces-query-editor">
+    // Monaco editor container uses class .monaco-editor; no parent data-test attr.
+    // SQL mode toggle is data-test="logs-search-bar-sql-mode-toggle-btn" (confirmed in traces SearchBar.vue:140)
+    this.sqlModeButton = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+    this.queryEditor = '.code-query-editor-container';
     this.queryErrorMessage = '[data-test="logs-search-error-message"]';
     this.viewLines = '.view-lines';
 
@@ -421,15 +423,6 @@ export class TracesPage {
       await sqlButton.click();
       // Wait for query editor to be visible after mode switch
       await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    }
-  }
-
-  async switchToUIMode() {
-    const uiButton = this.page.locator(this.uiModeButton);
-    if (await uiButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await uiButton.click();
-      // Wait for UI mode elements to be visible after mode switch
-      await this.page.locator(this.searchBar).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   }
 
@@ -1998,6 +1991,65 @@ export class TracesPage {
     // Look for selected stream toggles or chips (indicated by 'truthy' class or stream-chip data-test)
     // Also check for stream selector with non-empty aria-label as fallback
     return this.page.locator('[data-test*="stream-toggle-"][class*="truthy"], [data-test*="stream-chip"], [data-test="log-search-index-list-select-stream"][aria-label]:not([aria-label=""])');
+  }
+
+  // ===== Regression Test Helper Methods =====
+
+  /**
+   * Get PromQL tab/mode element on the current page.
+   * Targets the QueryTypeSelector button (used in metrics page and PanelEditor):
+   *   data-test="dashboard-promql-query-type"
+   * Falls back to text matching for other contexts.
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPromQLTab() {
+    return this.page.locator('[data-test="dashboard-promql-query-type"], button:has-text("PromQL")').first();
+  }
+
+  /**
+   * Check if PromQL tab is visible
+   * @returns {Promise<boolean>}
+   */
+  async isPromQLTabVisible() {
+    return await this.getPromQLTab().isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Get logs-specific query mode toggles (Quick/SQL mode)
+   * @returns {{ quickMode: import('@playwright/test').Locator, sqlMode: import('@playwright/test').Locator }}
+   */
+  getLogsQueryModeToggles() {
+    return {
+      quickMode: this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]'),
+      sqlMode: this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]'),
+    };
+  }
+
+  /**
+   * Check if any logs query mode toggle is visible
+   * @returns {Promise<{quickMode: boolean, sqlMode: boolean}>}
+   */
+  async isAnyLogsQueryToggleVisible() {
+    const toggles = this.getLogsQueryModeToggles();
+    return {
+      quickMode: await toggles.quickMode.isVisible({ timeout: 5000 }).catch(() => false),
+      sqlMode: await toggles.sqlMode.isVisible({ timeout: 5000 }).catch(() => false),
+    };
+  }
+
+  /**
+   * Check if autocomplete/suggestion widget is visible in the Monaco editor.
+   * Uses page.evaluate() to check Monaco's internal `visible` CSS class,
+   * because the app CSS forces display:flex !important on .suggest-widget,
+   * which makes Playwright's .isVisible() always return true.
+   * @returns {Promise<boolean>}
+   */
+  async isSuggestionWidgetVisible() {
+    return await this.page.evaluate(() => {
+      const widget = document.querySelector('.monaco-editor .suggest-widget');
+      if (!widget) return false;
+      return widget.classList.contains('visible') || widget.classList.contains('focused');
+    });
   }
 
 }
