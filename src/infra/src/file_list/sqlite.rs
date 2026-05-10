@@ -336,6 +336,23 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloo
         Ok(())
     }
 
+    async fn query_pending_bloom_dates(
+        &self,
+        stream_key: &str,
+        max_updated_at_us: i64,
+    ) -> Result<Vec<String>> {
+        let pool = CLIENT_RO.clone();
+        let rows: Vec<(String,)> = sqlx::query_as(
+            r#"SELECT DISTINCT date FROM file_list
+               WHERE stream = $1 AND bloom_ver = 0 AND updated_at < $2;"#,
+        )
+        .bind(stream_key)
+        .bind(max_updated_at_us)
+        .fetch_all(&pool)
+        .await?;
+        Ok(rows.into_iter().map(|(d,)| d).collect())
+    }
+
     async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()> {
         if ids.is_empty() {
             return Ok(());

@@ -73,6 +73,17 @@ pub trait FileList: Sync + Send + 'static {
     /// post-merge bloom builder (see `service::compact::bloom_build`).
     /// Empty `ids` is a no-op.
     async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()>;
+    /// Distinct `date` (YYYY/MM/DD/HH) values for `stream_key` that
+    /// contain at least one row with `bloom_ver = 0` AND whose newest
+    /// row was last touched before `max_updated_at_us`. The
+    /// `updated_at` filter is the settling window — buckets still
+    /// being actively compacted are excluded so the catchup sweep
+    /// doesn't race the per-merge bloom build.
+    async fn query_pending_bloom_dates(
+        &self,
+        stream_key: &str,
+        max_updated_at_us: i64,
+    ) -> Result<Vec<String>>;
     async fn list(&self) -> Result<Vec<FileKey>>;
     async fn query(
         &self,
@@ -288,6 +299,16 @@ pub async fn update_bloom_ver(ids: &[i64], bloom_ver: i64) -> Result<()> {
         return Ok(());
     }
     CLIENT.update_bloom_ver(ids, bloom_ver).await
+}
+
+#[inline]
+pub async fn query_pending_bloom_dates(
+    stream_key: &str,
+    max_updated_at_us: i64,
+) -> Result<Vec<String>> {
+    CLIENT
+        .query_pending_bloom_dates(stream_key, max_updated_at_us)
+        .await
 }
 
 #[inline]

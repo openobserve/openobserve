@@ -242,3 +242,94 @@ async fn build_blooms_for_file(
 // sweep that removes the entire `bloom/{org}/{stream}/{date}/`
 // directory when the date partition itself ages out, alongside parquet
 // and tantivy files.
+
+/// Settling window before a bucket is eligible for catchup. A bucket
+/// where the newest row was last touched within this window is assumed
+/// to still be actively compacted, and the per-merge bloom_build hook
+/// is expected to handle it. We pick `compact.interval * 4` as a
+/// conservative default — long enough to outlast a typical compaction
+/// round but short enough that backfills (e.g. enabling bloom_filter
+/// on already-settled data) are picked up within minutes.
+fn catchup_settling_window_us() -> i64 {
+    let cfg = get_config();
+    let secs = cfg.compact.interval.saturating_mul(4).max(60);
+    (secs as i64).saturating_mul(1_000_000)
+}
+
+/// Periodic sweep that finds (stream, date) buckets with at least one
+/// `bloom_ver = 0` row whose newest update predates the settling
+/// window, then calls `build_for_bucket` for each.
+///
+/// This catches buckets the per-merge hook never fires for:
+/// - streams that no longer ingest, with old data still at bloom_ver=0
+/// - operator just enabled `bloom_filter_enabled` or added fields to `bloom_filter_fields` on a
+///   stream that's already past compaction
+/// - any bucket where compaction hits the "1 file, no merge needed" early-out so the per-prefix
+///   worker doesn't run
+///
+/// Failures per (stream, date) are logged and skipped; one bad bucket
+/// doesn't block the rest.
+pub async fn run_catchup() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    if !cfg.common.bloom_filter_enabled {
+        return Ok(());
+    }
+    let max_updated_at_us = now_micros() - catchup_settling_window_us();
+    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        for stream_type in config::meta::stream::ALL_STREAM_TYPES {
+            let streams =
+                crate::service::db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            for stream_name in streams {
+                // Distributed scheduling: only the consistent-hash owner
+                // for this stream runs catchup, matching how
+                // `run_generate_job` and friends partition work.
+                let Some(node_name) = infra::cluster::get_node_from_consistent_hash(
+                    &stream_name,
+                    &config::meta::cluster::Role::Compactor,
+                    None,
+                )
+                .await
+                else {
+                    continue;
+                };
+                if config::cluster::LOCAL_NODE.name.ne(&node_name) {
+                    continue;
+                }
+
+                let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+                let dates = match infra_file_list::query_pending_bloom_dates(
+                    &stream_key,
+                    max_updated_at_us,
+                )
+                .await
+                {
+                    Ok(d) => d,
+                    Err(e) => {
+                        log::warn!(
+                            "[BLOOM_CATCHUP] query_pending_bloom_dates {stream_key} failed: {e}"
+                        );
+                        continue;
+                    }
+                };
+                if dates.is_empty() {
+                    continue;
+                }
+                log::info!(
+                    "[BLOOM_CATCHUP] {stream_key}: {} bucket(s) need bloom build",
+                    dates.len()
+                );
+                for date_key in dates {
+                    if let Err(e) =
+                        build_for_bucket(&org_id, stream_type, &stream_name, &date_key).await
+                    {
+                        log::warn!(
+                            "[BLOOM_CATCHUP] build_for_bucket {stream_key}/{date_key} failed: {e}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
