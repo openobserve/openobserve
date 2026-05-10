@@ -35,10 +35,17 @@
 use std::collections::HashMap;
 
 use config::meta::stream::{FileKey, StreamType};
-use futures::future::join_all;
+use futures::stream::{self, StreamExt};
 use infra::bloom::{BloomReader, path::bloom_path};
 
 use super::bloom_predicate::BloomPredicate;
+
+/// Cap on simultaneous in-flight `.bf` GETs from a single `prune` call.
+/// A 30-day high-cardinality query may touch ~720 buckets; firing them
+/// all at once would burst the object store and the local socket pool.
+/// 32 is conservative enough to coexist with parquet/tantivy fetches
+/// that run in the same query.
+const BLOOM_PREFETCH_CONCURRENCY: usize = 32;
 
 /// Prune `files` against `predicates`, returning the surviving subset.
 /// Files with `bloom_ver == 0` are always kept (no bloom info).
@@ -93,12 +100,42 @@ pub async fn prune(
         })
         .collect();
 
-    let fetches = bf_paths.iter().map(|(group, path)| async move {
-        let account = infra::storage::get_account(path).unwrap_or_default();
-        let bytes = infra::cache::file_data::get(&account, path, None).await;
-        (group.clone(), path.clone(), bytes)
-    });
-    let fetched = join_all(fetches).await;
+    // Bound concurrent fetches to BLOOM_PREFETCH_CONCURRENCY. After a
+    // remote miss, write-through into the file_data cache so subsequent
+    // prune calls touching the same .bf are cache hits.
+    let fetched: Vec<(Group, String, object_store::Result<bytes::Bytes>)> =
+        stream::iter(bf_paths)
+            .map(|(group, path)| async move {
+                let account = infra::storage::get_account(&path).unwrap_or_default();
+                // Cache-only first; on miss, hit storage and write back.
+                let cached = infra::cache::file_data::get_opts(
+                    &account,
+                    &path,
+                    object_store::GetOptions::default(),
+                    false,
+                )
+                .await;
+                if let Ok(get_result) = cached {
+                    let bytes = get_result.bytes().await.map_err(|e| {
+                        object_store::Error::Generic {
+                            store: "bloom",
+                            source: Box::new(e),
+                        }
+                    });
+                    return (group, path, bytes);
+                }
+                // Miss → remote fetch.
+                let bytes = infra::cache::file_data::get(&account, &path, None).await;
+                if let Ok(b) = &bytes
+                    && let Err(e) = infra::cache::file_data::set(&path, b.clone()).await
+                {
+                    log::debug!("[bloom-prune] cache-fill for {path} failed: {e}");
+                }
+                (group, path, bytes)
+            })
+            .buffer_unordered(BLOOM_PREFETCH_CONCURRENCY)
+            .collect()
+            .await;
 
     let mut readers: HashMap<Group, BloomReader> = HashMap::new();
     for (group, path, bytes) in fetched {
