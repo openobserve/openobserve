@@ -457,6 +457,14 @@ pub async fn merge_by_stream(
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(file.to_owned());
     }
+    // Snapshot the distinct prefixes (one per (stream, hour) bucket the
+    // compactor visited) before consuming the map. We use this *after*
+    // the merge tasks complete to fire `bloom_build` for every visited
+    // bucket — including buckets where no merging happened (e.g. only
+    // one file was present, or all files were already at max size).
+    // The previous design hooked bloom_build inside the per-prefix
+    // worker, which silently skipped all such buckets.
+    let visited_prefixes: Vec<String> = partition_files_with_size.keys().cloned().collect();
 
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
@@ -615,31 +623,6 @@ pub async fn merge_by_stream(
                 }
             }
             drop(permit);
-
-            // After every batch in this (stream, hour-prefix) is done,
-            // (re)build the bloom for the bucket. Pulls the *current*
-            // file list (post-merge) and writes a single `.bf` covering
-            // every file in the hour. Non-fatal — failure leaves
-            // bloom_ver=0 on the new files and search degrades to the
-            // pre-bloom path.
-            //
-            // Same scheduling pattern as `file_list_dump`: no explicit
-            // lock, one worker per (stream, prefix) by construction.
-            let date_key = derive_date_key_from_prefix(&prefix);
-            if !date_key.is_empty()
-                && let Err(e) = crate::service::compact::bloom_build::build_for_bucket(
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    &date_key,
-                )
-                .await
-            {
-                log::warn!(
-                    "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_key} failed: {e}"
-                );
-            }
-
             if let Some(e) = last_error {
                 return Err(e);
             }
@@ -650,6 +633,31 @@ pub async fn merge_by_stream(
 
     for task in tasks {
         task.await??;
+    }
+
+    // (Re)build the bloom for every (stream, hour-prefix) the compactor
+    // visited, regardless of whether any merging actually happened.
+    // `build_for_bucket` is internally a no-op when nothing changed
+    // (every file already has a non-zero bloom_ver) so this is cheap on
+    // already-settled buckets. Failure is non-fatal — search degrades to
+    // the pre-bloom path for affected files.
+    for prefix in visited_prefixes {
+        let date_key = derive_date_key_from_prefix(&prefix);
+        if date_key.is_empty() {
+            continue;
+        }
+        if let Err(e) = crate::service::compact::bloom_build::build_for_bucket(
+            org_id,
+            stream_type,
+            stream_name,
+            &date_key,
+        )
+        .await
+        {
+            log::warn!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_key} failed: {e}"
+            );
+        }
     }
 
     // update job status

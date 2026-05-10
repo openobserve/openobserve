@@ -38,7 +38,7 @@ use anyhow::Context;
 use bytes::Bytes;
 use config::{
     get_config,
-    meta::stream::{FileKey, FileListDeleted, StreamType},
+    meta::stream::{FileKey, StreamType},
     utils::{inverted_index::convert_parquet_file_name_to_tantivy_file, time::now_micros},
 };
 use infra::{
@@ -96,34 +96,44 @@ pub async fn build_for_bucket(
         return Ok(());
     }
 
-    // Cheap early-out: if every file already shares the same non-zero
-    // bloom_ver and no zero rows are present, nothing changed since the
-    // last build. Skip the rebuild.
+    // Trigger: rebuild only when **at least one file has bloom_ver=0**
+    // (i.e., new data needs blooming). A bucket where every file already
+    // has a non-zero bloom_ver — even if those values differ across files
+    // (e.g., older rows already dumped at one version, newer rows
+    // produced by a later compaction round at another) — has nothing
+    // new to do here. The search side handles mixed `bloom_ver` natively
+    // by grouping per (date, bloom_ver) and fetching each `.bf`.
+    //
+    // This is the key invariant that prevents `.bf` orphaning: rebuild
+    // never re-stamps an already-stamped file, so no live row ever
+    // moves off a `bloom_ver` while a dumped row may still point to it.
     let any_zero = files.iter().any(|f| f.meta.bloom_ver == 0);
     if !any_zero {
-        let mut iter = files.iter().map(|f| f.meta.bloom_ver);
-        let first = iter.next().unwrap();
-        if iter.all(|v| v == first) {
-            log::debug!(
-                "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: nothing changed, skipping ({} files at bloom_ver={first})",
-                files.len()
-            );
-            return Ok(());
-        }
+        log::debug!(
+            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: every file already has a bloom_ver, skipping ({} files)",
+            files.len()
+        );
+        return Ok(());
     }
 
-    // Iterate term dicts for every file. Each `.ttv` open is one object-
-    // store fetch (cached on disk after the first hit). Errors per file
-    // are logged and skipped — partial bloom is better than no bloom.
+    // Build blooms only for the *new* files (bloom_ver = 0). Existing
+    // files keep their assigned bloom_ver and continue to reference
+    // their original `.bf`. This is what makes the layer
+    // **append-only**: we never re-stamp a previously-blessed row, so
+    // dumped rows that point at an older `bloom_ver` always have their
+    // `.bf` preserved (no rebuild ever supersedes it).
     //
-    // Track the file_list ids that *actually contributed* blooms; only
-    // those get their `bloom_ver` stamped. Files we couldn't build for
-    // (or that produced no blooms because the field isn't in their
-    // schema) keep `bloom_ver = 0` so search doesn't pay a wasted
-    // `.bf` fetch only to find them missing from the footer.
+    // Files we couldn't build for (or that produced no blooms because
+    // the field isn't in their schema) keep `bloom_ver = 0` so search
+    // doesn't pay a wasted `.bf` fetch only to find them missing.
     let mut all_blooms: Vec<FieldBloom> = Vec::new();
     let mut contributing_ids: Vec<i64> = Vec::new();
+    let mut considered: usize = 0;
     for f in &files {
+        if f.meta.bloom_ver != 0 {
+            continue; // already stamped; do not touch
+        }
+        considered += 1;
         match build_blooms_for_file(f, &target_fields).await {
             Ok(mut blooms) if !blooms.is_empty() => {
                 all_blooms.append(&mut blooms);
@@ -140,8 +150,7 @@ pub async fn build_for_bucket(
     }
     if all_blooms.is_empty() {
         log::debug!(
-            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: no blooms produced from {} file(s); skipping",
-            files.len()
+            "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: no blooms produced from {considered} new file(s); skipping"
         );
         return Ok(());
     }
@@ -170,16 +179,7 @@ pub async fn build_for_bucket(
         return Ok(());
     }
 
-    // Bulk update file_list. Capture the *previous* distinct bloom_vers
-    // of contributing files (excluding 0 and the new value) so we can
-    // enqueue the now-orphaned `.bf`s for delete.
-    let contributing: HashSet<i64> = contributing_ids.iter().copied().collect();
-    let old_bloom_vers: HashSet<i64> = files
-        .iter()
-        .filter(|f| contributing.contains(&f.id))
-        .map(|f| f.meta.bloom_ver)
-        .filter(|v| *v != 0 && *v != bloom_ver)
-        .collect();
+    // Stamp the contributing rows (and only those) with the new bloom_ver.
     let covered = contributing_ids.len();
     debug_assert!(
         contributing_ids.iter().all(|id| *id > 0),
@@ -200,14 +200,9 @@ pub async fn build_for_bucket(
         .with_label_values(&[org_id, stream_type.as_str()])
         .inc();
     log::info!(
-        "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: wrote {bf_path} covering {covered}/{} files; superseded {} old version(s)",
-        files.len(),
-        old_bloom_vers.len()
+        "[BLOOM_BUILD] {org_id}/{stream_type}/{stream_name}/{date_key}: wrote {bf_path} covering {covered} new file(s) (out of {} in bucket)",
+        files.len()
     );
-
-    // Best-effort: enqueue obsolete `.bf` paths for deletion via the
-    // existing `file_list_deleted` cleanup pipeline.
-    enqueue_obsolete_bloom_paths(org_id, stream_type, stream_name, date_key, &old_bloom_vers).await;
 
     Ok(())
 }
@@ -238,39 +233,12 @@ async fn build_blooms_for_file(
     build_blooms_from_index(&index, file_id, target_fields, 0.01)
 }
 
-/// Enqueue the parquet-format `.bf` paths whose `bloom_ver` is no
-/// longer referenced by any file_list row in this bucket. The existing
-/// `file_list_deleted` worker eventually removes them from object
-/// storage. Failures here are logged-only (orphaned `.bf` only wastes
-/// storage; nothing breaks).
-async fn enqueue_obsolete_bloom_paths(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    date_key: &str,
-    old_bloom_vers: &HashSet<i64>,
-) {
-    if old_bloom_vers.is_empty() {
-        return;
-    }
-    let items: Vec<FileListDeleted> = old_bloom_vers
-        .iter()
-        .map(|ver| {
-            let path = bloom_path(org_id, stream_type, stream_name, date_key, *ver);
-            let account = storage::get_account(&path).unwrap_or_default();
-            FileListDeleted {
-                id: 0,
-                account,
-                file: path,
-                index_file: false,
-                flattened: false,
-            }
-        })
-        .collect();
-    if let Err(e) = infra_file_list::batch_add_deleted(org_id, now_micros(), &items).await {
-        log::warn!(
-            "[BLOOM_BUILD] failed to enqueue {} obsolete bloom file(s) for delete: {e}",
-            items.len()
-        );
-    }
-}
+// NOTE: there is intentionally no per-rebuild `.bf` GC in this module.
+// The append-only invariant (we never re-stamp a file that already has
+// a non-zero `bloom_ver`) means a `.bf` that's referenced when written
+// stays referenced for as long as any of its files exist — including
+// after dump (dumped rows preserve `bloom_ver` and so still reference
+// the original `.bf`). Deletion is left to the outer data-retention
+// sweep that removes the entire `bloom/{org}/{stream}/{date}/`
+// directory when the date partition itself ages out, alongside parquet
+// and tantivy files.

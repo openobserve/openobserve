@@ -89,8 +89,14 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(original_size_col, "original_size", Int64Array, rb);
     get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
     get_col!(index_size_col, "index_size", Int64Array, rb);
-    get_col!(bloom_ver_col, "bloom_ver", Int64Array, rb);
     get_col!(updated_at_col, "updated_at", Int64Array, rb);
+    // bloom_ver is OPTIONAL on read — dump parquets written before the
+    // bloom-filter pruning layer was added don't have this column.
+    // Missing → 0 (the "no .bf" sentinel), so search for those legacy
+    // rows falls through to the original tantivy path.
+    let bloom_ver_col = rb
+        .column_by_name("bloom_ver")
+        .and_then(|c| c.as_any().downcast_ref::<Int64Array>());
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
         let t = FileRecord {
@@ -108,7 +114,7 @@ pub fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
-            bloom_ver: bloom_ver_col.value(idx),
+            bloom_ver: bloom_ver_col.map(|c| c.value(idx)).unwrap_or(0),
             updated_at: updated_at_col.value(idx),
         };
         ret.push(t);
@@ -799,6 +805,58 @@ mod tests {
 
         let records = record_batch_to_file_record(empty_rb);
         assert_eq!(records.len(), 0);
+    }
+
+    /// A dump parquet written before the bloom-filter pruning layer was
+    /// added has no `bloom_ver` column. The reader must tolerate that and
+    /// default the field to 0 so search just falls back to tantivy for
+    /// those legacy rows instead of panicking.
+    #[test]
+    fn test_legacy_dump_without_bloom_ver_column_reads_with_zero() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, false),
+            Field::new("account", DataType::Utf8, false),
+            Field::new("org", DataType::Utf8, false),
+            Field::new("stream", DataType::Utf8, false),
+            Field::new("date", DataType::Utf8, false),
+            Field::new("file", DataType::Utf8, false),
+            Field::new("deleted", DataType::Boolean, false),
+            Field::new("flattened", DataType::Boolean, false),
+            Field::new("min_ts", DataType::Int64, false),
+            Field::new("max_ts", DataType::Int64, false),
+            Field::new("records", DataType::Int64, false),
+            Field::new("original_size", DataType::Int64, false),
+            Field::new("compressed_size", DataType::Int64, false),
+            Field::new("index_size", DataType::Int64, false),
+            Field::new("updated_at", DataType::Int64, false),
+            // intentionally NO bloom_ver column
+        ]));
+        let rb = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(vec![7])),
+                Arc::new(StringArray::from(vec!["acct"])),
+                Arc::new(StringArray::from(vec!["org"])),
+                Arc::new(StringArray::from(vec!["s/logs/x"])),
+                Arc::new(StringArray::from(vec!["2025/01/01/00"])),
+                Arc::new(StringArray::from(vec!["legacy.parquet"])),
+                Arc::new(BooleanArray::from(vec![false])),
+                Arc::new(BooleanArray::from(vec![false])),
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(Int64Array::from(vec![2])),
+                Arc::new(Int64Array::from(vec![3])),
+                Arc::new(Int64Array::from(vec![4])),
+                Arc::new(Int64Array::from(vec![5])),
+                Arc::new(Int64Array::from(vec![6])),
+                Arc::new(Int64Array::from(vec![100])),
+            ],
+        )
+        .unwrap();
+
+        let records = record_batch_to_file_record(rb);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].id, 7);
+        assert_eq!(records[0].bloom_ver, 0);
     }
 
     #[test]
