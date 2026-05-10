@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('search.patternDetailsTitle')"
     :sub-title="selectedPattern ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns }) : undefined"
   >
+    <div class="tw:px-5 tw:py-3">
     <template v-if="selectedPattern">
         <!-- Statistics -->
         <div class="tw-mb-[1rem]">
@@ -227,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
+    </div>
 
       <!-- Footer Navigation -->
     <template #footer>

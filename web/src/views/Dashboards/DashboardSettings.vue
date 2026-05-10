@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    :width="73"
+    :width="74"
     title="Dashboard Settings"
     @update:open="$emit('update:open', $event)"
   >
