@@ -17,18 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     v-model:open="isOpen"
-    :width="90"
-    :show-close="false"
+    :width="80"
     :title="drawerTitle"
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
       <q-icon name="timeline" size="1.5rem" color="primary" />
-    </template>
-    <template #header-right>
       <!-- Time Range Display: Inline chips -->
       <div
-        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap"
+        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-2"
       >
         <!-- Baseline Chip -->
         <div
@@ -84,9 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ filterMetadata }}
         </span>
-      </div>
 
-      <div class="tw:flex tw:items-center tw:gap-3 tw:ml-2">
         <!-- Refresh button (shown when percentile changes on duration tab) -->
         <OButton
           v-if="showRefreshButton"
@@ -97,15 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <RefreshCw class="tw:size-3.5 tw:shrink-0" />
           <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
-        </OButton>
-
-        <OButton
-          variant="ghost"
-          size="icon-xs-sq"
-          @click="isOpen = false"
-          data-test="analysis-dashboard-close"
-        >
-          <X class="tw:size-3.5 tw:shrink-0" />
         </OButton>
       </div>
     </template>

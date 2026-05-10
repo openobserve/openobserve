@@ -451,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODrawer
         data-test="logs-search-result-detail-dialog"
         v-model:open="searchObj.meta.showDetailTab"
-        size="full"
+        :width="85"
         :show-close="false"
         @close="searchObj.meta.showDetailTab = false"
         @update:open="(v) => !v && reDrawChart()"
