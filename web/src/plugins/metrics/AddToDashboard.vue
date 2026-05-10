@@ -1,6 +1,7 @@
 <template>
-  <ODialog
+  <ODrawer
     :open="open"
+    :width="40"
     :title="t('dashboard.addDashboard')"
     secondary-button-label="Cancel"
     :primary-button-label="t('metrics.add')"
@@ -11,7 +12,7 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-    <q-form ref="addToDashboardForm" @submit.stop="onSubmit.execute" class="add-dashboard-form-card-section">
+    <q-form ref="addToDashboardForm" @submit.stop="onSubmit.execute" class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 tw:px-4 tw:py-4">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
@@ -29,7 +30,6 @@
         :dashboard-id="selectedDashboard"
         @tab-selected="updateActiveTabId"
       />
-      <span>&nbsp;</span>
       <q-input
         v-model.trim="panelTitle"
         :label="t('dashboard.panelTitle') + '*'"
@@ -43,7 +43,7 @@
         data-test="metrics-new-dashboard-panel-title"
       />
     </q-form>
-  </ODialog>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -57,7 +57,7 @@ import { useQuasar } from "quasar";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
@@ -68,7 +68,7 @@ export default defineComponent({
     SelectFolderDropdown,
     SelectDashboardDropdown,
     SelectTabDropdown,
-    ODialog,
+    ODrawer,
   },
   props: {
     open: {

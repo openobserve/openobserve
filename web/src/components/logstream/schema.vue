@@ -2668,7 +2668,7 @@ export default defineComponent({
 
       this.getSchema();
     } else {
-      this.loadingState.value = false;
+      this.loadingState = false;
     }
   },
 });
