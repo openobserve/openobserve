@@ -22,21 +22,19 @@
  */
 
 // ---------------------------------------------------------------------------
-// Field resolvers — read OTEL gen_ai_* first, fall back to legacy llm_* so
-// historical traces still render. Centralised so a future field rename is a
-// one-file change.
+// Field resolvers — read OTEL gen_ai_* attributes.
 // ---------------------------------------------------------------------------
 
 /**
- * Read the LLM operation kind from a span. Normalised to upper-case.
- * @example getOp({ gen_ai_operation_name: "chat" })             // "CHAT"
- * @example getOp({ llm_observation_type: "GENERATION" })        // "GENERATION"
+ * Read the LLM operation kind from a span.
+ * Uses the OTEL gen_ai.operation.name value directly.
+ * @example getOp({ gen_ai_operation_name: "chat" })             // "chat"
  * @example getOp({})                                            // ""
  */
 export function getOp(span: any): string {
   return String(
     span?.gen_ai_operation_name || "",
-  ).toUpperCase();
+  );
 }
 
 /**
@@ -118,22 +116,24 @@ export function hasLLMPayload(span: any): boolean {
  * Sort a span into one of the kinds the chat view cares about.
  *
  * Rules:
- *   - "GENERATION" + non-empty payload → llm_turn (renders as a chat step)
- *   - "TOOL"                           → tool_call (renders under its parent)
- *   - "AGENT"                          → agent (used for context, not rendered)
- *   - server span with no parent       → root (the trace root)
- *   - everything else                  → other
+ *   - {chat, text_completion, generate_content} + non-empty payload → llm_turn
+ *   - "execute_tool"                           → tool_call
+ *   - {invoke_agent, create_agent}              → agent
+ *   - server span with no parent                → root
+ *   - everything else                           → other
  *
- * @example classify({ gen_ai_operation_name: "GENERATION",
+ * @example classify({ gen_ai_operation_name: "chat",
  *                     gen_ai_input_messages: "[{...}]" })     // "llm_turn"
- * @example classify({ gen_ai_operation_name: "TOOL" })        // "tool_call"
+ * @example classify({ gen_ai_operation_name: "execute_tool" }) // "tool_call"
  * @example classify({ span_kind: "2" })                       // "root"
  */
 export function classify(span: any): SpanKind {
   const obs = getOp(span);
-  if (obs === "GENERATION" && hasLLMPayload(span)) return "llm_turn";
-  if (obs === "TOOL") return "tool_call";
-  if (obs === "AGENT") return "agent";
+  const LLM_TURN_OPS = new Set(["chat", "text_completion", "generate_content"]);
+  if (LLM_TURN_OPS.has(obs) && hasLLMPayload(span)) return "llm_turn";
+  if (obs === "execute_tool") return "tool_call";
+  const AGENT_OPS = new Set(["invoke_agent", "create_agent"]);
+  if (AGENT_OPS.has(obs)) return "agent";
   if (
     String(span?.span_kind || "") === "2" &&
     !span?.reference_parent_span_id

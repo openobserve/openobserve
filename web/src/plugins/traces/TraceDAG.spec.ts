@@ -577,7 +577,7 @@ describe("TraceDAG", () => {
 
       await flushPromises();
 
-      const cssClass = wrapper.vm.getObservationTypeClass("generation");
+      const cssClass = wrapper.vm.getObservationTypeClass("chat");
       expect(cssClass).toBe("node-llm-generation");
     });
 
@@ -596,7 +596,7 @@ describe("TraceDAG", () => {
 
       await flushPromises();
 
-      const cssClass = wrapper.vm.getObservationTypeClass("tool");
+      const cssClass = wrapper.vm.getObservationTypeClass("execute_tool");
       expect(cssClass).toBe("node-llm-tool");
     });
 
@@ -653,7 +653,7 @@ describe("TraceDAG", () => {
 
       await flushPromises();
 
-      const cssClass = wrapper.vm.getObservationTypeClass("GENERATION");
+      const cssClass = wrapper.vm.getObservationTypeClass("chat");
       expect(cssClass).toBe("node-llm-generation");
     });
 
@@ -672,7 +672,7 @@ describe("TraceDAG", () => {
 
       await flushPromises();
 
-      const textClass = wrapper.vm.getObservationTypeTextClass("agent");
+      const textClass = wrapper.vm.getObservationTypeTextClass("invoke_agent");
       expect(textClass).toBe("node-llm-text-agent");
     });
   });

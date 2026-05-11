@@ -17,11 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Thread view — chat-style projection of an LLM trace.
 
-  Classifies spans by the OTEL `gen_ai.operation.name` attribute (with a
-  fallback to the legacy `llm_observation_type` so historical traces still
-  render — see `threadView.utils.ts → getOp`). Renders the chat transcript
-  + a summary chip-bar (turn count, total duration, cost, model, tool
-  calls, errors).
+  Phase A scope (this commit):
+    - Classify spans by `gen_ai_operation_name`
+    - Render the trace summary chip-bar (turn count, total duration, cost,
+      model, tool calls, errors)
+    - Empty + skeleton states
+
+  Phase B+ will add the actual conversation rendering.
 -->
 <template>
   <div
@@ -100,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex-1 tw:flex tw:items-center tw:justify-center tw:text-[var(--o2-text-3)] tw:text-[0.85rem]"
     >
       No LLM turns detected. The trace doesn't contain spans with
-      <code>gen_ai.operation.name = GENERATION</code>.
+      <code>gen_ai.operation.name = chat</code>.
     </div>
     <div v-else class="tw:flex-1 tw:overflow-auto tw:px-[1rem] tw:py-[0.75rem]">
       <!-- System prompt (global — identical across traces in a session). -->

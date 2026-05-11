@@ -20,10 +20,10 @@ use std::collections::HashMap;
 use config::utils::json;
 
 pub mod evaluation;
+pub mod gen_ai_operation;
 pub mod input_output;
 pub mod metadata;
 pub mod model;
-pub mod observation_type;
 pub mod parameters;
 pub mod prompt;
 pub mod provider;
@@ -33,10 +33,12 @@ pub mod usage;
 pub mod utils;
 
 pub use evaluation::EvaluationExtractor;
+pub use gen_ai_operation::{
+    ScopeInfo, is_generation_or_embedding, is_llm_trace, map_to_gen_ai_operation_name,
+};
 pub use input_output::InputOutputExtractor;
 pub use metadata::MetadataExtractor;
 pub use model::ModelExtractor;
-pub use observation_type::{ObservationType, ScopeInfo, is_llm_trace, map_to_observation_type};
 pub use parameters::ParametersExtractor;
 pub use prompt::PromptExtractor;
 pub use provider::ProviderExtractor;

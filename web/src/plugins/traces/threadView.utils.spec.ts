@@ -32,15 +32,12 @@ import {
 // ===========================================================================
 
 describe("getOp", () => {
-  // Prefer the OTEL gen_ai_* field over the legacy llm_observation_type.
-  it("prefers gen_ai_operation_name and uppercases the value", () => {
-    expect(getOp({ gen_ai_operation_name: "chat" })).toBe("CHAT");
+  // Reads the gen_ai_operation_name directly — spec values are already lowercase.
+  it("returns gen_ai_operation_name as-is (spec values are lowercase)", () => {
+    expect(getOp({ gen_ai_operation_name: "chat" })).toBe("chat");
   });
 
-  // `getOp` deliberately does NOT fall back to legacy
-  // `llm_observation_type` — we standardised on the OTEL field after
-  // the gen_ai_* migration. Legacy-only spans return empty string and
-  // the classifier treats them as "other".
+  // Does NOT fall back to legacy llm_observation_type.
   it("does not fall back to legacy llm_observation_type", () => {
     expect(getOp({ llm_observation_type: "GENERATION" })).toBe("");
   });
@@ -166,36 +163,36 @@ describe("hasLLMPayload", () => {
 });
 
 describe("classify", () => {
-  // Real LLM call: GENERATION + non-empty payload.
-  it('classifies a span with GENERATION op and payload as "llm_turn"', () => {
+  // Real LLM call: chat + non-empty payload.
+  it('classifies a span with "chat" op and payload as "llm_turn"', () => {
     expect(
       classify({
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: '[{"role":"user","content":"x"}]',
       }),
     ).toBe("llm_turn");
   });
 
-  // Vertex/ADK wrapper span: GENERATION but no payload — should NOT
+  // Vertex/ADK wrapper span: chat but no payload — should NOT
   // be classified as llm_turn (otherwise step counts double).
-  it('classifies GENERATION without payload as "other" (Vertex wrapper guard)', () => {
+  it('classifies chat without payload as "other" (Vertex wrapper guard)', () => {
     expect(
-      classify({ gen_ai_operation_name: "GENERATION" }),
+      classify({ gen_ai_operation_name: "chat" }),
     ).toBe("other");
     expect(
       classify({
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: "{}",
       }),
     ).toBe("other");
   });
 
-  it('classifies a TOOL span as "tool_call"', () => {
-    expect(classify({ gen_ai_operation_name: "TOOL" })).toBe("tool_call");
+  it('classifies an execute_tool span as "tool_call"', () => {
+    expect(classify({ gen_ai_operation_name: "execute_tool" })).toBe("tool_call");
   });
 
-  it('classifies an AGENT span as "agent"', () => {
-    expect(classify({ gen_ai_operation_name: "AGENT" })).toBe("agent");
+  it('classifies an invoke_agent span as "agent"', () => {
+    expect(classify({ gen_ai_operation_name: "invoke_agent" })).toBe("agent");
   });
 
   // Server span (kind=2) with no parent → root of the trace.
@@ -644,7 +641,7 @@ describe("buildTraceGroup", () => {
       makeSpan({ span_id: "root", span_kind: "2" }),
       makeSpan({
         span_id: "tool-1",
-        gen_ai_operation_name: "TOOL",
+        gen_ai_operation_name: "execute_tool",
         reference_parent_span_id: "root",
       }),
     ];
@@ -662,7 +659,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "system", content: "Be helpful." },
           { role: "user", content: "What is 2+2?" },
@@ -691,7 +688,7 @@ describe("buildTraceGroup", () => {
     const spans = [
       makeSpan({
         span_id: "turn-2",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "B" },
         ]),
@@ -699,7 +696,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "A" },
         ]),
@@ -716,7 +713,7 @@ describe("buildTraceGroup", () => {
     const spans = [
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "x" },
         ]),
@@ -724,13 +721,13 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "tool-A",
-        gen_ai_operation_name: "TOOL",
+        gen_ai_operation_name: "execute_tool",
         reference_parent_span_id: "turn-1",
         start_time: 110,
       }),
       makeSpan({
         span_id: "tool-B",
-        gen_ai_operation_name: "TOOL",
+        gen_ai_operation_name: "execute_tool",
         reference_parent_span_id: "turn-1",
         start_time: 120,
       }),
@@ -751,7 +748,7 @@ describe("buildTraceGroup", () => {
     const spans = [
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "x" },
         ]),
@@ -759,7 +756,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-2",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "y" },
         ]),
@@ -769,7 +766,7 @@ describe("buildTraceGroup", () => {
       // between turn-1 and turn-2 — must attach to turn-1.
       makeSpan({
         span_id: "tool-X",
-        gen_ai_operation_name: "TOOL",
+        gen_ai_operation_name: "execute_tool",
         reference_parent_span_id: "unrelated",
         start_time: 150,
       }),
@@ -785,7 +782,7 @@ describe("buildTraceGroup", () => {
     const spans = [
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "What is 2+2?" },
           // Injected pseudo-user message — agent feedback. Must NOT
@@ -805,7 +802,7 @@ describe("buildTraceGroup", () => {
     const spans = [
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "earlier question A" },
           { role: "assistant", content: "earlier answer" },
@@ -829,7 +826,7 @@ describe("buildTraceGroup", () => {
     const spans = [
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "Q1" },
         ]),
@@ -837,7 +834,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-2",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "Q1" },
           { role: "assistant", content: "A1" },
@@ -847,7 +844,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-3",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "Q1" },
           { role: "assistant", content: "A1" },
@@ -877,7 +874,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "x" },
         ]),
@@ -888,7 +885,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-2",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "x" },
         ]),
@@ -900,7 +897,7 @@ describe("buildTraceGroup", () => {
       // Tool span errored — must contribute to the trace's errorCount.
       makeSpan({
         span_id: "tool-fail",
-        gen_ai_operation_name: "TOOL",
+        gen_ai_operation_name: "execute_tool",
         reference_parent_span_id: "turn-1",
         span_status: "ERROR",
         start_time: 2000,
@@ -933,7 +930,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "x" },
         ]),
@@ -958,7 +955,7 @@ describe("buildTraceGroup", () => {
       }),
       makeSpan({
         span_id: "turn-1",
-        gen_ai_operation_name: "GENERATION",
+        gen_ai_operation_name: "chat",
         gen_ai_input_messages: JSON.stringify([
           { role: "user", content: "derived question" },
         ]),

@@ -29,14 +29,11 @@ use super::{
     extractors::{
         EvaluationExtractor, InputOutputExtractor, MetadataExtractor, ModelExtractor,
         ParametersExtractor, PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor,
-        ToolExtractor, UsageExtractor, map_to_observation_type,
+        ToolExtractor, UsageExtractor, is_generation_or_embedding, map_to_gen_ai_operation_name,
     },
     pricing,
 };
-use crate::{
-    common::meta::traces::Event,
-    service::{db::model_pricing::CachedModelPricing, traces::otel::extractors::ObservationType},
-};
+use crate::{common::meta::traces::Event, service::db::model_pricing::CachedModelPricing};
 
 pub struct OtelIngestionProcessor {
     model_extractor: ModelExtractor,
@@ -101,8 +98,8 @@ impl OtelIngestionProcessor {
         let scope_info = scope_name.map(|name| ScopeInfo {
             name: Some(name.to_string()),
         });
-        let obs_type =
-            map_to_observation_type(span_attributes, resource_attributes, scope_info.as_ref());
+        let op_name =
+            map_to_gen_ai_operation_name(span_attributes, resource_attributes, scope_info.as_ref());
 
         // Extract model name
         let model_name = self.model_extractor.extract(span_attributes);
@@ -177,10 +174,7 @@ impl OtelIngestionProcessor {
 
             if let Some(v) = &input
                 && !usage.contains_key("input")
-                && matches!(
-                    obs_type,
-                    ObservationType::Generation | ObservationType::Embedding
-                )
+                && is_generation_or_embedding(op_name)
             {
                 let prompt = v.to_string();
                 let prompt_tokens = pricing::calculate_token_count(tokenizer_key, &prompt);
@@ -188,10 +182,7 @@ impl OtelIngestionProcessor {
             }
             if let Some(v) = &output
                 && !usage.contains_key("output")
-                && matches!(
-                    obs_type,
-                    ObservationType::Generation | ObservationType::Embedding
-                )
+                && is_generation_or_embedding(op_name)
             {
                 let output_text = v.to_string();
                 let output_tokens = pricing::calculate_token_count(tokenizer_key, &output_text);
@@ -200,12 +191,7 @@ impl OtelIngestionProcessor {
 
             // Calculate cost from tokens if cost is missing but we have model and usage.
             // User-defined pricing takes priority over built-in pricing.
-            if cost.is_empty()
-                && matches!(
-                    obs_type,
-                    ObservationType::Generation | ObservationType::Embedding
-                )
-            {
+            if cost.is_empty() && is_generation_or_embedding(op_name) {
                 if let Some(pricing_def) = matched_pricing {
                     // Use user-defined per-token pricing (already matched above)
                     let result = crate::service::db::model_pricing::calculate_cost_from_definition(
@@ -264,7 +250,7 @@ impl OtelIngestionProcessor {
         // columns provisioned by GEN_AI_SCHEMA_FIELDS in service/db/schema.rs.
         span_attributes.insert(
             GenAiAttributes::OPERATION_NAME.to_string(),
-            json::json!(obs_type.as_str()),
+            json::json!(op_name),
         );
 
         if let Some(model) = model_name {
