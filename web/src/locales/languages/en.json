@@ -129,6 +129,16 @@
     "error": "Error",
     "db": "Database"
   },
+  "commandPalette": {
+    "placeholder": "Search pages, entities, or type /ai for help…",
+    "noResults": "No results found for \"{query}\"",
+    "searching": "Searching entities…",
+    "recents": "Recents",
+    "pages": "Pages",
+    "entities": "Entities",
+    "commands": "Commands",
+    "aiActions": "AI Actions"
+  },
   "validation": {
     "required": "This field is required",
     "invalidFormat": "Invalid format",
