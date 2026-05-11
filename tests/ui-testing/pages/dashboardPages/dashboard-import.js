@@ -39,7 +39,9 @@ export default class DashboardImport {
       // Tab might already be active, continue
     }
 
-    await this.inputFile.waitFor({ state: "visible", timeout: 20000 });
+    // Quasar's q-file renders the underlying input as hidden — wait for
+    // `attached` (not visible) since setInputFiles works on hidden inputs.
+    await this.inputFile.waitFor({ state: "attached", timeout: 20000 });
 
     // Retry file upload
     let retries = 3;
@@ -54,12 +56,15 @@ export default class DashboardImport {
       }
     }
 
-    // Wait for JSON editor
+    // Wait for JSON editor to mount; Monaco's `.view-line` may not paint immediately
+    // so fall back to waiting on the editor container itself.
     await this.page.locator('[data-test="dashboard-import-json-file-editor"]')
       .waitFor({ state: "visible", timeout: 10000 })
       .catch(() => this.page.locator('.monaco-editor').waitFor({ state: "visible", timeout: 10000 }));
 
-    await this.page.locator('.view-lines .view-line').first().waitFor({ state: "visible", timeout: 10000 });
+    await this.page.locator('.view-lines .view-line').first()
+      .waitFor({ state: "visible", timeout: 10000 })
+      .catch(() => this.page.locator('.monaco-editor').first().waitFor({ state: "visible", timeout: 5000 }));
   }
 
   // Click URL import tab with retry logic
@@ -105,7 +110,7 @@ export default class DashboardImport {
           await alternateRow.first().click();
           await this.page.locator('[data-test="dashboard-delete"]').first().waitFor({ state: "visible", timeout: 5000 });
           await this.page.locator('[data-test="dashboard-delete"]').first().click();
-          await this.page.locator('[data-test="confirm-button"]').click();
+          await this.page.locator('[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
           return;
         }
         await this.page.waitForLoadState('domcontentloaded');
@@ -121,7 +126,7 @@ export default class DashboardImport {
         await dashboardRow.hover();
         await deleteButton.waitFor({ state: "visible", timeout: 10000 });
         await deleteButton.click({ timeout: 10000 });
-        await this.page.locator('[data-test="confirm-button"]').waitFor({ state: "visible", timeout: 5000 });
+        await this.page.locator('[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]').waitFor({ state: "visible", timeout: 5000 });
         break;
       } catch (error) {
         deleteRetries--;
@@ -130,7 +135,7 @@ export default class DashboardImport {
       }
     }
 
-    await this.page.locator('[data-test="confirm-button"]').click({ timeout: 10000 });
+    await this.page.locator('[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]').click({ timeout: 10000 });
 
     // Verify deletion
     try {

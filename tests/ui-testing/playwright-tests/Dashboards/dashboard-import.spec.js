@@ -261,7 +261,11 @@ test.describe("dashboard Import testcases", () => {
     await page
       .locator('[data-test="dashboard-folder-add-name"]')
       .fill(folderName);
-    await page.locator('[data-test="dashboard-folder-add-save"]').click();
+    await page
+      .locator(
+        '[data-test="dashboard-folder-move-dialog"] [data-test="o-drawer-primary-btn"]'
+      )
+      .click();
 
     await pm.dashboardImport.clickImportButton();
 
@@ -285,7 +289,11 @@ test.describe("dashboard Import testcases", () => {
     await page.locator('[data-test="dashboard-delete-folder-icon"]').click();
 
     // Step 8: Confirm deletion in modal
-    await page.locator('[data-test="confirm-button"]').click();
+    await page
+      .locator(
+        '[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]'
+      )
+      .click();
 
     //  Assert folder is deleted
     await expect(
