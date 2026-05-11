@@ -22,12 +22,12 @@ export class DashboardPage {
     this.dashboardSearch = page.locator('[data-test="dashboard-search"]');
     this.dashboardTable = page.locator('[data-test="dashboard-table"]');
     this.dashboardDelete = page.locator('[data-test="dashboard-delete"]');
-    this.confirmButton = page.locator('[data-test="confirm-button"]');
+    this.confirmButton = page.locator('[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]');
     this.searchAcrossFoldersToggle = page.locator('[data-test="dashboard-search-across-folders-toggle"] div').nth(2);
 
     // Dashboard create dialog locators
     this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
-    this.dashboardSubmitButton = page.locator('[data-test="dashboard-add-submit"]');
+    this.dashboardSubmitButton = page.locator('[data-test="dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]');
 
     // Dashboard view/edit locators
     this.addPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
