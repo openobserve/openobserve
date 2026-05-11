@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :loading="isLoading"
     :disabled="disabled || !url || isWebUrlNotConfigured"
     @click="handleShareClick"
+    icon-left="share"
   >
-    <template #icon-left><q-icon name="share" /></template>
     <span v-if="showLabel" class="tw:ml-1">{{ t("search.shareLink") }}</span>
     <q-tooltip v-if="isWebUrlNotConfigured">
       <q-icon color="warning" name="warning" class="q-mr-xs" />

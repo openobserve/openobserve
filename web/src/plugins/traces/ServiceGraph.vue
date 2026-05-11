@@ -196,8 +196,8 @@
                   size="sm-action"
                   @click="loadServiceGraph"
                   class="tw:mt-4"
+                  icon-left="refresh"
                 >
-                  <template #icon-left><q-icon name="refresh" size="14px" /></template>
                   Retry
                 </OButton>
               </div>

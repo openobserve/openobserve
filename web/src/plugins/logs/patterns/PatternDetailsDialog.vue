@@ -240,8 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pattern-detail-previous-btn"
               :disabled="selectedPattern.index === 0"
               @click="$emit('navigate', false, true)"
+              icon-left="navigate-before"
             >
-              <template #icon-left><q-icon name="navigate_before" /></template>
               {{ t('search.patternNavPrevious') }}
             </OButton>
           </div>
@@ -257,9 +257,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pattern-detail-next-btn"
               :disabled="selectedPattern.index >= totalPatterns - 1"
               @click="$emit('navigate', true, false)"
+              icon-right="navigate-next"
             >
               {{ t('search.patternNavNext') }}
-              <template #icon-right><q-icon name="navigate_next" /></template>
             </OButton>
           </div>
         </div>

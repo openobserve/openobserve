@@ -537,8 +537,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             @click="showPreview"
+            icon-left="preview"
           >
-            <template #icon-left><q-icon name="preview" /></template>
             {{ t("alert_destinations.preview") }}
           </OButton>
           <OButton
@@ -547,8 +547,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             @click="handleTestDestination"
+            icon-left="send"
           >
-            <template #icon-left><q-icon name="send" /></template>
             {{ t("alert_destinations.test") }}
           </OButton>
         </div>

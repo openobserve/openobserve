@@ -126,20 +126,39 @@
               </div>
             </div>
 
-            <!-- Delete series -->
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="removecolorBySeriesByIndex(index)"
-              :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
-            >
-              <template #icon-left><q-icon name="close" /></template>
-            </OButton>
+              <!-- Delete series -->
+              <OButton
+                variant="ghost"
+                size="icon"
+                @click="removecolorBySeriesByIndex(index)"
+                :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
+              >
+                <template #icon-left><q-icon name="close" /></template>
+              </OButton>
+            </div>
           </div>
-        </div>
-      </draggable>
+        </draggable>
+      </div>
+      <!-- Footer Buttons -->
     </div>
-  </ODialog>
+    <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        @click="addcolorBySeries"
+        data-test="dashboard-addpanel-config-color-by-series-add-btn"
+        >+ Add a new color</OButton
+      >
+      <OButton
+        variant="primary"
+        size="sm-action"
+        @click="applycolorBySeries"
+        :disabled="!isFormValid"
+        data-test="dashboard-addpanel-config-color-by-series-apply-btn"
+        >Save</OButton
+      >
+    </div>
+  </div>
 </template>
 <script lang="ts">
 import { computed, ref, nextTick } from "vue";

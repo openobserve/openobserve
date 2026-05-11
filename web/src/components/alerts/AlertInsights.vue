@@ -160,8 +160,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="clear-filters-btn"
             @click="clearAllFilters"
             data-test="clear-all-filters-btn"
+            icon-left="clear"
           >
-            <template #icon-left><q-icon name="clear" /></template>
             {{ t('alerts.insights.filters.clearAll') }}
           </OButton>
         </div>
@@ -184,8 +184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="openDedupConfig"
         data-test="configure-dedup-btn"
+        icon-left="settings"
       >
-        <template #icon-left><q-icon name="settings" /></template>
         {{ t("alerts.insights.actions.configureDedup") }}
         <q-tooltip>{{ t("alerts.insights.actions.configureDedupTooltip") }}</q-tooltip>
       </OButton>
@@ -195,8 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="editAlert"
         data-test="edit-alert-btn"
+        icon-left="edit"
       >
-        <template #icon-left><q-icon name="edit" /></template>
         {{ t("alerts.insights.actions.editAlert") }}
         <q-tooltip>{{ t("alerts.insights.actions.editAlertTooltip") }}</q-tooltip>
       </OButton>
@@ -206,8 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="viewHistory"
         data-test="view-history-btn"
+        icon-left="history"
       >
-        <template #icon-left><q-icon name="history" /></template>
         {{ t("alerts.insights.actions.viewHistory") }}
         <q-tooltip>{{ t("alerts.insights.actions.viewHistoryTooltip") }}</q-tooltip>
       </OButton>

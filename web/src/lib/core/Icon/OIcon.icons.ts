@@ -29,11 +29,14 @@ import Attachment from "~icons/material-symbols-light/attachment";
 import AutoAwesome from "~icons/material-symbols-light/auto-awesome";
 import Backpack from "~icons/material-symbols-light/backpack";
 import Block from "~icons/material-symbols-light/block";
+import Bolt from "~icons/material-symbols-light/bolt";
+import Cached from "~icons/material-symbols-light/cached";
 import CalendarMonth from "~icons/material-symbols-light/calendar-month";
 import Campaign from "~icons/material-symbols-light/campaign";
 import Cancel from "~icons/material-symbols-light/cancel";
 import CardGiftcard from "~icons/material-symbols-light/card-giftcard";
 import Category from "~icons/material-symbols-light/category";
+import Check from "~icons/material-symbols-light/check";
 import CheckCircle from "~icons/material-symbols-light/check-circle";
 import ChevronLeft from "~icons/material-symbols-light/chevron-left";
 import ChevronRight from "~icons/material-symbols-light/chevron-right";
@@ -51,6 +54,8 @@ import Error from "~icons/material-symbols-light/error";
 import ErrorOutline from "~icons/material-symbols-light/error-outline";
 import Event from "~icons/material-symbols-light/event";
 import ExpandMore from "~icons/material-symbols-light/expand-more";
+import FileUpload from "~icons/material-symbols-light/file-upload";
+import FormatListBulleted from "~icons/material-symbols-light/format-list-bulleted";
 import Fullscreen from "~icons/material-symbols-light/fullscreen";
 import GroupWork from "~icons/material-symbols-light/group-work";
 import Groups from "~icons/material-symbols-light/groups";
@@ -68,6 +73,9 @@ import Language from "~icons/material-symbols-light/language";
 import Link from "~icons/material-symbols-light/link";
 import LocationOn from "~icons/material-symbols-light/location-on";
 import MoreVert from "~icons/material-symbols-light/more-vert";
+import NavigateBefore from "~icons/material-symbols-light/navigate-before";
+import NavigateNext from "~icons/material-symbols-light/navigate-next";
+import OpenInNew from "~icons/material-symbols-light/open-in-new";
 import Person from "~icons/material-symbols-light/person";
 import PlayArrow from "~icons/material-symbols-light/play-arrow";
 import Preview from "~icons/material-symbols-light/preview";
@@ -77,12 +85,14 @@ import Replay from "~icons/material-symbols-light/replay";
 import Schedule from "~icons/material-symbols-light/schedule";
 import Search from "~icons/material-symbols-light/search";
 import Send from "~icons/material-symbols-light/send";
+import Share from "~icons/material-symbols-light/share";
 import Settings from "~icons/material-symbols-light/settings";
 import Shield from "~icons/material-symbols-light/shield";
 import ShowChart from "~icons/material-symbols-light/show-chart";
 import Timeline from "~icons/material-symbols-light/timeline";
 import Tune from "~icons/material-symbols-light/tune";
 import Visibility from "~icons/material-symbols-light/visibility";
+import VisibilityOff from "~icons/material-symbols-light/visibility-off";
 import Warning from "~icons/material-symbols-light/warning";
 import Workspaces from "~icons/material-symbols-light/workspaces";
 import WorkspacePremium from "~icons/material-symbols-light/workspace-premium";
@@ -103,11 +113,14 @@ export const iconRegistry = {
   "auto-awesome": AutoAwesome,
   "backpack": Backpack,
   "block": Block,
+  "bolt": Bolt,
+  "cached": Cached,
   "calendar-month": CalendarMonth,
   "campaign": Campaign,
   "cancel": Cancel,
   "card-giftcard": CardGiftcard,
   "category": Category,
+  "check": Check,
   "check-circle": CheckCircle,
   "chevron-left": ChevronLeft,
   "chevron-right": ChevronRight,
@@ -125,6 +138,8 @@ export const iconRegistry = {
   "error-outline": ErrorOutline,
   "event": Event,
   "expand-more": ExpandMore,
+  "file-upload": FileUpload,
+  "format-list-bulleted": FormatListBulleted,
   "fullscreen": Fullscreen,
   "group-work": GroupWork,
   "groups": Groups,
@@ -142,6 +157,9 @@ export const iconRegistry = {
   "link": Link,
   "location-on": LocationOn,
   "more-vert": MoreVert,
+  "navigate-before": NavigateBefore,
+  "navigate-next": NavigateNext,
+  "open-in-new": OpenInNew,
   "person": Person,
   "play-arrow": PlayArrow,
   "preview": Preview,
@@ -151,12 +169,14 @@ export const iconRegistry = {
   "schedule": Schedule,
   "search": Search,
   "send": Send,
+  "share": Share,
   "settings": Settings,
   "shield": Shield,
   "show-chart": ShowChart,
   "timeline": Timeline,
   "tune": Tune,
   "visibility": Visibility,
+  "visibility-off": VisibilityOff,
   "warning": Warning,
   "workspaces": Workspaces,
   "workspace-premium": WorkspacePremium,

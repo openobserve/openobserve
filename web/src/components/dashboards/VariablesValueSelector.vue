@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="openAddVariable"
         data-test="dashboard-add-variable-btn"
+        icon-left="add"
       >
-        <template #icon-left><q-icon name="add" /></template>
         Add Variable
       </OButton>
     </div>

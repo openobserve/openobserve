@@ -108,8 +108,8 @@ limitations under the License. -->
             variant="ghost-primary"
             size="xs"
             @click="$emit('retry')"
+            icon-left="refresh"
           >
-            <template #icon-left><q-icon name="refresh" /></template>
             {{ t('alerts.retry') }}
           </OButton>
         </div>

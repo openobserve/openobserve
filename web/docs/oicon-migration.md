@@ -19,175 +19,165 @@ Tracks the full replacement of `<q-icon>` with `<OIcon>` across the application.
 
 ---
 
-## Pre-work: Missing Registry Entries
+## Pre-work: Missing Registry Entries ✅ DONE
 
-These icon names appear in the codebase but are **not yet in `OIcon.icons.ts`**. They must be added to the registry before migration of the affected files can proceed.
+These icon names appear in the codebase but were **not yet in `OIcon.icons.ts`**. All Phase 1 icons below have been added to the registry.
 
-| Icon name (q-icon) | OIcon registry key | Affected files |
+| Icon name (q-icon) | OIcon registry key | Status |
 |---|---|---|
-| `open_in_new` | `open-in-new` | `JsonPreview.vue`, `DetailTable.vue (logs)`, `EnterpriseUpgradeDialog.vue` |
-| `visibility_off` | `visibility-off` | `DetailTable.vue (logs)` |
-| `navigate_before` | `navigate-before` | `PatternDetailsDialog.vue` |
-| `navigate_next` | `navigate-next` | `PatternDetailsDialog.vue` |
-| `bolt` | `bolt` | `AlertList.vue` |
-| `file_upload` | `file-upload` | `AlertList.vue` |
-| `cached` | `cached` | `PanelContainer.vue` |
-| `check` | `check` | `TabsSettings.vue` |
-| `format_list_bulleted` | `format-list-bulleted` | `PanelSchemaRenderer.vue` |
-| `share` | `share` | `ShareButton.vue` |
-| `drive_file_move` | `drive-file-move` | `Dashboards.vue`, `AlertList.vue` |
-| `expand_less` | `expand-less` | `AttributeValueCell.vue` |
-| `account_tree` | `account-tree` | `FunctionList.vue` |
-| `window` | `window` | `UsageTab.vue` |
-| `schema` | `schema` | `logstream/schema.vue` |
+| `open_in_new` | `open-in-new` | ✅ added |
+| `visibility_off` | `visibility-off` | ✅ added |
+| `navigate_before` | `navigate-before` | ✅ added |
+| `navigate_next` | `navigate-next` | ✅ added |
+| `bolt` | `bolt` | ✅ added |
+| `file_upload` | `file-upload` | ✅ added |
+| `cached` | `cached` | ✅ added |
+| `check` | `check` | ✅ added |
+| `format_list_bulleted` | `format-list-bulleted` | ✅ added |
+| `share` | `share` | ✅ added |
+| `drive_file_move` | `drive-file-move` | 🔲 Phase 2b |
+| `expand_less` | `expand-less` | 🔲 Phase 2b |
+| `account_tree` | `account-tree` | 🔲 Phase 2b |
+| `window` | `window` | 🔲 Phase 2b |
+| `schema` | `schema` | 🔲 Phase 2b |
 
 > **Note on `outlinedXxx` imports**: All `@quasar/extras/material-icons-outlined` constants (e.g. `outlinedDelete`, `outlinedEdit`, `outlinedWarning`, `outlinedDriveFileMove`) resolve to the same icon as the base name (`delete`, `edit`, `warning`, `drive-file-move`). Material Symbols Light is already the outlined/light style — no suffix needed.
 
 ---
 
-## Phase 1 — OButton: Add `icon-left` / `icon-right` Props
+## Phase 1 — OButton: `icon-left` / `icon-right` Props ✅ DONE
 
-### What to implement
+### What was implemented
 
-Add two optional props to `OButton` / `OButton.types.ts`:
+Two optional props were added to `OButton` / `OButton.types.ts` with slot-fallback pattern:
 
 ```ts
-/** Name of an approved icon to render to the left of the label. Replaces the #icon-left slot for simple cases. */
-iconLeft?: IconName;
-/** Name of an approved icon to render to the right of the label. Replaces the #icon-right slot for simple cases. */
-iconRight?: IconName;
+iconLeft?: IconName;   // renders OIcon left of label; slot takes precedence
+iconRight?: IconName;  // renders OIcon right of label; slot takes precedence
 ```
 
-**Behaviour rules:**
-- When `iconLeft` is set, `OIcon` is rendered as the first child (size inherits from button size).
-- When a `#icon-left` slot is also provided, **the slot takes precedence** (backward-compatible).
-- Same rules apply to `iconRight` / `#icon-right`.
-- Slots remain — nothing is removed.
+### OButton icon-left/icon-right call sites — ALL DONE
 
-### OButton icon-left/icon-right call sites (Phase 1 targets)
+#### Dashboard / Panel ✅
 
-All of these use `<template #icon-left><q-icon name="…" /></template>` on an `<OButton>`.
-After Phase 1 they become `<OButton icon-left="…">`.
+| File | Before | After | Status |
+|---|---|---|---|
+| `views/Dashboards/ViewDashboard.vue:90` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `views/Dashboards/ViewDashboard.vue:143` | `#icon-left` `cancel` | `icon-left="cancel"` | ✅ |
+| `views/Dashboards/ViewDashboard.vue:156` | `#icon-left` `refresh` | `icon-left="refresh"` | ✅ |
+| `views/Dashboards/ViewDashboard.vue:187` | `#icon-left` `settings` | `icon-left="settings"` | ✅ |
+| `views/Dashboards/ViewDashboard.vue:248` | `#icon-left` `code` | `icon-left="code"` | ✅ |
+| `views/Dashboards/ScheduledDashboards.vue:90` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `views/Dashboards/addPanel/Group.vue:40` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `views/Dashboards/addPanel/Group.vue:64` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `views/Dashboards/addPanel/DashboardJoinsOption.vue:47` | `#icon-right` `arrow_drop_down` | `icon-right="arrow-drop-down"` | ✅ |
+| `views/Dashboards/addPanel/DashboardJoinsOption.vue:56` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `views/Dashboards/addPanel/DashboardJoinsOption.vue:68` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `views/Dashboards/addPanel/AddPanel.vue:64` | `#icon-left` `info_outline` | `icon-left="info-outline"` | ✅ |
+| `views/Dashboards/addPanel/AddJoinPopUp.vue:174` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `views/Dashboards/addPanel/AddJoinPopUp.vue:192` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `views/Dashboards/addPanel/AddCondition.vue:22` | `#icon-right` `arrow_drop_down` | `icon-right="arrow-drop-down"` | ✅ |
+| `views/Dashboards/addPanel/AddCondition.vue:157` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `views/Dashboards/ImportDashboard.vue` | `#icon-left` `arrow_back_ios_new` | `icon-left="arrow-back-ios-new"` | ✅ |
+| `views/Dashboards/PanelLayoutSettings.vue` | `#icon-left` (dynamic OIcon) | keep slot — dynamic | — |
+| `components/dashboards/viewPanel/ViewPanel.vue:70` | `#icon-left` `cancel` | `icon-left="cancel"` | ✅ |
+| `components/dashboards/viewPanel/ViewPanel.vue:81` | `#icon-left` `refresh` | `icon-left="refresh"` | ✅ |
+| `components/dashboards/viewPanel/ViewPanel.vue:94` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/VariablesValueSelector.vue:97` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/tabs/TabList.vue:67` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/tabs/AddTab.vue:44` | `#icon-left` `cancel` | `icon-left="cancel"` | ✅ |
+| `components/dashboards/OverrideConfigPopup.vue:16` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/OverrideConfigPopup.vue:114` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/SelectDashboardDropdown.vue:51` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/MoveDashboardToAnotherFolder.vue:36` | `#icon-left` `cancel` | `icon-left="cancel"` | ✅ |
+| `components/dashboards/QueryInspector.vue:46` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/QueryInspector.vue:94` | `#icon-left` `content_copy` | `icon-left="content-copy"` | ✅ |
+| `components/dashboards/QueryInspector.vue:123` | `#icon-left` `content_copy` | `icon-left="content-copy"` | ✅ |
+| `components/dashboards/ExportDashboard.vue:23` | `#icon-left` `download` | `icon-left="download"` | ✅ |
+| `components/dashboards/PanelSchemaRenderer.vue:212` | `#icon-left` `format_list_bulleted` | `icon-left="format-list-bulleted"` | ✅ |
+| `components/dashboards/PanelContainer.vue:67` | `#icon-left` `fullscreen` | `icon-left="fullscreen"` | ✅ |
+| `components/dashboards/PanelContainer.vue:105` | `#icon-left` `refresh` | `icon-left="refresh"` | ✅ |
+| `components/dashboards/PanelContainer.vue:123` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/PanelContainer.vue:228` | `#icon-left` `search` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `components/dashboards/PanelContainer.vue:236` | `#icon-left` `cached` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `components/dashboards/SelectTabDropdown.vue:51` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/SelectFolderDropdown.vue:52` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/settings/common/DashboardHeader.vue:27` | `#icon-left` `arrow_back_ios_new` | `icon-left="arrow-back-ios-new"` | ✅ |
+| `components/dashboards/settings/AddSettingVariable.vue:399` | `#icon-left` `info` | `icon-left="info"` | ✅ |
+| `components/dashboards/settings/AddSettingVariable.vue:523` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/settings/AddSettingVariable.vue:534` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/settings/AddSettingVariable.vue:640` | `#icon-left` `cancel` | `icon-left="cancel"` | ✅ |
+| `components/dashboards/settings/AddSettingVariable.vue:652` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/settings/AddSettingVariable.vue:735` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/settings/AddSettingVariable.vue:752` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/settings/VariableSettings.vue:163` | `#icon-left` `edit` | `icon-left="edit"` | ✅ |
+| `components/dashboards/settings/VariableSettings.vue:197` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/settings/TabsSettings.vue:88` | `#icon-left` `check` | `icon-left="check"` | ✅ |
+| `components/dashboards/settings/TabsSettings.vue:97` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/settings/TabsSettings.vue:109` | `#icon-left` `edit` | `icon-left="edit"` | ✅ |
+| `components/dashboards/settings/VariableAdHocValueSelector.vue:52` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/settings/SinglePanelMove.vue:71` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/addPanel/ColorBySeriesPopUp.vue:37` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/addPanel/ColorBySeriesPopUp.vue:143` | `#icon-left` `close` | `icon-left="close"` | ✅ |
+| `components/dashboards/addPanel/ColorBySeries.vue:29` | `#icon-left` `info_outline` | `icon-left="info-outline"` | ✅ |
+| `components/dashboards/addPanel/ConfigPanel.vue` | `#icon-left` `info_outline` (×7) | `icon-left="info-outline"` | ✅ |
+| `components/dashboards/AddDashboard.vue:36` | `#icon-left` `cancel` | `icon-left="cancel"` | ✅ |
+| `components/dashboards/AddDashboardFromGitHub.vue:32` | `#icon-left` `cancel` | `icon-left="cancel"` | ✅ |
+| `components/dashboards/AddDashboardFromGitHub.vue:187` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/dashboards/AddFolder.vue:36` | `#icon-left` `cancel` | `icon-left="cancel"` | ✅ |
 
-#### Dashboard / Panel
+#### Alerts ✅
 
-| File | Current | Proposed |
-|---|---|---|
-| `views/Dashboards/ViewDashboard.vue:90` | `#icon-left` `add` | `icon-left="add"` |
-| `views/Dashboards/ViewDashboard.vue:143` | `#icon-left` `cancel` | `icon-left="cancel"` |
-| `views/Dashboards/ViewDashboard.vue:156` | `#icon-left` `refresh` | `icon-left="refresh"` |
-| `views/Dashboards/ViewDashboard.vue:187` | `#icon-left` `settings` | `icon-left="settings"` |
-| `views/Dashboards/ViewDashboard.vue:248` | `#icon-left` `code` | `icon-left="code"` |
-| `views/Dashboards/ScheduledDashboards.vue:90` | `#icon-left` `close` | `icon-left="close"` |
-| `views/Dashboards/addPanel/Group.vue:40` | `#icon-left` `add` | `icon-left="add"` |
-| `views/Dashboards/addPanel/Group.vue:64` | `#icon-left` `close` | `icon-left="close"` |
-| `views/Dashboards/addPanel/DashboardJoinsOption.vue:47` | `#icon-right` `arrow_drop_down` | `icon-right="arrow-drop-down"` |
-| `views/Dashboards/addPanel/DashboardJoinsOption.vue:56` | `#icon-left` `close` | `icon-left="close"` |
-| `views/Dashboards/addPanel/DashboardJoinsOption.vue:68` | `#icon-left` `add` | `icon-left="add"` |
-| `views/Dashboards/addPanel/AddPanel.vue:64` | `#icon-left` `info_outline` | `icon-left="info-outline"` |
-| `views/Dashboards/addPanel/AddJoinPopUp.vue:174` | `#icon-left` `add` | `icon-left="add"` |
-| `views/Dashboards/addPanel/AddJoinPopUp.vue:192` | `#icon-left` `close` | `icon-left="close"` |
-| `views/Dashboards/addPanel/AddCondition.vue:22` | `#icon-right` `arrow_drop_down` | `icon-right="arrow-drop-down"` |
-| `views/Dashboards/addPanel/AddCondition.vue:157` | `#icon-left` `close` | `icon-left="close"` |
-| `views/Dashboards/ImportDashboard.vue` | `#icon-left` `arrow_back_ios_new` | `icon-left="arrow-back-ios-new"` |
-| `views/Dashboards/PanelLayoutSettings.vue` | `#icon-left` (dynamic OIcon) | keep slot |
-| `components/dashboards/viewPanel/ViewPanel.vue:70` | `#icon-left` `cancel` | `icon-left="cancel"` |
-| `components/dashboards/viewPanel/ViewPanel.vue:81` | `#icon-left` `refresh` | `icon-left="refresh"` |
-| `components/dashboards/viewPanel/ViewPanel.vue:94` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/VariablesValueSelector.vue:97` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/tabs/TabList.vue:67` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/tabs/AddTab.vue:44` | `#icon-left` `cancel` | `icon-left="cancel"` |
-| `components/dashboards/OverrideConfigPopup.vue:16` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/OverrideConfigPopup.vue:114` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/SelectDashboardDropdown.vue:51` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/MoveDashboardToAnotherFolder.vue:36` | `#icon-left` `cancel` | `icon-left="cancel"` |
-| `components/dashboards/QueryInspector.vue:46` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/QueryInspector.vue:94` | `#icon-left` `content_copy` | `icon-left="content-copy"` |
-| `components/dashboards/QueryInspector.vue:123` | `#icon-left` `content_copy` | `icon-left="content-copy"` |
-| `components/dashboards/ExportDashboard.vue:23` | `#icon-left` `download` | `icon-left="download"` |
-| `components/dashboards/PanelSchemaRenderer.vue:212` | `#icon-left` `format_list_bulleted` | `icon-left="format-list-bulleted"` ⚠️ |
-| `components/dashboards/PanelContainer.vue:67` | `#icon-left` `fullscreen` | `icon-left="fullscreen"` |
-| `components/dashboards/PanelContainer.vue:105` | `#icon-left` `refresh` | `icon-left="refresh"` |
-| `components/dashboards/PanelContainer.vue:123` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/PanelContainer.vue:228` | `#icon-left` `search` | `icon-left="search"` |
-| `components/dashboards/PanelContainer.vue:236` | `#icon-left` `cached` | `icon-left="cached"` ⚠️ |
-| `components/dashboards/SelectTabDropdown.vue:51` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/SelectFolderDropdown.vue:52` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/settings/common/DashboardHeader.vue:27` | `#icon-left` `arrow_back_ios_new` | `icon-left="arrow-back-ios-new"` |
-| `components/dashboards/settings/AddSettingVariable.vue:399` | `#icon-left` `info` | `icon-left="info"` |
-| `components/dashboards/settings/AddSettingVariable.vue:523` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/settings/AddSettingVariable.vue:534` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/settings/AddSettingVariable.vue:640` | `#icon-left` `cancel` | `icon-left="cancel"` |
-| `components/dashboards/settings/AddSettingVariable.vue:652` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/settings/AddSettingVariable.vue:735` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/settings/AddSettingVariable.vue:752` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/settings/VariableSettings.vue:163` | `#icon-left` `edit` | `icon-left="edit"` |
-| `components/dashboards/settings/VariableSettings.vue:197` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/settings/TabsSettings.vue:88` | `#icon-left` `check` | `icon-left="check"` ⚠️ |
-| `components/dashboards/settings/TabsSettings.vue:97` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/settings/TabsSettings.vue:109` | `#icon-left` `edit` | `icon-left="edit"` |
-| `components/dashboards/settings/VariableAdHocValueSelector.vue:52` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/settings/SinglePanelMove.vue:71` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/addPanel/ColorBySeriesPopUp.vue:37` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/addPanel/ColorBySeriesPopUp.vue:143` | `#icon-left` `close` | `icon-left="close"` |
-| `components/dashboards/addPanel/ColorBySeries.vue:29` | `#icon-left` `info_outline` | `icon-left="info-outline"` |
-| `components/dashboards/AddDashboard.vue:36` | `#icon-left` `cancel` | `icon-left="cancel"` |
-| `components/dashboards/AddDashboardFromGitHub.vue:32` | `#icon-left` `cancel` | `icon-left="cancel"` |
-| `components/dashboards/AddDashboardFromGitHub.vue:187` | `#icon-left` `add` | `icon-left="add"` |
-| `components/dashboards/AddFolder.vue:36` | `#icon-left` `cancel` | `icon-left="cancel"` |
+| File | Before | After | Status |
+|---|---|---|---|
+| `components/alerts/AlertInsights.vue:164` | `#icon-left` `clear` | `icon-left="clear"` | ✅ |
+| `components/alerts/AlertInsights.vue:188` | `#icon-left` `settings` | `icon-left="settings"` | ✅ |
+| `components/alerts/AlertInsights.vue:199` | `#icon-left` `edit` | `icon-left="edit"` | ✅ |
+| `components/alerts/AlertInsights.vue:210` | `#icon-left` `history` | `icon-left="history"` | ✅ |
+| `components/alerts/AlertList.vue:49` | `#icon-left` `schedule` (OToggleGroupItem) | keep slot — Phase 2 OToggleGroup | — |
+| `components/alerts/AlertList.vue:53` | `#icon-left` `bolt` (OToggleGroupItem) | keep slot — Phase 2 OToggleGroup | — |
+| `components/alerts/AlertList.vue:57` | `#icon-left` `query_stats` (OToggleGroupItem) | keep slot — Phase 2 OToggleGroup | — |
+| `components/alerts/AlertList.vue:139` | `#icon-left` `file_upload` | `icon-left="file-upload"` | ✅ |
+| `components/alerts/AddDestination.vue:541` | `#icon-left` `preview` | `icon-left="preview"` | ✅ |
+| `components/alerts/AddDestination.vue:551` | `#icon-left` `send` | `icon-left="send"` | ✅ |
+| `components/alerts/AddAlert.vue:67` | `#icon-left` `replay` | `icon-left="replay"` | ✅ |
+| `components/alerts/DestinationTestResult.vue:112` | `#icon-left` `refresh` | `icon-left="refresh"` | ✅ |
+| `components/alerts/DestinationPreview.vue:264` | `#icon-left` `content_copy` | `icon-left="content-copy"` | ✅ |
+| `components/alerts/FieldsInput.vue:31` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/alerts/PrebuiltDestinationForm.vue:415` | `#icon-left` `preview` | `icon-left="preview"` | ✅ |
+| `components/alerts/PrebuiltDestinationForm.vue:425` | `#icon-left` `send` | `icon-left="send"` | ✅ |
 
-#### Alerts
+#### Pagination ✅
 
-| File | Current | Proposed |
-|---|---|---|
-| `components/alerts/AlertInsights.vue:164` | `#icon-left` `clear` | `icon-left="clear"` |
-| `components/alerts/AlertInsights.vue:188` | `#icon-left` `settings` | `icon-left="settings"` |
-| `components/alerts/AlertInsights.vue:199` | `#icon-left` `edit` | `icon-left="edit"` |
-| `components/alerts/AlertInsights.vue:210` | `#icon-left` `history` | `icon-left="history"` |
-| `components/alerts/AlertList.vue:49` | `#icon-left` `schedule` | `icon-left="schedule"` |
-| `components/alerts/AlertList.vue:53` | `#icon-left` `bolt` | `icon-left="bolt"` ⚠️ |
-| `components/alerts/AlertList.vue:57` | `#icon-left` `query_stats` | `icon-left="query-stats"` |
-| `components/alerts/AlertList.vue:139` | `#icon-left` `file_upload` | `icon-left="file-upload"` ⚠️ |
-| `components/alerts/AddDestination.vue:541` | `#icon-left` `preview` | `icon-left="preview"` |
-| `components/alerts/AddDestination.vue:551` | `#icon-left` `send` | `icon-left="send"` |
-| `components/alerts/AddAlert.vue:67` | `#icon-left` `replay` | `icon-left="replay"` |
-| `components/alerts/DestinationTestResult.vue:112` | `#icon-left` `refresh` | `icon-left="refresh"` |
-| `components/alerts/DestinationPreview.vue:264` | `#icon-left` `content_copy` | `icon-left="content-copy"` |
-| `components/alerts/FieldsInput.vue:31` | `#icon-left` `add` | `icon-left="add"` |
-| `components/alerts/PrebuiltDestinationForm.vue:415` | `#icon-left` `preview` | `icon-left="preview"` |
-| `components/alerts/PrebuiltDestinationForm.vue:425` | `#icon-left` `send` | `icon-left="send"` |
+| File | Before | After | Status |
+|---|---|---|---|
+| `components/shared/grid/Pagination.vue:116` | `#icon-left` `chevron_left` | `icon-left="chevron-left"` | ✅ |
+| `components/shared/grid/Pagination.vue:124` | `#icon-left` `chevron_right` | `icon-left="chevron-right"` | ✅ |
 
-#### Pagination
+#### Misc app-level components ✅
 
-| File | Current | Proposed |
-|---|---|---|
-| `components/shared/grid/Pagination.vue:116` | `#icon-left` `chevron_left` | `icon-left="chevron-left"` |
-| `components/shared/grid/Pagination.vue:124` | `#icon-left` `chevron_right` | `icon-left="chevron-right"` |
+| File | Before | After | Status |
+|---|---|---|---|
+| `components/common/ShareButton.vue:27` | `#icon-left` `share` | `icon-left="share"` | ✅ |
+| `components/settings/DomainManagement.vue:75` | `#icon-left` `help_outline` | `icon-left="help-outline"` | ✅ |
+| `components/ai_toolsets/AddAiToolset.vue:167` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/ai_toolsets/AddAiToolset.vue:296` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `components/ai_toolsets/AddAiToolset.vue:343` | `#icon-left` `add` | `icon-left="add"` | ✅ |
+| `enterprise/components/EvalTemplateEditor.vue:32` | `#icon-left` `ChevronLeft` (SVG component) | keep slot | — |
 
-#### Misc app-level components
+#### Log/Traces plugins ✅
 
-| File | Current | Proposed |
-|---|---|---|
-| `components/common/ShareButton.vue:27` | `#icon-left` `share` | `icon-left="share"` ⚠️ |
-| `components/settings/DomainManagement.vue:75` | `#icon-left` `help_outline` | `icon-left="help-outline"` |
-| `components/ai_toolsets/AddAiToolset.vue:167` | `#icon-left` `add` | `icon-left="add"` |
-| `components/ai_toolsets/AddAiToolset.vue:296` | `#icon-left` `add` | `icon-left="add"` |
-| `components/ai_toolsets/AddAiToolset.vue:343` | `#icon-left` `add` | `icon-left="add"` |
-| `enterprise/components/EvalTemplateEditor.vue:32` | `#icon-left` `ChevronLeft` (already OIcon-like) | already using SVG component — keep slot |
-
-#### Log/Traces plugins
-
-| File | Current | Proposed |
-|---|---|---|
-| `plugins/logs/JsonPreview.vue:178` | `#icon-left` `visibility` | `icon-left="visibility"` |
-| `plugins/logs/JsonPreview.vue:190` | `#icon-left` `open_in_new` | `icon-left="open-in-new"` ⚠️ |
-| `plugins/logs/DetailTable.vue:213` | `#icon-left` `visibility` | `icon-left="visibility"` |
-| `plugins/logs/DetailTable.vue:221` | `#icon-left` `visibility_off` | `icon-left="visibility-off"` ⚠️ |
-| `plugins/logs/DetailTable.vue:233` | `#icon-left` `open_in_new` | `icon-left="open-in-new"` ⚠️ |
-| `plugins/logs/SearchSchedulersList.vue:194` | `#icon-left` `search` | `icon-left="search"` |
-| `plugins/logs/patterns/PatternDetailsDialog.vue:279` | `#icon-left` `navigate_before` | `icon-left="navigate-before"` ⚠️ |
-| `plugins/logs/patterns/PatternDetailsDialog.vue:297` | `#icon-right` `navigate_next` | `icon-right="navigate-next"` ⚠️ |
-| `plugins/traces/ServiceGraph.vue:200` | `#icon-left` `refresh` | `icon-left="refresh"` |
+| File | Before | After | Status |
+|---|---|---|---|
+| `plugins/logs/JsonPreview.vue:178` | `#icon-left` `visibility` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `plugins/logs/JsonPreview.vue:190` | `#icon-left` `open_in_new` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `plugins/logs/DetailTable.vue:213` | `#icon-left` `visibility` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `plugins/logs/DetailTable.vue:221` | `#icon-left` `visibility_off` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `plugins/logs/DetailTable.vue:233` | `#icon-left` `open_in_new` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `plugins/logs/SearchSchedulersList.vue:194` | `#icon-left` `search` | `icon-left="search"` | ✅ |
+| `plugins/logs/patterns/PatternDetailsDialog.vue:279` | `#icon-left` `navigate_before` | `icon-left="navigate-before"` | ✅ |
+| `plugins/logs/patterns/PatternDetailsDialog.vue:297` | `#icon-right` `navigate_next` | `icon-right="navigate-next"` | ✅ |
+| `plugins/traces/ServiceGraph.vue:200` | `#icon-left` `refresh` | `icon-left="refresh"` | ✅ |
 
 ---
 
@@ -311,13 +301,13 @@ These `q-icon` usages are **inside Quasar component slots** (prepend/append of `
 
 ## Summary by Phase
 
-| Phase | Scope | Approx. files | Prerequisite |
-|---|---|---|---|
-| **Pre-work** | Add 15 missing icons to registry | 1 file | None — do first |
-| **Phase 1** | Add `icon-left`/`icon-right` props to OButton; migrate all `#icon-left`/`#icon-right` q-icon slots | ~50 files | Pre-work |
-| **Phase 2a** | Replace standalone static-name `q-icon` with `<OIcon>` | ~25 files | Pre-work |
-| **Phase 2b** | Replace dynamic-bound `q-icon` (outlinedXxx constants and ternaries) | ~20 files | Pre-work |
-| **Phase 3 (data-driven)** | Map `dialogConfig.badgeIcon`, `feature.icon`, `col.icon`, nav `icon` prop to `IconName` | ~4 files | Phase 2 |
-| **Phase 4 (blocked)** | Migrate q-input prepend icons | ~10 files | OInput component built |
-| **Phase 5 (blocked)** | Migrate q-icon-wrapping-tooltip | ~5 files | OTooltip component built |
-| **Phase 6 (blocked)** | Migrate DateTime picker internal icons | ~3 files | ODatePicker component built |
+| Phase | Scope | Approx. files | Prerequisite | Status |
+|---|---|---|---|---|
+| **Pre-work** | Add missing icons to registry | 1 file | None | ✅ Done |
+| **Phase 1** | `icon-left`/`icon-right` props on OButton; migrate all OButton q-icon slots | ~50 files | Pre-work | ✅ Done |
+| **Phase 2a** | Replace standalone static-name `q-icon` with `<OIcon>` | ~25 files | Pre-work | 🔲 Next |
+| **Phase 2b** | Replace dynamic-bound `q-icon` (outlinedXxx constants and ternaries) | ~20 files | Pre-work | 🔲 |
+| **Phase 3 (data-driven)** | Map `dialogConfig.badgeIcon`, `feature.icon`, `col.icon`, nav `icon` prop to `IconName` | ~4 files | Phase 2 | 🔲 |
+| **Phase 4 (blocked)** | Migrate q-input prepend icons | ~10 files | OInput component built | 🔴 |
+| **Phase 5 (blocked)** | Migrate q-icon-wrapping-tooltip | ~5 files | OTooltip component built | 🔴 |
+| **Phase 6 (blocked)** | Migrate DateTime picker internal icons | ~3 files | ODatePicker component built | 🔴 |

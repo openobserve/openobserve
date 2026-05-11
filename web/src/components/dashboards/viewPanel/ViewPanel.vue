@@ -66,8 +66,8 @@
           size="icon-xs"
           @click="cancelViewPanelQuery"
           data-test="dashboard-viewpanel-cancel-btn"
+          icon-left="cancel"
         >
-          <template #icon-left><q-icon name="cancel" /></template>
           <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
         </OButton>
         <OButton
@@ -77,8 +77,8 @@
           @click="refreshData"
           :disabled="disable"
           data-test="dashboard-viewpanel-refresh-data-btn"
+          icon-left="refresh"
         >
-          <template #icon-left><q-icon name="refresh" /></template>
           <q-tooltip>{{
             isVariablesChanged
               ? "Refresh"
@@ -90,8 +90,8 @@
           size="icon-xs"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
       </div>
     </div>

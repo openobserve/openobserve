@@ -112,16 +112,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           :disabled="scope.isFirstPage"
           @click="scope.prevPage"
+          icon-left="chevron-left"
         >
-          <template #icon-left><q-icon name="chevron_left" /></template>
         </OButton>
         <OButton
           variant="outline"
           size="icon-sm"
           :disabled="scope.isLastPage"
           @click="scope.nextPage"
+          icon-left="chevron-right"
         >
-          <template #icon-left><q-icon name="chevron_right" /></template>
         </OButton>
       </OButtonGroup>
     </div>

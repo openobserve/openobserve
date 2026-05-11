@@ -25,8 +25,8 @@
         variant="ghost"
         size="icon"
         data-test="dashboard-addpanel-config-color-by-series"
+        icon-left="info-outline"
       >
-        <template #icon-left><q-icon name="info_outline" /></template>
         <q-tooltip
           class="bg-grey-8"
           anchor="bottom middle"

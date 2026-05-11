@@ -208,8 +208,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-circle"
           @click="$emit('show-legends')"
+          icon-left="format-list-bulleted"
         >
-          <template #icon-left><q-icon name="format_list_bulleted" /></template>
           <q-tooltip anchor="top middle" self="bottom right">
             Show Legends
           </q-tooltip>

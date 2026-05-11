@@ -63,8 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
               </span>
-              <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain">
-                  <template #icon-left><q-icon name="replay" /></template>
+              <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" icon-left="replay">
                   {{ t('alerts.retry') }}
                 </OButton>
             </template>

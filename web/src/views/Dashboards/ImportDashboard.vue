@@ -19,11 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
         <div class="col">
           <div class="flex">
-            <OButton variant="outline" size="icon-xs" @click="goBack()">
-              <template #icon-left
-                ><q-icon name="arrow_back_ios_new"
-              /></template>
-            </OButton>
+            <OButton variant="outline" size="icon-xs" @click="goBack()" icon-left="arrow-back-ios-new" />
+
             <div class="text-h6 q-ml-md">
               {{ t("dashboard.importDashboard") }}
             </div>

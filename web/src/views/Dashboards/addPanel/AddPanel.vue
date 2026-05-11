@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             @click="showViewPanel = true"
             data-test="dashboard-panel-data-view-query-inspector-btn"
+            icon-left="info-outline"
           >
-            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip anchor="center left" self="center right"
               >Query Inspector</q-tooltip
             >

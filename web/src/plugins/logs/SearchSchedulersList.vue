@@ -190,8 +190,8 @@
                             props.row.status_code == 3
                           "
                           @click.stop="fetchSearchResults(props.row)"
+                          icon-left="search"
                         >
-                          <template #icon-left><q-icon name="search" /></template>
                           {{ t('search_scheduler_job.logs') }}
                         </OButton>
                       </div>

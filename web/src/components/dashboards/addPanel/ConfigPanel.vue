@@ -150,8 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'o2-toggle-button-lg-light'
               "
             />
-            <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop>
-              <template #icon-left><q-icon name="info_outline" /></template>
+            <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop icon-left="info-outline">
               <q-tooltip
                 anchor="bottom middle"
                 self="top middle"

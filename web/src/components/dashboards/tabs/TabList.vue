@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       data-test="dashboard-tab-add-btn"
+      icon-left="add"
     >
-      <template #icon-left><q-icon name="add" /></template>
       <q-tooltip>Add Tab</q-tooltip>
     </OButton>
     <AddTab

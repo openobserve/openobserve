@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-muted"
             size="icon-xs-sq"
             @click="showVrlInfo = true"
+            icon-left="help-outline"
           >
-            <template #icon-left><q-icon name="help_outline" /></template>
             <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
           </OButton>
         </div>

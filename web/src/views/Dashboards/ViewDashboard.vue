@@ -87,8 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               @click="addPanelData"
               data-test="dashboard-panel-add"
+              icon-left="add"
             >
-              <template #icon-left><q-icon name="add" /></template>
               <q-tooltip>{{ t("panel.add") }}</q-tooltip>
             </OButton>
             <!-- <DateTimePicker 
@@ -140,8 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               @click="cancelQuery"
               data-test="dashboard-cancel-btn"
+              icon-left="cancel"
             >
-              <template #icon-left><q-icon name="cancel" /></template>
               <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
             </OButton>
             <OButton
@@ -153,8 +153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
               data-test="dashboard-refresh-btn"
+              icon-left="refresh"
             >
-              <template #icon-left><q-icon name="refresh" /></template>
               <q-tooltip>
                 {{
                   isVariablesChanged
@@ -184,8 +184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
+              icon-left="settings"
             >
-              <template #icon-left><q-icon name="settings" /></template>
               <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
             </OButton>
             <OButton
@@ -245,8 +245,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               data-test="dashboard-json-edit-btn"
               @click="openJsonEditor"
+              icon-left="code"
             >
-              <template #icon-left><q-icon name="code" /></template>
               <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
             </OButton>
           </div>

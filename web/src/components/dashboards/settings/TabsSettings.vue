@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="saveEdit"
                 :disabled="!editTabObj.data.name.trim()"
                 data-test="dashboard-tab-settings-tab-name-edit-save"
+                icon-left="check"
               >
-                <template #icon-left><q-icon name="check" /></template>
               </OButton>
               <OButton
                 variant="ghost"
@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.cancel')"
                 @click.stop="cancelEdit"
                 data-test="dashboard-tab-settings-tab-name-edit-cancel"
+                icon-left="close"
               >
-                <template #icon-left><q-icon name="close" /></template>
               </OButton>
             </div>
             <div class="actions">
@@ -105,8 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.edit')"
                 @click.stop="editItem(tab.tabId)"
                 data-test="dashboard-tab-settings-tab-edit-btn"
+                icon-left="edit"
               >
-                <template #icon-left><q-icon name="edit" /></template>
               </OButton>
               <OButton
                 v-if="currentDashboardData.data.tabs.length !== 1"

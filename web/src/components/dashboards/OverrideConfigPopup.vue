@@ -104,8 +104,8 @@
           size="icon"
           @click="removeOverrideConfig(index)"
           :data-test="`dashboard-addpanel-config-unit-config-delete-btn-${index}`"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
       </div>
     </div>

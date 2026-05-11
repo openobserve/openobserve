@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         class="q-mt-sm"
         @click="addApiHeader"
+        icon-left="add"
       >
-        <template #icon-left><q-icon name="add" /></template>
         Add Condition
       </OButton>
     </template>

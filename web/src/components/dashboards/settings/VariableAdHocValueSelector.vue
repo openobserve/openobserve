@@ -48,8 +48,8 @@
         class="tw:ml-1"
         @click="removeField(index)"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
+        icon-left="close"
       >
-        <template #icon-left><q-icon name="close" /></template>
       </OButton>
       <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
     </div>

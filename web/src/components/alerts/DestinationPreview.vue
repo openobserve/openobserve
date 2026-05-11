@@ -248,8 +248,8 @@ limitations under the License.
           variant="outline"
           size="sm-action"
           @click="copyTemplate"
+          icon-left="content-copy"
         >
-          <template #icon-left><q-icon name="content_copy" /></template>
           Copy Template
         </OButton>
       </div>

@@ -135,8 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="importAlert"
             data-test="alert-import"
+            icon-left="file-upload"
           >
-            <template #icon-left><q-icon name="file_upload" /></template>
             <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
             <q-tooltip v-if="isCompactToolbar">
               {{ t("dashboard.import") }}

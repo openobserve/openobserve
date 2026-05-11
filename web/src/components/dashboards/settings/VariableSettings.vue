@@ -159,8 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.edit')"
                   @click="editVariableFn(variable.name)"
                   :data-test="`dashboard-edit-variable-${variable.name}`"
+                  icon-left="edit"
                 >
-                  <template #icon-left><q-icon name="edit" /></template>
                 </OButton>
                 <OButton
                   variant="ghost"

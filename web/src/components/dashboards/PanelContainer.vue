@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onPanelModifyClick('ViewPanel')"
           :title="t('panel.fullScreen')"
           data-test="dashboard-panel-fullscreen-btn"
+          icon-left="fullscreen"
         >
-          <template #icon-left><q-icon name="fullscreen" /></template>
         </OButton>
         <OButton
           v-if="dependentAdHocVariable"
@@ -101,8 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :disabled="isPanelLoading"
+          icon-left="refresh"
         >
-          <template #icon-left><q-icon name="refresh" /></template>
           <q-tooltip>
             {{
               variablesDataUpdated
@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onPanelModifyClick('DeletePanel')"
           :title="t('panel.deletePanel')"
           :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
 
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->

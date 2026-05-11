@@ -64,8 +64,8 @@
                   variant="ghost-primary"
                   size="sm"
                   @click="copyText(query.originalQuery)"
+                  icon-left="content-copy"
                 >
-                  <template #icon-left><q-icon name="content_copy" /></template>
                   Copy
                 </OButton>
               </div>
@@ -94,8 +94,8 @@
                   variant="ghost-primary"
                   size="sm"
                   @click="copyText(query.query)"
+                  icon-left="content-copy"
                 >
-                  <template #icon-left><q-icon name="content_copy" /></template>
                   Copy
                 </OButton>
               </div>

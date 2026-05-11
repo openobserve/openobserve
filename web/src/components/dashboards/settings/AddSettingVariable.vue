@@ -395,8 +395,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon"
                     data-test="dashboard-variable-max-record-size-info"
+                    icon-left="info"
                   >
-                    <template #icon-left><q-icon name="info" /></template>
                     <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
                   </OButton>
                 </q-input>
@@ -519,8 +519,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                       @click="removeFilter(index)"
                       :data-test="`dashboard-variable-adhoc-close-${index}`"
+                      icon-left="close"
                     >
-                      <template #icon-left><q-icon name="close" /></template>
                     </OButton>
                   </div>
                 </div>
@@ -530,8 +530,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     @click="addFilter"
                     data-test="dashboard-add-filter-btn"
+                    icon-left="add"
                   >
-                    <template #icon-left><q-icon name="add" /></template>
                     Add Filter
                   </OButton>
                 </div>
@@ -636,8 +636,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="variableData?.options?.length === 1"
                   @click="removeField(index)"
                   :data-test="`dashboard-custom-variable-${index}-remove`"
+                  icon-left="cancel"
                 >
-                  <template #icon-left><q-icon name="cancel" /></template>
                 </OButton>
               </div>
             </div>
@@ -648,8 +648,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:mt-3"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
+                icon-left="add"
               >
-                <template #icon-left><q-icon name="add" /></template>
                 Add Option
               </OButton>
             </div>
@@ -731,8 +731,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon"
                     @click="removeCustomValue(index)"
                     :data-test="`dashboard-variable-custom-close-${index}`"
+                    icon-left="close"
                   >
-                    <template #icon-left><q-icon name="close" /></template>
                   </OButton>
                 </div>
               </div>
@@ -748,8 +748,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:mt-3"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
+                  icon-left="add"
                 >
-                  <template #icon-left><q-icon name="add" /></template>
                 </OButton>
               </div>
             </div>

@@ -170,8 +170,8 @@
             :aria-label="t('panel.addClause')"
             :data-test="`dashboard-join-condition-add-${argIndex}`"
             @click="handleAddCondition(argIndex)"
+            icon-left="add"
           >
-            <template #icon-left><q-icon name="add" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -188,8 +188,8 @@
             :disabled="modelValue.conditions.length === 1"
             @click="handleRemoveCondition(argIndex)"
             :aria-label="t('panel.removeClause')"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
