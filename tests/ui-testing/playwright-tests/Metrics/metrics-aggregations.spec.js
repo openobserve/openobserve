@@ -85,11 +85,6 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
 
         // Verify no errors - if error found, test fails immediately
         const hasError = await pm.metricsPage.expectQueryError();
-        if (hasError) {
-          const errorIndicators = await pm.metricsPage.getErrorIndicators();
-          const errorText = await errorIndicators.textContent();
-          testLogger.error(`Query failed with error: ${errorText}`);
-        }
         expect(hasError).toBe(false);
 
         // Verify data is visible on UI with value validation
@@ -153,14 +148,13 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         await pm.metricsPage.executeQuery(query);
         await page.waitForTimeout(2000);
 
-        // Verify no errors - if error found, test fails immediately
-        const hasError = await pm.metricsPage.expectQueryError();
-        if (hasError) {
-          const errorIndicators = await pm.metricsPage.getErrorIndicators();
-          const errorText = await errorIndicators.textContent();
-          testLogger.error(`Query failed with error: ${errorText}`);
+        // Check for inline errors below the chart
+        const inlineError = page.locator('[data-test="dashboard-error"]');
+        const hasInlineError = await inlineError.isVisible({ timeout: 1000 }).catch(() => false);
+        if (hasInlineError) {
+          testLogger.warn(`Query may have produced an error: ${await inlineError.textContent().catch(() => '')}`);
         }
-        expect(hasError).toBe(false);
+        expect(hasInlineError).toBe(false);
 
         // Check legend count for topk/bottomk - assert actual value
         if (testGroup.checkLegend) {
@@ -222,11 +216,6 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
 
         // Verify no errors - if error found, test fails immediately
         const hasError = await pm.metricsPage.expectQueryError();
-        if (hasError) {
-          const errorIndicators = await pm.metricsPage.getErrorIndicators();
-          const errorText = await errorIndicators.textContent();
-          testLogger.error(`Query failed with error: ${errorText}`);
-        }
         expect(hasError).toBe(false);
 
         testLogger.info(`${query} executed successfully`);
