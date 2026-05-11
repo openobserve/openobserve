@@ -287,6 +287,10 @@ const useRoutes = () => {
           "logStream.labelMetadata",
           "logStream.sdr",
         ],
+        create: {
+          labelKey: "commandPalette.newStream",
+          keywords: ["new stream", "add stream", "create stream"],
+        },
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -319,6 +323,10 @@ const useRoutes = () => {
           "graphs",
           "dashboard folders",
         ],
+        create: {
+          labelKey: "commandPalette.newDashboard",
+          keywords: ["new dashboard", "add dashboard", "create dashboard"],
+        },
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -416,6 +424,10 @@ const useRoutes = () => {
               "stream functions",
               "custom functions",
             ],
+            create: {
+              labelKey: "commandPalette.newFunction",
+              keywords: ["new function", "add function", "create VRL function"],
+            },
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -437,6 +449,10 @@ const useRoutes = () => {
               "reference data",
               "enrichment",
             ],
+            create: {
+              labelKey: "commandPalette.newEnrichmentTable",
+              keywords: ["new enrichment", "add enrichment table", "create lookup table"],
+            },
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -458,6 +474,10 @@ const useRoutes = () => {
               "log pipeline",
               "pipeline list",
             ],
+            create: {
+              labelKey: "commandPalette.newEvaluationTemplate",
+              keywords: ["new evaluation template", "add eval template", "create evaluation template"],
+            },
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -475,6 +495,13 @@ const useRoutes = () => {
               path: "add",
               name: "createPipeline",
               component: PipelineEditor,
+              meta: {
+                create: {
+                  labelKey: "commandPalette.newPipeline",
+                  icon: "account_tree",
+                  keywords: ["new pipeline", "add pipeline", "create stream pipeline"],
+                },
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -550,6 +577,11 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Add Alert",
+        create: {
+          labelKey: "commandPalette.newAlert",
+          icon: "notifications",
+          keywords: ["new alert", "create alert", "add monitor", "new monitor"],
+        },
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

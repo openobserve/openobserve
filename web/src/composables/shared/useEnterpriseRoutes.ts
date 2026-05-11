@@ -87,6 +87,10 @@ const useEnterpriseRoutes = () => {
               "programmatic access",
               "tokens",
             ],
+            create: {
+              labelKey: "commandPalette.newServiceAccount",
+              keywords: ["new service account", "add service account", "create API key", "create token"],
+            },
           },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
@@ -114,6 +118,10 @@ const useEnterpriseRoutes = () => {
             icon: "corporate_fare",
             section: "Management",
             keywords: ["organization management", "switch org", "tenants"],
+            create: {
+              labelKey: "commandPalette.newOrganization",
+              keywords: ["new organization", "add organization", "create org", "create tenant"],
+            },
           },
           component: Organizations,
           beforeEnter(to: any, from: any, next: any) {
@@ -194,6 +202,10 @@ const useEnterpriseRoutes = () => {
               "access groups",
               "group permissions",
             ],
+            create: {
+              labelKey: "commandPalette.newUserGroup",
+              keywords: ["new group", "add user group", "create group", "create RBAC group"],
+            },
           },
           component: AppGroups,
           beforeEnter(to: any, from: any, next: any) {
@@ -225,6 +237,10 @@ const useEnterpriseRoutes = () => {
               "permissions",
               "access control",
             ],
+            create: {
+              labelKey: "commandPalette.newRole",
+              keywords: ["new role", "add role", "create role", "create RBAC role"],
+            },
           },
           component: AppRoles,
           beforeEnter(to: any, from: any, next: any) {

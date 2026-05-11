@@ -95,6 +95,10 @@ const useManagementRoutes = () => {
               "SNS",
               "MSTeams",
             ],
+            create: {
+              labelKey: "commandPalette.newDestination",
+              keywords: ["new destination", "add notification destination", "create webhook", "new alert destination"],
+            },
           },
           component: AlertsDestinationList,
           beforeEnter(to: any, from: any, next: any) {
@@ -112,6 +116,10 @@ const useManagementRoutes = () => {
             icon: "description",
             section: "Management",
             keywords: ["alert templates", "notification templates"],
+            create: {
+              labelKey: "commandPalette.newTemplate",
+              keywords: ["new template", "add template", "create notification template", "new alert template"],
+            },
           },
           component: TemplateList,
           beforeEnter(to: any, from: any, next: any) {
@@ -164,6 +172,10 @@ const useManagementRoutes = () => {
               "cipher",
               "security keys",
             ],
+            create: {
+              labelKey: "commandPalette.newCipherKey",
+              keywords: ["new cipher key", "add cipher key", "create encryption key"],
+            },
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -206,6 +218,10 @@ const useManagementRoutes = () => {
               "data forwarding",
               "pipeline routing",
             ],
+            create: {
+              labelKey: "commandPalette.newPipelineDestination",
+              keywords: ["new pipeline destination", "add pipeline destination", "create pipeline output"],
+            },
           },
           component: () =>
             import("@/components/alerts/PipelinesDestinationList.vue"),
@@ -281,6 +297,10 @@ const useManagementRoutes = () => {
               "data masking",
               "PII redaction",
             ],
+            create: {
+              labelKey: "commandPalette.newPattern",
+              keywords: ["new pattern", "add regex pattern", "create pattern", "new regex", "add SDR pattern"],
+            },
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

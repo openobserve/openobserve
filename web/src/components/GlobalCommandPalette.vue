@@ -85,6 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="item.type === 'command'"
               class="palette-item-badge"
             >/</span>
+            <span
+              v-else-if="item.type === 'create'"
+              class="palette-item-badge palette-item-badge--create"
+            >+</span>
             <span v-else-if="item.path" class="palette-item-path">{{ item.path }}</span>
           </div>
         </template>
@@ -306,6 +310,10 @@ watch(isOpen, async (val) => {
   background: var(--o2-primary-color);
   color: #fff;
   font-weight: 600;
+
+  &--create {
+    background: var(--o2-status-success, #10b981);
+  }
 }
 
 .palette-status {
