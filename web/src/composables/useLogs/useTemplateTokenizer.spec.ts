@@ -192,12 +192,255 @@ describe("wildcardChipColor", () => {
     expect(wildcardChipColor("<:TIME>")).toContain("bg-purple-2");
   });
 
-  it('returns grey for unknown wildcard type', () => {
+  it("returns grey for unknown wildcard type", () => {
     expect(wildcardChipColor("<:UUID>")).toContain("bg-grey-3");
   });
 
-  it('returns grey for <:URL>', () => {
+  it("returns grey for <:URL>", () => {
     expect(wildcardChipColor("<:URL>")).toContain("bg-grey-3");
+  });
+
+  it("returns inferred color for <*> with sampleValues", () => {
+    const cls = wildcardChipColor("<*>", ["192.168.1.1", "10.0.0.1"]);
+    expect(cls).toContain("bg-green-2");
+  });
+
+  it("returns blue for <*> without sampleValues", () => {
+    const cls = wildcardChipColor("<*>");
+    expect(cls).toContain("bg-blue-2");
+  });
+
+  it("returns inferred method color for <*> with HTTP method values", () => {
+    const cls = wildcardChipColor("<*>", ["GET", "POST", "DELETE"]);
+    expect(cls).toContain("bg-red-2");
+  });
+});
+
+describe("chipColorForLabel", () => {
+  it("returns green for ip", () => {
+    expect(chipColorForLabel("ip")).toContain("bg-green-2");
+  });
+
+  it("returns red for method", () => {
+    expect(chipColorForLabel("method")).toContain("bg-red-2");
+  });
+
+  it("returns indigo for url", () => {
+    expect(chipColorForLabel("url")).toContain("bg-indigo-2");
+  });
+
+  it("returns orange for num", () => {
+    expect(chipColorForLabel("num")).toContain("bg-orange-2");
+  });
+
+  it("returns orange for float", () => {
+    expect(chipColorForLabel("float")).toContain("bg-orange-2");
+  });
+
+  it("returns amber for hex", () => {
+    expect(chipColorForLabel("hex")).toContain("bg-amber-2");
+  });
+
+  it("returns purple for ts", () => {
+    expect(chipColorForLabel("ts")).toContain("bg-purple-2");
+  });
+
+  it("returns teal for id", () => {
+    expect(chipColorForLabel("id")).toContain("bg-teal-2");
+  });
+
+  it("returns pink for email", () => {
+    expect(chipColorForLabel("email")).toContain("bg-pink-2");
+  });
+
+  it("returns grey for str", () => {
+    expect(chipColorForLabel("str")).toContain("bg-grey-3");
+  });
+
+  it("returns blue for pattern", () => {
+    expect(chipColorForLabel("pattern")).toContain("bg-blue-2");
+  });
+
+  it("returns grey for unknown label", () => {
+    expect(chipColorForLabel("unknownxyz")).toContain("bg-grey-3");
+  });
+});
+
+describe("wildcardLabel", () => {
+  it("returns lowercase ip for <:IP>", () => {
+    expect(wildcardLabel("<:IP>")).toBe("ip");
+  });
+
+  it("returns num for <:NUM>", () => {
+    expect(wildcardLabel("<:NUM>")).toBe("num");
+  });
+
+  it("returns num for <:INT> (mapped to num)", () => {
+    expect(wildcardLabel("<:INT>")).toBe("num");
+  });
+
+  it("returns float for <:FLOAT>", () => {
+    expect(wildcardLabel("<:FLOAT>")).toBe("float");
+  });
+
+  it("returns hex for <:HEX>", () => {
+    expect(wildcardLabel("<:HEX>")).toBe("hex");
+  });
+
+  it("returns ts for <:TIMESTAMP>", () => {
+    expect(wildcardLabel("<:TIMESTAMP>")).toBe("ts");
+  });
+
+  it("returns date for <:DATE>", () => {
+    expect(wildcardLabel("<:DATE>")).toBe("date");
+  });
+
+  it("returns time for <:TIME>", () => {
+    expect(wildcardLabel("<:TIME>")).toBe("time");
+  });
+
+  it("returns str for <:STR>", () => {
+    expect(wildcardLabel("<:STR>")).toBe("str");
+  });
+
+  it("returns url for <:URL>", () => {
+    expect(wildcardLabel("<:URL>")).toBe("url");
+  });
+
+  it("returns method for <:METHOD>", () => {
+    expect(wildcardLabel("<:METHOD>")).toBe("method");
+  });
+
+  it("returns id for <:IDENTIFIERS>", () => {
+    expect(wildcardLabel("<:IDENTIFIERS>")).toBe("id");
+  });
+
+  it('returns <*> for generic wildcard without sampleValues', () => {
+    expect(wildcardLabel("<*>")).toBe("<*>");
+  });
+
+  it("infers ip from sampleValues for <*>", () => {
+    expect(wildcardLabel("<*>", ["192.168.1.1", "10.0.0.1"])).toBe("ip");
+  });
+
+  it("infers method from sampleValues for <*>", () => {
+    expect(wildcardLabel("<*>", ["GET", "POST"])).toBe("method");
+  });
+
+  it("infers url from sampleValues for <*>", () => {
+    expect(wildcardLabel("<*>", ["https://example.com", "https://test.com"])).toBe("url");
+  });
+
+  it("infers num from integer sampleValues for <*>", () => {
+    expect(wildcardLabel("<*>", ["42", "123"])).toBe("num");
+  });
+
+  it("infers ts from timestamp sampleValues for <*>", () => {
+    expect(wildcardLabel("<*>", ["2024-01-15T10:30:00", "2024-01-16"])).toBe("ts");
+  });
+
+  it("infers id from UUID sampleValues for <*>", () => {
+    expect(
+      wildcardLabel("<*>", [
+        "550e8400-e29b-41d4-a716-446655440000",
+        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      ]),
+    ).toBe("id");
+  });
+
+  it("infers email from sampleValues for <*>", () => {
+    expect(wildcardLabel("<*>", ["user@example.com", "admin@test.com"])).toBe("email");
+  });
+
+  it("returns str when <*> values are unidentifiable strings", () => {
+    expect(wildcardLabel("<*>", ["hello world", "foo bar"])).toBe("str");
+  });
+
+  it("returns pattern when <*> values contain template wildcards", () => {
+    expect(wildcardLabel("<*>", ["error <*> occurred", "warning <:NUM>"])).toBe("pattern");
+  });
+
+  it("returns token as-is for unknown typed wildcards", () => {
+    expect(wildcardLabel("<:UNKNOWN>")).toBe("<:UNKNOWN>");
+  });
+});
+
+describe("inferTypeFromValues", () => {
+  it("returns ip for IPv4 addresses", () => {
+    expect(inferTypeFromValues(["192.168.1.1", "10.0.0.1", "127.0.0.1"])).toBe("ip");
+  });
+
+  it("returns ip for IPv6 addresses", () => {
+    expect(inferTypeFromValues(["::1", "2001:db8::1"])).toBe("ip");
+  });
+
+  it("returns method for HTTP methods", () => {
+    expect(inferTypeFromValues(["GET", "POST", "DELETE"])).toBe("method");
+  });
+
+  it("returns url for https URLs", () => {
+    expect(inferTypeFromValues(["https://example.com", "https://test.com/api"])).toBe("url");
+  });
+
+  it("returns num for integers", () => {
+    expect(inferTypeFromValues(["1", "42", "100"])).toBe("num");
+  });
+
+  it("returns float for float values", () => {
+    expect(inferTypeFromValues(["3.14", "2.71", "1.618"])).toBe("float");
+  });
+
+  it("returns num for mixed int+float (combined threshold)", () => {
+    expect(inferTypeFromValues(["42", "3.14", "100", "2.71"])).toBe("num");
+  });
+
+  it("returns hex for hex strings", () => {
+    expect(inferTypeFromValues(["deadbeef", "cafebabe", "a1b2c3d4"])).toBe("hex");
+  });
+
+  it("returns ts for ISO date values", () => {
+    expect(inferTypeFromValues(["2024-01-15", "2024-06-30"])).toBe("ts");
+  });
+
+  it("returns ts for time values", () => {
+    expect(inferTypeFromValues(["10:30:00", "23:59:59"])).toBe("ts");
+  });
+
+  it("returns id for UUIDs", () => {
+    expect(
+      inferTypeFromValues([
+        "550e8400-e29b-41d4-a716-446655440000",
+        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      ]),
+    ).toBe("id");
+  });
+
+  it("returns email for email addresses", () => {
+    expect(inferTypeFromValues(["user@example.com", "admin@test.org"])).toBe("email");
+  });
+
+  it("returns pattern when values contain template wildcards", () => {
+    expect(inferTypeFromValues(["error <*> occurred", "warning <:NUM> at line"])).toBe("pattern");
+  });
+
+  it("returns str for unidentifiable strings", () => {
+    expect(inferTypeFromValues(["hello", "world"])).toBe("str");
+  });
+
+  it("returns str for empty input", () => {
+    expect(inferTypeFromValues([])).toBe("str");
+  });
+
+  it("handles mixed {value, count} objects", () => {
+    const result = inferTypeFromValues([
+      { value: "192.168.1.1", count: 5 },
+      { value: "10.0.0.1", count: 3 },
+    ]);
+    expect(result).toBe("ip");
+  });
+
+  it("requires majority threshold for type assignment", () => {
+    expect(inferTypeFromValues(["192.168.1.1", "hello", "world", "foo", "bar"])).toBe("str");
   });
 });
 

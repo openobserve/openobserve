@@ -393,12 +393,12 @@ const variableColumns = computed(() => [
 
 .wildcard-chip-detail {
   font-family: monospace;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: bold;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 3px;
-  line-height: 18px;
+  height: 1.125rem;
+  padding: 0 0.3125rem;
+  border-radius: 0.1875rem;
+  line-height: 1.125rem;
   flex-shrink: 0;
 }
 </style>
