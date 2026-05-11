@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row justify-between items-center streams-header">
           <div class="row tw:items-center tw:gap-2">
             <div class="tile-icon icon-bg-blue" aria-hidden="true">
-              <q-icon :name="outlinedWindow" size="1.5rem" />
+              <OIcon name="window" size="md" />
             </div>
             <div class="section-header">{{ t("home.streams") }}</div>
           </div>
@@ -652,7 +652,6 @@ import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanne
 import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
-import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 

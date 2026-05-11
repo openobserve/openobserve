@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="confirmDeleteAction(props)"
                 :data-test="`delete-basic-user-${props.row.email}`"
               >
-                <q-icon :name="outlinedDelete" />
+                <OIcon name="delete" size="sm" />
               </OButton>
               <OButton
                 v-if="props.row.status == 'pending' && props.row.token"
@@ -263,7 +263,7 @@ import {
   verifyOrganizationStatus,
   maskText,
 } from "@/utils/zincutils";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -279,6 +279,7 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    OIcon,
     ODialog,
   },
   emits: [
@@ -1110,7 +1111,6 @@ export default defineComponent({
       maxRecordToReturn,
       showUpdateUserDialog,
       changeMaxRecordToReturn,
-      outlinedDelete,
       filterQuery,
       fetchUserGroups,
       toggleExpand,

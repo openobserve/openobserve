@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     title="Delete"
                     @click="confirmDeleteSourceMap(props.row)"
                   >
-                    <q-icon :name="outlinedDelete" size="16px" />
+                    <OIcon name="delete" size="sm" />
                   </OButton>
                 </template>
                 <template v-else>
@@ -249,7 +249,6 @@ import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import sourcemapsService from "@/services/sourcemaps";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

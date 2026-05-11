@@ -244,9 +244,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon"
                     @click="removeTier(idx as number)"
                   >
-                    <q-icon :name="outlinedDelete" size="14px" />
+                    <OIcon name="delete" size="sm" />
                   </OButton>
-                </div>
               </div>
 
               <!-- Tier Body -->
@@ -381,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="icon"
                         @click="deletePrice(tier, entry.key)"
                       >
-                        <q-icon :name="outlinedDelete" size="14px" />
+                        <OIcon name="delete" size="sm" />
                       </OButton>
                     </div>
 
@@ -545,7 +544,7 @@ import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 const store = useStore();

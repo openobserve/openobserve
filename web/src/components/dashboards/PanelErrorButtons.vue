@@ -15,9 +15,9 @@
       :key="error"
       variant="ghost-warning"
       size="icon"
+      icon-left="warning"
       data-test="panel-error-data"
     >
-      <template #icon-left><q-icon :name="outlinedWarning" /></template>
       <q-tooltip anchor="bottom right" self="top right" max-width="220px">
         <div style="white-space: pre-wrap">
           {{ error }}
@@ -28,9 +28,9 @@
       v-if="maxQueryRangeWarning"
       variant="ghost-warning"
       size="icon"
+      icon-left="warning"
       data-test="panel-max-duration-warning"
     >
-      <template #icon-left><q-icon :name="outlinedWarning" /></template>
       <q-tooltip anchor="bottom right" self="top right" max-width="220px">
         <div style="white-space: pre-wrap">
           {{ maxQueryRangeWarning }}
@@ -109,7 +109,6 @@ import { defineComponent } from "vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import {
-  outlinedWarning,
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
 import {
@@ -159,7 +158,6 @@ export default defineComponent({
   },
   setup() {
     return {
-      outlinedWarning,
       outlinedRunningWithErrors,
       symOutlinedClockLoader20,
       symOutlinedDataInfoAlert,

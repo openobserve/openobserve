@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(props.row)"
               >
-                <q-icon :name="outlinedDelete" />
+                <OIcon name="delete" size="sm" />
               </OButton>
             </div>
           </q-td>
@@ -280,7 +280,7 @@ import type { Template } from "@/ts/interfaces/index";
 import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 
 interface ConformDelete {
@@ -296,6 +296,7 @@ export default defineComponent({
     QTablePagination,
     ImportDestination,
     OButton,
+    OIcon,
   },
   setup() {
     const qTable = ref();
@@ -782,7 +783,6 @@ export default defineComponent({
       selectedPerPage,
       visibleRows,
       hasVisibleRows,
-      outlinedDelete,
       openBulkDeleteDialog,
       bulkDeleteDestinations,
       confirmBulkDelete,

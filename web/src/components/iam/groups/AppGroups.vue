@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('common.delete')"
               @click="showConfirmDialog(slotProps.column.row)"
             >
-              <q-icon :name="outlinedDelete" />
+              <OIcon name="delete" size="sm" />
             </OButton>
           </div>
         </template>
@@ -149,7 +149,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const showAddGroup = ref(false);
 

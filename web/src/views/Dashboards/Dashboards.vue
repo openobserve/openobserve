@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="dashboard-edit-folder-icon"
                             >
                               <template #icon-left>
-                                <q-icon :name="outlinedEdit" size="xs" />
+                                <OIcon name="edit" size="xs" />
                               </template>
                               Edit
                             </ODropdownItem>
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="dashboard-delete-folder-icon"
                             >
                               <template #icon-left>
-                                <q-icon :name="outlinedDelete" size="xs" />
+                                <OIcon name="delete" size="xs" />
                               </template>
                               Delete
                             </ODropdownItem>
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop="showMoveDashboardPanel(props.row)"
                         data-test="dashboard-move-to-another-folder"
                       >
-                        <q-icon :name="outlinedDriveFileMove" size="16px" />
+                        <OIcon name="drive-file-move" size="sm" />
                       </OButton>
                       <OButton
                         v-if="props.row.actions == 'true'"
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop="showDeleteDialogFn(props)"
                         data-test="dashboard-delete"
                       >
-                        <q-icon :name="outlinedDelete" size="16px" />
+                        <OIcon name="delete" size="sm" />
                       </OButton>
                     </div>
                   </q-td>
@@ -447,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="moveMultipleDashboards"
                       >
                         <template #icon-left>
-                          <q-icon :name="outlinedDriveFileMove" size="16px" />
+                          <OIcon name="drive-file-move" size="sm" />
                         </template>
                         Move
                       </OButton>
@@ -615,11 +615,6 @@ import {
   getFoldersList,
   moveModuleToAnotherFolder,
 } from "../../utils/commons.ts";
-import {
-  outlinedDelete,
-  outlinedDriveFileMove,
-  outlinedEdit,
-} from "@quasar/extras/material-icons-outlined";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { filter, forIn } from "lodash-es";
@@ -1441,9 +1436,6 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       changeMaxRecordToReturn,
-      outlinedDelete,
-      outlinedEdit,
-      outlinedDriveFileMove,
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,

@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alert_templates.delete')"
               @click="conformDeleteDestination(props.row)"
             >
-              <q-icon :name="outlinedDelete" />
+              <OIcon name="delete" size="sm" />
             </OButton>
           </q-td>
         </template>
@@ -223,7 +223,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";

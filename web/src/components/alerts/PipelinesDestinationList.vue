@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(props.row)"
               >
-                <q-icon :name="outlinedDelete" />
+                <OIcon name="delete" size="sm" />
               </OButton>
             </div>
           </q-td>
@@ -215,7 +215,6 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 
@@ -231,8 +230,8 @@ export default defineComponent({
     ConfirmDialog,
     QTablePagination,
     OButton,
+    OIcon,
   },
-  setup() {
     const qTable = ref();
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
@@ -687,7 +686,6 @@ export default defineComponent({
       resultTotal,
       selectedPerPage,
       pagination,
-      outlinedDelete,
       routeTo,
       store,
       // Exposed helper functions for testing

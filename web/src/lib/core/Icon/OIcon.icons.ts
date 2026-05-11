@@ -62,8 +62,15 @@ import HelpOutline from "~icons/material-symbols-light/help-outline";
 import History from "~icons/material-symbols-light/history";
 import Info from "~icons/material-symbols-light/info-outline";
 import InfoOutline from "~icons/material-symbols-light/info-outline";
+import AccountTree from "~icons/material-symbols-light/account-tree";
+import DarkMode from "~icons/material-symbols-light/dark-mode";
 import Draft from "~icons/material-symbols-light/draft-outline";
+import DriveFileMove from "~icons/material-symbols-light/drive-file-move";
+import ExpandLess from "~icons/material-symbols-light/expand-less";
 import Inventory2 from "~icons/material-symbols-light/inventory-2-outline";
+import LightMode from "~icons/material-symbols-light/light-mode";
+import Schema from "~icons/material-symbols-light/schema";
+import Window from "~icons/material-symbols-light/window";
 import Javascript from "~icons/material-symbols-light/javascript";
 import KeyboardArrowDown from "~icons/material-symbols-light/keyboard-arrow-down";
 import KeyboardDoubleArrowLeft from "~icons/material-symbols-light/keyboard-double-arrow-left";
@@ -73,6 +80,7 @@ import Link from "~icons/material-symbols-light/link";
 import LocationOn from "~icons/material-symbols-light/location-on-outline";
 import MoreVert from "~icons/material-symbols-light/more-vert";
 import OpenInNew from "~icons/material-symbols-light/open-in-new";
+import Pause from "~icons/material-symbols-light/pause";
 import Person from "~icons/material-symbols-light/person-outline";
 import PlayArrow from "~icons/material-symbols-light/play-arrow-outline";
 import Preview from "~icons/material-symbols-light/preview-outline";
@@ -143,8 +151,15 @@ export const iconRegistry = {
   "history": History,
   "info": Info,
   "info-outline": InfoOutline,
+  "account-tree": AccountTree,
+  "dark-mode": DarkMode,
   "draft": Draft,
+  "drive-file-move": DriveFileMove,
+  "expand-less": ExpandLess,
   "inventory-2": Inventory2,
+  "light-mode": LightMode,
+  "schema": Schema,
+  "window": Window,
   "javascript": Javascript,
   "keyboard-arrow-down": KeyboardArrowDown,
   "keyboard-double-arrow-left": KeyboardDoubleArrowLeft,
@@ -154,6 +169,7 @@ export const iconRegistry = {
   "location-on": LocationOn,
   "more-vert": MoreVert,
   "open-in-new": OpenInNew,
+  "pause": Pause,
   "person": Person,
   "play-arrow": PlayArrow,
   "preview": Preview,

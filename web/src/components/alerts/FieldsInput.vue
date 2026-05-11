@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alert_templates.edit')"
             @click="deleteApiHeader(field)"
           >
-            <q-icon :name="outlinedDelete" />
+            <OIcon name="delete" size="sm" />
           </OButton>
           <OButton
             data-test="alert-conditions-add-condition-btn"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 
 const props = defineProps({

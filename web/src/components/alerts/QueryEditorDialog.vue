@@ -330,8 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- No results after run -->
                   <div v-else-if="outputEvents == '' && !runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon :name="outlinedWarning" size="40px" class="tw:text-orange-400 tw:opacity-60" />
-                      <span class="empty-state-text">{{ runPromqlError ? runPromqlError : t('search.noResultsFound') }}</span>
+                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
@@ -386,8 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- No results -->
                   <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon :name="outlinedWarning" size="40px" class="tw:text-orange-400 tw:opacity-60" />
-                      <span class="empty-state-text">{{ t('search.noResultsFound') }}</span>
+                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
@@ -440,7 +438,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { debounce } from "lodash-es";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
-import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));

@@ -72,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon"
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
+          icon-left="warning"
         >
-          <template #icon-left><q-icon :name="outlinedWarning" /></template>
           <q-tooltip anchor="bottom right" self="top right" max-width="220px">
             Some dynamic variables are not applied because the field is not
             present in the query's stream. Open Query Inspector to see all the
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('EditPanel')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedEdit" size="16px"
+              ><OIcon name="edit" size="sm"
             /></template>
             {{ t("panel.editPanel") }}
           </ODropdownItem>
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('MovePanel')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedDriveFileMove" size="16px"
+              ><OIcon name="drive-file-move" size="sm"
             /></template>
             {{ t("panel.moveToAnotherTab") }}
           </ODropdownItem>
@@ -357,12 +357,10 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
-  outlinedWarning,
   outlinedRunningWithErrors,
   outlinedReportProblem,
-  outlinedDriveFileMove,
-  outlinedEdit,
   outlinedDashboardCustomize,
   outlinedFileDownload,
 } from "@quasar/extras/material-icons-outlined";
@@ -441,6 +439,7 @@ export default defineComponent({
     RelativeTime,
     PanelErrorButtons,
     OButton,
+    OIcon,
     ODropdown,
     ODropdownItem,
     ShowLegendsPopup: defineAsyncComponent(() => {
@@ -889,24 +888,6 @@ export default defineComponent({
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,
-      outlinedWarning,
-      outlinedReportProblem,
-      outlinedDriveFileMove,
-      outlinedEdit,
-      outlinedDashboardCustomize,
-      outlinedFileDownload,
-      symOutlinedClockLoader20,
-      symOutlinedDataInfoAlert,
-      outlinedRunningWithErrors,
-      store,
-      metaDataValue,
-      handleResultMetadataUpdate,
-      handleLastTriggeredAtUpdate,
-      isCachedDataDifferWithCurrentTimeRange,
-      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
-      lastTriggeredAt,
-      maxQueryRangeWarning,
-      metaData,
       showViewPanel,
       dependentAdHocVariable,
       confirmDeletePanelDialog,
@@ -928,6 +909,21 @@ export default defineComponent({
       t,
       showLegendsDialog,
       currentPanelData,
+      outlinedRunningWithErrors,
+      outlinedReportProblem,
+      outlinedDashboardCustomize,
+      outlinedFileDownload,
+      symOutlinedClockLoader20,
+      symOutlinedDataInfoAlert,
+      store,
+      metaDataValue,
+      handleResultMetadataUpdate,
+      handleLastTriggeredAtUpdate,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
+      lastTriggeredAt,
+      maxQueryRangeWarning,
+      metaData,
     };
   },
   methods: {

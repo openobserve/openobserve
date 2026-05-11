@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-delete-variable"
                 >
                   <template #icon-left
-                    ><q-icon :name="outlinedDelete"
+                    ><OIcon name="delete" size="sm"
                   /></template>
                 </OButton>
               </div>
@@ -221,9 +221,9 @@ import {
   deleteVariable,
   updateDashboard,
 } from "../../../utils/commons";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 import DashboardHeader from "./common/DashboardHeader.vue";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import NoData from "../../shared/grid/NoData.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
@@ -242,6 +242,7 @@ export default defineComponent({
     DashboardHeader,
     VariablesDependenciesGraph,
     OButton,
+    OIcon,
     ODialog,
   },
   emits: ["save"],
@@ -450,7 +451,6 @@ export default defineComponent({
       addVariables,
       dashboardVariablesList,
       isAddVariable,
-      outlinedDelete,
       showDeleteDialogFn,
       confirmDeleteDialog,
       deleteVariableFn,

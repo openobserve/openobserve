@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click="confirmDeleteAction(props)"
                   >
-                    <q-icon :name="outlinedDelete" />
+                    <OIcon name="delete" size="sm" />
                   </OButton>
                 </template>
               </q-td>
@@ -299,7 +299,8 @@ import {
   verifyOrganizationStatus,
   maskText,
 } from "@/utils/zincutils";
-import { outlinedDelete,outlinedVisibility } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { outlinedVisibility } from "@quasar/extras/material-icons-outlined";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -309,7 +310,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination, NoData, AddServiceAccount, OButton, ODialog },
+  components: { QTablePagination, NoData, AddServiceAccount, OButton, OIcon, ODialog },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -782,7 +783,6 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       changeMaxRecordToReturn,
-      outlinedDelete,
       refreshServiceToken,
       copyToClipboard,
       downloadTokenAsFile,

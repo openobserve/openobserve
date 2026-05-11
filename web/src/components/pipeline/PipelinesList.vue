@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click="openDeleteDialog(props.row)"
                             >
                               <q-item-section dense avatar>
-                                <q-icon size="16px" :name="outlinedDelete" />
+                                <OIcon name="delete" size="sm" />
                               </q-item-section>
                               <q-item-section>{{
                                 t("pipeline.delete")
@@ -632,11 +632,7 @@ import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
 import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
   outlinedVisibility,
-  outlinedMoreVert,
 } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";

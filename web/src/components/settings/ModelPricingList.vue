@@ -396,12 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="toggleEnabled(props.row, !props.row.enabled)"
                       data-test="model-pricing-toggle-btn"
                     >
-                      <q-icon
-                        :name="
-                          props.row.enabled ? outlinedPause : outlinedPlayArrow
-                        "
-                        size="14px"
-                      />
+                      <OIcon :name="props.row.enabled ? 'pause' : 'play-arrow'" size="sm" />
                     </OButton>
                     <OButton
                       variant="ghost"
@@ -419,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="confirmDelete(props.row)"
                       data-test="model-pricing-delete-btn"
                     >
-                      <q-icon :name="outlinedDelete" size="14px" />
+                      <OIcon name="delete" size="sm" />
                     </OButton>
                     <OButton
                       variant="ghost"
@@ -682,12 +677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         @click.stop="toggleEnabled(child, !child.enabled)"
                       >
-                        <q-icon
-                          :name="
-                            child.enabled ? outlinedPause : outlinedPlayArrow
-                          "
-                          size="14px"
-                        />
+                        <OIcon :name="child.enabled ? 'pause' : 'play-arrow'" size="sm" />
                       </OButton>
                       <OButton
                         variant="ghost"
@@ -703,7 +693,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="t('modelPricing.actionDelete')"
                         @click.stop="confirmDelete(child)"
                       >
-                        <q-icon :name="outlinedDelete" size="14px" />
+                        <OIcon name="delete" size="sm" />
                       </OButton>
                       <OButton
                         variant="ghost"
@@ -761,10 +751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="sm"
               @click="confirmDeleteSelected"
-            >
-              <template #icon-left
-                ><q-icon :name="outlinedDelete" size="14px"
-              /></template>
+              icon-left="delete"
               {{ t("modelPricing.deleteSelected", { count: selectedCount }) }}
             </OButton>
             <QTablePagination
@@ -901,11 +888,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";

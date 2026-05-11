@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             @click.stop="toggleAlertState(props.row)"
                           >
-                            <q-icon :name="props.row.enabled ? outlinedPause : outlinedPlayArrow" />
+                            <OIcon :name="props.row.enabled ? 'pause' : 'play-arrow'" size="sm" />
                           </OButton>
                           <OButton
                             :data-test="`alert-list-${props.row.name}-update-alert`"
@@ -436,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click.stop="openMenu($event, props.row)"
                               :data-test="`alert-list-${props.row.name}-more-options`"
                             >
-                              <q-icon :name="outlinedMoreVert" />
+                              <OIcon name="more-vert" size="sm" />
                               <q-menu>
                                 <q-list style="min-width: 100px">
                                 <q-item
@@ -446,10 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="moveAlertToAnotherFolder(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDriveFileMove"
-                                    />
+                                    <OIcon name="drive-file-move" size="sm" />
                                   </q-item-section>
                                   <q-item-section>Move</q-item-section>
                                 </q-item>
@@ -461,10 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="showDeleteDialogFn(props)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDelete"
-                                    />
+                                    <OIcon name="delete" size="sm" />
                                   </q-item-section>
                                   <q-item-section>{{
                                     t("alerts.delete")
@@ -631,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="moveMultipleAlerts"
                     >
-                      <q-icon :name="outlinedDriveFileMove" size="16px" />
+                      <OIcon name="drive-file-move" size="sm" />
                       <span class="tw:ml-2">Move</span>
                     </OButton>
                     <OButton
@@ -874,13 +868,7 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedDriveFileMove,
-  outlinedMoreVert,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
@@ -922,10 +910,9 @@ export default defineComponent({
     AlertHistoryDrawer,
     O2AIContextAddBtn,
     OButton,
+    OIcon,
     ODialog,
   },
-  emits: [
-    "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
@@ -2911,7 +2898,6 @@ export default defineComponent({
       isFetchingStreams,
       isSubmitting,
       changeMaxRecordToReturn,
-      outlinedDelete,
       filterQuery,
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -2929,9 +2915,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
-      outlinedPause,
-      outlinedPlayArrow,
-      toggleAlertState,
+      filterQuery,
       alertStateLoadingMap,
       templates,
       routeTo,
@@ -2950,7 +2934,6 @@ export default defineComponent({
       editAlertFromDrawer,
       deleteAlertByAlertId,
       showMoveAlertDialog,
-      outlinedDriveFileMove,
       selectedAlertToMove,
       selectedAnomalyConfigsToMove,
       moveAlertToAnotherFolder,
@@ -2970,7 +2953,6 @@ export default defineComponent({
       allSelectedAlerts,
       copyToClipboard,
       openMenu,
-      outlinedMoreVert,
       getAlertsFn,
       multipleExportAlert,
       computedName,

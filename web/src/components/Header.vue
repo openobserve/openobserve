@@ -412,7 +412,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
-        <q-icon :name="outlinedSettings" size="20px" class="header-icon" />
+        <OIcon name="settings" size="sm" class="header-icon" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.settings") }}
         </q-tooltip>
@@ -586,8 +586,8 @@ import { defineComponent, PropType, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -596,6 +596,7 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OButton,
+    OIcon,
   },
   props: {
     // Store instance
@@ -787,7 +788,6 @@ export default defineComponent({
 
     return {
       t,
-      outlinedSettings,
       getImageURL,
       enterpriseButtonText,
       ingestionQuotaPercentage,

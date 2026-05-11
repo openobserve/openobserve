@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-settings-tab-delete-btn"
               >
                 <template #icon-left
-                  ><q-icon :name="outlinedDelete"
+                  ><OIcon name="delete" size="sm"
                 /></template>
               </OButton>
             </div>
@@ -154,14 +154,12 @@ import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
 import { deleteTab, editTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { reactive } from "vue";
 import { onMounted } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
-import { updateDashboard } from "../../../utils/commons";
-import useNotifications from "@/composables/useNotifications";
-import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -171,8 +169,8 @@ export default defineComponent({
     AddTab,
     TabsDeletePopUp,
     OButton,
+    OIcon,
   },
-  emits: ["refresh"],
   setup(props, { emit }) {
     const store = useStore();
     const route = useRoute();
@@ -371,7 +369,6 @@ export default defineComponent({
       deletePopupVisible,
       tabIdToBeDeleted,
       handleDragEnd,
-      outlinedDelete,
       addNewItem,
       showAddTabDialog,
       isTabEditMode,

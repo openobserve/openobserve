@@ -102,7 +102,7 @@
           size="sm-action"
           variant="outline"
           @click="redirectToTraces"
-        ><q-icon :name="outlinedAccountTree" size="14px" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
+        ><OIcon name="account-tree" size="xs" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
@@ -306,7 +306,7 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -373,6 +373,7 @@ export default {
     ChunkedContent,
     OButton,
     ODialog,
+    OIcon,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -954,7 +955,6 @@ export default {
       getImageURL,
       addSearchTerm,
       addFieldToTable,
-      outlinedAccountTree,
       dropdownOpenMap,
       store,
       searchObj,

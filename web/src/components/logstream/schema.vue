@@ -427,8 +427,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :props="props"
                       >
                         <span v-if="col.icon" class="tw:ml-[5px]">
-                          <q-icon  size="12px" :name="outlinedPerson"></q-icon>
-                          <q-icon  size="12px" :name="outlinedSchema"></q-icon>
+                          <OIcon name="person" size="xs" />
+                          <OIcon name="schema" size="xs" />
                         </span>
                         <span class="tw:pl-7" v-else-if="col.name === 'patterns'">
                           {{ col.label }}
@@ -516,8 +516,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-slot:body-cell-settings="props">
                     <q-td class="text-left" v-if="props.row.isUserDefined">
-                      <q-icon size="12px"  :name="outlinedPerson"></q-icon>
-                      <q-icon size="12px" :name="outlinedSchema"></q-icon>
+                      <OIcon name="person" size="xs" />
+                      <OIcon name="schema" size="xs" />
                     </q-td>
                     <q-td v-else> </q-td>
                   </template>
@@ -1105,11 +1105,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { X, Plus, Trash2 } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
-import {
-  outlinedSchema,
-  outlinedPerson,
-  outlinedDelete,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1158,6 +1154,7 @@ export default defineComponent({
     LlmEvaluationSettings,
     CrossLinkManager,
     OButton,
+    OIcon,
     X,
     Plus,
     Trash2,
@@ -2611,9 +2608,6 @@ export default defineComponent({
       selectedPerPage,
       pagination,
       qTable,
-      outlinedPerson,
-      outlinedSchema,
-      outlinedDelete,
       openDialog,
       calculateDateRange,
       minDate,

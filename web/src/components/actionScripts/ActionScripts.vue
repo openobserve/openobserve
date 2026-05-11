@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-circle-sm"
                   :title="t('alerts.delete')"
                   @click="showDeleteDialogFn(props)"
-                  ><q-icon :name="outlinedDelete" size="16px"
+                  ><OIcon name="delete" size="sm"
                 /></OButton>
               </q-td>
             </template>
@@ -308,11 +308,7 @@ import {
   convertUnixToQuasarFormat,
 } from "@/utils/zincutils";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -345,6 +341,7 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     ODialog,
+    OIcon,
   },
   emits: [
     "updated:fields",
@@ -907,7 +904,6 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       isSubmitting,
-      outlinedDelete,
       filterQuery,
       filterData,
       getImageURL,
@@ -916,8 +912,6 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
-      outlinedPause,
-      outlinedPlayArrow,
       actionsScriptRows,
       alertStateLoadingMap,
       templates,

@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="'Associated Pipelines'"
                     @click="getAssociatedPipelines(props)"
                   >
-                    <q-icon :name="outlinedAccountTree" size="14px" />
+                    <OIcon name="account-tree" size="xs" />
                   </OButton>
                 </q-td>
               </template>
@@ -250,9 +250,8 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import {
-  outlinedDelete,
-  outlinedAccountTree,
 } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -267,6 +266,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
+    OIcon,
     ODialog,
     Pencil,
     Trash2,
@@ -743,8 +743,6 @@ export default defineComponent({
       maxRecordToReturn,
       showAddJSTransformDialog,
       changeMaxRecordToReturn,
-      outlinedDelete,
-      outlinedAccountTree,
       forceDeleteFn,
       confirmForceDelete,
       pipelineList,

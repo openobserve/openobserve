@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alert_templates.edit')"
             @click="removeVariable(variable)"
           >
-            <q-icon :name="outlinedDelete" />
+            <OIcon name="delete" size="sm" />
           </OButton>
           <OButton
             data-test="alert-variables-add-variable-btn"
@@ -109,7 +109,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
 

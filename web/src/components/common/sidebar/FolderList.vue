@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-edit-folder-icon"
                       >
                       <q-item-section avatar>
-                          <q-icon :name="outlinedEdit" size="xs" />
+                          <OIcon name="edit" size="xs" />
                       </q-item-section>
                       <q-item-section>
                           <q-item-label>{{ t('common.edit') }}</q-item-label>
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-delete-folder-icon"
                       >
                       <q-item-section avatar>
-                          <q-icon :name="outlinedDelete" size="xs" />
+                          <OIcon name="delete" size="xs" />
                       </q-item-section>
                       <q-item-section>
                           <q-item-label>{{ t('common.delete') }}</q-item-label>
@@ -172,11 +172,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
     getFoldersList,
     getFoldersListByType
   } from "@/utils/commons";
-  import {
-    outlinedDelete,
-    outlinedDriveFileMove,
-    outlinedEdit,
-  } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
   import AddFolder from "./AddFolder.vue";
   import useNotifications from "@/composables/useNotifications";
   import { filter, forIn } from "lodash-es";
@@ -204,6 +200,7 @@ export default defineComponent({
       OTabs,
       OTab,
       OButton,
+      OIcon,
     },
     props: {
       type: {
@@ -323,8 +320,6 @@ export default defineComponent({
         addFolder,
         updateFolderList,
         store,
-        outlinedDelete,
-        outlinedEdit,
         deleteFolder,
         selectedFolderDelete,
         confirmDeleteFolderDialog,
