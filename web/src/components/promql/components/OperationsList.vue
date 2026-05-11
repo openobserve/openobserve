@@ -126,8 +126,8 @@
                   size="icon-chip"
                   @click="removeOperation(index)"
                   :data-test="`promql-operation-remove-${index}`"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>

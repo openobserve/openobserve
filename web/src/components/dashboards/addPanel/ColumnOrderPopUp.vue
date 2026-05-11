@@ -82,8 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="index === 0"
               @click="moveColumnUp(index)"
               :data-test="`column-order-move-up-${index}`"
+              icon-left="arrow-upward"
             >
-              <template #icon-left><q-icon name="arrow_upward" /></template>
               <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
             </OButton>
             <OButton
@@ -92,8 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="index === editColumnOrder.length - 1"
               @click="moveColumnDown(index)"
               :data-test="`column-order-move-down-${index}`"
+              icon-left="arrow-downward"
             >
-              <template #icon-left><q-icon name="arrow_downward" /></template>
               <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
             </OButton>
           </div>

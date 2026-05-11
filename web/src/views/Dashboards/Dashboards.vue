@@ -445,10 +445,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-mr-sm tw:h-9"
                         data-test="dashboard-list-move-across-folders-btn"
                         @click="moveMultipleDashboards"
+                        icon-left="drive-file-move"
                       >
-                        <template #icon-left>
-                          <OIcon name="drive-file-move" size="sm" />
-                        </template>
                         Move
                       </OButton>
                       <OButton

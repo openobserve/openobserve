@@ -121,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-source-item-${sourceLabel}-remove`"
             @click="removeSource()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -243,8 +243,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-target-item-${targetLabel}-remove`"
             @click="removeTarget()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -365,8 +365,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-value-item-${valueLabel}-remove`"
             @click="removeValue()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div

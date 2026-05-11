@@ -55,24 +55,24 @@
           value="byDashboard"
           size="sm"
           data-test="dashboard-drilldown-by-dashboard-btn"
+          icon-left="dashboard"
         >
-          <template #icon-left><q-icon :name="outlinedDashboard" /></template>
           {{ t("menu.dashboard") }}
         </OToggleGroupItem>
         <OToggleGroupItem
           value="byUrl"
           size="sm"
           data-test="dashboard-drilldown-by-url-btn"
+          icon-left="link"
         >
-          <template #icon-left><q-icon name="link" /></template>
           {{ t("common.url") }}
         </OToggleGroupItem>
         <OToggleGroupItem
           value="logs"
           size="sm"
           data-test="dashboard-drilldown-by-logs-btn"
+          icon-left="search"
         >
-          <template #icon-left><q-icon name="search" /></template>
           {{ t("common.logs") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -244,8 +244,8 @@
                   })
               "
               data-test="dashboard-drilldown-add-variable"
+              icon-left="add"
             >
-              <template #icon-left><q-icon name="add" /></template>
               {{ t("common.add") }}
             </OButton>
           </div>
@@ -331,7 +331,6 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
-  outlinedDashboard,
   outlinedDelete,
 } from "@quasar/extras/material-icons-outlined";
 import { watch } from "vue";
@@ -842,7 +841,6 @@ export default defineComponent({
 
     return {
       t,
-      outlinedDashboard,
       dashboardPanelData,
       drilldownData,
       outlinedDelete,

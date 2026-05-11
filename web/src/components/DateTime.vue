@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hideRelative: disableRelative,
       }"
       :disabled="disable"
+      icon-left="schedule"
     >
-      <template #icon-left><q-icon name="schedule" /></template>
       <span class="date-time-label">{{ getDisplayValue }}</span>
       <template #icon-right
         ><q-icon name="arrow_drop_down" class="date-time-arrow"

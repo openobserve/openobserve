@@ -101,6 +101,11 @@ import VisibilityOff from "~icons/material-symbols-light/visibility-off-outline"
 import Warning from "~icons/material-symbols-light/warning-outline";
 import Workspaces from "~icons/material-symbols-light/workspaces-outline";
 import WorkspacePremium from "~icons/material-symbols-light/workspace-premium-outline";
+import UnfoldLess from "~icons/material-symbols-light/unfold-less";
+import Reorder from "~icons/material-symbols-light/reorder";
+import FirstPage from "~icons/material-symbols-light/first-page";
+import LastPage from "~icons/material-symbols-light/last-page";
+import Dashboard from "~icons/material-symbols-light/dashboard-outline";
 
 import type { Component } from "vue";
 
@@ -190,6 +195,11 @@ export const iconRegistry = {
   "warning": Warning,
   "workspaces": Workspaces,
   "workspace-premium": WorkspacePremium,
+  "unfold-less": UnfoldLess,
+  "reorder": Reorder,
+  "first-page": FirstPage,
+  "last-page": LastPage,
+  "dashboard": Dashboard,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

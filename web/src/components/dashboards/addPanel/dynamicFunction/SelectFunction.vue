@@ -151,8 +151,8 @@
                   size="icon"
                   @click="removeArgument(argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </div>
             </div>

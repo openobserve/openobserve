@@ -121,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-name-item-${nameLabel}-remove`"
             @click="removeMapName()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -244,8 +244,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
             @click="removeMapValue()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div

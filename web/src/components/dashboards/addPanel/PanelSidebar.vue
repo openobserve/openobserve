@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:rotate-90"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
+        icon-left="unfold-less"
       >
-        <template #icon-left><q-icon name="unfold_less" /></template>
       </OButton>
     </div>
     <q-separator style="margin-top: -1px; flex-shrink: 0" />

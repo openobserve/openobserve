@@ -167,8 +167,8 @@
               size="icon"
               @click="removeValueMappingByIndex(index)"
               :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </div>
         </div>

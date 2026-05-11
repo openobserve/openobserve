@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -1473,8 +1473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -1506,8 +1505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -1533,8 +1531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -1566,8 +1563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -1600,8 +1596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionValueTransformations") }}
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -1637,8 +1632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionFieldOverrides") }}
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -2247,13 +2241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.drilldown") }}
-          <OButton
-            variant="ghost"
-            size="icon"
-            data-test="dashboard-addpanel-config-drilldown-info"
-            @click.stop
-          >
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton`n            variant="ghost"`n            size="icon"`n            data-test="dashboard-addpanel-config-drilldown-info"`n            @click.stop`n            icon-left="info-outline"`n          >
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -2295,13 +2283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.comparisonAgainst") }}
-          <OButton
-            variant="ghost"
-            size="icon"
-            data-test="dashboard-addpanel-config-time-shift-info"
-            @click.stop
-          >
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton`n            variant="ghost"`n            size="icon"`n            data-test="dashboard-addpanel-config-time-shift-info"`n            @click.stop`n            icon-left="info-outline"`n          >
             <q-tooltip
               anchor="bottom middle"
               self="top middle"
@@ -2374,13 +2356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.markLines") }}
-          <OButton
-            variant="ghost"
-            size="icon"
-            data-test="dashboard-addpanel-config-markline-info"
-            @click.stop
-          >
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton`n            variant="ghost"`n            size="icon"`n            data-test="dashboard-addpanel-config-markline-info"`n            @click.stop`n            icon-left="info-outline"`n          >
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -3187,7 +3163,7 @@ export default defineComponent({
       { deep: true },
     );
     // When pivot mode activates: disable conflicting features and
-    // initialize pivot config values (undefined → false defaults).
+    // initialize pivot config values (undefined ? false defaults).
     // Without this, q-toggle shows undefined as OFF but conversion
     // may treat undefined differently — causing a mismatch.
     watch(

@@ -224,16 +224,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="props.data.queryType != 'sql'"
             data-test="dashboard-move-to-logs-module"
             @select="onLogPanel"
+            icon-left="search"
           >
-            <template #icon-left><q-icon name="search" size="16px" /></template>
             {{ t("panel.goToLogs") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
             data-test="dashboard-refresh-without-cache"
             @select="onPanelModifyClick('Refresh')"
+            icon-left="cached"
           >
-            <template #icon-left><q-icon name="cached" size="16px" /></template>
             Refresh Cache &amp; Reload
           </ODropdownItem>
           <ODropdownItem

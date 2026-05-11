@@ -104,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             class="tw:mr-2"
             @click="openBulkDeleteDialog"
+            icon-left="delete"
           >
-            <template #icon-left><q-icon name="delete" /></template>
             {{ t('common.delete') }}
           </OButton>
         </template>

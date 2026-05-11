@@ -117,8 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
             @click="removeLatitude()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -235,8 +235,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
             @click="removeLongitude()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -353,8 +353,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-weight-item-${weightLabel}-remove`"
             @click="removeWeight()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div

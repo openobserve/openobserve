@@ -489,8 +489,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           @click="openColumnOrderPopup"
           data-test="dashboard-config-column-order-button"
+          icon-left="reorder"
         >
-          <template #icon-left><q-icon name="reorder" /></template>
           {{ t(`dashboard.configureColumnOrder`) }}
         </OButton>
 

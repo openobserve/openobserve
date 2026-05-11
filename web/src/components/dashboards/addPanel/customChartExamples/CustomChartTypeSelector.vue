@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('dashboard.cancel')"
           @click.stop="closeDialog"
           data-test="custom-chart-type-selector-close"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
       </div>
     </q-card-section>

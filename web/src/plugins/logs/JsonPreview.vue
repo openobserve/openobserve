@@ -173,8 +173,8 @@
           <ODropdownItem
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
+            icon-left="visibility"
           >
-            <template #icon-left><q-icon name="visibility" size="16px" /></template>
             {{ addOrRemoveLabel(key) }}
           </ODropdownItem>
           <!-- Cross-link options -->
@@ -185,8 +185,8 @@
               :key="crossLink.name"
               :data-test="`log-details-cross-link-${crossLink.name}`"
               @select.stop="openCrossLink(crossLink.resolvedUrl)"
+              icon-left="open-in-new"
             >
-              <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
               {{ crossLink.name }}
             </ODropdownItem>
           </template>

@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isFirstPage"
         @click="$emit('firstPage')"
+        icon-left="first-page"
       >
-        <template #icon-left><q-icon name="first_page" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -55,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isFirstPage"
         @click="$emit('prevPage')"
+        icon-left="chevron-left"
       >
-        <template #icon-left><q-icon name="chevron_left" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -64,8 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isLastPage"
         @click="$emit('nextPage')"
+        icon-left="chevron-right"
       >
-        <template #icon-left><q-icon name="chevron_right" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -73,8 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isLastPage"
         @click="$emit('lastPage')"
+        icon-left="last-page"
       >
-        <template #icon-left><q-icon name="last_page" /></template>
       </OButton>
     </template>
   </div>

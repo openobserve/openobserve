@@ -113,8 +113,8 @@
             @click="toggleHavingFilter"
             v-if="!isHavingFilterVisible()"
             data-test="dynamic-function-popup-having-add-btn"
+            icon-left="add"
           >
-            <template #icon-left><q-icon name="add" /></template>
             Add
           </OButton>
         </div>
@@ -148,8 +148,8 @@
             size="icon"
             @click="cancelHavingFilter"
             data-test="dynamic-function-popup-having-cancel-btn"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </div>
       </div>

@@ -190,16 +190,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!searchObj.data.stream.selectedFields.includes(props.row.field.toString())"
                       data-test="log-details-include-field-btn"
                       @select="addFieldToTable(props.row.field.toString())"
+                      icon-left="visibility"
                     >
-                      <template #icon-left><q-icon name="visibility" size="16px" /></template>
                       {{ t("common.addFieldToTable") }}
                     </ODropdownItem>
                     <ODropdownItem
                       v-else
                       data-test="log-details-include-field-btn"
                       @select="addFieldToTable(props.row.field.toString())"
+                      icon-left="visibility-off"
                     >
-                      <template #icon-left><q-icon name="visibility_off" size="16px" /></template>
                       {{ t("common.removeFieldFromTable") }}
                     </ODropdownItem>
                     <!-- Cross-link options -->
@@ -210,8 +210,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="crossLink.name"
                         :data-test="`log-details-cross-link-${crossLink.name}`"
                         @select.stop="openCrossLink(crossLink.resolvedUrl)"
+                        icon-left="open-in-new"
                       >
-                        <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
                         {{ crossLink.name }}
                       </ODropdownItem>
                     </template>

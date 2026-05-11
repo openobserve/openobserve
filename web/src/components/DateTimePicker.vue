@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-cy="date-time-button"
     variant="outline"
     class="date-time-button"
+    icon-left="schedule"
   >
-    <template #icon-left><q-icon name="schedule" /></template>
     <span class="date-time-label">{{ displayValue }}</span>
     <template #icon-right
       ><q-icon name="arrow_drop_down" class="date-time-arrow"

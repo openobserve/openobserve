@@ -151,8 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-chip"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                   @click="removeXAxisItemByIndex(index)"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -332,8 +332,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-chip"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                   @click="removeBreakdownItemByIndex(index)"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -480,8 +480,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-chip"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
               @click="removeYAxisItemByIndex(index)"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </OButtonGroup>
         </div>
@@ -628,8 +628,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-chip"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                 @click="removeZAxisItemByIndex(index)"
+                icon-left="close"
               >
-                <template #icon-left><q-icon name="close" /></template>
               </OButton>
             </OButtonGroup>
           </div>

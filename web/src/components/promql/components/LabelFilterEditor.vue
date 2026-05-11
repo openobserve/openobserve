@@ -132,8 +132,8 @@
               size="icon-chip"
               @click="removeLabel(index)"
               :data-test="`promql-label-filter-remove-${index}`"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </OButtonGroup>
         </div>

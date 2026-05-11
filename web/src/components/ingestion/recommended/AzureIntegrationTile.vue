@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="!integration.hasDashboard"
         class="tw:flex-1"
         :data-test="`azure-${integration.id}-dashboard-btn`"
+        icon-left="dashboard"
       >
-        <template #icon-left><q-icon name="dashboard" /></template>
         Dashboard
       </OButton>
     </q-card-actions>
