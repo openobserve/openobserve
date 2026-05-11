@@ -118,6 +118,12 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     const page = await context.newPage();
 
     try {
+      // Navigate to base URL first so page.evaluate fetch calls have auth/CORS context
+      await page.goto(
+        `${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`,
+      );
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
       const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
       const org = getOrgIdentifier() || 'default';
       const authToken = Buffer.from(

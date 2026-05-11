@@ -1629,9 +1629,9 @@ export class AlertCreationWizard {
         // The outer flex container holds both the label div and controls div as siblings
         const promqlConditionRow = promqlConditionLabel.locator('..');
 
-        // Select operator — click the inner control area for proper q-select popup
+        // Select operator — force-click to bypass any remaining Monaco editor portal overlay
         const promqlOperatorSelect = promqlConditionRow.locator('.q-select').first();
-        await promqlOperatorSelect.locator('.q-field__control').click({ timeout: 10000 });
+        await promqlOperatorSelect.locator('.q-field__control').click({ force: true, timeout: 10000 });
         await this.page.waitForTimeout(800);
         // Pick operator from the now-visible q-menu popup
         const visibleMenu = this.page.locator('.q-menu:visible');
