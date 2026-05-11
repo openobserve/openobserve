@@ -2971,17 +2971,24 @@ export class AlertsPage {
     }
 
     /**
+     * Click the Continue button once to advance to the next wizard step
+     */
+    async clickContinueButton() {
+        const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
+        await expect(continueBtn).toBeVisible({ timeout: 10000 });
+        await continueBtn.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked Continue button');
+    }
+
+    /**
      * Navigate through wizard steps by clicking Continue button multiple times
      * @param {number} times - Number of times to click Continue
      */
     async navigateThroughWizardSteps(times = 5) {
         for (let i = 0; i < times; i++) {
-            const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
-            if (await continueBtn.isVisible({ timeout: 2000 })) {
-                await continueBtn.click();
-                await this.page.waitForTimeout(500);
-                testLogger.info('Clicked Continue button', { step: i + 1 });
-            }
+            await this.clickContinueButton();
+            testLogger.info('Clicked Continue button', { step: i + 1 });
         }
     }
 

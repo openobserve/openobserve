@@ -59,39 +59,12 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await pm.alertsPage.fillAlertName(alertName);
 
     // Select stream type first (enables stream name dropdown)
-    const streamTypeDropdown = page.locator(pm.alertsPage.streamTypeDropdown);
-    if (await streamTypeDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await streamTypeDropdown.click();
-      const logsOption = page.getByRole('option', { name: 'Logs' }).first();
-      if (await logsOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await logsOption.click();
-        testLogger.info('✓ Selected stream type: Logs');
-      }
-      await page.waitForTimeout(500);
-    }
+    await pm.alertsPage.selectStreamType('logs');
+    testLogger.info('✓ Selected stream type: Logs');
 
-    // Select stream name (enabled after stream type is chosen).
-    // Type into the q-select to filter, then pick e2e_automate.
-    const streamNameDropdown = page.locator(pm.alertsPage.streamNameDropdown);
-    if (await streamNameDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await streamNameDropdown.click();
-      await streamNameDropdown.fill('e2e_automate');
-      // Wait for options to filter
-      await page.waitForTimeout(1000);
-
-      const e2eOption = page.getByRole('option', { name: 'e2e_automate' }).first();
-      if (await e2eOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await e2eOption.click();
-        testLogger.info('✓ Selected stream: e2e_automate');
-      } else {
-        const firstOption = page.getByRole('option').first();
-        if (await firstOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await firstOption.click();
-          testLogger.info('✓ Selected first available stream');
-        }
-      }
-      await page.waitForTimeout(500);
-    }
+    // Select stream name using page object (handles dropdown click, keyboard filter, selection)
+    await pm.alertsPage.selectStreamByName('e2e_automate');
+    testLogger.info('✓ Selected stream: e2e_automate');
 
     // Add a condition
     const addConditionBtn = page.locator(pm.alertsPage.addConditionButton);
