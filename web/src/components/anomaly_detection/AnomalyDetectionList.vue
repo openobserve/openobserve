@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-table>
 
     <!-- Confirm delete dialog -->
-    <ODialog
+    <ODialog data-test="anomaly-detection-list-delete-dialog"
       v-model:open="showDeleteDialog"
       persistent
       size="xs"
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Confirm cancel training dialog -->
-    <ODialog
+    <ODialog data-test="anomaly-detection-list-cancel-training-dialog"
       v-model:open="showCancelTrainingDialog"
       persistent
       size="xs"
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Confirm retrain dialog -->
-    <ODialog
+    <ODialog data-test="anomaly-detection-list-retrain-dialog"
       v-model:open="showRetrainDialog"
       persistent
       size="sm"

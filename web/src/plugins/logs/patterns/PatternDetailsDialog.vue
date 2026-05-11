@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <ODrawer
+    <ODrawer data-test="pattern-details-dialog"
     :open="modelValue"
     @update:open="$emit('update:modelValue', $event)"
     :width="90"

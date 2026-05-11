@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ODrawer
+  <ODrawer data-test="add-role-dialog"
     :open="open"
     :width="30"
     :title="t('iam.addRole')"

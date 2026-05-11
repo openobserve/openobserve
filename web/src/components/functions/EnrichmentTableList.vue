@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- URL Jobs Dialog -->
-    <ODrawer
+    <ODrawer data-test="enrichment-table-list-url-jobs-drawer"
       v-model:open="showUrlJobsDialogState"
       size="lg"
     >

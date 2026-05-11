@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-icon name="add" />
     </OButton>
-    <ODrawer
+    <ODrawer data-test="inline-select-folder-dropdown-dialog"
       v-model:open="showDialog"
       :width="30"
       :show-close="false"

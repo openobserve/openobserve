@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     v-model:open="open"
+    data-test="resume-pipeline-dialog"
     size="sm"
     title="Resume Pipeline Ingestion"
     :sub-title="lastPausedAt ? `Last paused: ${convertUnixToQuasarFormat(lastPausedAt)}` : undefined"

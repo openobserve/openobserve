@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Extend Trial Dialog -->
-    <ODialog
+    <ODialog data-test="organization-management-extend-trial-dialog"
       v-model:open="extendTrialPrompt"
       size="sm"
       :title="`Extend Trial for ${extendTrialDataRow?.name}`"
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- External Contract Dialog -->
-    <ODialog
+    <ODialog data-test="organization-management-contract-dialog"
       v-model:open="contractPrompt"
       size="sm"
       :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"

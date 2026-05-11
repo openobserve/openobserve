@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
-    <ODialog v-model:open="confirmForceDelete" persistent size="md"
+    <ODialog data-test="function-list-force-delete-dialog" v-model:open="confirmForceDelete" persistent size="md"
       :title="`Pipelines Associated with ${selectedDelete?.name}`"
     >
       <div

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="add-update-organization-dialog"
     :open="open"
     size="lg"
     :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"

@@ -781,7 +781,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
-    <ODrawer v-model:open="showPricingDialog" :width="30" title="Hello">
+    <ODrawer data-test="model-pricing-list-pricing-drawer" v-model:open="showPricingDialog" :width="30" title="Hello">
       <!-- #header-left: source icon is conditional (3 variants) with tooltips — cannot be expressed as a simple prop -->
       <template #header-left>
         <span

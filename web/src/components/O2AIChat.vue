@@ -176,7 +176,7 @@
       <q-separator class="tw:bg-[#DBDBDB]" />
 
       <!-- History Panel -->
-      <ODrawer v-model:open="showHistory" size="sm" title="Chat History">
+      <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
         <q-list separator>
           <q-item
             v-for="chat in chatHistory"
@@ -199,7 +199,7 @@
       </ODrawer>
 
       <!-- Edit Title Dialog -->
-      <ODialog
+      <ODialog data-test="o2-ai-chat-edit-title-dialog"
         v-model:open="showEditTitleDialog"
         size="sm"
         title="Edit Chat Title"
@@ -238,7 +238,7 @@
 
 
       <!-- Image Preview Dialog -->
-      <ODialog v-model:open="showImagePreview" @update:open="(v) => !v && closeImagePreview()" size="lg" :title="previewImage?.filename">
+      <ODialog data-test="o2-ai-chat-image-preview-dialog" v-model:open="showImagePreview" @update:open="(v) => !v && closeImagePreview()" size="lg" :title="previewImage?.filename">
         <div class="tw:flex tw:justify-center">
           <img
             v-if="previewImage"

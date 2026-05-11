@@ -840,7 +840,7 @@ size="14px"
     </div>
 
     <!-- Filters Sidebar -->
-    <ODrawer
+    <ODrawer data-test="trace-details-filter-popover-drawer"
       v-model:open="showFilterPopover"
       :width="30"
       :title="t('traces.traceFilters')"

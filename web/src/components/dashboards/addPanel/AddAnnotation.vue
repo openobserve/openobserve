@@ -1,5 +1,5 @@
 <template>
-  <ODialog v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
+  <ODialog data-test="add-annotation-dialog" v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
     <div class="q-pa-md">
         <q-input
           v-model="annotationData.title"
@@ -100,7 +100,7 @@
       </div>
     </template>
 
-    <ODialog
+    <ODialog data-test="add-annotation-delete-confirm-dialog"
       v-model:open="showDeleteConfirm"
       size="xs"
       title="Confirm Delete"

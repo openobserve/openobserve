@@ -117,7 +117,7 @@
     </div>
 
     <!-- Query Preview Dialog -->
-    <ODialog
+    <ODialog data-test="correlation-demo-query-dialog"
       v-model:open="showQueryDialog"
       size="md"
       title="Generated Query"

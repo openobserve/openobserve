@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
-        <ODialog v-model:open="showVariablesDependenciesGraphPopUp" :width="60" title="Variables Dependency Graph">
+        <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" title="Variables Dependency Graph">
           <div style="height: 60vh">
             <VariablesDependenciesGraph
               :variablesList="dashboardVariablesList"

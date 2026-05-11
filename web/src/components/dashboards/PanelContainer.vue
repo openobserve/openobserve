@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <QueryInspector :metaData="metaData" :data="props.data" @close="showViewPanel = false"></QueryInspector>
     </ODialog>
 
-    <ODialog v-model:open="showLegendsDialog" :show-close="false" size="lg">
+    <ODialog data-test="panel-container-legends-dialog" v-model:open="showLegendsDialog" :show-close="false" size="lg">
       <ShowLegendsPopup
         :panelData="currentPanelData"
         @close="showLegendsDialog = false"

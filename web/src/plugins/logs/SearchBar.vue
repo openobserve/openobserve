@@ -1571,7 +1571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <ODialog
+    <ODialog data-test="search-bar-confirm-dialog"
       ref="confirmDialog"
       v-model:open="confirmDialogVisible"
       size="xs"
@@ -1583,7 +1583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>{{ confirmMessage }}</p>
     </ODialog>
 
-    <ODialog
+    <ODialog data-test="search-bar-confirm-saved-view-dialog"
       ref="confirmSavedViewDialog"
       v-model:open="confirmSavedViewDialogVisible"
       size="xs"
@@ -1594,7 +1594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ confirmMessageSavedView }}</p>
     </ODialog>
-    <ODialog
+    <ODialog data-test="search-bar-custom-download-dialog"
       v-model:open="customDownloadDialog"
       size="md"
       title="Custom Download"
@@ -1651,7 +1651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButtonGroup>
       </div>
     </ODialog>
-    <ODialog
+    <ODialog data-test="search-bar-store-state-saved-view-dialog"
       v-model:open="store.state.savedViewDialog"
       size="md"
       :title="t('search.savedViewsLabel')"
@@ -1700,7 +1700,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
-    <ODialog
+    <ODialog data-test="search-bar-store-state-saved-function-dialog"
       v-model:open="store.state.savedFunctionDialog"
       size="md"
       :title="t('search.functionPlaceholder')"
@@ -1761,7 +1761,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
-    <ODialog
+    <ODialog data-test="search-bar-search-scheduler-job-dialog"
       v-model:open="searchSchedulerJob"
       size="md"
       :title="t('search.scheduleSearchJob')"
@@ -1813,7 +1813,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Search Inspect Dialog -->
-    <ODialog
+    <ODialog data-test="search-bar-search-inspect-dialog"
       v-model:open="searchInspectDialog"
       size="sm"
       title="Search Inspect"

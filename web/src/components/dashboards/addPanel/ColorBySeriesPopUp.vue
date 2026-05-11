@@ -15,7 +15,7 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <ODialog
+  <ODialog data-test="color-by-series-popup-dialog"
     :open="open"
     @update:open="(v) => { if (!v) cancelEdit(); }"
     title="Color by series"

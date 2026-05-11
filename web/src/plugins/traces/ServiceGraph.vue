@@ -250,7 +250,7 @@
   </q-card>
 
   <!-- Enhanced Settings Dialog -->
-  <ODialog
+  <ODialog data-test="service-graph-settings-dialog"
     v-model:open="showSettings"
     size="sm"
     title="Service Graph Settings"

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog
+  <ODialog data-test="custom-chart-confirm-dialog"
     v-model:open="open"
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"

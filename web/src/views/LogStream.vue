@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @streamAdded="getLogStream"
     />
 
-    <ODialog
+    <ODialog data-test="log-stream-delete-dialog"
       v-model:open="confirmDelete"
       size="sm"
       :title="t('logStream.confirmDeleteHead')"
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODialog>
 
-    <ODialog
+    <ODialog data-test="log-stream-batch-delete-dialog"
       v-model:open="confirmBatchDelete"
       size="sm"
       :title="t('logStream.confirmBatchDeleteHead')"

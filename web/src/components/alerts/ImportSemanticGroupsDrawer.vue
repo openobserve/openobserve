@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- Group Details Dialog -->
-  <ODialog
+  <ODialog data-test="import-semantic-groups-drawer-group-dialog"
     v-model:open="showGroupDialog"
     size="md"
     :title="selectedGroup?.display"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <ODialog
+  <ODialog data-test="import-semantic-groups-drawer-modification-dialog"
     v-model:open="showModificationDialog"
     size="lg"
     :title="selectedModification?.proposed.display"

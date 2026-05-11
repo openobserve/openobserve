@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="predefined-themes-drawer"
     v-model:open="dialogOpen"
     size="sm"
     seamless
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
     <!-- Color Picker Dialog -->
-    <ODialog
+    <ODialog data-test="predefined-themes-color-picker-dialog"
       v-model:open="showColorPicker"
       size="sm"
       title="Pick Custom Color"

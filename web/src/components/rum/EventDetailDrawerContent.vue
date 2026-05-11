@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="event-detail-drawer"
     :open="open"
     size="lg"
     @update:open="emit('update:open', $event)"

@@ -1,5 +1,5 @@
 <template>
-  <ODialog
+  <ODialog data-test="override-config-popup-dialog"
     :open="open"
     @update:open="(v) => { if (!v) closePopup() }"
     :title="t('dashboard.overrideConfigTitle')"

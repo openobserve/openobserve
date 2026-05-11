@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog v-model:open="showDialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
+  <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
     <div class="enterprise-dialog-v3">
       <!-- Close Button -->
       <div class="close-btn-top-right">

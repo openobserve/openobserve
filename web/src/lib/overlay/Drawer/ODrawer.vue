@@ -250,6 +250,7 @@ watch(internalOpen, (open) => {
       <!-- Drawer panel -->
       <DialogContent
         data-o2-drawer
+        data-test="o-drawer-panel"
         :style="contentStyle"
         :class="[
           // Full-height, anchored to chosen edge
@@ -343,6 +344,7 @@ watch(internalOpen, (open) => {
             <button
               type="button"
               aria-label="Close drawer"
+              data-test="o-drawer-close-btn"
               @mousedown.prevent
               :class="[
                 'tw:shrink-0 tw:flex tw:items-center tw:justify-center',
@@ -411,6 +413,7 @@ watch(internalOpen, (open) => {
             <div>
               <OButton
                 v-if="neutralButtonLabel"
+                data-test="o-drawer-neutral-btn"
                 :variant="neutralButtonVariant"
                 size="sm-action"
                 :disabled="neutralEffectivelyDisabled"
@@ -425,6 +428,7 @@ watch(internalOpen, (open) => {
             <div class="tw:flex tw:items-center tw:gap-2">
               <OButton
                 v-if="secondaryButtonLabel"
+                data-test="o-drawer-secondary-btn"
                 :variant="secondaryButtonVariant"
                 size="sm-action"
                 :disabled="secondaryEffectivelyDisabled"
@@ -437,6 +441,7 @@ watch(internalOpen, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
+                data-test="o-drawer-primary-btn"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :disabled="primaryEffectivelyDisabled"

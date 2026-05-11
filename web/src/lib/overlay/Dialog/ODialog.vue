@@ -242,6 +242,7 @@ watch(internalOpen, (open) => {
       <!-- Dialog panel -->
       <DialogContent
         data-o2-dialog
+        data-test="o-dialog-panel"
         :style="contentStyle"
         :class="[
           // Positioning — centered in viewport
@@ -338,6 +339,7 @@ watch(internalOpen, (open) => {
             <button
               type="button"
               aria-label="Close dialog"
+              data-test="o-dialog-close-btn"
               @mousedown.prevent
               :class="[
                 'tw:shrink-0 tw:flex tw:items-center tw:justify-center',
@@ -407,6 +409,7 @@ watch(internalOpen, (open) => {
             <div>
               <OButton
                 v-if="neutralButtonLabel"
+                data-test="o-dialog-neutral-btn"
                 :variant="neutralButtonVariant"
                 size="sm-action"
                 :disabled="neutralEffectivelyDisabled"
@@ -421,6 +424,7 @@ watch(internalOpen, (open) => {
             <div class="tw:flex tw:items-center tw:gap-2">
               <OButton
                 v-if="secondaryButtonLabel"
+                data-test="o-dialog-secondary-btn"
                 :variant="secondaryButtonVariant"
                 size="sm-action"
                 :disabled="secondaryEffectivelyDisabled"
@@ -433,6 +437,7 @@ watch(internalOpen, (open) => {
               <OButton
                 v-if="primaryButtonLabel"
                 ref="primaryBtnRef"
+                data-test="o-dialog-primary-btn"
                 :variant="primaryButtonVariant"
                 size="sm-action"
                 :disabled="primaryEffectivelyDisabled"

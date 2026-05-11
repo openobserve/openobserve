@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <ODialog
+    <ODialog data-test="invitation-list-accept-dialog"
       v-model:open="confirmAccept"
       size="xs"
       :title="t('invitation.confirmAcceptHead')"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>{{ t('invitation.confirmAcceptMsg', { org: selectedInvitation?.org_name }) }}</p>
     </ODialog>
 
-    <ODialog
+    <ODialog data-test="invitation-list-reject-dialog"
       v-model:open="confirmReject"
       size="xs"
       :title="t('invitation.confirmRejectHead')"

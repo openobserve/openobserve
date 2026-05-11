@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODrawer>
 
   <!-- Confirmation Dialog for Delete Before Backfill -->
-  <ODialog v-model:open="showDeleteConfirmation" persistent size="sm"
+  <ODialog data-test="create-backfill-job-delete-confirmation-dialog" v-model:open="showDeleteConfirmation" persistent size="sm"
     title="Confirm Data Deletion"
     secondary-button-label="Cancel"
     primary-button-label="Yes, Delete and Backfill"

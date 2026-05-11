@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <ODrawer
+  <ODrawer data-test="pipeline-editor-config-drawer"
     v-model:open="pipelineObj.dialog.show"
     size="xl"
     :show-close="false"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
   </ODrawer>
-  <ODrawer
+  <ODrawer data-test="pipeline-editor-json-editor-drawer"
     v-model:open="showJsonEditorDialog"
     size="lg"
     :show-close="false"

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="panel-layout-settings-drawer"
     :open="open"
     size="sm"
     :title="t('panel.layout')"

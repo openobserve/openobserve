@@ -446,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
   </div>
 
-  <ODrawer
+  <ODrawer data-test="add-alert-json-editor-drawer"
     v-model:open="showJsonEditorDialog"
     size="lg"
     persistent

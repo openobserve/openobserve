@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="addMember"
     />
 
-    <ODialog
+    <ODialog data-test="user-delete-dialog"
       v-model:open="confirmDelete"
       size="xs"
       :title="t('user.confirmDeleteHead')"
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>{{ t('user.confirmDeleteMsg') }}</p>
     </ODialog>
 
-    <ODialog
+    <ODialog data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
       size="xs"
       title="Revoke Invitation"
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</p>
     </ODialog>
 
-    <ODialog
+    <ODialog data-test="user-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
       size="xs"
       title="Delete Users"

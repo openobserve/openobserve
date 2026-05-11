@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" title="Index Fields Detected"
+  <ODialog data-test="performance-fields-dialog" :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" title="Index Fields Detected"
     secondary-button-label="Skip"
     primary-button-label="Add Fields"
     @click:secondary="$emit('skip')"

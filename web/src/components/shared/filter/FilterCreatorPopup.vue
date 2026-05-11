@@ -1,5 +1,5 @@
 <template>
-  <ODialog v-model:open="show" size="sm" :title="fieldName"
+  <ODialog data-test="filter-creator-popup-dialog" v-model:open="show" size="sm" :title="fieldName"
     :secondary-button-label="t('common.cancel')"
     :primary-button-label="t('common.apply')"
     @click:secondary="show = false"
