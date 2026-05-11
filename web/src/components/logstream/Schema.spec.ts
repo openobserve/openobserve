@@ -65,6 +65,8 @@ const ODrawerStub = {
       :data-show-close="String(!!showClose)"
     >
       <slot name="header" />
+      <slot name="header-left" />
+      <slot name="header-right" />
       <slot />
       <slot name="footer" />
       <button
@@ -1296,10 +1298,9 @@ describe("Schema Component Tests", async () => {
       expect(drawers[0].props("open")).toBe(true);
     });
 
-    it("should mount the schema ODrawer with width=60 and showClose=false", () => {
+    it("should mount the schema ODrawer with width=60", () => {
       const drawers = w.findAllComponents(ODrawerStub);
       expect(drawers[0].props("width")).toBe(60);
-      expect(drawers[0].props("showClose")).toBe(false);
     });
 
     it("should mount the pattern association ODrawer with size=lg and showClose=false", () => {
@@ -1321,12 +1322,9 @@ describe("Schema Component Tests", async () => {
       expect(emitted[emitted.length - 1]).toEqual([false]);
     });
 
-    it("should emit update:open=false when the header close button is clicked", async () => {
-      // Header slot renders a custom OButton with X icon that emits update:open=false
-      const closeBtn = w.find('[data-test="schema-title-text"]')
-        .element.parentElement?.parentElement?.querySelector("button");
-      expect(closeBtn).toBeTruthy();
-      closeBtn!.click();
+    it("should emit update:open=false when the ODrawer close button is clicked", async () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      await drawers[0].find('[data-test="o-drawer-stub-close"]').trigger("click");
       await flushPromises();
       const emitted = w.emitted("update:open");
       expect(emitted).toBeTruthy();
