@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SwitchProps, SwitchEmits, SwitchSlots } from "./OSwitch.types";
-import { computed, ref, watch } from "vue";
+import { computed, ref, useId, useSlots, watch } from "vue";
 
 const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
@@ -74,6 +74,12 @@ const labelSize: Record<NonNullable<SwitchProps["size"]>, string> = {
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
+
+const slots = useSlots();
+const autoId = useId();
+const buttonId = computed(() => props.id ?? autoId);
+const labelId = computed(() => `${buttonId.value}-label`);
+const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
 </script>
 
 <template>
@@ -83,14 +89,16 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
       labelPosition === 'left' ? 'tw:flex-row-reverse' : 'tw:flex-row',
       disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
+    @click="toggle"
   >
     <!-- Plain button — avoids reka-ui controlled-component timing issues -->
     <button
-      :id="id"
+      :id="buttonId"
       :name="name"
       type="button"
       role="switch"
       :aria-checked="isChecked"
+      :aria-labelledby="hasLabel ? labelId : undefined"
       :data-state="isChecked ? 'checked' : 'unchecked'"
       :disabled="disabled"
       :class="[
@@ -108,7 +116,6 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
         'tw:focus-visible:ring-2 tw:focus-visible:ring-switch-focus-ring',
         'tw:transition-colors tw:duration-200',
       ]"
-      @click="toggle"
     >
       <span
         :class="[
@@ -122,13 +129,13 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
     </button>
 
     <span
-      v-if="$slots.label || label"
+      v-if="hasLabel"
+      :id="labelId"
       :class="[
         labelSize[size ?? 'md'],
         'tw:select-none tw:leading-none',
         disabled ? 'tw:text-switch-label-disabled' : 'tw:text-switch-label',
       ]"
-      @click="toggle"
     >
       <slot name="label">{{ label }}</slot>
     </span>
