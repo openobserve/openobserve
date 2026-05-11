@@ -16,11 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover"
+    class="tw:flex tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover tw:relative"
     :class="wrap ? 'tw:items-start' : 'tw:items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
+    <!-- Status level left border -->
+    <div
+      class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+      :style="{ backgroundColor: statusColor }"
+    />
     <!-- Pattern Column -->
     <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:px-2">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
@@ -139,6 +144,7 @@ import {
   wildcardChipColor,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
+import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
 import useWildcardHover from "./useWildcardHover";
 
 const props = defineProps<{
@@ -163,6 +169,12 @@ const templateTokens = computed(() =>
 );
 
 const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
+
+const isDark = computed(() => store.state.theme === "dark");
+
+const statusColor = computed(() =>
+  extractStatusFromTemplate(props.pattern.template ?? "", isDark.value).color,
+);
 </script>
 
 <style scoped lang="scss">
