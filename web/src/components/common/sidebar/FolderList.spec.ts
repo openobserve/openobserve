@@ -12,6 +12,66 @@ installQuasar({
   plugins: [Dialog, Notify],
 })
 
+// AddFolder stub — after the q-dialog -> ODrawer migration, AddFolder owns
+// the overlay surface itself via v-model:open. This stub mirrors the public
+// prop/emit shape FolderList relies on so the parent dialog open/close logic
+// can be tested without rendering the real drawer internals.
+const AddFolderStub = {
+  name: 'AddFolder',
+  props: {
+    open: { type: Boolean, default: false },
+    editMode: { type: Boolean, default: false },
+    folderId: { type: String, default: 'default' },
+    type: { type: String, default: 'alerts' },
+  },
+  emits: ['update:open', 'update:modelValue'],
+  template: `
+    <div
+      data-test="add-folder-stub"
+      :data-open="String(open)"
+      :data-edit-mode="String(editMode)"
+      :data-folder-id="folderId"
+      :data-type="type"
+    >
+      <button
+        data-test="add-folder-stub-close"
+        @click="$emit('update:open', false)"
+      >close</button>
+      <button
+        data-test="add-folder-stub-submit"
+        @click="$emit('update:modelValue', [{ folderId: 'stub-folder', name: 'Stub Folder' }])"
+      >submit</button>
+    </div>
+  `,
+}
+
+// ConfirmDialog stub — keeps the data-test surface that the original spec
+// asserted against, while exposing update:ok / update:cancel emits.
+const ConfirmDialogStub = {
+  name: 'ConfirmDialog',
+  props: {
+    modelValue: { type: Boolean, default: false },
+    title: { type: String, default: '' },
+    message: { type: String, default: '' },
+  },
+  emits: ['update:ok', 'update:cancel', 'update:modelValue'],
+  template: `
+    <div
+      data-test="dashboard-confirm-delete-folder-dialog"
+      :data-open="String(modelValue)"
+    >
+      <button
+        data-test="confirm-dialog-stub-ok"
+        @click="$emit('update:ok')"
+      >ok</button>
+      <button
+        data-test="confirm-dialog-stub-cancel"
+        @click="$emit('update:cancel')"
+      >cancel</button>
+    </div>
+  `,
+}
+
 // Mock the external dependencies
 vi.mock('vue-router')
 vi.mock('@/services/dashboards')
