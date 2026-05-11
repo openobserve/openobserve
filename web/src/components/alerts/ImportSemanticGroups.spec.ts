@@ -52,6 +52,50 @@ vi.mock("@/services/alerts", () => ({
 import ImportSemanticGroups from "@/components/alerts/ImportSemanticGroups.vue";
 import alertsService from "@/services/alerts";
 
+const ODialogStub = {
+  name: "ODialog",
+  template: `
+    <div
+      v-if="open"
+      :data-test="'o-dialog-stub'"
+      :data-title="title"
+      :data-sub-title="subTitle"
+      :data-size="size"
+      :data-primary-label="primaryButtonLabel"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button data-test="o-dialog-primary" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button data-test="o-dialog-secondary" @click="$emit('click:secondary')">secondary</button>
+      <button data-test="o-dialog-neutral" @click="$emit('click:neutral')">neutral</button>
+      <button data-test="o-dialog-close" @click="$emit('update:open', false)">close</button>
+    </div>
+  `,
+  props: [
+    "open",
+    "persistent",
+    "size",
+    "title",
+    "subTitle",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+};
+
 async function mountComp(props: Record<string, any> = {}) {
   return mount(ImportSemanticGroups, {
     props,
@@ -67,6 +111,7 @@ async function mountComp(props: Record<string, any> = {}) {
           props: ["title", "testPrefix", "isImporting", "showSplitter", "editorHeights"],
           emits: ["back", "cancel", "import", "update:jsonArray"],
         },
+        ODialog: ODialogStub,
       },
     },
   });
@@ -325,6 +370,75 @@ describe("ImportSemanticGroups - handleBack", () => {
     const w = await mountComp();
     (w.vm as any).handleBack();
     expect(mockBack).toHaveBeenCalled();
+  });
+});
+
+describe("ImportSemanticGroups - ODialog integration", () => {
+  it("group details dialog is hidden by default", async () => {
+    const w = await mountComp();
+    const dialogs = w.findAll('[data-test="o-dialog-stub"]');
+    expect(dialogs.length).toBe(0);
+  });
+
+  it("opens group details ODialog when viewGroup is called", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewGroup(mockDiffData.additions[0]);
+    await flushPromises();
+    const dialogs = w.findAll('[data-test="o-dialog-stub"]');
+    expect(dialogs.length).toBe(1);
+    expect(dialogs[0].attributes("data-title")).toBe("New Group 1");
+    expect(dialogs[0].attributes("data-sub-title")).toBe("ID: add-1");
+    expect(dialogs[0].attributes("data-size")).toBe("md");
+    expect(dialogs[0].attributes("data-primary-label")).toBe("Close");
+  });
+
+  it("opens modification ODialog when viewModification is called", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewModification(mockDiffData.modifications[0]);
+    await flushPromises();
+    const dialogs = w.findAll('[data-test="o-dialog-stub"]');
+    expect(dialogs.length).toBe(1);
+    expect(dialogs[0].attributes("data-title")).toBe("Updated Group");
+    expect(dialogs[0].attributes("data-sub-title")).toBe("Compare Changes");
+    expect(dialogs[0].attributes("data-size")).toBe("lg");
+  });
+
+  it("closes group details ODialog when primary button is clicked", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewGroup(mockDiffData.additions[0]);
+    await flushPromises();
+    expect((w.vm as any).showGroupDialog).toBe(true);
+    await w.find('[data-test="o-dialog-primary"]').trigger("click");
+    await flushPromises();
+    expect((w.vm as any).showGroupDialog).toBe(false);
+  });
+
+  it("closes modification ODialog when primary button is clicked", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewModification(mockDiffData.modifications[0]);
+    await flushPromises();
+    expect((w.vm as any).showModificationDialog).toBe(true);
+    await w.find('[data-test="o-dialog-primary"]').trigger("click");
+    await flushPromises();
+    expect((w.vm as any).showModificationDialog).toBe(false);
+  });
+
+  it("closes group details ODialog via update:open emit", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewGroup(mockDiffData.additions[0]);
+    await flushPromises();
+    await w.find('[data-test="o-dialog-close"]').trigger("click");
+    await flushPromises();
+    expect((w.vm as any).showGroupDialog).toBe(false);
+  });
+
+  it("closes modification ODialog via update:open emit", async () => {
+    const w = await mountComp();
+    (w.vm as any).viewModification(mockDiffData.modifications[0]);
+    await flushPromises();
+    await w.find('[data-test="o-dialog-close"]').trigger("click");
+    await flushPromises();
+    expect((w.vm as any).showModificationDialog).toBe(false);
   });
 });
 
