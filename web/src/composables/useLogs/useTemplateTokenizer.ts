@@ -100,18 +100,192 @@ export function tokenizeTemplate(
  * Return Tailwind/Quasar CSS classes for a wildcard chip based on the token
  * type so different data types are colour-coded at a glance.
  *
- *  <*>           → blue   (generic XDrain wildcard)
- *  <:IP*>        → green  (IP addresses)
- *  <:NUM*> etc.  → orange (numbers)
- *  <:TIMESTAMP*> → purple (timestamps / dates)
- *  anything else → grey
+ * When the token is generic <*> and sampleValues are provided the function
+ * infers the data type from the actual values and picks the colour
+ * accordingly, matching the behaviour of wildcardLabel().
+ *
+ *  <*> + values   → colour based on inferred type
+ *  <*> no values   → blue   (generic wildcard)
+ *  <:IP*>          → green  (IP addresses)
+ *  <:NUM*> etc.    → orange (numbers)
+ *  <:TIMESTAMP*>   → purple (timestamps / dates)
+ *  anything else   → grey
  */
-export function wildcardChipColor(token: string): string {
+export function wildcardChipColor(token: string, sampleValues?: any[]): string {
+  // For generic <*>, infer type from values and pick the matching colour
+  if (token === "<*>" && sampleValues && sampleValues.length > 0) {
+    const label = inferTypeFromValues(sampleValues);
+    return chipColorForLabel(label);
+  }
+
   if (token === "<*>") return "bg-blue-2 text-blue-9";
   if (/^<:IP/.test(token)) return "bg-green-2 text-green-9";
   if (/^<:(?:NUM|INT|FLOAT|HEX)/.test(token)) return "bg-orange-2 text-orange-9";
   if (/^<:(?:TIMESTAMP|DATE|TIME)/.test(token)) return "bg-purple-2 text-purple-9";
   return "bg-grey-3 text-grey-8";
+}
+
+/**
+ * Map a display label (as returned by wildcardLabel) to a fixed chip colour
+ * class so every data type has a visually distinct, predictable appearance.
+ *
+ *  ip      → green        method  → red          url     → indigo
+ *  num     → orange       float   → orange       hex     → amber
+ *  ts      → purple       date    → purple       time    → purple
+ *  id      → teal         email   → pink         str     → grey
+ *  pattern → blue         default → grey
+ */
+export function chipColorForLabel(label: string): string {
+  const colorMap: Record<string, string> = {
+    ip: "bg-green-2 text-green-9",
+    ipv4: "bg-green-2 text-green-9",
+    ipv6: "bg-green-2 text-green-9",
+    method: "bg-red-2 text-red-9",
+    url: "bg-indigo-2 text-indigo-9",
+    num: "bg-orange-2 text-orange-9",
+    float: "bg-orange-2 text-orange-9",
+    hex: "bg-amber-2 text-amber-9",
+    ts: "bg-purple-2 text-purple-9",
+    date: "bg-purple-2 text-purple-9",
+    time: "bg-purple-2 text-purple-9",
+    id: "bg-teal-2 text-teal-9",
+    email: "bg-pink-2 text-pink-9",
+    str: "bg-grey-3 text-grey-8",
+    pattern: "bg-blue-2 text-blue-9",
+  };
+  return colorMap[label] ?? "bg-grey-3 text-grey-8";
+}
+
+/**
+ * Map a wildcard token to a short, human-readable label.
+ *
+ * For typed tokens like <:IP>, <:NUM> etc. the mapping is static.
+ * For generic <*>, when sampleValues are provided, the function inspects
+ * the actual values to infer the most likely data type (ip, method, url,
+ * num, ts, str). Falls back to "str" when no type matches, or "pattern" when
+ * values contain template wildcards like <*>.
+ *  <*> + values   → inferred type (ip, method, url, num, float, hex, ts, id, str), pattern if template-like
+ *  <*> no values   → "<*>"
+ *  <:IP>           → "ip"
+ *  <:IPV4>         → "ipv4"
+ *  <:IPV6>         → "ipv6"
+ *  <:NUM>          → "num"
+ *  <:INT>          → "num"
+ *  <:FLOAT>        → "float"
+ *  <:HEX>          → "hex"
+ *  <:TIMESTAMP>    → "ts"
+ *  <:DATE>         → "date"
+ *  <:TIME>         → "time"
+ *  <:STR>          → "str"
+ *  <:URL>          → "url"
+ *  <:METHOD>       → "method"
+ *  <:IDENTIFIERS>  → "id"
+ *  anything else   → token as-is
+ */
+export function wildcardLabel(token: string, sampleValues?: any[]): string {
+  // For generic <*>, try to infer the type from actual values
+  if (token === "<*>" && sampleValues && sampleValues.length > 0) {
+    return inferTypeFromValues(sampleValues);
+  }
+
+  const labelMap: Record<string, string> = {
+    "<*>": "<*>",
+    "<:IP>": "ip",
+    "<:IPV4>": "ipv4",
+    "<:IPV6>": "ipv6",
+    "<:NUM>": "num",
+    "<:INT>": "num",
+    "<:FLOAT>": "float",
+    "<:HEX>": "hex",
+    "<:TIMESTAMP>": "ts",
+    "<:DATE>": "date",
+    "<:TIME>": "time",
+    "<:STR>": "str",
+    "<:URL>": "url",
+    "<:METHOD>": "method",
+    "<:IDENTIFIERS>": "id",
+  };
+  return labelMap[token] ?? token;
+}
+
+/**
+ * Normalize raw API values (strings or {value,count} objects) to a flat
+ * string array suitable for pattern matching.
+ */
+function normalizeValueStrings(raw: any[]): string[] {
+  return raw
+    .map((item) => {
+      if (typeof item === "string") return item;
+      return item?.value ?? "";
+    })
+    .filter((v) => v !== "");
+}
+
+const HTTP_METHODS = new Set([
+  "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "CONNECT", "TRACE",
+]);
+
+const IPV4_RE = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+const IPV6_RE = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INT_RE = /^-?\d+$/;
+const FLOAT_RE = /^-?\d+\.\d+$/;
+const HEX_RE = /^[0-9a-fA-F]+$/;
+const TS_DATE_RE = /\d{4}-\d{2}-\d{2}/;
+const TS_TIME_RE = /\d{2}:\d{2}:\d{2}/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Inspect sample values from a generic <*> wildcard position and infer the
+ * most likely data type.
+ *
+ * Uses a majority-threshold approach: if at least 50% of non-empty values
+ * match a recognised pattern the corresponding label is returned. If no
+ * pattern reaches the threshold the function falls back to "Str".
+ */
+export function inferTypeFromValues(rawValues: any[]): string {
+  const values = normalizeValueStrings(rawValues);
+  if (values.length === 0) return "str";
+
+  const threshold = Math.max(1, Math.floor(values.length * 0.5));
+
+  let ip = 0, method = 0, url = 0, uuid = 0, ts = 0, email = 0;
+  let int = 0, float = 0, hex = 0, pattern = 0;
+
+  // Matches wildcard placeholders like <*>, <:NUM>, <:IP>, etc.
+  const templateRe = /<(?:[*]|:[A-Z0-9_]+)>/;
+
+  for (const v of values) {
+    // Check if the value itself looks like a log pattern template
+    if (templateRe.test(v)) { pattern++; continue; }
+    // Structural patterns
+    if (IPV4_RE.test(v) || IPV6_RE.test(v)) { ip++; continue; }
+    if (HTTP_METHODS.has(v.toUpperCase())) { method++; continue; }
+    if (UUID_RE.test(v)) { uuid++; continue; }
+    if (EMAIL_RE.test(v)) { email++; continue; }
+    if (/^https?:\/\//.test(v)) { url++; continue; }
+    // Timestamp — must check before generic number patterns
+    if (TS_DATE_RE.test(v) || TS_TIME_RE.test(v)) { ts++; continue; }
+    // Numeric — check float before int (float pattern is more specific)
+    if (FLOAT_RE.test(v)) { float++; continue; }
+    if (INT_RE.test(v)) { int++; continue; }
+    if (HEX_RE.test(v) && v.length >= 4) { hex++; continue; }
+  }
+
+  if (pattern >= threshold) return "pattern";
+
+  if (ip >= threshold) return "ip";
+  if (method >= threshold) return "method";
+  if (url >= threshold) return "url";
+  if (uuid >= threshold) return "id";
+  if (email >= threshold) return "email";
+  if (ts >= threshold) return "ts";
+  if (hex >= threshold) return "hex";
+  if (float >= threshold) return "float";
+  if (int >= threshold) return "num";
+  if (int + float >= threshold) return "num";
+
+  return "str";
 }
 
 /**

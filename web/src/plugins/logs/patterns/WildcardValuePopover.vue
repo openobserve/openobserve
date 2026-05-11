@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Header -->
     <div class="wildcard-popover-header" :class="headerClass">
-      <span class="wildcard-popover-header-token">{{ token }}</span>
+      <span class="wildcard-popover-header-token">{{ wildcardLabel(token, displayValues) }}</span>
     </div>
 
     <!-- Body - bar chart distribution -->
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { formatCount } from "@/utils/logs/convertLogData";
-import { wildcardChipColor } from "@/composables/useLogs/useTemplateTokenizer";
+import { wildcardChipColor, wildcardLabel } from "@/composables/useLogs/useTemplateTokenizer";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { WildcardDisplayValue } from "./useWildcardHover";
 
@@ -129,7 +129,7 @@ const barColorClass = computed(() => {
 });
 
 const headerClass = computed(() => {
-  const chipClass = wildcardChipColor(props.token);
+  const chipClass = wildcardChipColor(props.token, props.displayValues);
   const bgMatch = chipClass.match(/bg-(\S+)/);
   if (bgMatch) {
     return `wildcard-header-${bgMatch[1]}`;
