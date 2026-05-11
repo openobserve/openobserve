@@ -48,7 +48,7 @@ export class PipelinesPage {
           "Destination node is required"
         );
         this.deleteButton = page.locator("button").filter({ hasText: "delete" });
-        this.confirmDeleteButton = page.locator('[data-test="confirm-button"]');
+        this.confirmDeleteButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.secondStreamButton = page.getByRole('button', { name: 'Stream' }).nth(1);
         this.functionButton =  page.getByRole('button', { name: 'Function' })
         this.conditionButton =  page.getByRole('button', { name: 'Condition' })
@@ -80,7 +80,7 @@ export class PipelinesPage {
         this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
         this.fieldRequiredError = page.getByText('Field is required!')
         this.tableRowsLocator = page.locator("tbody tr");
-        this.confirmButton = page.locator('[data-test="confirm-button"]');
+        this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
         this.pipelineDestinationsTab = page.locator('[data-test="pipeline-destinations-tab"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
@@ -178,7 +178,7 @@ export class PipelinesPage {
         this.validateAndCloseBtn = page.locator('[data-test="stream-routing-query-save-btn"]');
         this.streamRoutingQueryCancelBtn = page.locator('[data-test="stream-routing-query-cancel-btn"]');
         this.discardChangesDialog = page.getByText('Discard Changes');
-        this.discardChangesOkBtn = page.locator('.q-dialog').locator('[data-test="confirm-button"]');
+        this.discardChangesOkBtn = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.scheduledPipelineCancelBtn = page.locator('button').filter({ hasText: 'Cancel' }).first();
 
         // Bug #11498 - Run Query button (in scheduled pipeline dialog)
