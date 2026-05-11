@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ pattern.frequency.toLocaleString() }}
       </div>
       <div
-        class="tw:text-[0.6875rem] tw:opacity-60"
+        class="tw:text-[0.6875rem] tw:opacity-80"
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
         :data-test="`pattern-card-${index}-percentage`"
       >
