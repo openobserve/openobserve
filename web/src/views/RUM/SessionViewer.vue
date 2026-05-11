@@ -226,12 +226,12 @@ watch(
     ) {
       // Clear any existing timer
       if (seekTimer !== null) {
-        // eslint-disable-next-line no-undef
+         
         clearTimeout(seekTimer);
       }
 
       // Use setTimeout to give video player time to fully initialize
-      // eslint-disable-next-line no-undef
+       
       seekTimer = setTimeout(() => {
         if (videoPlayerRef.value) {
           try {

@@ -17,6 +17,9 @@ import { describe, expect, it } from "vitest";
 import {
   tokenizeTemplate,
   wildcardChipColor,
+  wildcardLabel,
+  inferTypeFromValues,
+  chipColorForLabel,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
 
