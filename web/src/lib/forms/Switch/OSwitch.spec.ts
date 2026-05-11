@@ -66,7 +66,9 @@ describe("OSwitch", () => {
     wrapper = mount(OSwitch, {
       props: { label: "My label", labelPosition: "left" },
     });
-    expect(wrapper.find("label").classes()).toContain("tw:flex-row-reverse");
+    expect(wrapper.element.classList.contains("tw:flex-row-reverse")).toBe(
+      true,
+    );
   });
 
   it("emits checkedValue when toggled on with custom values", async () => {
