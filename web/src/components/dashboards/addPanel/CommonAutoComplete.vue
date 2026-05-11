@@ -1,5 +1,5 @@
 <template>
-  <div class="relative" style="margin-top: 5px">
+  <div class="relative" style="margin-top: 5px" data-no-autofocus>
     <q-input
       v-model="inputValue"
       @update:model-value="onModelValueChanged"
