@@ -40,6 +40,19 @@ function handleSubmit(e: Event) {
 // call site during migration.
 
 /**
+ * All registered fields by dot-notation path.
+ *
+ * TanStack form keys `fieldMeta` by `DeepKeys<TFormData>` (a flat record
+ * with dot-notation paths for nested values, e.g. `"user.email"`). Walking
+ * `Object.keys(form.state.values)` would only enumerate top-level keys,
+ * so nested fields like `user.email` would never run their validators.
+ * Using `fieldMeta` reaches every registered field component.
+ */
+function registeredFieldPaths(): string[] {
+  return Object.keys(form.state.fieldMeta ?? {});
+}
+
+/**
  * Validate every field. With `greedy`, all validators run regardless of
  * earlier failures; otherwise short-circuits on the first invalid field.
  * Returns true when every field passes.
@@ -51,8 +64,7 @@ async function validate(): Promise<boolean> {
   if (props.greedy) {
     await form.validateAllFields("change");
   } else {
-    const fields = Object.keys(form.state.values);
-    for (const name of fields) {
+    for (const name of registeredFieldPaths()) {
       await form.validateField(name, "change");
       const err = form.getFieldMeta(name)?.errors ?? [];
       if (err.length > 0) return false;
@@ -70,7 +82,7 @@ function resetValidation() {
   // FieldMetaBase has errorMap (errors[] is a derived view) — clearing the
   // map clears the displayed errors. Also reset isTouched so child OForm*
   // components stop rendering their error <div> (they gate on isTouched).
-  for (const name of Object.keys(form.state.values)) {
+  for (const name of registeredFieldPaths()) {
     const meta = form.getFieldMeta(name);
     if (!meta) continue;
     form.setFieldMeta(name, {

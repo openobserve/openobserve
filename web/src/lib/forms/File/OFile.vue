@@ -100,6 +100,15 @@ function onDragOver(event: DragEvent) {
 
 function onDragLeave(event: DragEvent) {
   if (!props.dropZone) return;
+  // `dragleave` fires every time the pointer crosses into a child element
+  // (file chip, upload icon). If we cleared `isDragging` unconditionally,
+  // the active-border state would flicker on/off as the user drags across
+  // the drop zone. Only clear when leaving the wrapper itself — i.e. the
+  // event's `relatedTarget` (the element being entered) is outside the
+  // wrapper or null (dragged out of the window).
+  const wrapper = event.currentTarget as HTMLElement | null;
+  const related = event.relatedTarget as Node | null;
+  if (wrapper && related && wrapper.contains(related)) return;
   event.preventDefault();
   isDragging.value = false;
 }
