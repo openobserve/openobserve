@@ -966,22 +966,22 @@ fn partition_tantivy_files(
     idx_optimize_mode: &Option<IndexOptimizeMode>,
     target_partitions: usize,
 ) -> (Vec<Vec<FileKey>>, usize) {
-    let (file_groups, limit) = if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) =
+    let (file_groups, limit, ascend) = if let Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) =
         idx_optimize_mode
         && *limit > 0
     {
         let file_groups = group_files_by_time_range(index_parquet_files, target_partitions);
-        (file_groups, *limit)
+        (file_groups, *limit, *ascend)
     } else {
         // splite the filter groups by target partitions
         let file_groups = into_chunks(index_parquet_files, target_partitions);
-        (file_groups, 0)
+        (file_groups, 0, false)
     };
 
     if limit == 0 {
         (file_groups, limit)
     } else {
-        (regroup_tantivy_files(file_groups), limit)
+        (regroup_tantivy_files(file_groups, ascend), limit)
     }
 }
 
@@ -990,7 +990,7 @@ fn partition_tantivy_files(
 // group's time range not overlap, when execute the tantivy search, we get the last file in each
 // group and do the tantivy search.
 // so in this function, we recursive collect the last file in each group
-fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>) -> Vec<Vec<FileKey>> {
+fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>, ascend: bool) -> Vec<Vec<FileKey>> {
     let group_num = file_groups.len();
     let max_group_len = file_groups.iter().map(|g| g.len()).max().unwrap_or(0);
     let mut new_file_groups: Vec<Vec<FileKey>> = vec![Vec::new(); max_group_len];
@@ -998,7 +998,9 @@ fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>) -> Vec<Vec<FileKey>> {
     let mut file_groups: Vec<_> = file_groups
         .into_iter()
         .map(|mut group| {
-            group.reverse();
+            if !ascend {
+                group.reverse();
+            }
             group.into_iter()
         })
         .collect();
@@ -1310,7 +1312,7 @@ mod tests {
             vec![create_file_key(1, 10), create_file_key(11, 20)],
             vec![create_file_key(21, 30), create_file_key(31, 40)],
         ];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
 
         // Should have 2 groups (max length of input groups)
         assert_eq!(result.len(), 2);
@@ -1336,7 +1338,7 @@ mod tests {
             ],
             vec![create_file_key(31, 40)],
         ];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
 
         // Should have 3 groups (max length of input groups)
         assert_eq!(result.len(), 3);
@@ -1358,7 +1360,7 @@ mod tests {
     #[test]
     fn test_regroup_tantivy_files_empty_groups() {
         let file_groups: Vec<Vec<FileKey>> = vec![];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
         assert_eq!(result.len(), 0);
     }
 
@@ -1369,7 +1371,7 @@ mod tests {
             create_file_key(11, 20),
             create_file_key(21, 30),
         ]];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
 
         // Should have 3 groups (length of the single input group)
         assert_eq!(result.len(), 3);
@@ -1681,12 +1683,36 @@ mod tests {
             vec![create_file_key(11, 20)],
             vec![create_file_key(21, 30)],
         ];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
 
         assert_eq!(result.len(), 1); // Max group length is 1
         assert_eq!(result[0].len(), 3); // Should contain all files
         assert_eq!(result[0][0].key, "file_1_10");
         assert_eq!(result[0][1].key, "file_11_20");
         assert_eq!(result[0][2].key, "file_21_30");
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_ascend() {
+        // Same input as test_regroup_tantivy_files_basic, but with ascend=true.
+        // Without the reverse, each group stays in ascending order, so the
+        // interleaved output groups contain oldest files first.
+        let file_groups = vec![
+            vec![create_file_key(1, 10), create_file_key(11, 20)],
+            vec![create_file_key(21, 30), create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups, true);
+
+        assert_eq!(result.len(), 2);
+
+        // First group should contain the first (oldest) file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_1_10");
+        assert_eq!(result[0][1].key, "file_21_30");
+
+        // Second group should contain the last (newest) file from each input group
+        assert_eq!(result[1].len(), 2);
+        assert_eq!(result[1][0].key, "file_11_20");
+        assert_eq!(result[1][1].key, "file_31_40");
     }
 }
