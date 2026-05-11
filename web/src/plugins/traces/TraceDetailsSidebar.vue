@@ -379,7 +379,7 @@ class="tw:h-full tw:overflow-y-auto">
               ref="ioContainerRef"
             >
               <!-- Input Section -->
-              <div class="col-6 io-section">
+              <div class="tw:w-1/2 io-section">
                 <div
                   class="section-label text-bold q-mb-xs flex items-center justify-between"
                 >
@@ -446,7 +446,7 @@ class="tw:h-full tw:overflow-y-auto">
               </div>
 
               <!-- Output Section -->
-              <div class="col-6 io-section">
+              <div class="tw:w-1/2 io-section">
                 <div
                   class="section-label text-bold q-mb-xs flex items-center justify-between"
                 >
