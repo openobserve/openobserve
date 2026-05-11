@@ -70,6 +70,7 @@ const mockDashboardHeader = {
 
 const mockAddTab = {
   name: "AddTab",
+  props: ["open", "editMode", "tabId", "dashboardId"],
   template: "<div data-test='mock-add-tab'></div>",
   methods: {
     submit: vi.fn(),
@@ -87,57 +88,6 @@ const mockDraggable = {
     <slot></slot>
   </div>`,
   props: ["modelValue", "options"],
-};
-
-// ODrawer stub: drives buttons via emits (click:primary/secondary/neutral)
-const ODrawerStub = {
-  name: "ODrawer",
-  props: [
-    "open",
-    "width",
-    "showClose",
-    "persistent",
-    "size",
-    "title",
-    "subTitle",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test-stub="o-drawer"
-      :data-test="$attrs['data-test']"
-      :data-open="open"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-    >
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer">
-        <slot name="footer" />
-        <button
-          data-test-stub="o-drawer-primary"
-          @click="$emit('click:primary', $event)"
-        >primary</button>
-        <button
-          data-test-stub="o-drawer-secondary"
-          @click="$emit('click:secondary', $event)"
-        >secondary</button>
-      </div>
-    </div>
-  `,
-  inheritAttrs: false,
 };
 
 describe("TabsSettings", () => {
@@ -163,9 +113,7 @@ describe("TabsSettings", () => {
           TabsDeletePopUp: mockTabsDeletePopUp,
           draggable: mockDraggable,
         },
-        stubs: {
-          ODrawer: ODrawerStub,
-        },
+        stubs: {},
       },
     });
   };
@@ -221,9 +169,9 @@ describe("TabsSettings", () => {
       expect(wrapper.vm.editTabId).toBeNull();
     });
 
-    it("should expose addTabRef on the component instance", () => {
+    it("should not expose addTabRef (removed after refactor)", () => {
       wrapper = createWrapper();
-      expect("addTabRef" in wrapper.vm).toBe(true);
+      expect("addTabRef" in wrapper.vm).toBe(false);
     });
   });
 
@@ -672,72 +620,46 @@ describe("TabsSettings", () => {
     });
   });
 
-  describe("Add Tab Drawer (ODrawer)", () => {
-    it("should render add tab drawer", () => {
+  describe("Add Tab Drawer (AddTab owns its ODrawer)", () => {
+    it("should render AddTab component with data-test attribute", () => {
       wrapper = createWrapper();
 
-      const drawer = wrapper.find('[data-test="dashboard-tab-settings-add-tab-dialog"]');
-      expect(drawer.exists()).toBe(true);
+      const addTab = wrapper.findComponent({ name: "AddTab" });
+      expect(addTab.exists()).toBe(true);
+      expect(addTab.attributes("data-test")).toBe("dashboard-tab-settings-add-tab-dialog");
     });
 
-    it("should pass correct labels to ODrawer", () => {
-      wrapper = createWrapper();
-
-      const drawer = wrapper.find('[data-test="dashboard-tab-settings-add-tab-dialog"]');
-      expect(drawer.attributes("data-primary-label")).toBe("dashboard.save");
-      expect(drawer.attributes("data-secondary-label")).toBe("dashboard.cancel");
-    });
-
-    it("should reflect drawer open state via data-open", async () => {
+    it("should pass open=false to AddTab initially", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.find('[data-test="dashboard-tab-settings-add-tab-dialog"]');
-      expect(drawer.attributes("data-open")).toBe("false");
-
-      wrapper.vm.showAddTabDialog = true;
-      await wrapper.vm.$nextTick();
-
-      expect(drawer.attributes("data-open")).toBe("true");
+      const addTab = wrapper.findComponent({ name: "AddTab" });
+      expect(addTab.props("open")).toBe(false);
     });
 
-    it("should close drawer when secondary (cancel) emit fires", async () => {
+    it("should pass open=true to AddTab when showAddTabDialog is true", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       wrapper.vm.showAddTabDialog = true;
       await wrapper.vm.$nextTick();
 
-      const drawerComponent = wrapper.findComponent(ODrawerStub);
-      await drawerComponent.vm.$emit("click:secondary");
+      const addTab = wrapper.findComponent({ name: "AddTab" });
+      expect(addTab.props("open")).toBe(true);
+    });
+
+    it("should close drawer when AddTab emits update:open with false", async () => {
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.showAddTabDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const addTabComponent = wrapper.findComponent({ name: "AddTab" });
+      await addTabComponent.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showAddTabDialog).toBe(false);
-    });
-
-    it("should call addTabRef.submit when primary emit fires", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      // Set up addTabRef with a submit spy
-      const submitSpy = vi.fn();
-      wrapper.vm.addTabRef = { submit: submitSpy };
-
-      const drawerComponent = wrapper.findComponent(ODrawerStub);
-      await drawerComponent.vm.$emit("click:primary");
-      await wrapper.vm.$nextTick();
-
-      expect(submitSpy).toHaveBeenCalled();
-    });
-
-    it("should not throw when primary emit fires without addTabRef", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      wrapper.vm.addTabRef = null;
-
-      const drawerComponent = wrapper.findComponent(ODrawerStub);
-      expect(() => drawerComponent.vm.$emit("click:primary")).not.toThrow();
     });
 
     it("should pass correct props to AddTab component", async () => {
@@ -747,8 +669,9 @@ describe("TabsSettings", () => {
       wrapper.vm.showAddTabDialog = true;
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.isTabEditMode).toBe(false);
-      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe("test-dashboard-id");
+      const addTab = wrapper.findComponent({ name: "AddTab" });
+      expect(addTab.props("editMode")).toBe(false);
+      expect(addTab.props("dashboardId")).toBe("test-dashboard-id");
     });
 
     it("should close dialog and refresh after tab creation", async () => {
@@ -764,18 +687,16 @@ describe("TabsSettings", () => {
       expect(wrapper.emitted("refresh")).toBeTruthy();
     });
 
-    it("should close drawer when AddTab emits close", async () => {
+    it("should set isTabEditMode=false when opening add tab", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      wrapper.vm.showAddTabDialog = true;
-      await wrapper.vm.$nextTick();
+      // Simulate clicking add tab button
+      const addButton = wrapper.find('[data-test="dashboard-tab-settings-add-tab"]');
+      await addButton.trigger("click");
 
-      const addTabComponent = wrapper.findComponent({ name: "AddTab" });
-      await addTabComponent.vm.$emit("close");
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
+      expect(wrapper.vm.showAddTabDialog).toBe(true);
+      expect(wrapper.vm.isTabEditMode).toBe(false);
     });
   });
 
@@ -999,11 +920,11 @@ describe("TabsSettings", () => {
       expect(draggable.exists()).toBe(true);
     });
 
-    it("should integrate with ODrawer component", () => {
+    it("should integrate with AddTab component (owns its own ODrawer)", () => {
       wrapper = createWrapper();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.exists()).toBe(true);
+      const addTab = wrapper.findComponent({ name: "AddTab" });
+      expect(addTab.exists()).toBe(true);
     });
   });
 });
