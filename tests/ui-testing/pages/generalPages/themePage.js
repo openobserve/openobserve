@@ -8,7 +8,9 @@ export class ThemePage {
         this.predefinedThemesMenuItem = '[data-test="menu-link-predefined-themes-item"]';
         this.predefinedThemesDialog = '.predefined-theme-card';
         this.resetThemeBtn = 'button:has-text("Reset")';
-        this.closeDialogBtn = '[data-test="predefined-themes-close-btn"]';
+        // PredefinedThemes.vue migrated to ODrawer — its close (×) button
+        // is now the common o-drawer-close-btn inside the parent slug.
+        this.closeDialogBtn = '[data-test="predefined-themes-drawer"] [data-test="o-drawer-close-btn"]';
 
         // Light/Dark Mode Tabs in Predefined Themes
         this.lightModeTab = '[role="tab"]:has-text("Light Mode")';
@@ -23,8 +25,9 @@ export class ThemePage {
         this.customColorCard = '.theme-card-compact:has-text("Custom Color")';
         this.customColorPreview = '.theme-card-compact:has-text("Custom Color") .color-preview-small.clickable';
         this.colorPickerDialog = '.q-color-picker, .q-color';
-        // The color picker Close button is the rectangle-styled button, not the round X button
-        this.colorPickerClose = '[data-test="color-picker-close-btn"]';
+        // Custom-color picker is an ODialog whose only footer button is the
+        // primary "Close" button (see PredefinedThemes.vue:215).
+        this.colorPickerClose = '[data-test="predefined-themes-color-picker-dialog"] [data-test="o-dialog-primary-btn"]';
 
         // General Settings - Theme Management
         this.settingsMenuItem = '[data-test="menu-link-\\/settings-item"]';

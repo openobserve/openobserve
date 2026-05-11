@@ -73,13 +73,16 @@ export class UserPage {
 
     async deleteUser(email) {
         await this.page.locator(`[data-test="delete-basic-user-${email.replace('@', '\\@')}"]`).click();
-        await this.page.getByRole('button', { name: 'OK' }).click();
+        // User delete confirmation is rendered by ODialog — use its built-in
+        // primary button rather than matching by visible text, which is
+        // ambiguous when other "OK" buttons exist on the page.
+        await this.page.locator('[data-test="user-delete-dialog"] [data-test="o-dialog-primary-btn"]').click();
     }
 
     async deleteUserCancel(email) {
         // Logic to simulate unauthorized deletion
         await this.page.locator(`[data-test="delete-basic-user-${email.replace('@', '\\@')}"]`).click();
-        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.locator('[data-test="user-delete-dialog"] [data-test="o-dialog-secondary-btn"]').click();
     }
 
     async verifySuccessMessage(expectedMessage) {
