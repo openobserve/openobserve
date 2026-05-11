@@ -178,18 +178,19 @@ test.describe("Alerts Regression Bugs", () => {
     // Click PromQL tab using page object
     await pm.alertsPage.clickPromqlTab();
 
-    // Navigate to Step 4 to verify promql_condition fields
-    await pm.alertsPage.clickContinueButton(); // Step 3
-    await pm.alertsPage.clickContinueButton(); // Step 4
-
-    // ✅ COVERAGE: P1 - "Trigger if the value is" fields appear in Step 4
+    // ✅ COVERAGE: P1 - "Trigger if the value is" fields appear on Step 2 (QueryConfig)
+    // The condition row renders in QueryConfig.vue when PromQL tab is active, not on Step 4
     await pm.alertsPage.expectPromqlConditionRowVisible();
-    testLogger.info('✅ P1: PromQL condition row "Trigger if the value is" is visible');
+    testLogger.info('✅ P1: PromQL condition row "Alert if the value is" is visible on Step 2');
 
     // Verify operator dropdown and value input exist
     await pm.alertsPage.expectOperatorDropdownVisible();
     await pm.alertsPage.expectValueInputVisible();
     testLogger.info('✅ P1: Operator dropdown and value input are visible');
+
+    // Navigate to Step 4 for mode switching test
+    await pm.alertsPage.clickContinueButton(); // Step 3
+    await pm.alertsPage.clickContinueButton(); // Step 4
 
     // ========== PART 2: Mode Switching Test ==========
     testLogger.info('PART 2: Testing mode switching behavior');
