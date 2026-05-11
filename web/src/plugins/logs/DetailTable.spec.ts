@@ -287,6 +287,19 @@ describe("DetailTable Component", () => {
     // OButton renders the icon as a slot child, not as an 'icon' attribute
   });
 
+  it("should emit close when close dialog button is clicked", async () => {
+    const closeButton = wrapper.find('[data-test="close-dialog"]');
+    expect(closeButton.exists()).toBe(true);
+    await closeButton.trigger("click");
+
+    expect(wrapper.emitted().close).toBeTruthy();
+    expect(wrapper.emitted().close.length).toBe(1);
+  });
+
+  it("should not emit close when close button is not clicked", () => {
+    expect(wrapper.emitted().close).toBeFalsy();
+  });
+
   it("should render both tabs (JSON and Table)", () => {
     const jsonTab = wrapper.find('[data-test="log-detail-json-tab"]');
     const tableTab = wrapper.find('[data-test="log-detail-table-tab"]');

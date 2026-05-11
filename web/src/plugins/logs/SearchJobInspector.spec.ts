@@ -24,6 +24,30 @@ import searchService from "@/services/search";
 
 installQuasar({ plugins: [Dialog, Notify] });
 
+// ── Stubs for migrated ODialog / ODrawer ────────────────────────────────────
+// Mirror the real contract: v-model:open, title, size and the named slots
+// (default + header-right) that SearchJobInspector relies on.
+const oDrawerStub = {
+  template:
+    '<div data-test="o-drawer" v-if="open">' +
+    '<div data-test="o-drawer-title">{{ title }}</div>' +
+    '<div data-test="o-drawer-header-right"><slot name="header-right" /></div>' +
+    '<div data-test="o-drawer-body"><slot /></div>' +
+    '</div>',
+  props: ["open", "size", "title"],
+  emits: ["update:open"],
+};
+
+const oDialogStub = {
+  template:
+    '<div data-test="o-dialog" v-if="open">' +
+    '<div data-test="o-dialog-title">{{ title }}</div>' +
+    '<div data-test="o-dialog-body"><slot /></div>' +
+    '</div>',
+  props: ["open", "size", "title"],
+  emits: ["update:open"],
+};
+
 // A fixed microsecond timestamp: 2024-03-15 09:30:00 UTC
 const START_TIME_US = "1710495000000000";
 // A fixed microsecond timestamp: 2024-03-15 09:35:00 UTC
@@ -573,5 +597,206 @@ describe("SearchJobInspector — fetchProfileData", () => {
     await flushPromises();
 
     expect(wrapper.vm.errorMessage).toBe("Trace ID not found");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ODialog / ODrawer migration coverage
+// ---------------------------------------------------------------------------
+describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", () => {
+  const mountWithStubs = async () => {
+    const wrapper = mount(SearchJobInspector, {
+      global: {
+        provide: { store },
+        plugins: [i18n],
+        stubs: {
+          ODrawer: oDrawerStub,
+          ODialog: oDialogStub,
+        },
+      },
+    });
+    // Settle the onMounted fetch (mocked to resolve { data: null }) so that
+    // subsequent profileData assignments are not overwritten.
+    await flushPromises();
+    return wrapper;
+  };
+
+  beforeEach(() => {
+    // Ensure each test starts from a clean clipboard mock
+    vi.restoreAllMocks();
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+  });
+
+  it("does not render the SQL ODrawer or Trace ID ODialog by default", async () => {
+    const wrapper = await mountWithStubs();
+    expect(wrapper.find('[data-test="o-drawer"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
+  });
+
+  it("renders the SQL ODrawer with title 'SQL Query' once showSqlDialog flips true", async () => {
+    const wrapper = await mountWithStubs();
+    setProfileData(wrapper);
+    wrapper.vm.showSqlDialog = true;
+    await flushPromises();
+
+    const drawer = wrapper.find('[data-test="o-drawer"]');
+    expect(drawer.exists()).toBe(true);
+    expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("SQL Query");
+  });
+
+  it("renders the SQL content inside the ODrawer body slot", async () => {
+    const wrapper = await mountWithStubs();
+    setProfileData(wrapper, { sql: "SELECT id FROM events" });
+    wrapper.vm.showSqlDialog = true;
+    await flushPromises();
+
+    const body = wrapper.find('[data-test="inspector-sql-query-content"]');
+    expect(body.exists()).toBe(true);
+    expect(body.text()).toBe("SELECT id FROM events");
+  });
+
+  it("falls back to 'No SQL query available' when profileData has no sql", async () => {
+    const wrapper = await mountWithStubs();
+    setProfileData(wrapper, { sql: "" });
+    wrapper.vm.showSqlDialog = true;
+    await flushPromises();
+
+    expect(
+      wrapper.find('[data-test="inspector-sql-query-content"]').text()
+    ).toBe("No SQL query available");
+  });
+
+  it("exposes the Copy SQL button inside the ODrawer header-right slot when sql is present", async () => {
+    const wrapper = await mountWithStubs();
+    setProfileData(wrapper, { sql: "SELECT 1" });
+    wrapper.vm.showSqlDialog = true;
+    await flushPromises();
+
+    const headerRight = wrapper.find('[data-test="o-drawer-header-right"]');
+    expect(headerRight.exists()).toBe(true);
+    expect(
+      headerRight.find('[data-test="inspector-copy-sql-btn"]').exists()
+    ).toBe(true);
+  });
+
+  it("hides the Copy SQL button in the header-right slot when profileData.sql is empty", async () => {
+    const wrapper = await mountWithStubs();
+    setProfileData(wrapper, { sql: "" });
+    wrapper.vm.showSqlDialog = true;
+    await flushPromises();
+
+    expect(
+      wrapper.find('[data-test="inspector-copy-sql-btn"]').exists()
+    ).toBe(false);
+  });
+
+  it("closes the SQL ODrawer when it emits update:open=false (v-model:open contract)", async () => {
+    const wrapper = await mountWithStubs();
+    setProfileData(wrapper);
+    wrapper.vm.showSqlDialog = true;
+    await flushPromises();
+
+    const drawer = wrapper.findComponent(oDrawerStub);
+    drawer.vm.$emit("update:open", false);
+    await flushPromises();
+
+    expect(wrapper.vm.showSqlDialog).toBe(false);
+    expect(wrapper.find('[data-test="o-drawer"]').exists()).toBe(false);
+  });
+
+  it("renders the Trace ID ODialog with title 'Full Trace ID' once showTraceIdDialog flips true", async () => {
+    const wrapper = await mountWithStubs();
+    wrapper.vm.showTraceIdDialog = true;
+    await flushPromises();
+
+    const dialog = wrapper.find('[data-test="o-dialog"]');
+    expect(dialog.exists()).toBe(true);
+    expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe(
+      "Full Trace ID"
+    );
+  });
+
+  it("renders the traceId from the route inside the ODialog body", async () => {
+    const wrapper = await mountWithStubs();
+    wrapper.vm.showTraceIdDialog = true;
+    await flushPromises();
+
+    // mockRoute.query.trace_id === "abc123"
+    expect(wrapper.find('[data-test="o-dialog-body"]').text()).toContain(
+      "abc123"
+    );
+  });
+
+  it("closes the Trace ID ODialog when it emits update:open=false (v-model:open contract)", async () => {
+    const wrapper = await mountWithStubs();
+    wrapper.vm.showTraceIdDialog = true;
+    await flushPromises();
+
+    const dialog = wrapper.findComponent(oDialogStub);
+    dialog.vm.$emit("update:open", false);
+    await flushPromises();
+
+    expect(wrapper.vm.showTraceIdDialog).toBe(false);
+    expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
+  });
+
+  it("copySql writes profileData.sql to the clipboard and toggles copiedSql", async () => {
+    const wrapper = await mountWithStubs();
+    setProfileData(wrapper, { sql: "SELECT COUNT(*) FROM logs" });
+    wrapper.vm.copySql();
+    await flushPromises();
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      "SELECT COUNT(*) FROM logs"
+    );
+    expect(wrapper.vm.copiedSql).toBe(true);
+  });
+
+  it("copySql writes an empty string when profileData is null and still resolves cleanly", async () => {
+    const wrapper = await mountWithStubs();
+    wrapper.vm.profileData = null;
+    wrapper.vm.copySql();
+    await flushPromises();
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("");
+    expect(wrapper.vm.copiedSql).toBe(true);
+  });
+
+  it("copyTraceId writes the route trace_id to the clipboard and toggles copiedTraceId", async () => {
+    const wrapper = await mountWithStubs();
+    wrapper.vm.copyTraceId();
+    await flushPromises();
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("abc123");
+    expect(wrapper.vm.copiedTraceId).toBe(true);
+  });
+
+  it("copySql gracefully handles a clipboard rejection without throwing", async () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn().mockRejectedValueOnce(new Error("denied")),
+      },
+    });
+    const wrapper = await mountWithStubs();
+    setProfileData(wrapper, { sql: "SELECT 1" });
+
+    expect(() => wrapper.vm.copySql()).not.toThrow();
+    await flushPromises();
+    expect(wrapper.vm.copiedSql).toBe(false);
+  });
+
+  it("copyTraceId gracefully handles a clipboard rejection without throwing", async () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn().mockRejectedValueOnce(new Error("denied")),
+      },
+    });
+    const wrapper = await mountWithStubs();
+
+    expect(() => wrapper.vm.copyTraceId()).not.toThrow();
+    await flushPromises();
+    expect(wrapper.vm.copiedTraceId).toBe(false);
   });
 });
