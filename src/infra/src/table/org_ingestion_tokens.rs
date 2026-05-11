@@ -108,7 +108,7 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> 
 }
 
 /// Find a token by org_id and token value. Only returns enabled tokens.
-pub async fn find_by_token(
+pub async fn find_enabled_token(
     org_id: &str,
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {

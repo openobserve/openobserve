@@ -93,12 +93,12 @@ pub async fn set_enabled(
     Ok(())
 }
 
-/// Find a token by org_id and token value.
-pub async fn find_by_token(
+/// Find an enabled token by org_id and token value.
+pub async fn find_enabled_token(
     org_id: &str,
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, anyhow::Error> {
-    org_ingestion_tokens::find_by_token(org_id, token)
+    org_ingestion_tokens::find_enabled_token(org_id, token)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
@@ -155,11 +155,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let parts: Vec<&str> = item_key.splitn(2, '/').collect();
                 if parts.len() == 2 {
-                    // find_by_token only returns enabled tokens.
+                    // find_enabled_token only returns enabled tokens.
                     // If found → token is enabled → cache it.
                     // If not found → token is disabled/missing → remove from cache.
                     if let Ok(Some(record)) =
-                        org_ingestion_tokens::find_by_token(parts[0], parts[1]).await
+                        org_ingestion_tokens::find_enabled_token(parts[0], parts[1]).await
                     {
                         ORG_INGESTION_TOKENS.insert(item_key.to_string(), record.name);
                     } else {

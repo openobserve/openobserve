@@ -151,7 +151,7 @@ pub async fn validate_token(
     if !token.starts_with(org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX) {
         return Ok(None);
     }
-    db::org_ingestion_tokens::find_by_token(org_id, token).await
+    db::org_ingestion_tokens::find_enabled_token(org_id, token).await
 }
 
 #[cfg(test)]

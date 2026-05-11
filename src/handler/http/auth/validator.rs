@@ -286,8 +286,8 @@ pub async fn validate_credentials(
                 });
             }
 
-            // Cache miss — do DB lookup. find_by_token filters by enabled=true.
-            match crate::service::db::org_ingestion_tokens::find_by_token(org_id, user_password).await {
+            // Cache miss — do DB lookup. find_enabled_token filters by enabled=true.
+            match crate::service::db::org_ingestion_tokens::find_enabled_token(org_id, user_password).await {
                 Ok(Some(token_record)) => {
                     // Populate cache for future fast lookups
                     ORG_INGESTION_TOKENS.insert(cache_key, token_record.name.clone());
