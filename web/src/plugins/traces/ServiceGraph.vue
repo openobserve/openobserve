@@ -239,6 +239,7 @@
                 :time-range="searchObj.data.datetime"
                 :visible="showSidePanel"
                 :stream-filter="streamFilter"
+                :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
               />
@@ -1688,7 +1689,7 @@ export default defineComponent({
 
 .graph-with-panel-container {
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 code {

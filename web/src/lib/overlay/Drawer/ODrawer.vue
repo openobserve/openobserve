@@ -39,6 +39,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   secondaryButtonLoading: false,
   neutralButtonLoading: false,
   lazy: true,
+  portalTarget: undefined,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -161,12 +162,17 @@ const sizeClasses = computed(() => {
   }
 });
 
-// Explicit vw width override
+// When portaled into a specific container, use absolute positioning scoped to that element.
+const isContained = computed(() => !!props.portalTarget);
+
+// Explicit width override — vw when full-viewport, % when container-scoped
 const contentStyle = computed(() => {
   const style: Record<string, string | number> = {
     zIndex: contentZIndex.value,
   };
-  if (props.width != null) style.width = `${props.width}vw`;
+  if (props.width != null) {
+    style.width = isContained.value ? `${props.width}%` : `${props.width}vw`;
+  }
   return style;
 });
 
@@ -185,6 +191,20 @@ function clearBodyValidation() {
       vm.exposed.resetValidation();
     }
   });
+}
+
+/** When focus moves to a non-form element inside the body (e.g. an action
+ *  button), reset all field validation so sibling fields never show
+ *  premature errors before the user clicks Save. */
+function handleBodyFocusIn(e: FocusEvent) {
+  const target = e.target as HTMLElement | null;
+  if (!target) return;
+  const isFormField =
+    target.matches('input, textarea, select') ||
+    !!target.closest('.q-field, .q-input, .q-select');
+  if (!isFormField) {
+    clearBodyValidation();
+  }
 }
 
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
@@ -240,11 +260,11 @@ watch(internalOpen, (open) => {
       <slot name="trigger" />
     </DialogTrigger>
 
-    <DialogPortal>
+    <DialogPortal :to="props.portalTarget ?? 'body'">
       <!-- Overlay / scrim — same z-index as ODialog -->
       <DialogOverlay
         :class="[
-          'tw:fixed tw:inset-0',
+          isContained ? 'tw:absolute tw:inset-0' : 'tw:fixed tw:inset-0',
           seamless
             ? 'tw:bg-transparent tw:pointer-events-none'
             : 'tw:bg-dialog-overlay',
@@ -262,11 +282,12 @@ watch(internalOpen, (open) => {
         :style="contentStyle"
         :class="[
           // Full-height, anchored to chosen edge
-          'tw:fixed tw:inset-y-0',
+          isContained ? 'tw:absolute tw:inset-y-0' : 'tw:fixed tw:inset-y-0',
           isRight ? 'tw:right-0' : 'tw:left-0',
           // Flex column so header/footer are shrink-0 and body scrolls
-          // max-h-screen (not h-screen): panel shrinks to content, footer flows below body on short content
-          'tw:flex tw:flex-col tw:overflow-hidden tw:max-h-screen',
+          isContained
+            ? 'tw:flex tw:flex-col tw:overflow-hidden tw:h-full'
+            : 'tw:flex tw:flex-col tw:overflow-hidden tw:max-h-screen',
           sizeClasses,
           // Surface — reuse dialog tokens (same visual language)
           'tw:bg-dialog-bg tw:text-dialog-content-text',
@@ -396,6 +417,7 @@ watch(internalOpen, (open) => {
             canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollUp && canScrollDown && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
+          @focusin="handleBodyFocusIn"
         >
           <template v-if="!props.lazy || internalOpen">
             <slot />

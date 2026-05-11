@@ -61,21 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left><q-icon name="add" /></template>
           <q-tooltip>Add Tab</q-tooltip>
         </OButton>
-        <ODrawer data-test="single-panel-move-add-tab-drawer"
+        <AddTab
           v-model:open="showAddTabDialog"
-          size="md"
-          :show-close="false"
-          @close="showAddTabDialog = false"
-        >
-          <AddTab
-            :edit-mode="isTabEditMode"
-            :tabId="selectedTabIdToEdit"
-            :dashboard-id="currentDashboardData.data.dashboardId"
-            @refresh="refreshRequired"
-            @close="showAddTabDialog = false"
-            data-test="dashboard-tab-move-add-tab-dialog"
-          />
-        </ODrawer>
+          :edit-mode="isTabEditMode"
+          :tabId="selectedTabIdToEdit"
+          :dashboard-id="currentDashboardData.data.dashboardId"
+          @refresh="refreshRequired"
+          data-test="dashboard-tab-move-add-tab-dialog"
+        />
       </div>
     </div>
   </ODialog>
@@ -92,11 +85,10 @@ import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab, OButton, ODialog, ODrawer },
+  components: { AddTab, OButton, ODialog },
   emits: ["update:ok", "update:cancel", "refresh"],
   props: ["title", "message", "modelValue"],
   setup(props, { emit }) {

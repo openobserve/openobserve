@@ -112,6 +112,16 @@ export interface DrawerProps {
    * @default true
    */
   lazy?: boolean;
+
+  /**
+   * When provided, portals the drawer into this element and uses `position:
+   * absolute` so the panel is scoped to the element's bounds rather than the
+   * full viewport. The target element must have `position: relative` and
+   * `overflow: hidden`.
+   * Accepts an HTMLElement reference or a CSS selector string.
+   * @default undefined  (portals to document.body with fixed positioning)
+   */
+  portalTarget?: string | HTMLElement | null;
 }
 
 export interface DrawerEmits {

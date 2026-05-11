@@ -182,6 +182,20 @@ function clearBodyValidation() {
   });
 }
 
+/** When focus moves to a non-form element inside the body (e.g. an action
+ *  button), reset all field validation so sibling fields never show
+ *  premature errors before the user clicks Save. */
+function handleBodyFocusIn(e: FocusEvent) {
+  const target = e.target as HTMLElement | null;
+  if (!target) return;
+  const isFormField =
+    target.matches('input, textarea, select') ||
+    !!target.closest('.q-field, .q-input, .q-select');
+  if (!isFormField) {
+    clearBodyValidation();
+  }
+}
+
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
@@ -393,6 +407,7 @@ watch(internalOpen, (open) => {
             canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollUp && canScrollDown && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
+          @focusin="handleBodyFocusIn"
         >
           <slot />
         </div>
