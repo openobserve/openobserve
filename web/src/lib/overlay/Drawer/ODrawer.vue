@@ -113,7 +113,7 @@ const hasHeader = computed(
     !!slots["header-left"] ||
     !!slots["header-right"] ||
     !!props.title ||
-    (!props.persistent && props.showClose),
+    props.showClose,
 );
 const hasFooter = computed(
   () =>
@@ -369,7 +369,7 @@ watch(internalOpen, (open) => {
           </template>
 
           <!-- Close button — always shrink-0 at the far right -->
-          <DialogClose v-if="!persistent && showClose" as-child>
+          <DialogClose v-if="showClose" as-child>
             <button
               type="button"
               aria-label="Close drawer"
