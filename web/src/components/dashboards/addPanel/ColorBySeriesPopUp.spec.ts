@@ -28,6 +28,63 @@ vi.mock("vue-draggable-next", () => ({
   },
 }));
 
+// Stub ODialog so tests are deterministic (no Portal/Teleport) and so we can
+// drive primary/neutral button clicks via the emits the component listens to.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-title="title"
+      :data-width="width"
+      :data-primary-label="primaryButtonLabel"
+      :data-neutral-label="neutralButtonLabel"
+      :data-primary-disabled="String(primaryButtonDisabled)"
+    >
+      <span data-test="o-dialog-stub-title">{{ title }}</span>
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-dialog-stub-primary"
+        :disabled="primaryButtonDisabled"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-stub-neutral"
+        @click="$emit('click:neutral')"
+      >{{ neutralButtonLabel }}</button>
+      <button
+        data-test="o-dialog-stub-close"
+        @click="$emit('update:open', false)"
+      >close</button>
+    </div>
+  `,
+};
+
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -36,44 +93,82 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-describe("ColorBySeriesPopUp", () => {
-  let wrapper: any;
-  const mockSeriesOptions = [
-    { name: "Series 1", value: "series1" },
-    { name: "Series 2", value: "series2" },
-  ];
+const mockSeriesOptions = [
+  { name: "Series 1", value: "series1" },
+  { name: "Series 2", value: "series2" },
+];
 
-  const defaultProps = {
-    colorBySeries: [],
-    seriesOptions: mockSeriesOptions,
-  };
+function buildWrapper(props: Record<string, any> = {}) {
+  return mount(ColorBySeriesPopUp, {
+    attachTo: "#app",
+    props: {
+      open: true,
+      colorBySeries: [],
+      seriesOptions: mockSeriesOptions,
+      ...props,
+    },
+    global: {
+      plugins: [i18n, router],
+      provide: {
+        store,
+      },
+      stubs: {
+        ODialog: ODialogStub,
+      },
+    },
+  });
+}
+
+describe("ColorBySeriesPopUp", () => {
+  let wrapper: ReturnType<typeof buildWrapper>;
 
   beforeEach(async () => {
-    wrapper = mount(ColorBySeriesPopUp, {
-      attachTo: "#app",
-      props: defaultProps,
-      global: {
-        plugins: [i18n, router],
-        provide: {
-          store,
-        },
-      },
-    });
+    wrapper = buildWrapper();
     await flushPromises();
   });
 
   afterEach(() => {
-    wrapper.unmount();
+    if (wrapper) wrapper.unmount();
     vi.clearAllMocks();
   });
 
-  it("should render color by series popup", () => {
-    expect(
-      wrapper.find("[data-test='dashboard-color-by-series-popup']").exists(),
-    ).toBeTruthy();
+  it("renders ODialog wrapper", () => {
+    expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
   });
 
-  it("should initialize with default empty series if no colorBySeries provided", () => {
+  it("renders the popup content inside the dialog", () => {
+    expect(
+      wrapper.find("[data-test='dashboard-color-by-series-popup']").exists(),
+    ).toBe(true);
+  });
+
+  it("forwards the title to ODialog", () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("title")).toBe("Color by series");
+  });
+
+  it("forwards the width to ODialog", () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("width")).toBe(40);
+  });
+
+  it("forwards open prop from parent to ODialog", () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("open")).toBe(true);
+  });
+
+  it("renders the configured neutral and primary button labels", () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("neutralButtonLabel")).toBe("+ Add a new color");
+    expect(dialog.props("primaryButtonLabel")).toBe("Save");
+  });
+
+  it("uses outline variant for the neutral button", () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("neutralButtonVariant")).toBe("outline");
+  });
+
+  it("initializes with one default empty series when no colorBySeries provided", () => {
     expect(wrapper.vm.editColorBySeries).toHaveLength(1);
     expect(wrapper.vm.editColorBySeries[0]).toEqual({
       type: "value",
@@ -82,37 +177,27 @@ describe("ColorBySeriesPopUp", () => {
     });
   });
 
-  it("should initialize with provided colorBySeries data", async () => {
-    const colorBySeriesData = [
-      { value: "series1", color: "#FF0000" },
-      { value: "series2", color: "#00FF00" },
-    ];
-
-    wrapper = mount(ColorBySeriesPopUp, {
-      attachTo: "#app",
-      props: {
-        ...defaultProps,
-        colorBySeries: colorBySeriesData,
-      },
-      global: {
-        plugins: [i18n, router],
-        provide: {
-          store,
-        },
-      },
+  it("initializes with provided colorBySeries data", async () => {
+    wrapper.unmount();
+    wrapper = buildWrapper({
+      colorBySeries: [
+        { value: "series1", color: "#FF0000" },
+        { value: "series2", color: "#00FF00" },
+      ],
     });
     await flushPromises();
 
     expect(wrapper.vm.editColorBySeries).toHaveLength(2);
     expect(wrapper.vm.editColorBySeries[0].value).toBe("series1");
     expect(wrapper.vm.editColorBySeries[0].color).toBe("#FF0000");
+    expect(wrapper.vm.editColorBySeries[1].value).toBe("series2");
+    expect(wrapper.vm.editColorBySeries[1].color).toBe("#00FF00");
   });
 
-  it("should add new color series when add button is clicked", async () => {
-    const addButton = wrapper.find(
-      "[data-test='dashboard-addpanel-config-color-by-series-add-btn']",
-    );
-    await addButton.trigger("click");
+  it("adds a new color series when the neutral button is clicked", async () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    await dialog.vm.$emit("click:neutral");
+    await flushPromises();
 
     expect(wrapper.vm.editColorBySeries).toHaveLength(2);
     expect(wrapper.vm.editColorBySeries[1]).toEqual({
@@ -122,9 +207,10 @@ describe("ColorBySeriesPopUp", () => {
     });
   });
 
-  it("should remove color series when delete button is clicked", async () => {
+  it("removes a color series when the row delete button is clicked", async () => {
     await wrapper.vm.addcolorBySeries();
     await flushPromises();
+    expect(wrapper.vm.editColorBySeries).toHaveLength(2);
 
     const deleteButton = wrapper.find(
       "[data-test='dashboard-addpanel-config-color-by-series-delete-btn-0']",
@@ -134,51 +220,87 @@ describe("ColorBySeriesPopUp", () => {
     expect(wrapper.vm.editColorBySeries).toHaveLength(1);
   });
 
-  it("should set color when set color button is clicked", async () => {
-    const seriesIndex = 0;
-    await wrapper.vm.setColorByIndex(seriesIndex);
-
-    expect(wrapper.vm.editColorBySeries[seriesIndex].color).toBe("#5960b2");
+  it("sets color when setColorByIndex is invoked", async () => {
+    await wrapper.vm.setColorByIndex(0);
+    expect(wrapper.vm.editColorBySeries[0].color).toBe("#5960b2");
   });
 
-  it("should remove color when remove color button is clicked", async () => {
-    const seriesIndex = 0;
-    await wrapper.vm.setColorByIndex(seriesIndex);
-    await wrapper.vm.removeColorByIndex(seriesIndex);
-
-    expect(wrapper.vm.editColorBySeries[seriesIndex].color).toBeNull();
+  it("removes color when removeColorByIndex is invoked", async () => {
+    await wrapper.vm.setColorByIndex(0);
+    expect(wrapper.vm.editColorBySeries[0].color).toBe("#5960b2");
+    await wrapper.vm.removeColorByIndex(0);
+    expect(wrapper.vm.editColorBySeries[0].color).toBeNull();
   });
 
-  it("should compute series data items from options", () => {
+  it("computes series data items from options", () => {
     const items = wrapper.vm.seriesDataItems;
     expect(items).toHaveLength(2);
-    expect(items[0]).toEqual({
-      label: "Series 1",
-      value: "Series 1",
-    });
+    expect(items[0]).toEqual({ label: "Series 1", value: "Series 1" });
+    expect(items[1]).toEqual({ label: "Series 2", value: "Series 2" });
   });
 
-  it("should validate form before saving", async () => {
-    // Form should be invalid initially (no values set)
-    expect(wrapper.vm.isFormValid).toBe(false);
+  it("filters out series options with undefined name", async () => {
+    wrapper.unmount();
+    wrapper = buildWrapper({
+      seriesOptions: [
+        { name: "Valid" },
+        { name: undefined },
+        { name: "Another" },
+      ],
+    });
+    await flushPromises();
+    const items = wrapper.vm.seriesDataItems;
+    expect(items).toHaveLength(2);
+    expect(items.map((i: any) => i.label)).toEqual(["Valid", "Another"]);
+  });
 
-    // Set valid values
+  it("returns false from isFormValid when initial values are empty", () => {
+    expect(wrapper.vm.isFormValid).toBe(false);
+  });
+
+  it("returns true from isFormValid when all series have value and color", async () => {
     wrapper.vm.editColorBySeries[0].value = "Series 1";
     wrapper.vm.editColorBySeries[0].color = "#FF0000";
     await flushPromises();
-
     expect(wrapper.vm.isFormValid).toBe(true);
   });
 
-  it("should emit save event with valid data", async () => {
+  it("returns false from isFormValid when value is whitespace only", async () => {
+    wrapper.vm.editColorBySeries[0].value = "   ";
+    wrapper.vm.editColorBySeries[0].color = "#FF0000";
+    await flushPromises();
+    expect(wrapper.vm.isFormValid).toBe(false);
+  });
+
+  it("returns false from isFormValid when any one of several series is invalid", async () => {
+    await wrapper.vm.addcolorBySeries();
+    wrapper.vm.editColorBySeries[0].value = "Series 1";
+    wrapper.vm.editColorBySeries[0].color = "#FF0000";
+    // second row is left empty
+    await flushPromises();
+    expect(wrapper.vm.isFormValid).toBe(false);
+  });
+
+  it("forwards primaryButtonDisabled=true when the form is invalid", () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("primaryButtonDisabled")).toBe(true);
+  });
+
+  it("forwards primaryButtonDisabled=false when the form becomes valid", async () => {
+    wrapper.vm.editColorBySeries[0].value = "Series 1";
+    wrapper.vm.editColorBySeries[0].color = "#FF0000";
+    await flushPromises();
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("primaryButtonDisabled")).toBe(false);
+  });
+
+  it("emits save with the edited series when the primary button is clicked and form is valid", async () => {
     wrapper.vm.editColorBySeries[0].value = "Series 1";
     wrapper.vm.editColorBySeries[0].color = "#FF0000";
     await flushPromises();
 
-    const saveButton = wrapper.find(
-      "[data-test='dashboard-addpanel-config-color-by-series-apply-btn']",
-    );
-    await saveButton.trigger("click");
+    const dialog = wrapper.findComponent(ODialogStub);
+    await dialog.vm.$emit("click:primary");
 
     expect(wrapper.emitted().save).toBeTruthy();
     expect(wrapper.emitted().save[0][0]).toEqual([
@@ -190,35 +312,52 @@ describe("ColorBySeriesPopUp", () => {
     ]);
   });
 
-  it("should emit close event when cancel button is clicked", async () => {
-    const cancelButton = wrapper.find(
-      "[data-test='dashboard-color-by-series-cancel']",
-    );
-    await cancelButton.trigger("click");
+  it("does not emit save when the primary button is clicked while the form is invalid", async () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    await dialog.vm.$emit("click:primary");
+    expect(wrapper.emitted().save).toBeFalsy();
+  });
 
+  it("emits close when ODialog requests close via update:open=false", async () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    await dialog.vm.$emit("update:open", false);
     expect(wrapper.emitted().close).toBeTruthy();
+    expect(wrapper.emitted().close).toHaveLength(1);
   });
 
-  it("should disable save button when form is invalid", async () => {
-    // Initially form should be invalid (empty values)
-    expect(wrapper.vm.isFormValid).toBe(false);
-
-    // Set valid values
-    wrapper.vm.editColorBySeries[0].value = "Series 1";
-    wrapper.vm.editColorBySeries[0].color = "#FF0000";
-    await flushPromises();
-
-    // Now form should be valid
-    expect(wrapper.vm.isFormValid).toBe(true);
+  it("does not emit close when ODialog reports update:open=true", async () => {
+    const dialog = wrapper.findComponent(ODialogStub);
+    await dialog.vm.$emit("update:open", true);
+    expect(wrapper.emitted().close).toBeFalsy();
   });
 
-  it("should handle undefined or null series values", async () => {
+  it("coerces undefined series values back to an empty string via the deep watcher", async () => {
     wrapper.vm.editColorBySeries[0].value = undefined;
     await flushPromises();
     expect(wrapper.vm.editColorBySeries[0].value).toBe("");
+  });
 
+  it("coerces null series values back to an empty string via the deep watcher", async () => {
     wrapper.vm.editColorBySeries[0].value = null;
     await flushPromises();
     expect(wrapper.vm.editColorBySeries[0].value).toBe("");
+  });
+
+  it("returns value, label, or raw item from selectColorBySeriesOption", () => {
+    expect(
+      wrapper.vm.selectColorBySeriesOption({ value: "v", label: "l" }),
+    ).toBe("v");
+    expect(wrapper.vm.selectColorBySeriesOption({ label: "l" })).toBe("l");
+    expect(wrapper.vm.selectColorBySeriesOption("raw")).toBe("raw");
+  });
+
+  it("exposes the expected setup helpers", () => {
+    expect(typeof wrapper.vm.addcolorBySeries).toBe("function");
+    expect(typeof wrapper.vm.removecolorBySeriesByIndex).toBe("function");
+    expect(typeof wrapper.vm.setColorByIndex).toBe("function");
+    expect(typeof wrapper.vm.removeColorByIndex).toBe("function");
+    expect(typeof wrapper.vm.applycolorBySeries).toBe("function");
+    expect(typeof wrapper.vm.cancelEdit).toBe("function");
+    expect(typeof wrapper.vm.openColorPicker).toBe("function");
   });
 });

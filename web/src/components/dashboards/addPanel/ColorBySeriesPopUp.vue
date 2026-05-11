@@ -20,7 +20,7 @@
     @update:open="(v) => { if (!v) cancelEdit(); }"
     title="Color by series"
     :width="40"
-    neutral-button-label="+ Add a new color"\
+    neutral-button-label="+ Add a new color"
     neutral-button-variant="outline"
     primary-button-label="Save"
     :primary-button-disabled="!isFormValid"
