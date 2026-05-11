@@ -36,6 +36,12 @@ export interface SelectProps {
   options?: SelectOption[];
   /** Allows selecting multiple options */
   multiple?: boolean;
+  /**
+   * Maximum number of selection chips rendered in the trigger before the
+   * rest collapse into a "+N more" indicator. Defaults to 3.
+   * Only meaningful when `multiple` is true.
+   */
+  maxVisibleChips?: number;
   /** Enables local text filtering / combobox mode */
   searchable?: boolean;
   /** Debounce (ms) before emitting search events */
