@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-folder-move-new-add"
       variant="outline"
       size="icon-sm"
+      @mousedown.prevent
       @click="
         () => {
           showAddFolderDialog = true;

@@ -158,4 +158,54 @@ describe("ODrawer", () => {
       expect(footerEl?.className).not.toContain("tw:mt-auto");
     });
   });
+
+  describe("body action button validation suppression", () => {
+    it("AC-1/AC-2: focusin on a non-input body element calls resetValidation on q-fields", async () => {
+      const resetValidation = vi.fn();
+      const wrapper = mount(ODrawer, {
+        props: { open: true },
+        slots: {
+          default: `
+            <div class="q-field" data-testid="name-field"></div>
+            <button data-testid="action-btn">+</button>
+          `,
+        },
+      });
+      // Attach the vue component instance mock so clearBodyValidation can reach it
+      const qField = wrapper.find('[data-testid="name-field"]').element as any;
+      qField.__vueParentComponent = { ctx: { resetValidation } };
+
+      await wrapper.find('[data-testid="action-btn"]').trigger("focusin");
+
+      expect(resetValidation).toHaveBeenCalled();
+    });
+
+    it("AC-1/AC-2: focusin on a native input inside q-field does NOT call resetValidation", async () => {
+      const resetValidation = vi.fn();
+      const wrapper = mount(ODrawer, {
+        props: { open: true },
+        slots: {
+          default: `
+            <div class="q-field">
+              <input data-testid="name-input" />
+            </div>
+          `,
+        },
+      });
+      const qField = wrapper.find(".q-field").element as any;
+      qField.__vueParentComponent = { ctx: { resetValidation } };
+
+      await wrapper.find('[data-testid="name-input"]').trigger("focusin");
+
+      expect(resetValidation).not.toHaveBeenCalled();
+    });
+
+    it("AC-4: primary button emits click:primary so consumer can trigger validation", async () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, primaryButtonLabel: "Save" },
+      });
+      await wrapper.find('[data-test="o-drawer-primary-btn"]').trigger("click");
+      expect(wrapper.emitted("click:primary")).toBeTruthy();
+    });
+  });
 });
