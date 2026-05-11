@@ -3710,5 +3710,15 @@
     "clearAll": "Cancella tutto",
     "clearAllTitle": "Cancella tutte le chat",
     "clearAllMessage": "Ciò eliminerà definitivamente tutta la cronologia chat. Questa azione non può essere annullata."
+  },
+  "commandPalette": {
+    "placeholder": "Cerca nelle pagine, nelle entità o digita /ai per ricevere assistenza...",
+    "noResults": "Nessun risultato trovato per «{query}»",
+    "searching": "Ricerca di entità...",
+    "recents": "Recenti",
+    "pages": "Pagine",
+    "entities": "Entità",
+    "commands": "Comandi",
+    "aiActions": "Azioni AI"
   }
 }

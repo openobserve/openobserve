@@ -3705,5 +3705,15 @@
     "clearAll": "全部清除",
     "clearAllTitle": "清除所有聊天",
     "clearAllMessage": "这将永久删除所有聊天记录。此操作无法撤消。"
+  },
+  "commandPalette": {
+    "placeholder": "搜索页面、实体或键入 /ai 以获取帮助...",
+    "noResults": "未找到 “{query}” 的结果",
+    "searching": "正在搜索实体...",
+    "recents": "最近",
+    "pages": "页面",
+    "entities": "实体",
+    "commands": "命令",
+    "aiActions": "AI 动作"
   }
 }
