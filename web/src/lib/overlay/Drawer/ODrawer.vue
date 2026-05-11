@@ -30,6 +30,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   primaryButtonLoading: false,
   secondaryButtonLoading: false,
   neutralButtonLoading: false,
+  lazy: true,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -358,7 +359,9 @@ watch(internalOpen, (open) => {
             canScrollUp && canScrollDown && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
         >
-          <slot />
+          <template v-if="!props.lazy || internalOpen">
+            <slot />
+          </template>
         </div>
 
         <!-- ── Footer ───────────────────────────────────────── -->

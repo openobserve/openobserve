@@ -18,21 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="open"
     :width="60"
-    :show-close="false"
+    :title='t("logStream.schemaHeader")'
     @update:open="$emit('update:open', $event)"
   >
     <!-- #header override: complex stream header with name badge, timeline info,
          and close button — cannot be expressed with title + sub-slots -->
-    <template #header>
+    <template #header-left>
       <div class="row items-center no-wrap">
         <div class="col">
           <div
             class="tw:text-[18px] tw:flex tw:items-center"
             data-test="schema-title-text"
           >
-            {{ t("logStream.schemaHeader") }}
             <!-- introduced name at the top  -->
             <span 
+            v-if="indexData.name"
               :class="[
                 'tw:font-bold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
                 store.state.theme === 'dark' 
@@ -76,11 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </div>
-        <div class="col-auto">
-          <OButton variant="ghost" size="icon-sm" @click="$emit('update:open', false)">
-            <X :size="14" />
-          </OButton>
         </div>
       </div>
     </template>
@@ -2668,7 +2663,7 @@ export default defineComponent({
 
       this.getSchema();
     } else {
-      this.loadingState = false;
+      this.loadingState.value= false;
     }
   },
 });

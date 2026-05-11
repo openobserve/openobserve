@@ -2,6 +2,7 @@
   <ODrawer
     :open="open"
     :width="70"
+    persistent
     title="Edit Dashboard JSON"
     :secondary-button-label="t('common.cancel')"
     :primary-button-label="t('common.save')"
