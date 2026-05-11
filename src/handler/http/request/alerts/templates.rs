@@ -300,7 +300,7 @@ pub async fn delete_template_bulk(
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
         {

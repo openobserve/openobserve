@@ -97,7 +97,7 @@ pub async fn check_stream_permissions(
                 parent_id: "".to_string(),
                 use_all_org: false,
                 use_self_context: false,
-                use_self_parent: false,
+                use_self_parent: true,
             },
             user.role,
             user.is_external,

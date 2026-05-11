@@ -745,7 +745,7 @@ pub async fn delete_alert_bulk(
             "DELETE",
             Some(&_folder_id),
             false,
-            false,
+            true,
             false,
         )
         .await
@@ -1040,6 +1040,7 @@ pub async fn enable_alert_bulk(
     Json(req): Json<AlertBulkEnableRequest>,
 ) -> Response {
     let should_enable = query.value;
+    let _folder_id = query.folder;
 
     #[cfg(feature = "enterprise")]
     {
@@ -1052,9 +1053,9 @@ pub async fn enable_alert_bulk(
                 user_id,
                 "alerts",
                 "PUT",
-                None,
+                Some(&_folder_id),
                 false,
-                false,
+                true,
                 false,
             )
             .await

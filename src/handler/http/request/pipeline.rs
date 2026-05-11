@@ -422,7 +422,7 @@ pub async fn delete_pipeline_bulk(
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
         {
@@ -607,7 +607,7 @@ pub async fn enable_pipeline_bulk(
                 None,
                 false,
                 false,
-                false,
+                true,
             )
             .await
             {

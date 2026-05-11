@@ -83,7 +83,7 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
                 auth: "".to_string(),
                 method: method.to_string(),
                 o2_type: format!(
-                    "{}:_all__meta",
+                    "{}:_meta",
                     OFGA_MODELS
                         .get("license")
                         .map_or("license", |model| model.key),
@@ -91,7 +91,7 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
                 org_id: "_meta".to_string(),
                 bypass_check: false,
                 parent_id: "".to_string(),
-                use_all_org: false,
+                use_all_org: true,
                 use_self_context: false,
                 use_self_parent: false,
             },

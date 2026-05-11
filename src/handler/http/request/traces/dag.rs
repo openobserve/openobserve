@@ -140,7 +140,7 @@ pub async fn get_trace_dag(
                     parent_id: "".to_string(),
                     use_all_org: false,
                     use_self_context: false,
-                    use_self_parent: false,
+                    use_self_parent: true,
                 },
                 user.role,
                 user.is_external,

@@ -502,7 +502,7 @@ pub async fn move_dashboard(
             "PUT",
             Some(&curr_folder.folder_id),
             false,
-            false,
+            true,
             false,
         )
         .await
@@ -981,7 +981,7 @@ async fn filter_permitted_dashboards(
                 parent_id: "".to_string(),
                 use_all_org: false,
                 use_self_context: false,
-                use_self_parent: false,
+                use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
             },
             user_role,

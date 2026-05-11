@@ -107,13 +107,13 @@ pub async fn list(
     // Check if user has access to get users
     if get_openfga_config().enabled
         && check_permissions(
-            &format!("_all_{org_id}"),
+            &org_id,
             &org_id,
             &user_email.user_id,
             "users",
             "GET",
             None,
-            false,
+            true,
             false,
             false,
         )
@@ -472,7 +472,7 @@ pub async fn delete_bulk(
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
         {

@@ -550,7 +550,7 @@ pub async fn delete_destination_bulk(
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
         {
