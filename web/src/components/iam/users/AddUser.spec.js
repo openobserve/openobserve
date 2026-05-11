@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify, Quasar } from "quasar";
 import { nextTick, ref } from "vue";
@@ -66,13 +66,13 @@ vi.mock("@/composables/useDashboard", () => ({
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual: any = await importOriginal();
+  const actual = await importOriginal();
   return {
     ...actual,
     getImageURL: vi.fn(() => ""),
     verifyOrganizationStatus: vi.fn(() => Promise.resolve(true)),
-    logsErrorMessage: vi.fn((code: any) => `Error: ${code}`),
-    mergeRoutes: vi.fn((route1: any, route2: any) => [
+    logsErrorMessage: vi.fn((code) => `Error: ${code}`),
+    mergeRoutes: vi.fn((route1, route2) => [
       ...(route1 || []),
       ...(route2 || []),
     ]),
@@ -221,15 +221,15 @@ const ODialogStub = {
   inheritAttrs: false,
 };
 
-const findDrawer = (w: VueWrapper<any>) =>
+const findDrawer = (w) =>
   w.findComponent({ name: "ODrawer" });
-const findDialog = (w: VueWrapper<any>) =>
+const findDialog = (w) =>
   w.findComponent({ name: "ODialog" });
 
 describe("AddUser Component", () => {
-  let wrapper: VueWrapper<any>;
-  let mockRouter: { push: ReturnType<typeof vi.fn> };
-  let mockNotify: ReturnType<typeof vi.fn>;
+  let wrapper;
+  let mockRouter;
+  let mockNotify;
 
   const defaultProps = {
     open: true,
@@ -254,7 +254,7 @@ describe("AddUser Component", () => {
     customRoles: ["role1", "role2"],
   };
 
-  const buildWrapper = (overrides: Record<string, any> = {}) =>
+  const buildWrapper = (overrides = {}) =>
     mount(AddUser, {
       props: { ...defaultProps, ...overrides },
       global: {
@@ -382,7 +382,7 @@ describe("AddUser Component", () => {
       vi.mocked(userService.create).mockResolvedValue({
         data: { message: "User created successfully" },
         status: 200,
-      } as any);
+      });
 
       wrapper.vm.formData = {
         email: "test@example.com",
@@ -412,7 +412,7 @@ describe("AddUser Component", () => {
       vi.mocked(userService.create).mockResolvedValue({
         data: { message: "ok" },
         status: 200,
-      } as any);
+      });
 
       wrapper.vm.formData = {
         email: "new@example.com",
@@ -437,7 +437,7 @@ describe("AddUser Component", () => {
       vi.mocked(userService.update).mockResolvedValue({
         data: { message: "User updated successfully" },
         status: 200,
-      } as any);
+      });
 
       wrapper.vm.formData = {
         email: "test@example.com",
@@ -488,7 +488,7 @@ describe("AddUser Component", () => {
     it("fetches user roles for existing user in enterprise mode", async () => {
       vi.mocked(userService.getUserRoles).mockResolvedValue({
         data: ["role1"],
-      } as any);
+      });
 
       await wrapper.vm.fetchUserRoles("test@example.com");
       await flushPromises();
@@ -525,7 +525,7 @@ describe("AddUser Component", () => {
       vi.mocked(userService.update).mockResolvedValue({
         data: { message: "Password updated" },
         status: 200,
-      } as any);
+      });
 
       await passwordWrapper.find("form").trigger("submit.prevent");
       await flushPromises();
@@ -636,7 +636,7 @@ describe("AddUser Component", () => {
       const email = "test@example.com";
       vi.mocked(userService.getUserRoles).mockResolvedValue({
         data: ["role1", "role2"],
-      } as any);
+      });
 
       const enterpriseWrapper = buildWrapper({
         isUpdated: true,
@@ -908,7 +908,7 @@ describe("AddUser Component", () => {
       vi.mocked(userService.create).mockResolvedValue({
         data: { message: "User created successfully" },
         status: 200,
-      } as any);
+      });
 
       await nextTick();
       await wrapper.find("form").trigger("submit.prevent");
@@ -985,7 +985,7 @@ describe("AddUser Component", () => {
 
       vi.mocked(userService.create).mockResolvedValue({
         data: { message: "User created successfully" },
-      } as any);
+      });
 
       await nextTick();
       await wrapper.find("form").trigger("submit.prevent");
@@ -1032,7 +1032,7 @@ describe("AddUser Component", () => {
 
       vi.mocked(userService.getUserRoles).mockResolvedValue({
         data: roles,
-      } as any);
+      });
 
       wrapper.vm.existingUser = true;
       wrapper.vm.formData.email = email;

@@ -511,7 +511,7 @@ describe("UpdateRole Component", () => {
       const buttons = wrapper.findAll("button");
       const cancelButton = buttons.find((b) => b.attributes("type") !== "submit");
       expect(cancelButton).toBeDefined();
-      await cancelButton!.trigger("click");
+      await cancelButton.trigger("click");
 
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen).toBeTruthy();
@@ -528,7 +528,7 @@ describe("UpdateRole Component", () => {
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
         data: undefined,
-      } as any);
+      });
 
       await wrapper.vm.onSubmit();
       await flushPromises();
@@ -544,7 +544,7 @@ describe("UpdateRole Component", () => {
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
         data: { unexpected: "format" },
-      } as any);
+      });
 
       await wrapper.vm.onSubmit();
       await flushPromises();

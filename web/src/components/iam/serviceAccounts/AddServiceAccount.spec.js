@@ -1,4 +1,4 @@
-import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Dialog, Notify, Quasar } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
@@ -18,11 +18,11 @@ vi.mock("@/services/service_accounts", () => ({
 
 // Mock vue-i18n so labels resolve to their keys (predictable assertions)
 vi.mock("vue-i18n", async (importOriginal) => {
-  const actual: any = await importOriginal();
+  const actual = await importOriginal();
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key,
+      t: (key) => key,
     }),
   };
 });
@@ -94,11 +94,11 @@ const OButtonStub = {
 };
 
 describe("AddServiceAccount Component", () => {
-  let wrapper: VueWrapper<any>;
-  let mockStore: any;
-  let router: ReturnType<typeof createRouter>;
+  let wrapper;
+  let mockStore;
+  let router;
 
-  const mountComp = (props: Record<string, any> = {}): VueWrapper<any> =>
+  const mountComp = (props = {}) =>
     mount(AddServiceAccount, {
       props: {
         open: true,
@@ -249,7 +249,7 @@ describe("AddServiceAccount Component", () => {
     it("creates service account successfully and emits update:open false", async () => {
       vi.mocked(service_accounts.default.create).mockResolvedValue({
         data: {},
-      } as any);
+      });
 
       wrapper.vm.formData.email = "test@example.com";
       wrapper.vm.firstName = "Test Description";
@@ -271,7 +271,7 @@ describe("AddServiceAccount Component", () => {
       );
       expect(wrapper.emitted()["updated"]).toBeTruthy();
       expect(wrapper.emitted()["update:open"]).toBeTruthy();
-      expect(wrapper.emitted()["update:open"]![0]).toEqual([false]);
+      expect(wrapper.emitted()["update:open"][0]).toEqual([false]);
     });
 
     it("does not throw on 403 error during create", async () => {
@@ -312,7 +312,7 @@ describe("AddServiceAccount Component", () => {
   });
 
   describe("Service Account Update", () => {
-    let updateWrapper: VueWrapper<any>;
+    let updateWrapper;
 
     beforeEach(async () => {
       updateWrapper = mountComp({
@@ -334,7 +334,7 @@ describe("AddServiceAccount Component", () => {
     it("updates service account successfully and emits update:open false", async () => {
       vi.mocked(service_accounts.default.update).mockResolvedValue({
         data: {},
-      } as any);
+      });
 
       updateWrapper.vm.firstName = "Updated Description";
       await nextTick();
@@ -353,7 +353,7 @@ describe("AddServiceAccount Component", () => {
       );
       expect(updateWrapper.emitted()["updated"]).toBeTruthy();
       expect(updateWrapper.emitted()["update:open"]).toBeTruthy();
-      expect(updateWrapper.emitted()["update:open"]![0]).toEqual([false]);
+      expect(updateWrapper.emitted()["update:open"][0]).toEqual([false]);
     });
 
     it("does not emit update:open on update error", async () => {
@@ -391,7 +391,7 @@ describe("AddServiceAccount Component", () => {
       expect(cancelButton.exists()).toBe(true);
       await cancelButton.trigger("click");
       expect(wrapper.emitted()["update:open"]).toBeTruthy();
-      expect(wrapper.emitted()["update:open"]![0]).toEqual([false]);
+      expect(wrapper.emitted()["update:open"][0]).toEqual([false]);
     });
 
     it("forwards ODrawer update:open to parent", async () => {
@@ -399,7 +399,7 @@ describe("AddServiceAccount Component", () => {
         .findComponent({ name: "ODrawer" })
         .vm.$emit("update:open", false);
       expect(wrapper.emitted("update:open")).toBeTruthy();
-      expect(wrapper.emitted("update:open")![0]).toEqual([false]);
+      expect(wrapper.emitted("update:open")[0]).toEqual([false]);
     });
   });
 
