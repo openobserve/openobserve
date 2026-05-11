@@ -1425,7 +1425,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t('search.nlpModeDisabledForVisualization')
                 "
                 data-test="logs-search-bar-query-editor"
-                v-model:query="searchObj.data.query"
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
@@ -1447,35 +1446,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
               />
-              <div
-                v-if="searchObj.meta.logsVisualizeToggle === 'build'"
-                class="query-mode-toggle"
-              >
-                <span class="mode-label">Mode:</span>
-                <OToggleGroup
-                  :model-value="
-                    searchObj.meta.buildModeQueryEditorDisabled
-                      ? 'builder'
-                      : 'custom'
-                  "
-                  @update:model-value="
-                    onBuildModeToggle(($event as string) === 'builder')
-                  "
-                >
-                  <OToggleGroupItem value="builder" size="xs">
-                    <template #icon-left
-                      ><Wrench class="tw:size-3 tw:shrink-0"
-                    /></template>
-                    Builder
-                  </OToggleGroupItem>
-                  <OToggleGroupItem value="custom" size="xs">
-                    <template #icon-left
-                      ><Code2 class="tw:size-3 tw:shrink-0"
-                    /></template>
-                    Custom
-                  </OToggleGroupItem>
-                </OToggleGroup>
-              </div>
             </div>
           </template>
           <template #after>
@@ -3017,11 +2987,20 @@ export default defineComponent({
     };
 
     const updateQueryValue = (value: string, event?: any) => {
+      // During stream changes, the editor's debounced onDidChangeModelContent
+      // callback can re-emit a stale value after onStreamChange has cleared the
+      // query. Reject these stale re-emissions to prevent the old filter from
+      // reappearing in the search bar.
+      if (searchObj.loadingStream) {
+        return;
+      }
+
       // if (searchObj.meta.jobId != "") {
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
       searchObj.data.editorValue = value;
+      searchObj.data.query = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
@@ -3100,6 +3079,7 @@ export default defineComponent({
       }
       if (
         searchObj.meta.sqlMode === false &&
+        searchObj.meta.logsVisualizeToggle !== "build" &&
         value.toLowerCase().includes("select") &&
         value.toLowerCase().includes("from")
       ) {
@@ -4901,44 +4881,45 @@ export default defineComponent({
         // cancel all the logs queries
         cancelQuery();
       } else if (value == "build") {
-        // Switching to build mode - enable SQL mode and generate query using buildSearch
-        const wasSqlMode = searchObj.meta.sqlMode;
-        if (!wasSqlMode) {
-          searchObj.meta.sqlMode = true;
-        }
-
-        // Generate query using buildSearch if query is empty or doesn't have SELECT
-        if (
-          !searchObj.data.query ||
-          searchObj.data.query.toLowerCase().indexOf("select") < 0
-        ) {
-          const queryBuild = buildSearch();
-          const builtQuery = queryBuild?.query?.sql ?? "";
-          if (builtQuery) {
-            searchObj.data.query = builtQuery;
-            searchObj.data.editorValue = builtQuery;
+        // Only generate SQL query if user is already in SQL mode (Case 3).
+        // When SQL mode is OFF (Case 1), BuildQueryPage will set up builder
+        // mode with default histogram/count fields and carry over WHERE clause.
+        if (searchObj.meta.sqlMode) {
+          // Generate query using buildSearch if query is empty or doesn't have SELECT
+          if (
+            !searchObj.data.query ||
+            searchObj.data.query.toLowerCase().indexOf("select") < 0
+          ) {
+            const queryBuild = buildSearch();
+            const builtQuery = queryBuild?.query?.sql ?? "";
+            if (builtQuery) {
+              searchObj.data.query = builtQuery;
+              searchObj.data.editorValue = builtQuery;
+            }
           }
         }
 
         // Wait for Vue reactivity to process query changes before switching tabs
         await nextTick();
 
-        // Enable quick mode if config allows (same as visualization)
-        const isSelectAllQuery = /^\s*select\s+\*\s+from\s+/i.test(
-          searchObj.data.query || "",
-        );
-        const shouldEnableQuickMode =
-          !searchObj.meta.sqlMode || isSelectAllQuery;
-        const isQuickModeDisabled = !searchObj.meta.quickMode;
-        const isQuickModeConfigEnabled =
-          store.state.zoConfig.quick_mode_enabled === true;
+        // Quick mode logic only relevant for SQL mode
+        if (searchObj.meta.sqlMode) {
+          const isSelectAllQuery = /^\s*select\s+\*\s+from\s+/i.test(
+            searchObj.data.query || "",
+          );
+          const shouldEnableQuickMode =
+            !searchObj.meta.sqlMode || isSelectAllQuery;
+          const isQuickModeDisabled = !searchObj.meta.quickMode;
+          const isQuickModeConfigEnabled =
+            store.state.zoConfig.quick_mode_enabled === true;
 
-        if (
-          shouldEnableQuickMode &&
-          isQuickModeDisabled &&
-          isQuickModeConfigEnabled
-        ) {
-          searchObj.meta.quickMode = true;
+          if (
+            shouldEnableQuickMode &&
+            isQuickModeDisabled &&
+            isQuickModeConfigEnabled
+          ) {
+            searchObj.meta.quickMode = true;
+          }
         }
       }
       searchObj.meta.logsVisualizeToggle = value;

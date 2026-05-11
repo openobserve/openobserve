@@ -182,7 +182,7 @@ pub async fn get_trace_dag(
     // Query all spans for this trace_id
     let query_sql = format!(
         "SELECT span_id, trace_id, service_name, operation_name, span_status, \
-         reference_parent_span_id, start_time, end_time, llm_observation_type \
+         reference_parent_span_id, start_time, end_time, gen_ai_operation_name \
          FROM {stream_name} \
          WHERE trace_id = '{trace_id}'"
     );
@@ -305,8 +305,8 @@ pub async fn get_trace_dag(
                 .to_string(),
             start_time: item.get("start_time").and_then(|v| v.as_i64()).unwrap_or(0),
             end_time: item.get("end_time").and_then(|v| v.as_i64()).unwrap_or(0),
-            llm_observation_type: item
-                .get("llm_observation_type")
+            gen_ai_operation_name: item
+                .get("gen_ai_operation_name")
                 .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string()),
@@ -363,7 +363,7 @@ struct SpanNode {
     span_status: String,
     start_time: i64,
     end_time: i64,
-    llm_observation_type: Option<String>,
+    gen_ai_operation_name: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -386,7 +386,7 @@ mod tests {
             span_status: "OK".to_string(),
             start_time: 100,
             end_time: 200,
-            llm_observation_type: None,
+            gen_ai_operation_name: None,
         };
         let json = serde_json::to_string(&node).unwrap();
         assert!(json.contains("span1"));
@@ -403,7 +403,7 @@ mod tests {
             span_status: "OK".to_string(),
             start_time: 0,
             end_time: 1,
-            llm_observation_type: None,
+            gen_ai_operation_name: None,
         };
         let json = serde_json::to_string(&node).unwrap();
         assert!(json.contains("parent"));

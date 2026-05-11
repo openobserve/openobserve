@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw:px-4 tw:flex tw:justify-start">
-        <OTabs v-model="activeTab" dense @update:model-value="onTabChange">
+        <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
           <OTab
             name="services"
             :label="t('settings.correlation.discoveredServicesTab')"
@@ -73,10 +73,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <SemanticFieldGroupsConfig
         v-show="activeTab === 'field-aliases'"
-        :semantic-field-groups="semanticGroups"
+        :key="`field-aliases-${fieldAliasesEditorKey}`"
+        :semantic-field-groups="draftSemanticGroups"
         :scroll-to-group-id="aliasScrollToGroup"
-        @update:semantic-field-groups="onSaveSemanticGroups"
-      />
+        @update:semanticFieldGroups="onDraftSemanticGroupsChange"
+      >
+        <template #header-actions>
+          <OButton
+            data-test="correlation-semanticfieldgroup-save-btn"
+            :variant="isFieldAliasesDirty ? 'primary' : 'outline'"
+            size="sm"
+            :loading="savingFieldAliases"
+            @click="saveSemanticGroups"
+          >
+            {{ t("common.save") }}
+          </OButton>
+        </template>
+      </SemanticFieldGroupsConfig>
     </div>
   </div>
 </template>
@@ -88,13 +101,14 @@ import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { useRouter, useRoute } from "vue-router";
+import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { Server, ScanSearch, Bell, Link2 } from "lucide-vue-next";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import serviceStreamsService from "@/services/service_streams";
 
 export default defineComponent({
@@ -107,6 +121,7 @@ export default defineComponent({
     SemanticFieldGroupsConfig,
     OTabs,
     OTab,
+    OButton,
   },
   setup() {
     const store = useStore();
@@ -136,6 +151,37 @@ export default defineComponent({
     );
 
     const semanticGroups = ref<any[]>([]);
+    const draftSemanticGroups = ref<any[]>([]);
+    const savingFieldAliases = ref(false);
+
+    // Compare only user-meaningful fields. `id` is auto-derived from display+group
+    // by the child component on blur, so including it here would falsely flag dirty
+    // just because the user focused/blurred a Name input. Empty draft entries
+    // (no display + no fields) are ignored so just clicking "Add Custom Group"
+    // without filling anything in doesn't enable Save.
+    const normalizeGroupsForCompare = (groups: any[]): string => {
+      const normalized = (groups ?? [])
+        .filter((g) => (g.display ?? "").trim() !== "" || (g.fields ?? []).length > 0)
+        .map((g) => ({
+          display: (g.display ?? "").trim(),
+          group: g.group ?? "",
+          is_workload_type: !!g.is_workload_type,
+          fields: [...(g.fields ?? [])].sort(),
+        }));
+      normalized.sort((a, b) => a.display.localeCompare(b.display));
+      return JSON.stringify(normalized);
+    };
+
+    const isFieldAliasesDirty = computed(
+      () =>
+        normalizeGroupsForCompare(draftSemanticGroups.value) !==
+        normalizeGroupsForCompare(semanticGroups.value),
+    );
+    // Bumped to force-reset SemanticFieldGroupsConfig's internal state on discard
+    const fieldAliasesEditorKey = ref(0);
+
+    const cloneGroups = (groups: any[]): any[] =>
+      groups.map((g) => ({ ...g, fields: [...(g.fields ?? [])] }));
 
     const loadSemanticGroups = async () => {
       try {
@@ -145,6 +191,7 @@ export default defineComponent({
       } catch (_) {
         semanticGroups.value = [];
       }
+      draftSemanticGroups.value = cloneGroups(semanticGroups.value);
     };
 
     onMounted(loadSemanticGroups);
@@ -198,7 +245,27 @@ export default defineComponent({
       },
     ]);
 
-    const onTabChange = (tab: string) => {
+    const confirmDiscardUnsaved = (): Promise<boolean> => {
+      if (!isFieldAliasesDirty.value) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        q.dialog({
+          title: t("common.unsavedChanges"),
+          message: t("settings.correlation.fieldAliasesUnsavedConfirm"),
+          ok: { label: t("common.discardChanges"), color: "negative", flat: true },
+          cancel: { label: t("common.cancel"), flat: true },
+          persistent: true,
+        })
+          .onOk(() => resolve(true))
+          .onCancel(() => resolve(false));
+      });
+    };
+
+    const onTabChange = async (tab: string) => {
+      if (activeTab.value === "field-aliases" && tab !== "field-aliases") {
+        const proceed = await confirmDiscardUnsaved();
+        if (!proceed) return;
+        if (isFieldAliasesDirty.value) discardSemanticGroups();
+      }
       activeTab.value = tab;
       router.push({
         name: "correlationSettings",
@@ -217,15 +284,32 @@ export default defineComponent({
       });
     };
 
-    const onSaveSemanticGroups = async (groups: any[]) => {
+    const onDraftSemanticGroupsChange = (groups: any[]) => {
+      draftSemanticGroups.value = groups;
+    };
+
+    const saveSemanticGroups = async () => {
+      if (savingFieldAliases.value) return;
+      if (!isFieldAliasesDirty.value) return;
+      savingFieldAliases.value = true;
       try {
         const orgId = store.state.selectedOrganization.identifier;
+        const groups = draftSemanticGroups.value;
         await serviceStreamsService.updateSemanticGroups(orgId, groups);
         semanticGroups.value = groups;
+        draftSemanticGroups.value = cloneGroups(groups);
         q.notify({ type: "positive", message: t("settings.correlation.fieldAliasesSaved") });
       } catch (_) {
         q.notify({ type: "negative", message: t("settings.correlation.fieldAliasesSaveError") });
+      } finally {
+        savingFieldAliases.value = false;
       }
+    };
+
+    const discardSemanticGroups = () => {
+      draftSemanticGroups.value = cloneGroups(semanticGroups.value);
+      // Force-remount the editor so its internal localGroups resets cleanly
+      fieldAliasesEditorKey.value += 1;
     };
 
     const onUpdateServiceFields = async (fields: string[]) => {
@@ -247,6 +331,11 @@ export default defineComponent({
       // No global store update needed as settings are managed via settings v2 API
     };
 
+    onBeforeRouteLeave(async () => {
+      if (!isFieldAliasesDirty.value) return true;
+      return await confirmDiscardUnsaved();
+    });
+
     return {
       store,
       activeTab,
@@ -256,8 +345,14 @@ export default defineComponent({
       onCorrelationSettingsSaved,
       onNavigateToAliases,
       onUpdateServiceFields,
-      onSaveSemanticGroups,
+      onDraftSemanticGroupsChange,
+      saveSemanticGroups,
+      discardSemanticGroups,
       semanticGroups,
+      draftSemanticGroups,
+      isFieldAliasesDirty,
+      savingFieldAliases,
+      fieldAliasesEditorKey,
       t,
     };
   },

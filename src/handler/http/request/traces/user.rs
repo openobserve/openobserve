@@ -69,8 +69,8 @@ use crate::{
                     "first_event": 1234567890,
                     "last_event": 1234567900,
                     "total_events": 16,
-                    "llm_usage_tokens_total": 885,
-                    "llm_usage_cost_total": 105.30
+                    "gen_ai_usage_total_tokens": 885,
+                    "gen_ai_usage_cost": 105.30
                 }
             ]
         })),
@@ -296,8 +296,8 @@ pub async fn get_latest_users(
         "SELECT trace_id, \
         min(start_time) as trace_start_time, \
         max(end_time) as trace_end_time, \
-        sum(llm_usage_tokens_total) as llm_usage_details_total, \
-        sum(llm_usage_cost_total) as llm_cost_details_total \
+        sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
         FROM \"{stream_name}\" \
         WHERE trace_id IN ('{trace_ids_sql}') \
         GROUP BY trace_id"
@@ -358,11 +358,11 @@ pub async fn get_latest_users(
             TraceDetail {
                 start_time: json::get_int_value(item.get("trace_start_time").unwrap_or_default()),
                 end_time: json::get_int_value(item.get("trace_end_time").unwrap_or_default()),
-                llm_usage_total: json::get_int_value(
-                    item.get("llm_usage_details_total").unwrap_or_default(),
+                gen_ai_usage_total_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_total").unwrap_or_default(),
                 ),
-                llm_cost_total: json::get_float_value(
-                    item.get("llm_cost_details_total").unwrap_or_default(),
+                gen_ai_usage_cost: json::get_float_value(
+                    item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
             },
         );
@@ -409,8 +409,8 @@ pub async fn get_latest_users(
 struct TraceDetail {
     start_time: i64,
     end_time: i64,
-    llm_usage_total: i64,
-    llm_cost_total: f64,
+    gen_ai_usage_total_tokens: i64,
+    gen_ai_usage_cost: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -419,8 +419,8 @@ struct UserResponseItem {
     first_event: i64,
     last_event: i64,
     total_events: u32,
-    llm_usage_tokens_total: i64,
-    llm_usage_cost_total: f64,
+    gen_ai_usage_total_tokens: i64,
+    gen_ai_usage_cost: f64,
 }
 
 fn parse_user_trace_ids(
@@ -472,8 +472,8 @@ fn aggregate_users(
                 if detail.end_time > last_event {
                     last_event = detail.end_time;
                 }
-                usage_total += detail.llm_usage_total;
-                cost_total += detail.llm_cost_total;
+                usage_total += detail.gen_ai_usage_total_tokens;
+                cost_total += detail.gen_ai_usage_cost;
             }
         }
         users_data.push(UserResponseItem {
@@ -481,8 +481,8 @@ fn aggregate_users(
             first_event,
             last_event,
             total_events: trace_ids.len() as u32,
-            llm_usage_tokens_total: usage_total,
-            llm_usage_cost_total: cost_total,
+            gen_ai_usage_total_tokens: usage_total,
+            gen_ai_usage_cost: cost_total,
         });
     }
     users_data.sort_by(|a, b| b.last_event.cmp(&a.last_event));
@@ -556,8 +556,8 @@ mod tests {
             TraceDetail {
                 start_time: 1000,
                 end_time: 2000,
-                llm_usage_total: 150,
-                llm_cost_total: 0.01,
+                gen_ai_usage_total_tokens: 150,
+                gen_ai_usage_cost: 0.01,
             },
         );
         trace_details.insert(
@@ -565,8 +565,8 @@ mod tests {
             TraceDetail {
                 start_time: 500,
                 end_time: 3000,
-                llm_usage_total: 300,
-                llm_cost_total: 0.02,
+                gen_ai_usage_total_tokens: 300,
+                gen_ai_usage_cost: 0.02,
             },
         );
 
@@ -577,8 +577,8 @@ mod tests {
         assert_eq!(u.first_event, 500);
         assert_eq!(u.last_event, 3000);
         assert_eq!(u.total_events, 2);
-        assert_eq!(u.llm_usage_tokens_total, 450);
-        assert!((u.llm_usage_cost_total - 0.03).abs() < 1e-10);
+        assert_eq!(u.gen_ai_usage_total_tokens, 450);
+        assert!((u.gen_ai_usage_cost - 0.03).abs() < 1e-10);
     }
 
     #[test]
@@ -593,8 +593,8 @@ mod tests {
             TraceDetail {
                 start_time: 100,
                 end_time: 200,
-                llm_usage_total: 0,
-                llm_cost_total: 0.0,
+                gen_ai_usage_total_tokens: 0,
+                gen_ai_usage_cost: 0.0,
             },
         );
         trace_details.insert(
@@ -602,8 +602,8 @@ mod tests {
             TraceDetail {
                 start_time: 500,
                 end_time: 9000,
-                llm_usage_total: 0,
-                llm_cost_total: 0.0,
+                gen_ai_usage_total_tokens: 0,
+                gen_ai_usage_cost: 0.0,
             },
         );
 
@@ -639,8 +639,8 @@ mod tests {
                 TraceDetail {
                     start_time: start,
                     end_time: start + 50,
-                    llm_usage_total: 0,
-                    llm_cost_total: 0.0,
+                    gen_ai_usage_total_tokens: 0,
+                    gen_ai_usage_cost: 0.0,
                 },
             );
         }

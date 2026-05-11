@@ -1422,13 +1422,6 @@ export default defineComponent({
       ) {
         return "";
       }
-      // A rendered chart is already on screen — suppress "No Data" even if
-      // the raw data buffer is momentarily empty. This prevents a flicker on
-      // refresh where the executor resets state.data = [] before loading
-      // flips to true, transiently firing this computed with empty data.
-      if (panelData.value?.options?.series?.length > 0) {
-        return "";
-      }
       // Check if the queryType is 'promql'
       if (panelSchema.value?.queryType == "promql") {
         // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
@@ -1436,6 +1429,14 @@ export default defineComponent({
           filteredData.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
+      }
+
+      // A rendered chart is already on screen — suppress "No Data" even if
+      // the raw data buffer is momentarily empty. This prevents a flicker on
+      // refresh where the executor resets state.data = [] before loading
+      // flips to true, transiently firing this computed with empty data.
+      if (panelData.value?.options?.series?.length > 0) {
+        return "";
       }
       // The queryType is not 'promql'
       return data.value.length &&
@@ -1485,7 +1486,7 @@ export default defineComponent({
       showErrorNotification,
     });
 
-    const { downloadDataAsCSV, downloadDataAsJSON } = usePanelDownload({
+    const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
       filteredData,
@@ -1578,6 +1579,23 @@ export default defineComponent({
       showPopupsAndOverlays,
       downloadDataAsCSV,
       downloadDataAsJSON,
+      getPanelCsvData: (title: string) => {
+        const csv = getPanelCsvString();
+        if (!csv) return null;
+        return {
+          title: title ?? panelSchema.value?.title ?? "panel",
+          csv,
+        };
+      },
+      logDataAsJSON: (title: string) => {
+        const chartData =
+          panelSchema.value?.queryType === "promql"
+            ? filteredData.value
+            : data.value;
+        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.log(chartData);
+        console.groupEnd();
+      },
       loadingProgressPercentage,
       isPartialData,
       contextMenuVisible,

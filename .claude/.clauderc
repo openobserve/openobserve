@@ -2,3 +2,4 @@
 - Build: Always use `cargo build` (DEBUG only). Never use `--release`.
 - UI: Skip all `npm run build` or UI build steps.
 - Env: Always source/check `.env` in project root before running.
+- **Always check format**: Use `cargo fmt && cargo clippy` to check code style before done.

@@ -70,10 +70,10 @@ use crate::{
                     "end_time": 1234567900,
                     "duration": 10,
                     "trace_count": 3,
-                    "llm_usage_tokens_input": 100,
-                    "llm_usage_tokens_output": 50,
-                    "llm_usage_tokens_total": 150,
-                    "llm_usage_cost_total": 0.005
+                    "gen_ai_usage_input_tokens": 100,
+                    "gen_ai_usage_output_tokens": 50,
+                    "gen_ai_usage_total_tokens": 150,
+                    "gen_ai_usage_cost": 0.005
                 }
             ]
         })),
@@ -199,9 +199,9 @@ pub async fn get_latest_sessions(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // session_id may appear on the first span only or on all spans of a trace.
-    // _o2_llm_* fields may be on different spans than session_id.
+    // gen_ai_* fields may be on different spans than session_id.
     // So we must: get session→trace_id mapping first, then query by trace_id
-    // (which captures ALL spans) to get accurate _o2_llm_* totals.
+    // (which captures ALL spans) to get accurate gen_ai_* totals.
     let session_id_col = O2Attributes::SESSION_ID;
     let stream_type = StreamType::Traces;
     let user_id_opt = Some(user_id.to_string());
@@ -300,10 +300,10 @@ pub async fn get_latest_sessions(
         "SELECT trace_id, \
         min(start_time) as trace_start_time, \
         max(end_time) as trace_end_time, \
-        sum(llm_usage_tokens_input) as llm_usage_details_input, \
-        sum(llm_usage_tokens_output) as llm_usage_details_output, \
-        sum(llm_usage_tokens_total) as llm_usage_details_total, \
-        sum(llm_usage_cost_total) as llm_cost_details_total \
+        sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
+        sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+        sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
         FROM \"{stream_name}\" \
         WHERE trace_id IN ('{trace_ids_sql}') \
         GROUP BY trace_id"
@@ -364,17 +364,17 @@ pub async fn get_latest_sessions(
             TraceDetail {
                 start_time: json::get_int_value(item.get("trace_start_time").unwrap_or_default()),
                 end_time: json::get_int_value(item.get("trace_end_time").unwrap_or_default()),
-                llm_usage_input: json::get_int_value(
-                    item.get("llm_usage_details_input").unwrap_or_default(),
+                gen_ai_usage_input_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_input").unwrap_or_default(),
                 ),
-                llm_usage_output: json::get_int_value(
-                    item.get("llm_usage_details_output").unwrap_or_default(),
+                gen_ai_usage_output_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_output").unwrap_or_default(),
                 ),
-                llm_usage_total: json::get_int_value(
-                    item.get("llm_usage_details_total").unwrap_or_default(),
+                gen_ai_usage_total_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_total").unwrap_or_default(),
                 ),
-                llm_cost_total: json::get_float_value(
-                    item.get("llm_cost_details_total").unwrap_or_default(),
+                gen_ai_usage_cost: json::get_float_value(
+                    item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
             },
         );
@@ -421,10 +421,10 @@ pub async fn get_latest_sessions(
 struct TraceDetail {
     start_time: i64,
     end_time: i64,
-    llm_usage_input: i64,
-    llm_usage_output: i64,
-    llm_usage_total: i64,
-    llm_cost_total: f64,
+    gen_ai_usage_input_tokens: i64,
+    gen_ai_usage_output_tokens: i64,
+    gen_ai_usage_total_tokens: i64,
+    gen_ai_usage_cost: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -434,10 +434,10 @@ struct SessionResponseItem {
     end_time: i64,
     duration: i64,
     trace_count: u16,
-    llm_usage_tokens_input: i64,
-    llm_usage_tokens_output: i64,
-    llm_usage_tokens_total: i64,
-    llm_usage_cost_total: f64,
+    gen_ai_usage_input_tokens: i64,
+    gen_ai_usage_output_tokens: i64,
+    gen_ai_usage_total_tokens: i64,
+    gen_ai_usage_cost: f64,
 }
 
 fn parse_session_trace_ids(
@@ -491,10 +491,10 @@ fn aggregate_sessions(
                 if detail.end_time > session_end_time {
                     session_end_time = detail.end_time;
                 }
-                usage_input += detail.llm_usage_input;
-                usage_output += detail.llm_usage_output;
-                usage_total += detail.llm_usage_total;
-                cost_total += detail.llm_cost_total;
+                usage_input += detail.gen_ai_usage_input_tokens;
+                usage_output += detail.gen_ai_usage_output_tokens;
+                usage_total += detail.gen_ai_usage_total_tokens;
+                cost_total += detail.gen_ai_usage_cost;
             }
         }
         let duration = if session_end_time > session_start_time {
@@ -508,10 +508,10 @@ fn aggregate_sessions(
             end_time: session_end_time,
             duration,
             trace_count: trace_ids.len() as u16,
-            llm_usage_tokens_input: usage_input,
-            llm_usage_tokens_output: usage_output,
-            llm_usage_tokens_total: usage_total,
-            llm_usage_cost_total: cost_total,
+            gen_ai_usage_input_tokens: usage_input,
+            gen_ai_usage_output_tokens: usage_output,
+            gen_ai_usage_total_tokens: usage_total,
+            gen_ai_usage_cost: cost_total,
         });
     }
     sessions_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
@@ -585,10 +585,10 @@ mod tests {
             TraceDetail {
                 start_time: 1000,
                 end_time: 2000,
-                llm_usage_input: 100,
-                llm_usage_output: 50,
-                llm_usage_total: 150,
-                llm_cost_total: 0.01,
+                gen_ai_usage_input_tokens: 100,
+                gen_ai_usage_output_tokens: 50,
+                gen_ai_usage_total_tokens: 150,
+                gen_ai_usage_cost: 0.01,
             },
         );
         trace_details.insert(
@@ -596,10 +596,10 @@ mod tests {
             TraceDetail {
                 start_time: 1500,
                 end_time: 3000,
-                llm_usage_input: 200,
-                llm_usage_output: 100,
-                llm_usage_total: 300,
-                llm_cost_total: 0.02,
+                gen_ai_usage_input_tokens: 200,
+                gen_ai_usage_output_tokens: 100,
+                gen_ai_usage_total_tokens: 300,
+                gen_ai_usage_cost: 0.02,
             },
         );
 
@@ -611,10 +611,10 @@ mod tests {
         assert_eq!(s.end_time, 3000);
         assert_eq!(s.duration, 2000);
         assert_eq!(s.trace_count, 2);
-        assert_eq!(s.llm_usage_tokens_input, 300);
-        assert_eq!(s.llm_usage_tokens_output, 150);
-        assert_eq!(s.llm_usage_tokens_total, 450);
-        assert!((s.llm_usage_cost_total - 0.03).abs() < 1e-10);
+        assert_eq!(s.gen_ai_usage_input_tokens, 300);
+        assert_eq!(s.gen_ai_usage_output_tokens, 150);
+        assert_eq!(s.gen_ai_usage_total_tokens, 450);
+        assert!((s.gen_ai_usage_cost - 0.03).abs() < 1e-10);
     }
 
     #[test]
@@ -629,10 +629,10 @@ mod tests {
             TraceDetail {
                 start_time: 1000,
                 end_time: 2000,
-                llm_usage_input: 0,
-                llm_usage_output: 0,
-                llm_usage_total: 0,
-                llm_cost_total: 0.0,
+                gen_ai_usage_input_tokens: 0,
+                gen_ai_usage_output_tokens: 0,
+                gen_ai_usage_total_tokens: 0,
+                gen_ai_usage_cost: 0.0,
             },
         );
         trace_details.insert(
@@ -640,10 +640,10 @@ mod tests {
             TraceDetail {
                 start_time: 5000,
                 end_time: 6000,
-                llm_usage_input: 0,
-                llm_usage_output: 0,
-                llm_usage_total: 0,
-                llm_cost_total: 0.0,
+                gen_ai_usage_input_tokens: 0,
+                gen_ai_usage_output_tokens: 0,
+                gen_ai_usage_total_tokens: 0,
+                gen_ai_usage_cost: 0.0,
             },
         );
 
@@ -676,10 +676,10 @@ mod tests {
             TraceDetail {
                 start_time: 1000,
                 end_time: 1000,
-                llm_usage_input: 0,
-                llm_usage_output: 0,
-                llm_usage_total: 0,
-                llm_cost_total: 0.0,
+                gen_ai_usage_input_tokens: 0,
+                gen_ai_usage_output_tokens: 0,
+                gen_ai_usage_total_tokens: 0,
+                gen_ai_usage_cost: 0.0,
             },
         );
 
@@ -702,10 +702,10 @@ mod tests {
                 TraceDetail {
                     start_time: start,
                     end_time: start + 100,
-                    llm_usage_input: 0,
-                    llm_usage_output: 0,
-                    llm_usage_total: 0,
-                    llm_cost_total: 0.0,
+                    gen_ai_usage_input_tokens: 0,
+                    gen_ai_usage_output_tokens: 0,
+                    gen_ai_usage_total_tokens: 0,
+                    gen_ai_usage_cost: 0.0,
                 },
             );
         }
