@@ -192,6 +192,9 @@ export class ServicesCatalogPage {
   async getRowCount() {
     // Count service-name links (one per row, scoped to TenstackTable body)
     // Uses service-link prefix to avoid matching status-pill / status-legend in the toolbar
+    // Wait briefly for at least one row to render — virtual scrolling may delay row DOM
+    await this.page.locator('[data-test^="services-catalog-service-link-"]').first()
+      .waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
     return await this.page.locator('[data-test^="services-catalog-service-link-"]').count();
   }
 
