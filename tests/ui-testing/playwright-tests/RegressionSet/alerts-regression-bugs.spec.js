@@ -44,10 +44,17 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('✓ Navigated to alerts page');
 
     // Click "Add Alert" button
-    const addAlertBtnVisible = await page.locator(pm.alertsPage.addAlertButton).isVisible({ timeout: 5000 }).catch(() => false);
+    const addAlertBtn = page.locator(pm.alertsPage.addAlertButton);
+    const addAlertBtnVisible = await addAlertBtn.isVisible({ timeout: 5000 }).catch(() => false);
     if (!addAlertBtnVisible) {
       testLogger.warn('Add Alert button not visible — skipping');
       test.skip(true, 'Add Alert button not available');
+      return;
+    }
+    const addAlertBtnEnabled = await addAlertBtn.isEnabled().catch(() => false);
+    if (!addAlertBtnEnabled) {
+      testLogger.warn('Add Alert button is disabled (no destinations configured) — skipping');
+      test.skip(true, 'Add Alert button disabled — no destinations available');
       return;
     }
     await pm.alertsPage.clickAddAlertButton();

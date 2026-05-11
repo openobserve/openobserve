@@ -163,10 +163,7 @@ test.describe("Alerts Regression Bugs", () => {
     // Select Scheduled alert type using page object
     await pm.alertsPage.selectScheduledAlertType();
 
-    // Navigate to Step 2: Conditions
-    await pm.alertsPage.clickContinueButton();
-
-    // ✅ COVERAGE: P1 - PromQL tab visibility for metrics streams
+    // ✅ COVERAGE: P1 - QueryConfig tabs are visible directly in v3 single-pane UI (no step navigation)
     await pm.alertsPage.expectPromqlTabVisible();
     testLogger.info('✅ P1: PromQL tab is visible for metrics stream');
 
@@ -178,35 +175,23 @@ test.describe("Alerts Regression Bugs", () => {
     // Click PromQL tab using page object
     await pm.alertsPage.clickPromqlTab();
 
-    // ✅ COVERAGE: P1 - "Trigger if the value is" fields appear on Step 2 (QueryConfig)
-    // The condition row renders in QueryConfig.vue when PromQL tab is active, not on Step 4
+    // ✅ COVERAGE: P1 - PromQL condition row is visible (renders in QueryConfig.vue when PromQL is active)
     await pm.alertsPage.expectPromqlConditionRowVisible();
-    testLogger.info('✅ P1: PromQL condition row "Alert if the value is" is visible on Step 2');
+    testLogger.info('✅ P1: PromQL condition row "Alert if the value is" is visible');
 
     // Verify operator dropdown and value input exist
     await pm.alertsPage.expectOperatorDropdownVisible();
     await pm.alertsPage.expectValueInputVisible();
     testLogger.info('✅ P1: Operator dropdown and value input are visible');
 
-    // Navigate to Step 4 for mode switching test
-    await pm.alertsPage.clickContinueButton(); // Step 3
-    await pm.alertsPage.clickContinueButton(); // Step 4
-
     // ========== PART 2: Mode Switching Test ==========
     testLogger.info('PART 2: Testing mode switching behavior');
 
-    // Go back to Step 2 using wizard step navigation (index 1 = Step 2)
-    await pm.alertsPage.clickStepIndicator(1);
-
-    // Switch to Custom tab using page object
+    // Switch to Custom tab directly (v3 single-pane: all tabs visible on same page)
     await pm.alertsPage.clickCustomTab();
 
-    // Navigate to Step 4 (index 3 = Step 4)
-    await pm.alertsPage.clickStepIndicator(3);
-
-    // NOTE: In the current UI, the threshold operator row (alert-threshold-operator-select)
-    // is visible in all modes as a unified condition control. The old "Trigger if the value is"
-    // row that was PromQL-specific no longer exists as a separate row.
+    // NOTE: In v3 single-pane UI, the threshold operator row is mode-agnostic
+    // and doesn't need PromQL-specific verification. Tabs are the only navigation.
     testLogger.info('P2 mode-switch check skipped: threshold row is now mode-agnostic in current UI');
 
     // Cancel this wizard flow using page object
