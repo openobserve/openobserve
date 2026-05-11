@@ -64,10 +64,12 @@ export class LogsPage {
         this.savedViewsExpand = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.saveViewButton = 'button'; // filter by text in method
         this.savedViewNameInput = '[data-test="add-alert-name-input"]';
-        this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
+        // Saved view dialog migrated from q-dialog to ODialog (SearchBar.vue:1654) — built-in primary button replaces the old custom button
+        this.savedViewDialogSave = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
-        this.confirmButton = '[data-test="confirm-button"]';
+        // ConfirmDialog migrated to ODialog — primary button is now scoped inside the dialog panel
+        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
@@ -77,7 +79,7 @@ export class LogsPage {
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="close-dialog"]';
-        this.savedViewDialogSaveContent = '[data-test="saved-view-dialog-save-btn"]';
+        this.savedViewDialogSaveContent = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewByLabel = '.q-item__label';
         this.notificationMessage = '.q-notification__message';
         this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
