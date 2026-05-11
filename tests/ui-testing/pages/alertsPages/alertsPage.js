@@ -150,8 +150,8 @@ export class AlertsPage {
             cloneAlertName: '[data-test="to-be-clone-alert-name"]',
             cloneStreamType: '[data-test="to-be-clone-stream-type"]',
             cloneStreamName: '[data-test="to-be-clone-stream-name"]',
-            cloneSubmitButton: '[data-test="clone-alert-submit-btn"]',
-            cloneCancelButton: '[data-test="clone-alert-cancel-btn"]',
+            cloneSubmitButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-primary-btn"]',
+            cloneCancelButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-secondary-btn"]',
             pauseStartAlert: '[data-test="alert-list-{alertName}-pause-start-alert"]',
 
             // Alert management locators
@@ -164,7 +164,7 @@ export class AlertsPage {
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
             moveAcrossFoldersButton: '[data-test="alert-list-move-across-folders-btn"]',
             folderDropdown: '[data-test="alerts-index-dropdown-stream_type"]',
-            moveButton: '[data-test="alerts-folder-move"]',
+            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]',
             alertsMovedMessage: 'alerts Moved successfully',
 
             // Alert search and deletion locators
