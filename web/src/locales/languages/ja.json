@@ -124,7 +124,10 @@
     "create": "作成",
     "resources": "リソース",
     "updated_at": "更新日",
-    "error": "[エラー]"
+    "error": "[エラー]",
+    "db": "[データベース]",
+    "discardChanges": "変更を破棄",
+    "unsavedChanges": "未保存の変更"
   },
   "search": {
     "metrics": "メトリクス",
@@ -2256,6 +2259,8 @@
     "editJson": "アラート JSON の編集",
     "additional_settings": "その他の設定",
     "alertNamePlaceholder": "アラート名",
+    "nameRequired": "アラート名は必須です。",
+    "nameNoSpecialChars": "アラート名に ':', '#', '?', '&', '%', 引用符、スペースは使用できません。代わりにアンダースコア (_) を使用してください。",
     "anomalyNamePlaceholder": "アノマリー名",
     "folder": "フォルダー",
     "selectStreamTypeFirst": "最初にストリームタイプを選択してください",

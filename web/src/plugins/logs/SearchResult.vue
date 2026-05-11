@@ -1149,7 +1149,7 @@ export default defineComponent({
 
     const reDrawChart = () => {
       if (
-        // eslint-disable-next-line no-prototype-builtins
+         
         searchObj.data.histogram.hasOwnProperty("xData") &&
         searchObj.data.histogram.xData.length > 0
       ) {

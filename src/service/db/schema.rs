@@ -114,22 +114,24 @@ pub async fn set_stream_is_llm(
     settings.is_llm_stream = is_llm_stream;
 
     if is_llm_stream && !settings.defined_schema_fields.is_empty() {
-        // Check the actual schema to find which LLM fields are missing
+        // Provision Gen-AI semantic-convention columns for the stream. Legacy llm_*
+        // columns (if any from before the Gen-AI migration) are left as-is in UDS so
+        // historical data still reads cleanly; new streams only get gen_ai_* columns.
         let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
-        let missing_fields: Vec<Field> = LLM_SCHEMA_FIELDS
+        let missing_fields: Vec<Field> = GEN_AI_SCHEMA_FIELDS
             .iter()
             .filter(|f| !schema_cache.contains_field(f.name()))
             .cloned()
             .collect();
 
         if !missing_fields.is_empty() {
-            let llm_schema = Schema::new(missing_fields);
-            merge(org_id, stream_name, stream_type, &llm_schema, None).await?;
+            let gen_ai_schema = Schema::new(missing_fields);
+            merge(org_id, stream_name, stream_type, &gen_ai_schema, None).await?;
         }
 
         // Add to defined_schema_fields only if not already present
         let mut uds_updated = false;
-        for field in LLM_SCHEMA_FIELDS.iter() {
+        for field in GEN_AI_SCHEMA_FIELDS.iter() {
             if !settings
                 .defined_schema_fields
                 .contains(&field.name().to_string())
@@ -150,27 +152,38 @@ pub async fn set_stream_is_llm(
     update_setting(org_id, stream_name, stream_type, metadata).await
 }
 
-/// Returns the Arrow schema fields for LLM streams, matching fields used by
-/// the traces handler APIs (mod.rs, session.rs, user.rs, dag.rs).
-static LLM_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock::new(|| {
+/// Arrow schema fields provisioned on streams marked as LLM streams.
+///
+/// Column names follow OTEL Gen-AI semantic conventions (after dot→underscore
+/// flattening of attribute keys at ingestion). Three columns are OpenObserve
+/// extensions kept under the `gen_ai_` namespace per project convention: the
+/// derived `gen_ai_usage_total_tokens`, and the cost breakdown
+/// `gen_ai_usage_cost_input` / `gen_ai_usage_cost_output` (the spec only
+/// defines a single `gen_ai.usage.cost`).
+static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock::new(|| {
     vec![
         // String fields
-        Field::new("llm_observation_type", DataType::Utf8, true),
-        Field::new("llm_model_name", DataType::Utf8, true),
-        Field::new("llm_provider_name", DataType::Utf8, true),
-        Field::new("llm_input", DataType::Utf8, true),
-        Field::new("llm_output", DataType::Utf8, true),
-        Field::new("llm_user_id", DataType::Utf8, true),
-        Field::new("llm_session_id", DataType::Utf8, true),
+        Field::new("gen_ai_operation_name", DataType::Utf8, true),
+        Field::new("gen_ai_response_model", DataType::Utf8, true),
+        Field::new("gen_ai_provider_name", DataType::Utf8, true),
+        Field::new("gen_ai_input_messages", DataType::Utf8, true),
+        Field::new("gen_ai_output_messages", DataType::Utf8, true),
+        Field::new("gen_ai_system_instructions", DataType::Utf8, true),
+        Field::new("user_id", DataType::Utf8, true),
+        Field::new("gen_ai_conversation_id", DataType::Utf8, true),
         // Integer fields
-        Field::new("llm_usage_tokens_input", DataType::Int64, true),
-        Field::new("llm_usage_tokens_output", DataType::Int64, true),
-        Field::new("llm_usage_tokens_total", DataType::Int64, true),
-        Field::new("llm_completion_start_time", DataType::Int64, true),
+        Field::new("gen_ai_usage_input_tokens", DataType::Int64, true),
+        Field::new("gen_ai_usage_output_tokens", DataType::Int64, true),
+        Field::new("gen_ai_usage_total_tokens", DataType::Int64, true),
         // Float fields
-        Field::new("llm_usage_cost_input", DataType::Float64, true),
-        Field::new("llm_usage_cost_output", DataType::Float64, true),
-        Field::new("llm_usage_cost_total", DataType::Float64, true),
+        Field::new(
+            "gen_ai_response_time_to_first_chunk",
+            DataType::Float64,
+            true,
+        ),
+        Field::new("gen_ai_usage_cost", DataType::Float64, true),
+        Field::new("gen_ai_usage_cost_input", DataType::Float64, true),
+        Field::new("gen_ai_usage_cost_output", DataType::Float64, true),
     ]
 });
 
@@ -271,7 +284,12 @@ async fn list_stream_schemas(
                     schema: if fetch_schema {
                         val.schema().as_ref().clone()
                     } else {
-                        Schema::empty()
+                        // Even when the caller did not ask for the full schema,
+                        // preserve the metadata (which carries `settings`,
+                        // `created_at`, etc.) so downstream consumers can read
+                        // properties like `is_llm_stream` from the cached
+                        // schema. The fields list itself is omitted.
+                        Schema::empty().with_metadata(val.schema().metadata().clone())
                     },
                 }
             })
@@ -323,29 +341,31 @@ pub async fn list(
     }
     Ok(schemas
         .into_iter()
-        .map(|((stream_name, stream_type), versions)| StreamSchema {
-            stream_name,
-            stream_type,
-            schema: if fetch_schema {
-                versions
-                    .iter()
-                    .max_by_key(|(_, start_dt)| *start_dt)
-                    .map(|(val, _)| {
-                        if fetch_schema {
-                            let mut schema: Vec<Schema> = json::from_slice(val).unwrap();
-                            if !schema.is_empty() {
-                                schema.remove(schema.len() - 1)
-                            } else {
-                                Schema::empty()
-                            }
-                        } else {
-                            Schema::empty()
-                        }
-                    })
-                    .unwrap()
+        .map(|((stream_name, stream_type), versions)| {
+            let latest = versions
+                .iter()
+                .max_by_key(|(_, start_dt)| *start_dt)
+                .map(|(val, _)| {
+                    let mut schema: Vec<Schema> = json::from_slice(val).unwrap();
+                    if !schema.is_empty() {
+                        schema.remove(schema.len() - 1)
+                    } else {
+                        Schema::empty()
+                    }
+                })
+                .unwrap_or_else(Schema::empty);
+            // When the caller didn't request full schema, drop the field list
+            // but keep the metadata so settings (e.g. `is_llm_stream`) survive.
+            let schema = if fetch_schema {
+                latest
             } else {
-                Schema::empty()
-            },
+                Schema::empty().with_metadata(latest.metadata().clone())
+            };
+            StreamSchema {
+                stream_name,
+                stream_type,
+                schema,
+            }
         })
         .collect())
 }

@@ -124,7 +124,10 @@
     "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
     "resources": "Hulpbronnen",
     "updated_at": "Bijgewerkt op",
-    "error": "Fout"
+    "error": "Fout",
+    "db": "Database",
+    "discardChanges": "Wijzigingen negeren",
+    "unsavedChanges": "Niet opgeslagen wijzigingen"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -2237,6 +2240,8 @@
     "importedFromAnomalyPattern": "Waarschuwing vooraf ingevuld op basis van een abnormaal logpatroon — bekijk de urgentie-instellingen",
     "additional_settings": "Aanvullende instellingen",
     "alertNamePlaceholder": "Naam van de waarschuwing",
+    "nameRequired": "Waarschuwingsnaam is verplicht.",
+    "nameNoSpecialChars": "Waarschuwingsnaam mag geen ':', '#', '?', '&', '%', aanhalingstekens of spaties bevatten. Gebruik in plaats daarvan underscores (_).",
     "anomalyNamePlaceholder": "Anomalienaam",
     "folder": "Folder",
     "selectStreamTypeFirst": "Selecteer eerst een streamtype",

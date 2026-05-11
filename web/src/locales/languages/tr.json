@@ -124,7 +124,10 @@
     "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
     "resources": "Kaynaklar",
     "updated_at": "Güncellendi:",
-    "error": "Hata"
+    "error": "Hata",
+    "db": "Veritabanı",
+    "discardChanges": "Değişiklikleri iptal et",
+    "unsavedChanges": "Kaydedilmemiş değişiklikler"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -2237,6 +2240,8 @@
     "importedFromAnomalyPattern": "Anormal günlük düzeninden önceden doldurulmuş uyarı - aciliyet ayarlarını gözden geçirin",
     "additional_settings": "Ek Ayarlar",
     "alertNamePlaceholder": "Uyarı adı",
+    "nameRequired": "Uyarı adı gereklidir.",
+    "nameNoSpecialChars": "Uyarı adı ':', '#', '?', '&', '%', tırnak işaretleri veya boşluk içeremez. Bunun yerine alt çizgi (_) kullanın.",
     "anomalyNamePlaceholder": "Anomali adı",
     "folder": "Klasör",
     "selectStreamTypeFirst": "Önce bir akış türü seçin",

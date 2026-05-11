@@ -98,6 +98,11 @@ export class AlertsPage {
             contextAttributeValueInput: '[data-test="alert-variables-value-input"]',
             rowTemplateTextarea: '[data-test="add-alert-row-input-textarea"]',
             templateOverrideSelect: '.template-select-field',
+            // Advanced tab: template override select uses .alert-v3-select class
+            advancedTemplateOverrideSelect: '.step-advanced .alert-v3-select',
+            // Alert destinations select (in AlertSettings.vue, condition tab)
+            alertDestinationsSelect: '[data-test="alert-destinations-select"]',
+            advancedTabBtn: 'button:has-text("Advanced")',
             visibleDropdownMenu: '[role="listbox"]:visible, [role="menu"]:visible',
 
             // Query Editor Dialog selectors
@@ -710,6 +715,49 @@ export class AlertsPage {
 
     async getAllAlertNames() {
         return this.bulkOperations.getAllAlertNames();
+    }
+
+    // ==================== REGRESSION TEST HELPER METHODS ====================
+
+    /**
+     * Click the "Add Alert" button on the alerts list page
+     */
+    async clickAddAlertButton() {
+        const btn = this.page.locator(this.locators.addAlertButton);
+        await btn.waitFor({ state: 'visible', timeout: 5000 });
+        await btn.click();
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+        testLogger.info('Clicked Add Alert button');
+    }
+
+    /**
+     * Fill the alert name input in the add alert form
+     * @param {string} name - Alert name
+     */
+    async fillAlertName(name) {
+        const input = this.page.locator(this.locators.alertNameInput);
+        await input.waitFor({ state: 'visible', timeout: 3000 });
+        await input.fill(name);
+        testLogger.info(`Filled alert name: ${name}`);
+    }
+
+    /**
+     * Click the Advanced tab in the alert creation form
+     */
+    async clickAdvancedTab() {
+        const tab = this.page.locator(this.locators.advancedTabBtn).first();
+        await tab.waitFor({ state: 'visible', timeout: 3000 });
+        await tab.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Switched to Advanced tab');
+    }
+
+    /**
+     * Get the template override select element in the Advanced tab
+     * @returns {import('@playwright/test').Locator}
+     */
+    getAdvancedTemplateOverrideSelect() {
+        return this.page.locator(this.locators.advancedTemplateOverrideSelect).first();
     }
 
     // ==================== FOLDER OPERATIONS ====================

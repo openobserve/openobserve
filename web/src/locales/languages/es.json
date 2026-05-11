@@ -124,7 +124,10 @@
     "create": "Crear",
     "resources": "Recursos",
     "updated_at": "Actualizado en",
-    "error": "Error"
+    "error": "Error",
+    "db": "Base de datos",
+    "discardChanges": "Descartar cambios",
+    "unsavedChanges": "Cambios no guardados"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -2239,6 +2242,8 @@
     "editJson": "Editar alerta JSON",
     "additional_settings": "Ajustes adicionales",
     "alertNamePlaceholder": "Nombre de alerta",
+    "nameRequired": "El nombre de la alerta es obligatorio.",
+    "nameNoSpecialChars": "El nombre de la alerta no puede contener ':', '#', '?', '&', '%', comillas ni espacios. Use guiones bajos (_) en su lugar.",
     "anomalyNamePlaceholder": "Nombre de la anomalía",
     "folder": "Carpeta",
     "selectStreamTypeFirst": "Selecciona primero un tipo de transmisión",
