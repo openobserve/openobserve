@@ -60,3 +60,43 @@ pub enum InnerError {
         source: io::Error,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+
+    fn make_error(path: &str) -> Error {
+        Error(InnerError::Io {
+            path: PathBuf::from(path),
+            source: io::Error::new(io::ErrorKind::NotFound, "not found"),
+        })
+    }
+
+    #[test]
+    fn test_path_returns_error_path() {
+        let err = make_error("/some/path");
+        assert_eq!(err.path().unwrap(), Path::new("/some/path"));
+    }
+
+    #[test]
+    fn test_io_returns_io_error_with_correct_kind() {
+        let err = make_error("/some/path");
+        assert_eq!(err.io().unwrap().kind(), io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn test_into_io_consumes_and_returns_io_error() {
+        let err = make_error("/tmp/file");
+        let io_err = err.into_io().unwrap();
+        assert_eq!(io_err.kind(), io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn test_from_error_for_io_error_preserves_kind() {
+        let err = make_error("/some/path");
+        let io_err = io::Error::from(err);
+        assert_eq!(io_err.kind(), io::ErrorKind::NotFound);
+    }
+}

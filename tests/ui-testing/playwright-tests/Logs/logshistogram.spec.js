@@ -44,7 +44,7 @@ test.describe("Logs Histogram testcases", () => {
     testLogger.info('Histogram test setup completed');
   });
 
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async () => {
     try {
       // await pm.commonActions.flipStreaming();
       testLogger.info('Streaming flipped after test');
@@ -54,86 +54,93 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify error handling and no results found with histogram", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing error handling and no results found with histogram');
 
-    // Check if histogram is off and toggle it on if needed
+    const orgName = getOrgIdentifier();
+
+    // Ensure histogram is ON
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
       await pm.logsPage.toggleHistogram();
     }
 
-    // Type invalid query and verify error
-    await pm.logsPage.clearAndFillQueryEditor("match_all('invalid')");
+    await pm.logsPage.disableAutoRun();
+
+    // Step 1: FTS mode — match_all with no-results string
+    await pm.logsPage.ensureFTSMode();
+    await pm.logsPage.clearAndFillQueryEditor("match_all('asdukiabnfnsajkn')");
     await pm.logsPage.setDateTimeFilter();
-    await pm.logsPage.waitForTimeout(1000);
-
-    // Wait for search response before checking for error
-    const orgName = getOrgIdentifier();
-    const searchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+    await pm.logsPage.waitForTimeout(500);
+    const ftsResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    await searchResponse;
-    await pm.logsPage.waitForTimeout(2000);
-
+    await ftsResponse;
+    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickErrorMessage();
-    await pm.logsPage.clickResetFilters();
 
-    // Type SQL query and verify no results
-    await pm.logsPage.clearAndFillQueryEditor("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    await pm.logsPage.waitForTimeout(1000);
-
-    // Wait for search response before checking for no data
-    const sqlSearchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+    // Step 2: SQL mode — query that returns 0 rows
+    await pm.logsPage.ensureSQLMode();
+    await pm.logsPage.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' where code > 500");
+    await pm.logsPage.waitForTimeout(500);
+    const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    await sqlSearchResponse;
-    await pm.logsPage.waitForTimeout(2000);
-
+    await sqlResponse;
+    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickNoDataFound();
-    await pm.logsPage.clickResultDetail();
+
+    await pm.logsPage.enableAutoRun();
 
     testLogger.info('Error handling and no results verification completed');
   });
 
   test("Verify error handling with histogram toggle off and on", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing error handling with histogram toggle off and on');
-    
-    // Check if histogram is on and toggle it off
+
+    const orgName = getOrgIdentifier();
+
+    // Ensure histogram is OFF
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (isHistogramOn) {
       await pm.logsPage.toggleHistogram();
     }
 
-    // Type invalid query and verify error
-    await pm.logsPage.typeQuery("match_all('invalid')");
-    await pm.logsPage.setDateTimeFilter();
-    // Strategic 500ms wait for query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
-    await pm.logsPage.clickRefresh();
-    await pm.logsPage.clickErrorMessage();
-    await pm.logsPage.clickResetFilters();
+    await pm.logsPage.disableAutoRun();
 
-    // Toggle histogram back on
+    // Step 1: FTS mode — match_all with no-results string, histogram OFF
+    await pm.logsPage.ensureFTSMode();
+    await pm.logsPage.clearAndFillQueryEditor("match_all('asdukiabnfnsajkn')");
+    await pm.logsPage.setDateTimeFilter();
+    await pm.logsPage.waitForTimeout(500);
+    const ftsResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+    await pm.logsPage.clickRefresh();
+    await ftsResponse;
+    await pm.logsPage.waitForTimeout(1000);
+    await pm.logsPage.clickErrorMessage();
+
+    // Toggle histogram ON
     await pm.logsPage.toggleHistogram();
 
-    // Type SQL query and verify no results
-    await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    // Strategic 500ms wait for SQL query processing - this is functionally necessary
+    // Step 2: SQL mode — query that returns 0 rows, histogram ON
+    await pm.logsPage.ensureSQLMode();
+    await pm.logsPage.clearAndFillQueryEditor("SELECT * FROM 'e2e_automate' where code > 500");
     await pm.logsPage.waitForTimeout(500);
+    const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    // Strategic 500ms wait for SQL refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await sqlResponse;
+    await pm.logsPage.waitForTimeout(1000);
     await pm.logsPage.clickNoDataFound();
-    await pm.logsPage.clickResultDetail();
-    
+
+    await pm.logsPage.enableAutoRun();
+
     testLogger.info('Histogram toggle error handling verification completed');
   });
 
   test("Verify histogram toggle persistence after multiple queries", {
-    tag: ['@histogram', '@all', '@logs']
-  }, async ({ page }) => {
+    tag: ['@histogram', '@all', '@logs', '@P1']
+  }, async () => {
     testLogger.info('Testing histogram toggle persistence after multiple queries');
     
     // Start with histogram on
@@ -173,8 +180,8 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify histogram toggle with empty query", {
-    tag: ['@histogram', '@all', '@logs']
-  }, async ({ page }) => {
+    tag: ['@histogram', '@all', '@logs', '@P1']
+  }, async () => {
     testLogger.info('Testing histogram toggle with empty query');
     
     // Start with histogram off
@@ -203,8 +210,8 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify histogram toggle with complex query", {
-    tag: ['@histogram', '@all', '@logs']
-  }, async ({ page }) => {
+    tag: ['@histogram', '@all', '@logs', '@P1']
+  }, async () => {
     testLogger.info('Testing histogram toggle with complex query');
     
     // Start with histogram on

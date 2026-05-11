@@ -80,11 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #separator>
-                <q-btn
+                <OButton
                   data-test="logs-search-field-list-collapse-btn"
-                  :icon="
-                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
-                  "
+                  variant="sidebar-button"
+                  size="sidebar-button"
                   :title="
                     searchObj.meta.showFields
                       ? 'Collapse Fields'
@@ -95,12 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'logs-splitter-icon-expand'
                       : 'logs-splitter-icon-collapse'
                   "
-                  color="primary"
-                  size="sm"
-                  dense
-                  round
                   @click="collapseFieldList"
-                />
+                  ><template #icon-left>
+                    <q-icon
+                      :name="
+                        searchObj.meta.showFields
+                          ? 'chevron_left'
+                          : 'chevron_right'
+                      "
+                    />
+                  </template>
+                </OButton>
               </template>
               <template #after>
                 <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
@@ -145,16 +149,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           Result not found.
-                          <q-btn
+                          <OButton
                             v-if="
                               searchObj.data.errorMsg != '' ||
                               searchObj?.data?.functionError != ''
                             "
                             @click="toggleErrorDetails"
-                            size="sm"
-                            class="o2-secondary-button"
+                            variant="outline"
+                            size="sm-action"
                             data-test="logs-page-result-error-details-btn-result-not-found"
-                            >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                            >{{ t("search.functionErrorBtnLabel") }}</OButton
                           >
                         </div>
                         <div
@@ -163,33 +167,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-else
                         >
                           Error occurred while retrieving search events.
-                          <q-btn
+                          <OButton
                             v-if="
                               searchObj.data.errorMsg != '' ||
                               searchObj?.data?.functionError != ''
                             "
                             @click="toggleErrorDetails"
-                            size="sm"
-                            class="o2-secondary-button"
+                            variant="outline"
+                            size="sm-action"
                             data-test="logs-page-result-error-details-btn"
-                            >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                            >{{ t("search.histogramErrorBtnLabel") }}</OButton
                           >
                         </div>
                         <div
                           data-test="logs-search-error-20003"
                           v-if="parseInt(searchObj.data.errorCode) == 20003"
                         >
-                          <q-btn
-                            no-caps
-                            unelevated
-                            size="sm"
-                            bg-secondary
-                            class="no-border bg-secondary text-white"
+                          <OButton
+                            variant="primary"
+                            size="sm-action"
+                            as="RouterLink"
                             :to="
                               '/streams?dialog=' +
                               searchObj.data.stream.selectedStream.label
                             "
-                            >Click here</q-btn
+                            >Click here</OButton
                           >
                           to configure a full text search field to the stream.
                         </div>
@@ -209,7 +211,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-no-stream-selected-text"
                         class="text-center col-10 q-mx-none tw:mt-none! tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary" size="md" />
+                        <q-icon name="info" color="primary"
+size="md" />
                         {{ t("search.noStreamSelectedMessage") }}
                       </h6>
                     </div>
@@ -227,17 +230,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary" size="md" />
+                        <q-icon name="info" color="primary"
+size="md" />
                         {{ t("search.noRecordFound") }}
-                        <q-btn
+                        <OButton
                           v-if="
                             searchObj.data.errorMsg != '' ||
                             searchObj?.data?.functionError != ''
                           "
                           @click="toggleErrorDetails"
-                          size="sm"
+                          variant="outline"
+                          size="sm-action"
                           data-test="logs-page-result-error-details-btn-norecord"
-                          >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                          >{{ t("search.functionErrorBtnLabel") }}</OButton
                         ><br />
                       </h6>
                     </div>
@@ -255,7 +260,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary" size="md" />
+                        <q-icon name="info" color="primary"
+size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -272,7 +278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary" size="md" />
+                        <q-icon name="info" color="primary"
+size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
                     </div>
@@ -326,6 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
+              class="tw:pb-[0.75rem]!"
             >
             </VisualizeLogsQuery>
           </div>
@@ -340,6 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
+              class="tw:pb-[0.75rem]! tw:pr-[0.625rem]"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
@@ -385,21 +394,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon name="info" class="q-mr-xs" size="20px" />
+              <q-icon name="info" class="q-mr-xs"
+size="20px" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
               >
             </div>
 
-            <q-btn
+            <OButton
               class="q-mt-xl"
-              color="secondary"
-              unelevated
-              :label="t('search.redirect_to_logs_page')"
-              no-caps
+              variant="outline"
+              size="sm-action"
               @click="redirectBackToLogs"
-            />
+              >{{ t("search.redirect_to_logs_page") }}</OButton
+            >
           </div>
         </div>
       </div>
@@ -490,6 +499,8 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { ChevronRight, ChevronLeft } from "lucide-vue-next";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -502,6 +513,9 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList,
+    OButton,
+    ChevronRight,
+    ChevronLeft,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
@@ -2326,41 +2340,6 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Debounced auto-run triggered by datetime changes in live mode.
-    // Only fires when query_on_stream_selection is true (i.e., the existing
-    // updateDateTime path is NOT already auto-running the query).
-    // Uses runQueryFn so the histogram is also refreshed.
-    const debouncedAutoRunOnDatetime = debounce(() => {
-      // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (1500ms).
-      // Only auto-run here for relative time to avoid double-triggering.
-      if (
-        searchObj.data.datetime.type === "relative" &&
-        searchObj.meta.liveMode &&
-        store.state.zoConfig?.auto_query_enabled &&
-        store.state.zoConfig?.query_on_stream_selection !== false &&
-        searchObj.meta.logsVisualizeToggle === "logs" &&
-        searchObj.data.stream.selectedStream.length > 0 &&
-        !searchObj.loading &&
-        !searchObj.loadingHistogram
-      ) {
-        runQueryFn();
-      }
-    }, 500);
-
-    watch(
-      () => [
-        searchObj.data.datetime.type,
-        searchObj.data.datetime.startTime,
-        searchObj.data.datetime.endTime,
-        searchObj.data.datetime.relativeTimePeriod,
-      ],
-      (_newVal, _oldVal) => {
-        if (searchObj.shouldIgnoreWatcher) return;
-        debouncedAutoRunOnDatetime();
-      },
-      { deep: true },
-    );
-
     // Watch AI chat state and adjust splitter to give more space when chat is open
     const originalSplitterValue = ref(searchObj.config.splitterModel);
     watch(
@@ -2752,7 +2731,7 @@ export default defineComponent({
           searchObj?.data?.stream?.selectedStream?.length === 0
         ) {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2761,7 +2740,7 @@ export default defineComponent({
         // check if query is empty
         if (logsPageQuery === "") {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2774,7 +2753,7 @@ export default defineComponent({
           logsPageQuery.length > 1
         ) {
           showErrorNotification(
-            "Multiple SQL queries are not allowed to visualize",
+            t("search.multipleSqlNotAllowed"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2844,7 +2823,7 @@ export default defineComponent({
 
         if (!finalQuery) {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2857,7 +2836,7 @@ export default defineComponent({
         const allFieldsHaveAlias = allSelectionFieldsHaveAlias(finalQuery);
         if (!allFieldsHaveAlias) {
           showAliasErrorForVisualization(
-            "Fields using aggregation functions must have aliases to visualize.",
+            t("search.aggregationFieldsNeedAlias"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;

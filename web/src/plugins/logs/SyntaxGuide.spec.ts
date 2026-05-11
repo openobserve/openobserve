@@ -106,18 +106,17 @@ describe("SyntaxGuide.vue", () => {
   // Test 7: Button renders with correct attributes
   it("should render button with correct attributes", () => {
     wrapper = createWrapper();
-    const button = wrapper.findComponent({ name: "QBtn" });
+    const button = wrapper.findComponent({ name: "OButton" });
     expect(button.exists()).toBe(true);
     expect(button.attributes("data-cy")).toBe("syntax-guide-button");
-    expect(button.props("dense")).toBe(true);
-    expect(button.props("flat")).toBe(true);
-    expect(button.props("icon")).toBe("help");
+    // OButton uses variant/size props instead of Quasar's dense/flat/icon props
+    expect(button.props("variant")).toBe("ghost");
   });
 
   // Test 8: Button has correct CSS classes when sqlmode is false
   it("should have normal-mode class when sqlmode is false", () => {
     wrapper = createWrapper({ sqlmode: false });
-    const button = wrapper.findComponent({ name: "QBtn" });
+    const button = wrapper.findComponent({ name: "OButton" });
     expect(button.classes()).toContain("normal-mode");
     expect(button.classes()).not.toContain("sql-mode");
   });
@@ -125,25 +124,27 @@ describe("SyntaxGuide.vue", () => {
   // Test 9: Button has correct CSS classes when sqlmode is true
   it("should have sql-mode class when sqlmode is true", () => {
     wrapper = createWrapper({ sqlmode: true });
-    const button = wrapper.findComponent({ name: "QBtn" });
+    const button = wrapper.findComponent({ name: "OButton" });
     expect(button.classes()).toContain("sql-mode");
     expect(button.classes()).not.toContain("normal-mode");
   });
 
-  // Test 10: Button has syntax-guide-button class when AI chat is disabled
-  it("should have syntax-guide-button class when AI chat is disabled", () => {
+  // Test 10: Button exists when AI chat is disabled
+  it("should render button when AI chat is disabled", () => {
     store.state.isAiChatEnabled = false;
     wrapper = createWrapper();
-    const button = wrapper.findComponent({ name: "QBtn" });
-    expect(button.classes()).toContain("syntax-guide-button");
+    const button = wrapper.findComponent({ name: "OButton" });
+    expect(button.exists()).toBe(true);
+    // syntax-guide-button class was removed in OButton migration
   });
 
-  // Test 11: Button does not have syntax-guide-button class when AI chat is enabled
-  it("should not have syntax-guide-button class when AI chat is enabled", () => {
+  // Test 11: Button exists when AI chat is enabled
+  it("should render button when AI chat is enabled", () => {
     store.state.isAiChatEnabled = true;
     wrapper = createWrapper();
-    const button = wrapper.findComponent({ name: "QBtn" });
-    expect(button.classes()).not.toContain("syntax-guide-button");
+    const button = wrapper.findComponent({ name: "OButton" });
+    expect(button.exists()).toBe(true);
+    // syntax-guide-button class was removed in OButton migration
   });
 
   // Test 12: Menu has correct theme class for dark theme
@@ -196,7 +197,7 @@ describe("SyntaxGuide.vue", () => {
   // Test 17: Component structure includes required elements
   it("should include required template elements", () => {
     wrapper = createWrapper({ sqlmode: true });
-    const button = wrapper.findComponent({ name: "QBtn" });
+    const button = wrapper.findComponent({ name: "OButton" });
     const menu = wrapper.findComponent({ name: "QMenu" });
     const tooltip = wrapper.findComponent({ name: "QTooltip" });
     
@@ -230,7 +231,7 @@ describe("SyntaxGuide.vue", () => {
   // Test 20: Component has required structure elements
   it("should have basic component structure", () => {
     wrapper = createWrapper();
-    expect(wrapper.findComponent({ name: "QBtn" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OButton" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "QMenu" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
   });
@@ -296,12 +297,11 @@ describe("SyntaxGuide.vue", () => {
   it("should apply correct CSS classes based on props and state", () => {
     store.state.isAiChatEnabled = false;
     wrapper = createWrapper({ sqlmode: false });
-    const button = wrapper.findComponent({ name: "QBtn" });
-    
-    const expectedClasses = ["q-ml-xs", "q-pa-xs", "normal-mode", "syntax-guide-button"];
-    expectedClasses.forEach(className => {
-      expect(button.classes()).toContain(className);
-    });
+    const button = wrapper.findComponent({ name: "OButton" });
+
+    // OButton uses q-ml-xs and normal-mode classes; syntax-guide-button and q-pa-xs were removed in migration
+    expect(button.classes()).toContain("q-ml-xs");
+    expect(button.classes()).toContain("normal-mode");
   });
 
   // Test 27: Component props validation
@@ -341,64 +341,71 @@ describe("SyntaxGuide.vue", () => {
   // Test 31: noBorder prop applies correct CSS class
   it("should apply syntax-guide-no-border class when noBorder is true", () => {
     wrapper = createWrapper({ noBorder: true });
-    const button = wrapper.findComponent({ name: "QBtn" });
+    const button = wrapper.findComponent({ name: "OButton" });
     expect(button.classes()).toContain("syntax-guide-no-border");
     expect(button.classes()).not.toContain("q-ml-xs");
-    expect(button.classes()).not.toContain("q-pa-xs");
+    // q-pa-xs was removed in OButton migration
   });
 
   // Test 32: noBorder false keeps standard spacing classes
-  it("should apply q-ml-xs and q-pa-xs classes when noBorder is false", () => {
+  it("should apply q-ml-xs class when noBorder is false", () => {
     wrapper = createWrapper({ noBorder: false });
-    const button = wrapper.findComponent({ name: "QBtn" });
+    const button = wrapper.findComponent({ name: "OButton" });
     expect(button.classes()).toContain("q-ml-xs");
-    expect(button.classes()).toContain("q-pa-xs");
+    // q-pa-xs was removed in OButton migration
     expect(button.classes()).not.toContain("syntax-guide-no-border");
   });
 
   // Test 33: label prop renders on button when noBorder is false
   it("should render custom label on button when label prop is provided", () => {
     wrapper = createWrapper({ label: "My Custom Label" });
-    const button = wrapper.findComponent({ name: "QBtn" });
-    expect(button.props("label")).toBe("My Custom Label");
+    // OButton renders label as slot content, not as a 'label' prop
+    expect(wrapper.text()).toContain("My Custom Label");
+    expect(wrapper.props().label).toBe("My Custom Label");
   });
 
-  // Test 34: label prop default — shows 'Syntax Guide' when noBorder is false and no label provided
+  // Test 34: label text shows 'Syntax Guide' when noBorder is false and no label provided
   it("should show Syntax Guide label when noBorder is false and no label given", () => {
     wrapper = createWrapper({ noBorder: false });
-    const button = wrapper.findComponent({ name: "QBtn" });
-    expect(button.props("label")).toBe("Syntax Guide");
+    // OButton renders label as slot text, not as a 'label' prop
+    expect(wrapper.text()).toContain("Syntax Guide");
   });
 
-  // Test 35: label prop is undefined when noBorder is true and no label given
+  // Test 35: label prop is undefined/empty when noBorder is true and no label given
   it("should have undefined label when noBorder is true and no label prop given", () => {
     wrapper = createWrapper({ noBorder: true });
-    const button = wrapper.findComponent({ name: "QBtn" });
-    expect(button.props("label")).toBeUndefined();
+    // OButton renders label as slot text; the component prop 'label' defaults to ''
+    expect(wrapper.props().label).toBe('');
   });
 
-  // Test 36: syntax-guide-button-dark class in dark theme with normal mode
-  it("should have syntax-guide-button-dark class in dark theme for normal mode", () => {
+  // Test 36: button renders in dark theme with normal mode
+  it("should render button in dark theme for normal mode", () => {
     store.state.theme = "dark";
     wrapper = createWrapper({ sqlmode: false });
-    const button = wrapper.findComponent({ name: "QBtn" });
-    expect(button.classes()).toContain("syntax-guide-button-dark");
+    const button = wrapper.findComponent({ name: "OButton" });
+    // syntax-guide-button-dark class was removed in OButton migration
+    expect(button.exists()).toBe(true);
+    expect(button.classes()).toContain("normal-mode");
   });
 
-  // Test 37: syntax-guide-button-dark NOT applied in dark theme with sql mode
-  it("should not have syntax-guide-button-dark class in dark theme for sql mode", () => {
+  // Test 37: button renders in dark theme with sql mode
+  it("should render button in dark theme for sql mode", () => {
     store.state.theme = "dark";
     wrapper = createWrapper({ sqlmode: true });
-    const button = wrapper.findComponent({ name: "QBtn" });
-    expect(button.classes()).not.toContain("syntax-guide-button-dark");
+    const button = wrapper.findComponent({ name: "OButton" });
+    // syntax-guide-button-dark class was removed in OButton migration
+    expect(button.exists()).toBe(true);
+    expect(button.classes()).toContain("sql-mode");
   });
 
-  // Test 38: syntax-guide-button-dark NOT applied in light theme
-  it("should not have syntax-guide-button-dark class in light theme", () => {
+  // Test 38: button renders in light theme
+  it("should render button in light theme", () => {
     store.state.theme = "light";
     wrapper = createWrapper({ sqlmode: false });
-    const button = wrapper.findComponent({ name: "QBtn" });
-    expect(button.classes()).not.toContain("syntax-guide-button-dark");
+    const button = wrapper.findComponent({ name: "OButton" });
+    // syntax-guide-button-dark class was removed in OButton migration
+    expect(button.exists()).toBe(true);
+    expect(button.classes()).toContain("normal-mode");
   });
 
   // Test 39: noBorder defaults to false

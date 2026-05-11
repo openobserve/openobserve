@@ -138,28 +138,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item>
                 </template>
               </q-select>
-              <q-btn
-                icon="refresh"
-                class="iconHoverBtn q-ml-xs"
-                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
+              <OButton
+                class="q-ml-xs"
+                variant="ghost"
+                size="icon-circle-sm"
                 :title="t('alerts.alertSettings.refreshDestinations')"
                 @click="$emit('refresh:destinations')"
-                style="min-width: auto"
-              />
-              <q-btn
+              >
+                <q-icon name="refresh" />
+              </OButton>
+              <OButton
                 data-test="create-destination-btn"
-                :label="t('alerts.alertSettings.addNewDestination')"
-                class="o2-secondary-button q-ml-sm"
-                no-caps
+                variant="outline"
                 size="sm"
-                style="min-height: 28px; height: 28px;"
+                class="q-ml-sm"
                 @click="routeToCreateDestination"
-              />
+              >{{ t('alerts.alertSettings.addNewDestination') }}</OButton>
             </div>
             <div
               v-if="destinationsTouched && (!localDestinations || localDestinations.length === 0)"
@@ -355,27 +349,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item>
                 </template>
               </q-select>
-              <q-btn
-                icon="refresh"
-                class=" q-ml-xs"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
+              <OButton
+                class="q-ml-xs"
+                variant="ghost"
+                size="icon-circle-sm"
                 :title="t('alerts.alertSettings.refreshDestinations')"
                 @click="$emit('refresh:destinations')"
-                style="min-width: auto"
-              />
-              <q-btn
+              >
+                <q-icon name="refresh" />
+              </OButton>
+              <OButton
                 data-test="create-destination-btn"
-                :label="t('alerts.alertSettings.addNewDestination')"
-                class="o2-secondary-button q-ml-sm"
-                no-caps
+                variant="outline"
                 size="sm"
-                style="min-height: 28px; height: 28px;"
+                class="q-ml-sm"
                 @click="routeToCreateDestination"
-              />
+              >{{ t('alerts.alertSettings.addNewDestination') }}</OButton>
             </div>
             <div
               v-if="destinationsTouched && (!localDestinations || localDestinations.length === 0)"
@@ -426,6 +415,7 @@ import { defineComponent, ref, computed, watch, nextTick, type PropType } from "
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import OButton from '@/lib/core/Button/OButton.vue';
 import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
@@ -434,6 +424,7 @@ import {
 
 export default defineComponent({
   name: "Step3AlertConditions",
+  components: { OButton },
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -550,9 +541,10 @@ export default defineComponent({
       queryType,
       (newType) => {
         // Disable aggregation when switching to sql or promql
+        // Only update local state — do not emit to parent so the composable
+        // preserves the builder-mode isAggregationEnabled value across tab switches.
         if (newType !== "custom") {
           localIsAggregationEnabled.value = false;
-          emit("update:isAggregationEnabled", false);
         } else {
           // Re-enable aggregation if it was previously enabled
           localIsAggregationEnabled.value = props.isAggregationEnabled;

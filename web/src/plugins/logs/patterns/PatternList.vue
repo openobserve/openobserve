@@ -15,16 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex-1 tw:overflow-hidden">
+  <div class="tw:flex tw:flex-col">
     <!-- Patterns Table -->
-    <div v-if="patterns?.length > 0" class="tw:flex tw:flex-col tw:h-full">
+    <div v-if="patterns?.length > 0" class="tw:flex tw:flex-col">
       <!-- Table Header -->
       <div
-        class="tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)] tw:sticky tw:top-0 tw:z-10"
-        style="background: var(--o2-table-header-bg); min-width: 100%;"
+        class="tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)]"
+        style="background: var(--o2-table-header-bg); min-width: 100%"
       >
         <!-- Pattern Column Header -->
-        <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-left">
+        <div
+          class="tw:flex-1 tw:min-w-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-left"
+        >
           <span
             class="tw:font-bold"
             :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
@@ -34,7 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Occurrence Column Header -->
-        <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right">
+        <div
+          class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right"
+        >
           <span
             class="tw:font-bold"
             :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
@@ -44,7 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Percentage Column Header -->
-        <div class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right">
+        <div
+          class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right"
+        >
           <span
             class="tw:font-bold"
             :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
@@ -54,8 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Actions Column - No Header -->
-        <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:relative table-head">
-        </div>
+        <div
+          class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:relative table-head"
+        ></div>
       </div>
 
       <!-- Patterns List with Virtual Scroll -->
@@ -63,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :items="patterns"
         virtual-scroll-slice-size="5"
         v-slot="{ item: pattern, index }"
-        class="tw:flex-1"
+        :scroll-target="scrollTarget ?? undefined"
       >
         <PatternCard
           :pattern="pattern"
@@ -80,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div
       v-else-if="loading"
-      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[3rem]"
     >
       <q-spinner-hourglass color="primary" size="3.125rem" />
       <div
@@ -117,6 +124,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+
+    <!-- Wildcard hover popover (outside q-virtual-scroll to avoid DOM recycling conflicts) -->
+    <WildcardValuePopover
+      :visible="!!hoveredToken"
+      :token="hoveredToken?.token ?? ''"
+      :displayValues="hoveredToken?.displayValues ?? []"
+      :anchorEl="hoveredToken?.anchorEl ?? null"
+      @popoverEnter="onPopoverEnter"
+      @popoverLeave="onPopoverLeave"
+      @filter-value="(value, action) => $emit('filter-value', value, action)"
+    />
   </div>
 </template>
 
@@ -124,20 +142,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
+import WildcardValuePopover from "./WildcardValuePopover.vue";
+import useWildcardHover from "./useWildcardHover";
 
 defineProps<{
   patterns: any[];
   loading: boolean;
   totalLogsAnalyzed?: number;
   wrap?: boolean;
+  /** External scroll container passed to q-virtual-scroll's scroll-target. */
+  scrollTarget?: HTMLElement | null;
 }>();
 
 defineEmits<{
   (e: "open-details", pattern: any, index: number): void;
   (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
   (e: "create-alert", pattern: any): void;
+  (e: "filter-value", value: string, action: "include" | "exclude"): void;
 }>();
 
 const store = useStore();
-const { t} = useI18n();
+const { t } = useI18n();
+
+const {
+  hoveredToken,
+  onPopoverEnter,
+  onPopoverLeave,
+} = useWildcardHover();
 </script>

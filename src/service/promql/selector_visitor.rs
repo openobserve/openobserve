@@ -97,4 +97,21 @@ mod tests {
         ];
         assert_eq!(visitor.exprs_to_string(), expected.join(","));
     }
+
+    #[test]
+    fn test_selector_visitor_empty_exprs_to_string() {
+        let visitor = MetricSelectorVisitor::new();
+        assert_eq!(visitor.exprs_to_string(), "");
+    }
+
+    #[test]
+    fn test_selector_visitor_non_selector_expr_not_collected() {
+        // Scalar arithmetic has no VectorSelector or MatrixSelector
+        let promql = "1 + 2";
+        let ast = parser::parse(promql).unwrap();
+        let mut visitor = MetricSelectorVisitor::new();
+        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        assert!(visitor.exprs.is_empty());
+        assert_eq!(visitor.exprs_to_string(), "");
+    }
 }

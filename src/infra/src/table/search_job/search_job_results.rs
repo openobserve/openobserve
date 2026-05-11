@@ -62,3 +62,39 @@ pub async fn clean_deleted_job_result(job_id: &str) -> Result<(), errors::Error>
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_job_result_operator_construction() {
+        let op = JobResultOperator::Delete {
+            job_id: "abc-123".to_string(),
+        };
+        let JobResultOperator::Delete { job_id } = op;
+        assert_eq!(job_id, "abc-123");
+    }
+
+    #[test]
+    fn test_job_result_operator_serde_roundtrip() {
+        let op = JobResultOperator::Delete {
+            job_id: "xyz-456".to_string(),
+        };
+        let json = serde_json::to_string(&op).unwrap();
+        let back: JobResultOperator = serde_json::from_str(&json).unwrap();
+        let JobResultOperator::Delete { job_id } = back;
+        assert_eq!(job_id, "xyz-456");
+    }
+
+    #[test]
+    fn test_job_result_operator_clone() {
+        let op = JobResultOperator::Delete {
+            job_id: "clone-test".to_string(),
+        };
+        let cloned = op.clone();
+        let JobResultOperator::Delete { job_id: j1 } = op;
+        let JobResultOperator::Delete { job_id: j2 } = cloned;
+        assert_eq!(j1, j2);
+    }
+}

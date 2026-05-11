@@ -139,25 +139,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="flex justify-start q-mt-lg q-px-md">
-        <q-btn
-          v-close-popup
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+      <div class="tw:flex tw:gap-2 q-mt-lg q-px-md">
+        <OButton
+          variant="outline"
+          size="sm-action"
           data-test="add-pipeline-cancel-btn"
-        />
-        <q-btn
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('alerts.save')"
+        >{{ t('alerts.cancel') }}</OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
           type="submit"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           data-test="add-pipeline-submit-btn"
-        />
+        >{{ t('alerts.save') }}</OButton>
       </div>
     </q-form>
   </div>
@@ -168,6 +161,7 @@ import useStreams from "@/composables/useStreams";
 import { ref, computed, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = defineProps({
   isUpdating: {

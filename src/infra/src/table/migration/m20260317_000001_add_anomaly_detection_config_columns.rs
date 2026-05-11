@@ -267,3 +267,13 @@ enum AnomalyDetectionConfig {
     Owner,
     AlertDestinations,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_anomaly_config_folder_id_idx_constant_value() {
+        assert_eq!(ANOMALY_CONFIG_FOLDER_ID_IDX, "idx_anomaly_config_folder_id");
+    }
+}

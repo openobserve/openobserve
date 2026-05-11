@@ -263,3 +263,94 @@ where
         self.inner.flush()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, io::Write};
+
+    use super::*;
+
+    #[test]
+    fn test_serialize_header_empty() {
+        let header: FileHeader = HashMap::new();
+        let bytes = Writer::serialize_header(&header);
+        assert!(bytes.is_empty());
+    }
+
+    #[test]
+    fn test_serialize_header_single_entry_roundtrip() {
+        let mut header: FileHeader = HashMap::new();
+        header.insert("k".to_string(), "v".to_string());
+        let bytes = Writer::serialize_header(&header);
+        // key_len(4) + key(1) + val_len(4) + val(1) = 10
+        assert_eq!(bytes.len(), 10);
+    }
+
+    #[test]
+    fn test_hasher_wrapper_empty_produces_crc() {
+        let cursor = std::io::Cursor::new(Vec::<u8>::new());
+        let wrapper: HasherWrapper<_> = HasherWrapper::new(cursor);
+        let (checksum, _inner) = wrapper.finalize();
+        // CRC32 of empty data is 0
+        assert_eq!(checksum, 0);
+    }
+
+    #[test]
+    fn test_hasher_wrapper_write_and_finalize() {
+        let cursor = std::io::Cursor::new(Vec::<u8>::new());
+        let mut wrapper: HasherWrapper<_> = HasherWrapper::new(cursor);
+        wrapper.write_all(b"hello").unwrap();
+        let (checksum, inner) = wrapper.finalize();
+        assert_ne!(checksum, 0);
+        assert_eq!(inner.into_inner(), b"hello");
+    }
+
+    #[test]
+    fn test_writer_new_path_and_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.wal");
+        let p: &std::path::Path = path.as_path();
+        let (writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        assert_eq!(writer.path(), &path);
+        let (written, uncompressed) = writer.size();
+        assert!(written > 0);
+        assert_eq!(written, uncompressed);
+    }
+
+    #[test]
+    fn test_writer_write_increases_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test2.wal");
+        let p: &std::path::Path = path.as_path();
+        let (mut writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        let (before, _) = writer.size();
+        writer.write(b"hello world").unwrap();
+        let (after, _) = writer.size();
+        assert!(after > before);
+    }
+
+    #[test]
+    fn test_writer_current_position_after_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test3.wal");
+        let p: &std::path::Path = path.as_path();
+        let (mut writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        let pos_before = writer.current_position().unwrap();
+        writer.write(b"data").unwrap();
+        writer.sync().unwrap();
+        let pos_after = writer.current_position().unwrap();
+        assert!(pos_after > pos_before);
+    }
+
+    #[test]
+    fn test_hasher_wrapper_same_data_same_checksum() {
+        let make_checksum = |data: &[u8]| -> u32 {
+            let cursor = std::io::Cursor::new(Vec::<u8>::new());
+            let mut wrapper: HasherWrapper<_> = HasherWrapper::new(cursor);
+            wrapper.write_all(data).unwrap();
+            wrapper.finalize().0
+        };
+        assert_eq!(make_checksum(b"abc"), make_checksum(b"abc"));
+        assert_ne!(make_checksum(b"abc"), make_checksum(b"def"));
+    }
+}

@@ -360,3 +360,68 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use object_store::local::LocalFileSystem;
+
+    use super::*;
+
+    fn make_remote(prefix: &str) -> Remote {
+        Remote {
+            client: LimitStore::new(
+                Box::new(
+                    LocalFileSystem::new_with_prefix("/tmp")
+                        .expect("LocalFileSystem creation failed"),
+                ),
+                CONCURRENT_REQUESTS,
+            ),
+            bucket_prefix: prefix.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_name_returns_remote() {
+        assert_eq!(Remote::name(), "remote");
+    }
+
+    #[test]
+    fn test_display_formats_to_storage_for_remote() {
+        let r = make_remote("");
+        assert_eq!(format!("{r}"), "storage for remote");
+    }
+
+    #[test]
+    fn test_debug_contains_storage_for_remote() {
+        let r = make_remote("");
+        let s = format!("{r:?}");
+        assert!(s.contains("storage for remote"));
+    }
+
+    #[test]
+    fn test_format_key_empty_prefix_is_passthrough() {
+        let r = make_remote("");
+        assert_eq!(
+            r.format_key("files/default/logs/foo.parquet"),
+            "files/default/logs/foo.parquet"
+        );
+    }
+
+    #[test]
+    fn test_format_key_with_prefix_prepends() {
+        let r = make_remote("my-bucket/");
+        assert_eq!(
+            r.format_key("files/foo.parquet"),
+            "my-bucket/files/foo.parquet"
+        );
+    }
+
+    #[test]
+    fn test_format_key_already_has_prefix_no_double_prefix() {
+        let r = make_remote("my-bucket/");
+        assert_eq!(
+            r.format_key("my-bucket/files/foo.parquet"),
+            "my-bucket/files/foo.parquet"
+        );
+    }
+}

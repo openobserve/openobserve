@@ -25,3 +25,28 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            job_id: "job-1".to_string(),
+            partition_id: 0,
+            start_time: 0,
+            end_time: 1000,
+            created_at: 100,
+            started_at: None,
+            ended_at: None,
+            cluster: None,
+            status: 0,
+            result_path: None,
+            error_message: None,
+        };
+        assert_eq!(m.job_id, "job-1");
+        assert_eq!(m.partition_id, 0);
+        assert!(m.started_at.is_none());
+    }
+}

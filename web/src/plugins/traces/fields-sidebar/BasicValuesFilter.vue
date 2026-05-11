@@ -29,14 +29,15 @@
         <div
           class="field_overlay tw:bg-[var(--o2-hover-accent)] tw:absolute tw:right-0! tw:h-full tw:top-0 tw:flex! tw:items-center! tw:rounded"
         >
-          <q-btn
+          <OButton
+            variant="ghost"
+            size="icon-xs-circle"
             :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
-            :icon="outlinedAdd"
-            size="0.4rem"
             class="tw:mx-[0.375rem]!"
             @click.stop="addSearchTerm(`${row.name}=''`)"
-            round
-          />
+          >
+            <q-icon :name="outlinedAdd" />
+          </OButton>
           <q-icon
             :data-test="`log-search-index-list-add-${row.name}-field-btn`"
             v-if="showVisibilityToggle && !isFieldSelected"
@@ -83,41 +84,33 @@
                 {{ formatTimeWithSuffix(percentiles[p.key]) }}
               </span>
               <div class="tw:flex tw:w-[3rem]">
-                <q-btn
+                <OButton
                   v-if="p.key !== 'max'"
+                  variant="ghost"
+                  size="icon-xs-circle"
                   :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
-                  size="0.3rem"
-                  round
                   :title="`duration >= ${formatTimeWithSuffix(percentiles[p.key])}`"
-                  @click.stop="
-                    addSearchTerm(
-                      `duration>='${formatTimeWithSuffix(percentiles[p.key])}'`,
-                    )
-                  "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                  @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(percentiles[p.key])}'`)"
+                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-[var(--o2-border-color)]!"
                 >
                   <q-icon
                     :name="outlinedArrowForwardIos"
                     class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
                   />
-                </q-btn>
-                <q-btn
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-circle"
                   :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
-                  size="0.3rem"
-                  round
                   :title="`duration <= ${formatTimeWithSuffix(percentiles[p.key])}`"
-                  @click.stop="
-                    addSearchTerm(
-                      `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
-                    )
-                  "
-                  class="o2-custom-button-hover tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]! tw:ml-auto!"
+                  @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(percentiles[p.key])}'`)"
+                  class="o2-custom-button-hover tw:mr-[0.625rem]! tw:border! tw:border-[var(--o2-border-color)]! tw:ml-auto!"
                 >
                   <q-icon
                     :name="outlinedArrowBackIos"
                     class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
                   />
-                </q-btn>
+                </OButton>
               </div>
             </div>
           </template>
@@ -167,6 +160,7 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import {
   outlinedAdd,
   outlinedVisibility,

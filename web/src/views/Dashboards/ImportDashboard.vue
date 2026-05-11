@@ -17,187 +17,183 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="q-mx-sm q-pt-xs">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
-      <div class="col">
-        <div class="flex">
-          <q-btn
-            no-caps
-            padding="xs"
-            outline
-            @click="goBack()"
-            icon="arrow_back_ios_new"
-            class="el-border"
-          />
-          <div class="text-h6 q-ml-md">
-            {{ t("dashboard.importDashboard") }}
+        <div class="col">
+          <div class="flex">
+            <OButton variant="outline" size="icon-xs" @click="goBack()">
+              <template #icon-left
+                ><q-icon name="arrow_back_ios_new"
+              /></template>
+            </OButton>
+            <div class="text-h6 q-ml-md">
+              {{ t("dashboard.importDashboard") }}
+            </div>
           </div>
         </div>
+        <div class="flex justify-center tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="goToCommunityDashboards"
+            data-test="dashboard-panel-tutorial-btn"
+            >{{ t("dashboard.communityDashboard") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="sm-action"
+            v-close-popup
+            @click="goBack()"
+            >{{ t("function.cancel") }}</OButton
+          >
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :disabled="!!isLoading"
+            type="submit"
+            data-test="dashboard-import-submit-btn"
+            @click="importDashboard"
+            >{{ t("dashboard.import") }}</OButton
+          >
+        </div>
       </div>
-      <div class="flex justify-center">
-        <q-btn
-          class="q-mr-md o2-secondary-button"
-          no-caps
-          :label="t('dashboard.communityDashboard')"
-          @click="goToCommunityDashboards"
-          data-test="dashboard-panel-tutorial-btn"
-        ></q-btn>
-        <q-btn
-          v-close-popup
-          class="text-bold q-mr-md o2-secondary-button"
-          :label="t('function.cancel')"
-          no-caps
-          @click="goBack()"
-        />
-        <q-btn
-          :disable="!!isLoading"
-          class="text-bold o2-primary-button"
-          :label="t('dashboard.import')"
-          type="submit"
-          no-caps
-          @click="importDashboard"
-        />
-      </div>
-    </div>
     </div>
     <div class="flex">
-
       <div class="flex">
         <q-splitter
           no-scroll
           v-model="splitterModel"
           :limits="[40, 80]"
-          style="width: calc(100vw - 100px);"
+          style="width: calc(100vw - 100px)"
         >
           <template #before>
-          <div class="tw:w-full tw:h-full ">
-            <div class="card-container tw:py-[0.625rem] tw:pl-[0.625rem] tw:mb-[0.625rem]">
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
-            <app-tabs
-                data-test="dashboard-import-type-tabs"
-                class="tabs-selection-container"
-                :tabs="tabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="updateActiveTab"
-              />
-              </div>
-              </div>
-            <div
-              v-if="activeTab == 'import_json_url'"
-              class="editor-container-url card-container tw:py-1"
-            >
-              <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
-                <div
-                  style="width: calc(100% - 10px)"
-                  class="flex full-width"
-                >
-                  <div
-                    data-test="dashboard-import-url-input"
-                    style="width: 69%"
-                    class="q-pr-sm"
-                  >
-                    <q-input
-                      v-model="url"
-                      :label="t('dashboard.addURL')"
-                       style="padding: 10px;"
-                      stack-label
-                      label-slot
-                      :loading="isLoading == ImportType.URL"
-                     borderless hide-bottom-space/>
-                  </div>
-
-                  <div
-                    style="width: calc(30%);position: relative;"
-                    data-test="dashboard-folder-dropdown"
-                    class="import-folder-dropdown-container"
-                  >
-                    <select-folder-dropdown
-                      @folder-selected="selectedFolder = $event"
-                      :activeFolderId="selectedFolder.value"
-                    />
-                  </div>
+            <div class="tw:w-full tw:h-full">
+              <div
+                class="card-container tw:py-[0.625rem] tw:pl-[0.625rem] tw:mb-[0.625rem]"
+              >
+                <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+                  <app-tabs
+                    data-test="dashboard-import-type-tabs"
+                    class="tabs-selection-container"
+                    :tabs="tabs"
+                    v-model:active-tab="activeTab"
+                    @update:active-tab="updateActiveTab"
+                  />
                 </div>
-                <query-editor
-                  data-test="dashboard-import-url-editor"
-                  ref="queryEditorFileRef"
-                  editor-id="dashboards-query-editor-file"
-                  class="monaco-editor tw:mx-2"
-                  :debounceTime="300"
-                  v-model:query="jsonStr"
-                  language="json"
-                />
-              </q-form>
-            </div>
-            <div
-              v-if="activeTab == 'import_json_file'"
-              class="dashboard-import-json-container card-container tw:py-1"
-            >
-              <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
-                <div
-                  style="width: calc(100% - 10px)"
-                  class="flex full-width"
-                >
-                  <div
-                    data-test="dashboard-import-file-input"
-                    style="width: 69%"
-                    class="q-pr-sm"
-                  >
-                    <q-file
-                      v-model="jsonFiles"
-                      bottom-slots
-                      :label="t('dashboard.dropFileMsg')"
-                      accept=".json"
-                      multiple
-                      filled
-                      :disable="!!isLoading"
+              </div>
+              <div
+                v-if="activeTab == 'import_json_url'"
+                class="editor-container-url card-container tw:py-1"
+              >
+                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
+                  <div style="width: calc(100% - 10px)" class="flex full-width">
+                    <div
+                      data-test="dashboard-import-url-input"
+                      style="width: 69%"
+                      class="q-pr-sm"
                     >
-                      <template v-slot:prepend>
-                        <q-icon name="cloud_upload" @click.stop.prevent />
-                      </template>
-                      <template v-slot:append>
-                        <q-icon
-                          name="close"
-                          @click.stop.prevent="jsonFiles = null"
-                          class="cursor-pointer"
-                        />
-                      </template>
-                      <template v-slot:hint> .json files only </template>
-                    </q-file>
-                  </div>
-                  <div
-                    style="width: calc(30%);position: relative;"
-                    class="import-folder-dropdown-container"
-                  >
-                    <select-folder-dropdown
-                      @folder-selected="selectedFolder = $event"
-                      :activeFolderId="selectedFolder.value"
-                    />
-                  </div>
-                  <div v-if="filesImportResults.length" class="q-py-sm">
-                    <div v-for="importResult in filesImportResults">
-                      <span
-                        v-if="importResult.status == 'rejected'"
-                        class="text-red"
-                      >
-                        <code style="background-color: #f2f1f1; padding: 3px">{{
-                          importResult?.reason?.file
-                        }}</code>
-                        : {{ importResult?.reason?.error }}
-                      </span>
+                      <q-input
+                        v-model="url"
+                        :label="t('dashboard.addURL')"
+                        style="padding: 10px"
+                        stack-label
+                        label-slot
+                        :loading="isLoading == ImportType.URL"
+                        borderless
+                        hide-bottom-space
+                      />
+                    </div>
+
+                    <div
+                      style="width: calc(30%); position: relative; bottom: 21px"
+                      data-test="dashboard-folder-dropdown"
+                      class="import-folder-dropdown-container"
+                    >
+                      <select-folder-dropdown
+                        @folder-selected="selectedFolder = $event"
+                        :activeFolderId="selectedFolder.value"
+                      />
                     </div>
                   </div>
-                </div>
-                <query-editor
-                  data-test="dashboard-import-json-file-editor"
-                  ref="queryEditorJsonRef"
-                  editor-id="dashboards-query-editor-json"
-                  class="monaco-editor tw:mx-2"
-                  :debounceTime="300"
-                  v-model:query="jsonStr"
-                  language="json"
-                />
+                  <query-editor
+                    data-test="dashboard-import-url-editor"
+                    ref="queryEditorFileRef"
+                    editor-id="dashboards-query-editor-file"
+                    class="monaco-editor tw:mx-2"
+                    :debounceTime="300"
+                    v-model:query="jsonStr"
+                    language="json"
+                  />
+                </q-form>
+              </div>
+              <div
+                v-if="activeTab == 'import_json_file'"
+                class="dashboard-import-json-container card-container tw:py-1"
+              >
+                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
+                  <div style="width: calc(100% - 10px)" class="flex full-width">
+                    <div
+                      data-test="dashboard-import-file-input"
+                      style="width: 69%"
+                      class="q-pr-sm"
+                    >
+                      <q-file
+                        v-model="jsonFiles"
+                        bottom-slots
+                        :label="t('dashboard.dropFileMsg')"
+                        accept=".json"
+                        multiple
+                        filled
+                        :disable="!!isLoading"
+                      >
+                        <template v-slot:prepend>
+                          <q-icon name="cloud_upload" @click.stop.prevent />
+                        </template>
+                        <template v-slot:append>
+                          <q-icon
+                            name="close"
+                            @click.stop.prevent="jsonFiles = null"
+                            class="cursor-pointer"
+                          />
+                        </template>
+                        <template v-slot:hint> .json files only </template>
+                      </q-file>
+                    </div>
+                    <div
+                      style="width: calc(30%); position: relative; bottom: 21px"
+                      class="import-folder-dropdown-container"
+                    >
+                      <select-folder-dropdown
+                        @folder-selected="selectedFolder = $event"
+                        :activeFolderId="selectedFolder.value"
+                      />
+                    </div>
+                    <div v-if="filesImportResults.length" class="q-py-sm">
+                      <div v-for="importResult in filesImportResults">
+                        <span
+                          v-if="importResult.status == 'rejected'"
+                          class="text-red"
+                        >
+                          <code
+                            style="background-color: #f2f1f1; padding: 3px"
+                            >{{ importResult?.reason?.file }}</code
+                          >
+                          : {{ importResult?.reason?.error }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <query-editor
+                    data-test="dashboard-import-json-file-editor"
+                    ref="queryEditorJsonRef"
+                    editor-id="dashboards-query-editor-json"
+                    class="monaco-editor tw:mx-2"
+                    :debounceTime="300"
+                    v-model:query="jsonStr"
+                    language="json"
+                  />
 
-                <div></div>
-              </q-form>
-            </div>
+                  <div></div>
+                </q-form>
+              </div>
             </div>
           </template>
           <template #after>
@@ -205,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-import-error-container"
               class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-130px)]"
             >
-              <div  class="text-center text-h6 tw:py-2">Error Validations</div>
+              <div class="text-center text-h6 tw:py-2">Error Validations</div>
               <q-separator class="q-mt-md" />
               <div
                 class="error-section"
@@ -243,7 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               errorMessage.dashboardIndex,
                             )
                           "
-                         borderless hide-bottom-space/>
+                          borderless
+                          hide-bottom-space
+                        />
                       </div>
                     </span>
                     <span
@@ -278,7 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           "
                           behavior="menu"
-                         borderless hide-bottom-space/>
+                          borderless
+                          hide-bottom-space
+                        />
                       </div>
                     </span>
 
@@ -318,8 +318,12 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Upload, Link } from "lucide-vue-next";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/CodeQueryEditor.vue"),
+);
 import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",
@@ -348,10 +352,12 @@ export default defineComponent({
       {
         label: "File Upload / JSON",
         value: "import_json_file",
+        icon: Upload,
       },
       {
         label: "URL Import",
         value: "import_json_url",
+        icon: Link,
       },
     ]);
     const activeTab = ref("import_json_file");
@@ -873,7 +879,7 @@ export default defineComponent({
       streamTypes,
     };
   },
-  components: { SelectFolderDropdown, AppTabs, QueryEditor },
+  components: { SelectFolderDropdown, AppTabs, QueryEditor, OButton },
 });
 </script>
 
@@ -995,10 +1001,7 @@ export default defineComponent({
 }
 .import-folder-dropdown-container {
   :deep(.q-field) {
-    padding-top: 10px;
-  }
-  :deep(.flex) {
-    align-items: center !important;
+    padding-top: 32px;
   }
   :deep(.add-folder-btn) {
     margin-bottom: 0 !important;

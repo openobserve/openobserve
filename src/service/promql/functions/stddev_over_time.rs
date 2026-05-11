@@ -46,3 +46,46 @@ impl RangeFunc for StddevOverTimeFunc {
         std_deviation(&sample_values)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_samples(values: &[f64]) -> Vec<Sample> {
+        values
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| Sample {
+                timestamp: i as i64 * 1_000_000,
+                value: v,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_stddev_over_time_name() {
+        assert_eq!(StddevOverTimeFunc::new().name(), "stddev_over_time");
+    }
+
+    #[test]
+    fn test_stddev_over_time_empty() {
+        let func = StddevOverTimeFunc::new();
+        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
+    }
+
+    #[test]
+    fn test_stddev_over_time_constant() {
+        let func = StddevOverTimeFunc::new();
+        let samples = make_samples(&[3.0, 3.0, 3.0]);
+        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(0.0));
+    }
+
+    #[test]
+    fn test_stddev_over_time_non_trivial() {
+        let func = StddevOverTimeFunc::new();
+        // [1,2,3]: mean=2, variance=2/3, stddev=sqrt(2/3)
+        let samples = make_samples(&[1.0, 2.0, 3.0]);
+        let result = func.exec(&samples, 0, &Duration::from_secs(1)).unwrap();
+        assert!((result - (2.0_f64 / 3.0_f64).sqrt()).abs() < 1e-10);
+    }
+}

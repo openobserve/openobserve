@@ -866,4 +866,46 @@ mod tests {
         let template = get_prebuilt_template("nonexistent");
         assert!(template.is_none(), "Should return None for invalid type");
     }
+
+    #[test]
+    fn test_convert_template_config_http_type() {
+        let config = TemplateConfig {
+            name: "my_template".to_string(),
+            body: "alert body".to_string(),
+            title: None,
+        };
+        let result = convert_template_config(&config, "http");
+        assert_eq!(result.name, "my_template");
+        assert_eq!(result.body, "alert body");
+        assert!(matches!(result.template_type, TemplateType::Http));
+    }
+
+    #[test]
+    fn test_convert_template_config_email_with_title() {
+        let config = TemplateConfig {
+            name: "email_tpl".to_string(),
+            body: "email body".to_string(),
+            title: Some("Custom Subject".to_string()),
+        };
+        let result = convert_template_config(&config, "email");
+        assert_eq!(result.name, "email_tpl");
+        match result.template_type {
+            TemplateType::Email { title } => assert_eq!(title, "Custom Subject"),
+            _ => panic!("Expected Email template type"),
+        }
+    }
+
+    #[test]
+    fn test_convert_template_config_email_uses_default_title_when_none() {
+        let config = TemplateConfig {
+            name: "email_tpl2".to_string(),
+            body: "body".to_string(),
+            title: None,
+        };
+        let result = convert_template_config(&config, "email");
+        match result.template_type {
+            TemplateType::Email { title } => assert_eq!(title, "OpenObserve Alert"),
+            _ => panic!("Expected Email template type"),
+        }
+    }
 }

@@ -322,4 +322,98 @@ mod tests {
             filled_size,
         );
     }
+
+    #[test]
+    fn test_cache_name() {
+        let cache = FileStatisticsCache::new();
+        assert_eq!(cache.name(), "FileStatisticsCache");
+    }
+
+    #[test]
+    fn test_cache_contains_key_and_remove() {
+        let cache = FileStatisticsCache::new();
+        let path = Path::from("test_file");
+        let meta = ObjectMeta {
+            location: path.clone(),
+            last_modified: DateTime::parse_from_rfc3339("2024-01-15T00:00:00+00:00")
+                .unwrap()
+                .into(),
+            size: 512,
+            e_tag: None,
+            version: None,
+        };
+        let schema = Schema::new(vec![Field::new("col", DataType::Utf8, false)]);
+        let stats: Arc<Statistics> = Statistics::new_unknown(&schema).into();
+
+        assert!(!cache.contains_key(&path));
+
+        cache.put(&path, CachedFileMetadata::new(meta.clone(), stats, None));
+        assert!(cache.contains_key(&path));
+        assert_eq!(cache.len(), 1);
+
+        let removed = cache.remove(&path);
+        assert!(removed.is_some());
+        assert!(!cache.contains_key(&path));
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn test_cache_clear() {
+        let cache = FileStatisticsCache::new();
+        let schema = Schema::new(vec![Field::new("col", DataType::Int64, false)]);
+
+        for i in 0..3 {
+            let path = Path::from(format!("file_{i}"));
+            let meta = ObjectMeta {
+                location: path.clone(),
+                last_modified: DateTime::parse_from_rfc3339("2024-01-15T00:00:00+00:00")
+                    .unwrap()
+                    .into(),
+                size: 100 * (i + 1),
+                e_tag: None,
+                version: None,
+            };
+            let stats: Arc<Statistics> = Statistics::new_unknown(&schema).into();
+            cache.put(&path, CachedFileMetadata::new(meta, stats, None));
+        }
+
+        assert_eq!(cache.len(), 3);
+        cache.clear();
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn test_list_entries() {
+        use datafusion::execution::cache::cache_manager::FileStatisticsCache as FscTrait;
+
+        let cache = super::FileStatisticsCache::new();
+        let path = Path::from("list_test");
+        let meta = ObjectMeta {
+            location: path.clone(),
+            last_modified: DateTime::parse_from_rfc3339("2024-01-15T00:00:00+00:00")
+                .unwrap()
+                .into(),
+            size: 256,
+            e_tag: None,
+            version: None,
+        };
+        let schema = Schema::new(vec![Field::new("col", DataType::Utf8, false)]);
+        let stats: Arc<Statistics> = Statistics::new_unknown(&schema).into();
+
+        let entries_before = FscTrait::list_entries(&cache);
+        assert!(entries_before.is_empty());
+
+        cache.put(&path, CachedFileMetadata::new(meta, stats, None));
+        let entries = FscTrait::list_entries(&cache);
+        assert_eq!(entries.len(), 1);
+        assert!(entries.contains_key(&path));
+    }
+
+    #[test]
+    fn test_cache_remove_nonexistent_returns_none() {
+        let cache = FileStatisticsCache::new();
+        let path = Path::from("does_not_exist");
+        let removed = cache.remove(&path);
+        assert!(removed.is_none());
+    }
 }

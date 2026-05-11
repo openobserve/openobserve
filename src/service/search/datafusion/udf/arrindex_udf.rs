@@ -127,6 +127,7 @@ pub fn arr_index_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::{Array, Int64Array};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -138,6 +139,47 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_arr_index_impl_direct_valid() {
+        let arr = StringArray::from(vec![r#"["a","b","c","d"]"#]);
+        let start = Int64Array::from(vec![1i64]);
+        let args = [
+            ColumnarValue::Array(Arc::new(arr)),
+            ColumnarValue::Array(Arc::new(start)),
+        ];
+        let result = arr_index_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert_eq!(out.value(0), r#"["b"]"#);
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_arr_index_impl_wrong_arg_count_errors() {
+        let arr = StringArray::from(vec!["[1]"]);
+        let args = [ColumnarValue::Array(Arc::new(arr))];
+        assert!(arr_index_impl(&args).is_err());
+    }
+
+    #[test]
+    fn test_arr_index_impl_invalid_json_returns_null() {
+        let arr = StringArray::from(vec!["not-json"]);
+        let start = Int64Array::from(vec![0i64]);
+        let args = [
+            ColumnarValue::Array(Arc::new(arr)),
+            ColumnarValue::Array(Arc::new(start)),
+        ];
+        let result = arr_index_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert!(out.is_null(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
 
     #[tokio::test]
     async fn test_arr_index_udf() {

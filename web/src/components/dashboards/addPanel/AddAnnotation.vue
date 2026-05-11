@@ -81,37 +81,26 @@
         </div>
       </q-card-section>
       <q-card-actions align="right">
-        <div class="tw:w-full tw:flex">
-          <q-btn
+        <div class="tw:w-full tw:flex tw:gap-2">
+          <OButton
             v-if="annotationData.annotation_id"
-            color="negative"
-            label="Delete"
+            variant="destructive"
+            size="sm-action"
             @click="handleDeleteWithConfirm"
-          />
+            >Delete</OButton
+          >
           <div class="tw:flex-1"></div>
-          <q-btn
-            flat
-            label="Cancel"
-            @click="handleClose"
-            class="o2-secondary-button tw:h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-          />
-          <q-btn
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            :label="annotationData.annotation_id ? 'Update' : 'Save'"
+          <OButton variant="outline" size="sm-action" @click="handleClose"
+            >Cancel</OButton
+          >
+          <OButton
+            variant="primary"
+            size="sm-action"
             @click="saveAnnotation.execute()"
             :loading="saveAnnotation.isLoading?.value"
-            :disable="!annotationData.title"
-          />
+            :disabled="!annotationData.title"
+            >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
+          >
         </div>
       </q-card-actions>
     </q-card>
@@ -124,14 +113,17 @@
         <q-card-section>
           Are you sure you want to delete this annotation?
         </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat label="Cancel" v-close-popup />
-          <q-btn
-            color="negative"
-            label="Delete"
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton variant="outline" size="sm-action" v-close-popup
+            >Cancel</OButton
+          >
+          <OButton
+            variant="destructive"
+            size="sm-action"
             :loading="deleteAnnotation.isLoading.value"
             @click="deleteAnnotation.execute()"
-          />
+            >Delete</OButton
+          >
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -144,6 +136,7 @@ import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = defineProps({
   dashboardId: { type: String, required: true },

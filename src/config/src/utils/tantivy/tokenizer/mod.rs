@@ -51,3 +51,35 @@ pub fn o2_collect_search_tokens(text: &str) -> Vec<String> {
     token_stream.process(&mut add_token);
     tokens
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_o2_collect_search_tokens_basic() {
+        let tokens = o2_collect_search_tokens("hello world");
+        assert!(tokens.contains(&"hello".to_string()));
+        assert!(tokens.contains(&"world".to_string()));
+    }
+
+    #[test]
+    fn test_o2_collect_search_tokens_lowercase() {
+        let tokens = o2_collect_search_tokens("HelloWorld");
+        assert!(tokens.iter().all(|t| t == t.to_lowercase().as_str()));
+    }
+
+    #[test]
+    fn test_o2_collect_search_tokens_empty() {
+        let tokens = o2_collect_search_tokens("");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_o2_collect_search_tokens_short_words_filtered() {
+        let tokens = o2_collect_search_tokens("a b hello");
+        assert!(!tokens.contains(&"a".to_string()));
+        assert!(!tokens.contains(&"b".to_string()));
+        assert!(tokens.contains(&"hello".to_string()));
+    }
+}

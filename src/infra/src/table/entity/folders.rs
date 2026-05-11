@@ -43,3 +43,25 @@ impl Related<super::reports::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "folder-1".to_string(),
+            org: "myorg".to_string(),
+            folder_id: "fid-1".to_string(),
+            name: "My Folder".to_string(),
+            description: Some("test folder".to_string()),
+            r#type: 1,
+        };
+        assert_eq!(m.id, "folder-1");
+        assert_eq!(m.org, "myorg");
+        assert_eq!(m.name, "My Folder");
+        assert_eq!(m.r#type, 1);
+        assert!(m.description.is_some());
+    }
+}

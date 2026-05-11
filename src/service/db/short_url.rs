@@ -166,6 +166,26 @@ fn days_to_minutes(days: i64) -> i64 {
     days * 24 * 60
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_days_to_minutes_one_day() {
+        assert_eq!(days_to_minutes(1), 1440);
+    }
+
+    #[test]
+    fn test_days_to_minutes_zero() {
+        assert_eq!(days_to_minutes(0), 0);
+    }
+
+    #[test]
+    fn test_days_to_minutes_seven_days() {
+        assert_eq!(days_to_minutes(7), 7 * 1440);
+    }
+}
+
 /// Helper functions for sending events to cache watchers in the cluster.
 mod cluster {
     use super::SHORT_URL_KEY;

@@ -40,3 +40,31 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: 1,
+            scope: "org".to_string(),
+            org_id: Some("myorg".to_string()),
+            user_id: None,
+            setting_key: "theme".to_string(),
+            setting_category: Some("ui".to_string()),
+            setting_value: serde_json::json!({"dark": true}),
+            description: Some("UI theme setting".to_string()),
+            created_at: 1000,
+            updated_at: 2000,
+            created_by: Some("admin".to_string()),
+            updated_by: None,
+        };
+        assert_eq!(m.id, 1);
+        assert_eq!(m.scope, "org");
+        assert_eq!(m.setting_key, "theme");
+        assert!(m.user_id.is_none());
+        assert!(m.updated_by.is_none());
+    }
+}

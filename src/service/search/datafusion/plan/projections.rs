@@ -596,10 +596,112 @@ pub async fn get_result_schema(
 #[cfg(test)]
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::stream::StreamType;
+    use config::meta::{search::LogicalOperator, stream::StreamType};
+    use datafusion::logical_expr::Operator;
     use proto::cluster_rpc::SearchQuery;
 
     use super::*;
+
+    #[test]
+    fn test_operator_to_string_comparison_ops() {
+        assert_eq!(operator_to_string(&Operator::Eq), "=");
+        assert_eq!(operator_to_string(&Operator::NotEq), "!=");
+        assert_eq!(operator_to_string(&Operator::Lt), "<");
+        assert_eq!(operator_to_string(&Operator::LtEq), "<=");
+        assert_eq!(operator_to_string(&Operator::Gt), ">");
+        assert_eq!(operator_to_string(&Operator::GtEq), ">=");
+    }
+
+    #[test]
+    fn test_operator_to_string_other_op_fallback() {
+        // Non-comparison ops fall back to debug format
+        let s = operator_to_string(&Operator::Plus);
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn test_extract_having_fields_condition_with_alias() {
+        use config::meta::search::HavingNode;
+        let node = HavingNode::Condition {
+            expression: "count(*)".to_string(),
+            alias: Some("cnt".to_string()),
+            operator: ">".to_string(),
+            value: "10".to_string(),
+        };
+        let mut fields = HashSet::new();
+        extract_having_fields_recursive(&node, &mut fields);
+        assert!(fields.contains("cnt"));
+        assert!(!fields.contains("count(*)"));
+    }
+
+    #[test]
+    fn test_extract_having_fields_condition_without_alias() {
+        use config::meta::search::HavingNode;
+        let node = HavingNode::Condition {
+            expression: "count(*)".to_string(),
+            alias: None,
+            operator: ">".to_string(),
+            value: "10".to_string(),
+        };
+        let mut fields = HashSet::new();
+        extract_having_fields_recursive(&node, &mut fields);
+        assert!(fields.contains("count(*)"));
+    }
+
+    #[test]
+    fn test_extract_having_fields_none_is_noop() {
+        use config::meta::search::HavingNode;
+        let mut fields = HashSet::new();
+        extract_having_fields(&None::<HavingNode>, &mut fields);
+        assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn test_get_col_name_column_expr() {
+        use datafusion::common::Column;
+        let col_expr = Expr::Column(Column::new_unqualified("myfield"));
+        assert_eq!(get_col_name(&col_expr), "myfield");
+    }
+
+    #[test]
+    fn test_get_expr_string_column_expr() {
+        use datafusion::common::Column;
+        let col_expr = Expr::Column(Column::new_unqualified("myfield"));
+        assert_eq!(get_expr_string(&col_expr), "myfield");
+    }
+
+    #[test]
+    fn test_operator_to_string_minus_op_fallback() {
+        let s = operator_to_string(&Operator::Minus);
+        assert!(!s.is_empty());
+    }
+
+    #[test]
+    fn test_extract_having_fields_logical_and() {
+        use config::meta::search::HavingNode;
+        let node = HavingNode::LogicalOp {
+            operator: LogicalOperator::And,
+            conditions: vec![
+                HavingNode::Condition {
+                    expression: "count(*)".to_string(),
+                    alias: Some("cnt".to_string()),
+                    operator: ">".to_string(),
+                    value: "10".to_string(),
+                },
+                HavingNode::Condition {
+                    expression: "avg(val)".to_string(),
+                    alias: None,
+                    operator: "<".to_string(),
+                    value: "100".to_string(),
+                },
+            ],
+        };
+        let mut fields = HashSet::new();
+        extract_having_fields_recursive(&node, &mut fields);
+        assert!(fields.contains("cnt"));
+        assert!(fields.contains("avg(val)"));
+        assert_eq!(fields.len(), 2);
+    }
 
     macro_rules! hashset {
         {$($v: expr),* $(,)?} => {

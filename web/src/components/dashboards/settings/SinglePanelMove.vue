@@ -44,7 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="moveTabOptions"
           class="select-container o2-custom-select-dashboard"
           data-test="dashboard-tab-move-select"
-         borderless hide-bottom-space>
+          borderless
+          hide-bottom-space
+        >
           <!-- template when on options -->
           <template v-slot:no-option>
             <q-item data-test="dashboard-tab-move-select-no-option">
@@ -55,13 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
 
-        <q-btn
-          class="text-bold el-border"
-          no-caps
-          outline
-          rounded
-          icon="add"
-          style="padding: 10px; height: 40px; margin-left: 2px"
+        <OButton
+          variant="outline"
+          size="sm"
           @click="
             () => {
               isTabEditMode = false;
@@ -69,8 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="dashboard-tab-move-add-tab-btn"
-          ><q-tooltip>Add Tab</q-tooltip></q-btn
         >
+          <template #icon-left><q-icon name="add" /></template>
+          <q-tooltip>Add Tab</q-tooltip>
+        </OButton>
         <q-dialog
           v-model="showAddTabDialog"
           position="right"
@@ -87,30 +87,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-dialog>
       </div>
       <q-card-actions class="confirmActions">
-        <div class="button-container">
-          <q-btn
+        <div class="button-container tw:gap-2">
+          <OButton
             v-close-popup="true"
-            unelevated
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
+            variant="outline"
+            size="sm-action"
             @click="onCancel"
             data-test="cancel-button"
           >
             {{ t("confirmDialog.cancel") }}
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            unelevated
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
+            variant="primary"
+            size="sm-action"
             @click="onConfirm"
             data-test="confirm-button"
-            :disable="selectedMoveTabId === null"
+            :disabled="selectedMoveTabId === null"
           >
             Move
-          </q-btn>
+          </OButton>
         </div>
       </q-card-actions>
     </q-card>
@@ -126,10 +122,11 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab },
+  components: { AddTab, OButton },
   emits: ["update:ok", "update:cancel", "refresh"],
   props: ["title", "message"],
   setup(props, { emit }) {
@@ -152,7 +149,7 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
     };
 

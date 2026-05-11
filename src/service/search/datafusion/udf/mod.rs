@@ -114,3 +114,58 @@ pub fn stringify_json_value(field: &json::Value) -> String {
         _ => json::to_string(field).expect("failed to stringify json field"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stringify_bool_true() {
+        assert_eq!(stringify_json_value(&serde_json::Value::Bool(true)), "true");
+    }
+
+    #[test]
+    fn test_stringify_bool_false() {
+        assert_eq!(
+            stringify_json_value(&serde_json::Value::Bool(false)),
+            "false"
+        );
+    }
+
+    #[test]
+    fn test_stringify_integer() {
+        let val = serde_json::Value::Number(42i64.into());
+        assert_eq!(stringify_json_value(&val), "42");
+    }
+
+    #[test]
+    fn test_stringify_string() {
+        let val = serde_json::Value::String("hello world".to_string());
+        assert_eq!(stringify_json_value(&val), "hello world");
+    }
+
+    #[test]
+    fn test_stringify_null_produces_json_null() {
+        let s = stringify_json_value(&serde_json::Value::Null);
+        assert_eq!(s, "null");
+    }
+
+    #[test]
+    fn test_stringify_float() {
+        let val = serde_json::Value::Number(serde_json::Number::from_f64(1.5).unwrap());
+        assert_eq!(stringify_json_value(&val), "1.5");
+    }
+
+    #[test]
+    fn test_stringify_empty_string() {
+        let val = serde_json::Value::String(String::new());
+        assert_eq!(stringify_json_value(&val), "");
+    }
+
+    #[test]
+    fn test_stringify_array_produces_json() {
+        let val = serde_json::json!([1, 2, 3]);
+        let s = stringify_json_value(&val);
+        assert!(s.contains('1') && s.contains('2') && s.contains('3'));
+    }
+}

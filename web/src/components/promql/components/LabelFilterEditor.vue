@@ -10,19 +10,15 @@
           :key="index"
           class="label-filter-item"
         >
-          <q-btn-group>
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              :no-wrap="true"
-              color="primary"
-              size="sm"
-              :label="computedLabel(label)"
-              class="q-pl-sm"
+          <OButtonGroup class="axis-field" radius="sm">
+            <OButton
+              variant="primary"
+              size="chip"
+              class="tw:!text-[12px]"
               :data-test="`promql-label-filter-${index}`"
             >
+              {{ computedLabel(label) }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu class="q-pa-md">
                 <div style="width: 350px">
                   <!-- Label Selection -->
@@ -130,30 +126,29 @@
                   </q-select>
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="outline"
+              size="icon-chip"
               @click="removeLabel(index)"
-              icon="close"
               :data-test="`promql-label-filter-remove-${index}`"
-            />
-          </q-btn-group>
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
+          </OButtonGroup>
         </div>
 
         <!-- Add Button -->
-        <q-btn
-          flat
-          dense
-          icon="add"
+        <OButton
+          variant="ghost-primary"
           size="sm"
-          color="primary"
           @click="addLabel"
           class="add-filter-btn"
           data-test="promql-add-label-filter"
         >
+          <q-icon name="add" size="14px" />
           <q-tooltip>Add label filter</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
     </div>
   </div>
@@ -161,6 +156,8 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, inject } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";

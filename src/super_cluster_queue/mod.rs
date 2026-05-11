@@ -15,6 +15,7 @@
 
 mod action_scripts;
 mod alerts;
+mod anomaly_detection;
 mod cipher_keys;
 mod compactor_manual_jobs;
 mod dashboards;
@@ -79,6 +80,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_scheduler_msg: scheduler::process,
         on_semantic_groups_msg: semantic_groups::process,
         on_incident_msg: incidents::process,
+        on_anomaly_detection_msg: anomaly_detection::process,
     };
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,

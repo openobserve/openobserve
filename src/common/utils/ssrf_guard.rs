@@ -299,6 +299,130 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_url_returns_err() {
+        assert!(SsrfGuard::validate_url("not a url").is_err());
+        assert!(SsrfGuard::validate_url("").is_err());
+    }
+
+    #[test]
+    fn test_block_carrier_grade_nat() {
+        assert!(SsrfGuard::validate_url("http://100.64.0.1/webhook").is_err());
+        assert!(SsrfGuard::validate_url("http://100.127.255.255/webhook").is_err());
+    }
+
+    #[test]
+    fn test_carrier_grade_nat_is_private_ip() {
+        assert!(SsrfGuard::is_private_ip(&"100.64.0.1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(
+            &"100.127.255.255".parse().unwrap()
+        ));
+        // 100.128.0.1 is not in carrier-grade NAT range
+        assert!(!SsrfGuard::is_private_ip(&"100.128.0.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_block_documentation_ips() {
+        assert!(SsrfGuard::validate_url("http://192.0.2.1/webhook").is_err());
+        assert!(SsrfGuard::validate_url("http://198.51.100.1/webhook").is_err());
+        assert!(SsrfGuard::validate_url("http://203.0.113.1/webhook").is_err());
+    }
+
+    #[test]
+    fn test_documentation_ips_are_private() {
+        assert!(SsrfGuard::is_private_ip(&"192.0.2.1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"198.51.100.1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"203.0.113.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_block_benchmark_ips() {
+        assert!(SsrfGuard::validate_url("http://198.18.0.1/webhook").is_err());
+        assert!(SsrfGuard::validate_url("http://198.19.255.255/webhook").is_err());
+    }
+
+    #[test]
+    fn test_benchmark_ips_are_private() {
+        assert!(SsrfGuard::is_private_ip(&"198.18.0.1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"198.19.0.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_validate_url_with_config_safe_url() {
+        // validate_url_with_config reads ssrf_allow_loopback from config (default false)
+        // A safe external URL should pass
+        let result = SsrfGuard::validate_url_with_config("https://example.com/webhook");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_block_host_containing_local_in_middle() {
+        // .contains(".local.") branch — subdomain with .local. in the middle
+        assert!(SsrfGuard::validate_url("http://svc.local.cluster.example.com/webhook").is_err());
+    }
+
+    #[test]
+    fn test_ipv6_loopback_is_private() {
+        // ::1 is loopback; is_private_ip uses allow_loopback=false so it IS private
+        assert!(SsrfGuard::is_private_ip(
+            &"::1".parse::<std::net::IpAddr>().unwrap()
+        ));
+    }
+
+    #[test]
+    fn test_block_reserved_ips() {
+        assert!(SsrfGuard::validate_url("http://240.0.0.1/webhook").is_err());
+        // 255.255.255.255 is broadcast, not blocked by this implementation
+        assert!(SsrfGuard::validate_url("http://255.255.255.255/webhook").is_ok());
+    }
+
+    #[test]
+    fn test_reserved_ips_are_private() {
+        assert!(SsrfGuard::is_private_ip(&"240.0.0.1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"254.0.0.1".parse().unwrap()));
+        // 255.255.255.255 (broadcast) is not considered private per this impl
+        assert!(!SsrfGuard::is_private_ip(
+            &"255.255.255.255".parse().unwrap()
+        ));
+    }
+
+    #[test]
+    fn test_172_boundary() {
+        // 172.15.x is public, 172.16.x is private, 172.31.x is private, 172.32.x is public
+        assert!(!SsrfGuard::is_private_ip(
+            &"172.15.255.255".parse().unwrap()
+        ));
+        assert!(SsrfGuard::is_private_ip(&"172.16.0.1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"172.31.255.255".parse().unwrap()));
+        assert!(!SsrfGuard::is_private_ip(&"172.32.0.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_block_ipv6_special_ranges() {
+        // IPv6 link-local (fe80::/10)
+        assert!(SsrfGuard::validate_url("http://[fe80::1]/webhook").is_err());
+        // IPv6 unique local (fc00::/7)
+        assert!(SsrfGuard::validate_url("http://[fc00::1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url("http://[fd00::1]/webhook").is_err());
+        // IPv6 documentation (2001:db8::/32)
+        assert!(SsrfGuard::validate_url("http://[2001:db8::1]/webhook").is_err());
+    }
+
+    #[test]
+    fn test_ipv6_special_ranges_are_private() {
+        assert!(SsrfGuard::is_private_ip(&"fe80::1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"fc00::1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"fd00::1".parse().unwrap()));
+        assert!(SsrfGuard::is_private_ip(&"2001:db8::1".parse().unwrap()));
+        // Regular public IPv6 should not be private
+        assert!(!SsrfGuard::is_private_ip(&"2606:4700::1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_localhost_subdomain_blocked() {
+        assert!(SsrfGuard::validate_url("http://localhost.internal/webhook").is_err());
+    }
+
+    #[test]
     fn test_block_ipv4_mapped_ipv6() {
         // IPv4-mapped IPv6 must be blocked to prevent SSRF bypass (NEW-001)
         assert!(SsrfGuard::validate_url("http://[::ffff:127.0.0.1]/webhook").is_err());

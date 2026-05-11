@@ -103,6 +103,38 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_string_to_array_v2_impl_direct_split() {
+        let strings = StringArray::from(vec!["a,b,c"]);
+        let delims = StringArray::from(vec![","]);
+        let args = [
+            ColumnarValue::Array(Arc::new(strings)),
+            ColumnarValue::Array(Arc::new(delims)),
+        ];
+        let result = string_to_array_v2_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            use arrow::array::ListArray;
+            let list = out.as_any().downcast_ref::<ListArray>().unwrap();
+            assert!(!list.is_null(0));
+            assert_eq!(list.value(0).len(), 3);
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_string_to_array_v2_impl_wrong_arg_count_errors() {
+        let strings = StringArray::from(vec!["a,b"]);
+        let delims = StringArray::from(vec![","]);
+        let extra = StringArray::from(vec!["x"]);
+        let args = [
+            ColumnarValue::Array(Arc::new(strings)),
+            ColumnarValue::Array(Arc::new(delims)),
+            ColumnarValue::Array(Arc::new(extra)),
+        ];
+        assert!(string_to_array_v2_impl(&args).is_err());
+    }
+
     #[tokio::test]
     async fn test_string_to_array_v2_format() {
         // let log_line = r#"2024-02-29T14:25:27.964079614+00:00 INFO actix_web::middleware::logger:

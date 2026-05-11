@@ -1499,4 +1499,100 @@ mod tests {
         assert!(used_diff < 10000 || used1 == 0 || used2 == 0); // Allow reasonable variance
         assert!(len_diff < 100 || len1 == 0 || len2 == 0); // Allow reasonable variance
     }
+
+    #[test]
+    fn test_parse_result_cache_key_valid() {
+        let file =
+            "results/myorg/logs/default/query_key/1744081170000000_1744081180000000_0_1.json";
+        let result = parse_result_cache_key(file);
+        assert!(result.is_some());
+        let (org_id, stream_type, query_key, meta) = result.unwrap();
+        assert_eq!(org_id, "myorg");
+        assert_eq!(stream_type, "logs");
+        assert_eq!(query_key, "myorg_logs_default_query_key");
+        assert_eq!(meta.start_time, 1744081170000000);
+        assert_eq!(meta.end_time, 1744081180000000);
+        assert!(!meta.is_aggregate);
+    }
+
+    #[test]
+    fn test_parse_result_cache_key_too_short_returns_none() {
+        assert!(parse_result_cache_key("too/short").is_none());
+        assert!(parse_result_cache_key("a/b/c/d/e").is_none());
+    }
+
+    #[test]
+    fn test_parse_aggregation_cache_key_valid() {
+        let file = "aggregations/myorg/metrics/default/16042959487540176184/1744081170000000_1744081180000000.arrow";
+        let result = parse_aggregation_cache_key(file);
+        assert!(result.is_some());
+        let (org_id, stream_type, query_key, meta) = result.unwrap();
+        assert_eq!(org_id, "myorg");
+        assert_eq!(stream_type, "metrics");
+        assert_eq!(query_key, "myorg_metrics_default_16042959487540176184");
+        assert_eq!(meta.start_time, 1744081170000000);
+        assert_eq!(meta.end_time, 1744081180000000);
+        assert!(meta.is_aggregate);
+        assert!(!meta.is_descending);
+    }
+
+    #[test]
+    fn test_parse_aggregation_cache_key_too_short_returns_none() {
+        assert!(parse_aggregation_cache_key("too/short").is_none());
+    }
+
+    #[test]
+    fn test_file_type_display_data() {
+        assert_eq!(FileType::Data.to_string(), "data");
+    }
+
+    #[test]
+    fn test_file_type_display_result() {
+        assert_eq!(FileType::Result.to_string(), "result");
+    }
+
+    #[test]
+    fn test_file_type_display_aggregation() {
+        assert_eq!(FileType::Aggregation.to_string(), "aggregation");
+    }
+
+    #[test]
+    fn test_get_etag_format() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"hello").unwrap();
+        let meta = std::fs::metadata(tmp.path()).unwrap();
+        let etag = get_etag(&meta);
+        // etag format: "{mtime_hex}-{size_hex}", size of "hello" is 5 = 0x5
+        assert!(
+            etag.ends_with("-5"),
+            "etag should end with '-5', got {etag}"
+        );
+        assert!(etag.contains('-'));
+    }
+
+    #[test]
+    fn test_last_modified_returns_datetime() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"test").unwrap();
+        let meta = std::fs::metadata(tmp.path()).unwrap();
+        let dt = last_modified(&meta);
+        // should be a recent timestamp (after year 2020)
+        assert!(dt.timestamp() > 1_577_836_800);
+    }
+
+    #[test]
+    fn test_get_bucket_idx_returns_valid_index() {
+        let idx = get_bucket_idx("some/file/path.parquet");
+        let cfg = config::get_config();
+        let max = cfg.disk_cache.bucket_num.max(1);
+        assert!(idx < max);
+    }
+
+    #[test]
+    fn test_get_bucket_idx_empty_string() {
+        let idx = get_bucket_idx("");
+        let cfg = config::get_config();
+        let max = cfg.disk_cache.bucket_num.max(1);
+        assert!(idx < max);
+    }
 }

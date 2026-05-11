@@ -17,14 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="aws-quick-setup">
     <div class="setup-card">
-
       <!-- Header -->
       <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
-        <q-icon name="rocket_launch" size="2.5rem" color="primary" class="tw:flex-shrink-0" />
+        <q-icon
+          name="rocket_launch"
+          size="2.5rem"
+          color="primary"
+          class="tw:flex-shrink-0"
+        />
         <div>
-          <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-1 title">Complete AWS Integration</h5>
+          <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-1 title">
+            Complete AWS Integration
+          </h5>
           <p class="tw:text-sm tw:m-0 description">
-            Deploy all selected AWS services in one click using a single CloudFormation stack.
+            Deploy all selected AWS services in one click using a single
+            CloudFormation stack.
           </p>
         </div>
       </div>
@@ -32,26 +39,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Deployment Mode Toggle -->
       <div class="tw:mb-6">
         <div class="step-label tw:mb-3">Deployment mode</div>
-        <q-btn-toggle
+        <OToggleGroup
           v-model="deploymentMode"
-          :options="[
-            { label: 'Single Region', value: 'single' },
-            { label: 'Multi-Region (StackSets)', value: 'stackset' },
-          ]"
-          unelevated
-          toggle-color="primary"
-          color="white"
-          text-color="primary"
           data-test="aws-deployment-mode-toggle"
-        />
+        >
+          <OToggleGroupItem value="single">Single Region</OToggleGroupItem>
+          <OToggleGroupItem value="stackset"
+            >Multi-Region (StackSets)</OToggleGroupItem
+          >
+        </OToggleGroup>
         <div class="tw:mt-2 tw:text-xs mode-hint">
           <span v-if="deploymentMode === 'single'">
-            Deploys a CloudFormation stack in one AWS region. Parameters are pre-filled automatically.
+            Deploys a CloudFormation stack in one AWS region. Parameters are
+            pre-filled automatically.
           </span>
           <span v-else>
             Deploys across multiple regions using CloudFormation StackSets.
-            Requires AWS Organizations or self-managed IAM roles.
-            Parameters are shown for copy-paste into the AWS console wizard.
+            Requires AWS Organizations or self-managed IAM roles. Parameters are
+            shown for copy-paste into the AWS console wizard.
           </span>
         </div>
       </div>
@@ -63,15 +68,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showServices = !showServices"
         >
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-icon :name="showServices ? 'expand_less' : 'expand_more'" color="primary" />
+            <q-icon
+              :name="showServices ? 'expand_less' : 'expand_more'"
+              color="primary"
+            />
             <div class="step-label">Select services to monitor</div>
             <q-chip dense color="primary" text-color="white" size="sm">
-              {{ enabledServices.length }} / {{ QUICK_SETUP_SERVICES.length }} selected
+              {{ enabledServices.length }} /
+              {{ QUICK_SETUP_SERVICES.length }} selected
             </q-chip>
           </div>
           <div class="tw:flex tw:gap-2" @click.stop>
-            <q-btn flat dense size="sm" color="primary" label="Select all" @click="selectAll" />
-            <q-btn flat dense size="sm" color="primary" label="Deselect all" @click="deselectAll" />
+            <OButton variant="ghost-primary" size="xs" @click="selectAll"
+              >Select all</OButton
+            >
+            <OButton variant="ghost-primary" size="xs" @click="deselectAll"
+              >Deselect all</OButton
+            >
           </div>
         </div>
 
@@ -116,7 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- StackSets: admin + target regions -->
       <template v-else>
         <div class="tw:mb-6">
-          <div class="step-label tw:mb-3">Admin region <span class="tw:font-normal tw:text-xs region-hint">(where the StackSet is managed)</span></div>
+          <div class="step-label tw:mb-3">
+            Admin region
+            <span class="tw:font-normal tw:text-xs region-hint"
+              >(where the StackSet is managed)</span
+            >
+          </div>
           <q-select
             v-model="selectedRegion"
             :options="AWS_REGIONS"
@@ -137,19 +155,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="showTargetRegions = !showTargetRegions"
           >
             <div class="tw:flex tw:items-center tw:gap-2">
-              <q-icon :name="showTargetRegions ? 'expand_less' : 'expand_more'" color="primary" />
+              <q-icon
+                :name="showTargetRegions ? 'expand_less' : 'expand_more'"
+                color="primary"
+              />
               <div class="step-label">
                 Target regions
-                <span class="tw:font-normal tw:text-xs region-hint">(where stacks will be deployed)</span>
+                <span class="tw:font-normal tw:text-xs region-hint"
+                  >(where stacks will be deployed)</span
+                >
               </div>
               <q-chip
                 v-if="targetRegions.length > 0"
-                dense color="primary" text-color="white" size="sm"
-              >{{ targetRegions.length }} selected</q-chip>
+                dense
+                color="primary"
+                text-color="white"
+                size="sm"
+                >{{ targetRegions.length }} selected</q-chip
+              >
             </div>
             <div class="tw:flex tw:gap-2" @click.stop>
-              <q-btn flat dense size="sm" color="primary" label="Select all" @click="selectAllRegions" />
-              <q-btn flat dense size="sm" color="primary" label="Clear" @click="targetRegions = []" />
+              <OButton
+                variant="ghost-primary"
+                size="xs"
+                @click="selectAllRegions"
+                >Select all</OButton
+              >
+              <OButton
+                variant="ghost-primary"
+                size="xs"
+                @click="targetRegions = []"
+                >Clear</OButton
+              >
             </div>
           </div>
 
@@ -176,25 +213,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="tw:mb-6">
           <div class="step-label tw:mb-3">Deployment model</div>
-          <q-btn-toggle
+          <OToggleGroup
             v-model="stackSetModel"
-            :options="[
-              { label: 'Self-managed', value: 'self' },
-              { label: 'Service-managed (AWS Organizations)', value: 'service' },
-            ]"
-            unelevated
-            toggle-color="primary"
-            color="white"
-            text-color="primary"
             data-test="aws-stackset-model-toggle"
-          />
+          >
+            <OToggleGroupItem value="self">Self-managed</OToggleGroupItem>
+            <OToggleGroupItem value="service"
+              >Service-managed (AWS Organizations)</OToggleGroupItem
+            >
+          </OToggleGroup>
           <div class="tw:mt-2 tw:text-xs mode-hint">
             <span v-if="stackSetModel === 'self'">
-              Requires <code>AWSCloudFormationStackSetAdministrationRole</code> and
-              <code>AWSCloudFormationStackSetExecutionRole</code> IAM roles in your account.
+              Requires
+              <code>AWSCloudFormationStackSetAdministrationRole</code> and
+              <code>AWSCloudFormationStackSetExecutionRole</code> IAM roles in
+              your account.
             </span>
             <span v-else>
-              Uses AWS Organizations. Your account must be the management or delegated admin account.
+              Uses AWS Organizations. Your account must be the management or
+              delegated admin account.
             </span>
           </div>
         </div>
@@ -202,25 +239,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Launch -->
       <div class="tw:flex tw:items-center tw:gap-3 tw:mb-6">
-        <q-btn
-          color="primary"
-          unelevated
-          :disable="enabledServices.length === 0 || (deploymentMode === 'stackset' && targetRegions.length === 0)"
+        <OButton
+          variant="primary"
+          size="sm"
+          :disabled="
+            enabledServices.length === 0 ||
+            (deploymentMode === 'stackset' && targetRegions.length === 0)
+          "
           @click="handleLaunch"
-          :data-test="deploymentMode === 'single' ? 'aws-quick-setup-deploy-btn' : 'aws-stackset-launch-btn'"
+          :data-test="
+            deploymentMode === 'single'
+              ? 'aws-quick-setup-deploy-btn'
+              : 'aws-stackset-launch-btn'
+          "
         >
-          <q-icon name="cloud_upload" left size="sm" />
-          {{ deploymentMode === 'single' ? 'Launch CloudFormation Stack' : 'Open StackSets Console' }}
-        </q-btn>
-        <span v-if="enabledServices.length === 0" class="tw:text-sm text-negative">
+          <template #icon-left
+            ><q-icon name="cloud_upload" size="sm"
+          /></template>
+          {{
+            deploymentMode === "single"
+              ? "Launch CloudFormation Stack"
+              : "Open StackSets Console"
+          }}
+        </OButton>
+        <span
+          v-if="enabledServices.length === 0"
+          class="tw:text-sm text-negative"
+        >
           Select at least one service
         </span>
-        <span v-else-if="deploymentMode === 'stackset' && targetRegions.length === 0" class="tw:text-sm text-negative">
+        <span
+          v-else-if="
+            deploymentMode === 'stackset' && targetRegions.length === 0
+          "
+          class="tw:text-sm text-negative"
+        >
           Select at least one target region
         </span>
         <span v-else class="tw:text-sm detail-value">
-          {{ enabledServices.length }} service{{ enabledServices.length > 1 ? 's' : '' }} selected
-          <template v-if="deploymentMode === 'stackset'"> · {{ targetRegions.length }} region{{ targetRegions.length > 1 ? 's' : '' }}</template>
+          {{ enabledServices.length }} service{{
+            enabledServices.length > 1 ? "s" : ""
+          }}
+          selected
+          <template v-if="deploymentMode === 'stackset'">
+            · {{ targetRegions.length }} region{{
+              targetRegions.length > 1 ? "s" : ""
+            }}</template
+          >
         </span>
       </div>
 
@@ -230,28 +295,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-separator class="tw:mb-4" />
           <div class="param-helper">
             <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
-              <div class="tw:font-semibold step-label">Parameters to enter in the AWS wizard</div>
-              <q-btn flat dense size="sm" icon="close" @click="showParamHelper = false" />
+              <div class="tw:font-semibold step-label">
+                Parameters to enter in the AWS wizard
+              </div>
+              <OButton
+                variant="ghost"
+                size="icon-circle-sm"
+                @click="showParamHelper = false"
+              >
+                <q-icon name="close" />
+              </OButton>
             </div>
             <p class="tw:text-xs tw:mb-3 mode-hint">
-              The StackSets console doesn't support URL pre-fill. Enter these values as you go through the wizard.
+              The StackSets console doesn't support URL pre-fill. Enter these
+              values as you go through the wizard.
             </p>
             <div class="param-table">
-              <div v-for="param in stackSetParams" :key="param.key" class="param-row">
+              <div
+                v-for="param in stackSetParams"
+                :key="param.key"
+                class="param-row"
+              >
                 <div class="param-key">{{ param.key }}</div>
                 <div class="param-value">
                   <span class="param-val-text">{{ param.value }}</span>
-                  <q-btn
-                    flat dense round size="xs" icon="content_copy" color="primary"
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
                     @click="copyParam(param.value)"
                   >
+                    <q-icon name="content_copy" />
                     <q-tooltip>Copy</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
             </div>
             <div class="tw:mt-3">
-              <div class="tw:font-semibold tw:text-xs tw:mb-1 step-label">Target regions to enter in "Deployment targets":</div>
+              <div class="tw:font-semibold tw:text-xs tw:mb-1 step-label">
+                Target regions to enter in "Deployment targets":
+              </div>
               <div class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
                 <q-chip
                   v-for="r in targetRegions"
@@ -260,13 +342,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="primary"
                   text-color="white"
                   size="sm"
-                >{{ r }}</q-chip>
+                  >{{ r }}</q-chip
+                >
               </div>
             </div>
           </div>
         </div>
       </q-slide-transition>
-
     </div>
   </div>
 </template>
@@ -275,23 +357,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import { generateCloudFormationURL, AWS_REGIONS, QUICK_SETUP_SERVICES } from "@/utils/awsIntegrations";
+import {
+  generateCloudFormationURL,
+  AWS_REGIONS,
+  QUICK_SETUP_SERVICES,
+} from "@/utils/awsIntegrations";
+import OButton from "@/lib/core/Button/OButton.vue";
 import segment from "@/services/segment_analytics";
 
-const COMPLETE_TEMPLATE_URL = 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml';
+const COMPLETE_TEMPLATE_URL =
+  "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml";
 
 export default defineComponent({
   name: "AWSQuickSetup",
+  components: { OToggleGroup, OToggleGroupItem, OButton },
   setup() {
     const store = useStore();
     const q = useQuasar();
 
-    const deploymentMode = ref<'single' | 'stackset'>('single');
-    const stackSetModel = ref<'self' | 'service'>('self');
-    const selectedRegion = ref('us-east-1');
-    const targetRegions = ref<string[]>(['us-east-1']);
-    const enabledServices = ref<string[]>(QUICK_SETUP_SERVICES.map(s => s.flag));
+    const deploymentMode = ref<"single" | "stackset">("single");
+    const stackSetModel = ref<"self" | "service">("self");
+    const selectedRegion = ref("us-east-1");
+    const targetRegions = ref<string[]>(["us-east-1"]);
+    const enabledServices = ref<string[]>(
+      QUICK_SETUP_SERVICES.map((s) => s.flag),
+    );
     const showParamHelper = ref(false);
     const showTargetRegions = ref(false);
     const showServices = ref(false);
@@ -310,14 +403,20 @@ export default defineComponent({
       return { organizationId, email, passcode };
     };
 
-    const selectAll = () => { enabledServices.value = QUICK_SETUP_SERVICES.map(s => s.flag); };
-    const deselectAll = () => { enabledServices.value = []; };
-    const selectAllRegions = () => { targetRegions.value = AWS_REGIONS.map(r => r.value); };
+    const selectAll = () => {
+      enabledServices.value = QUICK_SETUP_SERVICES.map((s) => s.flag);
+    };
+    const deselectAll = () => {
+      enabledServices.value = [];
+    };
+    const selectAllRegions = () => {
+      targetRegions.value = AWS_REGIONS.map((r) => r.value);
+    };
 
     const buildServiceFlags = () => {
       const flags: Record<string, string> = {};
       QUICK_SETUP_SERVICES.forEach(({ flag }) => {
-        flags[flag] = enabledServices.value.includes(flag) ? 'true' : 'false';
+        flags[flag] = enabledServices.value.includes(flag) ? "true" : "false";
       });
       return flags;
     };
@@ -332,52 +431,75 @@ export default defineComponent({
       const serviceFlags = buildServiceFlags();
 
       const params = [
-        { key: 'Amazon S3 URL (template)', value: COMPLETE_TEMPLATE_URL },
-        { key: 'TemplateS3Bucket', value: 'openobserve-datasources-bucket' },
-        { key: 'TemplateS3Prefix', value: 'datasource/cloud/aws' },
-        { key: 'OpenObserveEndpoint', value: endpointUrl },
-        { key: 'OpenObserveAccessKey', value: accessKey },
-        ...QUICK_SETUP_SERVICES.map(({ flag }) => ({ key: flag, value: serviceFlags[flag] })),
+        { key: "Amazon S3 URL (template)", value: COMPLETE_TEMPLATE_URL },
+        { key: "TemplateS3Bucket", value: "openobserve-datasources-bucket" },
+        { key: "TemplateS3Prefix", value: "datasource/cloud/aws" },
+        { key: "OpenObserveEndpoint", value: endpointUrl },
+        { key: "OpenObserveAccessKey", value: accessKey },
+        ...QUICK_SETUP_SERVICES.map(({ flag }) => ({
+          key: flag,
+          value: serviceFlags[flag],
+        })),
       ];
       return params;
     });
 
     const copyParam = (value: string) => {
       navigator.clipboard.writeText(value);
-      q.notify({ type: 'positive', message: 'Copied to clipboard', timeout: 1500 });
+      q.notify({
+        type: "positive",
+        message: "Copied to clipboard",
+        timeout: 1500,
+      });
     };
 
     const handleLaunch = () => {
       if (!endpoint?.url) {
-        q.notify({ type: "negative", message: "Invalid ingestion endpoint. Please check configuration.", timeout: 3000 });
+        q.notify({
+          type: "negative",
+          message: "Invalid ingestion endpoint. Please check configuration.",
+          timeout: 3000,
+        });
         return;
       }
 
       const { organizationId, email, passcode } = getCredentials();
       if (!organizationId || !email || !passcode) {
-        q.notify({ type: "negative", message: "Missing organization credentials. Please refresh the page.", timeout: 3000 });
+        q.notify({
+          type: "negative",
+          message: "Missing organization credentials. Please refresh the page.",
+          timeout: 3000,
+        });
         return;
       }
 
-      if (deploymentMode.value === 'single') {
+      if (deploymentMode.value === "single") {
         launchSingleRegion(organizationId, email, passcode);
       } else {
         if (targetRegions.value.length === 0) {
-          q.notify({ type: "warning", message: "Select at least one target region.", timeout: 3000 });
+          q.notify({
+            type: "warning",
+            message: "Select at least one target region.",
+            timeout: 3000,
+          });
           return;
         }
         launchStackSet(organizationId);
       }
     };
 
-    const launchSingleRegion = (organizationId: string, email: string, passcode: string) => {
+    const launchSingleRegion = (
+      organizationId: string,
+      email: string,
+      passcode: string,
+    ) => {
       const accessKey = btoa(`${email}:${passcode}`);
 
       const url = generateCloudFormationURL(
         {
-          id: 'aws-complete',
-          name: 'AWS-Complete',
-          displayName: 'AWS Complete Integration',
+          id: "aws-complete",
+          name: "AWS-Complete",
+          displayName: "AWS Complete Integration",
           cloudFormationTemplate: COMPLETE_TEMPLATE_URL,
           comingSoon: false,
         } as any,
@@ -386,30 +508,42 @@ export default defineComponent({
         accessKey,
         selectedRegion.value,
         {
-          TemplateS3Bucket: 'openobserve-datasources-bucket',
-          TemplateS3Prefix: 'datasource/cloud/aws',
+          TemplateS3Bucket: "openobserve-datasources-bucket",
+          TemplateS3Prefix: "datasource/cloud/aws",
           ...buildServiceFlags(),
-        }
+        },
       );
 
       if (!url) {
-        q.notify({ type: "warning", message: "CloudFormation template not available yet", timeout: 3000 });
+        q.notify({
+          type: "warning",
+          message: "CloudFormation template not available yet",
+          timeout: 3000,
+        });
         return;
       }
 
-      window.open(url, '_blank', 'noopener,noreferrer');
-      segment.track("AWS Complete Integration Started", { mode: 'single', region: selectedRegion.value, services: enabledServices.value });
-      q.notify({ type: "info", message: "Opening AWS Console to deploy complete integration stack", timeout: 3000 });
+      window.open(url, "_blank", "noopener,noreferrer");
+      segment.track("AWS Complete Integration Started", {
+        mode: "single",
+        region: selectedRegion.value,
+        services: enabledServices.value,
+      });
+      q.notify({
+        type: "info",
+        message: "Opening AWS Console to deploy complete integration stack",
+        timeout: 3000,
+      });
     };
 
     const launchStackSet = (organizationId: string) => {
       // StackSets console doesn't support URL pre-fill — open the console and show param helper
       const consoleUrl = `https://console.aws.amazon.com/cloudformation/home?region=${selectedRegion.value}#/stacksets/create`;
-      window.open(consoleUrl, '_blank', 'noopener,noreferrer');
+      window.open(consoleUrl, "_blank", "noopener,noreferrer");
       showParamHelper.value = true;
 
       segment.track("AWS StackSet Integration Started", {
-        mode: 'stackset',
+        mode: "stackset",
         model: stackSetModel.value,
         admin_region: selectedRegion.value,
         target_regions: targetRegions.value,
@@ -418,7 +552,8 @@ export default defineComponent({
 
       q.notify({
         type: "info",
-        message: "AWS StackSets console opened. Use the parameter values below to complete setup.",
+        message:
+          "AWS StackSets console opened. Use the parameter values below to complete setup.",
         timeout: 5000,
       });
     };
@@ -500,27 +635,77 @@ export default defineComponent({
   }
 
   .body--light & {
-    .title { color: #1a1a1a; }
-    .description, .detail-value, .mode-hint { color: #666; }
-    .step-label { color: #333; }
-    .region-hint { color: #888; }
-    .param-helper { background: #f5f5f5; }
-    .param-row { background: #fff; border: 1px solid #e0e0e0; }
-    .param-key { color: #333; }
-    .param-val-text { color: #555; }
-    .region-collapsible-header { background: #f0f4ff; border: 1px solid #d0d9f0; &:hover { background: #e8eeff; } }
+    .title {
+      color: #1a1a1a;
+    }
+    .description,
+    .detail-value,
+    .mode-hint {
+      color: #666;
+    }
+    .step-label {
+      color: #333;
+    }
+    .region-hint {
+      color: #888;
+    }
+    .param-helper {
+      background: #f5f5f5;
+    }
+    .param-row {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+    }
+    .param-key {
+      color: #333;
+    }
+    .param-val-text {
+      color: #555;
+    }
+    .region-collapsible-header {
+      background: #f0f4ff;
+      border: 1px solid #d0d9f0;
+      &:hover {
+        background: #e8eeff;
+      }
+    }
   }
 
   .body--dark & {
-    .title { color: #e0e0e0; }
-    .description, .detail-value, .mode-hint { color: #b0b0b0; }
-    .step-label { color: #d0d0d0; }
-    .region-hint { color: #888; }
-    .param-helper { background: rgba(255,255,255,0.05); }
-    .param-row { background: rgba(255,255,255,0.03); border: 1px solid #404040; }
-    .param-key { color: #ccc; }
-    .param-val-text { color: #aaa; }
-    .region-collapsible-header { background: rgba(255,255,255,0.06); border: 1px solid #404040; &:hover { background: rgba(255,255,255,0.09); } }
+    .title {
+      color: #e0e0e0;
+    }
+    .description,
+    .detail-value,
+    .mode-hint {
+      color: #b0b0b0;
+    }
+    .step-label {
+      color: #d0d0d0;
+    }
+    .region-hint {
+      color: #888;
+    }
+    .param-helper {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .param-row {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid #404040;
+    }
+    .param-key {
+      color: #ccc;
+    }
+    .param-val-text {
+      color: #aaa;
+    }
+    .region-collapsible-header {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid #404040;
+      &:hover {
+        background: rgba(255, 255, 255, 0.09);
+      }
+    }
   }
 }
 </style>

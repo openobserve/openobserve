@@ -202,4 +202,20 @@ mod tests {
             assert_batches_eq!(item.1, &data);
         }
     }
+
+    #[test]
+    fn test_cast_to_timestamp_udf_name() {
+        use datafusion::logical_expr::ScalarUDFImpl as _;
+        let udf = CastToTimestampUdf::new();
+        assert_eq!(udf.name(), CAST_TO_TIMESTAMP_UDF_NAME);
+        assert_eq!(CAST_TO_TIMESTAMP_UDF_NAME, "cast_to_timestamp");
+    }
+
+    #[test]
+    fn test_cast_to_timestamp_udf_return_type_is_int64() {
+        use datafusion::logical_expr::ScalarUDFImpl as _;
+        let udf = CastToTimestampUdf::new();
+        let ret = udf.return_type(&[]).unwrap();
+        assert_eq!(ret, arrow::datatypes::DataType::Int64);
+    }
 }

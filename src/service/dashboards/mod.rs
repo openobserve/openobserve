@@ -1028,3 +1028,58 @@ async fn filter_permitted_dashboards(
         .collect();
     Ok(permitted_dashboards)
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::dashboards::v8;
+
+    use super::*;
+
+    fn make_panel(i: i64, x: i64, y: i64, w: i64, h: i64) -> v8::Panel {
+        let mut p: v8::Panel = serde_json::from_str(
+            r#"{"id":"","type":"bar","title":"","description":"","config":{"show_legends":false,"legends_position":null},"queries":[]}"#
+        ).unwrap();
+        p.id = format!("p{i}");
+        p.layout = Some(v8::Layout { x, y, w, h, i });
+        p
+    }
+
+    #[test]
+    fn test_compute_panel_layout_empty_panels() {
+        let layout = compute_panel_layout(&[], None, None);
+        assert_eq!(layout.x, 0);
+        assert_eq!(layout.y, 0);
+        assert_eq!(layout.w, 96);
+        assert_eq!(layout.h, 18);
+        assert_eq!(layout.i, 1);
+    }
+
+    #[test]
+    fn test_compute_panel_layout_custom_size_empty() {
+        let layout = compute_panel_layout(&[], Some(48), Some(10));
+        assert_eq!(layout.w, 48);
+        assert_eq!(layout.h, 10);
+    }
+
+    #[test]
+    fn test_compute_panel_layout_places_below_when_no_room() {
+        // Panel at x=0, y=0, w=192 — takes full row width
+        let panels = vec![make_panel(1, 0, 0, 192, 18)];
+        let layout = compute_panel_layout(&panels, None, None);
+        // No room to the right, should place below (y = 0 + 18 = 18)
+        assert_eq!(layout.y, 18);
+        assert_eq!(layout.x, 0);
+        assert_eq!(layout.i, 2);
+    }
+
+    #[test]
+    fn test_compute_panel_layout_places_right_when_room() {
+        // Panel at x=0, y=0, w=96 — leaves room on the right
+        let panels = vec![make_panel(1, 0, 0, 96, 18)];
+        let layout = compute_panel_layout(&panels, Some(96), None);
+        // Room to the right: x = 96, y = 0
+        assert_eq!(layout.x, 96);
+        assert_eq!(layout.y, 0);
+        assert_eq!(layout.i, 2);
+    }
+}

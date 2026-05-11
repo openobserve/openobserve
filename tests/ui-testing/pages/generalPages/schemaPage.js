@@ -56,10 +56,13 @@ class SchemaPage {
     // Apply query button action
     async applyQuery() {
         testLogger.debug('Applying query with search response wait');
+        // OButton returns early in handleClick when loading=true, so wait for enabled first.
+        const refreshBtn = this.page.locator(this.schemaLocators.logsSearchBarRefreshBtn);
+        await refreshBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await expect(refreshBtn).toBeEnabled({ timeout: 15000 });
         const search = this.page.waitForResponse(logData.applyQuery);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.locator(this.schemaLocators.logsSearchBarRefreshBtn).click({ force: true });
-        await expect.poll(async () => (await search).status()).toBe(200);
+        await refreshBtn.click();
+        await expect.poll(async () => (await search).status(), { timeout: 30000 }).toBe(200);
     }
 
     // Navigate to streams page

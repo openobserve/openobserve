@@ -289,3 +289,74 @@ impl Drop for FlightEncoderStream {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use arrow::ipc::writer::IpcWriteOptions;
+    use config::meta::search::ScanStats;
+    use flight::common::PreCustomMessage;
+
+    use super::*;
+
+    fn make_builder() -> FlightEncoderStreamBuilder {
+        FlightEncoderStreamBuilder::new(IpcWriteOptions::default(), 4096)
+    }
+
+    #[test]
+    fn test_builder_new_defaults() {
+        let b = make_builder();
+        assert_eq!(b.trace_id, "");
+        assert!(!b.is_super);
+        assert!(b.defer_lock.is_none());
+        assert!(b.custom_messages.is_empty());
+        assert!(b.queue.is_empty());
+    }
+
+    #[test]
+    fn test_builder_with_trace_id() {
+        let b = make_builder().with_trace_id("abc-123".to_string());
+        assert_eq!(b.trace_id, "abc-123");
+    }
+
+    #[test]
+    fn test_builder_with_is_super_true() {
+        let b = make_builder().with_is_super(true);
+        assert!(b.is_super);
+    }
+
+    #[test]
+    fn test_builder_with_is_super_false() {
+        let b = make_builder().with_is_super(false);
+        assert!(!b.is_super);
+    }
+
+    #[test]
+    fn test_builder_with_defer_lock_none() {
+        let b = make_builder().with_defer_lock(None);
+        assert!(b.defer_lock.is_none());
+    }
+
+    #[test]
+    fn test_builder_with_start() {
+        let t = std::time::Instant::now();
+        let b = make_builder().with_start(t);
+        // Can't compare Instant directly, but at least verify it compiled and ran
+        let _ = b.start;
+    }
+
+    #[test]
+    fn test_builder_with_custom_message() {
+        let msg = PreCustomMessage::ScanStats(ScanStats::new());
+        let b = make_builder().with_custom_message(msg);
+        assert_eq!(b.custom_messages.len(), 1);
+    }
+
+    #[test]
+    fn test_builder_chaining() {
+        let b = make_builder()
+            .with_trace_id("trace-xyz".to_string())
+            .with_is_super(true);
+        assert_eq!(b.trace_id, "trace-xyz");
+        assert!(b.is_super);
+    }
+}

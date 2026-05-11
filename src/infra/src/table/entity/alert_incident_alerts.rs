@@ -50,3 +50,25 @@ impl Related<super::alert_incidents::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            incident_id: "inc-1".to_string(),
+            alert_id: "alert-1".to_string(),
+            alert_fired_at: 1000,
+            alert_name: "High Error Rate".to_string(),
+            correlation_reason: Some("service_discovery".to_string()),
+            created_at: 1000,
+        };
+        assert_eq!(m.incident_id, "inc-1");
+        assert_eq!(m.alert_id, "alert-1");
+        assert_eq!(m.alert_fired_at, 1000);
+        assert_eq!(m.alert_name, "High Error Rate");
+        assert!(m.correlation_reason.is_some());
+    }
+}

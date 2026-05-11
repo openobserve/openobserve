@@ -52,3 +52,16 @@ enum Templates {
     Org,
     Name,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_templates_org_name_unique_idx_constant_value() {
+        assert_eq!(
+            TEMPLATES_ORG_NAME_UNIQUE_IDX,
+            "templates_org_name_unique_idx"
+        );
+    }
+}

@@ -885,6 +885,10 @@ pub async fn update_stream_settings(
         settings.storage_type = storage_type;
     }
 
+    if let Some(is_llm_stream) = new_settings.is_llm_stream {
+        settings.is_llm_stream = is_llm_stream;
+    }
+
     if !new_settings.full_text_search_keys.add.is_empty() {
         let mut add = new_settings.full_text_search_keys.add;
         add.sort();
@@ -1800,5 +1804,26 @@ mod tests {
             assert_eq!(meta.metric_family_name, "normal_metric");
             assert_eq!(meta.help, "normal_metric");
         }
+    }
+
+    #[test]
+    fn test_parse_data_type_all_variants() {
+        assert_eq!(parse_data_type("utf8"), Some(DataType::Utf8));
+        assert_eq!(parse_data_type("UTF8"), Some(DataType::Utf8));
+        assert_eq!(parse_data_type("largeutf8"), Some(DataType::LargeUtf8));
+        assert_eq!(parse_data_type("large_utf8"), Some(DataType::LargeUtf8));
+        assert_eq!(parse_data_type("LARGE_UTF8"), Some(DataType::LargeUtf8));
+        assert_eq!(parse_data_type("bool"), Some(DataType::Boolean));
+        assert_eq!(parse_data_type("boolean"), Some(DataType::Boolean));
+        assert_eq!(parse_data_type("BOOLEAN"), Some(DataType::Boolean));
+        assert_eq!(parse_data_type("int64"), Some(DataType::Int64));
+        assert_eq!(parse_data_type("INT64"), Some(DataType::Int64));
+        assert_eq!(parse_data_type("uint64"), Some(DataType::UInt64));
+        assert_eq!(parse_data_type("float64"), Some(DataType::Float64));
+        assert_eq!(parse_data_type("FLOAT64"), Some(DataType::Float64));
+        // unknown → None
+        assert_eq!(parse_data_type("text"), None);
+        assert_eq!(parse_data_type(""), None);
+        assert_eq!(parse_data_type("int32"), None);
     }
 }

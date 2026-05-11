@@ -69,3 +69,62 @@ impl UserDefinedLogicalNodeCore for DeduplicationLogicalNode {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use datafusion::{
+        common::DFSchema,
+        logical_expr::{EmptyRelation, LogicalPlan, UserDefinedLogicalNodeCore},
+    };
+
+    use super::*;
+
+    fn empty_plan() -> LogicalPlan {
+        LogicalPlan::EmptyRelation(EmptyRelation {
+            produce_one_row: false,
+            schema: Arc::new(DFSchema::empty()),
+        })
+    }
+
+    #[test]
+    fn test_name() {
+        let node = DeduplicationLogicalNode::new(empty_plan(), vec![]);
+        assert_eq!(node.name(), "Deduplication");
+    }
+
+    #[test]
+    fn test_inputs_returns_one_element() {
+        let node = DeduplicationLogicalNode::new(empty_plan(), vec![]);
+        assert_eq!(node.inputs().len(), 1);
+    }
+
+    #[test]
+    fn test_expressions_is_empty() {
+        let node = DeduplicationLogicalNode::new(empty_plan(), vec![]);
+        assert!(node.expressions().is_empty());
+    }
+
+    #[test]
+    fn test_fmt_for_explain() {
+        let node = DeduplicationLogicalNode::new(empty_plan(), vec![]);
+        struct Wrap<'a>(&'a DeduplicationLogicalNode);
+        impl std::fmt::Display for Wrap<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.fmt_for_explain(f)
+            }
+        }
+        assert_eq!(format!("{}", Wrap(&node)), "Deduplication");
+    }
+
+    #[test]
+    fn test_with_exprs_and_inputs_preserves_columns() {
+        let col = Column::from_name("ts");
+        let node = DeduplicationLogicalNode::new(empty_plan(), vec![col.clone()]);
+        let new_input = empty_plan();
+        let new_node = node.with_exprs_and_inputs(vec![], vec![new_input]).unwrap();
+        assert_eq!(new_node.deduplication_columns, vec![col]);
+        assert_eq!(new_node.max_rows, 1);
+    }
+}

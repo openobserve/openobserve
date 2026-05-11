@@ -537,4 +537,31 @@ mod tests {
         config.stream_strategy = "stream1:acc3".to_string(); // acc3 does not exist
         StorageClientFactory::new_with_config(&config, false);
     }
+
+    #[test]
+    fn test_get_value_by_idx_normal() {
+        let vals = ["a", "b", "c"];
+        assert_eq!(get_value_by_idx(&vals, 0), "a");
+        assert_eq!(get_value_by_idx(&vals, 1), "b");
+        assert_eq!(get_value_by_idx(&vals, 2), "c");
+    }
+
+    #[test]
+    fn test_get_value_by_idx_empty_slice() {
+        assert_eq!(get_value_by_idx(&[], 0), "");
+    }
+
+    #[test]
+    fn test_get_value_by_idx_index_out_of_bounds() {
+        let vals = ["x"];
+        assert_eq!(get_value_by_idx(&vals, 5), "");
+    }
+
+    #[test]
+    fn test_storage_client_factory_debug_and_display() {
+        let config = base_s3_config();
+        let factory = StorageClientFactory::new_with_config(&config, true);
+        assert_eq!(format!("{factory}"), "storage for StorageClientFactory");
+        assert_eq!(format!("{factory:?}"), "storage for StorageClientFactory");
+    }
 }

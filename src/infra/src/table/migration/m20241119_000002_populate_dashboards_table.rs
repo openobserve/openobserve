@@ -219,3 +219,60 @@ mod dashboards {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_meta(folder_id: Option<i64>, dashboard_id: &str, value: &str) -> MetaDashboard {
+        MetaDashboard {
+            folder_id,
+            dashboard_id: dashboard_id.to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    const VALID_JSON: &str = r#"{"version":1,"owner":"alice","title":"My Dashboard","created":"2024-01-01T00:00:00+00:00"}"#;
+
+    #[test]
+    fn test_try_from_missing_folder_id_returns_error() {
+        let m = make_meta(None, "dash-1", VALID_JSON);
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("folder"));
+    }
+
+    #[test]
+    fn test_try_from_empty_dashboard_id_returns_error() {
+        let m = make_meta(Some(1), "", VALID_JSON);
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("missing a dasbhoard ID"));
+    }
+
+    #[test]
+    fn test_try_from_invalid_json_returns_error() {
+        let m = make_meta(Some(1), "dash-1", "not json");
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not valid JSON"));
+    }
+
+    #[test]
+    fn test_try_from_non_object_json_returns_error() {
+        let m = make_meta(Some(1), "dash-1", r#"[1,2,3]"#);
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not a JSON object"));
+    }
+
+    #[test]
+    fn test_try_from_valid_succeeds() {
+        let m = make_meta(Some(42), "dash-abc", VALID_JSON);
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_ok());
+        let active = result.unwrap();
+        assert_eq!(active.folder_id.unwrap(), 42);
+        assert_eq!(active.dashboard_id.unwrap(), "dash-abc");
+    }
+}

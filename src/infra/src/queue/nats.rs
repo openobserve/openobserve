@@ -241,7 +241,7 @@ fn format_key(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::format_key;
+    use super::{format_key, *};
 
     #[test]
     fn test_queue_nats_format_key() {
@@ -268,5 +268,24 @@ mod tests {
         // Test unicode characters (should be replaced with _)
         assert_eq!(format_key("test中文key"), "test__key");
         assert_eq!(format_key("test🚀key"), "test_key");
+    }
+
+    #[test]
+    fn test_nats_queue_new_strips_trailing_slash() {
+        let q = NatsQueue::new("myprefix/");
+        assert_eq!(q.prefix, "myprefix");
+    }
+
+    #[test]
+    fn test_nats_queue_new_no_slash() {
+        let q = NatsQueue::new("myprefix");
+        assert_eq!(q.prefix, "myprefix");
+    }
+
+    #[test]
+    fn test_with_consumer_name_sets_fields() {
+        let q = NatsQueue::new("prefix").with_consumer_name("My Consumer".to_string(), true);
+        assert_eq!(q.consumer_name, "My_Consumer");
+        assert!(q.is_durable);
     }
 }

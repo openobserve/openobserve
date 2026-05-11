@@ -21,21 +21,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Schema Toggle Buttons -->
     <div v-if="showUserDefinedSchemaToggle">
-      <q-btn-toggle
-        no-caps
+      <OToggleGroup
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event)"
         data-test="logs-page-field-list-user-defined-schema-toggle"
         class="schema-field-toggle q-mr-xs tw:p-0"
-        toggle-color="primary"
-        bordered
-        size="0.5rem"
-        text-color="primary"
-        bg-color="primary"
-        :options="userDefinedSchemaBtnGroupOption"
       >
-        <template v-slot:user_defined_slot>
-          <div data-test="logs-user-defined-fields-btn">
+        <OToggleGroupItem
+          v-for="opt in userDefinedSchemaBtnGroupOption"
+          :key="opt.value"
+          :value="opt.value"
+          data-test="logs-user-defined-fields-btn"
+        >
+          <template v-if="opt.slot === 'user_defined_slot'">
             <q-icon name="person" class="tw:text-[12px]!"></q-icon>
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
@@ -49,10 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("search.userDefinedSchemaLabel")
               }}</span>
             </q-tooltip>
-          </div>
-        </template>
-        <template v-slot:all_fields_slot>
-          <div data-test="logs-all-fields-btn">
+          </template>
+          <template v-else-if="opt.slot === 'all_fields_slot'">
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
@@ -67,10 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator color="white" class="q-mt-xs q-mb-xs" />
               {{ t("search.allFieldsWarningMsg") }}
             </q-tooltip>
-          </div>
-        </template>
-        <template v-slot:interesting_fields_slot v-if="showQuickMode">
-          <div data-test="logs-interesting-fields-btn">
+          </template>
+          <template
+            v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
+          >
             <q-icon name="info" class="tw:text-[12px]!" />
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
@@ -83,27 +79,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("search.showOnlyInterestingFields")
               }}</span>
             </q-tooltip>
-          </div>
-        </template>
-      </q-btn-toggle>
+          </template>
+          <template v-else>{{ opt.label }}</template>
+        </OToggleGroupItem>
+      </OToggleGroup>
     </div>
 
     <!-- Interesting Fields Toggle (when no user defined schema) -->
     <div v-else-if="showQuickMode">
-      <q-btn-toggle
-        no-caps
+      <OToggleGroup
         :model-value="showOnlyInterestingFields"
         @update:model-value="$emit('toggle-interesting-fields', $event)"
         data-test="logs-page-field-list-user-defined-schema-toggle"
         class="schema-field-toggle q-mr-xs"
-        toggle-color="primary"
-        bordered
-        size="0.5rem"
-        text-color="primary"
-        :options="selectedFieldsBtnGroupOption"
       >
-        <template v-slot:all_fields_slot>
-          <div data-test="logs-all-fields-btn">
+        <OToggleGroupItem
+          v-for="opt in selectedFieldsBtnGroupOption"
+          :key="opt.value"
+          :value="opt.value"
+          :data-test="opt.slot === 'all_fields_slot' ? 'logs-all-fields-btn' : 'logs-interesting-fields-btn'"
+        >
+          <template v-if="opt.slot === 'all_fields_slot'">
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
@@ -118,10 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator color="white" class="q-mt-xs q-mb-xs" />
               {{ t("search.allFieldsWarningMsg") }}
             </q-tooltip>
-          </div>
-        </template>
-        <template v-slot:interesting_fields_slot v-if="showQuickMode">
-          <div data-test="logs-interesting-fields-btn">
+          </template>
+          <template
+            v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
+          >
             <q-icon name="info" class="tw:text-[12px]!" />
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
@@ -134,9 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("search.showOnlyInterestingFields")
               }}</span>
             </q-tooltip>
-          </div>
-        </template>
-      </q-btn-toggle>
+          </template>
+          <template v-else>{{ opt.label }}</template>
+        </OToggleGroupItem>
+      </OToggleGroup>
     </div>
 
     <!-- Pagination and Reset Controls -->
@@ -154,42 +151,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tooltip>
 
         <!-- First page button -->
-        <q-btn
+        <OButton
           data-test="logs-page-fields-list-pagination-firstpage-button"
-          icon="fast_rewind"
-          color="primary"
-          flat
-          :disable="isFirstPage"
+          variant="ghost"
+          size="icon-xs-sq"
+          :disabled="isFirstPage"
           @click="$emit('first-page')"
-          class="pagination-nav-btn"
           aria-label="First page"
-        />
+        >
+          <q-icon name="fast_rewind" size="14px" />
+        </OButton>
 
         <!-- Page number buttons (3 at a time) -->
         <template v-for="page in visiblePages" :key="page">
-          <q-btn
-            flat
+          <OButton
+            :variant="currentPage === page ? 'primary' : 'ghost'"
+            size="sm"
             :data-test="`logs-page-fields-list-pagination-page-${page}-button`"
-            :class="[
-              'pagination-page-btn',
-              currentPage === page ? 'pagination-page-active' : '',
-            ]"
             @click="$emit('set-page', page)"
-            >{{ page }}</q-btn
+            >{{ page }}</OButton
           >
         </template>
 
         <!-- Last page button -->
-        <q-btn
+        <OButton
           data-test="logs-page-fields-list-pagination-lastpage-button"
-          icon="fast_forward"
-          color="primary"
-          flat
-          :disable="isLastPage"
+          variant="ghost"
+          size="icon-xs-sq"
+          :disabled="isLastPage"
           @click="$emit('last-page')"
-          class="pagination-nav-btn"
           aria-label="Last page"
-        />
+        >
+          <q-icon name="fast_forward" size="14px" />
+        </OButton>
       </div>
 
       <!-- Reset Fields Icon -->
@@ -219,6 +213,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const { t } = useI18n();
 
@@ -281,22 +278,6 @@ const visiblePages = computed(() => {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-}
-
-.pagination-nav-btn {
-  min-width: 2rem;
-  height: 2rem;
-}
-
-.pagination-page-btn {
-  min-width: 2rem;
-  height: 2rem;
-  font-size: 0.8125rem;
-}
-
-.pagination-page-active {
-  background-color: var(--q-primary);
-  color: white;
 }
 
 .field-list-reset {

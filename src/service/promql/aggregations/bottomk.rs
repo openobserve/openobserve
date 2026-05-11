@@ -196,4 +196,20 @@ mod tests {
             _ => panic!("Expected None result when k=0"),
         }
     }
+
+    #[test]
+    fn test_bottomk_value_none_input() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = bottomk(2, &None, Value::None, &eval_ctx).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_bottomk_invalid_input_type_returns_err() {
+        let timestamp = 1640995200;
+        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
+        let result = bottomk(2, &None, Value::Float(1.0), &eval_ctx);
+        assert!(result.is_err());
+    }
 }

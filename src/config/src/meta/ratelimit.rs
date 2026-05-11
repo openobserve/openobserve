@@ -659,4 +659,32 @@ mod tests {
         assert_eq!(rule_1_min.threshold, 10);
         assert_eq!(rule_1_hour.threshold, 20);
     }
+
+    #[test]
+    fn test_interval_try_from_valid() {
+        assert!(matches!(Interval::try_from("second"), Ok(Interval::Second)));
+        assert!(matches!(Interval::try_from("minute"), Ok(Interval::Minute)));
+        assert!(matches!(Interval::try_from("hour"), Ok(Interval::Hour)));
+    }
+
+    #[test]
+    fn test_interval_try_from_invalid() {
+        let err = Interval::try_from("millisecond").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("Invalid interval"));
+        assert!(msg.contains("millisecond"));
+    }
+
+    #[test]
+    fn test_interval_get_interval_ms() {
+        assert_eq!(Interval::Second.get_interval_ms(), 1000);
+        assert_eq!(Interval::Minute.get_interval_ms(), 60000);
+        assert_eq!(Interval::Hour.get_interval_ms(), 3600000);
+    }
+
+    #[test]
+    fn test_invalid_interval_error_is_std_error() {
+        let err: Box<dyn std::error::Error> = Box::new(InvalidIntervalError("bad".to_string()));
+        assert!(err.to_string().contains("bad"));
+    }
 }

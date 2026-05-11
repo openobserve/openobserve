@@ -81,7 +81,7 @@ pub fn arr_count_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::StringArray;
+    use arrow::array::{Array, StringArray};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -93,6 +93,51 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_arr_count_impl_json_array_direct() {
+        let input = StringArray::from(vec!["[1, 2, 3]"]);
+        let args = [ColumnarValue::Array(Arc::new(input))];
+        let result = arr_count_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<UInt64Array>().unwrap();
+            assert_eq!(out.value(0), 3);
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_arr_count_impl_empty_array() {
+        let input = StringArray::from(vec!["[]"]);
+        let args = [ColumnarValue::Array(Arc::new(input))];
+        let result = arr_count_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<UInt64Array>().unwrap();
+            assert_eq!(out.value(0), 0);
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_arr_count_impl_invalid_json_returns_zero() {
+        let input = StringArray::from(vec!["not-json"]);
+        let args = [ColumnarValue::Array(Arc::new(input))];
+        let result = arr_count_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<UInt64Array>().unwrap();
+            assert_eq!(out.value(0), 0);
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_arr_count_impl_wrong_arg_count_errors() {
+        let result = arr_count_impl(&[]);
+        assert!(result.is_err());
+    }
 
     #[tokio::test]
     async fn test_arr_count_udf() {

@@ -198,9 +198,8 @@ export default defineComponent({
       },
     );
 
-    const downloadTableAsCSV = (title?: string) => {
+    const getTableCsvString = (): string => {
       const rows = tableRef.value?.getRows() ?? [];
-      if (!rows.length) return;
       const cols: any[] = props.data?.columns || [];
       const headers = cols.map((c: any) => c.label ?? c.name);
       const lines = [
@@ -208,13 +207,19 @@ export default defineComponent({
         ...rows.map((row: any) =>
           cols
             .map((c: any) => {
-              const val = row[c.name ?? c.field];
+              const val = row[c.field ?? c.name];
               return `"${String(val ?? "").replace(/"/g, '""')}"`;
             })
             .join(","),
         ),
       ];
-      const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+      return lines.join("\n");
+    };
+
+    const downloadTableAsCSV = (title?: string) => {
+      const csv = getTableCsvString();
+      if (!csv) return;
+      const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -246,6 +251,7 @@ export default defineComponent({
       localSortBy,
       localSortOrder,
       handleSortChange,
+      getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,
     };

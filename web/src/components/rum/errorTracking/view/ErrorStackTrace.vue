@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -21,24 +21,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-mb-sm">{{ error_stack[0] }}</div>
 
       <!-- Tabs for Pretty and Raw views -->
-      <q-tabs
+      <OTabs
         v-model="activeTab"
         dense
         class="text-grey q-mb-xs"
-        active-color="primary"
-        indicator-color="primary"
         align="left"
       >
-        <q-tab name="raw" label="Raw" />
-        <q-tab name="pretty" label="Pretty" />
-      </q-tabs>
+        <OTab name="raw" label="Raw" />
+        <OTab name="pretty" label="Pretty" />
+      </OTabs>
 
       <q-separator class="q-mb-sm" />
 
       <!-- Tab panels -->
-      <q-tab-panels v-model="activeTab" animated>
+      <OTabPanels v-model="activeTab" animated>
         <!-- Raw view -->
-        <q-tab-panel name="raw" class="q-pa-none">
+        <OTabPanel name="raw">
           <div class="error-stacks">
             <template v-for="(stack, index) in error_stack" :key="stack">
               <div
@@ -58,18 +56,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </div>
-        </q-tab-panel>
+        </OTabPanel>
 
         <!-- Pretty formatted view -->
-        <q-tab-panel name="pretty" class="q-pa-none">
+        <OTabPanel name="pretty">
           <PrettyStackTrace v-if="activeTab === 'pretty'" :error_stack="error_stack" :error="error" />
-        </q-tab-panel>
-      </q-tab-panels>
+        </OTabPanel>
+      </OTabPanels>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { useI18n } from "vue-i18n";
 import { ref } from "vue";
 import PrettyStackTrace from "./PrettyStackTrace.vue";

@@ -35,3 +35,20 @@ pub async fn emit_delete_event(pipeline_id: &str) -> Result<(), Error> {
     let cluster_coordinator = super::get_coordinator().await;
     cluster_coordinator.delete(&key, false, true, None).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pipelines_watch_prefix_value() {
+        assert_eq!(PIPELINES_WATCH_PREFIX, "/pipelines/");
+    }
+
+    #[test]
+    fn test_pipelines_key_format() {
+        let id = "pipe-123";
+        let key = format!("{PIPELINES_WATCH_PREFIX}{id}");
+        assert_eq!(key, "/pipelines/pipe-123");
+    }
+}

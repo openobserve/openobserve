@@ -49,3 +49,52 @@ impl RangeFunc for RateFunc {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rate_name() {
+        assert_eq!(RateFunc::new().name(), "rate");
+    }
+
+    #[test]
+    fn test_rate_empty_samples() {
+        let func = RateFunc::new();
+        assert!(func.exec(&[], 0, &Duration::from_secs(60)).is_none());
+    }
+
+    #[test]
+    fn test_rate_single_sample() {
+        let func = RateFunc::new();
+        let sample = Sample {
+            timestamp: 60_000_000,
+            value: 100.0,
+        };
+        assert!(
+            func.exec(&[sample], 120_000_000, &Duration::from_secs(60))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn test_rate_two_samples_returns_some() {
+        let func = RateFunc::new();
+        // range=60s, eval_ts=120s, start=60s
+        // samples within [60s, 120s]
+        let samples = vec![
+            Sample {
+                timestamp: 70_000_000,
+                value: 100.0,
+            },
+            Sample {
+                timestamp: 110_000_000,
+                value: 200.0,
+            },
+        ];
+        let result = func.exec(&samples, 120_000_000, &Duration::from_secs(60));
+        assert!(result.is_some());
+        assert!(result.unwrap() >= 0.0);
+    }
+}

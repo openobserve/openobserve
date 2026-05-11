@@ -117,3 +117,73 @@ impl VisitorMut for ExtractKeyNamesVisitor {
         ControlFlow::Continue(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_cipher_key_names_no_cipher_functions() {
+        let sql = "SELECT a, b FROM t WHERE a = 1";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_encrypt() {
+        let sql = "SELECT encrypt(col, 'mykey') FROM t";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert_eq!(keys, vec!["mykey"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_decrypt() {
+        let sql = "SELECT decrypt(col, 'secret') FROM t";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert_eq!(keys, vec!["secret"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_decrypt_path() {
+        let sql = "SELECT decrypt_path(col, 'pathkey') FROM t";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert_eq!(keys, vec!["pathkey"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_multiple_cipher_calls() {
+        let sql = "SELECT encrypt(a, 'k1'), decrypt(b, 'k2') FROM t";
+        let mut keys = get_cipher_key_names(sql).unwrap();
+        keys.sort();
+        assert_eq!(keys, vec!["k1", "k2"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_invalid_sql_returns_error() {
+        let result = get_cipher_key_names("NOT VALID SQL @@@@");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_too_few_args_returns_err() {
+        // encrypt with only 1 arg → "invalid number of arguments" error
+        let sql = "SELECT encrypt(col) FROM t";
+        let result = get_cipher_key_names(sql);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("invalid number of arguments"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_non_string_key_returns_err() {
+        // key arg is a column reference instead of string literal
+        let sql = "SELECT encrypt(col, other_col) FROM t";
+        let result = get_cipher_key_names(sql);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("key name must be a static string"),
+            "got: {msg}"
+        );
+    }
+}

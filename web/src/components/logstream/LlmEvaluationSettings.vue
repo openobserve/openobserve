@@ -167,17 +167,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   </q-item>
                 </template>
               </q-select>
-              <q-btn
-                round
-                flat
-                dense
-                icon="refresh"
+              <OButton
+                variant="ghost"
+                size="icon-sm"
                 @click="refreshTemplates"
                 :loading="loadingTemplates"
                 :title="t('common.refresh')"
                 data-test="stream-llm-eval-template-refresh-btn"
-                class="tw:opacity-70 hover:tw:opacity-100"
-              />
+              >
+                <RefreshCw :size="14" />
+              </OButton>
             </div>
             <small
               class="llm-eval-settings__hint"
@@ -329,9 +328,12 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import pipelineService from "@/services/pipelines";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { RefreshCw } from "lucide-vue-next";
 
 export default defineComponent({
   name: "LlmEvaluationSettings",
+  components: { OButton, RefreshCw },
 
   props: {
     streamName: {

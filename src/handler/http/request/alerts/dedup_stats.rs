@@ -112,6 +112,44 @@ pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
         .unwrap()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dedup_summary_response_construction() {
+        let r = DedupSummaryResponse {
+            total_alerts: 10,
+            alerts_with_dedup: 5,
+            suppressions_total: 100,
+            passed_total: 200,
+            suppression_rate: 0.333,
+            pending_batches: 3,
+            timestamp: 1000,
+        };
+        assert_eq!(r.total_alerts, 10);
+        assert_eq!(r.alerts_with_dedup, 5);
+        assert_eq!(r.suppressions_total, 100);
+        assert_eq!(r.passed_total, 200);
+        assert_eq!(r.pending_batches, 3);
+    }
+
+    #[test]
+    fn test_dedup_summary_response_zero_counts() {
+        let r = DedupSummaryResponse {
+            total_alerts: 0,
+            alerts_with_dedup: 0,
+            suppressions_total: 0,
+            passed_total: 0,
+            suppression_rate: 0.0,
+            pending_batches: 0,
+            timestamp: 0,
+        };
+        assert_eq!(r.total_alerts, 0);
+        assert_eq!(r.suppression_rate, 0.0);
+    }
+}
+
 /// Get dedup counts from database
 /// Returns (suppressions, passed) counts based on occurrence_count
 #[cfg(feature = "enterprise")]

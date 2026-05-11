@@ -39,19 +39,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template v-for="visual in usersDisplayOptions" :key="visual.value">
-              <q-btn
+              <OButton
                 :data-test="`iam-users-selection-show-${visual.value}-btn`"
-                :color="visual.value === usersDisplay ? 'primary' : ''"
-                :flat="visual.value === usersDisplay ? false : true"
-                dense
-                no-caps
-                size="11px"
-                class="q-px-md visual-selection-btn"
+                variant="ghost"
+                :active="visual.value === usersDisplay"
+                size="xs"
                 @click="updateUserTable(visual.value)"
-                style="height: 30px;"
               >
-                {{ visual.label }}</q-btn
-              >
+                {{ visual.label }}
+              </OButton>
             </template>
           </div>
         </div>
@@ -167,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import AppTable from "@/components/AppTable.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import { watch, computed } from "vue";

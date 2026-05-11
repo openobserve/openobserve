@@ -95,24 +95,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Splitter separator -->
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <q-btn
-              color="primary"
-              size="sm"
-              :icon="
-                dashboardPanelData.layout.showFieldList
-                  ? 'chevron_left'
-                  : 'chevron_right'
-              "
-              dense
-              round
+            <OButton
+              variant="sidebar-button"
+              size="sidebar-button"
+              :style="{ top: '14px', zIndex: 100 }"
               :class="
                 dashboardPanelData.layout.showFieldList
                   ? 'splitter-icon-collapse'
                   : 'splitter-icon-expand'
               "
-              style="top: 14px; z-index: 100"
               @click.stop="collapseFieldList"
-            />
+            >
+              <template #icon-left>
+                <q-icon
+                  :name="
+                    dashboardPanelData.layout.showFieldList
+                      ? 'chevron_left'
+                      : 'chevron_right'
+                  "
+                />
+              </template>
+            </OButton>
           </template>
 
           <!-- Main content area (after slot) -->
@@ -194,7 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Warning icons and last refreshed time -->
-                  <div class="tw:flex tw:justify-end tw:mr-2 tw:items-center">
+                  <div
+                    class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2"
+                  >
                     <!-- Common error/warning buttons component -->
                     <PanelErrorButtons
                       :error="errorMessage"
@@ -216,19 +221,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
 
                     <!-- Add to Dashboard button (metrics/logs/build mode) -->
-                    <q-btn
+                    <OButton
                       v-if="resolvedConfig.showAddToDashboardButton"
-                      size="md"
-                      class="no-border q-ml-sm"
-                      no-caps
-                      dense
-                      color="primary"
-                      style="padding: 2px 4px"
+                      variant="primary"
+                      size="xs"
                       @click="emit('addToDashboard')"
                       :title="t('search.addToDashboard')"
                     >
                       {{ t("search.addToDashboard") }}
-                    </q-btn>
+                    </OButton>
                   </div>
 
                   <!-- Chart Area -->
@@ -294,7 +295,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="resolvedConfig.showQueryEditor"
                   class="row column"
-                  :style="{ height: 'calc(100vh - var(--navbar-height) - 144px)' }"
+                  :style="{
+                    height: 'calc(100vh - var(--navbar-height) - 144px)',
+                  }"
                 >
                   <DashboardQueryEditor />
                 </div>
@@ -303,7 +306,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator vertical />
 
               <!-- Config Panel Sidebar -->
-              <div class="col-auto" :style="(pageType === 'logs' || pageType === 'build') ? { height: '100%' } : {}">
+              <div
+                class="col-auto"
+                :style="
+                  pageType === 'logs' || pageType === 'build'
+                    ? { height: '100%' }
+                    : {}
+                "
+              >
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -457,19 +467,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart splitter separator -->
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <q-btn
-              color="primary"
-              size="sm"
-              :icon="
-                dashboardPanelData.layout.showFieldList
-                  ? 'chevron_left'
-                  : 'chevron_right'
-              "
-              dense
-              round
-              style="top: 14px; z-index: 100"
+            <OButton
+              variant="sidebar-button"
+              size="sidebar-button"
+              :style="{ top: '14px', zIndex: 100 }"
               @click="collapseFieldList"
-            />
+            >
+              <template #icon-left>
+                <q-icon
+                  :name="
+                    dashboardPanelData.layout.showFieldList
+                      ? 'chevron_left'
+                      : 'chevron_right'
+                  "
+                />
+              </template>
+            </OButton>
           </template>
 
           <!-- Custom chart content area -->
@@ -509,16 +522,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             z-index: 10;
                           "
                         >
-                          <q-btn
-                            unelevated
-                            color="primary"
-                            icon="bar_chart"
-                            label="Example Charts"
+                          <OButton
+                            variant="primary"
+                            size="sm"
                             @click="showCustomChartTypeSelector = true"
                             data-test="custom-chart-type-selector-btn"
-                            no-caps
-                            size="md"
-                          />
+                          >
+                            <template #icon-left
+                              ><q-icon name="bar_chart"
+                            /></template>
+                            Example Charts
+                          </OButton>
                           <q-dialog v-model="showCustomChartTypeSelector">
                             <CustomChartTypeSelector
                               @select="handleChartTypeSelection"
@@ -599,7 +613,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="resolvedConfig.showQueryEditor"
                   class="row column"
-                  :style="{ height: 'calc(100vh - var(--navbar-height) - 144px)' }"
+                  :style="{
+                    height: 'calc(100vh - var(--navbar-height) - 144px)',
+                  }"
                 >
                   <DashboardQueryEditor />
                 </div>
@@ -669,6 +685,7 @@ import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQue
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(

@@ -149,7 +149,7 @@ describe("AddCondition.vue", () => {
   it("should not display logical operator when conditionIndex is 0", () => {
     wrapper = createWrapper({ conditionIndex: 0 });
     const logicalOperatorSelect = wrapper.find(
-      '[data-test="dashboard-add-condition-logical-operator-0}"]',
+      '[data-test="dashboard-add-condition-logical-operator-0"]',
     );
     expect(logicalOperatorSelect.exists()).toBe(false);
   });
@@ -157,7 +157,7 @@ describe("AddCondition.vue", () => {
   it("should display logical operator when conditionIndex is not 0", () => {
     wrapper = createWrapper({ conditionIndex: 1 });
     const logicalOperatorSelect = wrapper.find(
-      '[data-test="dashboard-add-condition-logical-operator-1}"]',
+      '[data-test="dashboard-add-condition-logical-operator-1"]',
     );
     expect(logicalOperatorSelect.exists()).toBe(true);
   });

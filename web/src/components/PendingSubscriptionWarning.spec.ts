@@ -59,7 +59,12 @@ describe('PendingSubscriptionWarning.vue', () => {
         plugins: [currentStore, router, Quasar],
         stubs: {
           'q-icon': true,
-          'q-btn': true
+          'q-btn': true,
+          OButton: {
+            template: '<button class="o-button-stub" v-bind="$attrs" @click="$emit(\'click\')"><slot></slot></button>',
+            props: ['variant', 'size', 'disabled', 'loading'],
+            emits: ['click'],
+          },
         }
       }
     });
@@ -89,9 +94,8 @@ describe('PendingSubscriptionWarning.vue', () => {
 
     it('displays subscription button', () => {
       wrapper = createWrapper();
-      const button = wrapper.find('q-btn-stub');
+      const button = wrapper.find('button.o-button-stub');
       expect(button.exists()).toBe(true);
-      expect(button.attributes('color')).toBe('primary');
       // Button text may be empty in stub, just check it exists
     });
 
@@ -105,7 +109,7 @@ describe('PendingSubscriptionWarning.vue', () => {
   describe('Router Navigation', () => {
     it('calls routerPush when button is clicked', async () => {
       wrapper = createWrapper();
-      const button = wrapper.find('q-btn-stub');
+      const button = wrapper.find('button.o-button-stub');
       
       await button.trigger('click');
       
@@ -122,7 +126,7 @@ describe('PendingSubscriptionWarning.vue', () => {
         }
       });
       
-      const button = wrapper.find('q-btn-stub');
+      const button = wrapper.find('button.o-button-stub');
       await button.trigger('click');
       
       expect(mockPush).toHaveBeenCalledWith({
@@ -136,7 +140,7 @@ describe('PendingSubscriptionWarning.vue', () => {
         selectedOrganization: {}
       });
       
-      const button = wrapper.find('q-btn-stub');
+      const button = wrapper.find('button.o-button-stub');
       await button.trigger('click');
       
       expect(mockPush).toHaveBeenCalledWith({
@@ -152,7 +156,7 @@ describe('PendingSubscriptionWarning.vue', () => {
         }
       });
       
-      const button = wrapper.find('q-btn-stub');
+      const button = wrapper.find('button.o-button-stub');
       await button.trigger('click');
       
       expect(mockPush).toHaveBeenCalledWith({
@@ -215,7 +219,7 @@ describe('PendingSubscriptionWarning.vue', () => {
         }
       });
       
-      const button = wrapper.find('q-btn-stub');
+      const button = wrapper.find('button.o-button-stub');
       button.trigger('click');
       
       expect(mockPush).toHaveBeenCalledWith({
@@ -232,14 +236,14 @@ describe('PendingSubscriptionWarning.vue', () => {
       });
       
       wrapper = createWrapper();
-      const button = wrapper.find('q-btn-stub');
+      const button = wrapper.find('button.o-button-stub');
       
       expect(() => button.trigger('click')).not.toThrow();
     });
 
     it('handles multiple button clicks', async () => {
       wrapper = createWrapper();
-      const button = wrapper.find('q-btn-stub');
+      const button = wrapper.find('button.o-button-stub');
       
       await button.trigger('click');
       await button.trigger('click');
@@ -255,7 +259,7 @@ describe('PendingSubscriptionWarning.vue', () => {
     it('renders with empty store state', () => {
       wrapper = createWrapper({});
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('q-btn-stub').exists()).toBe(true);
+      expect(wrapper.find('button.o-button-stub').exists()).toBe(true);
     });
   });
 

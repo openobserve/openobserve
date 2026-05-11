@@ -110,3 +110,36 @@ enum TimedAnnotations {
     Table,
     Id,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_table_name() {
+        let sql = create_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("timed_annotation_panels"));
+    }
+
+    #[test]
+    fn test_annotation_id_idx_name() {
+        let sql = create_index_annotation_id_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(TIMED_ANNOTATION_PANELS_ANNOTATION_ID_IDX));
+    }
+
+    #[test]
+    fn test_unique_composite_idx_name() {
+        let sql = create_unique_index_composite_key_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(TIMED_ANNOTATION_PANELS_ANNOTATION_ID_PANEL_ID_IDX));
+    }
+
+    #[test]
+    fn test_annotation_id_fk_constant() {
+        assert_eq!(
+            TIMED_ANNOTATION_PANELS_ANNOTATION_ID_FK,
+            "fk_timed_annotation_panels_annotation_id"
+        );
+    }
+}

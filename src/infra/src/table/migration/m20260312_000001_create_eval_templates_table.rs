@@ -169,3 +169,22 @@ enum EvalTemplates {
     #[sea_orm(rename = "updated_at")]
     UpdatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_eval_templates_table_contains_table_name() {
+        let sql = create_eval_templates_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("eval_templates"));
+    }
+
+    #[test]
+    fn test_create_eval_templates_table_contains_if_not_exists() {
+        let sql = create_eval_templates_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.to_uppercase().contains("IF NOT EXISTS"));
+    }
+}

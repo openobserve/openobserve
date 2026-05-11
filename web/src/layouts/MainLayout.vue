@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col-auto"
         :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
         :style="store.state.isAiChatExpanded
-          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: 44px;'
-          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;'"
+          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: calc(var(--navbar-height) + 8px);'
+          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: calc(var(--navbar-height) + 8px); padding-right: 0.625rem;'"
       >
         <O2AIChat
           :header-height="42.5"
@@ -380,7 +380,7 @@ export default defineComponent({
     let slackURL = "https://short.openobserve.ai/community";
     if (
       config.isEnterprise == "true" &&
-      store.state.zoConfig.custom_slack_url != ""
+      store.state.zoConfig.custom_slack_url
     ) {
       slackURL = store.state.zoConfig.custom_slack_url;
     }
@@ -1603,7 +1603,11 @@ export default defineComponent({
 }
 
 .header-menu {
-  .q-btn {
+  display: flex;
+  align-items: center;
+
+  .q-btn,
+  [data-o2-btn] {
     transition: transform 0.2s ease;
 
     &:hover {
@@ -1619,7 +1623,8 @@ export default defineComponent({
   }
 
   // Skip bounce for org selector (inside div)
-  [data-test="navbar-organizations-select"] .q-btn {
+  [data-test="navbar-organizations-select"] .q-btn,
+  [data-test="navbar-organizations-select"] [data-o2-btn] {
     &:hover {
       transform: none;
     }
@@ -1656,8 +1661,8 @@ body.ai-chat-open {
 .ai-btn-active {
   background: linear-gradient(
     135deg,
-    rgba(139, 92, 246, 0.35) 0%,
-    rgba(236, 72, 153, 0.35) 100%
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
   ) !important;
 
   .header-icon {
@@ -1670,8 +1675,8 @@ body.ai-chat-open {
 .ai-hover-btn {
   background: linear-gradient(
     135deg,
-    rgba(139, 92, 246, 0.3) 0%,
-    rgba(236, 72, 153, 0.4) 100%
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
   ) !important;
   transition:
     background 0.3s ease,

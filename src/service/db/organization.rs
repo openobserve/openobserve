@@ -427,3 +427,25 @@ mod super_cluster {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_org_settings_key_prefix_value() {
+        assert_eq!(ORG_SETTINGS_KEY_PREFIX, "/organization/setting");
+    }
+
+    #[test]
+    fn test_org_key_prefix_value() {
+        assert_eq!(ORG_KEY_PREFIX, "/organization/org/");
+    }
+
+    #[test]
+    fn test_org_key_format() {
+        let org_id = "myorg";
+        let key = format!("{ORG_KEY_PREFIX}{org_id}");
+        assert_eq!(key, "/organization/org/myorg");
+    }
+}

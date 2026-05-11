@@ -1,25 +1,54 @@
 /* ============================================================
    SEMANTIC TOKENS — maps base palette to intent/meaning
    Used directly in components for shared design decisions.
+   ============================================================
+   ARCHITECTURE (required for dark-mode + Tailwind prefix):
+   1. Plain `:root` block defines light-mode default values.
+   2. `@theme inline` with self-references registers tokens for
+      Tailwind utility generation. `inline` keeps `var()` refs
+      unprefixed, so dark.css overrides apply correctly.
    ============================================================ */
 
-@theme inline {
-  /* --- Text --- */
+/* ── Light-mode defaults ─────────────────────────────────── */
+:root {
+  /* Text */
   --color-text-primary:   var(--color-grey-900);
   --color-text-secondary: var(--color-grey-500);
   --color-text-disabled:  var(--color-grey-400);
   --color-text-inverse:   var(--color-white);
 
-  /* --- Surfaces --- */
+  /* Surfaces */
   --color-surface-base:    var(--color-white);
   --color-surface-panel:   var(--color-grey-50);
   --color-surface-overlay: var(--color-white);
+  --color-surface-subtle:       var(--color-grey-100);
+  --color-surface-subtle-hover: var(--color-grey-200);
 
-  /* --- Borders --- */
+  /* Borders */
   --color-border-default: var(--color-grey-200);
   --color-border-strong:  var(--color-grey-400);
+}
 
-  /* --- Brand / Primary --- */
+/* ── Register ALL semantic tokens for Tailwind utilities ── */
+@theme inline {
+  /* Text */
+  --color-text-primary:   var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-disabled:  var(--color-text-disabled);
+  --color-text-inverse:   var(--color-text-inverse);
+
+  /* Surfaces */
+  --color-surface-base:    var(--color-surface-base);
+  --color-surface-panel:   var(--color-surface-panel);
+  --color-surface-overlay: var(--color-surface-overlay);
+  --color-surface-subtle:       var(--color-surface-subtle);
+  --color-surface-subtle-hover: var(--color-surface-subtle-hover);
+
+  /* Borders */
+  --color-border-default: var(--color-border-default);
+  --color-border-strong:  var(--color-border-strong);
+
+  /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);
   --color-primary-100: var(--color-primary-100);
   --color-primary-200: var(--color-primary-200);
@@ -31,7 +60,7 @@
   --color-primary-800: var(--color-primary-800);
   --color-primary-900: var(--color-primary-900);
 
-  /* --- Error / Danger --- */
+  /* Error / Danger (re-exports from base.css) */
   --color-error-50:  var(--color-error-50);
   --color-error-100: var(--color-error-100);
   --color-error-400: var(--color-error-400);
@@ -39,7 +68,15 @@
   --color-error-600: var(--color-error-600);
   --color-error-700: var(--color-error-700);
 
-  /* --- Radius / Shadow (semantic aliases) --- */
+  /* Warning (re-exports from base.css) */
+  --color-warning-50:  var(--color-warning-50);
+  --color-warning-100: var(--color-warning-100);
+  --color-warning-400: var(--color-warning-400);
+  --color-warning-500: var(--color-warning-500);
+  --color-warning-600: var(--color-warning-600);
+  --color-warning-700: var(--color-warning-700);
+
+  /* Radius / Shadow (re-exports from base.css) */
   --radius-sm:   var(--radius-sm);
   --radius-md:   var(--radius-md);
   --radius-lg:   var(--radius-lg);

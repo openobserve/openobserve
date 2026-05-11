@@ -140,6 +140,8 @@ describe("Ingestion", () => {
             'q-btn': { template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
             'q-tabs': { template: '<div class="q-tabs"><slot /></div>' },
             'q-route-tab': { template: '<div class="q-route-tab"><slot /></div>' },
+            OTabs: { template: '<div class="o-tabs-stub"><slot /></div>', props: ['modelValue', 'horizontal', 'align'], emits: ['update:modelValue'] },
+            ORouteTab: { template: '<div class="o-route-tab-stub"><slot /></div>', props: ['name', 'to', 'label', 'icon'] },
             'q-separator': { template: '<div class="q-separator"></div>' },
             'router-view': { 
               template: '<div class="router-view" @copy-to-clipboard-fn="$emit(\'copy-to-clipboard-fn\', $event)"><slot /></div>', 
@@ -702,7 +704,7 @@ describe("Ingestion", () => {
         return;
       }
       
-      const tabs = wrapper.find(".q-tabs");
+      const tabs = wrapper.find(".o-tabs-stub");
       expect(tabs.exists()).toBe(true);
     });
 
@@ -711,8 +713,8 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
-      const routeTabs = wrapper.findAll(".q-route-tab");
+
+      const routeTabs = wrapper.findAll(".o-route-tab-stub");
       expect(routeTabs.length).toBeGreaterThan(0);
     });
 

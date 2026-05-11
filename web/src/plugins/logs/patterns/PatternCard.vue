@@ -33,40 +33,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'tw:flex-nowrap tw:overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
-        :title="pattern.template"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
           <span
             v-if="tok.kind === 'text'"
             :class="wrap ? 'tw:whitespace-pre-wrap tw:break-all' : 'tw:whitespace-pre'"
           >{{ tok.value }}</span>
-          <q-chip
+          <span
             v-else
-            dense
-            size="xs"
-            class="wildcard-chip q-my-none q-mx-none"
-            :class="wildcardChipColor(tok.value)"
+            class="tw:inline-flex"
+            @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
+            @mouseleave="onMouseLeave"
           >
-            {{ tok.value }}
-            <q-tooltip
-              v-if="tok.sampleValues.length > 0"
-              anchor="bottom middle"
-              self="top middle"
-              :delay="300"
-              class="wildcard-tooltip"
+            <q-chip
+              dense
+              size="xs"
+              class="wildcard-chip q-my-none q-mx-none"
+              :class="wildcardChipColor(tok.value)"
             >
-              <div class="tw:font-mono tw:text-xs">
-                <div class="tw:font-semibold tw:mb-1">{{ t("search.wildcardSampleValues") }}</div>
-                <div
-                  v-for="(val, vi) in tok.sampleValues.slice(0, 10)"
-                  :key="vi"
-                  class="tw:truncate tw:max-w-[20rem]"
-                >
-                  {{ val }}
-                </div>
-              </div>
-            </q-tooltip>
-          </q-chip>
+              {{ tok.value }}
+            </q-chip>
+          </span>
         </template>
       </div>
 
@@ -107,10 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center tw:justify-center tw:gap-[2px]"
       :class="wrap ? 'tw:pt-1' : ''"
     >
-      <q-btn
-        size="6px"
-        flat
-        round
+      <OButton
+        variant="ghost"
+        size="icon"
         @click.stop="$emit('include', pattern)"
         :title="t('search.includePatternInSearch')"
         :data-test="`pattern-card-${index}-include-btn`"
@@ -118,11 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon style="height: 8px; width: 8px">
           <EqualIcon />
         </q-icon>
-      </q-btn>
-      <q-btn
-        size="6px"
-        flat
-        round
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon"
         @click.stop="$emit('exclude', pattern)"
         :title="t('search.excludePatternFromSearch')"
         :data-test="`pattern-card-${index}-exclude-btn`"
@@ -130,18 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon style="height: 8px; width: 8px">
           <NotEqualIcon />
         </q-icon>
-      </q-btn>
-      <q-btn
-        size="6px"
-        flat
-        round
-        color="warning"
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon"
         @click.stop="$emit('create-alert', pattern)"
         :data-test="`pattern-card-${index}-create-alert-btn`"
       >
         <q-icon name="notifications" size="15px" />
         <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
-      </q-btn>
+      </OButton>
     </div>
   </div>
 </template>
@@ -152,11 +135,13 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
+import useWildcardHover from "./useWildcardHover";
 
 const props = defineProps<{
   pattern: any;
@@ -173,6 +158,7 @@ defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
+const { onMouseEnter, onMouseLeave } = useWildcardHover();
 
 const templateTokens = computed(() =>
   tokenizeTemplate(props.pattern.template ?? "", props.pattern.wildcard_values ?? []),

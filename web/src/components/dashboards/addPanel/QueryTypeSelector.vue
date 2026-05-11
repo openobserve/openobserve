@@ -16,86 +16,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-py-sm">
-    <div class="row">
-      <div class="row button-group">
-        <div>
-          <button
-            data-test="dashboard-sql-query-type"
-            :class="[
-              selectedButtonQueryType === 'sql' ? 'selected' : '',
-              !(
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream_type == 'metrics'
-              )
-                ? 'button-right'
-                : '',
-            ]"
-            :style="{
-              backgroundColor:
-                store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
-            }"
-            class="button button-left"
-            @click="onUpdateQueryMode('sql', $event)"
-          >
-            {{ t("panel.SQL") }}
-          </button>
-        </div>
-        <div>
-          <button
-            data-test="dashboard-promql-query-type"
-            class="button button-right"
-            :style="{
-              backgroundColor:
-                store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
-            }"
-            :class="selectedButtonQueryType === 'promql' ? 'selected' : ''"
-            v-show="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream_type == 'metrics'
-            "
-            @click="onUpdateQueryMode('promql', $event)"
-          >
-            {{ t("panel.promQL") }}
-          </button>
-        </div>
-      </div>
-      <div class="row button-group tw:ml-[0.25rem]">
-        <div v-if="dashboardPanelData.data.type != 'custom_chart'">
-          <button
-            data-test="dashboard-builder-query-type"
-            :class="selectedButtonType === 'builder' ? 'selected' : ''"
-            class="button button-left"
-            @click="onUpdateBuilderMode('builder', $event)"
-            :style="{
-              backgroundColor:
-                store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
-            }"
-          >
-            {{ t("panel.builder") }}
-          </button>
-        </div>
-        <div>
-          <button
-            data-test="dashboard-custom-query-type"
-            class="button button-right"
-            :style="{
-              backgroundColor:
-                store.state.theme == 'dark' ? 'transparent' : '#f0eaea',
-            }"
-            :class="[
-              selectedButtonType === 'custom' ? 'selected' : '',
-              dashboardPanelData.data.type === 'custom_chart'
-                ? 'button-left'
-                : '',
-            ]"
-            @click="onUpdateBuilderMode('custom', $event)"
-          >
-            {{ t("panel.custom") }}
-          </button>
-        </div>
-      </div>
+    <div class="row tw:gap-1">
+      <!-- Query Type: SQL / PromQL -->
+      <OToggleGroup
+        variant="primary"
+        :model-value="selectedButtonQueryType"
+        @update:model-value="onUpdateQueryMode($event as string)"
+      >
+        <OToggleGroupItem
+          value="sql"
+          size="sm"
+          data-test="dashboard-sql-query-type"
+        >
+          <template #icon-left><Database class="tw:size-3.5 tw:shrink-0" /></template>
+          {{ t("panel.SQL") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem
+          v-if="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type == 'metrics'"
+          value="promql"
+          size="sm"
+          data-test="dashboard-promql-query-type"
+        >
+          <template #icon-left><ChartLine class="tw:size-3.5 tw:shrink-0" /></template>
+          {{ t("panel.promQL") }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+
+      <!-- Builder Mode: Builder / Custom -->
+      <OToggleGroup
+        variant="primary"
+        :model-value="selectedButtonType"
+        @update:model-value="onUpdateBuilderMode($event as string)"
+      >
+        <OToggleGroupItem
+          v-if="dashboardPanelData.data.type != 'custom_chart'"
+          value="builder"
+          size="sm"
+          data-test="dashboard-builder-query-type"
+        >
+          <template #icon-left><Wrench class="tw:size-3.5 tw:shrink-0" /></template>
+          {{ t("panel.builder") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem
+          value="custom"
+          size="sm"
+          data-test="dashboard-custom-query-type"
+        >
+          <template #icon-left><Code2 class="tw:size-3.5 tw:shrink-0" /></template>
+          {{ t("panel.custom") }}
+        </OToggleGroupItem>
+      </OToggleGroup>
     </div>
     <ConfirmDialog
       title="Change Query Mode"
@@ -124,6 +94,9 @@ import { useQuasar } from "quasar";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useStore } from "vuex";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { Database, ChartLine, Wrench, Code2 } from "lucide-vue-next";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -223,9 +196,7 @@ export default defineComponent({
 
     const isCustomMode = computed(() => selectedButtonType.value === "custom");
 
-    const onUpdateQueryMode = (selectedQueryType: any, event?: any) => {
-      event.stopPropagation();
-
+    const onUpdateQueryMode = (selectedQueryType: any) => {
       // Should we show popup of query being cleared
 
       popupSelectedButtonType.value = selectedQueryType;
@@ -255,8 +226,7 @@ export default defineComponent({
       // }
     };
 
-    const onUpdateBuilderMode = (selectedQueryType: any, event?: any) => {
-      event.stopPropagation();
+    const onUpdateBuilderMode = (selectedQueryType: any) => {
       if (selectedQueryType != selectedButtonType.value) {
         // some exceptions
         // If user is switching from auto to custom, promql to auto, promql to custom-sql,
@@ -428,38 +398,9 @@ export default defineComponent({
       selectedButtonQueryType,
     };
   },
-  components: { ConfirmDialog },
+  components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, Database, ChartLine, Wrench, Code2 },
 });
 </script>
 
 <style lang="scss" scoped>
-.selected {
-  background-color: var(--q-primary) !important;
-  font-weight: bold;
-  color: white;
-}
-
-.button-group {
-  border: 1px solid gray !important;
-  border-radius: 9px;
-}
-
-.button {
-  display: block;
-  cursor: pointer;
-  // background-color: #f0eaea;
-  border: none;
-  font-size: 14px;
-  padding: 3px 10px;
-}
-
-.button-left {
-  border-top-left-radius: 8px;
-  border-bottom-left-radius: 8px;
-}
-
-.button-right {
-  border-top-right-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
 </style>

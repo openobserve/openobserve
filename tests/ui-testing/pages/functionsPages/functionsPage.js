@@ -11,6 +11,8 @@ class FunctionsPage {
   addFunctionButton = '[data-test="function-list-add-function-btn"]';
   searchInput = '[data-test="functions-list-search-input"]';
   deleteButton = '[data-test="function-list-delete-functions-btn"]';
+  rowEditButton = '[data-test="function-list-edit-function-btn"]';
+  rowDeleteButton = '[data-test="function-list-delete-function-btn"]';
 
   // Function type selection
   vrlRadio = '[data-test="function-transform-type-vrl-radio"]';
@@ -158,14 +160,15 @@ class FunctionsPage {
   async clickFunctionByName(name) {
     // Find the row containing the function name
     const functionRow = this.page.locator('tr').filter({ hasText: name }).first();
-    // Click the edit button in that row (Quasar icon button with edit icon)
-    const editButton = functionRow.getByRole('button').filter({ has: this.page.locator('.q-icon').filter({ hasText: 'edit' }) });
+    // Click the edit button using the stable data-test attribute
+    const editButton = functionRow.locator(this.rowEditButton);
     await editButton.click();
     await this.page.waitForTimeout(1000);
   }
 
   async deleteFirstFunction() {
-    const deleteBtn = this.page.locator(this.deleteButton).first();
+    // Use the per-row delete button (visible in each table row)
+    const deleteBtn = this.page.locator(this.rowDeleteButton).first();
     if (await deleteBtn.isVisible({ timeout: 2000 })) {
       await deleteBtn.click();
       await this.page.waitForTimeout(500);

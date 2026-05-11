@@ -26,10 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ><u><span class="text-red">Warning:</span></u></b
       >
       The content of this page cannot be viewed because the selected
-      organization's is on pending subscription state. <br /><br /><q-btn
-        color="primary"
+      organization's is on pending subscription state. <br /><br /><OButton
+        variant="primary"
+        size="sm-action"
         @click="routerPush"
-        >Click here to proceed with subscription</q-btn
+        >Click here to proceed with subscription</OButton
       >
     </h5>
   </div>
@@ -40,9 +41,11 @@ import { useRouter } from "vue-router";
 // @ts-nocheck
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "PendingSubscriptionWarning",
+  components: { OButton },
   setup() {
     const router = useRouter();
     const store = useStore();

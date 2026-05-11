@@ -872,7 +872,7 @@ describe("GroupUsers Component", () => {
     });
 
     it("has proper button styling", () => {
-      const filterButtons = wrapper.findAll('.visual-selection-btn');
+      const filterButtons = wrapper.findAll('[data-test^="iam-users-selection-show-"]');
       expect(filterButtons.length).toBeGreaterThan(0);
     });
 

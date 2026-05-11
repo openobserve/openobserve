@@ -400,3 +400,23 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_re_pattern_prefix_value() {
+        assert_eq!(RE_PATTERN_PREFIX, "/re_patterns/");
+    }
+
+    #[test]
+    fn test_re_pattern_associations_prefix_value() {
+        assert_eq!(RE_PATTERN_ASSOCIATIONS_PREFIX, "/re_pattern_associations/");
+    }
+
+    #[test]
+    fn test_prefixes_are_distinct() {
+        assert_ne!(RE_PATTERN_PREFIX, RE_PATTERN_ASSOCIATIONS_PREFIX);
+    }
+}

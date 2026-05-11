@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn data-test="navbar-theme-toggle-btn" rounded flat dense :ripple="false" @click="toggleDarkMode">
-    <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
+  <OButton variant="ghost" size="icon-circle-sm" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
+    <q-icon :name="DarkModeIcon" size="20px" class="header-icon"></q-icon>
     <q-tooltip anchor="top middle" self="bottom middle">
       {{ tooltipText }}
     </q-tooltip>
-  </q-btn>
+  </OButton>
 </template>
 
 <script lang="ts">
@@ -32,8 +32,10 @@ import {
   outlinedDarkMode,
   outlinedLightMode,
 } from "@quasar/extras/material-icons-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
+  components: { OButton },
   setup() {
     const store = useStore();
     const $q = useQuasar();
@@ -95,6 +97,8 @@ export default defineComponent({
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);
       }
+      // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
+      document.documentElement.classList.toggle('dark', theme === 'dark');
       $q.dark.set(theme == "dark");
       store.dispatch("appTheme", theme);
     };

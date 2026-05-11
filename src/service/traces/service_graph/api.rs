@@ -518,3 +518,92 @@ pub async fn get_current_topology(
 ) -> HttpResponse {
     MetaHttpResponse::forbidden("Not Supported")
 }
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+
+    fn make_record(
+        client: Option<&str>,
+        server: &str,
+        p50: u64,
+        p95: u64,
+        p99: u64,
+        req: u64,
+    ) -> serde_json::Value {
+        let mut m = serde_json::Map::new();
+        if let Some(c) = client {
+            m.insert("client_service".to_string(), serde_json::json!(c));
+        }
+        m.insert("server_service".to_string(), serde_json::json!(server));
+        m.insert("p50_latency_ns".to_string(), serde_json::json!(p50));
+        m.insert("p95_latency_ns".to_string(), serde_json::json!(p95));
+        m.insert("p99_latency_ns".to_string(), serde_json::json!(p99));
+        m.insert("total_requests".to_string(), serde_json::json!(req));
+        serde_json::Value::Object(m)
+    }
+
+    #[test]
+    fn test_aggregate_baselines_empty_returns_empty() {
+        let result = aggregate_baselines(vec![]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_baselines_single_record() {
+        let records = vec![make_record(Some("svc-a"), "svc-b", 100, 200, 300, 10)];
+        let result = aggregate_baselines(records);
+        assert_eq!(result.len(), 1);
+        let key = (Some("svc-a".to_string()), "svc-b".to_string());
+        assert!(result.contains_key(&key));
+        let (p50, p95, p99) = result[&key];
+        assert_eq!(p50, 100);
+        assert_eq!(p95, 200);
+        assert_eq!(p99, 300);
+    }
+
+    #[test]
+    fn test_aggregate_baselines_skips_missing_server_service() {
+        let mut m = serde_json::Map::new();
+        m.insert("client_service".to_string(), serde_json::json!("svc-a"));
+        m.insert("p50_latency_ns".to_string(), serde_json::json!(100u64));
+        m.insert("p95_latency_ns".to_string(), serde_json::json!(200u64));
+        m.insert("p99_latency_ns".to_string(), serde_json::json!(300u64));
+        m.insert("total_requests".to_string(), serde_json::json!(10u64));
+        let result = aggregate_baselines(vec![serde_json::Value::Object(m)]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_baselines_merges_multiple_records() {
+        let records = vec![
+            make_record(Some("svc-a"), "svc-b", 100, 200, 300, 10),
+            make_record(Some("svc-a"), "svc-b", 200, 400, 600, 10),
+        ];
+        let result = aggregate_baselines(records);
+        let key = (Some("svc-a".to_string()), "svc-b".to_string());
+        let (p50, p95, p99) = result[&key];
+        assert_eq!(p50, 150); // (100*10 + 200*10) / 20 = 150
+        assert_eq!(p95, 300); // (200*10 + 400*10) / 20 = 300
+        assert_eq!(p99, 450); // (300*10 + 600*10) / 20 = 450
+    }
+
+    #[test]
+    fn test_aggregate_baselines_filters_zero_request_entries() {
+        let records = vec![make_record(Some("svc-a"), "svc-b", 100, 200, 300, 0)];
+        let result = aggregate_baselines(records);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_baselines_null_client_service() {
+        let records = vec![make_record(None, "svc-b", 50, 100, 150, 5)];
+        let result = aggregate_baselines(records);
+        let key = (None, "svc-b".to_string());
+        assert!(result.contains_key(&key));
+        let (p50, p95, p99) = result[&key];
+        assert_eq!(p50, 50);
+        assert_eq!(p95, 100);
+        assert_eq!(p99, 150);
+    }
+}

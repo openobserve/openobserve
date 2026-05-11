@@ -291,12 +291,9 @@ describe("SinglePanelMove", () => {
 
     it("should have correct add tab button attributes", () => {
       wrapper = createWrapper();
-      
-      const addTabBtn = wrapper.findComponent({ name: "QBtn" });
+
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       expect(addTabBtn.exists()).toBe(true);
-      expect(addTabBtn.classes()).toContain("text-bold");
-      // Check for Quasar button class instead
-      expect(addTabBtn.classes()).toContain("q-btn");
     });
 
     it("should show add tab dialog when add button is clicked", async () => {

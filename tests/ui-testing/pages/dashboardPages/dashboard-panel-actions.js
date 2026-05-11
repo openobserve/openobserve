@@ -42,37 +42,15 @@ export default class DashboardactionPage {
   }
 
   // Wait for chart to render
-
   async waitForChartToRender() {
-    // Wait for button or parent to have light button class (render complete)
-    // The parent div.q-btn-group has classes o2-primary-button and o2-secondary-button-light
+    // On enterprise: while query runs the button switches to data-test="dashboard-cancel",
+    // reverting to data-test="dashboard-apply" when done.
+    // On non-enterprise: data-test="dashboard-apply" stays but the button is disabled while loading.
+    // Either way, wait for the apply button to exist and not be disabled.
     await this.page.waitForFunction(() => {
-      const btn = document.querySelector('[data-test="dashboard-apply"]');
-      if (!btn) return false;
-
-      // Check button itself
-      if (btn.classList.contains("o2-primary-button-light") ||
-          btn.classList.contains("o2-secondary-button-light")) {
-        return true;
-      }
-
-      // Check immediate parent (button group container)
-      const parent = btn.parentElement;
-      if (parent &&
-          (parent.classList.contains("o2-primary-button-light") ||
-           parent.classList.contains("o2-secondary-button-light"))) {
-        return true;
-      }
-
-      // Check if parent has both o2-primary-button AND o2-secondary-button-light
-      // (which indicates the button group is in the rendered state)
-      if (parent &&
-          parent.classList.contains("o2-primary-button") &&
-          parent.classList.contains("o2-secondary-button-light")) {
-        return true;
-      }
-
-      return false;
+      const applyBtn = document.querySelector('[data-test="dashboard-apply"]');
+      if (!applyBtn) return false;
+      return !applyBtn.disabled;
     }, { timeout: 30000 });
   }
 

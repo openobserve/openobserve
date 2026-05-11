@@ -116,6 +116,53 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_time_range_impl_wrong_arg_count_errors() {
+        assert!(time_range_expr_impl(&[]).is_err());
+    }
+
+    #[test]
+    fn test_time_range_impl_direct_in_range() {
+        let ts = time::parse_str_to_timestamp_micros("2021-06-15T12:00:00.000Z").unwrap();
+        let base = Int64Array::from(vec![ts]);
+        let min = StringArray::from(vec!["2021-01-01T00:00:00.000Z"]);
+        let max = StringArray::from(vec!["2022-01-01T00:00:00.000Z"]);
+        let args = [
+            ColumnarValue::Array(Arc::new(base)),
+            ColumnarValue::Array(Arc::new(min)),
+            ColumnarValue::Array(Arc::new(max)),
+        ];
+        let result = time_range_expr_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            use arrow::array::BooleanArray;
+            let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
+            assert!(out.value(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_time_range_impl_direct_out_of_range() {
+        let ts = time::parse_str_to_timestamp_micros("2020-01-01T00:00:00.000Z").unwrap();
+        let base = Int64Array::from(vec![ts]);
+        let min = StringArray::from(vec!["2021-01-01T00:00:00.000Z"]);
+        let max = StringArray::from(vec!["2022-01-01T00:00:00.000Z"]);
+        let args = [
+            ColumnarValue::Array(Arc::new(base)),
+            ColumnarValue::Array(Arc::new(min)),
+            ColumnarValue::Array(Arc::new(max)),
+        ];
+        let result = time_range_expr_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            use arrow::array::BooleanArray;
+            let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
+            assert!(!out.value(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
     #[tokio::test]
     async fn test_time_range() {
         let data_time = time::parse_str_to_timestamp_micros("2021-01-01T00:00:00.000Z").unwrap();

@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="row items-center" data-test="dashboard-table-pagination-controls">
     <!-- Records per page dropdown: only when pagination is enabled -->
     <div v-if="showPagination" class="row items-center q-gutter-sm">
-      <span class="text-caption" data-test="dashboard-table-rows-per-page-label">{{ t("dashboard.rowsPerPage") }}
-</span>
+      <span class="text-caption" data-test="dashboard-table-rows-per-page-label"
+        >{{ t("dashboard.rowsPerPage") }}
+      </span>
       <q-select
         :model-value="pagination.rowsPerPage"
         @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
@@ -39,46 +40,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation arrows: only when pagination is enabled -->
     <template v-if="showPagination">
-      <q-btn
+      <OButton
         v-if="pagesNumber > 1"
-        icon="first_page"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isFirstPage"
+        variant="ghost"
+        size="icon"
+        :disabled="isFirstPage"
         @click="$emit('firstPage')"
-      />
-      <q-btn
+      >
+        <template #icon-left><q-icon name="first_page" /></template>
+      </OButton>
+      <OButton
         v-if="pagesNumber > 1"
-        icon="chevron_left"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isFirstPage"
+        variant="ghost"
+        size="icon"
+        :disabled="isFirstPage"
         @click="$emit('prevPage')"
-      />
-      <q-btn
+      >
+        <template #icon-left><q-icon name="chevron_left" /></template>
+      </OButton>
+      <OButton
         v-if="pagesNumber > 1"
-        icon="chevron_right"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isLastPage"
+        variant="ghost"
+        size="icon"
+        :disabled="isLastPage"
         @click="$emit('nextPage')"
-      />
-      <q-btn
+      >
+        <template #icon-left><q-icon name="chevron_right" /></template>
+      </OButton>
+      <OButton
         v-if="pagesNumber > 1"
-        icon="last_page"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isLastPage"
+        variant="ghost"
+        size="icon"
+        :disabled="isLastPage"
         @click="$emit('lastPage')"
-      />
+      >
+        <template #icon-left><q-icon name="last_page" /></template>
+      </OButton>
     </template>
   </div>
 </template>
@@ -86,8 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 export default defineComponent({
   name: "TablePaginationControls",
+  components: { OButton },
   props: {
     showPagination: {
       type: Boolean,

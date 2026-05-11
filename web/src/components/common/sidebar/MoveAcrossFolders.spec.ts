@@ -1030,6 +1030,14 @@ describe('MoveAcrossFolders.vue', () => {
 
   // Test 40: Button state with null selectedFolder value
   it('should handle null selectedFolder value correctly', async () => {
+    // Ensure useLoading returns isLoading: false so OButton's loading prop doesn't
+    // keep the button disabled independently of the :disabled binding.
+    // (OButton renders as a native <button> with disabled = disabled || loading)
+    mockUseLoading.mockImplementation((fn: any) => ({
+      execute: vi.fn().mockImplementation(async () => fn && await fn()),
+      isLoading: { value: false },
+    }));
+
     wrapper = mount(MoveAcrossFolders, {
       props: {
         activeFolderId: 'folder1',
@@ -1050,7 +1058,7 @@ describe('MoveAcrossFolders.vue', () => {
     await nextTick();
 
     const moveButton = wrapper.find('[data-test="alerts-folder-move"]');
-    // Button should not be disabled when values don't match
+    // Button should not be disabled when selectedFolder.value is null (doesn't match activeFolderId)
     expect(moveButton.element.disabled).toBe(false);
   });
 

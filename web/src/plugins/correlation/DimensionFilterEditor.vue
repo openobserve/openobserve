@@ -26,15 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">{{ t('correlation.logs.filters.title') }}</div>
         <q-space />
-        <q-btn
-          icon="close"
-          flat
-          round
-          dense
+        <OButton
+          variant="ghost"
+          size="icon-sm"
           v-close-popup
           :aria-label="t('common.close')"
           data-test="close-dialog-btn"
-        />
+        >
+          <X :size="14" />
+        </OButton>
       </q-card-section>
 
       <q-separator class="q-mt-md" />
@@ -121,21 +121,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div class="tw:ml-8">
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    no-caps
-                    :label="
+                  <OButton
+                    variant="ghost"
+                    size="sm-action"
+                    :class="pendingFilters[key] === SELECT_ALL_VALUE ? 'tw:text-green-600' : ''"
+                    @click="toggleWildcard(key)"
+                    :data-test="`toggle-wildcard-${key}`"
+                  >
+                    <Infinity :size="14" class="tw:mr-1" />
+                    {{
                       pendingFilters[key] === SELECT_ALL_VALUE
                         ? t('correlation.logs.filters.showingAll')
                         : t('correlation.logs.filters.setToAll')
-                    "
-                    :color="pendingFilters[key] === SELECT_ALL_VALUE ? 'positive' : 'primary'"
-                    icon="all_inclusive"
-                    @click="toggleWildcard(key)"
-                    :data-test="`toggle-wildcard-${key}`"
-                  />
+                    }}
+                  </OButton>
                   <span class="tw:ml-2 tw:text-xs tw:text-gray-500">
                     {{ t('correlation.logs.filters.wildcardHelp') }}
                   </span>
@@ -163,27 +162,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Actions -->
       <q-card-actions align="right" class="q-pa-md">
-        <q-btn
-          flat
-          :label="t('common.cancel')"
+        <OButton
+          variant="outline"
+          size="sm-action"
           @click="handleCancel"
           data-test="cancel-btn"
-        />
-        <q-btn
-          flat
-          :label="t('common.reset')"
-          icon="restart_alt"
+        >
+          {{ t('common.cancel') }}
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="sm-action"
           @click="handleReset"
           data-test="reset-btn"
-        />
-        <q-btn
-          :label="t('common.apply')"
-          color="primary"
-          class="o2-primary-button"
+        >
+          <RotateCcw :size="14" class="tw:mr-1" />
+          {{ t('common.reset') }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
           @click="handleApply"
-          :disable="!hasChanges"
+          :disabled="!hasChanges"
           data-test="apply-btn"
-        />
+        >
+          {{ t('common.apply') }}
+        </OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -193,6 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
+import OButton from '@/lib/core/Button/OButton.vue';
+import { X, Infinity, RotateCcw } from 'lucide-vue-next';
 
 interface Props {
   modelValue: boolean;

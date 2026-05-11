@@ -149,3 +149,145 @@ fn is_timestamp_filter(expr: &Arc<dyn PhysicalExpr>) -> bool {
     }
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use datafusion::{
+        physical_expr::expressions::Column, physical_plan::expressions::Literal,
+        scalar::ScalarValue,
+    };
+
+    use super::*;
+
+    fn utf8_literal(s: &str) -> Arc<dyn PhysicalExpr> {
+        Arc::new(Literal::new(ScalarValue::Utf8(Some(s.to_string()))))
+    }
+
+    fn int64_literal(n: i64) -> Arc<dyn PhysicalExpr> {
+        Arc::new(Literal::new(ScalarValue::Int64(Some(n))))
+    }
+
+    fn col_expr(name: &str) -> Arc<dyn PhysicalExpr> {
+        Arc::new(Column::new(name, 0))
+    }
+
+    #[test]
+    fn test_extract_string_literal_utf8() {
+        let expr = utf8_literal("hello");
+        assert_eq!(extract_string_literal(&expr).unwrap(), "hello");
+    }
+
+    #[test]
+    fn test_extract_string_literal_utf8view() {
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Utf8View(Some(
+            "viewval".to_string(),
+        ))));
+        assert_eq!(extract_string_literal(&expr).unwrap(), "viewval");
+    }
+
+    #[test]
+    fn test_extract_string_literal_wrong_type_returns_error() {
+        let expr = int64_literal(42);
+        assert!(extract_string_literal(&expr).is_err());
+    }
+
+    #[test]
+    fn test_extract_string_literal_column_returns_error() {
+        let expr = col_expr("mycol");
+        assert!(extract_string_literal(&expr).is_err());
+    }
+
+    #[test]
+    fn test_extract_int64_literal() {
+        let expr = int64_literal(99);
+        assert_eq!(extract_int64_literal(&expr).unwrap(), 99);
+    }
+
+    #[test]
+    fn test_extract_int64_literal_wrong_type_returns_error() {
+        let expr = utf8_literal("not_int");
+        assert!(extract_int64_literal(&expr).is_err());
+    }
+
+    #[test]
+    fn test_is_value_true_for_literal() {
+        let expr = utf8_literal("x");
+        assert!(is_value(&expr));
+    }
+
+    #[test]
+    fn test_is_value_false_for_column() {
+        let expr = col_expr("col");
+        assert!(!is_value(&expr));
+    }
+
+    #[test]
+    fn test_is_column_true() {
+        let expr = col_expr("mycol");
+        assert!(is_column(&expr));
+    }
+
+    #[test]
+    fn test_is_column_false_for_literal() {
+        let expr = utf8_literal("val");
+        assert!(!is_column(&expr));
+    }
+
+    #[test]
+    fn test_get_column_name() {
+        let expr = col_expr("mycolname");
+        assert_eq!(get_column_name(&expr), "mycolname");
+    }
+
+    #[test]
+    fn test_get_column_name_unknown_for_literal() {
+        let expr = utf8_literal("val");
+        assert_eq!(get_column_name(&expr), UNKNOWN_NAME);
+    }
+
+    #[test]
+    fn test_is_aggregate_exec_false_for_empty_exec() {
+        use arrow::datatypes::{DataType, Field, Schema};
+        use datafusion::physical_plan::empty::EmptyExec;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
+        assert!(!is_aggregate_exec(&exec));
+    }
+
+    #[test]
+    fn test_extract_column_ok() {
+        let expr = col_expr("mycol");
+        let col = extract_column(&expr).unwrap();
+        assert_eq!(col.name(), "mycol");
+    }
+
+    #[test]
+    fn test_extract_column_err_for_literal() {
+        let expr = utf8_literal("val");
+        assert!(extract_column(&expr).is_err());
+    }
+
+    #[test]
+    fn test_disjunction_empty_returns_true_literal() {
+        let result = disjunction(vec![]);
+        // empty → lit(true)
+        let lit = result
+            .as_any()
+            .downcast_ref::<datafusion::physical_plan::expressions::Literal>();
+        assert!(lit.is_some());
+    }
+
+    #[test]
+    fn test_disjunction_single_returns_same() {
+        let expr = utf8_literal("x");
+        let result = disjunction(vec![expr.clone()]);
+        assert!(is_value(&result));
+    }
+
+    #[test]
+    fn test_is_only_timestamp_filter_empty_slice() {
+        // all() on empty = true
+        assert!(is_only_timestamp_filter(&[]));
+    }
+}

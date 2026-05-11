@@ -695,4 +695,46 @@ mod tests {
         let alert: Alert = serde_json::from_str(json_with_json_variant).unwrap();
         assert_eq!(alert.row_template_type, RowTemplateType::Json);
     }
+
+    #[test]
+    fn test_alert_skip_serializing_if_none_fields_absent() {
+        let alert = Alert {
+            template: None,
+            context_attributes: None,
+            updated_at: None,
+            deduplication: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&alert).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("template"));
+        assert!(!obj.contains_key("context_attributes"));
+        assert!(!obj.contains_key("updated_at"));
+        assert!(!obj.contains_key("deduplication"));
+    }
+
+    #[test]
+    fn test_alert_skip_serializing_if_some_fields_present() {
+        use chrono::TimeZone;
+
+        use crate::meta::alerts::deduplication::DeduplicationConfig;
+        let mut ctx = HashMap::new();
+        ctx.insert("env".to_string(), "prod".to_string());
+        let tz = chrono::FixedOffset::east_opt(0).unwrap();
+        let dt = tz.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+        let alert = Alert {
+            template: Some("my_template".to_string()),
+            context_attributes: Some(ctx),
+            updated_at: Some(dt),
+            deduplication: Some(DeduplicationConfig::default()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&alert).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("template"));
+        assert_eq!(obj["template"], serde_json::json!("my_template"));
+        assert!(obj.contains_key("context_attributes"));
+        assert!(obj.contains_key("updated_at"));
+        assert!(obj.contains_key("deduplication"));
+    }
 }

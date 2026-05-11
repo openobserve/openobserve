@@ -145,6 +145,31 @@ impl JobScheduler {
     }
 }
 
+#[cfg(test)]
+mod job_scheduler_tests {
+    use tokio::sync::mpsc;
+
+    use super::*;
+
+    #[test]
+    fn test_job_scheduler_new_and_tx() {
+        let (worker_tx, _rx) = mpsc::channel::<(MergeSender, MergeBatch)>(1);
+        let scheduler = JobScheduler::new(3, worker_tx);
+        let tx = scheduler.tx();
+        drop(tx);
+    }
+
+    #[test]
+    fn test_job_scheduler_multiple_tx_clones() {
+        let (worker_tx, _rx) = mpsc::channel::<(MergeSender, MergeBatch)>(1);
+        let scheduler = JobScheduler::new(1, worker_tx);
+        let tx1 = scheduler.tx();
+        let tx2 = scheduler.tx();
+        drop(tx1);
+        drop(tx2);
+    }
+}
+
 /// MergeWorker is a worker that merges files
 pub struct MergeWorker {
     num: usize,
@@ -218,5 +243,22 @@ impl MergeWorker {
             });
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod merge_worker_tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_worker_new_and_tx() {
+        let worker = MergeWorker::new(4);
+        let tx = worker.tx();
+        drop(tx);
+    }
+
+    #[test]
+    fn test_merge_worker_new_single() {
+        let _worker = MergeWorker::new(1);
     }
 }

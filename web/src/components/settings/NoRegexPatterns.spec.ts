@@ -52,8 +52,8 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["src", "style"],
         },
         QBtn: {
-          template: `<button 
-            data-test-stub='q-btn' 
+          template: `<button
+            data-test-stub='q-btn'
             @click='$emit("click", $event)'
             :class='[noCaps ? "no-caps" : "", "q-mt-sm"]'
           >
@@ -61,6 +61,12 @@ const createWrapper = (props = {}, options = {}) => {
           </button>`,
           props: ["noCaps", "class"],
           emits: ["click"],
+        },
+        OButton: {
+          name: 'OButton',
+          template: '<button data-test-stub="o-button" @click="$emit(\'click\', $event)"><slot /></button>',
+          props: ['variant', 'size', 'disabled'],
+          emits: ['click'],
         },
       },
     },
@@ -129,7 +135,7 @@ describe("NoRegexPatterns", () => {
 
     it("should emit import-regex-pattern when Import button is clicked", async () => {
       const wrapper = createWrapper();
-      const importButton = wrapper.find('[data-test-stub="q-btn"]');
+      const importButton = wrapper.find('[data-test-stub="o-button"]');
       
       await importButton.trigger("click");
       
@@ -139,10 +145,11 @@ describe("NoRegexPatterns", () => {
 
     it("should display import button with correct text", () => {
       const wrapper = createWrapper();
-      const importButtonText = wrapper.find(".import-button-text");
-      
-      expect(importButtonText.exists()).toBe(true);
-      expect(importButtonText.text()).toBe("Import Pattern");
+      // OButton replaces q-btn; find by stub selector and check text
+      const importButton = wrapper.find('[data-test-stub="o-button"]');
+
+      expect(importButton.exists()).toBe(true);
+      expect(importButton.text().trim()).toBe("Import Pattern");
     });
   });
 
@@ -151,21 +158,22 @@ describe("NoRegexPatterns", () => {
 
     it("should provide meaningful text content", () => {
       const wrapper = createWrapper();
-      
+
       const titleText = wrapper.find(".title-text");
       const subtitleText = wrapper.find(".subtitle-text");
       const createNewText = wrapper.find(".create-new-text");
-      const importButtonText = wrapper.find(".import-button-text");
-      
+      // OButton replaces q-btn; find import button by stub selector
+      const importButton = wrapper.find('[data-test-stub="o-button"]');
+
       expect(titleText.text()).toBeTruthy();
       expect(subtitleText.text()).toBeTruthy();
       expect(createNewText.text()).toBe("Create New");
-      expect(importButtonText.text()).toBe("Import Pattern");
+      expect(importButton.text().trim()).toBe("Import Pattern");
     });
 
     it("should have proper button structure for import action", () => {
       const wrapper = createWrapper();
-      const importButton = wrapper.find('[data-test-stub="q-btn"]');
+      const importButton = wrapper.find('[data-test-stub="o-button"]');
       
       expect(importButton.exists()).toBe(true);
       // Button should be clickable and functional
@@ -189,7 +197,7 @@ describe("NoRegexPatterns", () => {
 
     it("should handle multiple rapid clicks on import button", async () => {
       const wrapper = createWrapper();
-      const importButton = wrapper.find('[data-test-stub="q-btn"]');
+      const importButton = wrapper.find('[data-test-stub="o-button"]');
       
       // Simulate multiple rapid clicks
       await importButton.trigger("click");
@@ -209,7 +217,7 @@ describe("NoRegexPatterns", () => {
       createNewText.trigger("click");
       expect(wrapper.emitted("create-new-regex-pattern")).toBeTruthy();
       
-      const importButton = wrapper.find('[data-test-stub="q-btn"]');
+      const importButton = wrapper.find('[data-test-stub="o-button"]');
       importButton.trigger("click");
       expect(wrapper.emitted("import-regex-pattern")).toBeTruthy();
     });

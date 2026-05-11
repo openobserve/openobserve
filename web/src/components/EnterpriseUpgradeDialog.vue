@@ -18,14 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="showDialog" @hide="onDialogHide">
     <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
       <!-- Close Button -->
-      <q-btn
-        icon="cancel"
-        flat
-        round
-        dense
-        v-close-popup
-        class="close-btn-top-right"
-      />
+      <div class="close-btn-top-right">
+        <OButton
+          variant="ghost"
+          size="icon"
+          v-close-popup
+        >
+          <q-icon name="cancel" size="16px" />
+        </OButton>
+      </div>
 
       <div class="dialog-split-layout" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
@@ -72,18 +73,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
-            <div v-if="dialogConfig.isLicensed && chartData" class="usage-chart-section">
-              <div class="chart-wrapper">
-                <div class="usage-chart-container" style="height: 150px; width: 100%;">
-                  <ChartRenderer
-                    :key="dashboardRenderKey"
-                    :data="chartData"
-                  />
+            <div v-if="dialogConfig.isLicensed" class="usage-chart-section">
+              <!-- Loading skeleton -->
+              <template v-if="isLoadingLicense">
+                <q-skeleton
+                  type="rect"
+                  height="150px"
+                  class="chart-skeleton"
+                  animation="pulse"
+                  style="background: rgba(255, 255, 255, 0.1); border-radius: 8px;"
+                />
+              </template>
+              <!-- Loaded chart -->
+              <template v-else-if="chartData">
+                <div class="chart-wrapper">
+                  <div class="usage-chart-container" style="height: 150px; width: 100%;">
+                    <ChartRenderer
+                      :key="dashboardRenderKey"
+                      :data="chartData"
+                    />
+                  </div>
+                  <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
+                    {{ t('about.usage_shows_zero_unlimited') }}
+                  </div>
                 </div>
-                <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
-                  {{ t('about.usage_shows_zero_unlimited') }}
-                </div>
-              </div>
+              </template>
             </div>
 
             <!-- License Limit Note (only for Enterprise without license) -->
@@ -93,33 +107,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="hero-actions">
-              <q-btn
+              <OButton
                 v-if="dialogConfig.showPrimaryButton"
-                unelevated
-                :label="dialogConfig.primaryButtonText"
+                variant="on-dark-primary"
+                size="lg"
                 @click="handlePrimaryButtonClick"
-                :icon-right="dialogConfig.primaryButtonIcon"
-                no-caps
                 class="download-btn"
-              />
-              <q-btn
+              >
+                {{ dialogConfig.primaryButtonText }}
+                <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
+                  <q-icon :name="dialogConfig.primaryButtonIcon" />
+                </template>
+              </OButton>
+              <OButton
                 v-if="dialogConfig.showContactSales"
-                flat
-                :label="t('about.enterprise_offer.buttons.contact_sales')"
+                variant="on-dark-ghost"
+                size="lg"
                 @click="contactSales"
-                no-caps
                 class="learn-more-btn"
-                color="white"
-              />
-              <q-btn
+              >
+                {{ t('about.enterprise_offer.buttons.contact_sales') }}
+              </OButton>
+              <OButton
                 v-else
-                flat
-                :label="t('about.enterprise_offer.buttons.learn_more')"
+                variant="on-dark-ghost"
+                size="lg"
                 @click="openDocsLink"
-                no-caps
                 class="learn-more-btn"
-                color="white"
-              />
+              >
+                {{ t('about.enterprise_offer.buttons.learn_more') }}
+              </OButton>
             </div>
           </div>
         </div>
@@ -218,6 +235,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -247,7 +265,6 @@ const FEATURE_LINKS = {
   query_management: "query_mgmt",
   workload_management: "workload_mgmt",
   audit_trail: "audit_trail",
-  action_scripts: "action_scripts",
   sensitive_data_redaction: "data_redact",
   pipeline_remote_destinations: "pipeline_remote",
   query_optimizer: "query_opt",
@@ -268,6 +285,7 @@ export default defineComponent({
   name: "EnterpriseUpgradeDialog",
   components: {
     ChartRenderer,
+    OButton,
   },
   props: {
     modelValue: {
@@ -521,14 +539,6 @@ export default defineComponent({
         icon: "fact_check",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.audit_trail,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.action_scripts.name"),
-        note: t("about.enterprise_offer.enterprise_features.action_scripts.note"),
-        icon: "code",
-        requiresHA: true,
-        cloudHidden: true, // Hide from Cloud layout
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.action_scripts,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.name"),
@@ -1048,7 +1058,6 @@ export default defineComponent({
 
 .dialog-split-layout {
   display: flex;
-  height: 780px;
   max-height: 92vh;
 
   &.cloud-layout {

@@ -27,17 +27,15 @@
       <div class="flex items-center q-table__title q-mr-md">
         <span>Color by series</span>
       </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        borderless
+      <OButton
+        variant="ghost"
+        size="icon"
         :title="t('dashboard.cancel')"
         @click.stop="cancelEdit"
         data-test="dashboard-color-by-series-cancel"
-      ></q-btn>
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
     </div>
     <div class="flex tw:justify-between tw:flex-col">
       <div class="tw:mt-2 scrollable-content scroll tw:min-h-52">
@@ -99,7 +97,9 @@
                     style="width: 90%"
                     class="input-spacing"
                     dense
-                   borderless hide-bottom-space>
+                    borderless
+                    hide-bottom-space
+                  >
                     <template v-slot:append>
                       <q-icon
                         name="colorize"
@@ -123,27 +123,25 @@
                   />
                 </div>
                 <div v-else class="tw:w-full">
-                  <q-btn
-                    label="Set color"
-                    no-caps
-                    flat
-                    dense
-                    class="tw:text-blue-700 tw:font-semibold tw:w-full"
+                  <OButton
+                    variant="ghost-primary"
+                    size="sm"
+                    class="tw:w-full"
                     @click="setColorByIndex(index)"
-                  />
+                    >Set color</OButton
+                  >
                 </div>
               </div>
 
               <!-- Delete series -->
-              <q-btn
-                icon="close"
-                class="delete-btn"
-                dense
-                flat
-                round
+              <OButton
+                variant="ghost"
+                size="icon"
                 @click="removecolorBySeriesByIndex(index)"
                 :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
-              />
+              >
+                <template #icon-left><q-icon name="close" /></template>
+              </OButton>
             </div>
           </div>
         </draggable>
@@ -151,26 +149,21 @@
       <!-- Footer Buttons -->
     </div>
     <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer">
-      <q-btn
+      <OButton
+        variant="outline"
+        size="sm-action"
         @click="addcolorBySeries"
-        label="+ Add a new color"
-        no-caps
-        outline
-        dense
         data-test="dashboard-addpanel-config-color-by-series-add-btn"
-        class="el-border"
-      />
-      <q-btn
+        >+ Add a new color</OButton
+      >
+      <OButton
+        variant="primary"
+        size="sm-action"
         @click="applycolorBySeries"
-        color="primary"
-        label="Save"
-        style="margin-right: 10px"
-        padding="5px 14px"
-        no-caps
-        dense
-        :disable="!isFormValid"
+        :disabled="!isFormValid"
         data-test="dashboard-addpanel-config-color-by-series-apply-btn"
-      />
+        >Save</OButton
+      >
     </div>
   </div>
 </template>
@@ -183,10 +176,15 @@ import { VueDraggableNext } from "vue-draggable-next";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 import { watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "colorBySeriesPopUp",
-  components: { draggable: VueDraggableNext as any, CommonAutoComplete },
+  components: {
+    draggable: VueDraggableNext as any,
+    CommonAutoComplete,
+    OButton,
+  },
   props: {
     colorBySeries: {
       type: Array,

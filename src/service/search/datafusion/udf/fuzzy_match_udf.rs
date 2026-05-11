@@ -91,7 +91,7 @@ pub fn fuzzy_match_expr_impl() -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::StringArray;
+    use arrow::array::{BooleanArray, StringArray};
     use datafusion::{
         arrow::{
             array::Int64Array,
@@ -103,6 +103,54 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_fuzzy_match_impl_direct_match() {
+        let f = fuzzy_match_expr_impl();
+        let haystack = StringArray::from(vec!["hello world"]);
+        let needle = StringArray::from(vec!["helo"]);
+        let distance = Int64Array::from(vec![1i64]);
+        let args = [
+            ColumnarValue::Array(Arc::new(haystack)),
+            ColumnarValue::Array(Arc::new(needle)),
+            ColumnarValue::Array(Arc::new(distance)),
+        ];
+        let result = f(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
+            assert!(out.value(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_fuzzy_match_impl_no_match() {
+        let f = fuzzy_match_expr_impl();
+        let haystack = StringArray::from(vec!["hello"]);
+        let needle = StringArray::from(vec!["xyz"]);
+        let distance = Int64Array::from(vec![1i64]);
+        let args = [
+            ColumnarValue::Array(Arc::new(haystack)),
+            ColumnarValue::Array(Arc::new(needle)),
+            ColumnarValue::Array(Arc::new(distance)),
+        ];
+        let result = f(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
+            assert!(!out.value(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_fuzzy_match_impl_wrong_arg_count_errors() {
+        let f = fuzzy_match_expr_impl();
+        let haystack = StringArray::from(vec!["hello"]);
+        let args = [ColumnarValue::Array(Arc::new(haystack))];
+        assert!(f(&args).is_err());
+    }
 
     #[tokio::test]
     async fn test_fuzzy_match_udf() {

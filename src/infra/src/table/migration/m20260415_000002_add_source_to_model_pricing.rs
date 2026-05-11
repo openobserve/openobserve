@@ -108,3 +108,18 @@ enum ModelPricing {
     Provider,
     Description,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20260415_000002_add_source_to_model_pricing"
+        );
+    }
+}

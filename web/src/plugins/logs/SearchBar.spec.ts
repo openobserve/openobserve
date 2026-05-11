@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { queryIndexSplit } from "@/utils/zincutils";
 
 const quoteSqlIdentifierForTest = (field: string) =>
   field === "user" ? `"${field}"` : field;
@@ -1794,7 +1795,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
             componentInstance.searchObj.data.stream.selectedStream.length > 1) {
           componentInstance.$q.notify({
             type: "negative",
-            message: "Please enable SQL mode or select a single stream to visualize",
+            message: "Please enable SQL mode or select a single stream to use timechart",
           });
           return;
         }
@@ -2189,7 +2190,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     
     expect(componentInstance.$q.notify).toHaveBeenCalledWith({
       type: "negative",
-      message: "Please enable SQL mode or select a single stream to visualize",
+      message: "Please enable SQL mode or select a single stream to use timechart",
     });
   });
 
@@ -4159,6 +4160,485 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       // This should trigger validation (query-empty + no stream check)
       // and not silently skip it because logsVisualizeToggle is already "visualize"
       expect(typeof testInstance.onLogsVisualizeToggleUpdate).toBe("function");
+    });
+  });
+
+  describe("addFieldTerm — complete filter insertion logic", () => {
+    /**
+     * Mirrors the inner loop of the addSearchTerm watcher (queries.forEach
+     * callback) from SearchBar.vue. Given a single query part (pre-split by
+     * UNION), applies the filter with the same branches as production:
+     *
+     *   1. NULL filter conversion (isFilterValueNull)
+     *   2. SQL mode: existing WHERE → replace or AND-insert
+     *   3. SQL mode: no WHERE → WHERE-insert before earliest clause
+     *   4. Non-SQL mode: replace existing or append with "and"
+     *
+     * Uses the real queryIndexSplit from zincutils (imported at top of file).
+     */
+    const getFieldFromExpression = (expr: string): string | null => {
+      const cleaned = expr.trim().replace(/^\(\s*/, "");
+      const match =
+        cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
+        cleaned.match(/^"?(\w+)"?\s*(?:=|!=|is)/i);
+      return match ? match[1] : null;
+    };
+
+    const hasFieldCondition = (query: string, fieldName: string): boolean => {
+      const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pat = `(?:"${esc}"|${esc})\\s*(?:=|!=|is)`;
+      return new RegExp(pat, "i").test(query);
+    };
+
+    const replaceExistingFieldCondition = (
+      query: string,
+      fieldName: string,
+      newExpr: string,
+    ): string => {
+      const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+      const opPat = `(?:=|!=|is(?:\\s+not)?)`;
+      const fieldPat = `(?:"${esc}"|${esc})`;
+      const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+      const multiRegex = new RegExp(
+        `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
+        "gi",
+      );
+      if (multiRegex.test(query)) {
+        return query.replace(multiRegex, newExpr);
+      }
+      const singleRegex = new RegExp(condPat, "gi");
+      if (singleRegex.test(query)) {
+        return query.replace(singleRegex, newExpr);
+      }
+      return query;
+    };
+
+    /**
+     * Simulates the per-query-part filter insertion from addSearchTerm watcher.
+     * This is the inner forEach callback for a single query part, with options
+     * to control the branch taken.
+     */
+    const applyFilterToQueryPart = (
+      query: string,
+      filter: string,
+      options: {
+        sqlMode?: boolean;
+        isNullFilter?: boolean;
+      } = {},
+    ): string => {
+      const { sqlMode = true, isNullFilter = false } = options;
+
+      let effectiveFilter = filter;
+
+      // NULL filter conversion (mirrors isFilterValueNull branch)
+      if (isNullFilter) {
+        effectiveFilter = effectiveFilter
+          .replace(/=|!=/, (m) => (m === "=" ? " is " : " is not "))
+          .replace(/'null'/, "null");
+      }
+
+      if (sqlMode) {
+        if (query.toLowerCase().includes("where")) {
+          const fieldName = getFieldFromExpression(effectiveFilter);
+          if (fieldName && hasFieldCondition(query, fieldName)) {
+            return replaceExistingFieldCondition(
+              query,
+              fieldName,
+              effectiveFilter,
+            );
+          }
+          // AND insertion before earliest terminating clause
+          const clauses = ["group by", "having", "order by", "limit"];
+          const lowerQ = query.toLowerCase();
+          let firstClause: string | null = null;
+          let firstIdx = Infinity;
+          for (const c of clauses) {
+            const idx = lowerQ.indexOf(c);
+            if (idx !== -1 && idx < firstIdx) {
+              firstIdx = idx;
+              firstClause = c;
+            }
+          }
+          if (firstClause) {
+            const [before, after] = queryIndexSplit(query, firstClause);
+            return (
+              before.trim() +
+              " AND " +
+              effectiveFilter +
+              " " +
+              firstClause +
+              after
+            );
+          }
+          return query + " AND " + effectiveFilter;
+        }
+        // WHERE insertion before earliest terminating clause (the bug fix)
+        const clauses = ["group by", "having", "order by", "limit"];
+        const lowerQ = query.toLowerCase();
+        let firstClause: string | null = null;
+        let firstIdx = Infinity;
+        for (const c of clauses) {
+          const idx = lowerQ.indexOf(c);
+          if (idx !== -1 && idx < firstIdx) {
+            firstIdx = idx;
+            firstClause = c;
+          }
+        }
+        if (firstClause) {
+          const [before, after] = queryIndexSplit(query, firstClause);
+          return (
+            before.trim() +
+            " where " +
+            effectiveFilter +
+            " " +
+            firstClause +
+            after
+          );
+        }
+        return query + " where " + effectiveFilter;
+      }
+      // Non-SQL mode
+      const fieldName = getFieldFromExpression(effectiveFilter);
+      if (fieldName && hasFieldCondition(query, fieldName)) {
+        return replaceExistingFieldCondition(
+          query,
+          fieldName,
+          effectiveFilter,
+        );
+      }
+      return query.length === 0
+        ? effectiveFilter
+        : query + " and " + effectiveFilter;
+    };
+
+    // ── SQL mode: no existing WHERE (the bug-fix path) ─────────────
+
+    describe("SQL mode — inserting WHERE into query without existing WHERE", () => {
+      it("should insert WHERE before GROUP BY when only GROUP BY exists", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT count(*) FROM "logs" GROUP BY level',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT count(*) FROM "logs" where status = 200 group by level',
+        );
+      });
+
+      it("should insert WHERE before GROUP BY, not ORDER BY, when both are present (BUG FIX)", () => {
+        // The old code's if/else-if chain checked ORDER BY first, producing
+        // invalid SQL: ...GROUP BY x where y order by z
+        const result = applyFilterToQueryPart(
+          'SELECT count(*) FROM "logs" GROUP BY level ORDER BY count(*) DESC',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT count(*) FROM "logs" where status = 200 group by level ORDER BY count(*) DESC',
+        );
+      });
+
+      it("should insert WHERE before ORDER BY when no GROUP BY", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" ORDER BY timestamp DESC',
+          "level = 'error'",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where level = \'error\' order by timestamp DESC',
+        );
+      });
+
+      it("should insert WHERE before LIMIT when no GROUP BY or ORDER BY", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" LIMIT 100',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where status = 200 limit 100',
+        );
+      });
+
+      it("should insert WHERE before GROUP BY when all 4 clauses present", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT level, count(*) as cnt FROM "logs" GROUP BY level HAVING cnt > 5 ORDER BY cnt DESC LIMIT 10',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT level, count(*) as cnt FROM "logs" where status = 200 group by level HAVING cnt > 5 ORDER BY cnt DESC LIMIT 10',
+        );
+      });
+
+      it("should insert WHERE before HAVING when HAVING is the earliest clause (was MISSING in old code)", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT level, count(*) as cnt FROM "logs" HAVING cnt > 5',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT level, count(*) as cnt FROM "logs" where status = 200 having cnt > 5',
+        );
+      });
+
+      it("should append WHERE at end when no terminating clauses exist", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs"',
+          "status = 200",
+        );
+        expect(result).toBe('SELECT * FROM "logs" where status = 200');
+      });
+
+      it("should handle case-insensitive clause matching", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" Group By level Order By timestamp DESC',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where status = 200 group by level Order By timestamp DESC',
+        );
+      });
+    });
+
+    // ── SQL mode: existing WHERE (AND insertion) ──────────────────
+
+    describe("SQL mode — inserting AND into query with existing WHERE", () => {
+      it("should insert AND before GROUP BY", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' GROUP BY status',
+          "code = 500",
+        );
+        expect(result).toBe(
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 group by status',
+        );
+      });
+
+      it("should insert AND before GROUP BY with multiple trailing clauses", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' GROUP BY status ORDER BY count(*) DESC LIMIT 50',
+          "code = 500",
+        );
+        expect(result).toBe(
+          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 group by status ORDER BY count(*) DESC LIMIT 50',
+        );
+      });
+
+      it("should append AND when WHERE exists but no terminating clauses follow", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" WHERE level = \'error\'',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" WHERE level = \'error\' AND status = 200',
+        );
+      });
+
+      it("should replace existing field condition instead of appending AND", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" WHERE level = \'error\' GROUP BY status',
+          "level = 'warn'",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" WHERE level = \'warn\' GROUP BY status',
+        );
+      });
+
+      it("should replace existing field condition when no terminating clauses follow", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" WHERE level = \'error\'',
+          "level = 'warn'",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" WHERE level = \'warn\'',
+        );
+      });
+    });
+
+    // ── NULL filter handling ───────────────────────────────────────
+
+    describe("NULL filter conversion (isFilterValueNull)", () => {
+      it("should convert = 'null' to is null in SQL mode", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" GROUP BY level',
+          "field = 'null'",
+          { isNullFilter: true },
+        );
+        // The production regex replaces = with " is " (with surrounding spaces),
+        // and the original filter already has spaces around =, producing double
+        // spaces. SQL ignores extra whitespace so this is functionally correct.
+        expect(result).toMatch(
+          /SELECT \* FROM "logs" where field\s+is\s+null group by level/i,
+        );
+      });
+
+      it("should convert != 'null' to is not null in SQL mode", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" GROUP BY level',
+          "field != 'null'",
+          { isNullFilter: true },
+        );
+        expect(result).toMatch(
+          /SELECT \* FROM "logs" where field\s+is not\s+null group by level/i,
+        );
+      });
+
+      it("should convert = 'null' to is null in non-SQL mode", () => {
+        const result = applyFilterToQueryPart(
+          "existing query text",
+          "field = 'null'",
+          { sqlMode: false, isNullFilter: true },
+        );
+        expect(result).toMatch(/existing query text and field\s+is\s+null/);
+      });
+
+      it("should convert != 'null' to is not null in non-SQL mode", () => {
+        const result = applyFilterToQueryPart(
+          "existing query text",
+          "field != 'null'",
+          { sqlMode: false, isNullFilter: true },
+        );
+        expect(result).toMatch(/existing query text and field\s+is not\s+null/);
+      });
+    });
+
+    // ── Non-SQL mode ───────────────────────────────────────────────
+
+    describe("non-SQL mode filter insertion", () => {
+      it("should append filter with 'and' when query is non-empty", () => {
+        const result = applyFilterToQueryPart(
+          "existing query",
+          "status = 200",
+          { sqlMode: false },
+        );
+        expect(result).toBe("existing query and status = 200");
+      });
+
+      it("should set filter directly when query is empty", () => {
+        const result = applyFilterToQueryPart("", "status = 200", {
+          sqlMode: false,
+        });
+        expect(result).toBe("status = 200");
+      });
+
+      it("should replace existing field condition in non-SQL mode", () => {
+        const result = applyFilterToQueryPart(
+          "level = 'error' and status = 200",
+          "level = 'warn'",
+          { sqlMode: false },
+        );
+        expect(result).toBe("level = 'warn' and status = 200");
+      });
+
+      it("should replace when field is the only condition", () => {
+        const result = applyFilterToQueryPart(
+          "level = 'error'",
+          "level = 'warn'",
+          { sqlMode: false },
+        );
+        expect(result).toBe("level = 'warn'");
+      });
+    });
+
+    // ── UNION query handling ───────────────────────────────────────
+
+    describe("UNION query filter application", () => {
+      /**
+       * Simulates applying a filter across all UNION parts.
+       * Mirrors the queries.forEach() loop in addSearchTerm watcher.
+       */
+      const applyFilterAcrossUnion = (
+        query: string,
+        filter: string,
+        options: { sqlMode?: boolean } = {},
+      ): string => {
+        const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
+        const unionMatch = query.match(unionRegex);
+        let unionType = "";
+        if (unionMatch) {
+          unionType = unionMatch[0].toUpperCase() === "UNION ALL"
+            ? "UNION ALL"
+            : "UNION";
+        }
+        const parts = query.split(unionRegex);
+        const processed = parts.map((part) =>
+          applyFilterToQueryPart(part.trim(), filter, options),
+        );
+        return unionType
+          ? processed.join(` ${unionType} `)
+          : processed.join("");
+      };
+
+      it("should apply filter to each part of a UNION query", () => {
+        const result = applyFilterAcrossUnion(
+          'SELECT * FROM "logs" WHERE a = 1 UNION SELECT * FROM "logs" WHERE b = 2',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" WHERE a = 1 AND status = 200 UNION SELECT * FROM "logs" WHERE b = 2 AND status = 200',
+        );
+      });
+
+      it("should apply filter to each part of a UNION ALL query", () => {
+        const result = applyFilterAcrossUnion(
+          'SELECT * FROM "logs" UNION ALL SELECT * FROM "logs"',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where status = 200 UNION ALL SELECT * FROM "logs" where status = 200',
+        );
+      });
+
+      it("should handle UNION with aggregation in one part", () => {
+        const result = applyFilterAcrossUnion(
+          'SELECT * FROM "logs" WHERE a = 1 UNION SELECT count(*) FROM "logs" GROUP BY level ORDER BY count(*) DESC',
+          "status = 200",
+        );
+        // First part: has WHERE → AND before end. Second part: no WHERE → WHERE before GROUP BY.
+        expect(result).toBe(
+          'SELECT * FROM "logs" WHERE a = 1 AND status = 200 UNION SELECT count(*) FROM "logs" where status = 200 group by level ORDER BY count(*) DESC',
+        );
+      });
+    });
+
+    // ── Edge cases ─────────────────────────────────────────────────
+
+    describe("edge cases", () => {
+      it("should not be confused by column names containing clause-like substrings", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT order_count, group_name FROM "logs" GROUP BY group_name ORDER BY order_count DESC',
+          "status = 200",
+        );
+        expect(result).toBe(
+          'SELECT order_count, group_name FROM "logs" where status = 200 group by group_name ORDER BY order_count DESC',
+        );
+      });
+
+      it("should handle simple SELECT with no clauses", () => {
+        const result = applyFilterToQueryPart("SELECT 1", "status = 200");
+        expect(result).toBe("SELECT 1 where status = 200");
+      });
+
+      it("should handle filter with special characters in value", () => {
+        const result = applyFilterToQueryPart(
+          'SELECT * FROM "logs" GROUP BY level',
+          "message = 'error: 500 - internal'",
+        );
+        expect(result).toBe(
+          'SELECT * FROM "logs" where message = \'error: 500 - internal\' group by level',
+        );
+      });
+
+      it("should handle queryIndexSplit when split word is not found", () => {
+        // queryIndexSplit returns [query, ""] when not found — tested via "no clause" case
+        const [before, after] = queryIndexSplit("SELECT 1", "group by");
+        expect(before).toBe("SELECT 1");
+        expect(after).toBe("");
+      });
+
+      it("should handle queryIndexSplit preserving original case in non-clause parts", () => {
+        const [before, after] = queryIndexSplit(
+          'SELECT FooBar FROM "logs" GROUP BY level',
+          "group by",
+        );
+        expect(before.trim()).toBe('SELECT FooBar FROM "logs"');
+        expect(after.trim()).toBe("level");
+      });
     });
   });
 });

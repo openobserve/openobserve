@@ -17,18 +17,27 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
+const mockServiceColors: Record<string, string> = {
+  frontend: "#4caf50",
+  backend: "#2196f3",
+  database: "#ff9800",
+};
+
 const mockSearchObj = {
   meta: {
-    serviceColors: {
-      frontend: "#4caf50",
-      backend: "#2196f3",
-      database: "#ff9800",
-    } as Record<string, string>,
+    serviceColors: mockServiceColors,
   },
 };
 
+const mockGetOrSetServiceColor = vi.fn(
+  (serviceName: string) => mockServiceColors[serviceName] ?? "#9e9e9e",
+);
+
 vi.mock("@/composables/useTraces", () => ({
-  default: () => ({ searchObj: mockSearchObj }),
+  default: () => ({
+    searchObj: mockSearchObj,
+    getOrSetServiceColor: mockGetOrSetServiceColor,
+  }),
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({

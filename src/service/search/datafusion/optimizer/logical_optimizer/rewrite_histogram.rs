@@ -208,12 +208,19 @@ mod tests {
         },
         assert_batches_eq,
         datasource::MemTable,
+        optimizer::OptimizerRule,
         prelude::SessionContext,
     };
 
     use crate::service::search::datafusion::{
         optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram, udf::histogram_udf,
     };
+
+    #[test]
+    fn test_rewrite_histogram_rule_name() {
+        let rule = RewriteHistogram::new(0, 1000, 60);
+        assert_eq!(rule.name(), "rewrite_histogram");
+    }
 
     #[tokio::test]
     async fn test_rewrite_histogram_interval() {
@@ -281,5 +288,24 @@ mod tests {
             let data = df.collect().await.unwrap();
             assert_batches_eq!(item.1, &data);
         }
+    }
+
+    #[test]
+    fn test_rewrite_histogram_new_stores_fields() {
+        use datafusion::optimizer::OptimizerRule;
+        let rule = RewriteHistogram::new(100, 200, 50);
+        assert_eq!(rule.name(), "rewrite_histogram");
+        assert_eq!(
+            rule.apply_order(),
+            Some(datafusion::optimizer::optimizer::ApplyOrder::BottomUp)
+        );
+    }
+
+    #[test]
+    fn test_histogram_to_datebin_new_stores_fields() {
+        use datafusion::config::ConfigOptions;
+        let options = Arc::new(ConfigOptions::default());
+        let rewriter = super::HistogramToDatebin::new(0, 1000, 60, options);
+        let _ = rewriter;
     }
 }

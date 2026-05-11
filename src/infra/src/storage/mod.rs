@@ -413,3 +413,53 @@ impl From<Error> for object_store::Error {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_display_out_of_range() {
+        let e = Error::OutOfRange("test".to_string());
+        assert_eq!(e.to_string(), "Out of range: test");
+    }
+
+    #[test]
+    fn test_error_display_bad_range() {
+        let e = Error::BadRange("invalid".to_string());
+        assert_eq!(e.to_string(), "Bad range: invalid");
+    }
+
+    #[test]
+    fn test_get_stream_from_file_valid() {
+        let path = Path::from("files/default/logs/olympics/2023/08/21/08/00/a.parquet");
+        let stream = get_stream_from_file(&path);
+        assert_eq!(stream, Some("olympics".to_string()));
+    }
+
+    #[test]
+    fn test_get_stream_from_file_too_short_returns_none() {
+        let path = Path::from("files/default/logs");
+        assert_eq!(get_stream_from_file(&path), None);
+    }
+
+    #[test]
+    fn test_get_stream_from_file_wrong_prefix_returns_none() {
+        let path = Path::from("notfiles/default/logs/olympics/2023/08/21/08/00/a.parquet");
+        assert_eq!(get_stream_from_file(&path), None);
+    }
+
+    #[test]
+    fn test_bytes_size_in_mb_empty() {
+        let b = bytes::Bytes::new();
+        assert_eq!(bytes_size_in_mb(&b), 0.0);
+    }
+
+    #[test]
+    fn test_bytes_size_in_mb_one_mb() {
+        let data = vec![0u8; 1024 * 1024];
+        let b = bytes::Bytes::from(data);
+        let result = bytes_size_in_mb(&b);
+        assert!((result - 1.0).abs() < 1e-9);
+    }
+}

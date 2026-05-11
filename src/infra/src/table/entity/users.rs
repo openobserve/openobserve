@@ -33,3 +33,28 @@ impl Related<super::org_users::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "u-1".to_string(),
+            email: "test@example.com".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            password: "hashed_pw".to_string(),
+            salt: "salt_val".to_string(),
+            is_root: false,
+            password_ext: None,
+            user_type: 0,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        assert_eq!(m.email, "test@example.com");
+        assert!(!m.is_root);
+        assert!(m.password_ext.is_none());
+    }
+}

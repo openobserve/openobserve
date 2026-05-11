@@ -477,6 +477,135 @@ describe("TableRenderer", () => {
     });
   });
 
+  // ── CSV Export — field vs name lookup (fix for #11574) ──────────────────
+  describe("CSV Export — field key lookup", () => {
+    // Capture Blob content via a mock class since jsdom Blob lacks .text()
+    let capturedCsv: string;
+    const OrigBlob = globalThis.Blob;
+
+    beforeEach(() => {
+      capturedCsv = "";
+      vi.stubGlobal("Blob", class MockBlob {
+        constructor(parts: any[], _options?: any) {
+          capturedCsv = String(parts?.[0] ?? "");
+        }
+      });
+    });
+
+    afterEach(() => {
+      vi.stubGlobal("Blob", OrigBlob);
+    });
+
+    it("should use c.field (not c.name) to access row values when they differ", () => {
+      // Columns where name differs from field — the original bug scenario
+      const data = {
+        columns: [
+          { name: "Timestamp", label: "Timestamp", field: "_timestamp", align: "left" },
+          { name: "Level", label: "Level", field: "log_level", align: "left" },
+        ],
+        rows: [
+          { _timestamp: "2023-01-01T00:00:00Z", log_level: "INFO" },
+          { _timestamp: "2023-01-02T00:00:00Z", log_level: "ERROR" },
+        ],
+      };
+      wrapper = createWrapper({ data });
+
+      // Override tableRef so getRows() returns controlled data
+      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
+
+      wrapper.vm.downloadTableAsCSV("test");
+
+      // Headers should use label
+      expect(capturedCsv).toContain("Timestamp,Level");
+      // Values must be populated via field keys, not empty
+      expect(capturedCsv).toContain('"2023-01-01T00:00:00Z"');
+      expect(capturedCsv).toContain('"INFO"');
+      expect(capturedCsv).toContain('"2023-01-02T00:00:00Z"');
+      expect(capturedCsv).toContain('"ERROR"');
+    });
+
+    it("should not produce empty values when row data is keyed by field", () => {
+      const data = {
+        columns: [
+          { name: "Timestamp", label: "Timestamp", field: "_timestamp", align: "left" },
+        ],
+        rows: [{ _timestamp: "2023-01-01T00:00:00Z" }],
+      };
+      wrapper = createWrapper({ data });
+      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
+
+      wrapper.vm.downloadTableAsCSV("test");
+
+      const lines = capturedCsv.split("\n");
+      // Data line must not be empty-quoted (the old bug produced '""')
+      expect(lines[1]).toBe('"2023-01-01T00:00:00Z"');
+    });
+
+    it("should still work when name and field are identical", () => {
+      const data = {
+        columns: [
+          { name: "count", label: "Count", field: "count", align: "right" },
+        ],
+        rows: [{ count: 42 }],
+      };
+      wrapper = createWrapper({ data });
+      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
+
+      wrapper.vm.downloadTableAsCSV("test");
+
+      expect(capturedCsv).toContain("Count");
+      expect(capturedCsv).toContain('"42"');
+    });
+
+    it("should fall back to name when field is not defined", () => {
+      const data = {
+        columns: [
+          { name: "status", label: "Status" }, // no field property
+        ],
+        rows: [{ status: "active" }],
+      };
+      wrapper = createWrapper({ data });
+      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
+
+      wrapper.vm.downloadTableAsCSV("test");
+
+      expect(capturedCsv).toContain('"active"');
+    });
+
+    it("should properly escape double quotes in CSV values", () => {
+      const data = {
+        columns: [
+          { name: "msg", label: "Message", field: "msg", align: "left" },
+        ],
+        rows: [{ msg: 'He said "hello"' }],
+      };
+      wrapper = createWrapper({ data });
+      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
+
+      wrapper.vm.downloadTableAsCSV("test");
+
+      expect(capturedCsv).toContain('"He said ""hello"""');
+    });
+
+    it("should handle null and undefined values as empty strings", () => {
+      const data = {
+        columns: [
+          { name: "a", label: "A", field: "a", align: "left" },
+          { name: "b", label: "B", field: "b", align: "left" },
+        ],
+        rows: [{ a: null, b: undefined }],
+      };
+      wrapper = createWrapper({ data });
+      (wrapper.vm as any).tableRef = { getRows: () => data.rows };
+
+      wrapper.vm.downloadTableAsCSV("test");
+
+      const lines = capturedCsv.split("\n");
+      // Both null and undefined should become empty quoted strings
+      expect(lines[1]).toBe('"",""');
+    });
+  });
+
   // ── Pagination controls in bottom slot ───────────────────────────────────
   describe("Pagination controls", () => {
     it("should render the dashboard-table-pagination wrapper in the bottom slot", () => {

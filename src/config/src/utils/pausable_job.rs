@@ -141,3 +141,13 @@ macro_rules! spawn_pausable_job {
     };
     (@sleep_after, sleep_before, $interval:expr) => {};
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pause_sleep_duration_is_60() {
+        assert_eq!(PAUSE_SLEEP_DURATION, 60);
+    }
+}

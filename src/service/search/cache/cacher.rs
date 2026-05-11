@@ -978,6 +978,66 @@ mod tests {
     use crate::{common::meta::search::CachedQueryResponse, service::search::Sql};
 
     #[test]
+    fn test_parse_cache_file_timestamps_valid() {
+        let (start, end) = parse_cache_file_timestamps("cache/1000_2000.json").unwrap();
+        assert_eq!(start, 1000);
+        assert_eq!(end, 2000);
+    }
+
+    #[test]
+    fn test_parse_cache_file_timestamps_no_extension() {
+        let result = parse_cache_file_timestamps("cache/1000_2000");
+        assert!(result.is_some());
+        let (start, end) = result.unwrap();
+        assert_eq!(start, 1000);
+        assert_eq!(end, 2000);
+    }
+
+    #[test]
+    fn test_parse_cache_file_timestamps_invalid_returns_none() {
+        assert!(parse_cache_file_timestamps("cache/abc_def.json").is_none());
+    }
+
+    #[test]
+    fn test_time_ranges_overlap_overlapping() {
+        assert!(time_ranges_overlap(100, 300, 200, 400));
+    }
+
+    #[test]
+    fn test_time_ranges_overlap_non_overlapping() {
+        assert!(!time_ranges_overlap(100, 200, 300, 400));
+    }
+
+    #[test]
+    fn test_time_ranges_overlap_adjacent_no_overlap() {
+        assert!(!time_ranges_overlap(100, 200, 200, 300));
+    }
+
+    #[test]
+    fn test_should_delete_cache_file_delete_all() {
+        let criteria = DeletionCriteria::DeleteAll;
+        assert!(should_delete_cache_file("path/1000_2000.json", &criteria));
+    }
+
+    #[test]
+    fn test_should_delete_cache_file_invalid_path_returns_false() {
+        let criteria = DeletionCriteria::DeleteAll;
+        assert!(!should_delete_cache_file(
+            "path/no_timestamps_here.json",
+            &criteria
+        ));
+    }
+
+    #[test]
+    fn test_should_delete_cache_file_threshold() {
+        let criteria = DeletionCriteria::ThresholdTimestamp(1500);
+        // start_ts=1000 <= 1500 → delete
+        assert!(should_delete_cache_file("path/1000_2000.json", &criteria));
+        // start_ts=2000 > 1500 → keep
+        assert!(!should_delete_cache_file("path/2000_3000.json", &criteria));
+    }
+
+    #[test]
     fn test_calculate_deltas_multi_expected_intervals() {
         let hit = serde_json::json!({
             "hits":[{"breakdown_1":"EUR","x_axis_1":"2025-05-23T12:00:00","y_axis_1":106,"y_axis_2":106}]

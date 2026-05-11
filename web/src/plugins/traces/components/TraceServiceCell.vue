@@ -51,11 +51,10 @@ const props = defineProps<{
 }>();
 
 const $q = useQuasar();
-const { searchObj } = useTraces();
-const serviceColors = computed(() => searchObj.meta.serviceColors ?? {});
+const { getOrSetServiceColor } = useTraces();
 
 const rootColor = computed(
-  () => serviceColors.value[props.item.service_name] ?? "#9e9e9e",
+  () => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e",
 );
 
 const serviceIconUrl = computed(() =>
@@ -70,6 +69,6 @@ const extraServices = computed(() => {
   const svcs = props.item.services ?? {};
   return Object.keys(svcs)
     .filter((s) => s !== props.item.service_name)
-    .map((s) => ({ name: s, color: serviceColors.value[s] ?? "#9e9e9e" }));
+    .map((s) => ({ name: s, color: getOrSetServiceColor(s) ?? "#9e9e9e" }));
 });
 </script>

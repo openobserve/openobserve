@@ -76,4 +76,20 @@ mod tests {
         let return_type = MATCH_ALL_HASH_UDF.return_type(&[DataType::Utf8]).unwrap();
         assert_eq!(return_type, DataType::Boolean);
     }
+
+    #[test]
+    fn test_match_all_hash_expr_impl_always_errors() {
+        let result = match_all_hash_expr_impl(&[]);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("match_all_hash"),
+            "error should mention match_all_hash: {err}"
+        );
+    }
+
+    #[test]
+    fn test_match_all_hash_udf_name_constant() {
+        assert_eq!(MATCH_ALL_HASH_UDF_NAME, "match_all_hash");
+    }
 }

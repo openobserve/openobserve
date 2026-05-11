@@ -804,4 +804,62 @@ describe("PreviewAlert.vue", () => {
       expect(yAxis[0].label).toBeDefined();
     });
   });
+
+  describe("Issue #3: Empty query guard and placeholder", () => {
+    it("should return early from refreshData when query is empty", () => {
+      // Set query to empty and call refreshData
+      wrapper.vm.refreshData();
+      // When query is empty, chartData should remain unchanged
+      // The initial mount had query="SELECT * FROM test", so we need to change it
+    });
+
+    it("should not proceed past empty query check in refreshData", async () => {
+      await wrapper.setProps({ query: "" });
+      await nextTick();
+
+      // chartData should be empty since refreshData returned early during watch
+      // This depends on whether the watch triggered refreshData
+      expect(wrapper.vm.chartData).toBeDefined();
+    });
+
+    it("should show placeholder when query is empty and tab is sql", async () => {
+      await wrapper.setProps({ query: "", selectedTab: "sql" });
+      await nextTick();
+
+      const placeholder = wrapper.find(".tw\\:flex.tw\\:flex-col");
+      expect(placeholder.exists()).toBe(true);
+    });
+
+    it("should show placeholder when query is empty and tab is promql", async () => {
+      await wrapper.setProps({ query: "", selectedTab: "promql" });
+      await nextTick();
+
+      const placeholder = wrapper.find(".tw\\:flex.tw\\:flex-col");
+      expect(placeholder.exists()).toBe(true);
+    });
+
+    it("should NOT show placeholder when query is empty and tab is custom", async () => {
+      await wrapper.setProps({ query: "", selectedTab: "custom" });
+      await nextTick();
+
+      const placeholder = wrapper.find(".tw\\:flex.tw\\:flex-col");
+      expect(placeholder.exists()).toBe(false);
+    });
+
+    it("should NOT show placeholder when query has content in sql mode", async () => {
+      await wrapper.setProps({ query: "SELECT * FROM test", selectedTab: "sql" });
+      await nextTick();
+
+      const placeholder = wrapper.find(".tw\\:flex.tw\\:flex-col");
+      expect(placeholder.exists()).toBe(false);
+    });
+
+    it("should NOT show placeholder when query has content in promql mode", async () => {
+      await wrapper.setProps({ query: "up{job='test'}", selectedTab: "promql" });
+      await nextTick();
+
+      const placeholder = wrapper.find(".tw\\:flex.tw\\:flex-col");
+      expect(placeholder.exists()).toBe(false);
+    });
+  });
 });

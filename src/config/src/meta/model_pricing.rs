@@ -195,3 +195,239 @@ impl TierOperator {
 fn default_true() -> bool {
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pricing_source_as_str() {
+        assert_eq!(PricingSource::BuiltIn.as_str(), "built_in");
+        assert_eq!(PricingSource::MetaOrg.as_str(), "meta_org");
+        assert_eq!(PricingSource::Org.as_str(), "org");
+    }
+
+    #[test]
+    fn test_pricing_source_from_str() {
+        assert_eq!(PricingSource::from("built_in"), PricingSource::BuiltIn);
+        assert_eq!(PricingSource::from("meta_org"), PricingSource::MetaOrg);
+        assert_eq!(PricingSource::from("org"), PricingSource::Org);
+        // unknown → Org (default)
+        assert_eq!(PricingSource::from("unknown"), PricingSource::Org);
+        assert_eq!(PricingSource::from(""), PricingSource::Org);
+    }
+
+    #[test]
+    fn test_pricing_source_roundtrip() {
+        for src in [
+            PricingSource::BuiltIn,
+            PricingSource::MetaOrg,
+            PricingSource::Org,
+        ] {
+            assert_eq!(PricingSource::from(src.as_str()), src);
+        }
+    }
+
+    #[test]
+    fn test_tier_operator_gt() {
+        let op = TierOperator::Gt;
+        assert!(op.evaluate(5.0, 4.0));
+        assert!(!op.evaluate(4.0, 5.0));
+        assert!(!op.evaluate(4.0, 4.0));
+    }
+
+    #[test]
+    fn test_tier_operator_gte() {
+        let op = TierOperator::Gte;
+        assert!(op.evaluate(5.0, 4.0));
+        assert!(op.evaluate(4.0, 4.0));
+        assert!(!op.evaluate(3.0, 4.0));
+    }
+
+    #[test]
+    fn test_tier_operator_lt() {
+        let op = TierOperator::Lt;
+        assert!(op.evaluate(3.0, 4.0));
+        assert!(!op.evaluate(4.0, 4.0));
+        assert!(!op.evaluate(5.0, 4.0));
+    }
+
+    #[test]
+    fn test_tier_operator_lte() {
+        let op = TierOperator::Lte;
+        assert!(op.evaluate(3.0, 4.0));
+        assert!(op.evaluate(4.0, 4.0));
+        assert!(!op.evaluate(5.0, 4.0));
+    }
+
+    #[test]
+    fn test_tier_operator_eq_tolerance() {
+        let op = TierOperator::Eq;
+        assert!(op.evaluate(100.0, 100.0));
+        // within tolerance (0.5)
+        assert!(op.evaluate(100.3, 100.0));
+        // outside tolerance
+        assert!(!op.evaluate(101.0, 100.0));
+    }
+
+    #[test]
+    fn test_tier_operator_neq_tolerance() {
+        let op = TierOperator::Neq;
+        assert!(op.evaluate(101.0, 100.0));
+        // within tolerance → NOT neq
+        assert!(!op.evaluate(100.3, 100.0));
+        assert!(!op.evaluate(100.0, 100.0));
+    }
+
+    #[test]
+    fn test_tier_operator_serde_snake_case_all_variants() {
+        let cases = [
+            (TierOperator::Gt, "\"gt\""),
+            (TierOperator::Gte, "\"gte\""),
+            (TierOperator::Lt, "\"lt\""),
+            (TierOperator::Lte, "\"lte\""),
+            (TierOperator::Eq, "\"eq\""),
+            (TierOperator::Neq, "\"neq\""),
+        ];
+        for (variant, expected_json) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected_json);
+            let back: TierOperator = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_tier_operator_default_is_gt() {
+        let op: TierOperator = Default::default();
+        assert_eq!(op, TierOperator::Gt);
+    }
+
+    #[test]
+    fn test_pricing_source_serde_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&PricingSource::BuiltIn).unwrap(),
+            "\"built_in\""
+        );
+        assert_eq!(
+            serde_json::to_string(&PricingSource::MetaOrg).unwrap(),
+            "\"meta_org\""
+        );
+        assert_eq!(
+            serde_json::to_string(&PricingSource::Org).unwrap(),
+            "\"org\""
+        );
+    }
+
+    #[test]
+    fn test_model_pricing_definition_enabled_defaults_true() {
+        // `enabled` has `default = "default_true"` → deserializes as true when absent
+        let json = r#"{"name":"gpt-4","match_pattern":"gpt-4","tiers":[]}"#;
+        let def: ModelPricingDefinition = serde_json::from_str(json).unwrap();
+        assert!(def.enabled);
+        assert_eq!(def.name, "gpt-4");
+        assert!(def.tiers.is_empty());
+    }
+
+    #[test]
+    fn test_model_pricing_definition_skip_serializing_if_empty_strings() {
+        let def = ModelPricingDefinition {
+            provider: String::new(),
+            description: String::new(),
+            name: "test".to_string(),
+            match_pattern: ".*".to_string(),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&def).unwrap();
+        // skip_serializing_if = "String::is_empty" — absent when empty
+        assert!(!val.as_object().unwrap().contains_key("provider"));
+        assert!(!val.as_object().unwrap().contains_key("description"));
+    }
+
+    #[test]
+    fn test_model_pricing_definition_children_empty_omitted() {
+        let def = ModelPricingDefinition {
+            name: "m".to_string(),
+            match_pattern: ".*".to_string(),
+            children: vec![],
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&def).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("children"));
+    }
+
+    #[test]
+    fn test_pricing_tier_definition_serde_defaults() {
+        let json = r#"{"name":"default"}"#;
+        let tier: PricingTierDefinition = serde_json::from_str(json).unwrap();
+        assert_eq!(tier.name, "default");
+        assert!(tier.condition.is_none());
+        assert!(tier.prices.is_empty());
+    }
+
+    #[test]
+    fn test_tier_condition_serde_roundtrip() {
+        let cond = TierCondition {
+            usage_key: "input".to_string(),
+            operator: TierOperator::Gt,
+            value: 200000.0,
+        };
+        let json = serde_json::to_string(&cond).unwrap();
+        let back: TierCondition = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.usage_key, "input");
+        assert_eq!(back.operator, TierOperator::Gt);
+        assert_eq!(back.value, 200000.0);
+    }
+
+    #[test]
+    fn test_model_pricing_definition_optional_fields_absent_when_none() {
+        let def = ModelPricingDefinition {
+            name: "m".to_string(),
+            match_pattern: ".*".to_string(),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&def).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("id"));
+        assert!(!obj.contains_key("valid_from"));
+    }
+
+    #[test]
+    fn test_model_pricing_definition_valid_from_present_when_some() {
+        let def = ModelPricingDefinition {
+            name: "m".to_string(),
+            match_pattern: ".*".to_string(),
+            valid_from: Some(1_700_000_000_000_000),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&def).unwrap();
+        assert!(json.as_object().unwrap().contains_key("valid_from"));
+    }
+
+    #[test]
+    fn test_pricing_tier_condition_absent_when_none() {
+        let tier = PricingTierDefinition::default();
+        let json = serde_json::to_value(&tier).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("condition"));
+    }
+
+    #[test]
+    fn test_pricing_tier_condition_present_when_some() {
+        let tier = PricingTierDefinition {
+            name: "extended".to_string(),
+            condition: Some(TierCondition {
+                usage_key: "input".to_string(),
+                operator: TierOperator::Gt,
+                value: 200000.0,
+            }),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&tier).unwrap();
+        assert!(json.as_object().unwrap().contains_key("condition"));
+    }
+
+    #[test]
+    fn test_default_true_returns_true() {
+        assert!(default_true());
+    }
+}

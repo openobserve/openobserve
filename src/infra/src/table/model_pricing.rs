@@ -229,3 +229,98 @@ async fn get_by_org_and_name(
         .one(db)
         .await
 }
+
+#[cfg(test)]
+mod tests {
+    use svix_ksuid::KsuidLike;
+
+    use super::*;
+
+    fn make_model(id: &str) -> Model {
+        Model {
+            id: id.to_string(),
+            org: "myorg".to_string(),
+            name: "gpt-4o".to_string(),
+            match_pattern: "(?i)^gpt-4o".to_string(),
+            enabled: true,
+            tiers: serde_json::json!([]),
+            valid_from: None,
+            sort_order: 0,
+            source: "org".to_string(),
+            provider: Some("openai".to_string()),
+            description: None,
+            created_at: 1000,
+            updated_at: 2000,
+        }
+    }
+
+    #[test]
+    fn test_try_from_model_valid_ksuid() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id);
+        let result = ModelPricingDefinition::try_from(model);
+        assert!(result.is_ok());
+        let def = result.unwrap();
+        assert_eq!(def.org_id, "myorg");
+        assert_eq!(def.name, "gpt-4o");
+        assert!(def.enabled);
+        assert!(def.tiers.is_empty());
+        assert_eq!(def.source, PricingSource::Org);
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_ksuid() {
+        let model = make_model("not-a-valid-ksuid");
+        let result = ModelPricingDefinition::try_from(model);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_source_built_in() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id);
+        model.source = "built_in".to_string();
+        let def = ModelPricingDefinition::try_from(model).unwrap();
+        assert_eq!(def.source, PricingSource::BuiltIn);
+    }
+
+    #[test]
+    fn test_try_from_model_optional_fields() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id);
+        model.valid_from = Some(5000);
+        model.provider = None;
+        model.description = Some("A test model".to_string());
+        let def = ModelPricingDefinition::try_from(model).unwrap();
+        assert_eq!(def.valid_from, Some(5000));
+        assert_eq!(def.provider, "");
+        assert_eq!(def.description, "A test model");
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_tiers_json_returns_err() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id);
+        model.tiers = serde_json::json!("not-an-array");
+        let result = ModelPricingDefinition::try_from(model);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_unknown_source_defaults() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id);
+        model.source = "unknown_source".to_string();
+        let def = ModelPricingDefinition::try_from(model).unwrap();
+        // PricingSource::from on unknown string should give default (not panic)
+        assert!(!format!("{:?}", def.source).is_empty());
+    }
+
+    #[test]
+    fn test_try_from_model_children_always_empty() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id);
+        let def = ModelPricingDefinition::try_from(model).unwrap();
+        assert!(def.children.is_empty());
+    }
+}

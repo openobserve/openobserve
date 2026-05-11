@@ -38,3 +38,27 @@ impl Related<super::anomaly_detection_config::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_fields() {
+        let m = Model {
+            anomaly_id: "anom-1".to_string(),
+            version: 1,
+            s3_path: "/path/to/model".to_string(),
+            s3_bucket: "my-bucket".to_string(),
+            model_size_bytes: 1024,
+            training_start_time: 1000,
+            training_end_time: 2000,
+            training_data_points: 500,
+            created_at: 1000,
+        };
+        assert_eq!(m.anomaly_id, "anom-1");
+        assert_eq!(m.version, 1);
+        assert_eq!(m.model_size_bytes, 1024);
+        assert_eq!(m.training_data_points, 500);
+    }
+}

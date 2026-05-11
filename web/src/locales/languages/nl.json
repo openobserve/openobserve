@@ -123,7 +123,11 @@
     "create": "Creëren",
     "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
     "resources": "Hulpbronnen",
-    "updated_at": "Bijgewerkt op"
+    "updated_at": "Bijgewerkt op",
+    "error": "Fout",
+    "db": "Database",
+    "discardChanges": "Wijzigingen negeren",
+    "unsavedChanges": "Niet opgeslagen wijzigingen"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -390,7 +394,8 @@
     "autoRunEnabled": "Automatisch uitvoeren ingeschakeld",
     "selectStreamFirst": "Selecteer eerst een stream",
     "traces": "Sporen",
-    "switchToLogs": "klik om terug te schakelen naar de logboeken"
+    "switchToLogs": "klik om terug te schakelen naar de logboeken",
+    "patternNoValuesAvailable": "Geen waarden beschikbaar"
   },
   "menu": {
     "home": "Home",
@@ -1125,7 +1130,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub-logboeken"
+    "pubsub": "Pub/Sub-logboeken",
+    "aiLabel": "AI-integraties"
   },
   "dashboard": {
     "selectField": "Veld",
@@ -2234,6 +2240,8 @@
     "importedFromAnomalyPattern": "Waarschuwing vooraf ingevuld op basis van een abnormaal logpatroon — bekijk de urgentie-instellingen",
     "additional_settings": "Aanvullende instellingen",
     "alertNamePlaceholder": "Naam van de waarschuwing",
+    "nameRequired": "Waarschuwingsnaam is verplicht.",
+    "nameNoSpecialChars": "Waarschuwingsnaam mag geen ':', '#', '?', '&', '%', aanhalingstekens of spaties bevatten. Gebruik in plaats daarvan underscores (_).",
     "anomalyNamePlaceholder": "Anomalienaam",
     "folder": "Folder",
     "selectStreamTypeFirst": "Selecteer eerst een streamtype",
@@ -2280,7 +2288,8 @@
       "addNewDestination": "Nieuwe bestemming toevoegen",
       "destinationRequired": "Er is minstens één bestemming vereist!",
       "disabledNotificationsInfo": "De detectie van afwijkingen wordt nog steeds uitgevoerd en de resultaten worden naar de _anomalieënstream geschreven. Schakel meldingen in om waarschuwingen te ontvangen wanneer er afwijkingen worden gedetecteerd."
-    }
+    },
+    "anomalyName": "Naam van de anomalie"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2891,7 +2900,52 @@
       "multiStepAgent": "Agent met meerdere stappen"
     },
     "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service",
-    "spansTruncatedWarning": "Toont {count} van {total} overspanningen — de tracering is mogelijk onvolledig. Beperk de tijdspanne of neem contact op met uw beheerder om de limiet voor het bereik te verhogen."
+    "spansTruncatedWarning": "Toont {count} van {total} overspanningen — de tracering is mogelijk onvolledig. Beperk de tijdspanne of neem contact op met uw beheerder om de limiet voor het bereik te verhogen.",
+    "servicesCatalog": {
+      "tabLabel": "Servicecatalogus",
+      "title": "Servicecatalogus",
+      "filterPlaceholder": "Filteren op servicenaam...",
+      "noServicesFound": "Er zijn geen services gevonden in de geselecteerde periode.",
+      "loading": "Diensten aan het laden...",
+      "columns": {
+        "serviceName": "Service",
+        "status": "Status",
+        "requests": "Verzoeken",
+        "errorRate": "Foutpercentage",
+        "errors": "Fouten",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Gemiddelde latentie",
+        "lastSeen": "Laatst gezien",
+        "operations": "Operaties"
+      },
+      "status": {
+        "healthy": "Gezond",
+        "warning": "Waarschuwing",
+        "degraded": "Gedegradeerd"
+      },
+      "viewTraces": "Bekijk de sporen",
+      "exportCsv": "CSV exporteren",
+      "justNow": "Zojuist",
+      "minutesAgo": "{n} m geleden",
+      "hoursAgo": "{n} h geleden",
+      "daysAgo": "{n} geleden"
+    },
+    "noErrorPresent": "Geen fout aanwezig voor deze reeks",
+    "httpStatusCode": "HTTP-statuscode",
+    "grpcStatusCode": "gRPC-statuscode",
+    "dbResponseStatusCode": "DB-responsstatuscode",
+    "processExitCode": "Exitcode verwerken",
+    "exceptionsWithCount": "Uitzonderingen ({count})",
+    "typeLabel": "Typ:",
+    "messageLabel": "Bericht:",
+    "escapedLabel": "Ontsnapt:",
+    "stacktraceLabel": "Stapelspoor:",
+    "copyStacktrace": "Stacktrace kopiëren",
+    "noStacktraceAvailable": "Geen stacktrace beschikbaar",
+    "stacktraceCopied": "Stacktrace gekopieerd naar het klembord",
+    "stacktraceCopyFailed": "Kopiëren van stacktrace is mislukt"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -3293,7 +3347,9 @@
     "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
     "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen.",
     "serviceGroupProtected": "De servicegroep kan niet worden verwijderd. U kunt alleen de toegewezen velden wijzigen.",
-    "noDataFound": "Geen gegevens gevonden"
+    "noDataFound": "Geen gegevens gevonden",
+    "isWorkloadType": "Service-ID",
+    "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

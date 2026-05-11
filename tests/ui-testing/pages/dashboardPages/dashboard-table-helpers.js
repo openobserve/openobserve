@@ -6,8 +6,8 @@
 // Selectors for TanStack table in dashboard mode
 export const TABLE_SELECTOR = '[data-test="dashboard-panel-table"]';
 export const TABLE_HEADER_SELECTOR = `${TABLE_SELECTOR} thead tr th`;
-// TanStack table renders dashboard data rows directly in tbody with class dashboard-data-row
-export const TABLE_DATA_ROW_SELECTOR = `${TABLE_SELECTOR} tbody tr.dashboard-data-row`;
+// TanStack table renders dashboard data rows directly in tbody with data-test="dashboard-data-row"
+export const TABLE_DATA_ROW_SELECTOR = `${TABLE_SELECTOR} [data-test="dashboard-data-row"]`;
 
 /**
  * Extract header texts from the TanStack table thead via $$eval.
@@ -44,9 +44,9 @@ export async function getTableCellText(page, rowIndex, colIndex) {
   return page.$eval(
     TABLE_SELECTOR,
     (table, { ri, ci }) => {
-      // TanStack dashboard mode: rows are directly in tbody with class dashboard-data-row
-      const rows = Array.from(table.querySelectorAll("tbody tr.dashboard-data-row"));
-      // Fall back to any tbody tr if dashboard-data-row class is not present
+      // TanStack dashboard mode: rows use data-test="dashboard-data-row"
+      const rows = Array.from(table.querySelectorAll('[data-test="dashboard-data-row"]'));
+      // Fall back to any tbody tr if data-test is not present
       const allRows = rows.length > 0 ? rows : Array.from(table.querySelectorAll("tbody tr")).filter((r) => r.querySelectorAll("td").length >= 1);
       const row = allRows[ri];
       if (!row) return "";

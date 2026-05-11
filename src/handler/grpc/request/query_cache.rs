@@ -37,3 +37,13 @@ impl QueryCache for QueryCacheServerImpl {
         Ok(Response::new(DeleteResultCacheResponse { deleted }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_cache_server_impl_default() {
+        let _server = QueryCacheServerImpl::default();
+    }
+}

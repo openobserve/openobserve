@@ -1001,6 +1001,50 @@ mod tests {
         assert_eq!(org_role.custom_role, Some(vec!["".to_string()]));
     }
 
+    #[test]
+    fn test_user_response_optional_fields_absent_when_default() {
+        let r = UserResponse {
+            email: "u@example.com".to_string(),
+            first_name: String::new(),
+            last_name: String::new(),
+            role: "admin".to_string(),
+            is_external: false,
+            orgs: None,
+            created_at: 0,
+            token: None,
+            is_system: false,
+            description: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("orgs"));
+        assert!(!obj.contains_key("token"));
+        assert!(!obj.contains_key("is_system"));
+        assert!(!obj.contains_key("description"));
+    }
+
+    #[test]
+    fn test_user_response_optional_fields_present_when_some() {
+        let r = UserResponse {
+            email: "u@example.com".to_string(),
+            first_name: String::new(),
+            last_name: String::new(),
+            role: "admin".to_string(),
+            is_external: false,
+            orgs: Some(vec![]),
+            created_at: 0,
+            token: Some("tok".to_string()),
+            is_system: true,
+            description: Some("svc account".to_string()),
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("orgs"));
+        assert!(obj.contains_key("token"));
+        assert!(obj.contains_key("is_system"));
+        assert!(obj.contains_key("description"));
+    }
+
     #[cfg(feature = "cloud")]
     #[test]
     fn test_invite_status_conversion() {

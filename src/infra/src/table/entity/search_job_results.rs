@@ -20,3 +20,25 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            job_id: "job-1".to_string(),
+            trace_id: "trace-1".to_string(),
+            started_at: Some(1000),
+            ended_at: Some(2000),
+            cluster: Some("cluster-a".to_string()),
+            result_path: Some("/results/job-1.parquet".to_string()),
+            error_message: None,
+        };
+        assert_eq!(m.job_id, "job-1");
+        assert_eq!(m.trace_id, "trace-1");
+        assert_eq!(m.started_at, Some(1000));
+        assert!(m.error_message.is_none());
+    }
+}

@@ -217,6 +217,43 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_str_match_udf_name() {
+        let udf = StrMatchUdf::new();
+        assert_eq!(udf.name(), super::super::STR_MATCH_UDF_NAME);
+    }
+
+    #[test]
+    fn test_str_match_udf_return_type_is_boolean() {
+        let udf = StrMatchUdf::new();
+        let rt = udf.return_type(&[]).unwrap();
+        assert_eq!(rt, DataType::Boolean);
+    }
+
+    #[test]
+    fn test_str_match_ignore_case_udf_name() {
+        let udf = StrMatchIgnoreCaseUdf::new();
+        assert_eq!(udf.name(), super::super::STR_MATCH_UDF_IGNORE_CASE_NAME);
+    }
+
+    #[test]
+    fn test_str_match_ignore_case_return_type_is_boolean() {
+        let udf = StrMatchIgnoreCaseUdf::new();
+        let rt = udf.return_type(&[]).unwrap();
+        assert_eq!(rt, DataType::Boolean);
+    }
+
+    #[test]
+    fn test_str_match_udf_aliases_include_match_field() {
+        let udf = StrMatchUdf::new();
+        let aliases = udf.aliases();
+        assert!(
+            aliases
+                .iter()
+                .any(|a| a == super::super::MATCH_FIELD_UDF_NAME)
+        );
+    }
+
     #[tokio::test]
     async fn test_str_match_udf() {
         let sql = vec![
@@ -267,6 +304,49 @@ mod tests {
             let result = df.collect().await.unwrap();
             let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();
             assert!(count > 0);
+        }
+    }
+
+    #[test]
+    fn test_str_match_impl_wrong_arg_count_errors() {
+        let result = str_match_impl(&[], false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_str_match_impl_direct_match() {
+        use datafusion::common::ScalarValue;
+        let haystack = Arc::new(StringArray::from(vec!["hello world", "foo bar"]));
+        let args = [
+            ColumnarValue::Array(haystack),
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some("world".to_string()))),
+        ];
+        let result = str_match_impl(&args, false).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            use arrow::array::{Array, BooleanArray};
+            let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
+            assert!(out.value(0));
+            assert!(!out.value(1));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_str_match_impl_case_insensitive() {
+        use datafusion::common::ScalarValue;
+        let haystack = Arc::new(StringArray::from(vec!["Hello World"]));
+        let args = [
+            ColumnarValue::Array(haystack),
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some("world".to_string()))),
+        ];
+        let result = str_match_impl(&args, true).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            use arrow::array::{Array, BooleanArray};
+            let out = out.as_any().downcast_ref::<BooleanArray>().unwrap();
+            assert!(out.value(0));
+        } else {
+            panic!("expected array result");
         }
     }
 }

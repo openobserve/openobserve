@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="position: sticky; top: 0; z-index: 1000 ;"
       >
           <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
-          <div class="full-width tw:flex tw:justify-end">
+          <div class="full-width tw:flex tw:justify-end tw:gap-3">
 
             <q-input
               v-model="filterQuery"
@@ -38,14 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           
-            <q-btn
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="t(`organization.add`)"
+            <OButton
+              variant="primary"
+              size="sm"
               @click="addOrganization"
               data-test="Add Organization"
-            />
+            >
+              {{ t('organization.add') }}
+            </OButton>
             </div>
         </div>
         </div>
@@ -69,17 +69,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn
+          <OButton
             v-if="props.row.role == 'Admin'"
-            icon="group"
             :title="t('organization.invite')"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
+            variant="ghost"
+            size="icon-sm"
             @click="redirectToInviteMember(props)"
-          ></q-btn>
+          >
+            <q-icon name="group" />
+          </OButton>
         </q-td>
       </template> -->
 
@@ -101,20 +99,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn
+          <OButton
             data-test="organization-name-edit"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="'Edit'"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            icon="edit"
             @click="renameOrganization(props)"
-            style="cursor: pointer !important"
           >
-          </q-btn>
+            <q-icon name="edit" />
+          </OButton>
         </q-td>
       </template>
     </q-table>
@@ -135,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 // @ts-nocheck
 import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated, computed } from "vue";
 import { useStore } from "vuex";
@@ -147,6 +141,7 @@ import JoinOrganization from "./JoinOrganization.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -157,6 +152,7 @@ export default defineComponent({
     AddUpdateOrganization,
     QTablePagination,
     NoData,
+    OButton,
   },
   setup() {
     const store = useStore();

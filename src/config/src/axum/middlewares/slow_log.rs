@@ -170,3 +170,27 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slow_log_layer_new_stores_threshold() {
+        let layer = SlowLogLayer::new(30);
+        assert_eq!(layer.threshold_secs, 30);
+    }
+
+    #[test]
+    fn test_slow_log_layer_new_zero_threshold() {
+        let layer = SlowLogLayer::new(0);
+        assert_eq!(layer.threshold_secs, 0);
+    }
+
+    #[test]
+    fn test_slow_log_layer_clone() {
+        let layer = SlowLogLayer::new(60);
+        let cloned = layer.clone();
+        assert_eq!(cloned.threshold_secs, 60);
+    }
+}

@@ -608,3 +608,146 @@ pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response 
 
     MetaHttpResponse::json(prebuilt_destinations)
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{http::StatusCode, response::Response};
+
+    use crate::service::db::alerts::destinations::DestinationError;
+
+    fn status(err: DestinationError) -> StatusCode {
+        Response::from(err).status()
+    }
+
+    // 404 Not Found
+    #[test]
+    fn test_not_found_is_not_found() {
+        assert_eq!(status(DestinationError::NotFound), StatusCode::NOT_FOUND);
+    }
+
+    // 409 Conflict
+    #[test]
+    fn test_used_by_alert_is_conflict() {
+        assert_eq!(
+            status(DestinationError::UsedByAlert("my-alert".to_string())),
+            StatusCode::CONFLICT
+        );
+    }
+
+    #[test]
+    fn test_used_by_pipeline_is_conflict() {
+        assert_eq!(
+            status(DestinationError::UsedByPipeline("my-pipeline".to_string())),
+            StatusCode::CONFLICT
+        );
+    }
+
+    // 400 Bad Request
+    #[test]
+    fn test_unsupported_type_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::UnsupportedType),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_empty_name_is_bad_request() {
+        assert_eq!(status(DestinationError::EmptyName), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_invalid_name_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::InvalidName),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_empty_url_is_bad_request() {
+        assert_eq!(status(DestinationError::EmptyUrl), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_invalid_sns_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::InvalidSns),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_empty_email_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::EmptyEmail),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_user_not_permitted_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::UserNotPermitted),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_smtp_unavailable_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::SMTPUnavailable),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_template_not_found_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::TemplateNotFound),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_empty_pipeline_id_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::EmptyPipelineId),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_already_exists_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::AlreadyExists),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_not_supported_alert_destination_type_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::NotSupportedAlertDestinationType),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_prebuilt_template_not_found_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::PrebuiltTemplateNotFound(
+                "email".to_string()
+            )),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_email_send_failed_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::EmailSendFailed("timeout".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+}

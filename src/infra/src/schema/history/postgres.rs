@@ -139,3 +139,20 @@ pub async fn create_table_index() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_postgres_schema_history_new() {
+        let s = PostgresSchemaHistory::new();
+        drop(s);
+    }
+
+    #[test]
+    fn test_postgres_schema_history_default() {
+        let s = PostgresSchemaHistory::default();
+        drop(s);
+    }
+}

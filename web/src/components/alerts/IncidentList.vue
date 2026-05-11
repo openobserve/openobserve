@@ -25,16 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-btn
-              flat
-              round
+            <OButton
+              variant="outline"
+              size="sm"
               :loading="loading"
               @click="refreshIncidents"
               data-test="incident-refresh-btn"
-              class="o2-secondary-button"
-            >
-             Refresh
-            </q-btn>
+            >Refresh</OButton>
             <q-input
               v-model="searchQuery"
               dense
@@ -150,42 +147,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="col.name === 'actions'">
                 <div class="action-buttons">
-                  <q-btn
+                  <OButton
                     v-if="props.row.status === 'open'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="visibility"
-                    class="action-btn acknowledge-btn"
+                    variant="ghost-warning"
+                    size="icon-circle-sm"
                     @click.stop="acknowledgeIncident(props.row)"
                     data-test="incident-ack-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.acknowledge") }}</q-tooltip>
-                  </q-btn>
-                  <q-btn
+                  ><q-icon name="visibility" size="16px" /><q-tooltip>{{ t("alerts.incidents.acknowledge") }}</q-tooltip></OButton>
+                  <OButton
                     v-if="props.row.status !== 'resolved'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="task_alt"
-                    class="action-btn resolve-btn"
+                    variant="ghost-primary"
+                    size="icon-circle-sm"
                     @click.stop="resolveIncident(props.row)"
                     data-test="incident-resolve-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.resolve") }}</q-tooltip>
-                  </q-btn>
-                  <q-btn
+                  ><q-icon name="task_alt" size="16px" /><q-tooltip>{{ t("alerts.incidents.resolve") }}</q-tooltip></OButton>
+                  <OButton
                     v-if="props.row.status === 'resolved'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="restart_alt"
-                    class="action-btn reopen-btn"
+                    variant="ghost-warning"
+                    size="icon-circle-sm"
                     @click.stop="reopenIncident(props.row)"
                     data-test="incident-reopen-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.reopen") }}</q-tooltip>
-                  </q-btn>
+                  ><q-icon name="restart_alt" size="16px" /><q-tooltip>{{ t("alerts.incidents.reopen") }}</q-tooltip></OButton>
                 </div>
               </template>
             </q-td>
@@ -255,6 +237,7 @@ import incidentsService, { Incident } from "@/services/incidents";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import NoData from "../shared/grid/NoData.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "IncidentList",
@@ -262,6 +245,7 @@ export default defineComponent({
     QTablePagination,
     O2AIContextAddBtn,
     NoData,
+    OButton,
   },
   setup() {
     const { t } = useI18n();
@@ -1232,75 +1216,5 @@ body.body--dark {
   gap: 4px;
 }
 
-.action-btn {
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  transition: all 0.2s ease;
-  border-radius: 6px;
-}
 
-.action-btn:hover {
-  transform: translateY(-1px);
-}
-
-/* Acknowledge button - eye/visibility icon */
-.acknowledge-btn {
-  color: #d97706;
-}
-
-.acknowledge-btn:hover {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-/* Resolve button - checkmark icon */
-.resolve-btn {
-  color: #059669;
-}
-
-.resolve-btn:hover {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-/* Reopen button - refresh icon */
-.reopen-btn {
-  color: #ea580c;
-}
-
-.reopen-btn:hover {
-  background: #fed7aa;
-  color: #c2410c;
-}
-
-/* Dark mode adjustments for action buttons */
-body.body--dark {
-  .acknowledge-btn {
-    color: #fbbf24;
-  }
-
-  .acknowledge-btn:hover {
-    background: #78350f;
-    color: #fde68a;
-  }
-
-  .resolve-btn {
-    color: #34d399;
-  }
-
-  .resolve-btn:hover {
-    background: #065f46;
-    color: #6ee7b7;
-  }
-
-  .reopen-btn {
-    color: #fb923c;
-  }
-
-  .reopen-btn:hover {
-    background: #7c2d12;
-    color: #fdba74;
-  }
-}
 </style>
