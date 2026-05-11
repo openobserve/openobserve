@@ -849,4 +849,64 @@ describe("Stream Component", () => {
       ).toBe(false);
     });
   });
+
+  // -------------------------------------------------------------------------
+  describe("Header close button", () => {
+    // The header close button is the OButton inside the title row containing
+    // t("pipeline.streamTitle"). It has no data-test attribute; we locate it
+    // by scoping to the `.stream-routing-title` container, which holds
+    // exactly one <button> (the close icon button) and is separate from the
+    // form-footer save/cancel/delete buttons rendered later in the template.
+    function findHeaderCloseButton(wrapper) {
+      const titleRow = wrapper.find(".stream-routing-title");
+      expect(titleRow.exists()).toBe(true);
+      const buttons = titleRow.findAll("button");
+      expect(buttons).toHaveLength(1);
+      // Sanity-check the button contains the cancel q-icon (rendered as an
+      // <i class="q-icon ..."> with text content "cancel"). This guards
+      // against accidentally matching a different button if markup changes.
+      const icon = buttons[0].find("i.q-icon");
+      expect(icon.exists()).toBe(true);
+      expect(icon.text()).toBe("cancel");
+      return buttons[0];
+    }
+
+    it("has NOT emitted cancel:hideform before the header close button is clicked", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.emitted("cancel:hideform")).toBeUndefined();
+    });
+
+    it("emits cancel:hideform exactly once when the header close button is clicked", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // Pre-condition: no emit yet
+      expect(wrapper.emitted("cancel:hideform")).toBeUndefined();
+
+      const closeBtn = findHeaderCloseButton(wrapper);
+      await closeBtn.trigger("click");
+      await nextTick();
+
+      const emits = wrapper.emitted("cancel:hideform");
+      expect(emits).toBeTruthy();
+      expect(emits).toHaveLength(1);
+      // The emit carries no payload
+      expect(emits[0]).toEqual([]);
+    });
+
+    it("does NOT trigger save/delete/cancel-dialog flows (no addNode / deletePipelineNode / dialog)", async () => {
+      const wrapper = createWrapper({ isEditNode: true });
+      await flushPromises();
+
+      const closeBtn = findHeaderCloseButton(wrapper);
+      await closeBtn.trigger("click");
+      await nextTick();
+
+      expect(mockAddNode).not.toHaveBeenCalled();
+      expect(mockDeletePipelineNode).not.toHaveBeenCalled();
+      // openCancelDialog/openDeleteDialog set dialog.show = true; the header
+      // close button must bypass that confirmation flow entirely.
+      expect(wrapper.vm.dialog.show).toBe(false);
+    });
+  });
 });

@@ -997,4 +997,204 @@ describe("PromQLChartConfig", () => {
       expect(wrapper.html()).toContain("Aggregation Function");
     });
   });
+
+  describe("ODialog Migration", () => {
+    // After migration the q-dialog wrapper around ColumnOrderPopUp was removed.
+    // ColumnOrderPopUp now owns its own ODialog and accepts `:open` from the
+    // parent. These tests verify the new contract: prop wiring (open,
+    // column-order, available-columns) and event handler wiring (@cancel,
+    // @save). The child is rendered into a stub via findComponent so the
+    // actual ODialog system does not need to mount in jsdom.
+
+    const setupAllModeWrapper = async (overrides: any = {}) => {
+      mockDashboardPanelData.data.config = {
+        promql_table_mode: "all",
+        column_order: ["field1", "field2"],
+        ...overrides,
+      };
+      mockDashboardPanelData.data.queries = [
+        { fields: { stream: "stream1" } },
+      ];
+      mockDashboardPanelData.meta.streamFields.groupedFields = [
+        {
+          name: "stream1",
+          schema: [
+            { name: "field1" },
+            { name: "field2" },
+            { name: "field3" },
+          ],
+        },
+      ];
+
+      wrapper = createWrapper({ chartType: "table" });
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("should not render q-dialog wrapper around ColumnOrderPopUp", async () => {
+      await setupAllModeWrapper();
+
+      // The legacy data-test was applied to the removed <q-dialog>.
+      // It must not appear in the migrated template.
+      expect(
+        wrapper.find('[data-test="column-order-dialog"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should pass showColumnOrderPopup as :open prop on ColumnOrderPopUp (closed initially)", async () => {
+      await setupAllModeWrapper();
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(false);
+      expect(wrapper.vm.showColumnOrderPopup).toBe(false);
+    });
+
+    it("should propagate showColumnOrderPopup=true to the :open prop after openColumnOrderPopup()", async () => {
+      await setupAllModeWrapper();
+
+      wrapper.vm.openColumnOrderPopup();
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.exists()).toBe(true);
+      expect(wrapper.vm.showColumnOrderPopup).toBe(true);
+      expect(popup.props("open")).toBe(true);
+    });
+
+    it("should toggle :open prop from true to false when closeColumnOrderPopup() is called", async () => {
+      await setupAllModeWrapper();
+
+      wrapper.vm.openColumnOrderPopup();
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      let popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.props("open")).toBe(true);
+
+      wrapper.vm.closeColumnOrderPopup();
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.props("open")).toBe(false);
+      expect(wrapper.vm.showColumnOrderPopup).toBe(false);
+    });
+
+    it("should forward column-order prop reflecting dashboardPanelData.config.column_order", async () => {
+      await setupAllModeWrapper({
+        promql_table_mode: "all",
+        column_order: ["alpha", "beta", "gamma"],
+      });
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.exists()).toBe(true);
+      // Quasar/Vue normalizes kebab-case props to camelCase on props()
+      expect(popup.props("columnOrder")).toEqual(["alpha", "beta", "gamma"]);
+    });
+
+    it("should forward available-columns prop derived from filteredAvailableColumns", async () => {
+      await setupAllModeWrapper({
+        promql_table_mode: "all",
+        column_order: [],
+      });
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("availableColumns")).toEqual(
+        wrapper.vm.filteredAvailableColumns,
+      );
+      // With no visible/hidden filters all three fields are available
+      expect(popup.props("availableColumns")).toEqual([
+        "field1",
+        "field2",
+        "field3",
+      ]);
+    });
+
+    it("should respect visible_columns filter when forwarding available-columns", async () => {
+      await setupAllModeWrapper({
+        promql_table_mode: "all",
+        visible_columns: ["field1"],
+        column_order: [],
+      });
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.props("availableColumns")).toEqual(["field1"]);
+    });
+
+    it("should close popup when ColumnOrderPopUp emits @cancel", async () => {
+      await setupAllModeWrapper();
+
+      wrapper.vm.openColumnOrderPopup();
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.exists()).toBe(true);
+      expect(wrapper.vm.showColumnOrderPopup).toBe(true);
+
+      await popup.vm.$emit("cancel");
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(wrapper.vm.showColumnOrderPopup).toBe(false);
+      const popupAfter = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popupAfter.props("open")).toBe(false);
+    });
+
+    it("should save column order and close popup when ColumnOrderPopUp emits @save", async () => {
+      await setupAllModeWrapper();
+
+      wrapper.vm.openColumnOrderPopup();
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.exists()).toBe(true);
+
+      const newOrder = ["field3", "field1", "field2"];
+      await popup.vm.$emit("save", newOrder);
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      expect(mockDashboardPanelData.data.config.column_order).toEqual(newOrder);
+      expect(wrapper.vm.showColumnOrderPopup).toBe(false);
+    });
+
+    it("should render ColumnOrderPopUp in expanded_timeseries mode and bind :open", async () => {
+      mockDashboardPanelData.data.config = {
+        promql_table_mode: "expanded_timeseries",
+        column_order: ["x"],
+      };
+      wrapper = createWrapper({ chartType: "table" });
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(false);
+
+      wrapper.vm.openColumnOrderPopup();
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const popupAfter = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      expect(popupAfter.props("open")).toBe(true);
+    });
+
+    it("should not render ColumnOrderPopUp in single mode (template guarded)", async () => {
+      mockDashboardPanelData.data.config = { promql_table_mode: "single" };
+      wrapper = createWrapper({ chartType: "table" });
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
+      // The popup lives inside the v-if=(all|expanded_timeseries) block,
+      // so it must not be in the DOM when promql_table_mode === 'single'.
+      expect(popup.exists()).toBe(false);
+    });
+  });
 });

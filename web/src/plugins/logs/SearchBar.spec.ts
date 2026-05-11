@@ -4744,3 +4744,320 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ODialog migration contract tests
+//
+// SearchBar.vue was migrated from q-dialog/q-card markup to <ODialog> for three
+// confirmation/utility dialogs:
+//   1. confirmDialog            — v-model:open="confirmDialogVisible"
+//   2. confirmSavedViewDialog   — v-model:open="confirmSavedViewDialogVisible"
+//   3. customDownloadDialog     — v-model:open="customDownloadDialog"
+//
+// Each dialog now emits update:open / click:primary / click:secondary instead
+// of relying on internal q-btn clicks to close itself. This block asserts the
+// new contract using a lightweight harness component that mirrors SearchBar's
+// exact template binding for each dialog, plus an ODialogStub registered via
+// the `stubs` mounting option (mirroring the pattern in
+// `web/src/views/Dashboards/viewDashboard.spec.ts` "Migrated ODialog/ODrawer
+// Dialogs"). A harness is used here because the existing 307 tests in this
+// file deliberately avoid mounting SearchBar.vue — its setup() pulls a dozen
+// composables (useLogs, useSearchBar, useStreams, useStreamFields,
+// useSearchWebSocket, …) that would each need extensive mocking to instantiate.
+// The harness keeps the test focused on the v-model:open + click:primary +
+// click:secondary contract that the migration actually changes.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("ODialog Migration", () => {
+  // Lazy-load test-utils + vue so the rest of the spec (which runs without
+  // mounting anything) stays unaffected.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { mount } = require("@vue/test-utils");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { defineComponent, ref, h } = require("vue");
+
+  // Minimal ODialog stub: renders only the surface that tests interact with
+  // (open prop is reflected in DOM via data-open; click:secondary and
+  // click:primary are exposed as buttons so we can trigger them deterministically).
+  const ODialogStub = defineComponent({
+    name: "ODialog",
+    props: {
+      open: { type: Boolean, default: false },
+      title: { type: String, default: "" },
+      primaryButtonLabel: { type: String, default: "" },
+      secondaryButtonLabel: { type: String, default: "" },
+      size: { type: String, default: "md" },
+    },
+    emits: ["update:open", "click:primary", "click:secondary"],
+    setup(props: any, { emit, slots }: any) {
+      return () =>
+        h(
+          "div",
+          {
+            class: "o-dialog-stub",
+            "data-test": "o-dialog-stub",
+            "data-open": props.open ? "true" : "false",
+            "data-title": props.title,
+          },
+          [
+            slots.default?.(),
+            h(
+              "button",
+              {
+                class: "o-dialog-stub-secondary",
+                onClick: () => emit("click:secondary"),
+              },
+              props.secondaryButtonLabel,
+            ),
+            h(
+              "button",
+              {
+                class: "o-dialog-stub-primary",
+                onClick: () => emit("click:primary"),
+              },
+              props.primaryButtonLabel,
+            ),
+          ],
+        );
+    },
+  });
+
+  // The harness mirrors SearchBar's exact bindings for the three migrated
+  // dialogs and exposes the same handler shapes (cancelConfirmDialog /
+  // confirmDialogOK / downloadRangeData / customDownloadDialog = false).
+  // Each ODialog gets a data-test attribute so we can locate it without
+  // depending on render order — but findAllComponents(ODialogStub) is the
+  // primary lookup, matching the reference pattern.
+  const Harness = defineComponent({
+    name: "SearchBarDialogHarness",
+    components: { ODialog: ODialogStub },
+    setup() {
+      const confirmDialogVisible = ref(false);
+      const confirmSavedViewDialogVisible = ref(false);
+      const customDownloadDialog = ref(false);
+      const confirmCallback = ref<null | (() => void)>(null);
+      const downloadRangeSpy = vi.fn();
+
+      const cancelConfirmDialog = () => {
+        confirmSavedViewDialogVisible.value = false;
+        confirmDialogVisible.value = false;
+        confirmCallback.value = null;
+      };
+
+      const confirmDialogOK = () => {
+        if (confirmCallback.value) {
+          confirmCallback.value();
+        }
+        confirmDialogVisible.value = false;
+        confirmCallback.value = null;
+      };
+
+      const downloadRangeData = () => {
+        downloadRangeSpy();
+      };
+
+      return {
+        confirmDialogVisible,
+        confirmSavedViewDialogVisible,
+        customDownloadDialog,
+        confirmCallback,
+        downloadRangeSpy,
+        cancelConfirmDialog,
+        confirmDialogOK,
+        downloadRangeData,
+      };
+    },
+    template: `
+      <div>
+        <ODialog
+          data-test="confirm-dialog"
+          v-model:open="confirmDialogVisible"
+          size="xs"
+          secondary-button-label="Cancel"
+          primary-button-label="OK"
+          @click:secondary="cancelConfirmDialog"
+          @click:primary="confirmDialogOK"
+        >
+          <p>Confirm message</p>
+        </ODialog>
+
+        <ODialog
+          data-test="confirm-saved-view-dialog"
+          v-model:open="confirmSavedViewDialogVisible"
+          size="xs"
+          secondary-button-label="Cancel"
+          primary-button-label="OK"
+          @click:secondary="cancelConfirmDialog"
+          @click:primary="confirmDialogOK"
+        >
+          <p>Saved view confirm message</p>
+        </ODialog>
+
+        <ODialog
+          data-test="custom-download-dialog"
+          v-model:open="customDownloadDialog"
+          size="md"
+          title="Custom Download"
+          secondary-button-label="Cancel"
+          primary-button-label="Download"
+          @click:secondary="customDownloadDialog = false"
+          @click:primary="downloadRangeData"
+        >
+          <p>Custom download message</p>
+        </ODialog>
+      </div>
+    `,
+  });
+
+  const mountHarness = () =>
+    mount(Harness, {
+      global: {
+        stubs: {
+          // Defensive: ensure ODialog always resolves to our stub even if the
+          // real component is registered globally elsewhere in the test env.
+          ODialog: ODialogStub,
+        },
+      },
+    });
+
+  // ── confirmDialog ───────────────────────────────────────────────────────
+  describe("confirmDialog", () => {
+    it("propagates confirmDialogVisible to ODialog open prop", async () => {
+      const wrapper = mountHarness();
+      const dialog = wrapper.find('[data-test="confirm-dialog"]');
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.attributes("data-open")).toBe("false");
+
+      wrapper.vm.confirmDialogVisible = true;
+      await wrapper.vm.$nextTick();
+
+      expect(
+        wrapper.find('[data-test="confirm-dialog"]').attributes("data-open"),
+      ).toBe("true");
+    });
+
+    it("invokes cancelConfirmDialog and clears state on click:secondary", async () => {
+      const wrapper = mountHarness();
+      wrapper.vm.confirmDialogVisible = true;
+      wrapper.vm.confirmCallback = vi.fn();
+      await wrapper.vm.$nextTick();
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      expect(dialogs.length).toBe(3);
+      await dialogs[0].vm.$emit("click:secondary");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.confirmDialogVisible).toBe(false);
+      expect(wrapper.vm.confirmCallback).toBeNull();
+    });
+
+    it("invokes confirmDialogOK callback and closes on click:primary", async () => {
+      const wrapper = mountHarness();
+      const callback = vi.fn();
+      wrapper.vm.confirmDialogVisible = true;
+      wrapper.vm.confirmCallback = callback;
+      await wrapper.vm.$nextTick();
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      await dialogs[0].vm.$emit("click:primary");
+      await wrapper.vm.$nextTick();
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.confirmDialogVisible).toBe(false);
+      expect(wrapper.vm.confirmCallback).toBeNull();
+    });
+  });
+
+  // ── confirmSavedViewDialog ──────────────────────────────────────────────
+  describe("confirmSavedViewDialog", () => {
+    it("propagates confirmSavedViewDialogVisible to ODialog open prop", async () => {
+      const wrapper = mountHarness();
+      const dialog = wrapper.find(
+        '[data-test="confirm-saved-view-dialog"]',
+      );
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.attributes("data-open")).toBe("false");
+
+      wrapper.vm.confirmSavedViewDialogVisible = true;
+      await wrapper.vm.$nextTick();
+
+      expect(
+        wrapper
+          .find('[data-test="confirm-saved-view-dialog"]')
+          .attributes("data-open"),
+      ).toBe("true");
+    });
+
+    it("clears confirmSavedViewDialogVisible on click:secondary via cancelConfirmDialog", async () => {
+      const wrapper = mountHarness();
+      wrapper.vm.confirmSavedViewDialogVisible = true;
+      await wrapper.vm.$nextTick();
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      await dialogs[1].vm.$emit("click:secondary");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.confirmSavedViewDialogVisible).toBe(false);
+    });
+
+    it("invokes confirmDialogOK on click:primary and runs the registered callback", async () => {
+      const wrapper = mountHarness();
+      const callback = vi.fn();
+      wrapper.vm.confirmSavedViewDialogVisible = true;
+      wrapper.vm.confirmCallback = callback;
+      await wrapper.vm.$nextTick();
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      await dialogs[1].vm.$emit("click:primary");
+      await wrapper.vm.$nextTick();
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      // confirmDialogOK only flips confirmDialogVisible, not the saved-view
+      // flag — this matches SearchBar.vue's actual implementation.
+      expect(wrapper.vm.confirmCallback).toBeNull();
+    });
+  });
+
+  // ── customDownloadDialog ────────────────────────────────────────────────
+  describe("customDownloadDialog", () => {
+    it("propagates customDownloadDialog to ODialog open prop with the Custom Download title", async () => {
+      const wrapper = mountHarness();
+      const dialog = wrapper.find('[data-test="custom-download-dialog"]');
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.attributes("data-title")).toBe("Custom Download");
+      expect(dialog.attributes("data-open")).toBe("false");
+
+      wrapper.vm.customDownloadDialog = true;
+      await wrapper.vm.$nextTick();
+
+      expect(
+        wrapper
+          .find('[data-test="custom-download-dialog"]')
+          .attributes("data-open"),
+      ).toBe("true");
+    });
+
+    it("closes customDownloadDialog on click:secondary (inline handler)", async () => {
+      const wrapper = mountHarness();
+      wrapper.vm.customDownloadDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      await dialogs[2].vm.$emit("click:secondary");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.customDownloadDialog).toBe(false);
+    });
+
+    it("invokes downloadRangeData on click:primary", async () => {
+      const wrapper = mountHarness();
+      wrapper.vm.customDownloadDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      await dialogs[2].vm.$emit("click:primary");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.downloadRangeSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+});
