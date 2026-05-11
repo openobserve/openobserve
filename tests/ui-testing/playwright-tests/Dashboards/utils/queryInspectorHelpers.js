@@ -14,12 +14,11 @@ export async function openQueryInspector(page) {
   testLogger.info('Opening query inspector');
 
   await page.locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]').click();
-  await page.waitForTimeout(1000);
 
-  // Wait for query inspector to be visible
-  await page.locator('.tw\\:text-xl:has-text("Query Inspector")').waitFor({
+  // Wait for query inspector dialog to be visible
+  await page.locator('[data-test="query-inspector-dialog"]').waitFor({
     state: "visible",
-    timeout: 5000
+    timeout: 10000
   });
 
   testLogger.info('Query inspector opened successfully');

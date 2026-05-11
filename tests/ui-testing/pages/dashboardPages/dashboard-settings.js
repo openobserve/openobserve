@@ -438,9 +438,11 @@ export default class DashboardSetting {
 
   //close setting window
   async closeSettingWindow() {
-    // Use multiple selectors to detect if settings dialog is open
-    const settingsDialog = this.page.locator('[data-test="dashboard-settings-dialog"]').or(this.page.locator('.q-dialog'));
-    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
+    // The settings UI is now an ODrawer, scoped by data-test="dashboard-settings-drawer"
+    const settingsDialog = this.page.locator('[data-test="dashboard-settings-drawer"]');
+    const closeBtn = this.page.locator(
+      '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
+    );
 
     // First, check if the dialog exists and is visible
     const dialogExists = await settingsDialog.isVisible().catch(() => false);
