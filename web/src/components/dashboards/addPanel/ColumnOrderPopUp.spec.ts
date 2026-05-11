@@ -114,25 +114,26 @@ describe("ColumnOrderPopUp", () => {
   };
 
   describe("Component Rendering", () => {
-    it("should render the popup with correct structure", () => {
+    it("should render the ODialog wrapper", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.exists()).toBe(true);
     });
 
-    it("should render header with title via ODialog", () => {
+    it("should pass dashboard.columnOrder title to ODialog", () => {
       wrapper = createWrapper();
 
-      const dialog = wrapper.find('[data-test="o-dialog-stub"]');
-      expect(dialog.attributes("data-title")).toContain("Column Order");
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("title")).toContain("Column Order");
     });
 
     it("should pass primary and secondary button labels to ODialog", () => {
       wrapper = createWrapper();
 
-      const dialog = wrapper.find('[data-test="o-dialog-stub"]');
-      expect(dialog.attributes("data-primary-label")).toContain("Save");
-      expect(dialog.attributes("data-secondary-label")).toContain("Cancel");
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonLabel")).toContain("Save");
+      expect(dialog.props("secondaryButtonLabel")).toContain("Cancel");
     });
 
     it("should render the description text", () => {
@@ -141,18 +142,25 @@ describe("ColumnOrderPopUp", () => {
       expect(wrapper.text()).toContain("Customize the display order of columns");
     });
 
-    it("should pass open prop through to ODialog", () => {
+    it("should forward open prop to ODialog", () => {
       wrapper = createWrapper({ open: true });
 
-      const dialog = wrapper.find('[data-test="o-dialog-stub"]');
-      expect(dialog.attributes("data-open")).toBe("true");
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("should forward open=false to ODialog", () => {
+      wrapper = createWrapper({ open: false });
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(false);
     });
 
     it("should use lg size on ODialog", () => {
       wrapper = createWrapper();
 
-      const dialog = wrapper.find('[data-test="o-dialog-stub"]');
-      expect(dialog.attributes("data-size")).toBe("lg");
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("size")).toBe("lg");
     });
   });
 
@@ -706,23 +714,21 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
+      expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
       expect(
         wrapper.find('[data-test="dashboard-column-order-drag"]').exists(),
       ).toBe(true);
     });
 
-    it("should expose Save and Cancel button labels via ODialog", () => {
+    it("should expose Save and Cancel button labels via ODialog props", () => {
       wrapper = createWrapper({
         columnOrder: [],
         availableColumns: ["column1"],
       });
 
-      const primaryBtn = wrapper.find('[data-test="o-dialog-stub-primary"]');
-      const secondaryBtn = wrapper.find('[data-test="o-dialog-stub-secondary"]');
-
-      expect(primaryBtn.text()).toContain("Save");
-      expect(secondaryBtn.text()).toContain("Cancel");
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonLabel")).toContain("Save");
+      expect(dialog.props("secondaryButtonLabel")).toContain("Cancel");
     });
   });
 });

@@ -87,8 +87,9 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   }),
 }));
 
-// Shared ref so tests can toggle chartData to truthy/falsy
+// Shared refs so tests can toggle composable state to truthy/falsy
 const mockChartData = ref(undefined as any);
+const mockShowLegendsDialog = ref(false);
 
 // Mock usePanelEditor composable
 vi.mock("./composables/usePanelEditor", () => ({
@@ -98,7 +99,7 @@ vi.mock("./composables/usePanelEditor", () => ({
     metaData: ref(null),
     seriesData: ref([]),
     lastTriggeredAt: ref(null),
-    showLegendsDialog: ref(false),
+    showLegendsDialog: mockShowLegendsDialog,
     shouldRefreshWithoutCache: ref(false),
     maxQueryRangeWarning: ref(""),
     limitNumberOfSeriesWarningMessage: ref(""),
@@ -224,39 +225,89 @@ const i18n = createI18n({
   },
 });
 
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport) and we can
+// drive emits + assert forwarded props. Mirrors the runtime contract: it accepts
+// open/size/title/.../width and emits update:open + click:primary/secondary/neutral.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="String(size)"
+      :data-show-close="String(showClose)"
+      :data-width="String(width)"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+    </div>
+  `,
+};
+
+// Shared global mount options. Centralizing avoids the same 12-line block
+// repeated in every test and keeps the stub set in one place.
+const mountGlobal = {
+  plugins: [i18n, Quasar],
+  stubs: {
+    QSeparator: true,
+    QSplitter: {
+      template:
+        '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+    },
+    QIcon: true,
+    QBtn: true,
+    QTooltip: true,
+    QAvatar: true,
+    ODialog: ODialogStub,
+  },
+};
+
 describe("PanelEditor.vue", () => {
   let wrapper: any;
+
+  beforeEach(() => {
+    // Reset shared state to a known baseline before each test
+    mockChartData.value = undefined;
+    mockShowLegendsDialog.value = false;
+    mockDashboardPanelData.data.type = "line";
+    mockDashboardPanelData.layout.showFieldList = true;
+  });
 
   afterEach(() => {
     if (wrapper) {
       wrapper.unmount();
     }
     vi.clearAllMocks();
-    mockChartData.value = undefined;
   });
 
   describe("Component Initialization", () => {
     it("should mount successfully with dashboard pageType", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-          editMode: false,
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard", editMode: false },
+        global: mountGlobal,
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -265,25 +316,8 @@ describe("PanelEditor.vue", () => {
 
     it("should mount successfully with metrics pageType", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "metrics",
-          editMode: false,
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "metrics", editMode: false },
+        global: mountGlobal,
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -291,25 +325,8 @@ describe("PanelEditor.vue", () => {
 
     it("should mount successfully with logs pageType", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "logs",
-          editMode: false,
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "logs", editMode: false },
+        global: mountGlobal,
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -317,25 +334,8 @@ describe("PanelEditor.vue", () => {
 
     it("should mount successfully with build pageType", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "build",
-          editMode: true,
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "build", editMode: true },
+        global: mountGlobal,
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -345,24 +345,8 @@ describe("PanelEditor.vue", () => {
   describe("Props Handling", () => {
     it("should accept pageType prop", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       expect(wrapper.props("pageType")).toBe("dashboard");
@@ -370,25 +354,8 @@ describe("PanelEditor.vue", () => {
 
     it("should accept editMode prop", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-          editMode: true,
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard", editMode: true },
+        global: mountGlobal,
       });
 
       expect(wrapper.props("editMode")).toBe(true);
@@ -400,21 +367,7 @@ describe("PanelEditor.vue", () => {
           pageType: "logs",
           allowedChartTypes: ["table", "bar"],
         },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        global: mountGlobal,
       });
 
       expect(wrapper.props("allowedChartTypes")).toEqual(["table", "bar"]);
@@ -427,25 +380,8 @@ describe("PanelEditor.vue", () => {
       };
 
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-          selectedDateTime: dateTime,
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard", selectedDateTime: dateTime },
+        global: mountGlobal,
       });
 
       expect(wrapper.props("selectedDateTime")).toEqual(dateTime);
@@ -453,181 +389,57 @@ describe("PanelEditor.vue", () => {
   });
 
   describe("Exposed Methods", () => {
-    it("should expose runQuery method", () => {
+    beforeEach(() => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
+    });
 
+    it("should expose runQuery method", () => {
       expect(typeof wrapper.vm.runQuery).toBe("function");
     });
 
     it("should expose resetErrors method", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
       expect(typeof wrapper.vm.resetErrors).toBe("function");
     });
 
     it("should expose collapseFieldList method", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
       expect(typeof wrapper.vm.collapseFieldList).toBe("function");
     });
 
     it("should expose updateDateTime method", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
       expect(typeof wrapper.vm.updateDateTime).toBe("function");
     });
 
     it("should expose dashboardPanelData", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
       expect(wrapper.vm.dashboardPanelData).toBeDefined();
+    });
+
+    it("should expose cancelRunningQuery method", () => {
+      expect(typeof wrapper.vm.cancelRunningQuery).toBe("function");
+    });
+
+    it("should expose initChartData method", () => {
+      expect(typeof wrapper.vm.initChartData).toBe("function");
     });
   });
 
   describe("Emits", () => {
     it("should emit addToDashboard event when triggered", async () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "metrics",
-          showAddToDashboardButton: true,
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "metrics", showAddToDashboardButton: true },
+        global: mountGlobal,
       });
 
-      // Trigger the emit through component's exposed method or internal logic
       // The emit would normally be triggered by clicking "Add to Dashboard" button
       expect(wrapper.emitted()).toBeDefined();
     });
 
     it("should emit customQueryModeChanged on mount (immediate watcher)", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       // The watcher with { immediate: true } should fire on mount
@@ -636,24 +448,8 @@ describe("PanelEditor.vue", () => {
 
     it("should emit searchRequestTraceIdsUpdated on mount (immediate watcher)", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       expect(wrapper.emitted("searchRequestTraceIdsUpdated")).toBeDefined();
@@ -661,386 +457,63 @@ describe("PanelEditor.vue", () => {
   });
 
   describe("Exposed State Refs", () => {
-    it("should expose chartData ref", () => {
+    beforeEach(() => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
+    });
 
-      // chartData starts as undefined
+    it("should expose chartData ref (undefined initially)", () => {
       expect(wrapper.vm.chartData).toBeUndefined();
     });
 
-    it("should expose errorData ref", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
+    it("should expose errorData ref with empty errors array", () => {
       expect(wrapper.vm.errorData).toBeDefined();
       expect(wrapper.vm.errorData.errors).toEqual([]);
     });
 
-    it("should expose metaData ref", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
+    it("should expose metaData ref (null initially)", () => {
       expect(wrapper.vm.metaData).toBeNull();
     });
 
-    it("should expose seriesData ref", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "metrics",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
+    it("should expose seriesData ref (empty array initially)", () => {
       expect(wrapper.vm.seriesData).toEqual([]);
     });
 
-    it("should expose lastTriggeredAt ref", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
+    it("should expose lastTriggeredAt ref (null initially)", () => {
       expect(wrapper.vm.lastTriggeredAt).toBeNull();
     });
 
-    it("should expose isOutDated computed", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
+    it("should expose isOutDated computed (false initially)", () => {
       expect(wrapper.vm.isOutDated).toBe(false);
     });
 
-    it("should expose isLoading computed", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "logs",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
+    it("should expose isLoading computed (false initially)", () => {
       expect(wrapper.vm.isLoading).toBe(false);
     });
 
-    it("should expose searchRequestTraceIds ref", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
+    it("should expose searchRequestTraceIds ref (empty array initially)", () => {
       expect(wrapper.vm.searchRequestTraceIds).toEqual([]);
     });
 
-    it("should expose warning message refs", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
+    it("should expose warning message refs (empty strings initially)", () => {
       expect(wrapper.vm.maxQueryRangeWarning).toBe("");
       expect(wrapper.vm.limitNumberOfSeriesWarningMessage).toBe("");
       expect(wrapper.vm.errorMessage).toBe("");
     });
   });
 
-  describe("Exposed Methods", () => {
-    it("should expose cancelRunningQuery method", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
-      expect(typeof wrapper.vm.cancelRunningQuery).toBe("function");
-    });
-
-    it("should expose initChartData method", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
-      expect(typeof wrapper.vm.initChartData).toBe("function");
-    });
-  });
-
   describe("Content Height Calculation", () => {
-    it("should calculate correct content height for dashboard pageType", () => {
+    it.each([
+      ["dashboard"],
+      ["logs"],
+      ["metrics"],
+      ["build"],
+    ])("should mount cleanly for pageType=%s", (pageType) => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
-      // The component should be mounted without errors
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should calculate correct content height for logs pageType", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "logs",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
-      // The component should be mounted without errors
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should calculate correct content height for metrics pageType", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "metrics",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should calculate correct content height for build pageType", () => {
-      wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "build",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: pageType as any },
+        global: mountGlobal,
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -1052,56 +525,21 @@ describe("PanelEditor.vue", () => {
       mockDashboardPanelData.layout.showFieldList = false;
 
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       expect(
         wrapper.find(".field-list-sidebar-header-collapsed").exists(),
       ).toBe(true);
-
-      // Restore
-      mockDashboardPanelData.layout.showFieldList = true;
     });
 
     it("should not show collapsed field list when showFieldList is true", () => {
       mockDashboardPanelData.layout.showFieldList = true;
 
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       expect(
@@ -1113,117 +551,44 @@ describe("PanelEditor.vue", () => {
       mockDashboardPanelData.data.type = "html";
 
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       await nextTick();
       expect(wrapper.exists()).toBe(true);
-
-      // Restore
-      mockDashboardPanelData.data.type = "line";
     });
 
     it("should show markdown editor section when type is markdown", async () => {
       mockDashboardPanelData.data.type = "markdown";
 
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       await nextTick();
       expect(wrapper.exists()).toBe(true);
-
-      // Restore
-      mockDashboardPanelData.data.type = "line";
     });
 
     it("should show custom chart editor section when type is custom_chart", async () => {
       mockDashboardPanelData.data.type = "custom_chart";
 
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       await nextTick();
       expect(wrapper.exists()).toBe(true);
-
-      // Restore
-      mockDashboardPanelData.data.type = "line";
     });
   });
 
   describe("Props Defaults", () => {
     it("should default editMode to false", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "dashboard",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
       });
 
       expect(wrapper.props("editMode")).toBe(false);
@@ -1231,24 +596,8 @@ describe("PanelEditor.vue", () => {
 
     it("should default isUiHistogram to false", () => {
       wrapper = shallowMount(PanelEditor, {
-        props: {
-          pageType: "logs",
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            QSeparator: true,
-            QSplitter: {
-              template:
-                '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            },
-            QIcon: true,
-            QBtn: true,
-            QTooltip: true,
-            QAvatar: true,
-            QDialog: true,
-          },
-        },
+        props: { pageType: "logs" },
+        global: mountGlobal,
       });
 
       expect(wrapper.props("isUiHistogram")).toBe(false);
@@ -1256,22 +605,6 @@ describe("PanelEditor.vue", () => {
   });
 
   describe("searchType computed", () => {
-    const mountGlobalOptions = {
-      plugins: [i18n, Quasar],
-      stubs: {
-        QSeparator: true,
-        QSplitter: {
-          template:
-            '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-        },
-        QIcon: true,
-        QBtn: true,
-        QTooltip: true,
-        QAvatar: true,
-        QDialog: true,
-      },
-    };
-
     // PanelSchemaRenderer only renders when chartData is truthy
     beforeEach(() => {
       mockChartData.value = {};
@@ -1280,7 +613,7 @@ describe("PanelEditor.vue", () => {
     it('should pass searchType "dashboards" to PanelSchemaRenderer when pageType is "dashboard"', () => {
       wrapper = shallowMount(PanelEditor, {
         props: { pageType: "dashboard" },
-        global: mountGlobalOptions,
+        global: mountGlobal,
       });
 
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
@@ -1290,7 +623,7 @@ describe("PanelEditor.vue", () => {
     it('should pass searchType "ui" to PanelSchemaRenderer when pageType is "metrics"', () => {
       wrapper = shallowMount(PanelEditor, {
         props: { pageType: "metrics" },
-        global: mountGlobalOptions,
+        global: mountGlobal,
       });
 
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
@@ -1300,7 +633,7 @@ describe("PanelEditor.vue", () => {
     it('should pass searchType "ui" to PanelSchemaRenderer when pageType is "logs"', () => {
       wrapper = shallowMount(PanelEditor, {
         props: { pageType: "logs" },
-        global: mountGlobalOptions,
+        global: mountGlobal,
       });
 
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
@@ -1310,7 +643,7 @@ describe("PanelEditor.vue", () => {
     it('should pass searchType "dashboards" to PanelSchemaRenderer when pageType is "build"', () => {
       wrapper = shallowMount(PanelEditor, {
         props: { pageType: "build" },
-        global: mountGlobalOptions,
+        global: mountGlobal,
       });
 
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
@@ -1320,11 +653,105 @@ describe("PanelEditor.vue", () => {
     it('should default searchType to "dashboards" for unknown pageType', () => {
       wrapper = shallowMount(PanelEditor, {
         props: { pageType: "unknown" as any },
-        global: mountGlobalOptions,
+        global: mountGlobal,
       });
 
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
       expect(renderer.props("searchType")).toBe("dashboards");
+    });
+  });
+
+  describe("ODialog migration (legends popup)", () => {
+    // The legends popup uses ODialog with v-model:open + size="lg" + show-close=false.
+    // We need a truthy chartData so PanelSchemaRenderer renders (it emits show-legends).
+    beforeEach(() => {
+      mockChartData.value = {};
+      mockShowLegendsDialog.value = false;
+    });
+
+    it("renders the legends ODialog with the correct forwarded props", () => {
+      // Open the legends dialog so the ODialog body renders (ODialogStub renders unconditionally,
+      // but we still want to verify the bound props match the migration contract).
+      mockShowLegendsDialog.value = true;
+
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
+      });
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      // The legends ODialog is always present in the template; find the lg-sized one.
+      const legendsDialog = dialogs.find(
+        (d: any) => d.attributes("data-size") === "lg",
+      );
+
+      expect(legendsDialog).toBeTruthy();
+      expect(legendsDialog!.attributes("data-show-close")).toBe("false");
+      expect(legendsDialog!.attributes("data-open")).toBe("true");
+    });
+
+    it("starts with the legends ODialog closed (data-open=false)", () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
+      });
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      const legendsDialog = dialogs.find(
+        (d: any) => d.attributes("data-size") === "lg",
+      );
+
+      expect(legendsDialog).toBeTruthy();
+      expect(legendsDialog!.attributes("data-open")).toBe("false");
+    });
+
+    it("closes the legends dialog when ODialog emits update:open=false", async () => {
+      mockShowLegendsDialog.value = true;
+
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
+      });
+
+      const legendsDialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d: any) => d.props("size") === "lg");
+
+      expect(legendsDialog).toBeTruthy();
+      expect(legendsDialog!.props("open")).toBe(true);
+
+      // Driving the close via the emit contract (v-model:open binding).
+      await legendsDialog!.vm.$emit("update:open", false);
+      await nextTick();
+
+      expect(mockShowLegendsDialog.value).toBe(false);
+    });
+  });
+
+  describe("ODialog migration (custom chart type selector)", () => {
+    // The CustomChartTypeSelector ODialog only renders when type === 'custom_chart'
+    // AND pageType === 'dashboard' (the v-if on the wrapping div).
+    beforeEach(() => {
+      mockDashboardPanelData.data.type = "custom_chart";
+    });
+
+    it("renders the custom-chart-type-selector ODialog with width=95 and show-close=false", async () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard" },
+        global: mountGlobal,
+      });
+
+      await nextTick();
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      const selectorDialog = dialogs.find(
+        (d: any) => d.attributes("data-width") === "95",
+      );
+
+      expect(selectorDialog).toBeTruthy();
+      expect(selectorDialog!.attributes("data-show-close")).toBe("false");
+      // Closed by default
+      expect(selectorDialog!.attributes("data-open")).toBe("false");
     });
   });
 });
