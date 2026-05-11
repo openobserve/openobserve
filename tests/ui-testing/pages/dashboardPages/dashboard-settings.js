@@ -61,13 +61,24 @@ export default class DashboardSetting {
 
   //Open Dashboard Setting//
   async openSetting() {
+    // Idempotent: if the settings ODrawer is already open, do nothing.
+    // The settings UI is rendered as an ODrawer with a backdrop overlay; clicking
+    // the dashboard-setting-btn while the drawer is open causes the overlay to
+    // intercept the pointer and dismiss the drawer (onInteractOutside), so blindly
+    // re-clicking after a save would close the drawer mid-test.
+    const generalTab = this.page.locator('[data-test="dashboard-settings-general-tab"]');
+    const alreadyOpen = await generalTab.isVisible().catch(() => false);
+    if (alreadyOpen) {
+      return;
+    }
+
     await this.page.waitForSelector('[data-test="dashboard-setting-btn"]', {
       state: "visible",
       timeout: 15000,
     });
     await this.setting.click();
     // Wait for settings dialog to open - use more specific selector
-    await this.page.locator('[data-test="dashboard-settings-general-tab"]').waitFor({ state: "visible", timeout: 10000 });
+    await generalTab.waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
 
     // Wait for all tabs to be rendered in the dialog
