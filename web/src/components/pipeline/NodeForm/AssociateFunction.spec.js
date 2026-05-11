@@ -214,6 +214,16 @@ describe("AssociateFunction Component", () => {
       const deleteBtn = wrapper.find('[data-test="associate-function-delete-btn"]');
       expect(deleteBtn.exists()).toBe(false);
     });
+
+    it("emits cancel:hideform when the header close icon button is clicked", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const closeBtn = wrapper
+        .find('[data-test="add-function-node-routing-section"] .stream-routing-title button');
+      expect(closeBtn.exists()).toBe(true);
+      await closeBtn.trigger("click");
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
   });
 
   // -------------------------------------------------------------------------

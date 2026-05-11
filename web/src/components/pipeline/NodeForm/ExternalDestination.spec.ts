@@ -653,6 +653,24 @@ describe("ExternalDestination.vue", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="add-destination-delete-btn"]').exists()).toBe(true);
     });
+
+    it("11.9 emits 'close' when the header close OButton is clicked", async () => {
+      // Header close button is the first OButton (variant=ghost, size=icon)
+      // After migration to ODialog/ODrawer, this button now emits 'close'
+      // (previously used v-close-popup).
+      const headerCloseBtn = wrapper.findAllComponents({ name: "OButton" })[0];
+      expect(headerCloseBtn.exists()).toBe(true);
+      await headerCloseBtn.trigger("click");
+      expect(wrapper.emitted("close")).toBeTruthy();
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+
+    it("11.10 does NOT emit 'close' on cancel button click (cancel emits cancel:hideform)", async () => {
+      const cancelBtn = wrapper.find('[data-test="add-destination-cancel-btn"]');
+      await cancelBtn.trigger("click");
+      expect(wrapper.emitted("close")).toBeFalsy();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
   });
 
   // -----------------------------------------------------------------------

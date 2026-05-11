@@ -81,6 +81,57 @@ const makeJob = (overrides: Partial<BackfillJob> = {}): BackfillJob => ({
   ...overrides,
 });
 
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport)
+// and so we can assert on the props the component forwards + emit
+// the click events the component listens to.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-primary-label="primaryButtonLabel"
+    >
+      <slot name="header-left" />
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-dialog-stub-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-stub-close"
+        @click="$emit('update:open', false)"
+      >x</button>
+    </div>
+  `,
+};
+
 function createWrapper() {
   return mount(BackfillJobsList, {
     global: {
@@ -91,6 +142,7 @@ function createWrapper() {
         NoData: { template: "<div />" },
         QTablePagination: { template: "<div />" },
         ConfirmDialog: { template: "<div />" },
+        ODialog: ODialogStub,
       },
     },
   });
@@ -518,5 +570,100 @@ describe("BackfillJobsList – formatTimestamp", () => {
     const result = (wrapper.vm as any).formatTimestamp(1_700_000_000_000_000);
     expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+describe("BackfillJobsList – Error ODialog migration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(backfillService.listBackfillJobs).mockResolvedValue([]);
+  });
+
+  it("does not show the error ODialog initially", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const dialog = wrapper.find('[data-test="o-dialog-stub"]');
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.attributes("data-open")).toBe("false");
+  });
+
+  it("opens the error ODialog when showErrorDialog is called", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const job = makeJob({ error: "boom" });
+    (wrapper.vm as any).showErrorDialog(job);
+    await nextTick();
+    const dialog = wrapper.find('[data-test="o-dialog-stub"]');
+    expect(dialog.attributes("data-open")).toBe("true");
+    expect((wrapper.vm as any).errorDialogData).toEqual(job);
+  });
+
+  it("forwards size 'md' and title 'Backfill Job Error' to ODialog", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const dialog = wrapper.find('[data-test="o-dialog-stub"]');
+    expect(dialog.attributes("data-size")).toBe("md");
+    expect(dialog.attributes("data-title")).toBe("Backfill Job Error");
+  });
+
+  it("forwards primary-button-label 'Close' to ODialog", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const dialog = wrapper.find('[data-test="o-dialog-stub"]');
+    expect(dialog.attributes("data-primary-label")).toBe("Close");
+  });
+
+  it("closes and resets data when ODialog emits click:primary", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    (wrapper.vm as any).showErrorDialog(makeJob({ error: "boom" }));
+    await nextTick();
+    expect((wrapper.vm as any).errorDialogVisible).toBe(true);
+    await wrapper.find('[data-test="o-dialog-stub-primary"]').trigger("click");
+    await nextTick();
+    expect((wrapper.vm as any).errorDialogVisible).toBe(false);
+    expect((wrapper.vm as any).errorDialogData).toBeNull();
+  });
+
+  it("closes and resets data when ODialog emits update:open=false", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    (wrapper.vm as any).showErrorDialog(makeJob({ error: "boom" }));
+    await nextTick();
+    expect((wrapper.vm as any).errorDialogVisible).toBe(true);
+    await wrapper.find('[data-test="o-dialog-stub-close"]').trigger("click");
+    await nextTick();
+    expect((wrapper.vm as any).errorDialogVisible).toBe(false);
+    expect((wrapper.vm as any).errorDialogData).toBeNull();
+  });
+
+  it("renders job_id, pipeline name, and error message in the dialog body", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    (wrapper.vm as any).showErrorDialog(
+      makeJob({
+        job_id: "j-err",
+        pipeline_id: "pipe-err",
+        pipeline_name: "Err Pipe",
+        error: "kaboom",
+      })
+    );
+    await nextTick();
+    const dialog = wrapper.find('[data-test="o-dialog-stub"]');
+    const text = dialog.text();
+    expect(text).toContain("j-err");
+    expect(text).toContain("Err Pipe");
+    expect(text).toContain("kaboom");
+  });
+
+  it("closeErrorDialog hides dialog and clears errorDialogData", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    (wrapper.vm as any).showErrorDialog(makeJob({ error: "boom" }));
+    await nextTick();
+    (wrapper.vm as any).closeErrorDialog();
+    await nextTick();
+    expect((wrapper.vm as any).errorDialogVisible).toBe(false);
+    expect((wrapper.vm as any).errorDialogData).toBeNull();
   });
 });

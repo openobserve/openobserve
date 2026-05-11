@@ -440,6 +440,31 @@ describe("LlmEvaluation - edit mode", () => {
   });
 });
 
+describe("LlmEvaluation - close icon button", () => {
+  let wrapper: VueWrapper<any>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    wrapper = createWrapper();
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+
+  it("emits 'cancel:hideform' when the header close button is clicked", async () => {
+    // The header close button is the first OButton inside the title row.
+    // Previously used v-close-popup; now explicitly emits cancel:hideform.
+    const headerCloseBtn = wrapper
+      .find('.stream-routing-title')
+      .findComponent({ name: "OButton" });
+    expect(headerCloseBtn.exists()).toBe(true);
+    await headerCloseBtn.trigger("click");
+    expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+  });
+});
+
 describe("LlmEvaluation - dialog behavior", () => {
   let wrapper: VueWrapper<any>;
 
