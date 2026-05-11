@@ -104,6 +104,14 @@ export interface DrawerProps {
   secondaryButtonLoading?: boolean;
   /** Shows loading spinner on neutral button (also disables all buttons). */
   neutralButtonLoading?: boolean;
+
+  /**
+   * When true (default), the default slot content is only rendered while the
+   * drawer is open and destroyed when it closes. Set to false for drawers that
+   * must preserve component state between open/close cycles.
+   * @default true
+   */
+  lazy?: boolean;
 }
 
 export interface DrawerEmits {

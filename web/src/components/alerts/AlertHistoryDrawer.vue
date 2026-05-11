@@ -18,24 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="open"
     :width="55"
-    :show-close="false"
+    :title="t('alert_list.alert_history')"
     @update:open="emit('update:open', $event)"
   >
     <!-- #header override required: header contains alert name/type badges,
          tab toggle, and datetime picker — too complex for title + sub-slots -->
-    <template #header>
-      <div class="row items-center no-wrap">
-        <div class="col">
+    <template #header-left>
           <div
-            class="tw:text-[18px] tw:flex tw:items-center"
+            class="tw:flex tw:items-center tw:gap-2"
             data-test="alert-details-title"
           >
-            {{ t("alert_list.alert_history") }}
             <!-- Alert Name Badge -->
             <span
               v-if="alertDetails"
               :class="[
-                'tw:font-bold tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                'tw:font-bold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
@@ -90,9 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Tab toggle -->
             <OToggleGroup
-              class="tw:shrink-0 tw:ml-4"
               :model-value="activeTab"
-              @update:model-value="activeTab = ($event as string)"
+              @update:model-value="activeTab = $event as string"
             >
               <OToggleGroupItem
                 value="history"
@@ -116,38 +112,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
-        </div>
-        <div class="col-auto tw:flex tw:items-center tw:gap-1">
-          <DateTime
-            :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
-            ref="dateTimeRef"
-            auto-apply
-            :default-type="dateTimeType"
-            :default-absolute-time="{
-              startTime: absoluteTime.startTime,
-              endTime: absoluteTime.endTime,
-            }"
-            :default-relative-time="relativeTime"
-            data-test="alert-history-drawer-date-picker"
-            @on:date-change="updateDateTime"
-          />
-          <OButton
-            @click="emit('update:open', false)"
-            variant="ghost"
-            size="icon-circle-sm"
-            data-test="alert-details-close-btn"
-          >
-            <q-icon name="cancel" />
-          </OButton>
-        </div>
+    </template>
+    <template #header-right>
+      <div class="col-auto tw:flex tw:items-center tw:gap-1">
+        <DateTime
+          :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
+          ref="dateTimeRef"
+          auto-apply
+          :default-type="dateTimeType"
+          :default-absolute-time="{
+            startTime: absoluteTime.startTime,
+            endTime: absoluteTime.endTime,
+          }"
+          :default-relative-time="relativeTime"
+          data-test="alert-history-drawer-date-picker"
+          @on:date-change="updateDateTime"
+        />
       </div>
     </template>
 
     <!-- Content -->
-    <div
-      class="tw:flex tw:flex-col"
-      v-if="alertDetails"
-    >
+    <div class="tw:flex tw:flex-col" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
@@ -522,17 +507,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
-import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import { History, Code2 } from 'lucide-vue-next';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { History, Code2 } from "lucide-vue-next";
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
@@ -568,7 +553,7 @@ const anomalySql = computed(() => {
 });
 
 const emit = defineEmits<{
-  'update:open': [value: boolean];
+  "update:open": [value: boolean];
 }>();
 
 const resultTotal = ref(0);
