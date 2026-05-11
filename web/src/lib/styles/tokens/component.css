@@ -232,6 +232,18 @@
   --color-checkbox-label: var(--color-text-primary);
   --color-checkbox-label-disabled: var(--color-text-disabled);
 
+  /* Radio (ORadio) */
+  --color-radio-bg: var(--color-surface-base);
+  --color-radio-border: var(--color-border-strong);
+  --color-radio-hover-border: var(--color-primary-400);
+  --color-radio-checked-border: var(--color-primary-600);
+  --color-radio-checked-dot: var(--color-primary-600);
+  --color-radio-disabled-bg: var(--color-surface-subtle);
+  --color-radio-disabled-border: var(--color-border-default);
+  --color-radio-focus-ring: var(--color-primary-400);
+  --color-radio-label: var(--color-text-primary);
+  --color-radio-label-disabled: var(--color-text-disabled);
+
   /* ── Dialog ──────────────────────────────────────────────── */
 
   /* Overlay */
@@ -490,6 +502,18 @@
   --color-checkbox-focus-ring: var(--color-checkbox-focus-ring);
   --color-checkbox-label: var(--color-checkbox-label);
   --color-checkbox-label-disabled: var(--color-checkbox-label-disabled);
+
+  /* Radio (ORadio) */
+  --color-radio-bg: var(--color-radio-bg);
+  --color-radio-border: var(--color-radio-border);
+  --color-radio-hover-border: var(--color-radio-hover-border);
+  --color-radio-checked-border: var(--color-radio-checked-border);
+  --color-radio-checked-dot: var(--color-radio-checked-dot);
+  --color-radio-disabled-bg: var(--color-radio-disabled-bg);
+  --color-radio-disabled-border: var(--color-radio-disabled-border);
+  --color-radio-focus-ring: var(--color-radio-focus-ring);
+  --color-radio-label: var(--color-radio-label);
+  --color-radio-label-disabled: var(--color-radio-label-disabled);
 
 
   /* Dialog */

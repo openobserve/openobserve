@@ -2,6 +2,13 @@
 
 export type SwitchSize = "sm" | "md" | "lg";
 export type SwitchValue = boolean | string | number;
+/**
+ * Custom value type for `checkedValue`/`uncheckedValue`. Excludes `boolean` on
+ * purpose: Vue auto-coerces optional Boolean-typed props to `false` when not
+ * passed, which would make `checkedValue !== undefined` always evaluate true
+ * and break the default boolean toggle behaviour.
+ */
+export type SwitchCustomValue = string | number;
 
 export interface SwitchProps {
   /** Current on/off state */
@@ -13,9 +20,9 @@ export interface SwitchProps {
   /** Control size */
   size?: SwitchSize;
   /** Value to emit when checked — replaces q-toggle `true-value` */
-  checkedValue?: SwitchValue;
+  checkedValue?: SwitchCustomValue;
   /** Value to emit when unchecked — replaces q-toggle `false-value` */
-  uncheckedValue?: SwitchValue;
+  uncheckedValue?: SwitchCustomValue;
   /** Prevents interaction */
   disabled?: boolean;
   /** HTML id */

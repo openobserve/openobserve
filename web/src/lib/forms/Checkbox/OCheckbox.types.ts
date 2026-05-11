@@ -3,7 +3,13 @@
 import type { InjectionKey } from "vue";
 
 export type CheckboxSize = "xs" | "sm" | "md";
-export type CheckboxPrimitive = string | number | boolean;
+/**
+ * Identifier values used in group/custom-value mode. Excludes `boolean` on
+ * purpose: Vue auto-coerces optional Boolean-typed props to `false` when not
+ * passed, which would make these props indistinguishable from "unset".
+ * Boolean checkbox state is carried by `modelValue` instead.
+ */
+export type CheckboxPrimitive = string | number;
 export type CheckboxModelValue =
   | boolean
   | "indeterminate"

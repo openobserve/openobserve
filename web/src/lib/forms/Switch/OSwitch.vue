@@ -2,8 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SwitchProps, SwitchEmits, SwitchSlots } from "./OSwitch.types";
-import { SwitchRoot, SwitchThumb } from "reka-ui";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 
 const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
@@ -15,23 +14,34 @@ const emit = defineEmits<SwitchEmits>();
 
 defineSlots<SwitchSlots>();
 
-// ── Checked state with optional custom values ──────────────────────────────
+// ── Local state — immediate visual feedback ────────────────────────────────
+const internalValue = ref(props.modelValue);
+
+watch(
+  () => props.modelValue,
+  (v) => {
+    internalValue.value = v;
+  },
+);
+
 const isChecked = computed((): boolean => {
-  if (props.checkedValue !== undefined) {
-    return props.modelValue === props.checkedValue;
-  }
-  return Boolean(props.modelValue);
+  const v = internalValue.value;
+  if (props.checkedValue !== undefined) return v === props.checkedValue;
+  return Boolean(v);
 });
 
-function handleUpdate(value: boolean) {
-  let emitValue;
+function toggle() {
+  if (props.disabled) return;
+  const next = !isChecked.value;
+  let emitValue: typeof props.modelValue;
   if (props.checkedValue !== undefined || props.uncheckedValue !== undefined) {
-    emitValue = value
+    emitValue = next
       ? (props.checkedValue ?? true)
       : (props.uncheckedValue ?? false);
   } else {
-    emitValue = value;
+    emitValue = next;
   }
+  internalValue.value = emitValue;
   emit("update:modelValue", emitValue);
   emit("change", emitValue);
 }
@@ -43,17 +53,17 @@ const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
   sm: {
     track: "tw:w-7 tw:h-4",
     thumb: "tw:size-3",
-    thumbTranslate: "tw:data-[state=checked]:translate-x-3",
+    thumbTranslate: "tw:translate-x-3",
   },
   md: {
     track: "tw:w-9 tw:h-5",
     thumb: "tw:size-4",
-    thumbTranslate: "tw:data-[state=checked]:translate-x-4",
+    thumbTranslate: "tw:translate-x-4",
   },
   lg: {
     track: "tw:w-11 tw:h-6",
     thumb: "tw:size-5",
-    thumbTranslate: "tw:data-[state=checked]:translate-x-5",
+    thumbTranslate: "tw:translate-x-5",
   },
 };
 
@@ -74,47 +84,42 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
       disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
   >
-    <SwitchRoot
+    <!-- Plain button — avoids reka-ui controlled-component timing issues -->
+    <button
       :id="id"
       :name="name"
       type="button"
-      :checked="isChecked"
+      role="switch"
+      :aria-checked="isChecked"
+      :data-state="isChecked ? 'checked' : 'unchecked'"
       :disabled="disabled"
       :class="[
-        // Layout
         'tw:relative tw:inline-flex tw:shrink-0 tw:rounded-full',
         'tw:p-0.5 tw:items-center',
-        // Sizing
         currentSizes.track,
-        // Track colors
-        'tw:bg-switch-track-off',
-        'tw:data-[state=checked]:bg-switch-track-on',
-        // Disabled
-        'tw:data-disabled:bg-switch-disabled-track-off',
-        'tw:data-[state=checked]:data-disabled:bg-switch-disabled-track-on',
-        // Focus
+        isChecked ? 'tw:bg-switch-track-on' : 'tw:bg-switch-track-off',
+        disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
+        disabled && isChecked
+          ? 'tw:opacity-60 tw:bg-switch-disabled-track-on'
+          : disabled
+            ? 'tw:opacity-60 tw:bg-switch-disabled-track-off'
+            : '',
         'tw:outline-none',
         'tw:focus-visible:ring-2 tw:focus-visible:ring-switch-focus-ring',
-        // Transition
         'tw:transition-colors tw:duration-200',
       ]"
-      @update:checked="handleUpdate"
+      @click="toggle"
     >
-      <SwitchThumb
+      <span
         :class="[
-          // Base
-          'tw:block tw:rounded-full tw:bg-switch-thumb tw:shadow-sm',
-          // Sizing
-          currentSizes.thumb,
-          // Disabled thumb
-          'tw:data-disabled:bg-switch-disabled-thumb',
-          // Animate between positions
+          'tw:block tw:rounded-full tw:shadow-sm',
           'tw:transition-transform tw:duration-200',
-          'tw:translate-x-0',
-          currentSizes.thumbTranslate,
+          currentSizes.thumb,
+          disabled ? 'tw:bg-switch-disabled-thumb' : 'tw:bg-switch-thumb',
+          isChecked ? currentSizes.thumbTranslate : 'tw:translate-x-0',
         ]"
       />
-    </SwitchRoot>
+    </button>
 
     <span
       v-if="$slots.label || label"
@@ -123,7 +128,7 @@ const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
         'tw:select-none tw:leading-none',
         disabled ? 'tw:text-switch-label-disabled' : 'tw:text-switch-label',
       ]"
-      @click="!disabled && handleUpdate(!isChecked)"
+      @click="toggle"
     >
       <slot name="label">{{ label }}</slot>
     </span>

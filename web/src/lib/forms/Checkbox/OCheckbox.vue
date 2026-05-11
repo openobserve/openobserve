@@ -9,7 +9,6 @@ import type {
   CheckboxModelValue,
 } from "./OCheckbox.types";
 import { CHECKBOX_GROUP_KEY } from "./OCheckbox.types";
-import { CheckboxRoot, CheckboxIndicator } from "reka-ui";
 import { computed, inject } from "vue";
 
 const props = withDefaults(defineProps<CheckboxProps>(), {
@@ -69,12 +68,18 @@ const checked = computed((): boolean | "indeterminate" => {
     return Boolean(props.modelValue);
   }
 
-  return (props.modelValue as boolean | "indeterminate") ?? false;
+  if (props.modelValue === "indeterminate") return "indeterminate";
+  return Boolean(props.modelValue);
 });
 
 const isDisabled = computed(
   () => props.disabled || (groupContext?.disabled ?? false),
 );
+
+const dataState = computed<"checked" | "unchecked" | "indeterminate">(() => {
+  if (checked.value === "indeterminate") return "indeterminate";
+  return checked.value ? "checked" : "unchecked";
+});
 
 function mapToCustomValue(
   value: boolean | "indeterminate",
@@ -89,14 +94,16 @@ function mapToCustomValue(
   return props.falseValue ?? false;
 }
 
-function handleUpdate(value: boolean | "indeterminate") {
+function toggle() {
+  if (isDisabled.value) return;
+
   if (
     isGroupMember.value &&
     groupContext &&
     resolvedValue.value !== undefined
   ) {
     groupContext.toggle(resolvedValue.value);
-    emit("change", value);
+    emit("change", !groupContext.isChecked(resolvedValue.value));
     return;
   }
 
@@ -110,7 +117,9 @@ function handleUpdate(value: boolean | "indeterminate") {
     return;
   }
 
-  const nextValue = mapToCustomValue(value);
+  // Indeterminate transitions to checked, then unchecked → checked → unchecked
+  const nextBool = checked.value === true ? false : true;
+  const nextValue = mapToCustomValue(nextBool);
   emit("update:modelValue", nextValue);
   emit("change", nextValue);
 }
@@ -136,47 +145,45 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       isDisabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
     ]"
   >
-    <CheckboxRoot
+    <!-- Plain button — avoids reka-ui controlled-component timing issues -->
+    <button
       :id="id"
       :name="name"
-      :checked="checked"
+      type="button"
+      role="checkbox"
+      :aria-checked="checked === 'indeterminate' ? 'mixed' : checked"
+      :data-state="dataState"
       :disabled="isDisabled"
       :class="[
-        // Layout
         'tw:shrink-0 tw:rounded-sm tw:border',
-        // Sizing
         boxSizeClasses[size ?? 'md'],
-        // Base state
+        // Base / unchecked
         'tw:bg-checkbox-bg tw:border-checkbox-border',
         // Hover
         'tw:enabled:hover:border-checkbox-hover-border',
-        // Checked state
+        // Checked
         'tw:data-[state=checked]:bg-checkbox-checked-bg',
         'tw:data-[state=checked]:border-checkbox-checked-border',
-        // Indeterminate state
-        'tw:data-[state=indeterminate]:bg-checkbox-indeterminate-bg',
-        'tw:data-[state=indeterminate]:border-checkbox-indeterminate-border',
-        // Disabled state
-        'tw:data-disabled:bg-checkbox-disabled-bg',
-        'tw:data-disabled:border-checkbox-disabled-border',
+        // Indeterminate
+        'tw:data-[state=indeterminate]:bg-checkbox-checked-bg',
+        'tw:data-[state=indeterminate]:border-checkbox-checked-border',
+        // Disabled
+        'tw:disabled:bg-checkbox-disabled-bg',
+        'tw:disabled:border-checkbox-disabled-border',
         // Focus
         'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-checkbox-focus-ring',
         // Transition
         'tw:transition-colors tw:duration-150',
-        // Flex centering for indicator
+        // Centering for indicator
         'tw:flex tw:items-center tw:justify-center',
       ]"
-      @update:checked="handleUpdate"
+      @click="toggle"
     >
-      <CheckboxIndicator
-        :class="[
-          'tw:flex tw:items-center tw:justify-center',
-          'tw:text-checkbox-checked-fg',
-        ]"
+      <span
+        v-if="checked === true"
+        class="tw:flex tw:items-center tw:justify-center tw:text-checkbox-checked-fg tw:size-full"
       >
-        <!-- checkmark -->
         <svg
-          v-if="checked !== 'indeterminate'"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 12 12"
           fill="none"
@@ -189,9 +196,12 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         >
           <polyline points="2,6 5,9 10,3" />
         </svg>
-        <!-- dash for indeterminate -->
+      </span>
+      <span
+        v-else-if="checked === 'indeterminate'"
+        class="tw:flex tw:items-center tw:justify-center tw:text-checkbox-checked-fg tw:size-full"
+      >
         <svg
-          v-else
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 12 12"
           fill="none"
@@ -203,8 +213,8 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         >
           <line x1="2" y1="6" x2="10" y2="6" />
         </svg>
-      </CheckboxIndicator>
-    </CheckboxRoot>
+      </span>
+    </button>
 
     <span
       v-if="$slots.label || label"
