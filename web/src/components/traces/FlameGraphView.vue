@@ -139,6 +139,7 @@
       v-if="sidebarVisible"
       class="tw:h-1 tw:cursor-row-resize tw:bg-[var(--o2-border)] hover:tw:bg-[var(--o2-primary-color)] tw:flex-shrink-0 tw:transition-colors"
       style="min-height: 4px"
+      data-test="flame-graph-resizer"
       @mousedown="startResize"
     ></div>
 
@@ -171,7 +172,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick, watch } from "vue";
-import { throttle } from "lodash-es";
+import useResizer from "@/composables/useResizer";
 import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import useTraces from "@/composables/useTraces";
@@ -226,8 +227,18 @@ const cursorX = ref(0);
 const cursorTimeLabel = ref("");
 const sidebarVisible = ref(false);
 const sidebarActiveTab = ref("attributes");
-const bottomPanelHeight = ref(360);
-const isResizing = ref(false);
+const {
+  value: bottomPanelHeight,
+  onMouseDown: startResize,
+} = useResizer({
+  direction: "vertical",
+  initialValue: 360,
+  minValue: 200,
+  maxValue: window.innerHeight * 0.7,
+  unit: "px",
+  throttleMs: 50,
+  invert: true,
+});
 const chartScrollRef = ref<HTMLElement | null>(null);
 
 // Constants
@@ -591,28 +602,8 @@ watch(
   },
 );
 
-// Vertical resize for bottom panel
-const startResize = (event: MouseEvent) => {
-  event.preventDefault();
-  isResizing.value = true;
-  document.addEventListener("mousemove", resizing);
-  document.addEventListener("mouseup", stopResize);
-};
+// Resizer is now handled by useResizer composable
 
-const resizing = throttle((event: MouseEvent) => {
-  if (!isResizing.value) return;
-  const newHeight = window.innerHeight - event.clientY;
-  bottomPanelHeight.value = Math.max(
-    200,
-    Math.min(newHeight, window.innerHeight * 0.7),
-  );
-}, 50);
-
-const stopResize = () => {
-  isResizing.value = false;
-  document.removeEventListener("mousemove", resizing);
-  document.removeEventListener("mouseup", stopResize);
-};
 </script>
 
 <style scoped lang="scss">

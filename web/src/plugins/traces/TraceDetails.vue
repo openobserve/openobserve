@@ -526,6 +526,7 @@ size="14px"
                   >
                     <div class="position-relative">
                       <div
+                        data-test="trace-details-resizer"
                         :style="{
                           width: '1px',
                           left: `${leftWidth}px`,
@@ -903,7 +904,6 @@ v-close-popup>
 import {
   defineComponent,
   ref,
-  type Ref,
   type PropType,
   onMounted,
   onUnmounted,
@@ -943,7 +943,7 @@ import {
   SPAN_KIND_UNSPECIFIED,
   SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
-import { throttle } from "lodash-es";
+import useResizer from "@/composables/useResizer";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import {
@@ -1229,17 +1229,29 @@ export default defineComponent({
 
     const ChartData: any = ref({});
 
-    const leftWidth: Ref<number> = ref(460);
-    const initialX: Ref<number> = ref(0);
-    const initialWidth: Ref<number> = ref(0);
-
-    const throttledResizing = ref<any>(null);
+    const {
+      value: leftWidth,
+      onMouseDown: startResize,
+    } = useResizer({
+      direction: "horizontal",
+      initialValue: 460,
+      unit: "px",
+      throttleMs: 50,
+    });
 
     // DAG panel resize state
-    const dagLeftWidth: Ref<number> = ref(50); // percentage
-    const dagInitialX: Ref<number> = ref(0);
-    const dagInitialWidth: Ref<number> = ref(0);
-    const throttledDagResizing = ref<any>(null);
+    const {
+      value: dagLeftWidth,
+      onMouseDown: startDagResize,
+    } = useResizer({
+      direction: "horizontal",
+      initialValue: 50,
+      minValue: 20,
+      maxValue: 80,
+      unit: "%",
+      containerRef: parentContainer,
+      throttleMs: 16,
+    });
 
     // Calculate sidebar width based on leftWidth
     // Sidebar should take ~84% of the remaining space after left panel
@@ -2480,56 +2492,7 @@ export default defineComponent({
       updateHeight();
     };
 
-    onMounted(() => {
-      throttledResizing.value = throttle(resizing, 50);
-    });
-
-    const startResize = (event: any) => {
-      initialX.value = event.clientX;
-      initialWidth.value = leftWidth.value;
-
-      window.addEventListener("mousemove", throttledResizing.value);
-      window.addEventListener("mouseup", stopResize);
-      document.body.classList.add("no-select");
-    };
-
-    const resizing = (event: any) => {
-      const deltaX = event.clientX - initialX.value;
-      leftWidth.value = initialWidth.value + deltaX;
-    };
-
-    const stopResize = () => {
-      window.removeEventListener("mousemove", throttledResizing.value);
-      window.removeEventListener("mouseup", stopResize);
-      document.body.classList.remove("no-select");
-    };
-
-    // DAG panel resize handlers
-    const startDagResize = (event: MouseEvent) => {
-      dagInitialX.value = event.clientX;
-      dagInitialWidth.value = dagLeftWidth.value;
-
-      throttledDagResizing.value = throttle(dagResizing, 16);
-      window.addEventListener("mousemove", throttledDagResizing.value);
-      window.addEventListener("mouseup", stopDagResize);
-      document.body.classList.add("no-select");
-    };
-
-    const dagResizing = (event: MouseEvent) => {
-      if (!parentContainer.value) return;
-      const containerWidth = parentContainer.value.clientWidth;
-      const deltaX = event.clientX - dagInitialX.value;
-      const deltaPercent = (deltaX / containerWidth) * 100;
-      const newWidth = dagInitialWidth.value + deltaPercent;
-      // Constrain between 20% and 80%
-      dagLeftWidth.value = Math.max(20, Math.min(80, newWidth));
-    };
-
-    const stopDagResize = () => {
-      window.removeEventListener("mousemove", throttledDagResizing.value);
-      window.removeEventListener("mouseup", stopDagResize);
-      document.body.classList.remove("no-select");
-    };
+    // Resizers are now handled by useResizer composable
 
     const toggleTimeline = () => {
       isTimelineExpanded.value = !isTimelineExpanded.value;
