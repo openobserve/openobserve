@@ -175,9 +175,11 @@ watch(
 );
 
 // ── Styles ─────────────────────────────────────────────────────────────────
+// md was h-10 (40px); reduced to h-9 (36px) for a more compact field that
+// matches typical SaaS UI density. sm stays at h-8 (32px) for tight rows.
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
   sm: "tw:h-8 tw:text-sm",
-  md: "tw:h-10 tw:text-sm",
+  md: "tw:h-9 tw:text-sm",
 };
 
 const wrapperClasses = computed(() => [
