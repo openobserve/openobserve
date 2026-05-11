@@ -32,7 +32,7 @@ export async function openQueryInspector(page) {
 export async function closeQueryInspector(page) {
   testLogger.info('Closing query inspector');
 
-  await page.locator('[data-test="query-inspector-close-btn"]').click();
+  await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
   await page.waitForTimeout(500);
 
   testLogger.info('Query inspector closed successfully');

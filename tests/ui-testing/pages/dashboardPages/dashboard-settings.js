@@ -38,7 +38,7 @@ export default class DashboardSetting {
     this.tabName = page.locator('[data-test="dashboard-add-tab-name"]');
     this.saveTab = page.locator('[data-test="dashboard-add-tab-submit"]');
     this.closeSetting = page.locator(
-      '[data-test="dashboard-settings-close-btn"]'
+      '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
     );
     this.timeBtn = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');

@@ -586,7 +586,7 @@ export default class LogsVisualise {
 
   //wait for query inspector to be visible
   async waitForQueryInspector(page) {
-    const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-close-btn"]');
+    const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
     await queryInspectorCloseBtn.waitFor({ state: "visible", timeout: 10000 });
   }
 }
