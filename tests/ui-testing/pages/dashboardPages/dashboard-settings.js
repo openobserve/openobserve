@@ -30,20 +30,24 @@ export default class DashboardSetting {
     this.editBtn = page.locator(
       '[data-test="dashboard-tab-settings-tab-edit-btn"]'
     );
-    this.deleteconfirmBtn = page.locator('[data-test="confirm-button"]');
+    this.deleteconfirmBtn = page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]');
     this.editName = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit"]'
     );
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.tabName = page.locator('[data-test="dashboard-add-tab-name"]');
-    this.saveTab = page.locator('[data-test="dashboard-add-tab-submit"]');
+    this.saveTab = page.locator(
+      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-drawer-primary-btn"]'
+    );
     this.closeSetting = page.locator(
       '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
     );
     this.timeBtn = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
 
-    this.addTabCancel = page.locator('[data-test="dashboard-add-cancel"]');
+    this.addTabCancel = page.locator(
+      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-drawer-secondary-btn"]'
+    );
     this.EditSave = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
     );
@@ -171,7 +175,7 @@ export default class DashboardSetting {
 
   //cancel changes
   async cancelTabwithoutSave() {
-    await this.page.locator('[data-test="dashboard-add-cancel"]').click();
+    await this.addTabCancel.click();
   }
 
   //Cancel edit tab name
@@ -542,8 +546,8 @@ export default class DashboardSetting {
 
     // Confirm deletion
     await page
-      .locator('[data-test="confirm-button"]')
+      .locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]')
       .waitFor({ state: "visible" });
-    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]').click();
   }
 }
