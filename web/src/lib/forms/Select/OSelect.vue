@@ -11,8 +11,7 @@ import type {
 import { SELECT_VALUE_MAP_KEY } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import {
-  ListboxGroup,
-  ListboxGroupLabel,
+  ListboxFilter,
   ListboxItem,
   ListboxItemIndicator,
   ListboxRoot,
@@ -157,6 +156,12 @@ const filteredOptions = computed(() => {
     options = options.filter(
       (opt) => opt.header || !selectedValues.value.includes(opt.value),
     );
+    // Drop headers that no longer have any following non-header items
+    options = options.filter((opt, i) => {
+      if (!opt.header) return true;
+      const next = options[i + 1];
+      return next !== undefined && !next.header;
+    });
   }
 
   if (!term) return options;
@@ -307,6 +312,7 @@ function handleClear() {
 }
 
 function handleCreateFromInput() {
+  if (!props.creatable) return;
   const term = searchTerm.value.trim();
   if (!term) return;
 
@@ -486,19 +492,20 @@ const fieldWidthClass = computed(() => {
             ]"
             :style="dropdownStyle"
           >
-            <input
-              v-if="inputEnabled"
-              v-model="searchTerm"
-              class="tw:w-full tw:h-9 tw:px-3 tw:mb-1 tw:rounded-md tw:border tw:bg-input-bg tw:border-input-border tw:text-input-text tw:placeholder:text-input-placeholder tw:outline-none tw:focus:ring-2 tw:focus:ring-input-focus-ring"
-              :placeholder="searchPlaceholder"
-              @keydown.enter.prevent="handleCreateFromInput"
-            />
             <ListboxRoot
               :model-value="listboxStringModelValue"
               :multiple="multiple"
               :disabled="disabled"
               @update:model-value="handleListboxUpdate"
             >
+              <ListboxFilter
+                v-if="inputEnabled"
+                v-model="searchTerm"
+                auto-focus
+                class="tw:w-full tw:h-9 tw:px-3 tw:mb-1 tw:rounded-md tw:border tw:bg-input-bg tw:border-input-border tw:text-input-text tw:placeholder:text-input-placeholder tw:outline-none tw:focus:ring-2 tw:focus:ring-input-focus-ring"
+                :placeholder="searchPlaceholder"
+                @keydown.enter="handleCreateFromInput"
+              />
               <!-- Virtual scroll container -->
               <div ref="listboxScrollEl" class="tw:max-h-60 tw:overflow-auto">
                 <div
@@ -528,18 +535,20 @@ const fieldWidthClass = computed(() => {
                       transform: `translateY(${vRow.start}px)`,
                     }"
                   >
-                    <!-- Group header -->
-                    <ListboxGroup v-if="filteredOptions[vRow.index].header">
-                      <ListboxGroupLabel
-                        :class="[
-                          'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
-                          'tw:text-select-placeholder tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
-                          'tw:select-none tw:pointer-events-none',
-                        ]"
-                      >
-                        {{ filteredOptions[vRow.index].label }}
-                      </ListboxGroupLabel>
-                    </ListboxGroup>
+                    <!-- Group header — non-interactive label. Virtualisation
+                         renders each row as a sibling, so a real ListboxGroup
+                         can't wrap its items. Render a plain styled header
+                         instead of misusing ListboxGroup/Label ARIA roles. -->
+                    <div
+                      v-if="filteredOptions[vRow.index].header"
+                      :class="[
+                        'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
+                        'tw:text-select-placeholder tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
+                        'tw:select-none tw:pointer-events-none',
+                      ]"
+                    >
+                      {{ filteredOptions[vRow.index].label }}
+                    </div>
 
                     <!-- Regular item -->
                     <ListboxItem
