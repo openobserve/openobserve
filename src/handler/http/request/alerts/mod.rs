@@ -416,6 +416,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = String, Path, description = "Source alert or anomaly config ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
     responses(
