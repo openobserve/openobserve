@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OSelect from "./OSelect.vue";
 
 describe("OSelect", () => {
@@ -105,5 +105,29 @@ describe("OSelect", () => {
     await wrapper.find('button[aria-label="Clear selection"]').trigger("click");
     expect(wrapper.emitted("clear")).toBeTruthy();
     expect(wrapper.emitted("update:modelValue")![0][0]).toEqual([]);
+  });
+
+  it("does not emit create on Enter when creatable is false", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: {
+        searchable: true,
+        creatable: false,
+        options: [{ label: "Existing", value: "ex" }],
+      },
+    });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+    const input = document.body.querySelector(
+      'input[placeholder="Search..."]',
+    ) as HTMLInputElement | null;
+    expect(input).not.toBeNull();
+    input!.value = "brand-new-term";
+    input!.dispatchEvent(new Event("input", { bubbles: true }));
+    input!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+    await flushPromises();
+    expect(wrapper.emitted("create")).toBeFalsy();
   });
 });
