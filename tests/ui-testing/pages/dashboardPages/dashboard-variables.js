@@ -131,7 +131,8 @@ export default class DashboardVariables {
 
     // Use JavaScript evaluation to click the close button to avoid DOM instability issues
     await this.page.evaluate(() => {
-      const closeBtn = document.querySelector('[data-test="dashboard-settings-close-btn"]');
+      const drawer = document.querySelector('[data-test="dashboard-settings-drawer"]');
+      const closeBtn = drawer?.querySelector('[data-test="o-drawer-close-btn"]');
       if (closeBtn) closeBtn.click();
     });
     // }

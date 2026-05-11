@@ -126,7 +126,7 @@ export default class DashboardCreate {
     );
     await confirmDialog.waitFor({ state: "visible" });
     const confirmDeleteButton = confirmDialog.locator(
-      '[data-test="confirm-button"]'
+      '[data-test="o-dialog-primary-btn"]'
     );
     await confirmDeleteButton.waitFor({ state: "visible" });
     await confirmDeleteButton.click();
