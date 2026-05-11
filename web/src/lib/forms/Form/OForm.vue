@@ -7,10 +7,17 @@ import { FORM_CONTEXT_KEY } from "./OForm.types";
 
 const props = defineProps<{
   defaultValues: T;
+  /**
+   * Validate every field before stopping on the first error.
+   * Mirrors q-form's `greedy` prop. Without this, validation short-circuits
+   * on the first failed field.
+   */
+  greedy?: boolean;
 }>();
 
 const emit = defineEmits<{
   submit: [values: T];
+  reset: [];
 }>();
 
 const form = useForm({
@@ -26,6 +33,76 @@ function handleSubmit(e: Event) {
   e.preventDefault();
   form.handleSubmit();
 }
+
+// ── q-form compatibility surface ──────────────────────────────────────────
+// q-form exposes these methods on its ref. The 50 existing q-form refs in
+// the codebase rely on them — keep names identical to avoid touching every
+// call site during migration.
+
+/**
+ * Validate every field. With `greedy`, all validators run regardless of
+ * earlier failures; otherwise short-circuits on the first invalid field.
+ * Returns true when every field passes.
+ */
+async function validate(): Promise<boolean> {
+  // TanStack form's validateAllFields runs every field's validators
+  // concurrently. Without `greedy`, run them sequentially and stop at the
+  // first failure to match q-form semantics.
+  if (props.greedy) {
+    await form.validateAllFields("change");
+  } else {
+    const fields = Object.keys(form.state.values);
+    for (const name of fields) {
+      await form.validateField(name, "change");
+      const err = form.getFieldMeta(name)?.errors ?? [];
+      if (err.length > 0) return false;
+    }
+  }
+  // After all validations, check the canonical isValid flag.
+  return form.state.isValid;
+}
+
+/**
+ * Clear validation errors on every field without resetting their values.
+ * Mirrors q-form's `resetValidation()`.
+ */
+function resetValidation() {
+  // FieldMetaBase has errorMap (errors[] is a derived view) — clearing the
+  // map clears the displayed errors. Also reset isTouched so child OForm*
+  // components stop rendering their error <div> (they gate on isTouched).
+  for (const name of Object.keys(form.state.values)) {
+    const meta = form.getFieldMeta(name);
+    if (!meta) continue;
+    form.setFieldMeta(name, {
+      ...meta,
+      errorMap: {},
+      isTouched: false,
+    });
+  }
+}
+
+/**
+ * Programmatically trigger submission (runs validators → onSubmit).
+ * Mirrors q-form's `submit()`.
+ */
+function submit() {
+  form.handleSubmit();
+}
+
+/** Reset every field to its initial defaultValues and clear meta state. */
+function reset() {
+  form.reset();
+  emit("reset");
+}
+
+defineExpose({
+  validate,
+  resetValidation,
+  submit,
+  reset,
+  /** Direct access to the underlying TanStack form for advanced cases. */
+  form,
+});
 </script>
 
 <template>
