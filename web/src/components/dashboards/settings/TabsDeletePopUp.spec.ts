@@ -28,6 +28,7 @@ vi.mock("vue-i18n", () => ({
 // Exposes the same props/emits surface used by TabsDeletePopUp.
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

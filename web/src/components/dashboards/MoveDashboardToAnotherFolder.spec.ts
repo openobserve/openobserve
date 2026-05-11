@@ -76,6 +76,7 @@ const i18n = createI18n({
 // the component listens to.
 const ODrawerStub = {
   name: "ODrawer",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

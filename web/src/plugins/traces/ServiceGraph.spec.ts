@@ -25,6 +25,7 @@ import ServiceGraph from "./ServiceGraph.vue";
 // open so we can assert dialog body content without exercising reka-ui.
 const ODialogStub = defineComponent({
   name: "ODialog",
+  inheritAttrs: false,
   props: {
     open: { type: Boolean, default: false },
     title: String,

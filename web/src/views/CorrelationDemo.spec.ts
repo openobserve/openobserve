@@ -48,6 +48,7 @@ const i18n = createI18n({
 // ---------------------------------------------------------------------------
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

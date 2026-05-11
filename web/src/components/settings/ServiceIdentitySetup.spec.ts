@@ -119,6 +119,7 @@ const i18n = createI18n({
 // update:open + click:primary/secondary/neutral.
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: {
     open: { type: Boolean, default: false },
     persistent: { type: Boolean, default: false },
@@ -175,6 +176,7 @@ const ODialogStub = {
 // and update:open emit.
 const ODrawerStub = {
   name: "ODrawer",
+  inheritAttrs: false,
   props: {
     open: { type: Boolean, default: false },
     persistent: { type: Boolean, default: false },

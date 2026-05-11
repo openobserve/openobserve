@@ -46,6 +46,7 @@ vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
   const { defineComponent } = await import("vue");
   const component = defineComponent({
     name: "ODrawer",
+    inheritAttrs: false,
     props: [
       "open",
       "width",

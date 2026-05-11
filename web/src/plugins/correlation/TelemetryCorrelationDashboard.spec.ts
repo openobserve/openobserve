@@ -172,6 +172,7 @@ const i18n = createI18n({
 // ---------------------------------------------------------------------------
 const ODrawerStub = {
   name: "ODrawer",
+  inheritAttrs: false,
   props: [
     "open",
     "side",
@@ -218,6 +219,7 @@ const ODrawerStub = {
 // ---------------------------------------------------------------------------
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

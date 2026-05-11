@@ -104,6 +104,7 @@ const i18n = createI18n({
 // listens to (`click:primary`, `click:secondary`, `update:open`).
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

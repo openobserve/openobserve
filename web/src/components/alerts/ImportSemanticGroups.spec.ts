@@ -54,6 +54,7 @@ import alertsService from "@/services/alerts";
 
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   template: `
     <div
       v-if="open"

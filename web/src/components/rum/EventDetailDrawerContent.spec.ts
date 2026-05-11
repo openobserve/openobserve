@@ -140,6 +140,7 @@ function findByTestId(wrapper: any, testId: string) {
  */
 const ODrawerStub = {
   name: "ODrawer",
+  inheritAttrs: false,
   props: [
     "open",
     "side",

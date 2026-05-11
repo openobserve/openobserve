@@ -32,6 +32,7 @@ vi.mock("vue-draggable-next", () => ({
 // drive primary/neutral button clicks via the emits the component listens to.
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

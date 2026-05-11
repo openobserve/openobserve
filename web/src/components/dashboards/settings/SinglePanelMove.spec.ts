@@ -60,6 +60,7 @@ const mockAddTab = {
 // the component listens to.
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",
@@ -111,6 +112,7 @@ const ODialogStub = {
 
 const ODrawerStub = {
   name: "ODrawer",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

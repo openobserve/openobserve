@@ -28,6 +28,7 @@ installQuasar();
 // listens to.
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: {
     open: { type: Boolean, default: false },
     size: { type: String, default: "md" },

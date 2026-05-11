@@ -44,6 +44,7 @@ installQuasar({
 // the click events the component listens to.
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",
