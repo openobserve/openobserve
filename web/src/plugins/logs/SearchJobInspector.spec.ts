@@ -28,6 +28,7 @@ installQuasar({ plugins: [Dialog, Notify] });
 // Mirror the real contract: v-model:open, title, size and the named slots
 // (default + header-right) that SearchJobInspector relies on.
 const oDrawerStub = {
+  inheritAttrs: false,
   template:
     '<div data-test="o-drawer" v-if="open">' +
     '<div data-test="o-drawer-title">{{ title }}</div>' +
@@ -39,6 +40,7 @@ const oDrawerStub = {
 };
 
 const oDialogStub = {
+  inheritAttrs: false,
   template:
     '<div data-test="o-dialog" v-if="open">' +
     '<div data-test="o-dialog-title">{{ title }}</div>' +

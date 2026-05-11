@@ -97,6 +97,7 @@ describe("User Component", () => {
         userInfo: {
           email: "test@example.com"
         },
+        organizations: [],
         theme: 'light'
       }
     };

@@ -107,6 +107,7 @@ describe("AssociatedStreamFunction", () => {
 
   const ODrawerStub = {
     name: "ODrawer",
+    inheritAttrs: false,
     props: ["open", "size", "persistent", "title", "subTitle", "showClose", "width"],
     emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
     template:

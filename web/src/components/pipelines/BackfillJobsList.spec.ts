@@ -86,6 +86,7 @@ const makeJob = (overrides: Partial<BackfillJob> = {}): BackfillJob => ({
 // the click events the component listens to.
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

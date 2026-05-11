@@ -78,6 +78,7 @@ installQuasar();
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
 const oDialogStub = {
+  inheritAttrs: false,
   template: '<div data-test="o-dialog" v-if="open"><slot /></div>',
   props: ["open", "size", "title"],
   emits: ["update:open"],

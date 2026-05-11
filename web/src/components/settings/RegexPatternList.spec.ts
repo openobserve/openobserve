@@ -1067,14 +1067,29 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
   // can be asserted directly via props.
   const ODrawerStub = {
     name: 'ODrawer',
+    inheritAttrs: false,
     props: {
       open: { type: Boolean, default: false },
       width: { type: [String, Number], default: undefined },
       showClose: { type: Boolean, default: true },
       size: { type: String, default: undefined },
       persistent: { type: Boolean, default: false },
+      title: { type: String, default: '' },
+      subTitle: { type: String, default: '' },
+      primaryButtonLabel: { type: String, default: '' },
+      secondaryButtonLabel: { type: String, default: '' },
+      neutralButtonLabel: { type: String, default: '' },
+      primaryButtonVariant: { type: String, default: 'primary' },
+      secondaryButtonVariant: { type: String, default: 'outline' },
+      neutralButtonVariant: { type: String, default: 'ghost' },
+      primaryButtonDisabled: { type: Boolean, default: false },
+      secondaryButtonDisabled: { type: Boolean, default: false },
+      neutralButtonDisabled: { type: Boolean, default: false },
+      primaryButtonLoading: { type: Boolean, default: false },
+      secondaryButtonLoading: { type: Boolean, default: false },
+      neutralButtonLoading: { type: Boolean, default: false },
     },
-    emits: ['update:open'],
+    emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
     template: `
       <div
         data-test="o-drawer-stub"
@@ -1090,19 +1105,23 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
   };
 
   // Stub AddRegexPattern so the tests don't pull in the full implementation
-  // (heavy q-input/q-table/AI chat dependencies). Surface the forwarded props
-  // and emits so we can verify wiring through the drawer.
+  // (heavy q-input/q-table/AI chat dependencies). The component now owns the
+  // ODrawer internally, so the host passes v-model:open and the drawer
+  // mechanics are encapsulated here.
   const AddRegexPatternStub = {
     name: 'AddRegexPattern',
+    inheritAttrs: false,
     props: {
       data: { type: Object, default: () => ({}) },
       isEdit: { type: Boolean, default: false },
+      open: { type: Boolean, default: false },
     },
-    emits: ['update:list', 'close'],
+    emits: ['update:list', 'close', 'update:open'],
     template: `
       <div
         data-test="add-regex-pattern-stub"
         :data-is-edit="String(isEdit)"
+        :data-open="String(open)"
       >AddRegexPattern</div>
     `,
   };
@@ -1184,7 +1203,6 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
   };
 
   let w: any;
-  let s: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -1196,7 +1214,6 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
     });
     const mounted = await mountComponent({ isAiChatEnabled: false });
     w = mounted.wrapper;
-    s = mounted.store;
   });
 
   afterEach(() => {
@@ -1204,58 +1221,23 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
     vi.clearAllMocks();
   });
 
-  it('renders exactly one ODrawer for the AddRegexPattern dialog', () => {
-    const drawers = w.findAllComponents(ODrawerStub);
-    expect(drawers.length).toBe(1);
+  it('renders exactly one AddRegexPattern instance for the dialog', () => {
+    const children = w.findAllComponents(AddRegexPatternStub);
+    expect(children.length).toBe(1);
   });
 
-  it('forwards showAddRegexPatternDialog.show to the ODrawer open prop (closed by default)', () => {
-    const drawer = w.findComponent(ODrawerStub);
-    expect(drawer.props('open')).toBe(false);
-    expect(drawer.attributes('data-open')).toBe('false');
+  it('forwards showAddRegexPatternDialog.show to AddRegexPattern open prop (closed by default)', () => {
+    const child = w.findComponent(AddRegexPatternStub);
+    expect(child.props('open')).toBe(false);
+    expect(child.attributes('data-open')).toBe('false');
   });
 
-  it('opens the ODrawer when showAddRegexPatternDialog.show becomes true', async () => {
+  it('opens AddRegexPattern when showAddRegexPatternDialog.show becomes true', async () => {
     w.vm.showAddRegexPatternDialog.show = true;
     await nextTick();
-    const drawer = w.findComponent(ODrawerStub);
-    expect(drawer.props('open')).toBe(true);
-    expect(drawer.attributes('data-open')).toBe('true');
-  });
-
-  it('uses width=40 when store.state.isAiChatEnabled is false', () => {
-    const drawer = w.findComponent(ODrawerStub);
-    expect(drawer.props('width')).toBe(40);
-  });
-
-  it('uses width=70 when store.state.isAiChatEnabled is true', async () => {
-    const mounted = await mountComponent({ isAiChatEnabled: true });
-    const drawer = mounted.wrapper.findComponent(ODrawerStub);
-    expect(drawer.props('width')).toBe(70);
-    mounted.wrapper.unmount();
-  });
-
-  it('reactively updates the width when isAiChatEnabled toggles after mount', async () => {
-    const drawer = w.findComponent(ODrawerStub);
-    expect(drawer.props('width')).toBe(40);
-
-    s.state.isAiChatEnabled = true;
-    await nextTick();
-    expect(w.findComponent(ODrawerStub).props('width')).toBe(70);
-  });
-
-  it('passes show-close=false to the ODrawer (host owns the close UI)', () => {
-    const drawer = w.findComponent(ODrawerStub);
-    expect(drawer.props('showClose')).toBe(false);
-    expect(drawer.attributes('data-show-close')).toBe('false');
-  });
-
-  it('renders AddRegexPattern inside the ODrawer when the drawer is open', async () => {
-    w.vm.showAddRegexPatternDialog.show = true;
-    await nextTick();
-    const drawer = w.findComponent(ODrawerStub);
-    const child = drawer.findComponent(AddRegexPatternStub);
-    expect(child.exists()).toBe(true);
+    const child = w.findComponent(AddRegexPatternStub);
+    expect(child.props('open')).toBe(true);
+    expect(child.attributes('data-open')).toBe('true');
   });
 
   it('forwards isEdit and data props from showAddRegexPatternDialog to AddRegexPattern', async () => {
@@ -1273,23 +1255,23 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
   it('closes showAddRegexPatternDialog.show when AddRegexPattern emits close', async () => {
     w.vm.showAddRegexPatternDialog.show = true;
     await nextTick();
-    expect(w.findComponent(ODrawerStub).props('open')).toBe(true);
+    expect(w.findComponent(AddRegexPatternStub).props('open')).toBe(true);
 
     const child = w.findComponent(AddRegexPatternStub);
     await child.vm.$emit('close');
     await flushPromises();
 
     expect(w.vm.showAddRegexPatternDialog.show).toBe(false);
-    expect(w.findComponent(ODrawerStub).props('open')).toBe(false);
+    expect(w.findComponent(AddRegexPatternStub).props('open')).toBe(false);
   });
 
-  it('closes showAddRegexPatternDialog.show when the ODrawer emits update:open=false', async () => {
+  it('closes showAddRegexPatternDialog.show when AddRegexPattern emits update:open=false', async () => {
     w.vm.showAddRegexPatternDialog.show = true;
     await nextTick();
-    const drawer = w.findComponent(ODrawerStub);
-    expect(drawer.props('open')).toBe(true);
+    const child = w.findComponent(AddRegexPatternStub);
+    expect(child.props('open')).toBe(true);
 
-    await drawer.vm.$emit('update:open', false);
+    await child.vm.$emit('update:open', false);
     await flushPromises();
     expect(w.vm.showAddRegexPatternDialog.show).toBe(false);
   });

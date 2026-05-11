@@ -349,6 +349,7 @@ describe("ViewPanel", () => {
           },
           ODialog: {
             name: "ODialog",
+            inheritAttrs: false,
             template:
               '<div data-test="o-dialog" v-if="open"><slot name="header" /><slot /><slot name="footer" /></div>',
             props: [

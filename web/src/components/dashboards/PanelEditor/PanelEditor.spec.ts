@@ -230,6 +230,7 @@ const i18n = createI18n({
 // open/size/title/.../width and emits update:open + click:primary/secondary/neutral.
 const ODialogStub = {
   name: "ODialog",
+  inheritAttrs: false,
   props: [
     "open",
     "size",

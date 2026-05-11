@@ -217,6 +217,7 @@ describe("VariableSettings", () => {
           },
           ODialog: {
             name: 'ODialog',
+            inheritAttrs: false,
             template: '<div v-if="open" data-test="o-dialog-stub" class="o-dialog"><div data-test="o-dialog-title">{{ title }}</div><slot /></div>',
             props: ['open', 'width', 'title', 'subTitle', 'persistent', 'size', 'showClose'],
             emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral']

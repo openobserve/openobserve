@@ -126,6 +126,7 @@ describe("ActionScripts", () => {
           },
           ODialog: {
             name: "ODialog",
+            inheritAttrs: false,
             template:
               '<div data-test="o-dialog" :data-open="open ? \'true\' : \'false\'"><slot name="header-left" /><slot name="header" /><slot /><slot name="footer" /></div>',
             props: [
