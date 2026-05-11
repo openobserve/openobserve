@@ -70,23 +70,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <!-- Occurrence Column -->
-    <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-right">
-      <span
+    <!-- Count & Percentage Column -->
+    <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:text-right">
+      <div
         class="tw:text-[var(--o2-text-4)]"
         :data-test="`pattern-card-${index}-frequency`"
       >
         {{ pattern.frequency.toLocaleString() }}
-      </span>
-    </div>
-
-    <!-- Percentage Column -->
-    <div class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:text-right">
-      <span
-        class="tw:text-[var(--o2-text-4)]"
+      </div>
+      <div
+        class="tw:text-[0.6875rem] tw:opacity-60"
+        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
         :data-test="`pattern-card-${index}-percentage`"
-        >{{ pattern.percentage.toFixed(2) }}%</span
       >
+        {{ pattern.percentage.toFixed(1) }}%
+      </div>
     </div>
 
     <!-- Actions Column -->
