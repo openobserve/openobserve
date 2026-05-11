@@ -3701,5 +3701,15 @@
     "clearAll": "Limpar tudo",
     "clearAllTitle": "Limpar todos os bate-papos",
     "clearAllMessage": "Isso excluirá permanentemente todo o histórico de bate-papo. Essa ação não pode ser desfeita."
+  },
+  "commandPalette": {
+    "placeholder": "Pesquise páginas, entidades ou digite /ai para obter ajuda...",
+    "noResults": "Nenhum resultado encontrado para “{query}”",
+    "searching": "Pesquisando entidades...",
+    "recents": "Recentes",
+    "pages": "Páginas",
+    "entities": "Entidades",
+    "commands": "Comandos",
+    "aiActions": "Ações de IA"
   }
 }

@@ -3699,5 +3699,15 @@
     "clearAll": "Borrar todo",
     "clearAllTitle": "Borrar todos los chats",
     "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer."
+  },
+  "commandPalette": {
+    "placeholder": "Busca páginas, entidades o escribe /ai para obtener ayuda...",
+    "noResults": "No se han encontrado resultados para «{query}»",
+    "searching": "Buscando entidades...",
+    "recents": "Recientes",
+    "pages": "Páginas",
+    "entities": "Entidades",
+    "commands": "Comandos",
+    "aiActions": "Acciones de IA"
   }
 }

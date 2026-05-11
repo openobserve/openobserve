@@ -3712,5 +3712,15 @@
     "clearAll": "Tümünü temizle",
     "clearAllTitle": "Tüm sohbetleri temizle",
     "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz."
+  },
+  "commandPalette": {
+    "placeholder": "Sayfaları, varlıkları arayın veya yardım için /ai yazın...",
+    "noResults": "“{query}” için sonuç bulunamadı",
+    "searching": "Varlıklar aranıyor...",
+    "recents": "Recent",
+    "pages": "Sayfalar",
+    "entities": "Varlıklar",
+    "commands": "Komutlar",
+    "aiActions": "Yapay Zeka Eylemleri"
   }
 }
