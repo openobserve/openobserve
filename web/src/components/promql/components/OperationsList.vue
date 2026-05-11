@@ -192,7 +192,7 @@
           </template>
         </q-list>
       </div>
-    </ODialog>>
+    </ODialog>
   </div>
 </template>
 
