@@ -254,11 +254,13 @@ const alerts = {
     org_identifier: string,
     alert_id: string,
     data: { name?: string; folder_id?: string; stream_type?: string; stream_name?: string },
+    folder_id?: any,
   ) => {
-    return http().post(
-      `/api/v2/${org_identifier}/alerts/${alert_id}/clone`,
-      data,
-    );
+    let url = `/api/v2/${org_identifier}/alerts/${alert_id}/clone`;
+    if (folder_id) {
+      url += `?folder=${folder_id}`;
+    }
+    return http().post(url, data);
   },
   // POST /api/v2/{org}/alerts/{id}/export — returns config with runtime fields stripped
   export_by_id: (org_identifier: string, alert_id: string) => {

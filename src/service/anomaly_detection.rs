@@ -29,6 +29,7 @@ use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use svix_ksuid::KsuidLike;
 
 use crate::{
+    common::{meta::authz::Authz, utils::auth::set_ownership},
     handler::http::request::anomaly_detection::{
         CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
     },
@@ -350,6 +351,17 @@ pub async fn create_config(
     let result = anomaly_config_table::create(db, new_config)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    set_ownership(
+        org_id,
+        "alerts",
+        Authz {
+            obj_id: result.anomaly_id.clone(),
+            parent_type: "alert_folders".to_owned(),
+            parent: folder_name.to_owned(),
+        },
+    )
+    .await;
 
     // Broadcast config creation to all super cluster regions for API-read consistency.
     #[cfg(feature = "enterprise")]
