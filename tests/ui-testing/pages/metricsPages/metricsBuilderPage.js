@@ -34,15 +34,20 @@ export class MetricsBuilderPage {
         this.runQueryButton = '[data-test="metrics-apply"]';
 
         // Add to Dashboard dialog selectors
+        // AddToDashboard.vue is now an ODrawer with parent slug `add-to-dashboard-dialog`.
+        // Cancel/Add are the ODrawer footer secondary/primary buttons, not the old
+        // metrics-schema-* buttons.
         this.addToDashboardButton = '[data-test="panel-editor-add-to-dashboard-btn"], button:has-text("Add To Dashboard"), button:has-text("Add to Dashboard")';
-        this.dashboardDialogTitle = '[data-test="schema-title-text"]';
+        this.dashboardDialogTitle = '[data-test="add-to-dashboard-dialog"]';
         this.dashboardPanelTitleInput = '[data-test="metrics-new-dashboard-panel-title"]';
-        this.dashboardCancelButton = '[data-test="metrics-schema-cancel-button"]';
-        this.dashboardAddButton = '[data-test="metrics-schema-update-settings-button"]';
+        this.dashboardCancelButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-secondary-btn"]';
+        this.dashboardAddButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]';
 
-        // Confirm dialog for mode switching
-        this.confirmDialogOk = '.q-dialog button:has-text("OK"), .q-dialog button:has-text("Confirm")';
-        this.confirmDialogCancel = '.q-dialog button:has-text("Cancel")';
+        // Confirm dialog for mode switching — ConfirmDialog.vue wraps ODialog with
+        // hardcoded data-test="confirm-dialog"; the OK action is the ODialog primary
+        // footer button after the dialog migration.
+        this.confirmDialogOk = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.confirmDialogCancel = '[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]';
     }
 
     // ===== Query Mode Switching =====
@@ -362,7 +367,11 @@ export class MetricsBuilderPage {
     async clickAddOperation() {
         const addBtn = this.page.locator(this.addOperationButton);
         await addBtn.click();
-        await this.page.locator('.q-dialog').waitFor({ state: 'visible', timeout: 5000 });
+        // Operation selector is now an ODialog (see OperationsList.vue) — wait on the
+        // parent slug rather than the legacy `.q-dialog` wrapper.
+        await this.page
+            .locator('[data-test="operations-list-operation-selector-dialog"]')
+            .waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -371,7 +380,7 @@ export class MetricsBuilderPage {
      */
     async selectOperation(operationName) {
         // Wait for dialog to appear and fully render (expansion items are default-opened)
-        const dialog = this.page.locator('.q-dialog');
+        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
         await this.page.waitForTimeout(300);
 
@@ -733,7 +742,7 @@ export class MetricsBuilderPage {
      * Get operation dialog categories (expansion panel labels)
      */
     async getOperationCategories() {
-        const dialog = this.page.locator('.q-dialog');
+        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
         if (!await dialog.isVisible({ timeout: 3000 }).catch(() => false)) return [];
 
         const headers = dialog.locator('.q-expansion-item .q-item__label');
@@ -750,8 +759,9 @@ export class MetricsBuilderPage {
      * Close operation selector dialog
      */
     async closeOperationDialog() {
-        const dialog = this.page.locator('.q-dialog');
-        const closeBtn = dialog.locator('button:has-text("Close")');
+        // OperationsList dialog now uses ODialog with primary button label "Close".
+        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
+        const closeBtn = dialog.locator('[data-test="o-dialog-primary-btn"]');
         if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await closeBtn.click();
             await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
@@ -764,7 +774,10 @@ export class MetricsBuilderPage {
      * Check if operation selector dialog is visible
      */
     async isOperationDialogVisible() {
-        return await this.page.locator('.q-dialog').isVisible({ timeout: 2000 }).catch(() => false);
+        return await this.page
+            .locator('[data-test="operations-list-operation-selector-dialog"]')
+            .isVisible({ timeout: 2000 })
+            .catch(() => false);
     }
 
     /**
