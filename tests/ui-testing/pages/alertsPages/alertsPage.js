@@ -2276,38 +2276,44 @@ export class AlertsPage {
 
     /**
      * Select a metrics stream from dropdown with fallback to first available
+     * Uses keyboard typing for filtering (avoids virtual scroll rendering issues)
      */
     async selectMetricsStream(streamName) {
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
+            await expect(streamDropdown).toBeVisible({ timeout: 10000 });
+            await streamDropdown.click();
+            await this.page.waitForTimeout(500);
+            await this.page.keyboard.press('Control+a');
+            await this.page.keyboard.type(streamName, { delay: 30 });
+            await this.page.waitForTimeout(1500);
+
+            const testStreamOption = this.page.getByText(streamName, { exact: true });
+            if (await testStreamOption.isVisible({ timeout: 5000 }).catch(() => false)) {
+                await testStreamOption.click();
+                testLogger.info('Selected metrics stream', { streamName, attempt });
+                return true;
+            }
+
+            testLogger.warn('Metrics stream not found, retrying', { streamName, attempt, maxRetries });
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(1000);
+        }
+
+        // Final fallback: try first available option
         const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
         await streamDropdown.click();
-
-        const testStreamOption = this.page.getByText(streamName, { exact: true });
-        try {
-            await expect(testStreamOption).toBeVisible({ timeout: 5000 });
-            await testStreamOption.click();
-            testLogger.info('Selected metrics stream', { stream: streamName });
+        await this.page.waitForTimeout(500);
+        const anyStreamOption = this.page.locator('.q-menu .q-item').first();
+        if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await anyStreamOption.click();
+            testLogger.info('Using first available metrics stream (fallback)');
             return true;
-        } catch (e) {
-            // Retry: click dropdown again
-            await streamDropdown.click();
-            await this.page.waitForTimeout(1000);
-
-            if (await testStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await testStreamOption.click();
-                testLogger.info('Selected metrics stream on retry', { stream: streamName });
-                return true;
-            } else {
-                // Use first available metrics stream from dropdown
-                const anyStreamOption = this.page.locator('.q-menu .q-item').first();
-                if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-                    await anyStreamOption.click();
-                    testLogger.info('Using first available metrics stream');
-                    return true;
-                }
-                testLogger.warn('No metrics streams available');
-                return false;
-            }
         }
+
+        testLogger.warn('No metrics streams available');
+        return false;
     }
 
     /**
