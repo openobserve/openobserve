@@ -88,9 +88,18 @@ describe("ODrawer", () => {
     expect(emitted?.[0]).toEqual([false]);
   });
 
-  it("does not render a close button when persistent=true", () => {
+  it("shows the close button when persistent=true (persistent only blocks Escape/backdrop)", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true, persistent: true, title: "Persistent" },
+    });
+    expect(
+      wrapper.find('button[aria-label="Close drawer"]').exists(),
+    ).toBe(true);
+  });
+
+  it("hides the close button when showClose=false even with persistent=true", () => {
+    const wrapper = mount(ODrawer, {
+      props: { open: true, persistent: true, title: "Persistent", showClose: false },
     });
     expect(
       wrapper.find('button[aria-label="Close drawer"]').exists(),

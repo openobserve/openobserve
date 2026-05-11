@@ -20,26 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:h-[calc(100vh)] tw:overflow-auto tw:w-[40vw]"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <q-page>
-      <div class="o2-input">
-        <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
-          <div class="flex items-center tw:w-full">
-            <div class="tw:w-full" data-test="add-destination-title">
-              <div
-                class="tw:text-[18px] tw:flex tw:items-center tw:justify-between"
-              >
-                External Destination
-                <div>
-                  <OButton variant="ghost" size="icon" @click="$emit('close')">
-                    <q-icon name="cancel" size="14px" />
-                  </OButton>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <q-separator />
-        <div class="row q-col-gutter-sm q-px-lg">
+    <div class="o2-input">
+        <div class="row q-col-gutter-sm q-px-lg q-pt-md">
           <q-toggle
             data-test="create-stream-toggle"
             class="q-mb-sm tw:h-[36px] o2-toggle-button-xs tw:mr-3 q-mt-md"
@@ -118,8 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </div>
-    </q-page>
+    </div>
   </div>
   <confirm-dialog
     v-model="dialog.show"

@@ -98,9 +98,18 @@ describe("ODialog", () => {
     );
   });
 
-  it("hides the close button when persistent=true", () => {
+  it("shows the close button when persistent=true (persistent only blocks Escape/backdrop)", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test", persistent: true },
+    });
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("hides the close button when showClose=false even with persistent=true", () => {
+    const wrapper = mount(ODialog, {
+      props: { open: true, title: "Test", persistent: true, showClose: false },
     });
     expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
       false,
