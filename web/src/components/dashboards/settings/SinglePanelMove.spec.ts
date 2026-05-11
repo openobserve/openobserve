@@ -51,8 +51,9 @@ vi.mock("vuex", () => ({
 
 const mockAddTab = {
   name: "AddTab",
-  props: ["editMode", "tabId", "dashboardId"],
-  template: "<div data-test='mock-add-tab'></div>",
+  props: ["editMode", "tabId", "dashboardId", "open"],
+  emits: ["refresh", "update:open"],
+  template: "<div data-test='mock-add-tab' :data-open='String(open)'></div>",
 };
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
@@ -110,35 +111,6 @@ const ODialogStub = {
   `,
 };
 
-const ODrawerStub = {
-  name: "ODrawer",
-  inheritAttrs: false,
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-  ],
-  emits: ["update:open", "close", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test="o-drawer-stub"
-      :data-open="String(open)"
-      :data-size="size"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-    </div>
-  `,
-};
-
 describe("SinglePanelMove", () => {
   let wrapper: VueWrapper<any>;
 
@@ -168,7 +140,6 @@ describe("SinglePanelMove", () => {
         },
         stubs: {
           ODialog: ODialogStub,
-          ODrawer: ODrawerStub,
           AddTab: mockAddTab,
         },
       },
@@ -409,12 +380,12 @@ describe("SinglePanelMove", () => {
       expect(wrapper.vm.isTabEditMode).toBe(false);
     });
 
-    it("should render the ODrawer stub which hosts the AddTab dialog", async () => {
+    it("should render the AddTab dialog", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.exists()).toBe(true);
+      const addTab = wrapper.findComponent(mockAddTab);
+      expect(addTab.exists()).toBe(true);
     });
 
     it("should pass correct state when add tab button is clicked", async () => {
@@ -432,13 +403,13 @@ describe("SinglePanelMove", () => {
       );
     });
 
-    it("closes the drawer when the ODrawer emits close", async () => {
+    it("closes the add-tab dialog when AddTab emits update:open false", async () => {
       wrapper = createWrapper();
       wrapper.vm.showAddTabDialog = true;
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("close");
+      const addTab = wrapper.findComponent(mockAddTab);
+      await addTab.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showAddTabDialog).toBe(false);
