@@ -16,16 +16,19 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-const DESTINATION_NAME = 'e2e_template_override_dest';
-const TEMPLATE_NAME = 'e2e_template_override_tpl';
+const RUN_ID = Date.now();
+const DESTINATION_NAME = `e2e_tpl_override_dest_${RUN_ID}`;
+const TEMPLATE_NAME = `e2e_tpl_override_tpl_${RUN_ID}`;
 
 test.describe("Alerts Regression Bugs — Batch 1", () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
 
   // ============================================================================
-  // Setup: Create a template and destination via API so the Add Alert button
-  // is enabled and templates are available for the override select.
+  // Setup: Create unique-named template + destination via API so that:
+  //   1) The Add Alert button is enabled (requires at least one destination)
+  //   2) Templates are available in the override template select
+  //   3) Per-run uniqueness avoids stale-state collisions from prior runs
   // ============================================================================
   test.beforeAll(async ({ browser }) => {
     testLogger.info('Setting up prerequisites for template override test (beforeAll)');
@@ -34,6 +37,11 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     const page = await context.newPage();
 
     try {
+      await page.goto(
+        `${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`,
+      );
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
       const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
       const org = getOrgIdentifier() || 'default';
       const authToken = Buffer.from(
@@ -43,7 +51,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
       // Create template via API
       const templatePayload = {
         name: TEMPLATE_NAME,
-        body: JSON.stringify({ text: "Alert: {alert_name}" }),
+        body: JSON.stringify({ text: 'Alert: {alert_name}' }),
         isDefault: false,
       };
 
@@ -61,7 +69,8 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
         },
         { baseUrl, org, authToken, templatePayload },
       );
-      testLogger.info('Template creation', { status: tplResp.status });
+      expect(tplResp.status, `Template creation should succeed (got ${tplResp.status})`).toBeLessThan(400);
+      testLogger.info('Template created', { templateName: TEMPLATE_NAME, status: tplResp.status });
 
       // Create destination via API (references the template)
       const destPayload = {
@@ -87,7 +96,8 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
         },
         { baseUrl, org, authToken, destPayload },
       );
-      testLogger.info('Destination creation', { status: destResp.status });
+      expect(destResp.status, `Destination creation should succeed (got ${destResp.status})`).toBeLessThan(400);
+      testLogger.info('Destination created', { destinationName: DESTINATION_NAME, status: destResp.status });
 
       testLogger.info('Prerequisites setup completed');
     } finally {
@@ -97,29 +107,42 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
   });
 
   // ============================================================================
-  // Cleanup: Remove created template and destination
+  // Cleanup: Delete destination + template via API (avoids UI navigation and
+  // stale state leaking across runs). Delete destination first to handle any
+  // reference cascade, then the template.
   // ============================================================================
   test.afterAll(async ({ browser }) => {
     testLogger.info('Cleaning up test prerequisites (afterAll)');
 
     const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
     const page = await context.newPage();
-    const cleanupPm = new PageManager(page);
 
     try {
-      await page.goto(
-        `${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`,
+      const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+      const org = getOrgIdentifier() || 'default';
+      const authToken = Buffer.from(
+        `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
+      ).toString('base64');
+
+      // Delete destination via API
+      const delDestResp = await page.evaluate(
+        async ({ url, authToken }) => {
+          const r = await fetch(url, { method: 'DELETE', headers: { Authorization: `Basic ${authToken}` } });
+          return { status: r.status, body: await r.text().catch(() => '') };
+        },
+        { url: `${baseUrl}/api/${org}/alerts/destinations/${DESTINATION_NAME}`, authToken },
       );
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      testLogger.info('Destination cleanup', { destinationName: DESTINATION_NAME, status: delDestResp.status });
 
-      await cleanupPm.alertDestinationsPage
-        .deleteDestinationByName(DESTINATION_NAME)
-        .catch((e) => testLogger.warn('Could not delete destination', { error: e.message }));
-      await cleanupPm.alertTemplatesPage
-        .deleteTemplateAndVerify(TEMPLATE_NAME)
-        .catch((e) => testLogger.warn('Could not delete template', { error: e.message }));
-
-      testLogger.info('Test suite cleanup completed');
+      // Delete template via API
+      const delTplResp = await page.evaluate(
+        async ({ url, authToken }) => {
+          const r = await fetch(url, { method: 'DELETE', headers: { Authorization: `Basic ${authToken}` } });
+          return { status: r.status, body: await r.text().catch(() => '') };
+        },
+        { url: `${baseUrl}/api/${org}/alerts/templates/${TEMPLATE_NAME}`, authToken },
+      );
+      testLogger.info('Template cleanup', { templateName: TEMPLATE_NAME, status: delTplResp.status });
     } finally {
       await page.close();
       await context.close();
