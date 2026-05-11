@@ -63,9 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               size="xs"
               class="wildcard-chip q-my-none q-mx-none"
-              :class="wildcardChipColor(tok.value)"
+              :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
-              {{ tok.value }}
+              {{ wildcardLabel(tok.value, tok.sampleValues) }}
             </q-chip>
           </span>
         </template>
@@ -151,6 +151,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,
+  wildcardLabel,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
 import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
@@ -236,11 +237,12 @@ function highlightLevels(text: string): HighlightSegment[] {
 @import "@/assets/styles/log-highlighting.css";
 .wildcard-chip {
   font-family: monospace;
-  font-size: 10px;
-  height: 16px;
-  padding: 0 4px;
+  font-size: 12px;
+  font-weight: bold;
+  height: 18px;
+  padding: 0 5px;
   border-radius: 3px;
-  line-height: 16px;
+  line-height: 18px;
   // Prevent chips from inheriting the truncate overflow of the parent row
   flex-shrink: 0;
 }
