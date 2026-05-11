@@ -139,6 +139,34 @@
     --color-radio-disabled-bg: var(--color-surface-subtle);
     --color-radio-disabled-border: var(--color-border-default);
 
+    /* Slider (OSlider) */
+    --color-slider-track: var(--color-grey-700);
+    --color-slider-track-fill: var(--color-primary-500);
+    --color-slider-thumb: var(--color-primary-500);
+    --color-slider-thumb-border: var(--color-surface-panel);
+    --color-slider-disabled-track: var(--color-grey-800);
+    --color-slider-disabled-track-fill: var(--color-grey-700);
+    --color-slider-disabled-thumb: var(--color-grey-600);
+
+    /* File (OFile) */
+    --color-file-bg: var(--color-surface-panel);
+    --color-file-border: var(--color-border-strong);
+    --color-file-disabled-bg: var(--color-surface-subtle);
+    --color-file-disabled-border: var(--color-border-default);
+    --color-file-error-border: var(--color-error-400);
+    --color-file-chip-bg: var(--color-primary-900);
+    --color-file-chip-text: var(--color-primary-200);
+    --color-file-chip-remove: var(--color-primary-200);
+    --color-file-drag-bg: var(--color-primary-950);
+    --color-file-drag-border: var(--color-primary-400);
+
+    /* Date / Time / Color (ODate, OTime, OColor) */
+    --color-datepicker-bg: var(--color-surface-panel);
+    --color-datepicker-border: var(--color-border-strong);
+    --color-datepicker-disabled-bg: var(--color-surface-subtle);
+    --color-datepicker-disabled-border: var(--color-border-default);
+    --color-datepicker-error-border: var(--color-error-400);
+
     /* Dialog */
     --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
     --color-dialog-bg: var(--color-grey-900);

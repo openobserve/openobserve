@@ -244,6 +244,59 @@
   --color-radio-label: var(--color-text-primary);
   --color-radio-label-disabled: var(--color-text-disabled);
 
+  /* Slider (OSlider) */
+  --color-slider-track: var(--color-grey-200);
+  --color-slider-track-fill: var(--color-primary-600);
+  --color-slider-thumb: var(--color-primary-600);
+  --color-slider-thumb-border: var(--color-white);
+  --color-slider-disabled-track: var(--color-grey-100);
+  --color-slider-disabled-track-fill: var(--color-grey-300);
+  --color-slider-disabled-thumb: var(--color-grey-400);
+  --color-slider-focus-ring: var(--color-primary-400);
+  --color-slider-label: var(--color-text-primary);
+  --color-slider-value: var(--color-text-secondary);
+  --color-slider-error-text: var(--color-error-600);
+
+  /* File (OFile) */
+  --color-file-bg: var(--color-surface-base);
+  --color-file-border: var(--color-border-strong);
+  --color-file-hover-border: var(--color-primary-400);
+  --color-file-focus-border: var(--color-primary-500);
+  --color-file-focus-ring: var(--color-primary-400);
+  --color-file-disabled-bg: var(--color-surface-subtle);
+  --color-file-disabled-border: var(--color-border-default);
+  --color-file-text: var(--color-text-primary);
+  --color-file-placeholder: var(--color-text-disabled);
+  --color-file-label: var(--color-text-secondary);
+  --color-file-icon: var(--color-text-secondary);
+  --color-file-error-text: var(--color-error-600);
+  --color-file-error-border: var(--color-error-500);
+  --color-file-chip-bg: var(--color-primary-100);
+  --color-file-chip-text: var(--color-primary-700);
+  --color-file-chip-remove: var(--color-primary-700);
+  --color-file-drag-bg: var(--color-primary-50);
+  --color-file-drag-border: var(--color-primary-500);
+
+  /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
+  --color-datepicker-bg: var(--color-surface-base);
+  --color-datepicker-border: var(--color-border-strong);
+  --color-datepicker-hover-border: var(--color-primary-400);
+  --color-datepicker-focus-border: var(--color-primary-500);
+  --color-datepicker-focus-ring: var(--color-primary-400);
+  --color-datepicker-disabled-bg: var(--color-surface-subtle);
+  --color-datepicker-disabled-border: var(--color-border-default);
+  --color-datepicker-text: var(--color-text-primary);
+  --color-datepicker-placeholder: var(--color-text-disabled);
+  --color-datepicker-label: var(--color-text-secondary);
+  --color-datepicker-icon: var(--color-text-secondary);
+  --color-datepicker-error-text: var(--color-error-600);
+  --color-datepicker-error-border: var(--color-error-500);
+
+  /* Option Group (OOptionGroup) */
+  --color-option-group-label: var(--color-text-primary);
+  --color-option-group-label-disabled: var(--color-text-disabled);
+  --color-option-group-error-text: var(--color-error-600);
+
   /* ── Dialog ──────────────────────────────────────────────── */
 
   /* Overlay */
@@ -514,6 +567,59 @@
   --color-radio-focus-ring: var(--color-radio-focus-ring);
   --color-radio-label: var(--color-radio-label);
   --color-radio-label-disabled: var(--color-radio-label-disabled);
+
+  /* Slider (OSlider) */
+  --color-slider-track: var(--color-slider-track);
+  --color-slider-track-fill: var(--color-slider-track-fill);
+  --color-slider-thumb: var(--color-slider-thumb);
+  --color-slider-thumb-border: var(--color-slider-thumb-border);
+  --color-slider-disabled-track: var(--color-slider-disabled-track);
+  --color-slider-disabled-track-fill: var(--color-slider-disabled-track-fill);
+  --color-slider-disabled-thumb: var(--color-slider-disabled-thumb);
+  --color-slider-focus-ring: var(--color-slider-focus-ring);
+  --color-slider-label: var(--color-slider-label);
+  --color-slider-value: var(--color-slider-value);
+  --color-slider-error-text: var(--color-slider-error-text);
+
+  /* File (OFile) */
+  --color-file-bg: var(--color-file-bg);
+  --color-file-border: var(--color-file-border);
+  --color-file-hover-border: var(--color-file-hover-border);
+  --color-file-focus-border: var(--color-file-focus-border);
+  --color-file-focus-ring: var(--color-file-focus-ring);
+  --color-file-disabled-bg: var(--color-file-disabled-bg);
+  --color-file-disabled-border: var(--color-file-disabled-border);
+  --color-file-text: var(--color-file-text);
+  --color-file-placeholder: var(--color-file-placeholder);
+  --color-file-label: var(--color-file-label);
+  --color-file-icon: var(--color-file-icon);
+  --color-file-error-text: var(--color-file-error-text);
+  --color-file-error-border: var(--color-file-error-border);
+  --color-file-chip-bg: var(--color-file-chip-bg);
+  --color-file-chip-text: var(--color-file-chip-text);
+  --color-file-chip-remove: var(--color-file-chip-remove);
+  --color-file-drag-bg: var(--color-file-drag-bg);
+  --color-file-drag-border: var(--color-file-drag-border);
+
+  /* Date / Time / Color (ODate, OTime, OColor) */
+  --color-datepicker-bg: var(--color-datepicker-bg);
+  --color-datepicker-border: var(--color-datepicker-border);
+  --color-datepicker-hover-border: var(--color-datepicker-hover-border);
+  --color-datepicker-focus-border: var(--color-datepicker-focus-border);
+  --color-datepicker-focus-ring: var(--color-datepicker-focus-ring);
+  --color-datepicker-disabled-bg: var(--color-datepicker-disabled-bg);
+  --color-datepicker-disabled-border: var(--color-datepicker-disabled-border);
+  --color-datepicker-text: var(--color-datepicker-text);
+  --color-datepicker-placeholder: var(--color-datepicker-placeholder);
+  --color-datepicker-label: var(--color-datepicker-label);
+  --color-datepicker-icon: var(--color-datepicker-icon);
+  --color-datepicker-error-text: var(--color-datepicker-error-text);
+  --color-datepicker-error-border: var(--color-datepicker-error-border);
+
+  /* Option Group (OOptionGroup) */
+  --color-option-group-label: var(--color-option-group-label);
+  --color-option-group-label-disabled: var(--color-option-group-label-disabled);
+  --color-option-group-error-text: var(--color-option-group-error-text);
 
 
   /* Dialog */
