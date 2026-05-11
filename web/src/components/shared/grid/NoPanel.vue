@@ -27,11 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm-action"
+        icon-left="insert-drive-file"
         style="font-size: 1rem"
         @click="$emit('update:Panel')"
         data-test="dashboard-if-no-panel-add-panel-btn"
       >
-        <q-icon name="insert_drive_file" size="16px" class="q-mr-xs" />
         {{ t('panel.add') }}
       </OButton>
     </div>

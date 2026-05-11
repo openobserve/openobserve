@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="hero-content">
             <div class="hero-icon">
-              <q-icon name="workspace_premium" size="48px" />
+              <OIcon name="workspace-premium" size="xl" />
             </div>
 
             <h2 class="hero-title">{{ dialogConfig.heroTitle }}</h2>
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- License Limit Note (only for Enterprise without license) -->
             <div v-if="dialogConfig.showLicenseNote" class="license-note">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
+              <OIcon name="info" size="xs" class="q-mr-xs" />
               <span>{{ dialogConfig.licenseNoteText }}</span>
             </div>
 

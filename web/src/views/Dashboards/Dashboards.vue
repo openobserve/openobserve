@@ -88,11 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
-              <OButton variant="outline" size="sm" class="q-ml-sm" data-test="dashboard-import">
+              <OButton variant="outline" size="sm" class="q-ml-sm" data-test="dashboard-import" icon-right="expand-more">
                 {{ t(`dashboard.import`) }}
-                <template #icon-right>
-                  <q-icon name="expand_more" size="xs" />
-                </template>
               </OButton>
             </template>
             <ODropdownItem
@@ -167,13 +164,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="outline"
                         size="icon"
+                        icon-left="add"
                         class="tw:h-7 tw:w-8"
                         @click.stop="addFolder"
                         data-test="dashboard-new-folder-btn"
                         title="Add Folder"
-                      >
-                        <q-icon name="add" size="xs" />
-                      </OButton>
+                      />
                     </div>
                   </div>
                   <q-separator
@@ -251,11 +247,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OButton
                                 size="icon"
                                 variant="ghost"
+                                icon-left="more-vert"
                                 class="tw:h-6 tw:w-6"
                                 data-test="dashboard-more-icon"
-                              >
-                                <q-icon name="more_vert" size="xs" />
-                              </OButton>
+                              />
                             </template>
                             <ODropdownItem
                               @select="editFolder(tab.folderId)"
@@ -415,14 +410,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="props.row.actions == 'true'"
                         :title="t('dashboard.duplicate')"
                         size="icon"
+                        icon-left="content-copy"
                         variant="ghost"
                         @click.stop="
                           duplicateDashboard(props.row.id, props.row.folder_id)
                         "
                         data-test="dashboard-duplicate"
-                      >
-                        <q-icon name="content_copy" size="16px" />
-                      </OButton>
+                      />
                       <OButton
                         v-if="props.row.actions == 'true'"
                         :title="t('dashboard.delete')"
@@ -462,12 +456,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="outline"
                         size="sm"
                         class="q-mr-sm tw:h-9"
+                        icon-left="download"
                         data-test="dashboard-list-export-dashboards-btn"
                         @click="multipleExportDashboard"
                       >
-                        <template #icon-left>
-                          <q-icon name="download" size="16px" />
-                        </template>
                         Export
                       </OButton>
                       <OButton
@@ -475,12 +467,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="outline"
                         size="sm"
                         class="q-mr-sm tw:h-9"
+                        icon-left="delete"
                         data-test="dashboard-list-delete-dashboards-btn"
                         @click="openBulkDeleteDialog"
                       >
-                        <template #icon-left>
-                          <q-icon name="delete" size="16px" />
-                        </template>
                         Delete
                       </OButton>
                     </div>
@@ -590,6 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -656,6 +647,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    OIcon,
     ODropdown,
     ODropdownItem,
     ODrawer,

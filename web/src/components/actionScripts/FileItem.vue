@@ -24,10 +24,10 @@
       class="tw:w-[36px] tw:flex tw:items-center tw:space-x-2 tw:ml-auto file-actions"
     >
       <OButton variant="ghost" size="icon-xs-sq" @click.stop="editFile">
-        <q-icon name="edit" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
+        <OIcon name="edit" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
       </OButton>
       <OButton variant="ghost" size="icon-xs-sq" @click.stop="deleteFile">
-        <q-icon name="delete" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
+        <OIcon name="delete" :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'" />
       </OButton>
     </div>
   </li>
@@ -36,6 +36,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps<{
   name: string;

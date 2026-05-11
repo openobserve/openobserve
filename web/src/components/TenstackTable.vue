@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="opacity: 0.7"
             >
               <div class="text-subtitle2 text-weight-bold bg-warning">
-                <q-icon size="xs" name="warning" class="q-mr-xs" />
+                <OIcon size="sm" name="warning" class="q-mr-xs" />
                 {{ errMsg }}
               </div>
             </td>
@@ -366,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="14px"
                   /> </OButton
                 ><b>
-                  <q-icon name="warning" size="15px"></q-icon>
+                  <OIcon name="warning" size="sm"></OIcon>
                   {{ t("search.functionErrorLabel") }}</b
                 >
               </div>
@@ -1034,6 +1034,7 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import { debounce, copyToClipboard } from "quasar";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";

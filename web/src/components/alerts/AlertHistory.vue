@@ -29,11 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="xs"
               variant="outline"
               size="icon-sm"
+              icon-left="arrow-back-ios-new"
               @click="goBack"
               data-test="alert-history-back-btn"
-            >
-              <q-icon name="arrow_back_ios_new" />
-            </OButton>
+            />
             <div
               class="q-table__title tw:font-[600] q-ml-sm"
               data-test="alerts-history-title"
@@ -95,23 +94,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-select>
             <OButton
               variant="ghost"
+              icon-left="search"
               size="icon-sm"
               @click="manualSearch"
               data-test="alert-history-manual-search-btn"
               :disabled="loading"
               class="q-mr-sm"
             >
-              <q-icon name="search" />
               <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
             </OButton>
             <OButton
               variant="ghost"
               size="icon-sm"
+              icon-left="refresh"
               @click="refreshData"
               data-test="alert-history-refresh-btn"
               :loading="loading"
             >
-              <q-icon name="refresh" />
               <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
             </OButton>
           </div>
@@ -228,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Suppressed by deduplication -->
               <div v-else-if="props.row.dedup_suppressed" class="text-negative">
-                <q-icon name="block" size="sm" />
+                <OIcon name="block" size="md" />
                 <q-tooltip class="bg-grey-8">
                   Suppressed by deduplication
                   <div v-if="props.row.dedup_count" class="text-caption">
@@ -239,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Grouped notification -->
               <div v-else-if="props.row.grouped" class="text-primary flex items-center justify-center">
-                <q-icon name="group_work" size="sm" />
+                <OIcon name="group-work" size="md" />
                 <span class="text-caption q-ml-xs">×{{ props.row.group_size || 1 }}</span>
                 <q-tooltip class="bg-grey-8">
                   Grouped notification
@@ -251,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Sent (passed dedup) -->
               <div v-else class="text-positive flex items-center justify-center">
-                <q-icon name="check_circle" size="sm" />
+                <OIcon name="check-circle" size="md" />
                 <span v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption q-ml-xs">
                   ×{{ props.row.dedup_count }}
                 </span>
@@ -270,10 +269,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-circle-sm"
+                icon-left="visibility"
                 @click="showDetailsDialog(props.row)"
                 data-test="alert-history-view-details"
               >
-                <q-icon name="visibility" />
                 <q-tooltip>View Details</q-tooltip>
               </OButton>
               <OButton
@@ -281,9 +280,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pipeline-list-${props.row.name}-error-indicator`"
                 variant="ghost-destructive"
                 size="icon-circle-sm"
+                icon-left="error"
                 @click.stop="showErrorDialog(props.row)"
               >
-                <q-icon name="error" />
                 <q-tooltip>
                   Last error: {{ new Date(props.row.timestamp / 1000).toLocaleString() }}
                 </q-tooltip>
@@ -457,9 +456,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator class="q-my-sm" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
+                  <OIcon
                     name="error"
-                    color="negative"
                     size="xs"
                     class="q-mr-xs"
                   />
@@ -486,9 +484,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator class="q-my-sm" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
-                    name="check_circle"
-                    color="positive"
+                  <OIcon
+                    name="check-circle"
                     size="xs"
                     class="q-mr-xs"
                   />
@@ -554,6 +551,7 @@ import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 const store = useStore();

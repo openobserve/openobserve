@@ -132,13 +132,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     size="icon-sm"
                     :disabled="searchRequestTraceIds.length > 0"
-                  >
-                    <q-icon name="keyboard_arrow_down" size="xs" />
-                  </OButton>
+                    icon-left="keyboard-arrow-down"
+                  />
                 </template>
                 <ODropdownItem @select="runQuery(true)">
                   <div class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon size="xs" name="refresh" />
+                  <OIcon name="refresh" size="xs" />
                     <span>Refresh Cache &amp; Apply</span>
                   </div>
                 </ODropdownItem>
@@ -243,6 +242,7 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
@@ -257,6 +257,7 @@ export default defineComponent({
   components: {
     OButtonGroup,
     OButton,
+    OIcon,
     ODropdown,
     ODropdownItem,
     DateTimePickerDashboard,

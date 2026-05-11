@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('home.viewButton')"
             data-test="home-usage-tab-view-streams-btn"
           >
-            <q-icon name="arrow_forward" class="view-arrow-icon" />
+            <OIcon name="arrow-forward" class="view-arrow-icon" />
             <router-link
               exact
               :to="{
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'positive-increase-light'
                   "
                 >
-                  <q-icon name="arrow_upward" size="0.875rem" /> 2.89% from last
+                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'positive-increase-light'
                   "
                 >
-                  <q-icon name="arrow_upward" size="0.875rem" /> 2.89% from last
+                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'negative-increase-light'
                   "
                 >
-                  <q-icon name="arrow_downward" size="0.875rem" /> 2.89% from last
+                  <OIcon name="arrow-downward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'positive-increase-light'
                   "
                 >
-                  <q-icon name="arrow_upward" size="0.875rem" /> 2.89% from last
+                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'positive-increase-light'
                   "
                 >
-                  <q-icon name="arrow_upward" size="0.875rem" /> 0.00% from last
+                  <OIcon name="arrow-upward" size="xs" /> 0.00% from last
                   week
                 </div>
               </div>
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-functions-btn"
                   >
-                    <q-icon name="arrow_forward" class="view-arrow-icon" />
+                    <OIcon name="arrow-forward" class="view-arrow-icon" />
                     <router-link
                       exact
                       :to="{
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-dashboards-btn"
                   >
-                    <q-icon name="arrow_forward" class="view-arrow-icon" />
+                    <OIcon name="arrow-forward" class="view-arrow-icon" />
                     <router-link
                       exact
                       :to="{
@@ -462,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('home.viewButton')"
                 data-test="home-usage-tab-view-alerts-btn"
               >
-                <q-icon name="arrow_forward" class="view-arrow-icon" />
+                <OIcon name="arrow-forward" class="view-arrow-icon" />
                 <router-link
                   exact
                   :to="{
@@ -545,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('home.viewButton')"
                 data-test="home-usage-tab-view-pipelines-btn"
               >
-                <q-icon name="arrow_forward" class="view-arrow-icon" />
+                <OIcon name="arrow-forward" class="view-arrow-icon" />
                 <router-link
                   exact
                   :to="{
@@ -645,6 +645,7 @@ import orgService from "@/services/organizations";
 import config from "@/aws-exports";
 import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanner.vue";

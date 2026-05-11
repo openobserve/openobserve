@@ -185,53 +185,56 @@ iconRight?: IconName;  // renders OIcon right of label; slot takes precedence
 
 These are `q-icon` used as standalone elements (not inside OButton slots), in app-level components that do **not** have a Quasar parent blocking them.
 
-### 2a — Straightforward: static `name="…"`
+### 2a — Straightforward: static `name="…"` ✅ DONE
 
-| File | Line | Icon | Registry key | Notes |
-|---|---|---|---|---|
-| `components/about/FeatureComparisonTable.vue` | 22 | `compare_arrows` | `compare-arrows` | |
-| `components/DatabaseDeprecationBanner.vue` | 37 | `close` | `close` | |
-| `components/alerts/AlertContextMenu.vue` | 35,46 | `arrow_upward`, `arrow_downward` | `arrow-upward`, `arrow-downward` | |
-| `components/alerts/AlertHistorySummary.vue` | 60 | `history` | `history` | |
-| `components/alerts/AlertHistory.vue` | 231,242,254 | `block`, `group_work`, `check_circle` | in registry | |
-| `components/alerts/AlertHistory.vue` | 276 | `visibility` | `visibility` | |
-| `components/alerts/AlertHistory.vue` | 286,542 | `error` | `error` | |
-| `components/alerts/AlertHistory.vue` | 323,557 | `close` | `close` | |
-| `components/alerts/AlertHistory.vue` | 547 | `schedule` | `schedule` | |
-| `components/alerts/AlertInsightsContextMenu.vue` | 38,46,54,65 | `tune`,`edit`,`history`,`close` | in registry | |
-| `components/TelemetryCorrelationPanel.vue` | 5,13 | `link`, `close` | in registry | |
-| `components/TelemetryCorrelationPanel.vue` | 26,32 | `error_outline`, `info_outline` | `error-outline`, `info-outline` | has `color=` prop → remove, set on wrapper |
-| `components/TelemetryCorrelationPanel.vue` | 41,52 | `cloud`, `link` | `cloud`, `link` | has `color=` prop → remove |
-| `components/TelemetryCorrelationPanel.vue` | 79,127,152,177 | `tune`,`timeline`,`show_chart`,`article` | in registry | has `color=` prop → remove |
-| `components/functions/RetryJobDialog.vue` | 42 | `close` | `close` | |
-| `components/functions/RetryJobDialog.vue` | 61 | `warning` | `warning` | |
-| `components/functions/RetryJobDialog.vue` | 86,107 | `refresh`, `play_arrow` | `refresh`, `play-arrow` | |
-| `components/shared/grid/NoPanel.vue` | 34 | `insert_drive_file` | `insert-drive-file` | |
-| `components/TenstackTable.vue` | 336,369 | `warning` | `warning` | |
-| `components/EnterpriseUpgradeDialog.vue` | 27 | `cancel` | `cancel` | |
-| `components/EnterpriseUpgradeDialog.vue` | 37 | `workspace_premium` | `workspace-premium` | |
-| `components/EnterpriseUpgradeDialog.vue` | 105 | `info` | `info` | |
-| `components/WebinarBanner.vue` | 79 | `schedule` | `schedule` | |
-| `components/WebinarBanner.vue` | 95 | `arrow_forward` | `arrow-forward` | |
-| `components/actionScripts/FileItem.vue` | 27,30 | `edit`, `delete` | in registry | has color via class — keep class on `<OIcon>` |
-| `views/DetailTable.vue` | 28 | `cancel` | `cancel` | |
-| `views/About.vue` | 40–187 | `workspaces`,`code`,`event`,`settings`,`backpack`,`javascript`,`inventory_2`,`shield`,`info`,`groups`,`language`,`workspace_premium`,`warning` | all in registry | |
-| `views/UsageTab.vue` | 70,115,156,199,242,283,342,407,465,548 | `arrow_forward`,`arrow_upward`,`arrow_downward` | in registry | |
-| `views/RUM/UploadSourceMaps.vue` | 34 | `arrow_back_ios_new` | `arrow-back-ios-new` | |
-| `views/RUM/UploadSourceMaps.vue` | 103 | `cloud_upload` | `cloud-upload` | has color class — remove `color=` prop |
-| `views/RUM/UploadSourceMaps.vue` | 112 | `insert_drive_file` | `insert-drive-file` | has color class |
-| `views/RUM/UploadSourceMaps.vue` | 123 | `close` | `close` | |
-| `views/RUM/SessionViewer.vue` | 26–45 | `arrow_back_ios_new`,`language`,`calendar_month`,`person`,`location_on`,`settings` | in registry | |
-| `views/RUM/RealUserMonitoring.vue` | 94 | `arrow_forward` | `arrow-forward` | |
-| `views/RUM/AppPerformance.vue` | 48 | `refresh` | `refresh` | |
-| `views/RUM/SourceMaps.vue` | 221 | `code` | `code` | has `color=` prop → remove |
-| `views/PromQL/QueryBuilder.vue` | 53,61,70 | `content_copy`,`clear`,`play_arrow` | `content-copy`,`clear`,`play-arrow` | |
-| `views/Ingestion.vue` | 62 | `search` | `search` | |
-| `views/Dashboards/Dashboards.vue` | 175,257 | `add`,`more_vert` | `add`,`more-vert` | |
-| `views/Dashboards/Dashboards.vue` | 424,469,482 | `content_copy`,`download`,`delete` | in registry | |
-| `views/Dashboards/addPanel/AddPanel.vue` | 136,141 | `keyboard_arrow_down`,`refresh` | `keyboard-arrow-down`,`refresh` | |
-| `enterprise/components/EvalTemplateList.vue` | 45 | `search` | `search` | inside q-input prepend → 🔴 blocked |
-| `enterprise/components/EvalTemplateEditor.vue` | 47–134 | `info` | `info` | inside `q-icon` with tooltip slot — keep as `<OIcon>` + `<OTooltip>` once OTooltip exists |
+| File | Line | Icon | Registry key | Notes | Status |
+|---|---|---|---|---|---|
+| `components/about/FeatureComparisonTable.vue` | 22 | `compare_arrows` | `compare-arrows` | | ✅ |
+| `components/DatabaseDeprecationBanner.vue` | 37 | `close` | `close` | OButton slot → icon-left prop | ✅ |
+| `components/alerts/AlertHistorySummary.vue` | 60 | `history` | `history` | | ✅ |
+| `components/alerts/AlertHistory.vue` | 35,104,114,276,286,323,557 | OButton slots | icon-left props | | ✅ |
+| `components/alerts/AlertHistory.vue` | 231,242,254 | `block`, `group_work`, `check_circle` | in registry | | ✅ |
+| `components/alerts/AlertHistory.vue` | 470,499 | `error`, `check_circle` | in registry | detail dialog | ✅ |
+| `components/alerts/AlertHistory.vue` | 542,547 | `error`, `schedule` | in registry | error dialog header | ✅ |
+| `components/alerts/AlertHistory.vue` | 77 | `search` in q-select prepend | — | blocked by OInput | 🔴 |
+| `components/alerts/AlertHistory.vue` | 176,190,388,399,406 | dynamic ternaries | — | Phase 2b | 🔲 |
+| `components/alerts/AlertInsightsContextMenu.vue` | 38,46,54,65 | `tune`,`edit`,`history`,`close` | in registry | | ✅ |
+| `components/TelemetryCorrelationPanel.vue` | 5 | `link` | `link` | | ✅ |
+| `components/TelemetryCorrelationPanel.vue` | 13 | `close` | `close` | OButton slot → icon-left prop | ✅ |
+| `components/TelemetryCorrelationPanel.vue` | 26,32 | `error_outline`, `info_outline` | `error-outline`, `info-outline` | color= stripped | ✅ |
+| `components/TelemetryCorrelationPanel.vue` | 41,52 | `cloud`, `link` | `cloud`, `link` | color= stripped | ✅ |
+| `components/TelemetryCorrelationPanel.vue` | 79,127,152,177 | `tune`,`timeline`,`show_chart`,`article` | in registry | color= stripped | ✅ |
+| `components/functions/RetryJobDialog.vue` | 42 | `close` | `close` | OButton slot → icon-left prop | ✅ |
+| `components/functions/RetryJobDialog.vue` | 61,86,107 | `warning`,`refresh`,`play_arrow` | in registry | standalone | ✅ |
+| `components/shared/grid/NoPanel.vue` | 34 | `insert_drive_file` | `insert-drive-file` | OButton slot → icon-left prop | ✅ |
+| `components/TenstackTable.vue` | 336,369 | `warning` | `warning` | | ✅ |
+| `components/EnterpriseUpgradeDialog.vue` | 27 | `cancel` | `cancel` | OButton slot → icon-left prop | ✅ |
+| `components/EnterpriseUpgradeDialog.vue` | 37 | `workspace_premium` | `workspace-premium` | size="xl" | ✅ |
+| `components/EnterpriseUpgradeDialog.vue` | 105 | `info` | `info` | | ✅ |
+| `components/WebinarBanner.vue` | 79,95 | `schedule`,`arrow_forward` | in registry | | ✅ |
+| `components/actionScripts/FileItem.vue` | 27,30 | `edit`, `delete` | in registry | dynamic class kept | ✅ |
+| `views/DetailTable.vue` | 28 | `cancel` | `cancel` | OButton slot → icon-left prop | ✅ |
+| `views/About.vue` | 40–187 | 15 icons | all in registry | | ✅ |
+| `views/UsageTab.vue` | 54 | `outlinedWindow` | `window` | Phase 2b | 🔲 |
+| `views/UsageTab.vue` | 70,115,156,199,242,283,342,407,465,548 | `arrow_forward`,`arrow_upward`,`arrow_downward` | in registry | | ✅ |
+| `views/RUM/UploadSourceMaps.vue` | 34,103,112 | `arrow_back_ios_new`,`cloud_upload`,`insert_drive_file` | in registry | color= stripped | ✅ |
+| `views/RUM/UploadSourceMaps.vue` | 123 | `close` | `close` | OButton slot → icon-left prop | ✅ |
+| `views/RUM/SessionViewer.vue` | 26–45 | 6 icons | in registry | | ✅ |
+| `views/RUM/SessionViewer.vue` | 54 | `sentiment_very_dissatisfied` | not in registry | skipped — add to registry if needed | — |
+| `views/RUM/RealUserMonitoring.vue` | 94 | `arrow_forward` | `arrow-forward` | OButton slot → icon-right prop | ✅ |
+| `views/RUM/AppPerformance.vue` | 48 | `refresh` | `refresh` | OButton slot → icon-left prop | ✅ |
+| `views/RUM/SourceMaps.vue` | 221 | `code` | `code` | color= stripped | ✅ |
+| `views/PromQL/QueryBuilder.vue` | 53,61,70 | `content_copy`,`clear`,`play_arrow` | in registry | icon labels in OButton slot | ✅ |
+| `views/Dashboards/Dashboards.vue` | 94 | `expand_more` | `expand-more` | OButton `#icon-right` template → icon-right prop | ✅ |
+| `views/Dashboards/Dashboards.vue` | 175,257 | `add`,`more_vert` | `add`,`more-vert` | OButton slot → icon-left prop | ✅ |
+| `views/Dashboards/Dashboards.vue` | 424 | `content_copy` | `content-copy` | OButton slot → icon-left prop | ✅ |
+| `views/Dashboards/Dashboards.vue` | 469,482 | template #icon-left → `download`,`delete` | in registry | OButton #icon-left → icon-left prop | ✅ |
+| `views/Dashboards/Dashboards.vue` | 54,198,260,269,407,450 | dynamic/q-input | — | blocked or Phase 2b | 🔲/🔴 |
+| `views/Dashboards/addPanel/AddPanel.vue` | 136 | `keyboard_arrow_down` | `keyboard-arrow-down` | OButton slot → icon-left prop | ✅ |
+| `views/Dashboards/addPanel/AddPanel.vue` | 141 | `refresh` | `refresh` | ODropdownItem standalone → OIcon | ✅ |
+| `views/Ingestion.vue` | 62 | `search` | `search` | inside q-input context | 🔴 blocked |
+| `enterprise/components/EvalTemplateList.vue` | 45 | `search` | `search` | inside q-input prepend | 🔴 blocked |
+| `enterprise/components/EvalTemplateEditor.vue` | 47–134 | `info` | `info` | `q-icon` wrapping `q-tooltip` | 🔴 blocked |
 
 ### 2b — Dynamic bindings (`:name="variable"`) — `🔁` requires mapping
 
@@ -305,8 +308,8 @@ These `q-icon` usages are **inside Quasar component slots** (prepend/append of `
 |---|---|---|---|---|
 | **Pre-work** | Add missing icons to registry | 1 file | None | ✅ Done |
 | **Phase 1** | `icon-left`/`icon-right` props on OButton; migrate all OButton q-icon slots | ~50 files | Pre-work | ✅ Done |
-| **Phase 2a** | Replace standalone static-name `q-icon` with `<OIcon>` | ~25 files | Pre-work | 🔲 Next |
-| **Phase 2b** | Replace dynamic-bound `q-icon` (outlinedXxx constants and ternaries) | ~20 files | Pre-work | 🔲 |
+| **Phase 2a** | Replace standalone static-name `q-icon` with `<OIcon>` | ~25 files | Pre-work | ✅ Done |
+| **Phase 2b** | Replace dynamic-bound `q-icon` (outlinedXxx constants and ternaries) | ~20 files | Pre-work | 🔲 Next |
 | **Phase 3 (data-driven)** | Map `dialogConfig.badgeIcon`, `feature.icon`, `col.icon`, nav `icon` prop to `IconName` | ~4 files | Phase 2 | 🔲 |
 | **Phase 4 (blocked)** | Migrate q-input prepend icons | ~10 files | OInput component built | 🔴 |
 | **Phase 5 (blocked)** | Migrate q-icon-wrapping-tooltip | ~5 files | OTooltip component built | 🔴 |

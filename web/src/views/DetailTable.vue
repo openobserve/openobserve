@@ -24,9 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="cancel" size="14px" />
-          </OButton>
+          <OButton variant="ghost" size="icon" v-close-popup icon-left="cancel" />
         </div>
       </div>
     </q-card-section>
