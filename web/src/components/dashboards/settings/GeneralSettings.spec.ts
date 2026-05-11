@@ -480,15 +480,20 @@ describe("GeneralSettings", () => {
   });
 
   describe("User Actions", () => {
-    it("should close dialog when cancel button is clicked", async () => {
+    it("should emit close event when cancel button is clicked", async () => {
       wrapper = await createWrapper();
 
       const cancelBtn = wrapper.find(
         '[data-test="dashboard-general-setting-cancel-btn"]',
       );
-      // Check if the button has the close popup functionality
       expect(cancelBtn.exists()).toBe(true);
       expect(cancelBtn.element.tagName.toLowerCase()).toBe("button");
+
+      await cancelBtn.trigger("click");
+      await flushPromises();
+
+      expect(wrapper.emitted()).toHaveProperty("close");
+      expect(wrapper.emitted("close")).toHaveLength(1);
     });
 
   });
