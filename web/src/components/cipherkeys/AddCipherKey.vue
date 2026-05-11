@@ -126,14 +126,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <q-stepper-navigation>
-            <q-btn
+            <OButton
               data-test="add-report-step1-continue-btn"
+              variant="primary"
+              size="sm-action"
               @click="validateForm(2)"
-              class="o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="'Continue'"
-            />
+            >
+              Continue
+            </OButton>
           </q-stepper-navigation>
         </q-step>
 
@@ -146,42 +146,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <add-encryption-mechanism v-model:formData="formData" />
           <q-stepper-navigation class="q-pa-none">
-            <q-btn
+            <OButton
               data-test="add-cipher-key-step2-back-btn"
-              flat
+              variant="outline"
+              size="sm-action"
+              class="q-mb-sm"
               @click="step = 1"
-              class="o2-secondary-button tw:h-[36px] q-mb-sm"
-              :label="t('common.back')"
-              no-caps
-            />
+            >
+              {{ t('common.back') }}
+            </OButton>
           </q-stepper-navigation>
         </q-step>
       </q-stepper>
       </div>
     </div>
     <div class="tw:mx-2">
-            <div class="flex justify-end q-px-sm q-py-lg full-width"
+            <div class="flex justify-end q-px-sm q-py-lg full-width tw:gap-2"
       style="position: sticky; bottom: 0px; z-index: 2"
       >
-        <q-btn
+        <OButton
           data-test="add-cipher-key-cancel-btn"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          :label="t('common.cancel')"
-          no-caps
-          flat
+          variant="outline"
+          size="sm-action"
           @click="openCancelDialog"
-        />
-        <q-btn
-          :disable="
+        >
+          {{ t('common.cancel') }}
+        </OButton>
+        <OButton
+          :disabled="
             (step === 1 && isUpdatingCipherKey == false) || isSubmitting
           "
           data-test="add-cipher-key-save-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('common.save')"
+          variant="primary"
+          size="sm-action"
           type="submit"
-          no-caps
-          flat
-        />
+        >
+          {{ t('common.save') }}
+        </OButton>
       </div>
     </div>
     </q-form>
@@ -209,6 +210,7 @@ import AddAkeylessType from "@/components/cipherkeys/AddAkeylessType.vue";
 import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechanism.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CipherKeysService from "@/services/cipher_keys";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();

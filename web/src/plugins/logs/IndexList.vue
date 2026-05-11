@@ -23,15 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:items-center tw:gap-1"
       style="max-width: 100%; overflow: hidden"
     >
-      <q-btn
+      <OButton
         v-if="
           searchObj.data.stream.streamType &&
           searchObj.data.stream.streamType !== 'logs'
         "
         data-test="log-search-index-list-stream-type-badge"
-        flat
-        dense
-        no-caps
+        variant="ghost"
+        size="icon-sm"
         class="stream-type-badge tw:shrink-0"
         @click="onStreamTypeChange('logs')"
       >
@@ -39,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tooltip anchor="bottom middle" self="top middle">
           {{ streamTypeLabel }} — {{ t("search.switchToLogs") }}
         </q-tooltip>
-      </q-btn>
+      </OButton>
       <q-select
         ref="streamSelect"
         data-test="log-search-index-list-select-stream"
@@ -225,6 +224,7 @@ import { applyCollapseFilter } from "@/utils/fieldCategories";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -242,6 +242,7 @@ export default defineComponent({
     FieldList: defineAsyncComponent(
       () => import("@/plugins/logs/components/FieldList.vue"),
     ),
+    OButton,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {

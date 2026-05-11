@@ -96,61 +96,55 @@
       </q-form>
     </div>
     <div class="add-function-actions flex justify-center tw:gap-2">
-      <q-btn
+      <OButton
             v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
-            :ripple="false"
+            variant="ghost"
+            size="icon-sm"
             @click="emit('open:chat',!store.state.isAiChatEnabled)"
             data-test="menu-link-ai-item"
-            no-caps
-            :borderless="true"
-            flat
-            dense
-            class="o2-button ai-hover-btn q-px-sm q-py-sm"
             :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
             style="border-radius: 6px;"
             @mouseenter="isHovered = true"
             @mouseleave="isHovered = false"
-
           >
-            <div class="row items-center no-wrap tw:gap-2  ">
-              <img  :src="getBtnLogo" class="header-icon ai-icon" />
-            </div>
-          </q-btn>
-      <q-btn
+            <img :src="getBtnLogo" class="header-icon ai-icon" />
+          </OButton>
+      <OButton
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
-        class="o2-secondary-button tw:h-[36px]"
-        :label="t('common.fullscreen')"
-        no-caps
-        flat
-        icon="fullscreen"
+        variant="outline"
+        size="sm-action"
         @click="handleFullScreen"
-      />
-      <q-btn
+      >
+        <Maximize :size="14" class="tw:mr-1" />
+        {{ t('common.fullscreen') }}
+      </OButton>
+      <OButton
         data-test="add-function-test-btn"
-        :label="t('function.testFunction')"
-        class="tw:ml-[12px] o2-secondary-button no-border tw:h-[36px]"
-        no-caps
-        icon="play_arrow"
+        variant="outline"
+        size="sm-action"
         @click="emit('test')"
-      />
-      <q-btn
+      >
+        <Play :size="14" class="tw:mr-1" />
+        {{ t('function.testFunction') }}
+      </OButton>
+      <OButton
         data-test="add-function-cancel-btn"
-        class="tw:ml-[12px] o2-secondary-button no-border tw:h-[36px]"
-        flat
-        :label="t('function.cancel')"
-        no-caps
+        variant="outline"
+        size="sm-action"
         @click="emit('cancel')"
-      />
-      <q-btn
+      >
+        {{ t('function.cancel') }}
+      </OButton>
+      <OButton
         data-test="add-function-save-btn"
-        :label="t('function.save')"
-        class="tw:ml-[12px] o2-primary-button no-border tw:h-[36px]"
-        flat
+        variant="primary"
+        size="sm-action"
         type="submit"
-        no-caps
         @click="onSave"
-      />
+      >
+        {{ t('function.save') }}
+      </OButton>
     </div>
   </div>
 </template>
@@ -166,6 +160,8 @@ import { useStore } from "vuex";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Maximize, Play } from "lucide-vue-next";
 const { t } = useI18n();
 
 const q = useQuasar();

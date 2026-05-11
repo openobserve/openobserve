@@ -23,11 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :id="editorId"
     />
     <!-- AI Icon Button -->
-    <q-btn
+    <OButton
       v-if="showAiIcon && !disableAi"
-      round
-      flat
-      size="sm"
+      variant="sidebar-toggle"
+      size="icon-toolbar"
       class="ai-icon-button"
       :class="nlpMode ? 'ai-icon-active' : ''"
       @click="toggleNlpMode"
@@ -42,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
         }}
       </q-tooltip>
-    </q-btn>
+    </OButton>
   </div>
 </template>
 
@@ -80,9 +79,11 @@ import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   inheritAttrs: false,
+  components: { OButton },
   props: {
     editorId: {
       type: String,

@@ -119,15 +119,15 @@ test.describe("dashboard filter testcases", () => {
       .click();
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+      page.locator('[data-test="query-inspector-executed-query-0"]')
+    ).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Change operator to OR and verify
-    await page.getByText("ANDarrow_drop_down").click();
+    await page.locator('[data-test="dashboard-add-condition-logical-operator-1"]').click();
 
     await page.getByRole("option", { name: "OR" }).click();
 
@@ -142,10 +142,10 @@ test.describe("dashboard filter testcases", () => {
       .click();
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+      page.locator('[data-test="query-inspector-executed-query-0"]')
+    ).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 

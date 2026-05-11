@@ -42,6 +42,7 @@ const mockRouter = {
 
 vi.mock('vue-router', () => ({
   useRouter: () => mockRouter,
+  useRoute: () => mockRouter.currentRoute.value,
 }));
 
 // Global mock notify for Quasar

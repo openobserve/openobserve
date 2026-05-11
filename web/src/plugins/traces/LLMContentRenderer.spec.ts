@@ -115,10 +115,10 @@ describe("LLMContentRenderer", () => {
   describe("Tool Observation Type", () => {
     it("should render tool content with metadata", () => {
       const mockSpan = {
-        llm_tool_name: "calculator",
-        llm_tool_call_id: "call-123",
-        llm_tool_call_arguments: '{"operation": "add", "numbers": [1, 2]}',
-        llm_tool_call_result: '{"result": 3}',
+        gen_ai_tool_name: "calculator",
+        gen_ai_tool_call_id: "call-123",
+        gen_ai_tool_call_arguments: '{"operation": "add", "numbers": [1, 2]}',
+        gen_ai_tool_call_result: '{"result": 3}',
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -138,9 +138,9 @@ describe("LLMContentRenderer", () => {
 
     it("should render tool input arguments", () => {
       const mockSpan = {
-        llm_tool_name: "search",
-        llm_tool_call_id: "call-456",
-        llm_tool_call_arguments: '{"query": "test search"}',
+        gen_ai_tool_name: "search",
+        gen_ai_tool_call_id: "call-456",
+        gen_ai_tool_call_arguments: '{"query": "test search"}',
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -158,9 +158,9 @@ describe("LLMContentRenderer", () => {
 
     it("should render tool output result", () => {
       const mockSpan = {
-        llm_tool_name: "calculator",
-        llm_tool_call_id: "call-789",
-        llm_tool_call_result: '{"answer": 42}',
+        gen_ai_tool_name: "calculator",
+        gen_ai_tool_call_id: "call-789",
+        gen_ai_tool_call_result: '{"answer": 42}',
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -178,7 +178,7 @@ describe("LLMContentRenderer", () => {
 
     it("should handle tool content with nested structure", () => {
       const mockSpan = {
-        llm_tool_call_arguments: JSON.stringify({
+        gen_ai_tool_call_arguments: JSON.stringify({
           content: [{ type: "text", text: "Nested text content" }],
         }),
       };
@@ -206,8 +206,8 @@ describe("LLMContentRenderer", () => {
 
     it("should not render when tool content is null", () => {
       const mockSpan = {
-        llm_tool_name: "test",
-        llm_tool_call_arguments: "null",
+        gen_ai_tool_name: "test",
+        gen_ai_tool_call_arguments: "null",
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -607,7 +607,7 @@ describe("LLMContentRenderer", () => {
     });
 
     it("should accept span prop", () => {
-      const mockSpan = { llm_tool_name: "test" };
+      const mockSpan = { gen_ai_tool_name: "test" };
 
       wrapper = mount(LLMContentRenderer, {
         props: {
@@ -960,7 +960,7 @@ describe("LLMContentRenderer", () => {
   describe("toolContentJson & parsedContentJson", () => {
     it("should stringify toolContentJson for object content", () => {
       const mockSpan = {
-        llm_tool_call_arguments: '{"key": "value"}',
+        gen_ai_tool_call_arguments: '{"key": "value"}',
       };
 
       wrapper = mount(LLMContentRenderer, {
@@ -981,7 +981,7 @@ describe("LLMContentRenderer", () => {
           content: null,
           observationType: "TOOL",
           contentType: "input",
-          span: { llm_tool_call_arguments: "null" },
+          span: { gen_ai_tool_call_arguments: "null" },
         },
       });
 
@@ -1186,9 +1186,9 @@ describe("LLMContentRenderer", () => {
 
     it("should render CodeQueryEditor stub for tool content", () => {
       const mockSpan = {
-        llm_tool_name: "test-tool",
-        llm_tool_call_id: "call-1",
-        llm_tool_call_arguments: '{"op": "add"}',
+        gen_ai_tool_name: "test-tool",
+        gen_ai_tool_call_id: "call-1",
+        gen_ai_tool_call_arguments: '{"op": "add"}',
       };
 
       wrapper = mount(LLMContentRenderer, {

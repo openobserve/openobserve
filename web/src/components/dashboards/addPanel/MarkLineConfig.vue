@@ -89,14 +89,13 @@
         />
       </div>
     </div>
-    <q-btn
+    <OButton
+      variant="outline"
+      size="sm"
       @click="addNewMarkLine"
-      style="cursor: pointer; padding: 0px 5px"
-      :label="t('dashboard.markLineAdd')"
-      class="el-border"
-      no-caps
       data-test="dashboard-addpanel-config-markline-add-btn"
-    />
+      >{{ t("dashboard.markLineAdd") }}</OButton
+    >
   </div>
 </template>
 
@@ -106,9 +105,11 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "MarkLineConfig",
+  components: { OButton },
   setup() {
     const store = useStore();
     const { t } = useI18n();

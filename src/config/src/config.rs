@@ -1895,7 +1895,7 @@ pub struct Compact {
     pub strategy: String,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
-    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
+    #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 2048)] // MB
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
@@ -1907,8 +1907,6 @@ pub struct Compact {
     pub old_data_max_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_HOURS", default = 2)] // hours
     pub old_data_min_hours: i64,
-    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
-    pub old_data_min_records: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
     pub old_data_min_files: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
@@ -3044,8 +3042,17 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "ZO_MEMORY_CACHE_MAX_SIZE is larger than total memory, please set a smaller value"
         ));
     }
+    let local_node_role: Vec<cluster::Role> = cfg
+        .common
+        .node_role
+        .clone()
+        .split(',')
+        .map(|s| s.parse().unwrap())
+        .collect();
     if cfg.memory_cache.datafusion_max_size == 0 {
-        if cfg.common.local_mode {
+        if local_node_role == [cluster::Role::Compactor] {
+            cfg.memory_cache.datafusion_max_size = mem_total / cfg.limit.file_merge_thread_num;
+        } else if cfg.common.local_mode {
             cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 25%
         } else {
             cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size; // 50%
@@ -3257,9 +3264,6 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_hours < 1 {
         cfg.compact.old_data_min_hours = 2;
-    }
-    if cfg.compact.old_data_min_records < 1 {
-        cfg.compact.old_data_min_records = 100;
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
@@ -3954,7 +3958,6 @@ mod tests {
         cfg.compact.old_data_interval = 0;
         cfg.compact.old_data_max_days = 0;
         cfg.compact.old_data_min_hours = 0;
-        cfg.compact.old_data_min_records = 0;
         cfg.compact.old_data_min_files = 0;
         cfg.compact.file_list_deleted_batch_size = 0;
         cfg.compact.batch_size = 0;
@@ -3966,7 +3969,6 @@ mod tests {
         assert_eq!(cfg.compact.old_data_interval, 3600);
         assert_eq!(cfg.compact.old_data_max_days, 7);
         assert_eq!(cfg.compact.old_data_min_hours, 2);
-        assert_eq!(cfg.compact.old_data_min_records, 100);
         assert_eq!(cfg.compact.old_data_min_files, 10);
         assert_eq!(cfg.compact.file_list_deleted_batch_size, 1000);
         assert_eq!(cfg.compact.batch_size, 100);

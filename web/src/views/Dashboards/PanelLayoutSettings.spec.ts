@@ -325,7 +325,7 @@ describe("PanelLayoutSettings.vue", () => {
     });
 
     it("should have buttons for actions", () => {
-      const buttons = wrapper.findAll('q-btn-stub');
+      const buttons = wrapper.findAll('o-button-stub');
       expect(buttons.length).toBeGreaterThan(0);
     });
   });

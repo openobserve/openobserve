@@ -22,11 +22,11 @@ export async function selectStreamType(page, streamType) {
   await page
     .locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT)
     .click();
-  await page
-    .getByRole("option", { name: streamType, exact: true })
-    .locator("div")
-    .nth(2)
-    .click();
+  // Use .first() — the q-focus-helper div that Quasar may insert makes
+  // .locator("div").nth(2) index-unstable; clicking the option element directly is safe.
+  const streamTypeOption = page.getByRole("option", { name: streamType, exact: true }).first();
+  await streamTypeOption.waitFor({ state: "visible", timeout: 10000 });
+  await streamTypeOption.click();
 }
 
 /**

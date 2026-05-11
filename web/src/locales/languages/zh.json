@@ -123,7 +123,11 @@
     "version": "版本",
     "create": "创建",
     "resources": "资源",
-    "updated_at": "更新于"
+    "updated_at": "更新于",
+    "error": "错误",
+    "db": "数据库",
+    "discardChanges": "放弃更改",
+    "unsavedChanges": "未保存的更改"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -390,7 +394,8 @@
     "autoRunEnabled": "自动运行已启用",
     "selectStreamFirst": "先选择一个直播",
     "traces": "痕迹",
-    "switchToLogs": "点击切换回日志"
+    "switchToLogs": "点击切换回日志",
+    "patternNoValuesAvailable": "没有可用值"
   },
   "menu": {
     "home": "主页",
@@ -2237,6 +2242,8 @@
     "editJson": "编辑警报 JSON",
     "additional_settings": "其他设置",
     "alertNamePlaceholder": "警报名称",
+    "nameRequired": "警报名称不能为空。",
+    "nameNoSpecialChars": "警报名称不能包含 ':'、'#'、'?'、'&'、'%'、引号或空格字符，请使用下划线 (_) 代替。",
     "anomalyNamePlaceholder": "异常名称",
     "folder": "文件夹",
     "selectStreamTypeFirst": "请先选择直播类型",
@@ -2917,7 +2924,21 @@
       "minutesAgo": "{n} 我之前",
       "hoursAgo": "{n} 小时前",
       "daysAgo": "{n} d 之前"
-    }
+    },
+    "noErrorPresent": "此跨度没有错误",
+    "httpStatusCode": "HTTP 状态码",
+    "grpcStatusCode": "gRPC 状态码",
+    "dbResponseStatusCode": "数据库响应状态码",
+    "processExitCode": "进程退出代码",
+    "exceptionsWithCount": "异常 ({count})",
+    "typeLabel": "类型：",
+    "messageLabel": "消息：",
+    "escapedLabel": "逃脱了：",
+    "stacktraceLabel": "堆栈跟踪：",
+    "copyStacktrace": "复制堆栈跟踪",
+    "noStacktraceAvailable": "没有可用的堆栈跟踪",
+    "stacktraceCopied": "Stacktrace 已复制到剪贴板",
+    "stacktraceCopyFailed": "无法复制堆栈跟踪"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3319,7 +3340,9 @@
     "noMetricsDescription": "在所选时间范围内未找到此关联的指标。",
     "errorRetrievingTraces": "检索跟踪时出错。",
     "serviceGroupProtected": "无法删除服务组。您只能修改映射的字段。",
-    "noDataFound": "未找到任何数据"
+    "noDataFound": "未找到任何数据",
+    "isWorkloadType": "服务标识符",
+    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

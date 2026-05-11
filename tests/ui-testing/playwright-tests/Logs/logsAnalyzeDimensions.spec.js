@@ -188,13 +188,13 @@ test.describe("Logs Analyze Dimensions testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing analyze button hidden when no results');
 
-    // Select stream but do NOT run a search — hits array is empty so button should be hidden
-    await pm.logsPage.selectStream(logData.Stream);
+    // Navigate to logs page but do NOT select a stream — no auto-search runs,
+    // so hits array is empty and button should be hidden
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Analyze button should NOT be visible with no search results (hits.length === 0)
-    const analyzeButtonVisible = await pm.logsPage.isAnalyzeDimensionsButtonVisible();
-    expect(analyzeButtonVisible).toBeFalsy();
+    await pm.logsPage.expectAnalyzeDimensionsButtonNotVisible();
 
     testLogger.info('Analyze button correctly hidden when no results');
   });

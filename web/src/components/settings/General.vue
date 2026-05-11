@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- scape interval section -->
           <div class="settings-grid-item">
             <span class="individual-setting-title">
-              {{ t('settings.scrapintervalLabel') }}
+              {{ t("settings.scrapintervalLabel") }}
             </span>
             <q-input
               v-model.number="scrapeIntereval"
@@ -45,9 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               hide-bottom-space
               data-test="general-settings-scrape-interval"
-              :rules="[(val: any) => !!val || t('settings.scrapeIntervalRequired')]"
+              :rules="[
+                (val: any) => !!val || t('settings.scrapeIntervalRequired'),
+              ]"
               :lazy-rules="true"
-              style="width: 120px;"
+              style="width: 120px"
             />
             <span class="individual-setting-description">
               {{ t("settings.scrapeIntervalDescription") }}
@@ -57,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Max Series Per Query section -->
           <div class="settings-grid-item">
             <span class="individual-setting-title">
-              {{ t('settings.maxSeriesPerQueryLabel') }}
+              {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
             <q-input
               v-model.number="maxSeriesPerQuery"
@@ -73,25 +75,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[
                 (val: any) => {
                   // Allow empty/null (user wants default)
-                  if (val === null || val === undefined || val === '') return true;
+                  if (val === null || val === undefined || val === '')
+                    return true;
 
                   // Validate numeric range
                   const numVal = Number(val);
-                  return (numVal >= 1000 && numVal <= 1000000) || t('settings.maxSeriesPerQueryValidation');
-                }
+                  return (
+                    (numVal >= 1000 && numVal <= 1000000) ||
+                    t('settings.maxSeriesPerQueryValidation')
+                  );
+                },
               ]"
               :lazy-rules="true"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
-              style="width: 180px;"
+              style="width: 180px"
             >
               <template v-slot:append>
-                <q-icon
-                  name="info"
-                  size="xs"
-                  class="cursor-pointer"
-                >
+                <q-icon name="info" size="xs" class="cursor-pointer">
                   <q-tooltip max-width="300px">
-                    {{ t('settings.maxSeriesPerQueryTooltip') }}
+                    {{ t("settings.maxSeriesPerQueryTooltip") }}
                   </q-tooltip>
                 </q-icon>
               </template>
@@ -106,15 +108,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title">
               {{ t("settings.manageTheme") }}
             </span>
-            <div class="tw:flex tw:gap-2 tw:items-center" style="margin-left: -60px;">
+            <div
+              class="tw:flex tw:gap-2 tw:items-center"
+              style="margin-left: -60px"
+            >
               <!-- Light Mode Theme -->
               <div
                 class="theme-color-chip"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
-                <div class="color-circle" :style="{ backgroundColor: customLightColor }">
-                  <q-icon name="palette" size="14px" color="white" class="palette-icon" />
+                <div
+                  class="color-circle"
+                  :style="{ backgroundColor: customLightColor }"
+                >
+                  <q-icon
+                    name="palette"
+                    size="14px"
+                    color="white"
+                    class="palette-icon"
+                  />
                 </div>
                 <span class="chip-label">{{ t("settings.light") }}</span>
                 <span class="chip-value">{{ customLightColor }}</span>
@@ -126,8 +139,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
-                <div class="color-circle" :style="{ backgroundColor: customDarkColor }">
-                  <q-icon name="palette" size="14px" color="white" class="palette-icon" />
+                <div
+                  class="color-circle"
+                  :style="{ backgroundColor: customDarkColor }"
+                >
+                  <q-icon
+                    name="palette"
+                    size="14px"
+                    color="white"
+                    class="palette-icon"
+                  />
                 </div>
                 <span class="chip-label">{{ t("settings.dark") }}</span>
                 <span class="chip-value">{{ customDarkColor }}</span>
@@ -151,15 +172,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>&nbsp;</span>
 
           <div class="flex justify-start">
-            <q-btn
+            <OButton
               data-test="dashboard-add-submit"
               :loading="onSubmit.isLoading.value"
-              :label="t('dashboard.save')"
-              class="q-mb-md o2-primary-button no-border tw:h-[36px]"
+              variant="primary"
+              size="sm-action"
               type="submit"
-              no-caps
-              size="md"
-            />
+            >
+              {{ t("dashboard.save") }}
+            </OButton>
           </div>
         </q-form>
       </div>
@@ -173,14 +194,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="q-px-md q-py-sm">
-        <GroupHeader :title="t('settings.enterpriseFeatures')" :showIcon="false" />
+        <GroupHeader
+          :title="t('settings.enterpriseFeatures')"
+          :showIcon="false"
+        />
       </div>
       <div class="q-mx-md">
         <div class="settings-grid-item no-border-bottom">
           <span class="individual-setting-title">
-            {{ t('settings.customLogoText') }}
+            {{ t("settings.customLogoText") }}
           </span>
-          <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="tw:flex tw:gap-3 tw:items-center">
+          <div
+            v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
+            class="tw:flex tw:gap-3 tw:items-center"
+          >
             <q-input
               class="showLabelOnTop tw:w-[250px] tw:mr-sm"
               stack-label
@@ -190,45 +217,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="customText"
             />
             <div class="btn-group tw:flex tw:h-[28px]">
-              <q-btn
+              <OButton
                 type="button"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
                 @click="editingText = !editingText"
-              ></q-btn>
-              <q-btn
+              >
+                <X class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
+              <OButton
                 data-test="settings_ent_logo_custom_text_save_btn"
                 :loading="onSubmit.isLoading.value"
-                icon="check"
-                class="q-mr-sm "
-                dense
-                size="sm"
-                color="primary"
+                variant="primary"
+                size="icon-xs-sq"
+                class="q-mr-sm"
                 type="submit"
-                no-caps
                 @click="updateCustomText"
-              />
+              >
+                <Check class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
             </div>
           </div>
           <div v-else class="flex items-center">
-            <span class="tw:w-[190px] tw:text-center tw:truncate">{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
-              <q-tooltip v-if="store.state.zoConfig.custom_logo_text.length > 20" class="tw:text-center tw:text-[12px] tw:max-w-[250px]">
+            <span class="tw:w-[190px] tw:text-center tw:truncate"
+              >{{
+                store.state.zoConfig.custom_logo_text ||
+                t("settings.noTextAvailable")
+              }}
+              <q-tooltip
+                v-if="store.state.zoConfig.custom_logo_text.length > 20"
+                class="tw:text-center tw:text-[12px] tw:max-w-[250px]"
+              >
                 {{ store.state.zoConfig.custom_logo_text }}
               </q-tooltip>
             </span>
-            <q-btn
+            <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
               :loading="onSubmit.isLoading.value"
-              icon="edit"
-              size="sm"
-              class="text-bold q-ml-sm"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="q-ml-sm"
               type="submit"
               @click="editingText = !editingText"
-            />
+            >
+              <Pencil class="tw:size-3.5 tw:shrink-0" />
+            </OButton>
           </div>
           <span class="individual-setting-description">
             {{ t("settings.customLogoTextDescription") }}
@@ -255,54 +289,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="max-width: 150px; max-height: 31px"
               class="q-mx-md"
             />
-            <q-btn
-              icon="delete"
+            <OButton
               data-test="setting_ent_custom_logo_img_delete_btn"
-              @click="confirmDeleteLogo('light')"
+              variant="ghost-destructive"
+              size="icon-xs-sq"
               class="q-mx-md"
-              size="sm"
-            ></q-btn>
+              @click="confirmDeleteLogo('light')"
+            >
+              <Trash2 class="tw:size-3.5 tw:shrink-0" />
+            </OButton>
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
-            data-test="setting_ent_custom_logo_img_file_upload"
-            v-model="filesLight"
-            :label="t('settings.dragDropUpload')"
-            counter
-            :counter-label="counterLabelFn"
-            accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-            @rejected="onRejected"
-            dense
-            borderless
-            class="q-mx-none o2-file-input tw:w-[250px] "
-          >
-            <template v-slot:prepend>
-              <q-icon name="attach_file" />
-            </template>
-          </q-file>
-          <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
-              <q-btn
+              data-test="setting_ent_custom_logo_img_file_upload"
+              v-model="filesLight"
+              :label="t('settings.dragDropUpload')"
+              counter
+              :counter-label="counterLabelFn"
+              accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+              @rejected="onRejected"
+              dense
+              borderless
+              class="q-mx-none o2-file-input tw:w-[250px]"
+            >
+              <template v-slot:prepend>
+                <q-icon name="attach_file" />
+              </template>
+            </q-file>
+            <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
+              <OButton
                 type="button"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
                 @click="filesLight = null"
-              ></q-btn>
-              <q-btn
+              >
+                <X class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
+              <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
-                icon="check"
-                class="q-mr-sm "
-                dense
-                size="sm"
-                color="primary"
+                variant="primary"
+                size="icon-xs-sq"
+                class="q-mr-sm"
                 type="submit"
-                no-caps
                 @click="uploadImage(filesLight, 'light')"
-              />
+              >
+                <Check class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -327,60 +361,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-img
               data-test="setting_ent_custom_logo_dark_img"
               :src="
-                `data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img
+                `data:image; base64, ` +
+                store.state.zoConfig.custom_logo_dark_img
               "
               :alt="t('settings.logoLabel')"
               style="max-width: 150px; max-height: 31px"
               class="q-mx-md"
             />
-            <q-btn
-              icon="delete"
+            <OButton
               data-test="setting_ent_custom_logo_dark_img_delete_btn"
-              @click="confirmDeleteLogo('dark')"
+              variant="ghost-destructive"
+              size="icon-xs-sq"
               class="q-mx-md"
-              size="sm"
-            ></q-btn>
+              @click="confirmDeleteLogo('dark')"
+            >
+              <Trash2 class="tw:size-3.5 tw:shrink-0" />
+            </OButton>
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
-            data-test="setting_ent_custom_logo_dark_img_file_upload"
-            v-model="filesDark"
-            :label="t('settings.dragDropUpload')"
-            counter
-            :counter-label="counterLabelFn"
-            accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-            @rejected="onRejected"
-            dense
-            borderless
-            class="q-mx-none o2-file-input tw:w-[250px] "
-          >
-            <template v-slot:prepend>
-              <q-icon name="attach_file" />
-            </template>
-          </q-file>
-          <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
-              <q-btn
+              data-test="setting_ent_custom_logo_dark_img_file_upload"
+              v-model="filesDark"
+              :label="t('settings.dragDropUpload')"
+              counter
+              :counter-label="counterLabelFn"
+              accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+              @rejected="onRejected"
+              dense
+              borderless
+              class="q-mx-none o2-file-input tw:w-[250px]"
+            >
+              <template v-slot:prepend>
+                <q-icon name="attach_file" />
+              </template>
+            </q-file>
+            <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
+              <OButton
                 type="button"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
                 class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
                 @click="filesDark = null"
-              ></q-btn>
-              <q-btn
+              >
+                <X class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
+              <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
                 :loading="onSubmit.isLoading.value"
-                icon="check"
-                class="q-mr-sm "
-                dense
-                size="sm"
-                color="primary"
+                variant="primary"
+                size="icon-xs-sq"
+                class="q-mr-sm"
                 type="submit"
-                no-caps
                 @click="uploadImage(filesDark, 'dark')"
-              />
+              >
+                <Check class="tw:size-3.5 tw:shrink-0" />
+              </OButton>
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -405,22 +440,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right" class="tw:flex tw:gap-1">
-        <q-btn
+        <OButton
           data-test="logs-search-bar-confirm-dialog-cancel-btn"
-          :label="t('confirmDialog.cancel')"
-          class="o2-secondary-button tw:h-[28px] no-border"
-          flat
-          no-caps
+          variant="outline"
+          size="sm-action"
           @click="cancelConfirmDialog"
-        />
-        <q-btn
+        >
+          {{ t("confirmDialog.cancel") }}
+        </OButton>
+        <OButton
           data-test="logs-search-bar-confirm-dialog-ok-btn"
-          :label="t('confirmDialog.ok')"
-          class="o2-primary-button tw:h-[28px] no-border"
-          no-caps
-          flat
+          variant="primary"
+          size="sm-action"
           @click="confirmDialogOK"
-        />
+        >
+          {{ t("confirmDialog.ok") }}
+        </OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -432,13 +467,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-h6">{{ t("settings.pickCustomColor") }}</div>
       </q-card-section>
       <q-card-section>
-        <q-color
-          v-model="tempColor"
-          @update:model-value="updateCustomColor"
-        />
+        <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat :label="t('settings.close')" color="primary" v-close-popup />
+        <OButton variant="outline" size="sm-action" v-close-popup>
+          {{ t("settings.close") }}
+        </OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -460,6 +494,8 @@ import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { X, Check, Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -478,6 +514,7 @@ export default defineComponent({
   },
   components: {
     GroupHeader,
+    OButton,
   },
   setup() {
     const { t } = useI18n();
@@ -489,8 +526,8 @@ export default defineComponent({
         15,
     );
     const maxSeriesPerQuery = ref(
-      store.state?.organizationData?.organizationSettings?.max_series_per_query ??
-        null,
+      store.state?.organizationData?.organizationSettings
+        ?.max_series_per_query ?? null,
     );
 
     const loadingState = ref(false);
@@ -499,7 +536,7 @@ export default defineComponent({
     const files = ref(null);
     const filesLight = ref(null);
     const filesDark = ref(null);
-    const logoThemeToDelete = ref<string>('light');
+    const logoThemeToDelete = ref<string>("light");
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
@@ -513,19 +550,21 @@ export default defineComponent({
     // These refs display the current color in the UI and in the color picker
     const customLightColor = ref(
       store.state.tempThemeColors?.light ||
-      store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
-      DEFAULT_LIGHT_COLOR
+        store.state?.organizationData?.organizationSettings
+          ?.light_mode_theme_color ||
+        DEFAULT_LIGHT_COLOR,
     );
     const customDarkColor = ref(
       store.state.tempThemeColors?.dark ||
-      store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
-      DEFAULT_DARK_COLOR
+        store.state?.organizationData?.organizationSettings
+          ?.dark_mode_theme_color ||
+        DEFAULT_DARK_COLOR,
     );
 
     // Color picker dialog state
-    const showColorPicker = ref(false);                          // Controls dialog visibility
-    const currentPickerMode = ref<"light" | "dark">("light");    // Which mode is being edited
-    const tempColor = ref(DEFAULT_LIGHT_COLOR);                  // Bound to q-color component
+    const showColorPicker = ref(false); // Controls dialog visibility
+    const currentPickerMode = ref<"light" | "dark">("light"); // Which mode is being edited
+    const tempColor = ref(DEFAULT_LIGHT_COLOR); // Bound to q-color component
 
     /**
      * Update theme colors from Vuex store
@@ -547,11 +586,13 @@ export default defineComponent({
 
       const newLightColor =
         tempLightFromStore ||
-        store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
+        store.state?.organizationData?.organizationSettings
+          ?.light_mode_theme_color ||
         DEFAULT_LIGHT_COLOR;
       const newDarkColor =
         tempDarkFromStore ||
-        store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
+        store.state?.organizationData?.organizationSettings
+          ?.dark_mode_theme_color ||
         DEFAULT_DARK_COLOR;
 
       // Check if colors changed and need to be applied
@@ -570,7 +611,8 @@ export default defineComponent({
       if (shouldApply) {
         const currentMode = store.state.theme === "dark" ? "dark" : "light";
         const color = currentMode === "light" ? newLightColor : newDarkColor;
-        const isDefault = color === DEFAULT_LIGHT_COLOR || color === DEFAULT_DARK_COLOR;
+        const isDefault =
+          color === DEFAULT_LIGHT_COLOR || color === DEFAULT_DARK_COLOR;
         applyThemeColors(color, currentMode, isDefault);
       }
     };
@@ -587,9 +629,9 @@ export default defineComponent({
       () => {
         // Only update from org settings if user is NOT actively previewing a color
         // If temp colors exist in store, skip update to preserve the preview
-          updateFromStore();
+        updateFromStore();
       },
-      { deep: true, immediate: true }  // Deep watch to catch nested property changes
+      { deep: true, immediate: true }, // Deep watch to catch nested property changes
     );
 
     watch(
@@ -608,11 +650,12 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
-          max_series_per_query: maxSeriesPerQuery.value === null ||
-                                maxSeriesPerQuery.value === undefined ||
-                                maxSeriesPerQuery.value === ''
-                                ? null
-                                : maxSeriesPerQuery.value,
+          max_series_per_query:
+            maxSeriesPerQuery.value === null ||
+            maxSeriesPerQuery.value === undefined ||
+            maxSeriesPerQuery.value === ""
+              ? null
+              : maxSeriesPerQuery.value,
           light_mode_theme_color: customLightColor.value,
           dark_mode_theme_color: customDarkColor.value,
         });
@@ -625,11 +668,14 @@ export default defineComponent({
 
         // Apply the current mode's theme
         const currentMode = store.state.theme === "dark" ? "dark" : "light";
-        const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
+        const color =
+          currentMode === "light"
+            ? customLightColor.value
+            : customDarkColor.value;
         applyThemeColors(color, currentMode, false);
 
         // Clear temporary theme colors from store since we're saving permanently
-        store.commit('clearTempThemeColors');
+        store.commit("clearTempThemeColors");
 
         q.notify({
           type: "positive",
@@ -645,7 +691,7 @@ export default defineComponent({
       }
     });
 
-    const uploadImage = (fileList: any = null, theme: string = 'light') => {
+    const uploadImage = (fileList: any = null, theme: string = "light") => {
       const selectedFiles = fileList || files.value;
       // Handle single file or file array
       //but mostly we will support single file because we only show one image at a time right
@@ -678,7 +724,12 @@ export default defineComponent({
             if (res.status == 200) {
               q.notify({
                 type: "positive",
-                message: t("settings.logoUpdatedSuccessfully", { mode: theme === 'dark' ? t('settings.darkMode') : t('settings.lightMode') }),
+                message: t("settings.logoUpdatedSuccessfully", {
+                  mode:
+                    theme === "dark"
+                      ? t("settings.darkMode")
+                      : t("settings.lightMode"),
+                }),
                 timeout: 2000,
               });
 
@@ -687,7 +738,7 @@ export default defineComponent({
               });
 
               // Clear the appropriate file ref
-              if (theme === 'dark') {
+              if (theme === "dark") {
                 filesDark.value = null;
               } else {
                 filesLight.value = null;
@@ -726,7 +777,7 @@ export default defineComponent({
       }
     };
 
-    const deleteLogo = (theme: string = 'light') => {
+    const deleteLogo = (theme: string = "light") => {
       loadingState.value = true;
       let orgIdentifier = "default";
       for (let item of store.state.organizations) {
@@ -743,7 +794,12 @@ export default defineComponent({
           if (res.status == 200) {
             q.notify({
               type: "positive",
-              message: t("settings.logoDeletedSuccessfully", { mode: theme === 'dark' ? t('settings.darkMode') : t('settings.lightMode') }),
+              message: t("settings.logoDeletedSuccessfully", {
+                mode:
+                  theme === "dark"
+                    ? t("settings.darkMode")
+                    : t("settings.lightMode"),
+              }),
               timeout: 2000,
             });
 
@@ -801,7 +857,8 @@ export default defineComponent({
     const openColorPicker = (mode: "light" | "dark") => {
       currentPickerMode.value = mode;
       // Initialize tempColor with current color for this mode
-      tempColor.value = mode === "light" ? customLightColor.value : customDarkColor.value;
+      tempColor.value =
+        mode === "light" ? customLightColor.value : customDarkColor.value;
       showColorPicker.value = true;
     };
 
@@ -835,9 +892,9 @@ export default defineComponent({
       // Store temporarily in Vuex store
       // This makes the color available to App.vue and PredefinedThemes.vue
       // and prevents other watchers/observers from overriding it
-      store.commit('setTempThemeColor', {
+      store.commit("setTempThemeColor", {
         mode: currentPickerMode.value,
-        color: tempColor.value
+        color: tempColor.value,
       });
 
       // Apply the theme immediately to the UI for live preview
@@ -851,12 +908,19 @@ export default defineComponent({
       customDarkColor.value = DEFAULT_DARK_COLOR;
 
       // Store temporarily in Vuex store
-      store.commit('setTempThemeColor', { mode: 'light', color: DEFAULT_LIGHT_COLOR });
-      store.commit('setTempThemeColor', { mode: 'dark', color: DEFAULT_DARK_COLOR });
+      store.commit("setTempThemeColor", {
+        mode: "light",
+        color: DEFAULT_LIGHT_COLOR,
+      });
+      store.commit("setTempThemeColor", {
+        mode: "dark",
+        color: DEFAULT_DARK_COLOR,
+      });
 
       // Apply the theme immediately for current mode
       const currentMode = store.state.theme === "dark" ? "dark" : "light";
-      const color = currentMode === "light" ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR;
+      const color =
+        currentMode === "light" ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR;
       applyThemeColors(color, currentMode, true);
 
       // Show notification
@@ -883,11 +947,13 @@ export default defineComponent({
       localStorage.setItem("theme", mode);
 
       // Get the color for the new mode
-      const color = mode === "light" ? customLightColor.value : customDarkColor.value;
+      const color =
+        mode === "light" ? customLightColor.value : customDarkColor.value;
 
       // Check if the color is a default color
-      const isDefault = (mode === "light" && color === DEFAULT_LIGHT_COLOR) ||
-                       (mode === "dark" && color === DEFAULT_DARK_COLOR);
+      const isDefault =
+        (mode === "light" && color === DEFAULT_LIGHT_COLOR) ||
+        (mode === "dark" && color === DEFAULT_DARK_COLOR);
 
       // Apply the theme color for the new mode
       applyThemeColors(color, mode, isDefault);
@@ -981,7 +1047,9 @@ export default defineComponent({
         // https://quasar.dev/quasar-plugins/notify#Installation
         q.notify({
           type: "negative",
-          message: t("settings.filesValidationFailed", { count: rejectedEntries.length }),
+          message: t("settings.filesValidationFailed", {
+            count: rejectedEntries.length,
+          }),
         });
       },
       uploadImage,
@@ -1008,23 +1076,22 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-
 .general-page-title {
   font-size: 20px;
   font-weight: 700;
   line-height: 24px;
 }
-.general-page-subtitle{
+.general-page-subtitle {
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
 }
-.individual-setting-title{
+.individual-setting-title {
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
 }
-.individual-setting-description{
+.individual-setting-description {
   font-size: 13px;
   opacity: 0.7;
 }
@@ -1041,11 +1108,11 @@ export default defineComponent({
 .dark-settings-theme .settings-grid-item {
   border-bottom: 1px solid var(--o2-border-color) !important;
 }
-.text-btn-border-light{
-  border: 1px solid #D3D5DB ;
+.text-btn-border-light {
+  border: 1px solid #d3d5db;
 }
-.text-btn-border-dark{
-  border: 1px solid #6F737A ;
+.text-btn-border-dark {
+  border: 1px solid #6f737a;
 }
 
 // Theme management styles - Compact chip design
@@ -1109,7 +1176,7 @@ body.body--dark .theme-color-chip:hover {
 }
 
 .chip-value {
-  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-family: "SF Mono", "Monaco", "Menlo", monospace;
   font-size: 11px;
   font-weight: 500;
   opacity: 0.7;
@@ -1154,5 +1221,4 @@ body.body--dark .theme-reset-chip:hover {
 body.body--dark .theme-reset-chip:hover .q-icon {
   color: rgb(248, 113, 113);
 }
-
 </style>

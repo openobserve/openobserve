@@ -48,14 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /^[a-zA-Z0-9-]*$/.test(val) || 'Access ID should be alphanumeric',
         ]"
       />
-      <q-btn data-test="add-cipher-key-akeyless-access-id-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false" size="sm" color="primary" :label="t('common.cancel')" />
+      <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
       <label class="row q-field q-mb-md">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
       <pre class="pre-text">{{ formData.key.store.akeyless.access_id }}</pre>
-      <q-btn data-test="add-cipher-key-akeyless-access-id-input-update" @click="isUpdateAccessID = true" size="sm" color="primary" :label="t('common.update')" />
+      <OButton data-test="add-cipher-key-akeyless-access-id-input-update" variant="primary" size="sm-action" @click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
     </div>
     <q-select
       data-test="add-cipher-key-auth-method-input"
@@ -93,14 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             :rules="[(val: any) => !!val || 'Access Key is required']"
           />
-          <q-btn data-test="add-cipher-key-akeyless-access-key-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.access_key }}</pre>
-          <q-btn data-test="add-cipher-key-akeyless-access-key-input-update" @click="isUpdateAccessKey = true" size="sm" color="primary" :label="t('common.update')" />
+          <OButton data-test="add-cipher-key-akeyless-access-key-input-update" variant="primary" size="sm-action" @click="isUpdateAccessKey = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
       <div v-if="formData.key.store.akeyless.auth.type === 'ldap'">
@@ -118,14 +118,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (val: any) => /^[a-zA-Z0-9._-]+$/.test(val) || 'Username can only contain alphanumeric characters, dots, underscores, and hyphens',
             ]"
           />
-          <q-btn data-test="add-cipher-key-akeyless-ldap-username-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.username }}</pre>
-          <q-btn data-test="add-cipher-key-akeyless-ldap-username-input-update" @click="isUpdateLDAPUsername = true" size="sm" color="primary" :label="t('common.update')" />
+          <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
         </div>
         <div v-if="!formData.isUpdate || isUpdateLDAPPass || formData.key.store.akeyless.auth.ldap.password == ''">
           <q-input
@@ -140,14 +140,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             autocomplete="new-password"
             :rules="[(val: any) => !!val || 'LDAP Password is required']"
           />
-          <q-btn data-test="add-cipher-key-akeyless-ldap-password-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
           <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.password }}</pre>
-          <q-btn data-test="add-cipher-key-akeyless-ldap-password-input-update" @click="isUpdateLDAPPass = true" size="sm" color="primary" :label="t('common.update')" />
+          <OButton data-test="add-cipher-key-akeyless-ldap-password-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPPass = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
     </fieldset>
@@ -227,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { validateUrl } from "@/utils/zincutils";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 export interface AkeylessStore {
   store: {
@@ -261,6 +262,7 @@ export interface FormData {
 }
 export default defineComponent({
   name: "PageAddAkeylessType",
+  components: { OButton },
   props: {
     formData: {
       type: Object,

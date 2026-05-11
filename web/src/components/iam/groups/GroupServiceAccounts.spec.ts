@@ -551,7 +551,7 @@ describe("GroupServiceAccounts Component", () => {
     });
 
     it("has proper button styling", () => {
-      const filterButtons = wrapper.findAll('.visual-selection-btn');
+      const filterButtons = wrapper.findAll('[data-test^="iam-service-accounts-selection-show-"]');
       expect(filterButtons.length).toBeGreaterThan(0);
     });
 

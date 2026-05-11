@@ -43,14 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <span class="webinar-top-bar-sep" aria-hidden="true">|</span>
 
-      <button
-        class="webinar-top-bar-link webinar-top-bar-dismiss"
+      <OButton
+        variant="webinar-dismiss"
         aria-label="Dismiss webinar banner"
         @click="dismiss"
         data-test="webinar-top-bar-dismiss-btn"
       >
         Dismiss
-      </button>
+      </OButton>
     </div>
   </div>
 
@@ -81,20 +81,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-btn
+      <OButton
         v-if="webinarData.primaryButton"
-        no-caps
-        color="secondary"
-        class="webinar-home-register-btn"
+        variant="secondary"
+        size="sm"
+        as="a"
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
         data-test="webinar-home-register-btn"
       >
         {{ webinarData.primaryButton.text }}
-        <q-icon name="arrow_forward" class="q-ml-sm"
-size="1rem" />
-      </q-btn>
+        <q-icon name="arrow_forward" class="q-ml-sm" size="1rem" />
+      </OButton>
     </div>
   </div>
 </template>
@@ -102,6 +101,7 @@ size="1rem" />
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const store = useStore();
 
@@ -352,15 +352,5 @@ onMounted(async () => {
   span {
     line-height: 1;
   }
-}
-
-.webinar-home-register-btn {
-  flex-shrink: 0;
-  border-radius: 0.25rem !important;
-  font-size: 0.875rem !important;
-  padding: 0 1.25rem !important;
-  height: 2.375rem !important;
-  min-height: 2.375rem !important;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--q-secondary) 35%, transparent) !important;
 }
 </style>

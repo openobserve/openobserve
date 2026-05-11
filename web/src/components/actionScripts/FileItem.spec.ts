@@ -284,21 +284,21 @@ describe("FileItem.vue", () => {
   describe("Button Styling", () => {
     it("applies light gray styling to buttons when active", () => {
       wrapper = createWrapper({ isActive: true });
-      const buttons = wrapper.findAll("button");
+      const icons = wrapper.findAll(".file-actions .q-icon");
 
-      buttons.forEach((button) => {
-        expect(button.classes()).toContain("tw:text-gray-100");
-        expect(button.classes()).not.toContain("tw:text-gray-600");
+      icons.forEach((icon) => {
+        expect(icon.classes()).toContain("tw:text-gray-100");
+        expect(icon.classes()).not.toContain("tw:text-gray-600");
       });
     });
 
     it("applies dark gray styling to buttons when not active", () => {
       wrapper = createWrapper({ isActive: false });
-      const buttons = wrapper.findAll("button");
+      const icons = wrapper.findAll(".file-actions .q-icon");
 
-      buttons.forEach((button) => {
-        expect(button.classes()).toContain("tw:text-gray-600");
-        expect(button.classes()).not.toContain("tw:text-gray-100");
+      icons.forEach((icon) => {
+        expect(icon.classes()).toContain("tw:text-gray-600");
+        expect(icon.classes()).not.toContain("tw:text-gray-100");
       });
     });
   });

@@ -58,47 +58,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-select>
       </div>
       <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
-        <q-btn
+        <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          :label="t('correlation.exportToJson')"
-          :disable="localGroups.length === 0"
+          variant="outline"
+          size="sm"
+          :disabled="localGroups.length === 0"
           @click="exportGroups"
-        />
-        <q-btn
+        >{{ t('correlation.exportToJson') }}</OButton>
+        <OButton
           data-test="correlation-semanticfieldgroup-import-json-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          :label="t('correlation.importFromJson')"
+          variant="outline"
+          size="sm"
           @click="navigateToImport"
-        />
-        <q-btn
+        >{{ t('correlation.importFromJson') }}</OButton>
+        <OButton
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          color="primary"
-          :label="t('correlation.addCustomGroup')"
+          variant="primary"
+          size="sm"
           @click="addGroup"
-        />
+        >{{ t('correlation.addCustomGroup') }}</OButton>
+        <slot name="header-actions" />
       </div>
     </div>
 
@@ -187,6 +166,7 @@ import { useI18n } from "vue-i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 const store = useStore();
 const { t } = useI18n();

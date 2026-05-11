@@ -27,17 +27,15 @@
       <div class="flex items-center q-table__title q-mr-md">
         <span>{{ t("dashboard.valueMappingsTitle") }}</span>
       </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        outline
+      <OButton
+        variant="ghost"
+        size="icon"
         :title="t('dashboard.cancel')"
         @click.stop="cancelEdit"
         data-test="dashboard-tab-settings-tab-name-edit-cancel"
-      ></q-btn>
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
     </div>
     <div class="tw:mb-4">
       <draggable
@@ -72,7 +70,8 @@
               borderless
               dense
               class="q-mb-xs tw:flex-1 o2-custom-select-dashboard"
-             hide-bottom-space></q-select>
+              hide-bottom-space
+            ></q-select>
             <div
               v-if="mapping.type === 'value'"
               class="input-container tw:flex-1"
@@ -83,7 +82,9 @@
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
             </div>
             <div
               v-if="mapping.type === 'regex'"
@@ -95,7 +96,9 @@
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
             </div>
             <div
               v-if="mapping.type === 'range'"
@@ -107,14 +110,18 @@
                 class="input-spacing"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
               <q-input
                 v-model="mapping.to"
                 :label="t('dashboard.valueMappingTo')"
                 class="input-spacing tw:flex-1"
                 dense
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
             </div>
             <q-input
               v-model="mapping.text"
@@ -122,7 +129,9 @@
               class="input-spacing tw:flex-1"
               dense
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
-             borderless hide-bottom-space/>
+              borderless
+              hide-bottom-space
+            />
             <div class="color-section tw:flex-1">
               <div
                 v-if="mapping.color !== null"
@@ -133,7 +142,9 @@
                   style="width: 90%"
                   class="input-spacing"
                   dense
-                 borderless hide-bottom-space>
+                  borderless
+                  hide-bottom-space
+                >
                   <template v-slot:append>
                     <q-icon name="colorize" class="cursor-pointer">
                       <q-popup-proxy cover transition-show="scale">
@@ -152,48 +163,41 @@
                 />
               </div>
               <div v-else class="tw:w-full">
-                <q-btn
-                  :label="t('dashboard.valueMappingSetColor')"
-                  no-caps
-                  flat
-                  dense
-                  class="tw:text-blue-700 tw:font-semibold tw:w-full"
+                <OButton
+                  variant="ghost-primary"
+                  size="sm"
+                  class="tw:w-full"
                   @click="setColorByIndex(index)"
-                />
+                  >{{ t("dashboard.valueMappingSetColor") }}</OButton
+                >
               </div>
             </div>
-            <q-btn
-              icon="close"
-              class="delete-btn"
-              dense
-              flat
-              round
+            <OButton
+              variant="ghost"
+              size="icon"
               @click="removeValueMappingByIndex(index)"
               :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
         </div>
       </draggable>
       <div class="flex justify-between">
-        <q-btn
+        <OButton
+          variant="outline"
+          size="sm"
           @click="addValueMapping"
-          :label="t('dashboard.valueMappingAddNew')"
-          no-caps
-          outline
-          dense
           data-test="dashboard-addpanel-config-value-mapping-add-btn"
-          class="el-border"
-        />
-        <q-btn
+          >{{ t("dashboard.valueMappingAddNew") }}</OButton
+        >
+        <OButton
+          variant="primary"
+          size="sm"
           @click="applyValueMapping"
-          color="primary"
-          :label="t('dashboard.valueMappingApply')"
-          style="margin-right: 10px"
-          padding="5px 14px"
-          no-caps
-          dense
           data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-        />
+          >{{ t("dashboard.valueMappingApply") }}</OButton
+        >
       </div>
     </div>
   </div>
@@ -205,10 +209,11 @@ import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: { draggable: VueDraggableNext as any },
+  components: { draggable: VueDraggableNext as any, OButton },
   props: {
     valueMapping: {
       type: Array,

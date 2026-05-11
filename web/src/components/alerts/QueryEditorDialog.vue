@@ -70,20 +70,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:gap-3">
 
               <!-- AI button -->
-              <q-btn
+              <OButton
                 v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                 :ripple="false"
                 @click="toggleAIChat"
                 data-test="menu-link-ai-item"
-                no-caps flat dense
+                variant="ghost"
+                size="icon-circle-sm"
                 class="ai-hover-btn"
                 :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-                style="border-radius: 6px; width: 32px; height: 32px;"
                 @mouseenter="isHovered = true"
                 @mouseleave="isHovered = false"
               >
                 <img :src="getBtnLogo" style="width: 18px; height: 18px;" />
-              </q-btn>
+              </OButton>
             </div>
           </div>
 
@@ -132,17 +132,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <q-tooltip :delay="400" class="tw:text-[12px]">{{ sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor' }}</q-tooltip>
                         </q-toggle>
-                        <q-btn
+                        <OButton
                           data-test="alert-run-query-btn"
-                          no-caps
-                          unelevated
-                          color="primary"
+                          variant="primary"
+                          size="sm"
                           class="run-query-btn"
-                          :disable="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
+                          :disabled="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
                           @click="localTab === 'sql' ? runSqlQuery() : runPromqlQuery()"
                         >
                           <span class="tw:text-xs tw:font-semibold">{{ t('alerts.runQuery') }}</span>
-                        </q-btn>
+                        </OButton>
                       </div>
                     </div>
 
@@ -256,17 +255,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </q-select>
                       <!-- Apply VRL -->
-                      <q-btn
+                      <OButton
                         data-test="alert-apply-vrl-btn"
-                        no-caps
-                        unelevated
-                        color="primary"
+                        variant="primary"
+                        size="sm"
                         class="run-query-btn"
-                        :disable="vrlFunctionContent == ''"
+                        :disabled="vrlFunctionContent == ''"
                         @click="runTestFunction"
                       >
                         <span class="tw:text-xs tw:font-semibold">{{ t('alerts.applyVRL') }}</span>
-                      </q-btn>
+                      </OButton>
                     </div>
                   </div>
 
@@ -444,6 +442,7 @@ import { ref, computed, watch, type PropType, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import OButton from '@/lib/core/Button/OButton.vue';
 import { debounce } from "lodash-es";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
@@ -1339,7 +1338,7 @@ const getBtnLogo = computed(() => {
   }
 }
 
-.ai-hover-btn {
+:deep(.ai-hover-btn) {
   opacity: 1;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   transition: background 0.3s ease, box-shadow 0.3s ease;
@@ -1350,7 +1349,7 @@ const getBtnLogo = computed(() => {
   }
 }
 
-.ai-btn-active {
+:deep(.ai-btn-active) {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
 }
 

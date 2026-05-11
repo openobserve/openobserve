@@ -97,25 +97,20 @@
       />
     </template>
 
-    <div class="flex justify-start q-mt-md">
-      <q-btn
+    <div class="tw:flex tw:gap-2 q-mt-md">
+      <OButton
         data-test="add-alert-cancel-btn"
-        v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
+        variant="outline"
+        size="sm-action"
         @click="$emit('cancel:hideform')"
-      />
-      <q-btn
+      >{{ t('alerts.cancel') }}</OButton>
+      <OButton
         data-test="add-alert-submit-btn"
-        :label="t('alerts.save')"
-        class="o2-primary-button no-border tw:h-[36px]"
+        variant="primary"
+        size="sm-action"
         type="submit"
-        no-caps
-        flat
         @click="saveOrgSettings"
-      />
+      >{{ t('alerts.save') }}</OButton>
     </div>
     </div>
   </div>
@@ -128,6 +123,7 @@ import organizations from "@/services/organizations";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import config from "@/aws-exports";
 
 const { t } = useI18n();

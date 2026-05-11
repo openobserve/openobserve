@@ -255,30 +255,13 @@ export async function hasRefreshIndicator(page, level = 'global') {
   try {
     if (level === 'global') {
       const refreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
-      // Check if button has warning color class
-      // When Quasar applies :color="warning" with :outline="false", it adds q-btn--warning class
-      // When :outline="true", it's just an outlined button with no warning
-      const classList = await refreshBtn.getAttribute('class');
-      // Check for Quasar warning classes (q-btn--warning) or custom refresh indicator classes
-      return classList && (
-        classList.includes('q-btn--warning') ||
-        classList.includes('bg-warning') ||
-        classList.includes('text-warning') ||
-        classList.includes('refresh-needed') ||
-        classList.includes('needs-refresh') ||
-        classList.includes('highlighted')
-      );
+      // OButton exposes variant via data-o2-variant attribute
+      const variant = await refreshBtn.getAttribute('data-o2-variant');
+      return variant === 'warning';
     } else {
-      const panelRefreshBtn = page.locator(`[data-panel="dashboard-panel-refresh-panel-btn"]`);
-      const classList = await panelRefreshBtn.getAttribute('class');
-      return classList && (
-        classList.includes('q-btn--warning') ||
-        classList.includes('bg-warning') ||
-        classList.includes('text-warning') ||
-        classList.includes('refresh-needed') ||
-        classList.includes('needs-refresh') ||
-        classList.includes('highlighted')
-      );
+      const panelRefreshBtn = page.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
+      const variant = await panelRefreshBtn.getAttribute('data-o2-variant');
+      return variant === 'warning';
     }
   } catch (error) {
     testLogger.debug(`Error checking refresh indicator: ${error.message}`);

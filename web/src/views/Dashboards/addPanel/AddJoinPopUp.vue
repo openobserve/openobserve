@@ -164,15 +164,14 @@
             />
           </div>
 
-          <q-btn
-            @click="handleAddCondition(argIndex)"
-            no-caps
-            dense
-            flat
-            icon="add"
+          <OButton
+            variant="ghost"
+            size="icon"
             :aria-label="t('panel.addClause')"
             :data-test="`dashboard-join-condition-add-${argIndex}`"
+            @click="handleAddCondition(argIndex)"
           >
+            <template #icon-left><q-icon name="add" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -180,27 +179,23 @@
             >
               Add another clause
             </q-tooltip>
-          </q-btn>
+          </OButton>
 
-          <q-btn
+          <OButton
+            variant="ghost"
+            size="icon-circle"
             :data-test="`dashboard-join-condition-remove-${argIndex}`"
-            icon="close"
-            dense
-            flat
-            round
-            :disable="modelValue.conditions.length === 1"
+            :disabled="modelValue.conditions.length === 1"
             @click="handleRemoveCondition(argIndex)"
-            class="tw:h-10 tw:w-10"
             :aria-label="t('panel.removeClause')"
           >
+            <template #icon-left><q-icon name="close" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
               self="bottom middle"
-            >
-              Remove clause
-            </q-tooltip>
-          </q-btn>
+            >Remove clause</q-tooltip>
+          </OButton>
         </div>
       </div>
     </div>
@@ -208,6 +203,7 @@
 </template>
 
 <script lang="ts">
+import OButton from "@/lib/core/Button/OButton.vue";
 import {
   defineComponent,
   watch,
@@ -277,6 +273,7 @@ export default defineComponent({
   name: "AddJoinPopUp",
 
   components: {
+    OButton,
     StreamFieldSelect,
     LeftJoinSvg,
     LeftJoinTypeSvg,

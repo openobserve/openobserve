@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -44,19 +44,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn
-            :icon="outlinedCancel"
+          <OButton
+            variant="ghost-destructive"
+            size="icon-sm"
             :title="t('queries.cancelQuery')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            style="color: red"
-            round
-            flat
-            @click.stop="confirmDeleteAction(props)"
             data-test="cancelQuery-btn"
-          />
+            @click.stop="confirmDeleteAction(props)"
+          >
+            <X class="tw:size-4" />
+          </OButton>
         </q-td>
       </template>
       <template #body-cell-duration="props">
@@ -71,17 +67,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #bottom="scope">
-        <q-btn
+        <OButton
           data-test="qm-multiple-cancel-query-btn"
-          class="o2-secondary-button no-border tw:h-[36px]"
-          flat
-          outline
-          padding="sm lg"
-          :disable="selectedRow.length === 0"
+          variant="outline-destructive"
+          size="sm-action"
+          :disabled="selectedRow.length === 0"
           @click="handleMultiQueryCancel"
-          no-caps
-          :label="t('queries.cancelQuery')"
-        />
+        >
+          {{ t('queries.cancelQuery') }}
+        </OButton>
         <q-space />
         <div style="width: auto">
           <q-table-pagination
@@ -100,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, type Ref, defineComponent, computed } from "vue";
 import { type QTableProps, QTable } from "quasar";
@@ -107,11 +102,13 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { X } from 'lucide-vue-next';
 import { durationFormatter } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QTablePagination, NoData },
+  components: { QTablePagination, NoData, OButton, X },
   props: {
     rows: {
       type: Array,

@@ -149,7 +149,7 @@ describe("AddCondition.vue", () => {
   it("should not display logical operator when conditionIndex is 0", () => {
     wrapper = createWrapper({ conditionIndex: 0 });
     const logicalOperatorSelect = wrapper.find(
-      '[data-test="dashboard-add-condition-logical-operator-0}"]',
+      '[data-test="dashboard-add-condition-logical-operator-0"]',
     );
     expect(logicalOperatorSelect.exists()).toBe(false);
   });
@@ -157,7 +157,7 @@ describe("AddCondition.vue", () => {
   it("should display logical operator when conditionIndex is not 0", () => {
     wrapper = createWrapper({ conditionIndex: 1 });
     const logicalOperatorSelect = wrapper.find(
-      '[data-test="dashboard-add-condition-logical-operator-1}"]',
+      '[data-test="dashboard-add-condition-logical-operator-1"]',
     );
     expect(logicalOperatorSelect.exists()).toBe(true);
   });
@@ -262,10 +262,10 @@ describe("AddCondition.vue", () => {
 
     it("should return formatted condition for comparison operators", () => {
       const comparisonTests = [
-        { operator: ">=", value: "100", expected: "test_column >= '100'" },
-        { operator: "<=", value: "50", expected: "test_column <= '50'" },
-        { operator: ">", value: "10", expected: "test_column > '10'" },
-        { operator: "<", value: "5", expected: "test_column < '5'" },
+        { operator: ">=", value: "100", expected: "test_column >= 100" },
+        { operator: "<=", value: "50", expected: "test_column <= 50" },
+        { operator: ">", value: "10", expected: "test_column > 10" },
+        { operator: "<", value: "5", expected: "test_column < 5" },
       ];
 
       comparisonTests.forEach(({ operator, value, expected }) => {
@@ -362,7 +362,7 @@ describe("AddCondition.vue", () => {
       });
 
       const result = wrapper.vm.computedLabel(wrapper.props().condition);
-      expect(result).toBe("message NOT LIKE %debug%");
+      expect(result).toBe("message NOT LIKE '%debug%'");
     });
 
     it("should return LIKE condition for Starts With operator", () => {
@@ -376,7 +376,7 @@ describe("AddCondition.vue", () => {
       });
 
       const result = wrapper.vm.computedLabel(wrapper.props().condition);
-      expect(result).toBe("path LIKE /api%");
+      expect(result).toBe("path LIKE '/api%'");
     });
 
     it("should return LIKE condition for Ends With operator", () => {
@@ -390,7 +390,7 @@ describe("AddCondition.vue", () => {
       });
 
       const result = wrapper.vm.computedLabel(wrapper.props().condition);
-      expect(result).toBe("filename LIKE %.log");
+      expect(result).toBe("filename LIKE '%.log'");
     });
   });
 

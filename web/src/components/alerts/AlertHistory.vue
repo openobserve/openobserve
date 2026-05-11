@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -25,15 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-between full-width tw:h-[68px] tw:px-2 tw:py-3"
         >
           <div class="flex items-center">
-            <q-btn
-              no-caps
+            <OButton
               padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              class="el-border"
+              variant="outline"
+              size="icon-sm"
               @click="goBack"
               data-test="alert-history-back-btn"
-            />
+            >
+              <q-icon name="arrow_back_ios_new" />
+            </OButton>
             <div
               class="q-table__title tw:font-[600] q-ml-sm"
               data-test="alerts-history-title"
@@ -93,28 +93,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item>
               </template>
             </q-select>
-            <q-btn
-              icon="search"
-              flat
-              dense
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               @click="manualSearch"
               data-test="alert-history-manual-search-btn"
-              :disable="loading"
-              class="q-mr-sm download-logs-btn q-px-sm q-py-sm element-box-shadow el-border"
+              :disabled="loading"
+              class="q-mr-sm"
             >
+              <q-icon name="search" />
               <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              icon="refresh"
-              flat
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               @click="refreshData"
-              class="download-logs-btn q-px-sm q-py-sm element-box-shadow el-border"
               data-test="alert-history-refresh-btn"
               :loading="loading"
             >
+              <q-icon name="refresh" />
               <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
         </div>
       </div>
@@ -268,34 +267,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #body-cell-actions="props">
             <q-td :props="props">
-              <q-btn
-                icon="visibility"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
+              <OButton
+                variant="ghost"
+                size="icon-circle-sm"
                 @click="showDetailsDialog(props.row)"
                 data-test="alert-history-view-details"
               >
+                <q-icon name="visibility" />
                 <q-tooltip>View Details</q-tooltip>
-              </q-btn>
-              <q-btn
+              </OButton>
+              <OButton
                 v-if="props.row.error"
                 :data-test="`pipeline-list-${props.row.name}-error-indicator`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                color="negative"
-                icon="error"
+                variant="ghost-destructive"
+                size="icon-circle-sm"
                 @click.stop="showErrorDialog(props.row)"
               >
+                <q-icon name="error" />
                 <q-tooltip>
                   Last error: {{ new Date(props.row.timestamp / 1000).toLocaleString() }}
                 </q-tooltip>
-              </q-btn>
+              </OButton>
             </q-td>
           </template>
 
@@ -327,7 +319,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-xs bg-primary text-white">
           <div class="text-h6">Alert Execution Details</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton variant="ghost" size="icon-circle-sm" v-close-popup>
+            <q-icon name="close" />
+          </OButton>
         </q-card-section>
 
         <q-separator />
@@ -534,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="right" class="q-pa-md">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -554,14 +548,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
             </div>
           </div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
+          <OButton
+            variant="ghost"
+            size="icon-circle-sm"
             @click="closeErrorDialog"
             class="close-btn"
-          />
+          >
+            <q-icon name="close" />
+          </OButton>
         </q-card-section>
 
         <q-separator />
@@ -575,13 +569,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
         <q-card-actions class="pipeline-error-actions">
-          <q-btn
-            flat
-            no-caps
-            label="Close"
-            class="o2-secondary-button tw:h-[36px]"
+          <OButton
+            variant="ghost"
+            size="sm-action"
             @click="closeErrorDialog"
-          />
+          >Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -589,6 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -598,6 +591,7 @@ import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 const { t } = useI18n();
 const store = useStore();

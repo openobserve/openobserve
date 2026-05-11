@@ -201,9 +201,10 @@ describe("AddRegexPattern", () => {
     });
 
     it("should render the component title for editing regex pattern", () => {
-      const wrapper = createWrapper({ isEdit: true });
+      const wrapper = createWrapper({ isEdit: true, data: { name: "", pattern: "", description: "" } });
       const title = wrapper.find('[data-test="add-regex-pattern-title"]');
       expect(title.exists()).toBe(true);
+      wrapper.unmount();
     });
   });
 
@@ -215,9 +216,10 @@ describe("AddRegexPattern", () => {
     });
 
     it("should handle isEdit prop correctly for edit mode", () => {
-      const wrapper = createWrapper({ isEdit: true });
+      const wrapper = createWrapper({ isEdit: true, data: { name: "", pattern: "", description: "" } });
       const nameInput = wrapper.find('[data-test="add-regex-pattern-name-input"]');
       expect(nameInput.attributes("disabled")).toBeDefined();
+      wrapper.unmount();
     });
 
     it("should populate fields when editing existing pattern", () => {
@@ -242,7 +244,7 @@ describe("AddRegexPattern", () => {
       const wrapper = createWrapper();
       const saveBtn = wrapper.find('[data-test="add-regex-pattern-save-btn"]');
       if (saveBtn.exists()) {
-        expect(saveBtn.attributes("disable")).toBeDefined();
+        expect(saveBtn.attributes("disabled")).toBeDefined();
       } else {
         // If button doesn't exist, check the component's computed property instead
         expect(wrapper.vm.isFormEmpty).toBe(true);
@@ -328,13 +330,16 @@ describe("AddRegexPattern", () => {
 
     it("should toggle AI chat when AI button is clicked", async () => {
       mockStore.state.zoConfig.ai_enabled = true;
+      mockStore.state.isAiChatEnabled = false;
       const wrapper = createWrapper();
       const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
-      
+
       if (aiBtn.exists()) {
         await aiBtn.trigger("click");
-        expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
+        // toggleAIChat dispatches setIsAiChatEnabled — verify via state change
+        expect(mockStore.state.isAiChatEnabled).toBe(true);
       }
+      wrapper.unmount();
     });
   });
 
@@ -509,12 +514,10 @@ describe("AddRegexPattern", () => {
       expect(wrapper.vm.store.state.zoConfig.ai_enabled).toBe(true);
       
       // Look for button that should have the AI attributes
-      const allBtns = wrapper.findAll('[data-test-stub="q-btn"]');
-      const aiBtn = allBtns.find(btn => {
-        return btn.attributes('data-test') === 'add-regex-pattern-open-close-ai-btn';
-      });
-      
-      if (aiBtn) {
+      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
+      const allBtns = wrapper.findAll('button[data-o2-btn]');
+
+      if (aiBtn.exists()) {
         expect(aiBtn.exists()).toBe(true);
       } else {
         // Since all conditions are met, the AI functionality is properly configured

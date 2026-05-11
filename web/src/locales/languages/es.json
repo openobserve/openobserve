@@ -123,7 +123,11 @@
     "version": "Versión",
     "create": "Crear",
     "resources": "Recursos",
-    "updated_at": "Actualizado en"
+    "updated_at": "Actualizado en",
+    "error": "Error",
+    "db": "Base de datos",
+    "discardChanges": "Descartar cambios",
+    "unsavedChanges": "Cambios no guardados"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -390,7 +394,8 @@
     "autoRunEnabled": "Ejecución automática habilitada",
     "selectStreamFirst": "Selecciona primero una transmisión",
     "traces": "Huellas",
-    "switchToLogs": "haga clic para volver a Registros"
+    "switchToLogs": "haga clic para volver a Registros",
+    "patternNoValuesAvailable": "No hay valores disponibles"
   },
   "menu": {
     "home": "Inicio",
@@ -2237,6 +2242,8 @@
     "editJson": "Editar alerta JSON",
     "additional_settings": "Ajustes adicionales",
     "alertNamePlaceholder": "Nombre de alerta",
+    "nameRequired": "El nombre de la alerta es obligatorio.",
+    "nameNoSpecialChars": "El nombre de la alerta no puede contener ':', '#', '?', '&', '%', comillas ni espacios. Use guiones bajos (_) en su lugar.",
     "anomalyNamePlaceholder": "Nombre de la anomalía",
     "folder": "Carpeta",
     "selectStreamTypeFirst": "Selecciona primero un tipo de transmisión",
@@ -2911,7 +2918,21 @@
       "minutesAgo": "Hace {n} m",
       "hoursAgo": "Hace {n} h",
       "daysAgo": "Hace {n} d"
-    }
+    },
+    "noErrorPresent": "No hay ningún error en este intervalo",
+    "httpStatusCode": "Código de estado HTTP",
+    "grpcStatusCode": "Código de estado de gRPC",
+    "dbResponseStatusCode": "Código de estado de respuesta de base de datos",
+    "processExitCode": "Código de salida del proceso",
+    "exceptionsWithCount": "Excepciones ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Mensaje:",
+    "escapedLabel": "Se escapó:",
+    "stacktraceLabel": "Stacktrace:",
+    "copyStacktrace": "Copiar stacktrace",
+    "noStacktraceAvailable": "No hay stacktrace disponible",
+    "stacktraceCopied": "Stacktrace copiado al portapapeles",
+    "stacktraceCopyFailed": "No se pudo copiar stacktrace"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -3313,7 +3334,9 @@
     "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado.",
     "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros.",
     "serviceGroupProtected": "No se puede eliminar el grupo de servicios. Solo puede modificar los campos mapeados.",
-    "noDataFound": "No se han encontrado datos"
+    "noDataFound": "No se han encontrado datos",
+    "isWorkloadType": "Identificador de servicio",
+    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

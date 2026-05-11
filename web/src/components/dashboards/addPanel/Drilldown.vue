@@ -51,14 +51,14 @@
         />
       </div>
     </div>
-    <q-btn
+    <OButton
+      variant="outline"
+      size="sm"
       @click="addNewDrilldown"
-      style="cursor: pointer; padding: 0px 5px"
-      label="+ Add"
-      class="el-border"
-      no-caps
       data-test="dashboard-addpanel-config-drilldown-add-btn"
-    />
+    >
+      + Add
+    </OButton>
     <app-dialog v-model="showDrilldownPopUp">
       <drilldown-pop-up
         :drilldown-data-index="selectedDrilldownIndexToEdit"
@@ -75,6 +75,7 @@
 import { defineComponent, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import AppDialog from "../../common/AppDialog.vue";
@@ -82,7 +83,7 @@ import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, AppDialog },
+  components: { DrilldownPopUp, AppDialog, OButton },
   props: ["variablesData"],
   setup() {
     const { t } = useI18n();

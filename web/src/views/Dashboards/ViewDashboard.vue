@@ -24,7 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         fullscreen: isFullscreen,
         'print-mode-container': store.state.printMode,
       }"
-      :style="!store.state.printMode && !isFullscreen ? { height: 'calc(100vh - var(--navbar-height))' } : {}"
+      :style="
+        !store.state.printMode && !isFullscreen
+          ? { height: 'calc(100vh - var(--navbar-height))' }
+          : {}
+      "
       class="tw:mx-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden q-pt-xs"
     >
       <div
@@ -41,16 +45,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex justify-between items-center tw:w-full tw:px-[0.626rem] tw:min-w-0 card-container tw:h-[48px]"
         >
           <div class="tw:flex tw:flex-1 tw:overflow-hidden">
-            <q-btn
+            <OButton
               v-if="!isFullscreen"
-              no-caps
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-xs"
               @click="goBackToDashboardList"
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
               data-test="dashboard-back-btn"
-              class="hideOnPrintMode el-border"
-            />
+            >
+              <template #icon-left
+                ><q-icon name="arrow_back_ios_new"
+              /></template>
+            </OButton>
             <span
               class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
               @click="goBackToDashboardList"
@@ -72,19 +78,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ currentDashboardData.data?.title }}
             </span>
           </div>
-          <div class="tw:flex">
-            <q-btn
+          <div class="tw:flex tw:gap-2 tw:items-center">
+            <OButton
               v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="add"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-xs"
               @click="addPanelData"
               data-test="dashboard-panel-add"
             >
+              <template #icon-left><q-icon name="add" /></template>
               <q-tooltip>{{ t("panel.add") }}</q-tooltip>
-            </q-btn>
+            </OButton>
             <!-- <DateTimePicker 
             class="q-ml-sm"
             ref="refDateTime"
@@ -108,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
-              class="dashboard-icons q-ml-sm"
+              class="dashboard-icons"
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
@@ -123,37 +128,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode q-ml-sm"
+              class="dashboard-icons hideOnPrintMode"
               style="padding-left: 0px; padding-right: 0px"
               size="sm"
             />
-            <q-btn
+            <OButton
               v-if="config.isEnterprise == 'true' && arePanelsLoading"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="cancel"
+              v-show="store.state.printMode !== true"
+              variant="outline-destructive"
+              size="icon-xs"
               @click="cancelQuery"
               data-test="dashboard-cancel-btn"
-              color="negative"
             >
+              <template #icon-left><q-icon name="cancel" /></template>
               <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
-            </q-btn>
-            <q-btn
+            </OButton>
+            <OButton
               v-else
-              :outline="isVariablesChanged ? false : true"
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="refresh"
+              v-show="store.state.printMode !== true"
+              :variant="isVariablesChanged ? 'warning' : 'outline'"
+              size="icon-xs"
               @click="refreshData"
-              :disable="arePanelsLoading"
+              :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
               data-test="dashboard-refresh-btn"
-              :color="isVariablesChanged ? 'warning' : ''"
-              :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
             >
+              <template #icon-left><q-icon name="refresh" /></template>
               <q-tooltip>
                 {{
                   isVariablesChanged
@@ -161,87 +161,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : "Refresh"
                 }}
               </q-tooltip>
-            </q-btn>
+            </OButton>
 
             <ExportDashboard
               v-if="!isFullscreen"
-              class="hideOnPrintMode el-border"
+              v-show="store.state.printMode !== true"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
             <share-button
               v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
               :url="dashboardShareURL"
-              button-class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              button-size="sm"
+              variant="outline"
+              size="icon-xs"
               data-test="dashboard-share-btn"
             />
-            <q-btn
+            <OButton
               v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="settings"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-xs"
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
             >
+              <template #icon-left><q-icon name="settings" /></template>
               <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm el-border"
-              size="sm"
-              no-caps
-              :icon="store.state.printMode === true ? 'close' : 'print'"
+            </OButton>
+            <OButton
+              variant="outline"
+              size="icon-xs"
               @click="printDashboard"
               data-test="dashboard-print-btn"
-              ><q-tooltip>{{
+            >
+              <template #icon-left
+                ><q-icon
+                  :name="store.state.printMode === true ? 'close' : 'print'"
+              /></template>
+              <q-tooltip>{{
                 store.state.printMode === true
                   ? t("common.close")
                   : t("dashboard.print")
-              }}</q-tooltip></q-btn
-            >
-            <q-btn
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              :icon="
-                quasar.fullscreen.isActive ? 'fullscreen_exit' : 'fullscreen'
-              "
+              }}</q-tooltip>
+            </OButton>
+            <OButton
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-xs"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
-              ><q-tooltip>{{
+            >
+              <template #icon-left
+                ><q-icon
+                  :name="
+                    quasar.fullscreen.isActive
+                      ? 'fullscreen_exit'
+                      : 'fullscreen'
+                  "
+              /></template>
+              <q-tooltip>{{
                 quasar.fullscreen.isActive
                   ? t("dashboard.exitFullscreen")
                   : t("dashboard.fullscreen")
-              }}</q-tooltip></q-btn
-            >
-            <q-btn
+              }}</q-tooltip>
+            </OButton>
+            <OButton
               v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              :icon="outlinedDescription"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-xs"
               @click="openScheduledReports"
               data-test="view-dashboard-scheduled-reports"
-              ><q-tooltip>
-                {{ t("dashboard.scheduledDashboards") }}
-              </q-tooltip></q-btn
             >
-            <q-btn
+              <template #icon-left
+                ><q-icon :name="outlinedDescription"
+              /></template>
+              <q-tooltip>{{ t("dashboard.scheduledDashboards") }}</q-tooltip>
+            </OButton>
+            <OButton
               v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="code"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-xs"
               data-test="dashboard-json-edit-btn"
               @click="openJsonEditor"
             >
+              <template #icon-left><q-icon name="code" /></template>
               <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
         </div>
         <q-separator></q-separator>
@@ -249,7 +255,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <RenderDashboardCharts
         :class="store.state.printMode ? '' : 'tw:flex-1 tw:min-h-0'"
-        :key="currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey"
+        :key="
+          currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
+        "
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
@@ -287,6 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="right"
         full-height
         maximized
+        data-test="dashboard-settings-dialog"
       >
         <DashboardSettings @refresh="loadDashboard" />
       </q-dialog>
@@ -362,7 +371,11 @@ import {
   movePanelToAnotherTab,
   getFoldersList,
 } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import {
+  parseDuration,
+  generateDurationLabel,
+  getConsumableRelativeTime,
+} from "../../utils/date";
 import { useRoute } from "vue-router";
 import { deletePanel } from "../../utils/commons";
 import {
@@ -381,6 +394,7 @@ import config from "@/aws-exports";
 import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -419,6 +433,7 @@ export default defineComponent({
     ScheduledDashboards,
     PanelLayoutSettings,
     DashboardJsonEditor,
+    OButton,
   },
   setup() {
     const { t } = useI18n();
@@ -621,7 +636,7 @@ export default defineComponent({
       // Explicitly dereference to ensure Vue tracks the dependency
       const manager = variablesManager.value;
 
-      if (manager && 'hasUncommittedChanges' in manager) {
+      if (manager && "hasUncommittedChanges" in manager) {
         // Access the value (Vue auto-unwraps computed refs in composable returns)
         const hasChanges = manager.hasUncommittedChanges;
         return hasChanges;
@@ -766,14 +781,15 @@ export default defineComponent({
           !Object.keys(dashboard).length
         ) {
           showErrorNotification(
-            "Dashboard not found or has been deleted. Redirecting to dashboard list."
+            "Dashboard not found or has been deleted. Redirecting to dashboard list.",
           );
           goBackToDashboardList();
           return;
         }
       } catch (error: any) {
         showErrorNotification(
-          error?.message || "Failed to load dashboard. Redirecting to dashboard list."
+          error?.message ||
+            "Failed to load dashboard. Redirecting to dashboard list.",
         );
         goBackToDashboardList();
         return;
@@ -880,15 +896,20 @@ export default defineComponent({
     const convertPickerToTimeObj = (pickerValue: any) => {
       if (!pickerValue) return null;
 
-      if (pickerValue.valueType === 'relative' && pickerValue.relativeTimePeriod) {
-        const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
+      if (
+        pickerValue.valueType === "relative" &&
+        pickerValue.relativeTimePeriod
+      ) {
+        const result = getConsumableRelativeTime(
+          pickerValue.relativeTimePeriod,
+        );
         if (result) {
           return {
             start_time: new Date(result.startTime),
             end_time: new Date(result.endTime),
           };
         }
-      } else if (pickerValue.valueType === 'absolute') {
+      } else if (pickerValue.valueType === "absolute") {
         return {
           start_time: new Date(pickerValue.startTime),
           end_time: new Date(pickerValue.endTime),
@@ -912,7 +933,9 @@ export default defineComponent({
 
       // Priority 2: Use panel's configured time range (if set)
       if (panel.config?.panel_time_range) {
-        const pickerValue = convertPanelTimeRangeToPicker(panel.config.panel_time_range);
+        const pickerValue = convertPanelTimeRangeToPicker(
+          panel.config.panel_time_range,
+        );
         if (pickerValue) {
           return convertPickerToTimeObj(pickerValue);
         }
@@ -943,8 +966,12 @@ export default defineComponent({
       }
 
       const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
+        start_time: new Date(
+          dateTimePicker.value.getConsumableDateTime().startTime,
+        ),
+        end_time: new Date(
+          dateTimePicker.value.getConsumableDateTime().endTime,
+        ),
       };
 
       // Check if panel has its own time configuration
@@ -982,14 +1009,19 @@ export default defineComponent({
       }
 
       const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
+        start_time: new Date(
+          dateTimePicker.value.getConsumableDateTime().startTime,
+        ),
+        end_time: new Date(
+          dateTimePicker.value.getConsumableDateTime().endTime,
+        ),
       };
 
       // CRITICAL FIX: Preserve existing __global reference if time hasn't changed
       // This prevents unnecessary refreshes of panels that depend on global time
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
-      const shouldUpdateGlobal = forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
+      const shouldUpdateGlobal =
+        forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -1028,13 +1060,13 @@ export default defineComponent({
       // CRITICAL: Update individual properties instead of replacing the entire object
       // This prevents triggering reactivity for panels whose time hasn't changed
       // Remove keys that no longer exist
-      Object.keys(currentTimeObjPerPanel.value).forEach(key => {
+      Object.keys(currentTimeObjPerPanel.value).forEach((key) => {
         if (!newPanelTimes.hasOwnProperty(key)) {
           delete currentTimeObjPerPanel.value[key];
         }
       });
       // Update or add keys
-      Object.keys(newPanelTimes).forEach(key => {
+      Object.keys(newPanelTimes).forEach((key) => {
         if (currentTimeObjPerPanel.value[key] !== newPanelTimes[key]) {
           currentTimeObjPerPanel.value[key] = newPanelTimes[key];
         }
@@ -1086,9 +1118,10 @@ export default defineComponent({
           newQuery.to !== oldQuery.to;
 
         // Check if only panel time params changed
-        const onlyPanelParamsChanged = Object.keys(newQuery).some(key =>
-          key.startsWith('pt-') && newQuery[key] !== oldQuery?.[key]
-        ) && !globalTimeParamsChanged;
+        const onlyPanelParamsChanged =
+          Object.keys(newQuery).some(
+            (key) => key.startsWith("pt-") && newQuery[key] !== oldQuery?.[key],
+          ) && !globalTimeParamsChanged;
 
         // If only panel params changed, don't recompute (panel refresh handles it)
         // If global time or other params changed, recompute all panel times
@@ -1098,7 +1131,7 @@ export default defineComponent({
           computeAllPanelTimes();
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Sync selectedTabId from URL changes (handles back/forward navigation and drilldown)
@@ -1215,11 +1248,15 @@ export default defineComponent({
       }
 
       // Primary check: use valueType if available
-      if (data.valueType === 'relative' && data.relativeTimePeriod) {
+      if (data.valueType === "relative" && data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod,
         };
-      } else if (data.valueType === 'absolute' && data.startTime && data.endTime) {
+      } else if (
+        data.valueType === "absolute" &&
+        data.startTime &&
+        data.endTime
+      ) {
         return {
           from: data.startTime,
           to: data.endTime,
@@ -1552,10 +1589,7 @@ export default defineComponent({
     // whenever the refreshInterval or selectedTabId is changed, update the query params
     // Note: selectedDate changes are handled in the selectedDate watch above
     watch(
-      [
-        refreshInterval,
-        selectedTabId,
-      ],
+      [refreshInterval, selectedTabId],
       () => {
         if (isDashboardLoading.value) return; // skip during cross-dashboard navigation
         if (isDrilldownInProgress.value) return; // skip during same-dashboard drilldown
@@ -1727,14 +1761,17 @@ export default defineComponent({
     const dashboardRemountKey = ref(0);
 
     // Listen for AI assistant dashboard mutations to auto-refresh
-    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
+    const { on: onDashboardEvent, off: offDashboardEvent } =
+      useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const currentDashboardId = route.query.dashboard as string;
       const shouldReload = event.dashboardId === currentDashboardId;
 
       if (shouldReload && currentDashboardId) {
         // Clear cached dashboard data so getDashboard() fetches fresh from API
-        delete store.state.organizationData.allDashboardData[currentDashboardId];
+        delete store.state.organizationData.allDashboardData[
+          currentDashboardId
+        ];
         await loadDashboard();
         // Bump key to force RenderDashboardCharts to fully remount with new data
         dashboardRemountKey.value++;
@@ -1956,11 +1993,6 @@ export default defineComponent({
 
   &:hover {
     background-color: var(--o2-hover-accent);
-  }
-
-  :deep(.date-time-button) {
-    height: 30px;
-    min-height: 30px;
   }
 
   :deep(.q-btn-dropdown) {

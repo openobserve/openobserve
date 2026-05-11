@@ -83,14 +83,10 @@ export class UserPage {
     }
 
     async verifySuccessMessage(expectedMessage) {
-        // Wait for alert to appear and verify the message
-        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
-        
-        // Find the alert that contains the expected message (instead of just checking the first one)
+        // Wait directly for the specific alert — avoids being confused by earlier
+        // "Please wait..." spinner notifications that briefly appear as role=alert.
         const specificAlert = this.page.getByRole('alert').filter({ hasText: expectedMessage });
-        
-        // Verify the specific alert with our expected message is visible
-        await expect(specificAlert).toBeVisible({ timeout: 5000 });
+        await expect(specificAlert).toBeVisible({ timeout: 15000 });
     }
 
     async addUserFirstLast(firstName, lastName) {

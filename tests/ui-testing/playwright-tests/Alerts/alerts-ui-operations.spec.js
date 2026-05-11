@@ -249,6 +249,8 @@ test.describe("Alerts UI Operations", () => {
     // Move alert to target folder
     const targetFolderName = 'testfoldermove';
     await pm.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
+    // Navigate back to source folder — ensureFolderExists may navigate away via createFolder
+    await pm.alertsPage.navigateToFolder(folderName);
     await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
 
     // Verify in target folder

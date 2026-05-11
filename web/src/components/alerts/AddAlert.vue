@@ -24,17 +24,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="alert-v3-topbar card-container tw:mx-[0.625rem] tw:mb-2 tw:shrink-0">
         <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[48px]">
 
-          <!-- Back button -->
-          <q-btn
-            no-caps
-            padding="xs"
-            outline
-            icon="arrow_back_ios_new"
-            data-test="add-alert-back-btn"
-            size="sm"
-            class="el-border tw:shrink-0"
-            @click="goBackToAlertsList"
-          />
+          <!-- Back + Title -->
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:min-w-0">
+
+            <!-- Back button — matches dashboard style -->
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              data-test="add-alert-back-btn"
+              @click="goBackToAlertsList"
+            >
+              <q-icon name="arrow_back_ios_new" />
+            </OButton>
 
           <!-- EDIT MODE: (folder → chevron → name) -->
           <template v-if="beingUpdated || anomalyEditMode">
@@ -62,7 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
               </span>
-              <q-btn v-if="anomalyConfig.status === 'failed'" flat no-caps dense size="xs" color="negative" icon="replay" :label="t('alerts.retry')" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" />
+              <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain">
+                  <template #icon-left><q-icon name="replay" /></template>
+                  {{ t('alerts.retry') }}
+                </OButton>
             </template>
           </template>
 
@@ -109,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <div class="tw:flex-1" />
-
+          </div>
         </div>
       </div>
 
@@ -200,19 +204,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- TIER 3: Configuration Tabs -->
       <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
         <!-- Tab Headers -->
-        <div class="tw:flex tw:border-b tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'">
-          <div
+        <OToggleGroup
+          :model-value="activeTab"
+          @update:model-value="activeTab = ($event as string)"
+          class="tw:shrink-0"
+        >
+          <OToggleGroupItem
             v-for="tab in alertTabs"
             :key="tab.key"
-            class="tw:px-4 tw:py-2.5 tw:cursor-pointer tw:text-sm tw:font-medium tw:relative tw:select-none tw:transition-colors"
-            :class="activeTab === tab.key
-              ? 'active-tab'
-              : (store.state.theme === 'dark' ? 'tw:text-gray-300 hover:tw:text-white' : 'tw:text-gray-600 hover:tw:text-gray-900')"
-            @click="activeTab = tab.key"
+            :value="tab.key"
+            size="sm"
           >
+            <template #icon-left>
+              <Shield v-if="tab.key === 'condition'" class="tw:size-3.5 tw:shrink-0" />
+              <SlidersHorizontal v-else-if="tab.key === 'advanced'" class="tw:size-3.5 tw:shrink-0" />
+              <TrendingUp v-else-if="tab.key === 'anomaly-config'" class="tw:size-3.5 tw:shrink-0" />
+              <Bell v-else-if="tab.key === 'anomaly-alerting'" class="tw:size-3.5 tw:shrink-0" />
+            </template>
             {{ tab.label }}{{ tab.required ? ' *' : '' }}
-          </div>
-        </div>
+          </OToggleGroupItem>
+        </OToggleGroup>
 
         <!-- Tab Content -->
         <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
@@ -340,26 +351,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
       >
-        <q-btn
+        <OButton
           data-test="add-alert-cancel-btn"
-          class="o2-secondary-button tw:h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          variant="outline"
+          size="sm-action"
           @click="$emit('cancel:hideform')"
-        />
-        <q-btn
+        >{{ t('alerts.cancel') }}</OButton>
+        <OButton
           data-test="add-alert-submit-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
-          no-caps
-          flat
+          variant="primary"
+          size="sm-action"
           :loading="isAnomalyMode ? anomalySaving : false"
-          :disable="isAnomalyMode ? !canSaveAlert : false"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :disabled="isAnomalyMode ? !canSaveAlert : false"
           @click="handleSave"
-        />
+        >{{ isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save') }}</OButton>
       </div>
 
       </div><!-- end LEFT column wrapper -->
@@ -463,6 +468,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, watch } from "vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import { Shield, SlidersHorizontal, TrendingUp, Bell } from 'lucide-vue-next';
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -519,6 +528,13 @@ export default defineComponent({
     AnomalySummary,
     QueryEditor,
     InlineSelectFolderDropdown,
+    OButton,
+    OToggleGroup,
+    OToggleGroupItem,
+    Shield,
+    SlidersHorizontal,
+    TrendingUp,
+    Bell,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
@@ -601,17 +617,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.active-tab {
-  color: var(--q-primary);
-  border-bottom: 2px solid var(--q-primary);
-  font-weight: 600;
-}
-
-.body--dark .active-tab {
-  color: #fff;
-  border-bottom-color: var(--q-primary);
-}
-
 .alert-v3-inline-label {
   font-size: 12px;
   font-weight: 600;

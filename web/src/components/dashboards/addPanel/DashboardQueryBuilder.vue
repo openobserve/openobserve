@@ -80,81 +80,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 &nbsp;
               </div>
-              <q-btn-group
+              <OButtonGroup
                 class="axis-field"
+                radius="sm"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemX, 'x', index)"
                 @drop="onDrop($event, 'x', index)"
                 @dragenter="onDragEnter($event, 'x', index)"
               >
-                <div>
-                  <q-icon
-                    name="drag_indicator"
-                    color="grey-13"
-                    size="13px"
-                    class="cursor-grab q-my-xs"
-                  />
-                  <q-btn
-                    square
-                    icon-right="arrow_drop_down"
-                    no-caps
-                    color="primary"
-                    dense
-                    :no-wrap="true"
-                    size="sm"
-                    :label="xLabel[index]"
-                    class="q-pl-sm"
-                    :data-test="`dashboard-x-item-${itemX?.alias}`"
+                <OButton
+                  variant="outline"
+                  size="icon-chip"
+                  class="cursor-grab"
+                  :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
+                >
+                  <template #icon-left>
+                    <q-icon name="drag_indicator" size="13px" />
+                  </template>
+                </OButton>
+                <OButton
+                  variant="primary"
+                  size="chip-12"
+                  :data-test="`dashboard-x-item-${itemX?.alias}`"
+                >
+                  {{ xLabel[index] }}
+                  <template #icon-right
+                    ><q-icon name="arrow_drop_down"
+                  /></template>
+                  <q-menu
+                    :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
+                    class="field-function-menu-popup"
                   >
-                    <q-menu
-                      :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                      class="field-function-menu-popup"
+                    <div
+                      style="padding: 3px 16px 16px 16px"
+                      :style="{
+                        width:
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery ||
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.x[index].isDerived
+                            ? 'auto'
+                            : FIELD_FUNCTION_MENU_WIDTH,
+                      }"
                     >
-                      <div
-                        style="padding: 3px 16px 16px 16px"
-                        :style="{
-                          width:
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery ||
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.x[index].isDerived
-                              ? 'auto'
-                              : FIELD_FUNCTION_MENU_WIDTH,
-                        }"
-                      >
-                        <div>
-                          <div class="q-mr-xs q-mb-sm">
-                            <DynamicFunctionPopUp
-                              v-model="
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields.x[index]
-                              "
-                              :allowAggregation="false"
-                              :customQuery="
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].customQuery
-                              "
-                              :chartType="dashboardPanelData.data.type"
-                            />
-                          </div>
+                      <div>
+                        <div class="q-mr-xs q-mb-sm">
+                          <DynamicFunctionPopUp
+                            v-model="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.x[index]
+                            "
+                            :allowAggregation="false"
+                            :customQuery="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].customQuery
+                            "
+                            :chartType="dashboardPanelData.data.type"
+                          />
                         </div>
                       </div>
-                    </q-menu>
-                  </q-btn>
-                  <q-btn
-                    style="height: 100%"
-                    size="xs"
-                    dense
-                    :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
-                    @click="removeXAxisItemByIndex(index)"
-                    icon="close"
-                  />
-                </div>
-              </q-btn-group>
+                    </div>
+                  </q-menu>
+                </OButton>
+                <OButton
+                  variant="outline"
+                  size="icon-chip"
+                  :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
+                  @click="removeXAxisItemByIndex(index)"
+                >
+                  <template #icon-left><q-icon name="close" /></template>
+                </OButton>
+              </OButtonGroup>
             </div>
             <div
               class="text-caption text-weight-bold text-center q-py-xs"
@@ -261,81 +261,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 &nbsp;
               </div>
-              <q-btn-group
+              <OButtonGroup
                 class="axis-field"
+                radius="sm"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemB, 'breakdown', index)"
                 @drop="onDrop($event, 'breakdown', index)"
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
-                <div>
-                  <q-icon
-                    name="drag_indicator"
-                    color="grey-13"
-                    size="13px"
-                    class="cursor-grab q-my-xs"
-                  />
-                  <q-btn
-                    square
-                    icon-right="arrow_drop_down"
-                    no-caps
-                    color="primary"
-                    dense
-                    :no-wrap="true"
-                    size="sm"
-                    :label="bLabel[index]"
-                    class="q-pl-sm"
-                    :data-test="`dashboard-b-item-${itemB?.alias}`"
+                <OButton
+                  variant="outline"
+                  size="icon-chip"
+                  class="cursor-grab"
+                  :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
+                >
+                  <template #icon-left>
+                    <q-icon name="drag_indicator" size="13px" />
+                  </template>
+                </OButton>
+                <OButton
+                  variant="primary"
+                  size="chip-12"
+                  :data-test="`dashboard-b-item-${itemB?.alias}`"
+                >
+                  {{ bLabel[index] }}
+                  <template #icon-right
+                    ><q-icon name="arrow_drop_down"
+                  /></template>
+                  <q-menu
+                    :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
+                    class="field-function-menu-popup"
                   >
-                    <q-menu
-                      :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                      class="field-function-menu-popup"
+                    <div
+                      style="padding: 3px 16px 16px 16px"
+                      :style="{
+                        width:
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery ||
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.breakdown[index].isDerived
+                            ? 'auto'
+                            : FIELD_FUNCTION_MENU_WIDTH,
+                      }"
                     >
-                      <div
-                        style="padding: 3px 16px 16px 16px"
-                        :style="{
-                          width:
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery ||
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.breakdown[index].isDerived
-                              ? 'auto'
-                              : FIELD_FUNCTION_MENU_WIDTH,
-                        }"
-                      >
-                        <div>
-                          <div class="q-mr-xs q-mb-sm">
-                            <DynamicFunctionPopUp
-                              v-model="
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].fields.breakdown[index]
-                              "
-                              :allowAggregation="false"
-                              :customQuery="
-                                dashboardPanelData.data.queries[
-                                  dashboardPanelData.layout.currentQueryIndex
-                                ].customQuery
-                              "
-                              :chartType="dashboardPanelData.data.type"
-                            />
-                          </div>
+                      <div>
+                        <div class="q-mr-xs q-mb-sm">
+                          <DynamicFunctionPopUp
+                            v-model="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.breakdown[index]
+                            "
+                            :allowAggregation="false"
+                            :customQuery="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].customQuery
+                            "
+                            :chartType="dashboardPanelData.data.type"
+                          />
                         </div>
                       </div>
-                    </q-menu>
-                  </q-btn>
-                  <q-btn
-                    style="height: 100%"
-                    size="xs"
-                    dense
-                    :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
-                    @click="removeBreakdownItemByIndex(index)"
-                    icon="close"
-                  />
-                </div>
-              </q-btn-group>
+                    </div>
+                  </q-menu>
+                </OButton>
+                <OButton
+                  variant="outline"
+                  size="icon-chip"
+                  :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
+                  @click="removeBreakdownItemByIndex(index)"
+                >
+                  <template #icon-left><q-icon name="close" /></template>
+                </OButton>
+              </OButtonGroup>
             </div>
             <div
               class="text-caption text-weight-bold text-center q-py-xs"
@@ -407,85 +407,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             &nbsp;
           </div>
-          <q-btn-group
+          <OButtonGroup
             class="axis-field"
+            radius="sm"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemY, 'y', index)"
             @drop="onDrop($event, 'y', index)"
             @dragenter="onDragEnter($event, 'y', index)"
           >
-            <div>
-              <q-icon
-                name="drag_indicator"
-                color="grey-13"
-                size="13px"
-                class="cursor-grab q-my-xs"
-              />
-              <q-btn
-                icon-right="arrow_drop_down"
-                no-caps
-                dense
-                color="primary"
-                square
-                :no-wrap="true"
-                size="sm"
-                :label="yLabel[index]"
-                :data-test="`dashboard-y-item-${itemY?.alias}`"
-                class="q-pl-sm"
+            <OButton
+              variant="outline"
+              size="icon-chip"
+              class="cursor-grab"
+              :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
+            >
+              <template #icon-left>
+                <q-icon name="drag_indicator" size="13px" />
+              </template>
+            </OButton>
+            <OButton
+              variant="primary"
+              size="chip-12"
+              :data-test="`dashboard-y-item-${itemY?.alias}`"
+            >
+              {{ yLabel[index] }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
+              <q-menu
+                :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
+                class="field-function-menu-popup"
               >
-                <q-menu
-                  :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                  class="field-function-menu-popup"
+                <div
+                  style="padding: 3px 16px 16px 16px"
+                  :style="{
+                    width:
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery ||
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields.y[index].isDerived
+                        ? 'auto'
+                        : FIELD_FUNCTION_MENU_WIDTH,
+                  }"
                 >
-                  <div
-                    style="padding: 3px 16px 16px 16px"
-                    :style="{
-                      width:
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery ||
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.y[index].isDerived
-                          ? 'auto'
-                          : FIELD_FUNCTION_MENU_WIDTH,
-                    }"
-                  >
-                    <div>
-                      <div class="q-mr-xs q-mb-sm">
-                        <DynamicFunctionPopUp
-                          v-model="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.y[index]
-                          "
-                          :allowAggregation="
-                            dashboardPanelData.data.type == 'heatmap'
-                              ? false
-                              : true
-                          "
-                          :customQuery="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].customQuery
-                          "
-                          :chartType="dashboardPanelData.data.type"
-                        />
-                      </div>
+                  <div>
+                    <div class="q-mr-xs q-mb-sm">
+                      <DynamicFunctionPopUp
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.y[index]
+                        "
+                        :allowAggregation="
+                          dashboardPanelData.data.type == 'heatmap'
+                            ? false
+                            : true
+                        "
+                        :customQuery="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].customQuery
+                        "
+                        :chartType="dashboardPanelData.data.type"
+                      />
                     </div>
                   </div>
-                </q-menu>
-              </q-btn>
-              <q-btn
-                style="height: 100%"
-                size="xs"
-                dense
-                :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
-                @click="removeYAxisItemByIndex(index)"
-                icon="close"
-              />
-            </div>
-          </q-btn-group>
+                </div>
+              </q-menu>
+            </OButton>
+            <OButton
+              variant="outline"
+              size="icon-chip"
+              :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
+              @click="removeYAxisItemByIndex(index)"
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
+          </OButtonGroup>
         </div>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
@@ -559,81 +557,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               &nbsp;
             </div>
-            <q-btn-group
+            <OButtonGroup
               class="axis-field"
+              radius="sm"
               :draggable="true"
               @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
               @drop="onDrop($event, 'z', index)"
               @dragenter="onDragEnter($event, 'z', index)"
             >
-              <div>
-                <q-icon
-                  name="drag_indicator"
-                  color="grey-13"
-                  size="13px"
-                  class="cursor-grab q-my-xs"
-                />
-                <q-btn
-                  square
-                  icon-right="arrow_drop_down"
-                  no-caps
-                  dense
-                  :no-wrap="true"
-                  color="primary"
-                  size="sm"
-                  :label="zLabel[index]"
-                  :data-test="`dashboard-z-item-${itemZ?.alias}`"
-                  class="q-pl-sm"
+              <OButton
+                variant="outline"
+                size="icon-chip"
+                class="cursor-grab"
+                :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
+              >
+                <template #icon-left>
+                  <q-icon name="drag_indicator" size="13px" />
+                </template>
+              </OButton>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-z-item-${itemZ?.alias}`"
+              >
+                {{ zLabel[index] }}
+                <template #icon-right
+                  ><q-icon name="arrow_drop_down"
+                /></template>
+                <q-menu
+                  :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
+                  class="field-function-menu-popup"
                 >
-                  <q-menu
-                    :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                    class="field-function-menu-popup"
+                  <div
+                    style="padding: 3px 16px 16px 16px"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.z[index].isDerived
+                          ? 'auto'
+                          : FIELD_FUNCTION_MENU_WIDTH,
+                    }"
                   >
-                    <div
-                      style="padding: 3px 16px 16px 16px"
-                      :style="{
-                        width:
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery ||
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].isDerived
-                            ? 'auto'
-                            : FIELD_FUNCTION_MENU_WIDTH,
-                      }"
-                    >
-                      <div>
-                        <div class="q-mr-xs q-mb-sm">
-                          <DynamicFunctionPopUp
-                            v-model="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.z[index]
-                            "
-                            :allowAggregation="true"
-                            :customQuery="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].customQuery
-                            "
-                            :chartType="dashboardPanelData.data.type"
-                          />
-                        </div>
+                    <div>
+                      <div class="q-mr-xs q-mb-sm">
+                        <DynamicFunctionPopUp
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.z[index]
+                          "
+                          :allowAggregation="true"
+                          :customQuery="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery
+                          "
+                          :chartType="dashboardPanelData.data.type"
+                        />
                       </div>
                     </div>
-                  </q-menu>
-                </q-btn>
-                <q-btn
-                  style="height: 100%"
-                  size="xs"
-                  dense
-                  :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
-                  @click="removeZAxisItemByIndex(index)"
-                  icon="close"
-                />
-              </div>
-            </q-btn-group>
+                  </div>
+                </q-menu>
+              </OButton>
+              <OButton
+                variant="outline"
+                size="icon-chip"
+                :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
+                @click="removeZAxisItemByIndex(index)"
+              >
+                <template #icon-left><q-icon name="close" /></template>
+              </OButton>
+            </OButtonGroup>
           </div>
           <div
             class="text-caption text-weight-bold text-center q-py-xs"
@@ -720,10 +718,14 @@ import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOp
 import { promQueryModeller } from "@/components/promql/operations/queryModeller";
 import type { PromVisualQuery } from "@/components/promql/types";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
   components: {
+    OButtonGroup,
+    OButton,
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
@@ -1450,18 +1452,8 @@ export default defineComponent({
 
 .axis-field {
   overflow: hidden;
-}
-
-:deep(.axis-field div) {
-  display: flex;
-}
-
-:deep(.axis-field .q-btn--rectangle) {
-  border-radius: 0%;
-}
-
-:deep(.axis-field .q-btn:before) {
-  border: 0px solid transparent;
+  // Subtle white divider between label and close buttons on primary background
+  --tw-divide-color: rgba(255, 255, 255, 0.25);
 }
 
 .axis-container {

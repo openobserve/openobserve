@@ -25,7 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" />
+          <OButton v-close-popup="true" variant="ghost" size="icon-circle-sm">
+            <q-icon name="cancel" />
+          </OButton>
         </div>
       </div>
     </q-card-section>
@@ -73,24 +75,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
         />
 
-        <div class="flex justify-center q-mt-lg">
-          <q-btn
+        <div class="flex justify-center q-mt-lg tw:gap-2">
+          <OButton
             v-close-popup="true"
-            class="q-mb-md text-bold no-border"
-            :label="t('user.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            color="accent"
-            no-caps
-          />
-          <q-btn
-            :label="t('user.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            variant="outline"
+            size="sm-action"
+          >
+            {{ t('user.cancel') }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
             type="submit"
-            no-caps
-          />
+          >
+            {{ t('user.save') }}
+          </OButton>
         </div>
       </q-form>
     </q-card-section>
@@ -99,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -118,6 +118,7 @@ let callOrgMember: any;
 
 export default defineComponent({
   name: "ComponentUpdateUser",
+  components: { OButton },
   props: {
     modelValue: {
       type: Object,

@@ -123,7 +123,11 @@
     "create": "작성",
     "redirectingHome": "{countdown} 초 내에 홈으로 리디렉션하는 중...",
     "resources": "리소스",
-    "updated_at": "업데이트 날짜"
+    "updated_at": "업데이트 날짜",
+    "error": "오류",
+    "db": "데이터베이스",
+    "discardChanges": "변경 내용 취소",
+    "unsavedChanges": "저장되지 않은 변경 사항"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -390,7 +394,8 @@
     "autoRunEnabled": "자동 실행 활성화",
     "selectStreamFirst": "먼저 스트림을 선택하세요",
     "traces": "트레이스",
-    "switchToLogs": "로그로 다시 전환하려면 클릭"
+    "switchToLogs": "로그로 다시 전환하려면 클릭",
+    "patternNoValuesAvailable": "사용할 수 있는 값 없음"
   },
   "menu": {
     "home": "홈",
@@ -2235,6 +2240,8 @@
     "importedFromAnomalyPattern": "비정상적인 로그 패턴으로 미리 채워진 경고 — 긴급 설정 검토",
     "additional_settings": "추가 설정",
     "alertNamePlaceholder": "알림 이름",
+    "nameRequired": "알림 이름은 필수입니다.",
+    "nameNoSpecialChars": "알림 이름에 ':', '#', '?', '&', '%', 따옴표 또는 공백을 사용할 수 없습니다. 대신 밑줄 (_)을 사용하세요.",
     "anomalyNamePlaceholder": "예외 항목 이름",
     "folder": "폴더",
     "selectStreamTypeFirst": "먼저 스트림 유형을 선택합니다.",
@@ -2924,7 +2931,21 @@
       "minutesAgo": "{n} m 전",
       "hoursAgo": "{n} 시간 전",
       "daysAgo": "{n} 일 전"
-    }
+    },
+    "noErrorPresent": "이 스팬에는 오류가 없습니다.",
+    "httpStatusCode": "HTTP 상태 코드",
+    "grpcStatusCode": "gRPC 상태 코드",
+    "dbResponseStatusCode": "DB 응답 상태 코드",
+    "processExitCode": "프로세스 종료 코드",
+    "exceptionsWithCount": "예외 ({개수})",
+    "typeLabel": "유형:",
+    "messageLabel": "메시지:",
+    "escapedLabel": "탈출:",
+    "stacktraceLabel": "스택 트레이스:",
+    "copyStacktrace": "스택 트레이스 복사",
+    "noStacktraceAvailable": "스택트레이스를 사용할 수 없음",
+    "stacktraceCopied": "스택트레이스를 클립보드에 복사했습니다.",
+    "stacktraceCopyFailed": "스택 트레이스를 복사하지 못했습니다."
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -3326,7 +3347,9 @@
     "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다.",
     "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다.",
     "serviceGroupProtected": "서비스 그룹은 제거할 수 없습니다.매핑된 필드만 수정할 수 있습니다.",
-    "noDataFound": "데이터를 찾을 수 없음"
+    "noDataFound": "데이터를 찾을 수 없음",
+    "isWorkloadType": "서비스 식별자",
+    "isWorkloadTypeTooltip": "활성화되면 이 그룹은 서비스 (예: 클러스터, 네임스페이스, 배포) 를 고유하게 식별하는 데 사용됩니다.HTTP 메서드 또는 데이터베이스 이름과 같이 서비스를 통한 작업을 설명하는 그룹에 대해서는 사용하지 않도록 설정합니다."
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, ops::Bound, sync::Arc};
 
-use anyhow::Context;
 use arrow_schema::Schema;
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
@@ -44,7 +43,10 @@ use infra::{
 };
 use itertools::Itertools;
 use roaring::RoaringBitmap;
-use tantivy::Directory;
+use tantivy::{
+    Directory, Term,
+    query::{BooleanQuery, Occur, Query, RangeQuery},
+};
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
 use tracing::Instrument;
@@ -413,12 +415,7 @@ pub async fn cache_files(
     }
 }
 
-/// Filter file list using inverted index
-/// This function will load the index file corresponding to each file in the file list.
-/// FSTs in those files are used to match the incoming query in `SearchRequest`.
-/// If the query does not match any FST in the index file, the file will be filtered out.
-/// If the query does match then the segment IDs for the file will be updated.
-/// If the query not find corresponding index file, the file will *not* be filtered out.
+/// Filter file list using tantivy index
 #[tracing::instrument(name = "service:search:grpc:storage:tantivy_search", skip_all)]
 pub async fn tantivy_search(
     query: Arc<super::QueryParams>,
@@ -599,7 +596,12 @@ pub async fn tantivy_search(
         } {
             // Each result corresponds to a file in the file list
             match result {
-                Ok((file_name, result)) => {
+                Ok((file_name, result, has_skipped_conditions)) => {
+                    // when has_skipped_conditions is true, we should add filter back to datafusion,
+                    // because the index result is not accurate
+                    if has_skipped_conditions {
+                        is_add_filter_back = true;
+                    }
                     if file_name.is_empty() {
                         // no need inverted index for this file, need add filter back
                         let took = start.elapsed().as_millis() as usize;
@@ -717,15 +719,16 @@ pub async fn get_tantivy_directory(
     Ok(PuffinDirReader::from_path(file_account, source).await?)
 }
 
+/// Returns (file_key, result, has_skipped_conditions).
+/// when has_skipped_conditions is true, we should all filter back to datafusion.
 async fn search_tantivy_index(
     trace_id: &str,
     time_range: (i64, i64),
     index_condition: Option<IndexCondition>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
-) -> anyhow::Result<(String, TantivyResult)> {
+) -> anyhow::Result<(String, TantivyResult, bool)> {
     let file_account = parquet_file.account.clone();
-    // TODO: this convert happen two times, once before cache_files and once in search_tantivy_index
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
@@ -744,7 +747,7 @@ async fn search_tantivy_index(
             metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
                 .with_label_values::<&str>(&[])
                 .inc();
-            return Ok((parquet_file.key.to_string(), result));
+            return Ok((parquet_file.key.to_string(), result, false));
         }
     }
 
@@ -781,19 +784,33 @@ async fn search_tantivy_index(
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
     // check if the index has multiple segments
-    let seg_metas = tantivy_index
-        .searchable_segment_metas()
-        .context("Count segments")?;
-    if seg_metas.len() > 1 {
+    if tantivy_index.searchable_segment_metas()?.len() > 1 {
         return Err(anyhow::anyhow!(
-            "Multiple segments in tantivy index not supported"
+            "one tantivy file should only have one segment"
         ));
     }
 
     // generate the tantivy query
     let condition: IndexCondition =
         index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
-    let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field)?;
+    let (mut query, has_skipped_conditions) =
+        condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
+
+    // when the file is not fully within the time range, add a timestamp filter
+    let (start_time, end_time) = time_range;
+    let file_in_range =
+        parquet_file.meta.min_ts >= start_time && parquet_file.meta.max_ts < end_time;
+    if !file_in_range && let Ok(ts_field) = tantivy_schema.get_field(TIMESTAMP_COL_NAME) {
+        let ts_range = RangeQuery::new(
+            Bound::Included(Term::from_field_i64(ts_field, start_time)),
+            Bound::Excluded(Term::from_field_i64(ts_field, end_time)),
+        );
+        query = Box::new(BooleanQuery::new(vec![
+            (Occur::Must, query),
+            (Occur::Must, Box::new(ts_range)),
+        ]));
+    }
+
     let need_all_term_fields = condition
         .need_all_term_fields()
         .into_iter()
@@ -810,11 +827,22 @@ async fn search_tantivy_index(
         entry.insert(term.clone(), need_position);
     });
 
-    let need_fast_field = idx_optimize_rule.as_ref().and_then(|rule| match rule {
-        IndexOptimizeMode::SimpleHistogram(..) => Some(TIMESTAMP_COL_NAME.to_string()),
-        IndexOptimizeMode::SimpleTopN(field, ..) => Some(field.to_string()),
-        _ => None,
-    });
+    let mut need_fast_field = HashSet::new();
+    if let Some(rule) = &idx_optimize_rule {
+        match rule {
+            IndexOptimizeMode::SimpleHistogram(..) => {
+                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
+            }
+            IndexOptimizeMode::SimpleTopN(field, ..) => {
+                need_fast_field.insert(field.clone());
+            }
+            _ => {}
+        }
+    }
+    if !file_in_range {
+        need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
+    }
+
     warm_up_terms(
         &searcher,
         &warm_terms,
@@ -825,17 +853,15 @@ async fn search_tantivy_index(
 
     // search the index
     let trace_id_clone = trace_id.to_string();
-    let file_in_range =
-        parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
-    let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
-        (false, _) | (true, None) => TantivyResult::handle_matched_docs(&searcher, query),
-        (true, Some(IndexOptimizeMode::SimpleSelect(limit, ascend))) => {
+    let res = tokio::task::spawn_blocking(move || match idx_optimize_rule {
+        None => TantivyResult::handle_matched_docs(&searcher, query),
+        Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) => {
             TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
         }
-        (true, Some(IndexOptimizeMode::SimpleCount)) => {
+        Some(IndexOptimizeMode::SimpleCount) => {
             TantivyResult::handle_simple_count(&searcher, query)
         }
-        (true, Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets))) => {
+        Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets)) => {
             // fail the function if field not in tantivy schema
             if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
                 log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
@@ -849,10 +875,10 @@ async fn search_tantivy_index(
                 num_buckets,
             )
         }
-        (true, Some(IndexOptimizeMode::SimpleTopN(field, limit, ascend))) => {
+        Some(IndexOptimizeMode::SimpleTopN(field, limit, ascend)) => {
             TantivyResult::handle_simple_top_n(&searcher, query, &field, limit, ascend)
         }
-        (true, Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend))) => {
+        Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend)) => {
             if tantivy_schema.get_field(&field).is_err() {
                 log::warn!("[trace_id {trace_id_clone}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
                 Ok(TantivyResult::Distinct(HashSet::new()))
@@ -872,7 +898,7 @@ async fn search_tantivy_index(
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
-                return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
+                return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY), false));
             }
             // return early if the number of matched docs is too large
             let skip_threshold = cfg.limit.inverted_index_skip_threshold;
@@ -886,6 +912,7 @@ async fn search_tantivy_index(
                 return Ok((
                     "".to_string(),
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
+                    true,
                 ));
             }
             percent = row_ids_percent;
@@ -910,15 +937,17 @@ async fn search_tantivy_index(
     };
 
     // cache the result if the memory size is less than the limit
+    // Do not cache when conditions were skipped — the result is incomplete.
     if cfg.common.inverted_index_result_cache_enabled
         && !cache_key.is_empty()
+        && !has_skipped_conditions
         && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
             || percent < 1.0)
     {
         let entry = get_cache_entry(result.clone(), percent, parquet_file.meta.records as usize);
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
-    Ok((key, result))
+    Ok((key, result, has_skipped_conditions))
 }
 
 /// if simple distinct without filter, we need to warm up the field
@@ -937,22 +966,22 @@ fn partition_tantivy_files(
     idx_optimize_mode: &Option<IndexOptimizeMode>,
     target_partitions: usize,
 ) -> (Vec<Vec<FileKey>>, usize) {
-    let (file_groups, limit) = if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) =
+    let (file_groups, limit, ascend) = if let Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) =
         idx_optimize_mode
         && *limit > 0
     {
         let file_groups = group_files_by_time_range(index_parquet_files, target_partitions);
-        (file_groups, *limit)
+        (file_groups, *limit, *ascend)
     } else {
         // splite the filter groups by target partitions
         let file_groups = into_chunks(index_parquet_files, target_partitions);
-        (file_groups, 0)
+        (file_groups, 0, false)
     };
 
     if limit == 0 {
         (file_groups, limit)
     } else {
-        (regroup_tantivy_files(file_groups), limit)
+        (regroup_tantivy_files(file_groups, ascend), limit)
     }
 }
 
@@ -961,7 +990,7 @@ fn partition_tantivy_files(
 // group's time range not overlap, when execute the tantivy search, we get the last file in each
 // group and do the tantivy search.
 // so in this function, we recursive collect the last file in each group
-fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>) -> Vec<Vec<FileKey>> {
+fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>, ascend: bool) -> Vec<Vec<FileKey>> {
     let group_num = file_groups.len();
     let max_group_len = file_groups.iter().map(|g| g.len()).max().unwrap_or(0);
     let mut new_file_groups: Vec<Vec<FileKey>> = vec![Vec::new(); max_group_len];
@@ -969,7 +998,9 @@ fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>) -> Vec<Vec<FileKey>> {
     let mut file_groups: Vec<_> = file_groups
         .into_iter()
         .map(|mut group| {
-            group.reverse();
+            if !ascend {
+                group.reverse();
+            }
             group.into_iter()
         })
         .collect();
@@ -999,63 +1030,47 @@ fn into_chunks<T>(mut v: Vec<T>, chunk_size: usize) -> Vec<Vec<T>> {
     chunks
 }
 
-// Group files by time range
-// use the min_ts & max_ts of the file.meta to group files and each group can't contains crossing
-// time range files
+// Group files by time range.
+// Use file.meta min_ts/max_ts to keep each group's files sorted and non-overlapping.
 fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> Vec<Vec<FileKey>> {
-    let expect_group_elements = files.len().div_ceil(partition_num);
-    // sort files by max_ts in ascending order
-    files.sort_unstable_by(|a, b| a.meta.max_ts.cmp(&b.meta.max_ts));
-    // group by time range
-    let mut file_groups_indices: Vec<Vec<FileKey>> = vec![];
+    if files.is_empty() {
+        return vec![];
+    }
+
+    let partition_num = partition_num.max(1);
+
+    // Sort files by min_ts in ascending order, matching DataFusion's
+    // split_groups_by_statistics_with_target_partitions strategy.
+    files.sort_unstable_by(|a, b| {
+        a.meta
+            .min_ts
+            .cmp(&b.meta.min_ts)
+            .then_with(|| a.meta.max_ts.cmp(&b.meta.max_ts))
+    });
+
+    let mut file_groups_indices: Vec<Vec<FileKey>> = vec![vec![]; partition_num];
     for file in files {
-        let file_group_to_insert = file_groups_indices.iter_mut().find(|group| {
-            file.meta.min_ts
-                > group
-                    .last()
-                    .expect("groups should be nonempty at construction")
-                    .meta
-                    .max_ts
-        });
-        match file_group_to_insert {
-            Some(group) => group.push(file),
-            None => file_groups_indices.push(vec![file]),
+        if let Some(group) = file_groups_indices
+            .iter_mut()
+            .filter(|group| {
+                group.is_empty()
+                    || file.meta.min_ts
+                        > group
+                            .last()
+                            .expect("groups should not be empty after is_empty check")
+                            .meta
+                            .max_ts
+            })
+            .min_by_key(|group| group.len())
+        {
+            group.push(file);
+        } else {
+            file_groups_indices.push(vec![file]);
         }
     }
-    // regroup if the number of groups is less than expect partitions
-    if file_groups_indices
-        .first()
-        .is_some_and(|g| g.len() <= expect_group_elements)
-    {
-        file_groups_indices
-    } else {
-        repartition_sorted_groups(file_groups_indices, expect_group_elements)
-    }
-}
 
-// repartition the groups to the number of partitions
-fn repartition_sorted_groups(
-    mut groups: Vec<Vec<FileKey>>,
-    expect_group_elements: usize,
-) -> Vec<Vec<FileKey>> {
-    if groups.is_empty() {
-        return groups;
-    }
-
-    loop {
-        if groups[0].len() <= expect_group_elements {
-            break;
-        }
-        let max_group = groups.remove(0);
-        let chunk_num = max_group.len().div_ceil(expect_group_elements);
-        let mut new_groups = vec![vec![]; chunk_num];
-        for (k, item) in max_group.into_iter().enumerate() {
-            new_groups[k % chunk_num].push(item);
-        }
-        groups.extend(new_groups);
-    }
-
-    groups
+    file_groups_indices.retain(|group| !group.is_empty());
+    file_groups_indices
 }
 
 fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: usize) -> CacheEntry {
@@ -1100,7 +1115,7 @@ fn generate_cache_key(
         Some(rule) => rule.to_rule_string(),
         None => return String::new(),
     };
-    format!("{}_{}_{}", condition, rule, parquet_file.key)
+    format!("{condition}_{rule}_{}", parquet_file.key)
 }
 
 #[cfg(test)]
@@ -1125,6 +1140,28 @@ mod tests {
         }
     }
 
+    fn assert_groups_are_sorted_and_non_overlapping(groups: &[Vec<FileKey>]) {
+        for group in groups {
+            for files in group.windows(2) {
+                assert!(
+                    files[0].meta.min_ts <= files[1].meta.min_ts,
+                    "files should be sorted by min_ts within each group"
+                );
+                assert!(
+                    files[0].meta.max_ts < files[1].meta.min_ts,
+                    "files should not overlap within each group"
+                );
+            }
+        }
+    }
+
+    fn group_keys(groups: &[Vec<FileKey>]) -> Vec<Vec<String>> {
+        groups
+            .iter()
+            .map(|group| group.iter().map(|file| file.key.clone()).collect())
+            .collect()
+    }
+
     #[test]
     fn test_group_files_by_time_range() {
         let files = vec![
@@ -1136,7 +1173,8 @@ mod tests {
         ];
         let partition_num = 3;
         let groups = group_files_by_time_range(files, partition_num);
-        assert!(groups.len() >= 3);
+        assert_eq!(groups.len(), 3);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
@@ -1152,6 +1190,7 @@ mod tests {
         let partition_num = 2;
         let groups = group_files_by_time_range(files, partition_num);
         assert!(groups.len() >= 2);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
@@ -1159,32 +1198,74 @@ mod tests {
         let files = vec![create_file_key(1, 10), create_file_key(11, 20)];
         let partition_num = 3;
         let groups = group_files_by_time_range(files, partition_num);
-        assert!(groups.len() >= 2);
+        assert_eq!(groups.len(), 2);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
-    fn test_repartition_sorted_groups() {
-        let groups = vec![
-            vec![create_file_key(1, 10), create_file_key(11, 20)],
-            vec![create_file_key(21, 30), create_file_key(31, 40)],
+    fn test_group_files_by_time_range_sorts_unsorted_input_by_min_ts() {
+        let files = vec![
+            create_file_key(31, 40),
+            create_file_key(1, 10),
+            create_file_key(21, 30),
+            create_file_key(11, 20),
         ];
-        let expect_group_elements = 1;
-        let repartitioned_groups = repartition_sorted_groups(groups, expect_group_elements);
-        assert!(repartitioned_groups.len() >= 4);
+
+        let groups = group_files_by_time_range(files, 2);
+
+        assert_eq!(
+            group_keys(&groups),
+            vec![
+                vec!["file_1_10".to_string(), "file_21_30".to_string()],
+                vec!["file_11_20".to_string(), "file_31_40".to_string()],
+            ]
+        );
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
-    fn test_repartition_sorted_groups_with_large_group() {
-        let groups = vec![vec![
+    fn test_group_files_by_time_range_balances_smallest_eligible_group() {
+        let files = vec![
             create_file_key(1, 10),
             create_file_key(11, 20),
             create_file_key(21, 30),
             create_file_key(31, 40),
             create_file_key(41, 50),
-        ]];
-        let expect_group_elements = 2;
-        let repartitioned_groups = repartition_sorted_groups(groups, expect_group_elements);
-        assert!(repartitioned_groups.len() >= 3);
+            create_file_key(51, 60),
+            create_file_key(61, 70),
+        ];
+
+        let groups = group_files_by_time_range(files, 3);
+        let group_sizes = groups.iter().map(Vec::len).collect::<Vec<_>>();
+
+        assert_eq!(group_sizes, vec![3, 2, 2]);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_adds_groups_when_all_targets_overlap() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(2, 11),
+            create_file_key(3, 12),
+        ];
+
+        let groups = group_files_by_time_range(files, 2);
+
+        assert_eq!(groups.len(), 3);
+        assert!(groups.iter().all(|group| group.len() == 1));
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_requires_strictly_non_overlapping_ranges() {
+        let files = vec![create_file_key(1, 10), create_file_key(10, 20)];
+
+        let groups = group_files_by_time_range(files, 1);
+
+        assert_eq!(groups.len(), 2);
+        assert!(groups.iter().all(|group| group.len() == 1));
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
@@ -1231,7 +1312,7 @@ mod tests {
             vec![create_file_key(1, 10), create_file_key(11, 20)],
             vec![create_file_key(21, 30), create_file_key(31, 40)],
         ];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
 
         // Should have 2 groups (max length of input groups)
         assert_eq!(result.len(), 2);
@@ -1257,7 +1338,7 @@ mod tests {
             ],
             vec![create_file_key(31, 40)],
         ];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
 
         // Should have 3 groups (max length of input groups)
         assert_eq!(result.len(), 3);
@@ -1279,7 +1360,7 @@ mod tests {
     #[test]
     fn test_regroup_tantivy_files_empty_groups() {
         let file_groups: Vec<Vec<FileKey>> = vec![];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
         assert_eq!(result.len(), 0);
     }
 
@@ -1290,7 +1371,7 @@ mod tests {
             create_file_key(11, 20),
             create_file_key(21, 30),
         ]];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
 
         // Should have 3 groups (length of the single input group)
         assert_eq!(result.len(), 3);
@@ -1551,23 +1632,6 @@ mod tests {
     }
 
     #[test]
-    fn test_repartition_sorted_groups_empty() {
-        let groups: Vec<Vec<FileKey>> = vec![];
-        let result = repartition_sorted_groups(groups, 2);
-        assert_eq!(result.len(), 0);
-    }
-
-    #[test]
-    fn test_repartition_sorted_groups_no_split_needed() {
-        let groups = vec![vec![create_file_key(1, 10)], vec![create_file_key(11, 20)]];
-        let expect_group_elements = 2;
-        let result = repartition_sorted_groups(groups.clone(), expect_group_elements);
-
-        // Should remain unchanged since groups are already small enough
-        assert_eq!(result, groups);
-    }
-
-    #[test]
     fn test_group_files_by_time_range_single_file() {
         let files = vec![create_file_key(1, 10)];
         let partition_num = 3;
@@ -1576,6 +1640,22 @@ mod tests {
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].len(), 1);
         assert_eq!(groups[0][0].key, "file_1_10");
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_empty() {
+        let groups = group_files_by_time_range(vec![], 3);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_zero_partitions() {
+        let files = vec![create_file_key(1, 10), create_file_key(11, 20)];
+        let groups = group_files_by_time_range(files, 0);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].len(), 2);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
@@ -1588,11 +1668,12 @@ mod tests {
         let partition_num = 10; // More partitions than files
         let groups = group_files_by_time_range(files, partition_num);
 
-        // Should create separate groups for non-overlapping files
+        // Should only keep non-empty target partitions.
         assert_eq!(groups.len(), 3);
         for group in &groups {
             assert_eq!(group.len(), 1); // Each file should be in its own group
         }
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
@@ -1602,12 +1683,36 @@ mod tests {
             vec![create_file_key(11, 20)],
             vec![create_file_key(21, 30)],
         ];
-        let result = regroup_tantivy_files(file_groups);
+        let result = regroup_tantivy_files(file_groups, false);
 
         assert_eq!(result.len(), 1); // Max group length is 1
         assert_eq!(result[0].len(), 3); // Should contain all files
         assert_eq!(result[0][0].key, "file_1_10");
         assert_eq!(result[0][1].key, "file_11_20");
         assert_eq!(result[0][2].key, "file_21_30");
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_ascend() {
+        // Same input as test_regroup_tantivy_files_basic, but with ascend=true.
+        // Without the reverse, each group stays in ascending order, so the
+        // interleaved output groups contain oldest files first.
+        let file_groups = vec![
+            vec![create_file_key(1, 10), create_file_key(11, 20)],
+            vec![create_file_key(21, 30), create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups, true);
+
+        assert_eq!(result.len(), 2);
+
+        // First group should contain the first (oldest) file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_1_10");
+        assert_eq!(result[0][1].key, "file_21_30");
+
+        // Second group should contain the last (newest) file from each input group
+        assert_eq!(result[1].len(), 2);
+        assert_eq!(result[1][0].key, "file_11_20");
+        assert_eq!(result[1][1].key, "file_31_40");
     }
 }

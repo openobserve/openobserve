@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("pipeline_destinations.header") }}
         </div>
-        <div class="tw:flex tw:justify-end">
+        <div class="tw:flex tw:justify-end tw:gap-2">
           <q-input
             v-model="filterQuery"
             borderless
@@ -41,14 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
           </q-input>
-          <q-btn
+          <OButton
             data-test="pipeline-destination-list-add-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
-            no-caps
-            flat
-            :label="t(`alert_destinations.add`)"
+            variant="primary"
+            size="sm-action"
+            class="q-ml-sm"
             @click="editDestination(null)"
-          />
+            >{{ t(`alert_destinations.add`) }}</OButton
+          >
         </div>
       </div>
       <q-table
@@ -75,92 +75,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div class="tw:flex tw:justify-center tw:items-center">
-              <q-btn
+              <OButton
                 :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="edit"
+                variant="ghost"
+                size="icon-circle-sm"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(props.row)"
               >
-              </q-btn>
-              <q-btn
+                <q-icon name="edit" />
+              </OButton>
+              <OButton
                 :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :icon="outlinedDelete"
+                variant="ghost"
+                size="icon-circle-sm"
                 :title="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(props.row)"
               >
-              </q-btn>
+                <q-icon :name="outlinedDelete" />
+              </OButton>
             </div>
           </q-td>
         </template>
 
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <q-checkbox
+            v-model="scope.selected"
+            size="sm"
+            class="o2-table-checkbox"
+          />
         </template>
 
         <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
-                  {{ resultTotal }} {{ t('pipeline_destinations.header') }}
-                </div>
-            <q-btn
+          <div
+            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+          >
+            <div
+              class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md"
+            >
+              {{ resultTotal }} {{ t("pipeline_destinations.header") }}
+            </div>
+            <OButton
               v-if="selectedDestinations.length > 0"
               data-test="pipeline-destination-list-delete-destinations-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              no-caps
-              dense
+              variant="outline"
+              size="sm"
+              class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
               <q-icon name="delete" size="16px" />
               <span class="tw:ml-2">Delete</span>
-            </q-btn>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+            </OButton>
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
           </div>
         </template>
         <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
+          <q-tr :props="props">
+            <!-- Adding this block to render the select-all checkbox -->
+            <q-th v-if="columns.length > 0" auto-width>
+              <q-checkbox
+                v-model="props.selected"
+                size="sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
+                class="o2-table-checkbox"
+              />
+            </q-th>
 
-              <!-- render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
+            <!-- render the table headers -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
+          </q-tr>
+        </template>
       </q-table>
     </div>
     <div v-else>
@@ -216,6 +217,7 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useReo } from "@/services/reodotdev_analytics";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface ConformDelete {
   visible: boolean;
@@ -228,6 +230,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     QTablePagination,
+    OButton,
   },
   setup() {
     const qTable = ref();
@@ -593,7 +596,7 @@ export default defineComponent({
 
         const response = await destinationService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         dismiss();
@@ -643,7 +646,10 @@ export default defineComponent({
         console.error("Error deleting destinations:", error);
 
         // Show error message from response if available
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting destinations. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          "Error deleting destinations. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
           q.notify({
             type: "negative",

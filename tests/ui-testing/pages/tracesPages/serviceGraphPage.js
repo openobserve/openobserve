@@ -42,7 +42,8 @@ export class ServiceGraphPage {
     this.operationsTab = '[data-test="service-graph-node-panel-tab-operations"]';
     this.nodesTab = '[data-test="service-graph-node-panel-tab-nodes"]';
     this.podsTab = '[data-test="service-graph-node-panel-tab-pods"]';
-    this.recentOperations = '[data-test="service-graph-side-panel-recent-operations"]';
+    // data-test on OTabPanel is swallowed by <Transition> — target slot content instead
+    this.recentOperations = '[data-test="service-graph-side-panel-operations-table"]';
     this.operationsTable = '[data-test="service-graph-side-panel-operations-table"]';
     this.nodesPanel = '[data-test="service-graph-side-panel-nodes"]';
     this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
@@ -52,7 +53,7 @@ export class ServiceGraphPage {
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
     this.correlationDashboardCard = '.correlation-dashboard-card';
-    this.correlationDialogTabs = '.q-dialog .q-tab';
+    this.correlationDialogTabs = '.q-dialog [role="tab"]';
   }
 
   // ===== NAVIGATION =====
@@ -99,24 +100,24 @@ export class ServiceGraphPage {
 
   async switchToGraphView() {
     await this.page.locator(this.graphViewTab).click();
-    // Wait for the graph button to become selected
-    await expect(this.page.locator(this.graphViewTab)).toHaveClass(/selected/, { timeout: 5000 });
+    // Wait for the graph button to become selected (OToggleGroup uses data-state="on")
+    await expect(this.page.locator(this.graphViewTab)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
   }
 
   async switchToTreeView() {
     await this.page.locator(this.treeViewTab).click();
-    // Wait for the tree button to become selected
-    await expect(this.page.locator(this.treeViewTab)).toHaveClass(/selected/, { timeout: 5000 });
+    // Wait for the tree button to become selected (OToggleGroup uses data-state="on")
+    await expect(this.page.locator(this.treeViewTab)).toHaveAttribute('data-state', 'on', { timeout: 5000 });
   }
 
   async getActiveViewTab() {
-    // Check which view toggle button has the .selected class
+    // Check which view toggle button has data-state="on" (OToggleGroup)
     const treeSelected = await this.page.locator(this.treeViewTab)
-      .evaluate(el => el.classList.contains('selected')).catch(() => false);
+      .evaluate(el => el.getAttribute('data-state') === 'on').catch(() => false);
     if (treeSelected) return 'Tree View';
 
     const graphSelected = await this.page.locator(this.graphViewTab)
-      .evaluate(el => el.classList.contains('selected')).catch(() => false);
+      .evaluate(el => el.getAttribute('data-state') === 'on').catch(() => false);
     if (graphSelected) return 'Graph View';
 
     return 'Unknown';

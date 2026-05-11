@@ -436,7 +436,14 @@ export class AlertCreationWizard {
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== SUBMIT ====================
-        await this.page.locator(this.locators.alertSubmitButton).click();
+        // The submit button sits inside a scroll container that clips it from the viewport.
+        // Playwright's force:true doesn't bypass scroll-container clipping, so we use a
+        // native DOM click via evaluate() which has no viewport restrictions.
+        await this.page.locator(this.locators.alertSubmitButton).waitFor({ state: 'attached', timeout: 10000 });
+        await this.page.evaluate((selector) => {
+            const btn = document.querySelector(selector);
+            if (btn) btn.click();
+        }, this.locators.alertSubmitButton);
         await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
         await expect(this.page.getByRole('cell', { name: '15 Mins' }).first()).toBeVisible({ timeout: 10000 });
         testLogger.info('Successfully created scheduled alert', { alertName: randomAlertName });

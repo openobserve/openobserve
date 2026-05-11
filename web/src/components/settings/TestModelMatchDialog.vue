@@ -1,30 +1,37 @@
 <template>
   <q-dialog v-model="internalValue" persistent>
     <q-card class="test-match-card" data-test="test-model-match-dialog">
-
       <!-- Header -->
       <div class="tmm-header">
         <div>
-          <div class="tmm-title">{{ t('modelPricing.testMatchTitle') }}</div>
-          <div class="tmm-subtitle">{{ t('modelPricing.testMatchSubtitle') }}</div>
+          <div class="tmm-title">{{ t("modelPricing.testMatchTitle") }}</div>
+          <div class="tmm-subtitle">
+            {{ t("modelPricing.testMatchSubtitle") }}
+          </div>
         </div>
-        <q-btn icon="cancel" flat round dense v-close-popup />
+        <OButton variant="ghost" size="icon" v-close-popup>
+          <q-icon name="cancel" size="14px" />
+        </OButton>
       </div>
 
       <!-- Two-column body -->
       <div class="tmm-body">
-
         <!-- ── Left: Inputs ── -->
         <div class="tmm-inputs-panel">
-
           <!-- Model Name -->
           <div class="tmm-section">
-            <label class="tmm-label">{{ t('modelPricing.modelNameInput') }} <span class="tmm-required">*</span></label>
-            <div class="tmm-label-hint">{{ t('modelPricing.modelNameHint') }}</div>
+            <label class="tmm-label"
+              >{{ t("modelPricing.modelNameInput") }}
+              <span class="tmm-required">*</span></label
+            >
+            <div class="tmm-label-hint">
+              {{ t("modelPricing.modelNameHint") }}
+            </div>
             <q-input
               ref="modelInputRef"
               v-model="testModelName"
-              dense borderless
+              dense
+              borderless
               placeholder="e.g. gpt-4-turbo"
               spellcheck="false"
               autocomplete="off"
@@ -35,18 +42,19 @@
                 <q-icon name="smart_toy" size="18px" class="tmm-search-icon" />
               </template>
               <template #append>
-                <q-btn
+                <OButton
                   v-if="testModelName"
-                  icon="close"
-                  flat round dense size="xs"
+                  variant="ghost"
+                  size="icon"
                   class="tmm-clear-btn"
                   @click="clearAndFocus"
                   data-test="test-match-clear-btn"
-                />
+                >
+                  <q-icon name="close" size="14px" />
+                </OButton>
               </template>
             </q-input>
           </div>
-
         </div>
 
         <!-- ── Vertical divider ── -->
@@ -55,62 +63,108 @@
         <!-- ── Right: Live Results ── -->
         <div class="tmm-results-panel">
           <transition name="tmm-fade" mode="out-in">
-
             <!-- Empty state -->
-            <div v-if="!testModelName" key="empty" class="tmm-empty-state" data-test="test-match-empty">
+            <div
+              v-if="!testModelName"
+              key="empty"
+              class="tmm-empty-state"
+              data-test="test-match-empty"
+            >
               <q-icon name="manage_search" size="40px" class="tmm-empty-icon" />
-              <div class="tmm-empty-text">{{ t('modelPricing.enterModelName') }}</div>
+              <div class="tmm-empty-text">
+                {{ t("modelPricing.enterModelName") }}
+              </div>
             </div>
 
             <!-- Typed but not yet tested -->
-            <div v-else-if="testResult === null" key="waiting" class="tmm-empty-state" data-test="test-match-waiting">
+            <div
+              v-else-if="testResult === null"
+              key="waiting"
+              class="tmm-empty-state"
+              data-test="test-match-waiting"
+            >
               <q-icon name="ads_click" size="40px" class="tmm-empty-icon" />
-              <div class="tmm-empty-text">{{ t('modelPricing.clickToTest') }}</div>
+              <div class="tmm-empty-text">
+                {{ t("modelPricing.clickToTest") }}
+              </div>
             </div>
 
             <!-- No Match -->
-            <div v-else-if="!testResult?.matched" key="no-match" class="tmm-result-area" data-test="test-match-no-result">
+            <div
+              v-else-if="!testResult?.matched"
+              key="no-match"
+              class="tmm-result-area"
+              data-test="test-match-no-result"
+            >
               <div class="tmm-status-card tmm-status-card--error">
                 <div class="tmm-status-icon-wrap tmm-status-icon-wrap--error">
                   <q-icon name="error_outline" size="22px" />
                 </div>
                 <div>
-                  <div class="tmm-status-title">{{ t('modelPricing.noMatchFound') }}</div>
-                  <div class="tmm-status-desc">{{ t('modelPricing.noMatchDesc', { modelName: testModelName }) }}</div>
+                  <div class="tmm-status-title">
+                    {{ t("modelPricing.noMatchFound") }}
+                  </div>
+                  <div class="tmm-status-desc">
+                    {{
+                      t("modelPricing.noMatchDesc", {
+                        modelName: testModelName,
+                      })
+                    }}
+                  </div>
                 </div>
               </div>
               <div class="tmm-suggestions">
-                <div class="tmm-suggestions-title">{{ t('modelPricing.troubleshootingTitle') }}</div>
+                <div class="tmm-suggestions-title">
+                  {{ t("modelPricing.troubleshootingTitle") }}
+                </div>
                 <ul class="tmm-suggestions-list">
-                  <li>{{ t('modelPricing.tip1') }}</li>
-                  <li>{{ t('modelPricing.tip2') }}</li>
-                  <li>{{ t('modelPricing.tip3') }}</li>
+                  <li>{{ t("modelPricing.tip1") }}</li>
+                  <li>{{ t("modelPricing.tip2") }}</li>
+                  <li>{{ t("modelPricing.tip3") }}</li>
                 </ul>
               </div>
             </div>
 
             <!-- Match Found -->
-            <div v-else key="match" class="tmm-result-area" data-test="test-match-result">
-
+            <div
+              v-else
+              key="match"
+              class="tmm-result-area"
+              data-test="test-match-result"
+            >
               <!-- Match status -->
               <div class="tmm-status-card tmm-status-card--success">
                 <div class="tmm-status-icon-wrap tmm-status-icon-wrap--success">
                   <q-icon name="check_circle" size="22px" />
                 </div>
                 <div class="tw:flex-1 tw:min-w-0">
-                  <div class="tmm-status-title">{{ t('modelPricing.matchFound') }}</div>
+                  <div class="tmm-status-title">
+                    {{ t("modelPricing.matchFound") }}
+                  </div>
                   <div class="tmm-status-desc tw:truncate">
-                    <code class="tmm-model-badge">{{ testResult.matched.name }}</code>
+                    <code class="tmm-model-badge">{{
+                      testResult.matched.name
+                    }}</code>
                   </div>
                 </div>
-                <q-badge :color="sourceColor(testResult.matched)" text-color="white" :label="sourceLabel(testResult.matched)" class="tmm-source-badge" />
+                <q-badge
+                  :color="sourceColor(testResult.matched)"
+                  text-color="white"
+                  :label="sourceLabel(testResult.matched)"
+                  class="tmm-source-badge"
+                />
               </div>
 
               <!-- Priority flow -->
               <div class="tmm-flow">
-                <div class="tmm-flow-title">{{ t('modelPricing.matchPriority') }}</div>
+                <div class="tmm-flow-title">
+                  {{ t("modelPricing.matchPriority") }}
+                </div>
                 <div class="tmm-flow-steps">
-                  <template v-for="(step, sIdx) in matchFlowSteps" :key="step.key">
+                  <template
+                    v-for="(step, sIdx) in matchFlowSteps"
+                    :key="step.key"
+                  >
                     <div class="tmm-flow-arrow" v-if="sIdx > 0">
                       <q-icon name="arrow_forward" size="13px" color="grey-5" />
                     </div>
@@ -118,12 +172,21 @@
                       class="tmm-flow-step"
                       :class="{
                         'tmm-flow-step--winner': step.key === winnerSource,
-                        'tmm-flow-step--dimmed': step.key !== winnerSource
+                        'tmm-flow-step--dimmed': step.key !== winnerSource,
                       }"
                     >
-                      <q-icon :name="step.icon" size="14px" class="tmm-flow-step-icon" />
+                      <q-icon
+                        :name="step.icon"
+                        size="14px"
+                        class="tmm-flow-step-icon"
+                      />
                       <span class="tmm-flow-step-label">{{ step.label }}</span>
-                      <q-icon v-if="step.key === winnerSource" name="check_circle" size="13px" class="tmm-flow-step-check" />
+                      <q-icon
+                        v-if="step.key === winnerSource"
+                        name="check_circle"
+                        size="13px"
+                        class="tmm-flow-step-check"
+                      />
                     </div>
                   </template>
                 </div>
@@ -133,91 +196,116 @@
               <div class="tmm-cost-card">
                 <div class="tmm-cost-header">
                   <div>
-                    <div class="tmm-cost-tier-name">{{ testResult.tier || 'Default' }}</div>
-                    <div class="tmm-cost-tier-desc" v-if="matchedTierDef?.condition">
-                      Condition: <code>{{ matchedTierDef.condition.usage_key }} {{ operatorSymbol(matchedTierDef.condition.operator) }} {{ matchedTierDef.condition.value }}</code>
+                    <div class="tmm-cost-tier-name">
+                      {{ testResult.tier || "Default" }}
                     </div>
-                    <div class="tmm-cost-tier-desc" v-else>{{ t('modelPricing.defaultPricingTier') }}</div>
+                    <div
+                      class="tmm-cost-tier-desc"
+                      v-if="matchedTierDef?.condition"
+                    >
+                      Condition:
+                      <code
+                        >{{ matchedTierDef.condition.usage_key }}
+                        {{ operatorSymbol(matchedTierDef.condition.operator) }}
+                        {{ matchedTierDef.condition.value }}</code
+                      >
+                    </div>
+                    <div class="tmm-cost-tier-desc" v-else>
+                      {{ t("modelPricing.defaultPricingTier") }}
+                    </div>
                   </div>
                 </div>
 
                 <div class="tmm-cost-table" v-if="pricingRows.length > 0">
                   <div class="tmm-cost-table-head">
-                    <span>{{ t('modelPricing.usageType') }}</span>
-                    <span class="tw:text-right">{{ t('modelPricing.pricePerMTokens') }}</span>
+                    <span>{{ t("modelPricing.usageType") }}</span>
+                    <span class="tw:text-right">{{
+                      t("modelPricing.pricePerMTokens")
+                    }}</span>
                   </div>
-                  <div v-for="row in pricingRows" :key="row.key" class="tmm-cost-table-row">
+                  <div
+                    v-for="row in pricingRows"
+                    :key="row.key"
+                    class="tmm-cost-table-row"
+                  >
                     <span class="tmm-cost-usage-key">{{ row.key }}</span>
-                    <span class="tmm-cost-value tw:text-right">${{ formatRate(row.rate) }}</span>
+                    <span class="tmm-cost-value tw:text-right"
+                      >${{ formatRate(row.rate) }}</span
+                    >
                   </div>
                 </div>
                 <div v-else class="tmm-cost-empty">
                   <q-icon name="info_outline" size="15px" />
-                  {{ t('modelPricing.noPricingForTier') }}
+                  {{ t("modelPricing.noPricingForTier") }}
                 </div>
               </div>
-
             </div>
           </transition>
         </div>
-
       </div>
 
       <!-- Footer -->
       <div class="tmm-footer">
-        <q-btn :label="t('modelPricing.close')" flat no-caps v-close-popup class="o2-secondary-button" data-test="test-match-close-btn" />
-        <q-btn
-          :label="t('modelPricing.testMatch')"
-          no-caps
-          unelevated
-          class="o2-primary-button"
-          :disable="!testModelName"
+        <OButton
+          variant="outline"
+          size="sm-action"
+          v-close-popup
+          data-test="test-match-close-btn"
+        >
+          {{ t("modelPricing.close") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="!testModelName"
           :loading="testing"
           @click="runTest"
           data-test="test-match-run-btn"
-        />
+        >
+          {{ t("modelPricing.testMatch") }}
+        </OButton>
         <div class="tw:flex-1"></div>
       </div>
-
     </q-card>
   </q-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useStore } from 'vuex';
-import modelPricingService from '@/services/model_pricing';
+import { ref, computed, watch, nextTick } from "vue";
+import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import modelPricingService from "@/services/model_pricing";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
 });
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(["update:modelValue"]);
 
 const { t } = useI18n();
 const store = useStore();
-const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || '');
+const orgIdentifier = computed(
+  () => store.state.selectedOrganization?.identifier || "",
+);
 
 const internalValue = computed({
   get: () => props.modelValue,
-  set: (val) => emit('update:modelValue', val)
+  set: (val) => emit("update:modelValue", val),
 });
 
-const testModelName = ref('');
+const testModelName = ref("");
 const modelInputRef = ref<any>(null);
 
 function clearAndFocus() {
-  testModelName.value = '';
+  testModelName.value = "";
   nextTick(() => modelInputRef.value?.focus());
 }
-
-
 
 // Reset state and focus on open
 watch(internalValue, (val) => {
   if (val) {
     testResult.value = null;
-    testModelName.value = '';
+    testModelName.value = "";
     nextTick(() => {
       setTimeout(() => modelInputRef.value?.focus(), 100);
     });
@@ -260,8 +348,10 @@ watch(testModelName, (val) => {
 
 // ── Derived display values ────────────────────────────────────────────────────
 
-const PRICE_KEY_ORDER = ['input', 'output'];
-function sortedPriceEntries(prices: Record<string, number>): [string, number][] {
+const PRICE_KEY_ORDER = ["input", "output"];
+function sortedPriceEntries(
+  prices: Record<string, number>,
+): [string, number][] {
   return Object.entries(prices).sort(([a], [b]) => {
     const ai = PRICE_KEY_ORDER.indexOf(a);
     const bi = PRICE_KEY_ORDER.indexOf(b);
@@ -275,16 +365,20 @@ function sortedPriceEntries(prices: Record<string, number>): [string, number][] 
 const winnerSource = computed(() => testResult.value?.matched?.source || null);
 
 const matchFlowSteps = [
-  { key: 'org', label: 'your org', icon: 'person' },
-  { key: 'meta_org', label: 'global', icon: 'corporate_fare' },
-  { key: 'built_in', label: 'built-in', icon: 'auto_awesome' },
+  { key: "org", label: "your org", icon: "person" },
+  { key: "meta_org", label: "global", icon: "corporate_fare" },
+  { key: "built_in", label: "built-in", icon: "auto_awesome" },
 ];
 
 const matchedTierDef = computed(() => {
   const result = testResult.value;
   if (!result?.matched) return null;
   const tiers: any[] = result.matched.tiers || [];
-  return tiers.find((t: any) => (t.name || 'Default') === result.tier) || tiers[0] || null;
+  return (
+    tiers.find((t: any) => (t.name || "Default") === result.tier) ||
+    tiers[0] ||
+    null
+  );
 });
 
 const pricingRows = computed(() => {
@@ -297,30 +391,36 @@ const pricingRows = computed(() => {
 });
 
 function operatorSymbol(op: string) {
-  const map: Record<string, string> = { gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=', neq: '≠' };
+  const map: Record<string, string> = {
+    gt: ">",
+    gte: "≥",
+    lt: "<",
+    lte: "≤",
+    eq: "=",
+    neq: "≠",
+  };
   return map[op] || op;
 }
 
 function sourceColor(model: any) {
-  if (!model.source || model.source === 'org') return 'primary';
-  if (model.source === 'meta_org') return 'secondary';
-  return 'grey-8';
+  if (!model.source || model.source === "org") return "primary";
+  if (model.source === "meta_org") return "secondary";
+  return "grey-8";
 }
 function sourceLabel(model: any) {
-  if (!model.source || model.source === 'org') return 'Your Org';
-  if (model.source === 'meta_org') return 'Global';
-  return 'Built-in';
+  if (!model.source || model.source === "org") return "Your Org";
+  if (model.source === "meta_org") return "Global";
+  return "Built-in";
 }
 
 function formatRate(rate: number) {
   if (rate === 0) return "0.00";
-  if (rate < 0.01) return rate.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+  if (rate < 0.01) return rate.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
   return rate.toFixed(2);
 }
 </script>
 
 <style lang="scss" scoped>
-
 /* ── Card Shell ─────────────────────────────────────── */
 .test-match-card {
   width: 860px;
@@ -358,7 +458,9 @@ function formatRate(rate: number) {
   margin-right: -8px;
   opacity: 0.45;
   transition: opacity 0.15s;
-  &:hover { opacity: 1; }
+  &:hover {
+    opacity: 1;
+  }
 }
 
 /* ── Two-column body ────────────────────────────────── */
@@ -446,17 +548,24 @@ function formatRate(rate: number) {
   background: transparent;
   transition: all 0.15s ease;
 
-  &:hover { border-color: rgba(89, 96, 178, 0.35); }
+  &:hover {
+    border-color: rgba(89, 96, 178, 0.35);
+  }
 
   &--focus {
     border-color: #5960b2;
     box-shadow: 0 0 0 3px rgba(89, 96, 178, 0.12);
 
-    .body--dark & { box-shadow: 0 0 0 3px rgba(89, 96, 178, 0.2); }
+    .body--dark & {
+      box-shadow: 0 0 0 3px rgba(89, 96, 178, 0.2);
+    }
   }
 }
 
-.tmm-search-icon { opacity: 0.35; flex-shrink: 0; }
+.tmm-search-icon {
+  opacity: 0.35;
+  flex-shrink: 0;
+}
 
 .tmm-search-input {
   flex: 1;
@@ -464,14 +573,24 @@ function formatRate(rate: number) {
   outline: none;
   background: transparent;
   font-size: 13px;
-  font-family: 'SF Mono', 'JetBrains Mono', monospace;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
   color: inherit;
 
-  &::placeholder { color: rgba(0, 0, 0, 0.25); font-family: inherit; }
-  .body--dark &::placeholder { color: rgba(255, 255, 255, 0.25); }
+  &::placeholder {
+    color: rgba(0, 0, 0, 0.25);
+    font-family: inherit;
+  }
+  .body--dark &::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+  }
 }
 
-.tmm-clear-btn { opacity: 0.35; &:hover { opacity: 0.7; } }
+.tmm-clear-btn {
+  opacity: 0.35;
+  &:hover {
+    opacity: 0.7;
+  }
+}
 
 /* ── Templates ──────────────────────────────────────── */
 .tmm-templates {
@@ -502,8 +621,13 @@ function formatRate(rate: number) {
   transition: all 0.15s;
   color: inherit;
 
-  &:hover { border-color: var(--tpl-color); }
-  &--active { border-color: var(--tpl-color); font-weight: 600; }
+  &:hover {
+    border-color: var(--tpl-color);
+  }
+  &--active {
+    border-color: var(--tpl-color);
+    font-weight: 600;
+  }
 }
 
 .tmm-template-dot {
@@ -566,7 +690,9 @@ function formatRate(rate: number) {
   transition: background 0.15s;
   margin-top: 2px;
 
-  &:hover { background: rgba(89, 96, 178, 0.08); }
+  &:hover {
+    background: rgba(89, 96, 178, 0.08);
+  }
 }
 
 /* ── Empty State ────────────────────────────────────── */
@@ -580,7 +706,9 @@ function formatRate(rate: number) {
   gap: 10px;
 }
 
-.tmm-empty-icon { opacity: 0.12; }
+.tmm-empty-icon {
+  opacity: 0.12;
+}
 
 .tmm-empty-text {
   font-size: 13px;
@@ -607,13 +735,19 @@ function formatRate(rate: number) {
 .tmm-status-card--success {
   background: rgba(22, 163, 74, 0.05);
   border: 1px solid rgba(22, 163, 74, 0.2);
-  .body--dark & { background: rgba(22, 163, 74, 0.08); border-color: rgba(22, 163, 74, 0.25); }
+  .body--dark & {
+    background: rgba(22, 163, 74, 0.08);
+    border-color: rgba(22, 163, 74, 0.25);
+  }
 }
 
 .tmm-status-card--error {
   background: rgba(239, 68, 68, 0.04);
   border: 1px solid rgba(239, 68, 68, 0.15);
-  .body--dark & { background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.2); }
+  .body--dark & {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.2);
+  }
 }
 
 .tmm-status-icon-wrap {
@@ -626,16 +760,32 @@ function formatRate(rate: number) {
   flex-shrink: 0;
 }
 
-.tmm-status-icon-wrap--success { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
-.tmm-status-icon-wrap--error   { background: rgba(239, 68, 68, 0.1);  color: #dc2626; }
+.tmm-status-icon-wrap--success {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+}
+.tmm-status-icon-wrap--error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
 
 .tmm-status-title {
   font-size: 13px;
   font-weight: 700;
 }
 
-.tmm-status-card--success .tmm-status-title { color: #15803d; .body--dark & { color: #4ade80; } }
-.tmm-status-card--error   .tmm-status-title { color: #b91c1c; .body--dark & { color: #fca5a5; } }
+.tmm-status-card--success .tmm-status-title {
+  color: #15803d;
+  .body--dark & {
+    color: #4ade80;
+  }
+}
+.tmm-status-card--error .tmm-status-title {
+  color: #b91c1c;
+  .body--dark & {
+    color: #fca5a5;
+  }
+}
 
 .tmm-status-desc {
   font-size: 12px;
@@ -649,7 +799,7 @@ function formatRate(rate: number) {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
-  font-family: 'SF Mono', 'JetBrains Mono', monospace;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
   background: rgba(22, 163, 74, 0.08);
   border: 1px solid rgba(22, 163, 74, 0.2);
   color: inherit;
@@ -668,7 +818,9 @@ function formatRate(rate: number) {
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.02);
   border: 1px solid var(--o2-border-color);
-  .body--dark & { background: rgba(255, 255, 255, 0.02); }
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.02);
+  }
 }
 
 .tmm-suggestions-title {
@@ -692,7 +844,9 @@ function formatRate(rate: number) {
   border: 1px solid var(--o2-border-color);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.015);
-  .body--dark & { background: rgba(255, 255, 255, 0.02); }
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.02);
+  }
 }
 
 .tmm-flow-title {
@@ -726,13 +880,23 @@ function formatRate(rate: number) {
   border-color: #16a34a;
   background: rgba(22, 163, 74, 0.06);
   font-weight: 700;
-  .body--dark & { background: rgba(22, 163, 74, 0.1); }
+  .body--dark & {
+    background: rgba(22, 163, 74, 0.1);
+  }
 }
 
-.tmm-flow-step--dimmed { opacity: 0.4; }
-.tmm-flow-step-icon { opacity: 0.6; }
-.tmm-flow-step-check { color: #16a34a; }
-.tmm-flow-arrow { opacity: 0.3; }
+.tmm-flow-step--dimmed {
+  opacity: 0.4;
+}
+.tmm-flow-step-icon {
+  opacity: 0.6;
+}
+.tmm-flow-step-check {
+  color: #16a34a;
+}
+.tmm-flow-arrow {
+  opacity: 0.3;
+}
 
 /* ── Cost Card ──────────────────────────────────────── */
 .tmm-cost-card {
@@ -745,10 +909,15 @@ function formatRate(rate: number) {
   padding: 12px 14px;
   background: rgba(0, 0, 0, 0.02);
   border-bottom: 1px solid var(--o2-border-color);
-  .body--dark & { background: rgba(255, 255, 255, 0.03); }
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.03);
+  }
 }
 
-.tmm-cost-tier-name { font-size: 13px; font-weight: 700; }
+.tmm-cost-tier-name {
+  font-size: 13px;
+  font-weight: 700;
+}
 
 .tmm-cost-tier-desc {
   font-size: 11px;
@@ -760,7 +929,9 @@ function formatRate(rate: number) {
     border-radius: 3px;
     background: rgba(0, 0, 0, 0.05);
     font-size: 11px;
-    .body--dark & { background: rgba(255, 255, 255, 0.08); }
+    .body--dark & {
+      background: rgba(255, 255, 255, 0.08);
+    }
   }
 }
 
@@ -772,7 +943,9 @@ function formatRate(rate: number) {
   padding: 7px 14px;
   border-bottom: 1px solid var(--o2-border-color);
   background: rgba(0, 0, 0, 0.015);
-  .body--dark & { background: rgba(255, 255, 255, 0.02); }
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.02);
+  }
 
   span {
     font-size: 10px;
@@ -789,20 +962,39 @@ function formatRate(rate: number) {
   padding: 8px 14px;
   font-size: 12px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-  .body--dark & { border-bottom-color: rgba(255, 255, 255, 0.04); }
-  &:last-child { border-bottom: none; }
-  &:hover { background: rgba(0, 0, 0, 0.015); .body--dark & { background: rgba(255, 255, 255, 0.02); } }
+  .body--dark & {
+    border-bottom-color: rgba(255, 255, 255, 0.04);
+  }
+  &:last-child {
+    border-bottom: none;
+  }
+  &:hover {
+    background: rgba(0, 0, 0, 0.015);
+    .body--dark & {
+      background: rgba(255, 255, 255, 0.02);
+    }
+  }
 }
 
 .tmm-cost-usage-key {
   font-weight: 600;
-  font-family: 'SF Mono', 'JetBrains Mono', monospace;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
   font-size: 11px;
 }
 
-.tmm-cost-tokens { font-variant-numeric: tabular-nums; opacity: 0.65; }
-.tmm-cost-rate   { font-variant-numeric: tabular-nums; opacity: 0.5; font-size: 11px; }
-.tmm-cost-value  { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tmm-cost-tokens {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
+}
+.tmm-cost-rate {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+  font-size: 11px;
+}
+.tmm-cost-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 .tmm-cost-empty {
   display: flex;
@@ -824,7 +1016,9 @@ function formatRate(rate: number) {
   background: rgba(0, 0, 0, 0.02);
   font-size: 13px;
   font-weight: 700;
-  .body--dark & { background: rgba(255, 255, 255, 0.03); }
+  .body--dark & {
+    background: rgba(255, 255, 255, 0.03);
+  }
 }
 
 .tmm-cost-total-value {
@@ -833,7 +1027,9 @@ function formatRate(rate: number) {
   color: #16a34a;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  .body--dark & { color: #4ade80; }
+  .body--dark & {
+    color: #4ade80;
+  }
 }
 
 /* ── Footer ─────────────────────────────────────────── */
@@ -848,18 +1044,38 @@ function formatRate(rate: number) {
 .tmm-reset-btn {
   font-size: 12px;
   opacity: 0.55;
-  &:hover { opacity: 1; }
+  &:hover {
+    opacity: 1;
+  }
 }
 
-.tmm-close-footer-btn { font-weight: 600; font-size: 13px; }
+.tmm-close-footer-btn {
+  font-weight: 600;
+  font-size: 13px;
+}
 
 /* ── Animations ─────────────────────────────────────── */
-.tmm-fade-enter-active, .tmm-fade-leave-active { transition: all 0.18s ease; }
-.tmm-fade-enter-from { opacity: 0; transform: translateY(5px); }
-.tmm-fade-leave-to   { opacity: 0; }
+.tmm-fade-enter-active,
+.tmm-fade-leave-active {
+  transition: all 0.18s ease;
+}
+.tmm-fade-enter-from {
+  opacity: 0;
+  transform: translateY(5px);
+}
+.tmm-fade-leave-to {
+  opacity: 0;
+}
 
-.tmm-row-enter-active { transition: all 0.18s ease; }
-.tmm-row-leave-active { transition: all 0.12s ease; }
-.tmm-row-enter-from, .tmm-row-leave-to { opacity: 0; transform: translateX(-8px); }
-
+.tmm-row-enter-active {
+  transition: all 0.18s ease;
+}
+.tmm-row-leave-active {
+  transition: all 0.12s ease;
+}
+.tmm-row-enter-from,
+.tmm-row-leave-to {
+  opacity: 0;
+  transform: translateX(-8px);
+}
 </style>

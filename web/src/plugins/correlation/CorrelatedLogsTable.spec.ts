@@ -46,6 +46,15 @@ vi.mock("@/composables/useCorrelatedLogs", () => ({
   })),
 }));
 
+// Mock useServiceCorrelation composable
+vi.mock("@/composables/useServiceCorrelation", () => ({
+  useServiceCorrelation: vi.fn(() => ({
+    loadKeyFields: vi.fn().mockResolvedValue({}),
+  })),
+  clearSemanticGroupsCaches: vi.fn(),
+  getSemanticGroupsCacheStatus: vi.fn(),
+}));
+
 // Mock TenstackTable component
 vi.mock("@/plugins/logs/TenstackTable.vue", () => ({
   default: {
@@ -116,6 +125,18 @@ describe("CorrelatedLogsTable.vue", () => {
         stubs: {
           TenstackTable: true,
           DimensionFiltersBar: true,
+          // Render ODropdown inline so data-test attrs are findable in tests
+          ODropdown: {
+            name: "ODropdown",
+            template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+            emits: ["update:open"],
+            props: ["open", "side", "align", "sideOffset"],
+          },
+          ODropdownItem: {
+            name: "ODropdownItem",
+            template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+            emits: ["select"],
+          },
         },
       },
       ...options,
@@ -166,9 +187,134 @@ describe("CorrelatedLogsTable.vue", () => {
       await nextTick();
       await flushPromises();
 
-      // Initially only timestamp should be visible
+      // Initially only timestamp should be visible (key fields mock returns empty)
       expect(wrapper.vm.visibleColumns.has("_timestamp")).toBe(true);
       expect(wrapper.vm.visibleColumns.size).toBe(1);
+    });
+
+    it("should include key fields in default columns when they match available fields", async () => {
+      // Mock loadKeyFields to return matching key fields for logs
+      const mockUseSC = await import("@/composables/useServiceCorrelation");
+      vi.mocked(mockUseSC.useServiceCorrelation).mockReturnValue({
+        loadKeyFields: vi.fn().mockResolvedValue({
+          logs: { fields: ["field1"], groups: [] },
+        }),
+        clearSemanticGroupsCaches: vi.fn(),
+        getSemanticGroupsCacheStatus: vi.fn(),
+      } as any);
+
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        searchResults: {
+          value: [
+            { _timestamp: 1234567890, field1: "value1", field2: "value2" },
+          ],
+        },
+        hasResults: { value: true },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+      await flushPromises();
+
+      expect(wrapper.vm.visibleColumns.has("_timestamp")).toBe(true);
+      expect(wrapper.vm.visibleColumns.has("field1")).toBe(true);
+      expect(wrapper.vm.visibleColumns.size).toBe(2);
+    });
+
+    it("should fall back to source column when no key fields match available fields", async () => {
+      // Mock loadKeyFields to return key fields that don't exist in data
+      const mockUseSC = await import("@/composables/useServiceCorrelation");
+      vi.mocked(mockUseSC.useServiceCorrelation).mockReturnValue({
+        loadKeyFields: vi.fn().mockResolvedValue({
+          logs: { fields: ["nonexistent_field"], groups: [] },
+        }),
+        clearSemanticGroupsCaches: vi.fn(),
+        getSemanticGroupsCacheStatus: vi.fn(),
+      } as any);
+
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        searchResults: {
+          value: [
+            { _timestamp: 1234567890, field1: "value1" },
+          ],
+        },
+        hasResults: { value: true },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+      await flushPromises();
+
+      // Should only have _timestamp (fallback to source column behavior)
+      expect(wrapper.vm.visibleColumns.has("_timestamp")).toBe(true);
+      expect(wrapper.vm.visibleColumns.has("field1")).toBe(false);
+      expect(wrapper.vm.visibleColumns.size).toBe(1);
+    });
+
+    it("should always include _timestamp in default columns", async () => {
+      const mockUseSC = await import("@/composables/useServiceCorrelation");
+      vi.mocked(mockUseSC.useServiceCorrelation).mockReturnValue({
+        loadKeyFields: vi.fn().mockResolvedValue({
+          logs: { fields: ["field1", "field2"], groups: [] },
+        }),
+        clearSemanticGroupsCaches: vi.fn(),
+        getSemanticGroupsCacheStatus: vi.fn(),
+      } as any);
+
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        searchResults: {
+          value: [
+            { _timestamp: 1234567890, field1: "a", field2: "b", field3: "c" },
+          ],
+        },
+        hasResults: { value: true },
+      });
+
+      wrapper = createWrapper();
+      await nextTick();
+      await flushPromises();
+
+      // _timestamp should always be included
+      expect(wrapper.vm.visibleColumns.has("_timestamp")).toBe(true);
+    });
+
+    it("should not override user-customized columns when key fields load", async () => {
+      const mockUseSC = await import("@/composables/useServiceCorrelation");
+      vi.mocked(mockUseSC.useServiceCorrelation).mockReturnValue({
+        loadKeyFields: vi.fn().mockResolvedValue({
+          logs: { fields: ["field1"], groups: [] },
+        }),
+        clearSemanticGroupsCaches: vi.fn(),
+        getSemanticGroupsCacheStatus: vi.fn(),
+      } as any);
+
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        searchResults: {
+          value: [
+            { _timestamp: 123, field1: "a", field2: "b" },
+          ],
+        },
+        hasResults: { value: true },
+      });
+
+      wrapper = createWrapper();
+      // Simulate user having previously customized columns (e.g., from localStorage)
+      wrapper.vm.visibleColumns = new Set(["_timestamp", "field2"]);
+      await nextTick();
+      await flushPromises();
+
+      // Should respect user's customization (field2), not replace with key fields (field1)
+      expect(wrapper.vm.visibleColumns.has("_timestamp")).toBe(true);
+      expect(wrapper.vm.visibleColumns.has("field2")).toBe(true);
+      expect(wrapper.vm.visibleColumns.has("field1")).toBe(false);
     });
 
     it("should toggle column visibility when toggleColumnVisibility is called", async () => {

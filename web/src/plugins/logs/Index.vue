@@ -80,11 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #separator>
-                <q-btn
+                <OButton
                   data-test="logs-search-field-list-collapse-btn"
-                  :icon="
-                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
-                  "
+                  variant="sidebar-button"
+                  size="sidebar-button"
                   :title="
                     searchObj.meta.showFields
                       ? 'Collapse Fields'
@@ -95,12 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'logs-splitter-icon-expand'
                       : 'logs-splitter-icon-collapse'
                   "
-                  color="primary"
-                  size="sm"
-                  dense
-                  round
                   @click="collapseFieldList"
-                />
+                  ><template #icon-left>
+                    <q-icon
+                      :name="
+                        searchObj.meta.showFields
+                          ? 'chevron_left'
+                          : 'chevron_right'
+                      "
+                    />
+                  </template>
+                </OButton>
               </template>
               <template #after>
                 <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
@@ -145,16 +149,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           Result not found.
-                          <q-btn
+                          <OButton
                             v-if="
                               searchObj.data.errorMsg != '' ||
                               searchObj?.data?.functionError != ''
                             "
                             @click="toggleErrorDetails"
-                            size="sm"
-                            class="o2-secondary-button"
+                            variant="outline"
+                            size="sm-action"
                             data-test="logs-page-result-error-details-btn-result-not-found"
-                            >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                            >{{ t("search.functionErrorBtnLabel") }}</OButton
                           >
                         </div>
                         <div
@@ -163,33 +167,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-else
                         >
                           Error occurred while retrieving search events.
-                          <q-btn
+                          <OButton
                             v-if="
                               searchObj.data.errorMsg != '' ||
                               searchObj?.data?.functionError != ''
                             "
                             @click="toggleErrorDetails"
-                            size="sm"
-                            class="o2-secondary-button"
+                            variant="outline"
+                            size="sm-action"
                             data-test="logs-page-result-error-details-btn"
-                            >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+                            >{{ t("search.histogramErrorBtnLabel") }}</OButton
                           >
                         </div>
                         <div
                           data-test="logs-search-error-20003"
                           v-if="parseInt(searchObj.data.errorCode) == 20003"
                         >
-                          <q-btn
-                            no-caps
-                            unelevated
-                            size="sm"
-                            bg-secondary
-                            class="no-border bg-secondary text-white"
+                          <OButton
+                            variant="primary"
+                            size="sm-action"
+                            as="RouterLink"
                             :to="
                               '/streams?dialog=' +
                               searchObj.data.stream.selectedStream.label
                             "
-                            >Click here</q-btn
+                            >Click here</OButton
                           >
                           to configure a full text search field to the stream.
                         </div>
@@ -231,15 +233,16 @@ size="md" />
                         <q-icon name="info" color="primary"
 size="md" />
                         {{ t("search.noRecordFound") }}
-                        <q-btn
+                        <OButton
                           v-if="
                             searchObj.data.errorMsg != '' ||
                             searchObj?.data?.functionError != ''
                           "
                           @click="toggleErrorDetails"
-                          size="sm"
+                          variant="outline"
+                          size="sm-action"
                           data-test="logs-page-result-error-details-btn-norecord"
-                          >{{ t("search.functionErrorBtnLabel") }}</q-btn
+                          >{{ t("search.functionErrorBtnLabel") }}</OButton
                         ><br />
                       </h6>
                     </div>
@@ -341,22 +344,18 @@ size="md" />
           >
             <BuildQueryPage
               ref="buildQueryPageRef"
-              :searchQuery="searchObj.data.query"
+              :searchQuery="searchObj.meta.sqlMode ? searchObj.data.query : ''"
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
+              :isSqlMode="searchObj.meta.sqlMode"
+              :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
               class="tw:pb-[0.75rem]! tw:pr-[0.625rem]"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
               @customQueryModeChanged="onCustomQueryModeChanged"
               @initialized="onBuildInitialized"
-              @fieldsUpdated="
-                updateUrlQueryParams(
-                  null,
-                  buildQueryPageRef?.dashboardPanelData,
-                )
-              "
             />
           </div>
         </template>
@@ -399,14 +398,13 @@ size="20px" />
               >
             </div>
 
-            <q-btn
+            <OButton
               class="q-mt-xl"
-              color="secondary"
-              unelevated
-              :label="t('search.redirect_to_logs_page')"
-              no-caps
+              variant="outline"
+              size="sm-action"
               @click="redirectBackToLogs"
-            />
+              >{{ t("search.redirect_to_logs_page") }}</OButton
+            >
           </div>
         </div>
       </div>
@@ -467,6 +465,7 @@ import {
   getFieldsFromQuery,
   isSimpleSelectAllQuery,
   getStreamFromQuery,
+  extractWhereClause,
 } from "@/utils/query/sqlUtils";
 import {
   buildColumnIdentifierAst,
@@ -497,6 +496,8 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { ChevronRight, ChevronLeft } from "lucide-vue-next";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -509,6 +510,9 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList,
+    OButton,
+    ChevronRight,
+    ChevronLeft,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
@@ -2246,6 +2250,32 @@ export default defineComponent({
       },
     );
 
+    // Watch for build page config changes to sync URL params
+    watch(
+      () => buildDashboardPanelData.data.config,
+      () => {
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          updateUrlQueryParams(null, buildDashboardPanelData);
+        }
+      },
+      { deep: true },
+    );
+
+    // Watch for SQL mode changes while in build mode.
+    // When SQL mode is toggled, re-sync the search bar query:
+    //   ON  → show the builder's full generated SQL
+    //   OFF → show only the WHERE clause (filter text)
+    watch(
+      () => searchObj.meta.sqlMode,
+      async () => {
+        if (searchObj.meta.logsVisualizeToggle !== "build") return;
+
+        const generatedQuery =
+          buildDashboardPanelData.data.queries?.[0]?.query || "";
+        await onBuildQueryGenerated(generatedQuery);
+      },
+    );
+
     watch(
       () => splitterModel.value,
       () => {
@@ -2272,17 +2302,6 @@ export default defineComponent({
     watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
       deep: true,
     });
-
-    // Watch for build page config changes to sync URL params
-    watch(
-      () => buildDashboardPanelData.data.config,
-      () => {
-        if (searchObj.meta.logsVisualizeToggle === "build") {
-          updateUrlQueryParams(null, buildDashboardPanelData);
-        }
-      },
-      { deep: true },
-    );
 
     // Sync searchObj.data.query to build page's dashboardPanelData when in custom query mode
     // This ensures edited queries are reflected in the panel schema immediately
@@ -2460,8 +2479,8 @@ export default defineComponent({
           buildDashboardPanelData.data.queries[0]?.customQuery === true;
         if (
           isCustomQueryMode &&
-          searchObj.meta.sqlMode &&
-          !searchObj.data.query?.trim()
+          !searchObj.data.query?.trim() &&
+          !buildDashboardPanelData.data.queries[0]?.query?.trim()
         ) {
           showErrorNotification(
             "Query is empty, please select fields to build query",
@@ -2512,11 +2531,18 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
-    const onBuildQueryGenerated = (query: string) => {
-      // Sync generated query to logs composables so user can see it in the editor
-      // Always update, including empty string when all fields are removed
-      searchObj.data.query = query;
-      searchObj.data.editorValue = query;
+    const onBuildQueryGenerated = async (query: string) => {
+      if (searchObj.meta.sqlMode) {
+        // SQL mode ON: sync the full generated SQL to the search bar
+        searchObj.data.query = query;
+        searchObj.data.editorValue = query;
+      } else {
+        // SQL mode OFF: extract only the WHERE clause and sync that
+        // so the search bar stays in filter mode
+        const whereClause = await extractWhereClause(query);
+        searchObj.data.query = whereClause;
+        searchObj.data.editorValue = whereClause;
+      }
     };
 
     const onCustomQueryModeChanged = (isCustomMode: boolean) => {
@@ -2531,18 +2557,31 @@ export default defineComponent({
       if (buildDashboardPanelData.data.queries[0]) {
         buildDashboardPanelData.data.queries[0].customQuery = isCustomMode;
 
-        // Reuse the same logic as QueryTypeSelector's changeToggle:
-        // clear fields and query when switching modes
+        // Builder → Custom: show the generated SQL in the editor for editing
+        if (isCustomMode) {
+          const generatedQuery =
+            buildDashboardPanelData.data.queries[0]?.query || "";
+          if (searchObj.meta.sqlMode) {
+            searchObj.data.query = generatedQuery;
+            searchObj.data.editorValue = generatedQuery;
+          } else {
+            // SQL mode OFF: sync only the WHERE clause
+            const whereClause = await extractWhereClause(generatedQuery);
+            searchObj.data.query = whereClause;
+            searchObj.data.editorValue = whereClause;
+          }
+          return;
+        }
+
+        // Custom → Builder: clear fields and query
         await nextTick();
         buildRemoveXYFilters();
         buildUpdateXYFieldsForCustomQueryMode();
 
-        // Clear query when switching from Custom to Builder mode
-        if (!isCustomMode) {
-          buildDashboardPanelData.data.queries[
-            buildDashboardPanelData.layout.currentQueryIndex
-          ].query = "";
-          // Also clear the search bar editor
+        buildDashboardPanelData.data.queries[
+          buildDashboardPanelData.layout.currentQueryIndex
+        ].query = "";
+        if (searchObj.meta.sqlMode) {
           searchObj.data.query = "";
           searchObj.data.editorValue = "";
         }
@@ -2724,7 +2763,7 @@ export default defineComponent({
           searchObj?.data?.stream?.selectedStream?.length === 0
         ) {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2733,7 +2772,7 @@ export default defineComponent({
         // check if query is empty
         if (logsPageQuery === "") {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2746,7 +2785,7 @@ export default defineComponent({
           logsPageQuery.length > 1
         ) {
           showErrorNotification(
-            "Multiple SQL queries are not allowed to visualize",
+            t("search.multipleSqlNotAllowed"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2816,7 +2855,7 @@ export default defineComponent({
 
         if (!finalQuery) {
           showErrorNotification(
-            "Query is empty, please write query to visualize",
+            t("search.queryEmptyToVisualize"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -2829,7 +2868,7 @@ export default defineComponent({
         const allFieldsHaveAlias = allSelectionFieldsHaveAlias(finalQuery);
         if (!allFieldsHaveAlias) {
           showAliasErrorForVisualization(
-            "Fields using aggregation functions must have aliases to visualize.",
+            t("search.aggregationFieldsNeedAlias"),
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -3140,6 +3179,7 @@ export default defineComponent({
       extractPatternsForCurrentQuery,
       patternsState,
       buildQueryPageRef,
+      buildDashboardPanelData,
       onBuildApply,
       onBuildCancel,
       onBuildQueryGenerated,
@@ -3324,6 +3364,11 @@ export default defineComponent({
       }
     },
     async fullSQLMode(newVal) {
+      // Build mode handles SQL mode changes via its own watcher in setup()
+      if (this.searchObj.meta.logsVisualizeToggle === "build") {
+        return;
+      }
+
       if (newVal) {
         await nextTick();
         if (this.searchObj.meta.sqlModeManualTrigger) {
