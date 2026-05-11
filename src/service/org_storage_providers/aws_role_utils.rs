@@ -31,6 +31,7 @@ const EXPIRY_BUFFER_SEC: i64 = 60;
 pub struct CredentialProvider {
     org_id: String,
     role_arn: String,
+    external_id: String,
     region: &'static str,
     expiry: AtomicI64,
     cache: RwLock<Arc<AwsCredential>>,
@@ -69,19 +70,23 @@ impl object_store::CredentialProvider for CredentialProvider {
                     "attempting to refresh credentials via sts for org {}",
                     self.org_id
                 );
-                let (expiry, credentials) =
-                    get_sts_credentials(&self.org_id, self.region, &self.role_arn)
-                        .await
-                        .map_err(|e| {
-                            log::info!(
-                                "error in refreshing credentials via sts for org {} : {e}",
-                                self.org_id
-                            );
-                            object_store::Error::Generic {
-                                store: "org_level_storage_sts",
-                                source: Box::new(std::io::Error::other(e)),
-                            }
-                        })?;
+                let (expiry, credentials) = get_sts_credentials(
+                    &self.org_id,
+                    self.region,
+                    &self.external_id,
+                    &self.role_arn,
+                )
+                .await
+                .map_err(|e| {
+                    log::info!(
+                        "error in refreshing credentials via sts for org {} : {e}",
+                        self.org_id
+                    );
+                    object_store::Error::Generic {
+                        store: "org_level_storage_sts",
+                        source: Box::new(std::io::Error::other(e)),
+                    }
+                })?;
                 *lock = Arc::new(AwsCredential {
                     key_id: credentials.access_key_id().to_string(),
                     secret_key: credentials.secret_access_key().to_string(),
@@ -118,6 +123,7 @@ impl object_store::CredentialProvider for CredentialProvider {
 async fn get_sts_credentials(
     org_id: &str,
     region: &'static str,
+    external_id: &str,
     role_arn: &str,
 ) -> Result<(i64, Credentials), anyhow::Error> {
     let cfg = aws_config::load_defaults(BehaviorVersion::latest()).await;
@@ -128,6 +134,7 @@ async fn get_sts_credentials(
         .session_name(format!("openobserve-cloud-{org_id}"))
         .session_length(std::time::Duration::from_hours(SESSION_DURATION_HR))
         .configure(&cfg)
+        .external_id(external_id)
         .region(Region::from_static(region))
         .build()
         .await;
@@ -180,7 +187,7 @@ pub async fn get_aws_from_role(
     };
     drop(wlock);
 
-    let (exp, creds) = get_sts_credentials(org_id, region, &config.role_arn)
+    let (exp, creds) = get_sts_credentials(org_id, region, &config.external_id, &config.role_arn)
         .await
         .map_err(|e| object_store::Error::Generic {
             store: "aws_from_role",
@@ -196,6 +203,7 @@ pub async fn get_aws_from_role(
     let credential_provider = CredentialProvider {
         org_id: org_id.to_string(),
         role_arn: config.role_arn,
+        external_id: config.external_id,
         region,
         expiry: AtomicI64::new(exp),
         cache: RwLock::new(Arc::new(creds)),

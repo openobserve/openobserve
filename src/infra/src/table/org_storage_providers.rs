@@ -78,6 +78,7 @@ pub struct AwsRoleArn {
     pub bucket_name: String,
     pub region: String,
     pub role_arn: String,
+    pub external_id: String,
 }
 
 impl From<String> for ProviderType {

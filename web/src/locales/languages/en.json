@@ -2762,6 +2762,7 @@
     "serverURLRequired": "Server URL is required",
     "regionRequired": "Region is required",
     "roleARNRequired": "Role ARN is required",
+    "externalIdRequired": "External ID is required",
     "back": "Back",
     "continue": "Continue",
     "save": "Save",

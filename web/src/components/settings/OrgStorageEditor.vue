@@ -343,6 +343,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   stack-label
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.roleARNRequired')]"
                 />
+                <q-input
+                  data-test="storage-settings-role-external-id-input"
+                  v-model="formData.external_id"
+                  label="External Id *"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  stack-label
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.externalIdRequired')]"
+                />
               </template>
             </div>
           </q-step>
@@ -460,6 +471,7 @@ const formData = reactive({
   access_key: "",
   secret_key: "",
   role_arn: "",
+  external_id: "",
 });
 
 const cloudProviders = computed(() => {
@@ -535,6 +547,7 @@ function resetFormData() {
   formData.access_key = "";
   formData.secret_key = "";
   formData.role_arn = "";
+  formData.external_id = "";
 }
 
 function buildDataPayload() {
@@ -562,6 +575,7 @@ function buildDataPayload() {
       data.bucket_name = formData.bucket_name;
       data.region = formData.region;
       data.role_arn = formData.role_arn;
+      data.external_id = formData.external_id;
       break;
   }
   return data;
@@ -631,6 +645,8 @@ onMounted(async () => {
         formData.access_key = "";
         formData.secret_key = "";
         formData.role_arn = "";
+        // external id is something that is technically a credential, but not masked
+        formData.external_id = parsed.external_id || "";
       }
     } catch {
       $q.notify({
