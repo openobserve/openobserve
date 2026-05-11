@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
         :data-test="`pattern-card-${index}-percentage`"
       >
-        {{ pattern.percentage.toFixed(1) }}%
+        {{ pattern.percentage.toFixed(2) }}%
       </div>
     </div>
 
