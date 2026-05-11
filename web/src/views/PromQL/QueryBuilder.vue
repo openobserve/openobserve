@@ -58,7 +58,7 @@
             size="sm-action"
             @click="clearQuery"
           >
-            <OIcon name="clear" size="xs" class="q-mr-xs" />
+            <OIcon name="close" size="xs" class="q-mr-xs" />
             Clear All
           </OButton>
           <OButton

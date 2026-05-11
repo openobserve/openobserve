@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="clear-filters-btn"
             @click="clearAllFilters"
             data-test="clear-all-filters-btn"
-            icon-left="clear"
+            icon-left="close"
           >
             {{ t('alerts.insights.filters.clearAll') }}
           </OButton>

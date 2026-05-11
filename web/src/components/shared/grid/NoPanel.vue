@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm-action"
-        icon-left="insert-drive-file"
+        icon-left="draft"
         style="font-size: 1rem"
         @click="$emit('update:Panel')"
         data-test="dashboard-if-no-panel-add-panel-btn"

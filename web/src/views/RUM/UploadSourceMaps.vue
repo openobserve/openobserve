@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div v-if="!formData.file" class="upload-content">
-              <OIcon name="cloud-upload" size="xl" class="tw:mb-3" />
+              <OIcon name="backup" size="xl" class="tw:mb-3" />
               <div class="text-h6 text-grey-8 tw:mb-2">Drop your file here</div>
               <div class="text-body2 text-grey-6 tw:mb-3">or click to browse</div>
               <div class="text-caption text-grey-5">.zip files only</div>
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="file-info">
               <div class="tw:flex tw:items-center tw:justify-between">
                 <div class="tw:flex tw:items-center tw:gap-3">
-                  <OIcon name="insert-drive-file" size="lg" />
+                  <OIcon name="draft" size="lg" />
                   <div>
                     <div class="text-subtitle2 text-weight-medium">{{ formData.file.name }}</div>
                     <div class="text-caption text-grey-6">{{ formatFileSize(formData.file.size) }}</div>
