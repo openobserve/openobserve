@@ -3710,6 +3710,23 @@
     "pages": "Páginas",
     "entities": "Entidades",
     "commands": "Comandos",
-    "aiActions": "Ações de IA"
+    "aiActions": "Ações de IA",
+    "create": "Criar",
+    "newDashboard": "Novo painel",
+    "newStream": "Novo stream",
+    "newAlert": "Novo alerta",
+    "newPipeline": "Novo gasoduto",
+    "newFunction": "Nova função",
+    "newEnrichmentTable": "Nova tabela de enriquecimento",
+    "newEvaluationTemplate": "Novo modelo de avaliação",
+    "newServiceAccount": "Nova conta de serviço",
+    "newOrganization": "Nova organização",
+    "newUserGroup": "Novo grupo de usuários",
+    "newRole": "Novo papel",
+    "newDestination": "Novo destino",
+    "newPipelineDestination": "Novo destino do gasoduto",
+    "newTemplate": "Novo modelo",
+    "newCipherKey": "Nova chave cifrada",
+    "newPattern": "Novo padrão"
   }
 }

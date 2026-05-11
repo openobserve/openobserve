@@ -3710,6 +3710,23 @@
     "pages": "Seiten",
     "entities": "Entitäten",
     "commands": "Befehle",
-    "aiActions": "KI-Aktionen"
+    "aiActions": "KI-Aktionen",
+    "create": "Erstellen",
+    "newDashboard": "Neues Dashboard",
+    "newStream": "Neuer Stream",
+    "newAlert": "Neue Warnung",
+    "newPipeline": "Neue Pipeline",
+    "newFunction": "Neue Funktion",
+    "newEnrichmentTable": "Neue Anreicherungstabelle",
+    "newEvaluationTemplate": "Neue Bewertungsvorlage",
+    "newServiceAccount": "Neues Servicekonto",
+    "newOrganization": "Neue Organisation",
+    "newUserGroup": "Neue Benutzergruppe",
+    "newRole": "Neue Rolle",
+    "newDestination": "Neues Reiseziel",
+    "newPipelineDestination": "Neues Pipeline-Ziel",
+    "newTemplate": "Neue Vorlage",
+    "newCipherKey": "Neuer Chiffrenschlüssel",
+    "newPattern": "Neues Muster"
   }
 }

@@ -3714,6 +3714,23 @@
     "pages": "页面",
     "entities": "实体",
     "commands": "命令",
-    "aiActions": "AI 动作"
+    "aiActions": "AI 动作",
+    "create": "创建",
+    "newDashboard": "新仪表板",
+    "newStream": "新直播",
+    "newAlert": "新警报",
+    "newPipeline": "新管道",
+    "newFunction": "新函数",
+    "newEnrichmentTable": "新的浓缩表",
+    "newEvaluationTemplate": "新的评估模板",
+    "newServiceAccount": "新服务账号",
+    "newOrganization": "新组织",
+    "newUserGroup": "新用户组",
+    "newRole": "新角色",
+    "newDestination": "新目的地",
+    "newPipelineDestination": "新的管道目的地",
+    "newTemplate": "新模板",
+    "newCipherKey": "新密码密钥",
+    "newPattern": "新图案"
   }
 }

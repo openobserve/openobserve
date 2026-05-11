@@ -3721,6 +3721,23 @@
     "pages": "Paginas",
     "entities": "Entiteiten",
     "commands": "Commando's",
-    "aiActions": "AI-acties"
+    "aiActions": "AI-acties",
+    "create": "Creëren",
+    "newDashboard": "Nieuw dashboard",
+    "newStream": "Nieuwe stream",
+    "newAlert": "Nieuwe waarschuwing",
+    "newPipeline": "Nieuwe pijplijn",
+    "newFunction": "Nieuwe functie",
+    "newEnrichmentTable": "Nieuwe verrijkingstabel",
+    "newEvaluationTemplate": "Nieuw evaluatiesjabloon",
+    "newServiceAccount": "Nieuw serviceaccount",
+    "newOrganization": "Nieuwe organisatie",
+    "newUserGroup": "Nieuwe gebruikersgroep",
+    "newRole": "Nieuwe rol",
+    "newDestination": "Nieuwe bestemming",
+    "newPipelineDestination": "Nieuwe bestemming voor pijpleidingen",
+    "newTemplate": "Nieuw sjabloon",
+    "newCipherKey": "Nieuwe coderingssleutel",
+    "newPattern": "Nieuw patroon"
   }
 }

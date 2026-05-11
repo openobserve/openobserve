@@ -3710,6 +3710,23 @@
     "pages": "ページ",
     "entities": "エンティティ",
     "commands": "コマンド",
-    "aiActions": "AI アクション"
+    "aiActions": "AI アクション",
+    "create": "作成",
+    "newDashboard": "新しいダッシュボード",
+    "newStream": "新しいストリーム",
+    "newAlert": "新しいアラート",
+    "newPipeline": "新しいパイプライン",
+    "newFunction": "新しい機能",
+    "newEnrichmentTable": "新しいエンリッチメントテーブル",
+    "newEvaluationTemplate": "新しい評価テンプレート",
+    "newServiceAccount": "新しいサービスアカウント",
+    "newOrganization": "新しい組織",
+    "newUserGroup": "新しいユーザーグループ",
+    "newRole": "新しい役割",
+    "newDestination": "新しい目的地",
+    "newPipelineDestination": "新しいパイプライン送信先",
+    "newTemplate": "新しいテンプレート",
+    "newCipherKey": "新しい暗号キー",
+    "newPattern": "新しいパターン"
   }
 }
