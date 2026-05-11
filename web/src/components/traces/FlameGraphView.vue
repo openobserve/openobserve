@@ -575,6 +575,7 @@ const handleChartClick = (params: any) => {
     searchObj.data.traceDetails.selectedSpanId =
       params.data.spanData.span_id;
     sidebarVisible.value = true;
+    emit("select-span", params.data.spanData.span_id);
     nextTick(() => scrollToSpan(params.data.spanData.span_id));
   }
 };
