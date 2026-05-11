@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:max-w-[32rem]"
+                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap"
               >
                 <span>{{ formatTimestamp(traceStartTime) }}</span>
                 <div
@@ -102,6 +102,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
+
+                <!-- Session ID (LLM traces) -->
+                <template v-if="sessionId">
+                  <div
+                    class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+                  />
+                  <span class="tw:mr-[0.25rem]">
+                    Session ID:
+                    <span
+                      data-test="trace-details-session-id"
+                      class="tw:text-[var(--o2-text-primary)] tw:font-mono"
+                      :title="sessionId"
+                    >
+                      {{ sessionId }}
+                    </span>
+                  </span>
+                  <q-icon
+                    data-test="trace-details-copy-session-id-btn"
+                    name="content_copy"
+                    size="12px"
+                    class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
+                    title="Copy Session ID"
+                    @click="copySessionId"
+                  />
+                </template>
 
                 <!-- Open in new icon (embedded mode only) -->
                 <q-icon
@@ -167,7 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openFilterPopover"
             >
               <template #icon-left
-                ><q-icon name="filter_alt" size="14px"
+                ><q-icon name="filter_alt"
+size="14px"
               /></template>
               <span class="tw:text-[0.75rem]">{{
                 t("traces.viewFilters")
@@ -221,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white tw:bg-[var(--o2-card-bg)]!"
         >
           <div
-            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem]"
+            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.25rem]"
           >
             <OToggleGroup
               :model-value="activeTab"
@@ -245,11 +271,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 /></template>
                 Trace Graph
               </OToggleGroupItem>
-              <OToggleGroupItem v-if="hasLLMSpans" value="dag" size="sm">
+              <OToggleGroupItem v-if="hasLLMSpans"
+value="dag"
+size="sm">
                 <template #icon-left
                   ><GitBranch class="tw:size-3.5 tw:shrink-0"
                 /></template>
                 DAG
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                v-if="hasLLMSpans"
+                value="thread"
+                size="sm"
+                data-test="trace-details-thread-tab"
+              >
+                <template #icon-left
+                  ><MessageSquare class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                Thread
               </OToggleGroupItem>
               <OToggleGroupItem
                 v-if="hasLLMSpans && evalPipelineExists && evalData.length > 0"
@@ -264,11 +303,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
           </div>
 
-          <div class="tw:flex tw:items-center tw:space-x-2">
+          <div class="tw:flex tw:items-center tw:space-x-2 tw:gap-[0.5rem] tw:pr-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map'"
-              class="unified-search-group"
+              class="unified-search-group tw:mr-0!"
             >
               <div class="log-stream-search-input">
                 <q-input
@@ -398,12 +437,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   data-test="trace-details-view-logs-btn"
                   variant="outline"
-                  size="sm"
+                  size="xs"
+                  class="tw:h-full tw:text-[0.75rem]!"
                   :title="t('traces.viewLogs')"
                   @click="redirectToLogs"
                 >
                   <template #icon-left
-                    ><q-icon name="search" size="14px"
+                    ><q-icon name="search"
+size="14px"
                   /></template>
                   {{
                     searchObj.meta.redirectedFromLogs
@@ -421,7 +462,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="redirectToSessionReplay"
               >
                 <template #icon-left
-                  ><q-icon :name="outlinedPlayCircle" size="14px"
+                  ><q-icon :name="outlinedPlayCircle"
+size="14px"
                 /></template>
                 {{ t("rum.playSessionReplay") }}
               </OButton>
@@ -501,6 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :search-query="searchQuery"
                         :spanList="spanList"
                         :selectedSpanId="selectedSpanId"
+                        :hoveredSpanId="hoveredSpanId"
                         :isSidebarOpen="
                           !!(
                             isSidebarOpen &&
@@ -509,6 +552,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
+                        @hover-span="onHoverSpan"
+                        @unhover-span="onUnhoverSpan"
                         @update-current-index="handleIndexUpdate"
                         @search-result="handleSearchResult"
                       />
@@ -526,17 +571,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <trace-details-sidebar
                   data-test="trace-details-sidebar"
-                  :span="spanMap[selectedSpanId as string]"
+                  :span="spanMap[effectiveSpanId as string]"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
+                  :activeTab="sidebarActiveTab"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
+                  @update:activeTab="sidebarActiveTab = $event as string"
                 />
               </div>
             </div>
@@ -588,17 +635,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <trace-details-sidebar
                   data-test="trace-details-dag-sidebar"
-                  :span="spanMap[selectedSpanId as string]"
+                  :span="spanMap[effectiveSpanId as string]"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
+                  :activeTab="sidebarActiveTab"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
+                  @update:activeTab="sidebarActiveTab = $event as string"
                 />
               </div>
             </div>
@@ -615,6 +664,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :trace-duration="traceMetadata?.duration_ms || 0"
                 @span-selected="updateSelectedSpan"
               />
+            </div>
+
+            <!-- Thread View — chat-style projection of LLM turns -->
+            <div
+              v-if="activeTab === 'thread'"
+              style="display: flex; flex: 1; min-height: 0"
+              class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
+            >
+              <div
+                class="thread-left-panel"
+                :style="{
+                  width:
+                    isSidebarOpen && (selectedSpanId || showTraceDetails)
+                      ? '60%'
+                      : '100%',
+                  minWidth: '320px',
+                  height: '100%',
+                  overflow: 'hidden',
+                }"
+              >
+                <ThreadView
+                  :spans="effectiveSpanList"
+                  :selected-span-id="selectedSpanId"
+                  @span-selected="updateSelectedSpan"
+                />
+              </div>
+              <div
+                v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
+                class="tw:border-l tw:border-l-solid tw:border-l-[var(--o2-border-color)]"
+                style="width: 40%; min-width: 300px; height: 100%; overflow: hidden;"
+              >
+                <trace-details-sidebar
+                  data-test="trace-details-thread-sidebar"
+                  :span="spanMap[selectedSpanId as string]"
+                  :baseTracePosition="baseTracePosition"
+                  :search-query="searchQuery"
+                  :stream-name="currentTraceStreamName"
+                  :service-streams-enabled="serviceStreamsEnabled"
+                  :parent-mode="mode"
+                  @view-logs="redirectToLogs"
+                  @close="closeSidebar"
+                  @open-trace="openTraceLink"
+                  @add-filter="addFilterFromSidebar"
+                  @apply-filter-immediately="applyFilterImmediately"
+                />
+              </div>
             </div>
 
             <!-- Spans Table View Placeholder -->
@@ -730,7 +825,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("traces.traceFilters") }}
           </div>
-          <OButton variant="ghost-muted" size="icon" v-close-popup>
+          <OButton variant="ghost-muted"
+size="icon"
+v-close-popup>
             <q-icon name="close" size="16px" />
           </OButton>
         </q-card-section>
@@ -752,7 +849,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
         >
           <div class="tw:flex tw:gap-2">
-            <OButton variant="outline" size="sm-action" v-close-popup>
+            <OButton variant="outline"
+size="sm-action"
+v-close-popup>
               {{ t("common.cancel") }}
             </OButton>
             <OButton
@@ -803,6 +902,7 @@ import {
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
+import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import {
   SPAN_KIND_MAP,
@@ -839,6 +939,7 @@ import {
   Network,
   GitBranch,
   ClipboardCheck,
+  MessageSquare,
 } from "lucide-vue-next";
 import pipelineService from "@/services/pipelines";
 
@@ -850,6 +951,11 @@ const FlameGraphView = defineAsyncComponent(
 // Import TraceEvaluationsView
 const TraceEvaluationsView = defineAsyncComponent(
   () => import("./TraceEvaluationsView.vue"),
+);
+
+// Import ThreadView (LLM Thread tab)
+const ThreadView = defineAsyncComponent(
+  () => import("./ThreadView.vue"),
 );
 
 export default defineComponent({
@@ -939,6 +1045,8 @@ export default defineComponent({
     Network,
     GitBranch,
     ClipboardCheck,
+    MessageSquare,
+    ThreadView,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
@@ -952,6 +1060,7 @@ export default defineComponent({
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
     const activeTab = ref("waterfall");
+    const sidebarActiveTab = ref("attributes");
 
     const { searchObj, getUrlQueryParams } = useTraces();
     const baseTracePosition: any = ref({});
@@ -1258,6 +1367,30 @@ export default defineComponent({
     });
 
     // Tabs configuration matching TraceDetailsV2 — inlined into template
+    const traceTabs = computed(() => {
+      const tabs = [
+        { label: "Waterfall", value: "waterfall" },
+        { label: "Flame Graph", value: "flame-graph" },
+        { label: "Trace Graph", value: "map" },
+      ];
+      // Conditionally add DAG tab for LLM traces
+      if (hasLLMSpans.value) {
+        tabs.push({ label: "DAG", value: "dag" });
+      }
+      // Thread view — chat-style projection of LLM turns and tool calls.
+      if (hasLLMSpans.value) {
+        tabs.push({ label: "Thread", value: "thread" });
+      }
+      // Conditionally add Evaluations tab for LLM traces with evaluation data
+      if (
+        hasLLMSpans.value &&
+        evalPipelineExists.value &&
+        evalData.value.length > 0
+      ) {
+        tabs.push({ label: "Evaluations", value: "evaluations" });
+      }
+      return tabs;
+    });
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -1508,6 +1641,33 @@ export default defineComponent({
     const selectedSpanId = computed(() => {
       return searchObj.data.traceDetails.selectedSpanId;
     });
+
+    const hoveredSpanId = ref("");
+    const effectiveSpanId = computed(
+      () => hoveredSpanId.value || selectedSpanId.value,
+    );
+
+    // Set the default sidebar tab on the first span selection,
+    // and re-evaluate when the current tab no longer exists for the new span
+    // (e.g. moving from LLM span with "preview" to a non-LLM span).
+    watch(selectedSpanId, (newSpanId, oldSpanId) => {
+      if (newSpanId && spanMap.value[newSpanId]) {
+        const isLLM = isLLMTrace(spanMap.value[newSpanId]);
+        if (
+          !oldSpanId ||
+          (sidebarActiveTab.value === "preview" && !isLLM)
+        ) {
+          sidebarActiveTab.value = isLLM ? "preview" : "attributes";
+        }
+      }
+    });
+
+    const onHoverSpan = (spanId: string) => {
+      hoveredSpanId.value = spanId;
+    };
+    const onUnhoverSpan = () => {
+      hoveredSpanId.value = "";
+    };
 
     const getTraceMeta = () => {
       try {
@@ -2141,16 +2301,6 @@ export default defineComponent({
     // Convert span object to required format
     // Converting ns to ms
     const getFormattedSpan = (span: any) => {
-      // Parse usage details from split fields
-      span = {
-        ...span,
-        llm_usage_details_input: span.llm_usage_tokens_input,
-        llm_usage_details_output: span.llm_usage_tokens_output,
-        llm_usage_details_total: span.llm_usage_tokens_total,
-        llm_cost_details_total: span.llm_usage_cost_total,
-        llm_input: span.llm_input || {},
-      };
-
       const usage = parseUsageDetails(span);
       const cost = parseCostDetails(span);
 
@@ -2163,8 +2313,8 @@ export default defineComponent({
         endTimeUs: Math.floor(span.end_time / 1000),
         durationMs: span?.duration
           ? Number((span?.duration / 1000).toFixed(4))
-          : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
-        durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
+          : 0,
+        durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0,
         idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
         busyMs: span.busy_ns ? convertTime(span.busy_ns) : 0,
         spanId: span.span_id || `generated_${Date.now()}_${Math.random()}`,
@@ -2179,8 +2329,8 @@ export default defineComponent({
           color: "",
         },
         links: JSON.parse(span.links || "[]"),
-        llm_usage: usage,
-        llm_cost: cost,
+        genAiUsage: usage,
+        genAiCost: cost,
       };
     };
 
@@ -2209,6 +2359,7 @@ export default defineComponent({
     };
 
     const closeSidebar = () => {
+      hoveredSpanId.value = "";
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = null;
     };
@@ -2344,6 +2495,20 @@ export default defineComponent({
       copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
+    const sessionId = computed<string>(() =>
+      resolveSessionId(spanList.value),
+    );
+
+    const copySessionId = () => {
+      if (!sessionId.value) return;
+      copyToClipboard(sessionId.value);
+      $q.notify({
+        type: "positive",
+        message: "Session ID copied to clipboard",
+        timeout: 2000,
+      });
+    };
+
     /**
      * Computed property for trace details share URL
      * Uses custom time range from router query params
@@ -2454,6 +2619,7 @@ export default defineComponent({
       spanId: string,
       swichToWaterfall: boolean = false,
     ) => {
+      hoveredSpanId.value = ""; // clear any hover state on click
       showTraceDetails.value = false;
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
@@ -2686,6 +2852,7 @@ export default defineComponent({
       router,
       t,
       activeTab,
+      sidebarActiveTab,
       traceTree,
       collapseMapping,
       traceRootSpan,
@@ -2694,6 +2861,10 @@ export default defineComponent({
       spanList,
       isSidebarOpen,
       selectedSpanId,
+      hoveredSpanId,
+      effectiveSpanId,
+      onHoverSpan,
+      onUnhoverSpan,
       spanMap,
       closeSidebar,
       toggleSpanCollapse,
@@ -2715,6 +2886,8 @@ export default defineComponent({
       toggleTimeline,
       copyToClipboard,
       copyTraceId,
+      sessionId,
+      copySessionId,
       traceDetailsShareURL,
       outlinedInfo,
       outlinedPlayCircle,
@@ -2896,7 +3069,7 @@ $traceChartCollapseHeight: 42px;
 }
 
 .log-stream-search-input {
-  width: 20rem;
+  width: 20.2rem;
 
   .q-field .q-field__control {
     padding: 0px 8px;

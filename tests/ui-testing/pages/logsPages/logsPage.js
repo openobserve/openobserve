@@ -649,10 +649,10 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 5, apiWaitMs = null) {
+    async selectStream(stream, maxRetries = 5, apiWaitMs = null, skipNavigation = false) {
         // Cloud environments need longer for streams to be indexed after ingestion
         const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 120000 : 30000);
-        testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms)`);
+        testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms, skipNavigation: ${skipNavigation})`);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
         if (effectiveApiWaitMs > 0) {
@@ -666,12 +666,18 @@ export class LogsPage {
             testLogger.info(`selectStream: Skipping API wait (apiWaitMs=0)`);
         }
 
-        // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
-        const orgId = getOrgIdentifier();
-        const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
-        testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
-        await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-        await this.page.waitForTimeout(3000);
+        // Navigate to logs page via URL to ensure fresh stream list.
+        // skipNavigation=true bypasses page.goto when the caller is already
+        // on the logs page and wants to avoid auto-triggering a query.
+        if (!skipNavigation) {
+            const orgId = getOrgIdentifier();
+            const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}`;
+            testLogger.info(`selectStream: Navigating to logs page: ${logsUrl}`);
+            await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+            await this.page.waitForTimeout(3000);
+        } else {
+            testLogger.info('selectStream: Skipping page navigation (skipNavigation=true)');
+        }
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             testLogger.info(`selectStream: Attempt ${attempt}/${maxRetries} for stream: ${stream}`);
@@ -2031,7 +2037,7 @@ export class LogsPage {
     }
 
     async fillQueryEditor(query) {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
     }
 
     async clearQueryEditor() {
@@ -6244,7 +6250,8 @@ export class LogsPage {
      */
     async setQueryEditorContent(query) {
         // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        // Use .first() to avoid strict mode violations when multiple monaco instances exist
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea').first();
         await inputArea.click({ force: true });
         await inputArea.fill(query);
         // Wait for Monaco to render the new content in the view-line
@@ -6347,7 +6354,7 @@ export class LogsPage {
      * Assert that the Patterns toggle is in selected state
      */
     async expectPatternsToggleSelected() {
-        await expect(this.page.locator(this.patternsToggle)).toHaveClass(/selected/);
+        await expect(this.page.locator(this.patternsToggle)).toHaveAttribute('data-state', 'on');
         testLogger.info('Patterns toggle is in selected state');
     }
 
@@ -6761,9 +6768,11 @@ export class LogsPage {
     /**
      * Expect Builder mode (Auto mode) to be active
      */
-    async expectBuilderModeActive() {
+    async expectBuilderModeActive(timeout = 15000) {
         const builderTypeBtn = this.page.locator(this.builderQueryType);
-        await expect(builderTypeBtn).toBeVisible();
+        await expect(builderTypeBtn).toBeVisible({ timeout });
+        // Verify "Builder" button is active (OToggleGroupItem uses data-state="on")
+        await expect(builderTypeBtn).toHaveAttribute('data-state', 'on', { timeout });
         testLogger.info('Builder mode is active');
     }
 
@@ -6781,7 +6790,13 @@ export class LogsPage {
      */
     async clickBuilderQueryType() {
         await this.page.locator(this.builderQueryType).click();
-        await this.page.waitForTimeout(500);
+        // Confirmation dialog only appears when switching Custom → Builder
+        // AND there's an existing query that would be wiped
+        const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+        if (await confirmBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+            await confirmBtn.click();
+            testLogger.info('Confirmed Builder mode switch (dialog dismissed)');
+        }
         testLogger.info('Clicked Builder query type');
     }
 
@@ -6797,24 +6812,24 @@ export class LogsPage {
     /**
      * Expect X-axis layout section to be visible
      */
-    async expectXAxisLayoutVisible() {
-        await expect(this.page.locator(this.xAxisLayout)).toBeVisible();
+    async expectXAxisLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.xAxisLayout)).toBeVisible({ timeout });
         testLogger.info('X-axis layout is visible');
     }
 
     /**
      * Expect Y-axis layout section to be visible
      */
-    async expectYAxisLayoutVisible() {
-        await expect(this.page.locator(this.yAxisLayout)).toBeVisible();
+    async expectYAxisLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.yAxisLayout)).toBeVisible({ timeout });
         testLogger.info('Y-axis layout is visible');
     }
 
     /**
      * Expect Breakdown layout section to be visible
      */
-    async expectBreakdownLayoutVisible() {
-        await expect(this.page.locator(this.breakdownLayout)).toBeVisible();
+    async expectBreakdownLayoutVisible(timeout = 15000) {
+        await expect(this.page.locator(this.breakdownLayout)).toBeVisible({ timeout });
         testLogger.info('Breakdown layout is visible');
     }
 
@@ -6909,8 +6924,7 @@ export class LogsPage {
 
     /**
      * Verify a chart type is selected (theme-aware: checks bg-grey-3 for light, bg-grey-5 for dark)
-     * Uses page.waitForFunction to poll the DOM directly, which is more reliable than
-     * locator-based polling during Vue reactive re-renders.
+     * Uses waitForFunction for reliable DOM detection that survives reactive re-renders.
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      * @param {boolean} shouldBeSelected - Whether the chart type should be selected (default: true)
      */
@@ -7150,6 +7164,87 @@ export class LogsPage {
             testLogger.info(`Chart type detected via fallback: ${fallback}`);
         }
         return fallback;
+    }
+
+    // ============================================================================
+    // BUILD TAB IMPROVEMENT METHODS - PR #11586
+    // New behavior: SQL mode preserved, default histogram/count for empty/SELECT*
+    // ============================================================================
+
+    /**
+     * Verify SQL mode state is preserved (not forced ON) when switching to Build tab.
+     * NEW behavior in PR #11586 — replaces verifySqlModeAutoEnablesOnBuild().
+     * @param {boolean} expectedState - Expected SQL mode state after Build toggle
+     * @returns {Promise<boolean>} True if SQL mode matches expected state
+     */
+    async verifySqlModePreservedOnBuild(expectedState) {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        const actualState = isChecked === 'true';
+        if (actualState === expectedState) {
+            testLogger.info(`SQL mode preserved on Build tab: expected=${expectedState}, actual=${actualState}`);
+            return true;
+        } else {
+            testLogger.warn(`SQL mode NOT preserved: expected=${expectedState}, actual=${actualState}`);
+            return false;
+        }
+    }
+
+    /**
+     * Expect the builder has X-axis items populated (any items on X axis).
+     * Checks that at least one item exists inside the X-axis layout.
+     */
+    async expectXAxisHasItems() {
+        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
+        await expect(xItems.first()).toBeVisible({ timeout: 15000 });
+        const count = await xItems.count();
+        testLogger.info(`X-axis has ${count} item(s)`);
+        return count;
+    }
+
+    /**
+     * Expect the builder has Y-axis items populated (any items on Y axis).
+     * Checks that at least one item exists inside the Y-axis layout.
+     */
+    async expectYAxisHasItems() {
+        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        await expect(yItems.first()).toBeVisible({ timeout: 15000 });
+        const count = await yItems.count();
+        testLogger.info(`Y-axis has ${count} item(s)`);
+        return count;
+    }
+
+    /**
+     * Expect X-axis and Y-axis are empty (no items)
+     */
+    async expectAxesEmpty() {
+        const xItems = this.page.locator(`${this.xAxisLayout} [data-test^="dashboard-x-item-"]`);
+        const yItems = this.page.locator(`${this.yAxisLayout} [data-test^="dashboard-y-item-"]`);
+        await expect(xItems).toHaveCount(0, { timeout: 5000 });
+        await expect(yItems).toHaveCount(0, { timeout: 5000 });
+        testLogger.info('X and Y axes are empty');
+    }
+
+    /**
+     * Check if the filter section has any conditions populated.
+     * Looks for filter condition items inside the filter layout.
+     * Filter conditions use data-test="dashboard-add-condition-label-{index}-{label}" pattern.
+     * @returns {Promise<number>} Number of filter conditions found
+     */
+    async getFilterConditionCount() {
+        // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
+        const filterItems = this.page.locator('[data-test^="dashboard-add-condition-label-"]');
+        const count = await filterItems.count();
+        testLogger.info(`Filter has ${count} condition(s)`);
+        return count;
+    }
+
+    /**
+     * Expect the logs table to be visible (when on Logs tab)
+     */
+    async expectLogsTableVisible() {
+        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Logs table is visible');
     }
 
     // ============================================================================
@@ -7472,6 +7567,149 @@ export class LogsPage {
             testLogger.warn('Error checking editor error state', { error: e.message });
             return 'editor-not-found';
         }
+    }
+
+    // ===== Regression Test Helper Methods =====
+
+    /**
+     * Get logs table body element
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLogsTableBody() {
+        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody');
+    }
+
+    /**
+     * Get table rows in the logs result table
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLogsTableRows() {
+        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
+    }
+
+    /**
+     * Get first row expand menu button
+     * @returns {import('@playwright/test').Locator}
+     */
+    getFirstRowExpandMenu() {
+        return this.page.locator('[data-test="table-row-expand-menu"]').first();
+    }
+
+    /**
+     * Find the visible query mode toggle (Quick/SQL mode)
+     * Returns the first matching locator or null if none visible
+     * @returns {Promise<import('@playwright/test').Locator|null>}
+     */
+    async findQueryModeToggle() {
+        const selectors = [
+            this.quickModeToggle,
+            this.sqlModeToggle,
+            '[data-test="logs-search-bar-quick-mode-toggle-btn"]',
+            '[data-test="logs-search-bar-sql-mode-toggle-btn"]',
+            '[data-test="logs-search-bar-ui-mode-btn"]',
+            '[data-test="logs-search-ui-mode-btn"]',
+            'button:has-text("UI Mode")',
+            '[data-test*="quick-mode"]',
+            '[data-test*="sql-mode"]',
+        ];
+
+        for (const sel of selectors) {
+            const loc = this.page.locator(sel).first();
+            if (await loc.isVisible({ timeout: 2000 }).catch(() => false)) {
+                return loc;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if a toggle element is in active/checked state
+     * @param {import('@playwright/test').Locator} toggle - The toggle locator
+     * @returns {Promise<boolean|null>}
+     */
+    async isToggleActive(toggle) {
+        return await toggle.evaluate(el => {
+            return el.classList.contains('q-toggle--checked') ||
+                   el.getAttribute('aria-checked') === 'true' ||
+                   el.querySelector('.q-toggle__inner--truthy') !== null;
+        }).catch(() => null);
+    }
+
+    /**
+     * Check if histogram toggle is visible
+     * @returns {Promise<boolean>}
+     */
+    async isHistogramToggleVisible() {
+        return await this.page.locator(this.histogramToggle).isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    /**
+     * Click histogram toggle
+     */
+    async clickHistogramToggle() {
+        await this.page.locator(this.histogramToggle).click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Find the absolute time input field in the datetime picker
+     * @returns {Promise<import('@playwright/test').Locator|null>}
+     */
+    async findTimeInput() {
+        const timeInputSelectors = [
+            '[data-test="start-time-input"]',
+            '[data-test="end-time-input"]',
+            '[data-test="start-time-field"] input',
+            '[data-test="end-time-field"] input',
+            'input[type="time"]',
+            '.q-time input',
+            '[aria-label*="time" i] input',
+            '[aria-label*="Time" i]',
+        ];
+
+        for (const sel of timeInputSelectors) {
+            const loc = this.page.locator(sel).first();
+            if (await loc.isVisible({ timeout: 2000 }).catch(() => false)) {
+                return loc;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if no data or empty state is visible
+     * @returns {Promise<boolean>}
+     */
+    async isNoDataVisible() {
+        const sel = this.page.locator('[data-test="no-data"], [class*="no-data"]').first();
+        const txt = this.page.getByText('No data').first();
+        return await sel.isVisible({ timeout: 2000 }).catch(() => false)
+            || await txt.isVisible({ timeout: 1000 }).catch(() => false);
+    }
+
+    /**
+     * Check if no results message is visible
+     * @returns {Promise<boolean>}
+     */
+    async isNoResultsVisible() {
+        return await this.page.locator('[data-test="logs-search-result-not-found-text"]')
+            .isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    /**
+     * Get the date-time button locator (confirmed: data-test="date-time-btn")
+     * @returns {import('@playwright/test').Locator}
+     */
+    getDateTimeButton() {
+        return this.page.locator('[data-test="date-time-btn"]').first();
+    }
+
+    /**
+     * Get the logs search error message locator (confirmed: logs/Index.vue)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLogsSearchErrorMessage() {
+        return this.page.locator('[data-test="logs-search-error-message"]').first();
     }
 
 }

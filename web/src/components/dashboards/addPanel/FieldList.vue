@@ -896,15 +896,14 @@ export default defineComponent({
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
           // Check if selected stream for current query exists in index options
           // If not, set the first index option as the selected stream
-          if (
-            dashboardPanelData.meta.stream.streamResults.find(
-              (it: any) =>
-                it.name ==
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream,
-            )
-          ) {
+          const existingStream = dashboardPanelData.meta.stream.streamResults.find(
+            (it: any) =>
+              it.name ==
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream,
+          );
+          if (existingStream) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -928,6 +927,7 @@ export default defineComponent({
           dashboardPanelData.meta.stream.customQueryFields.length +
           dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
       },
+      { immediate: true },
     );
 
     const flattenGroupedFields = computed(() => {
@@ -1044,9 +1044,28 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.meta.stream.filterField,
       () => {
-        // set the custom query fields length
-        customQueryFieldsLength.value =
-          dashboardPanelData.meta.stream.customQueryFields.length;
+        // Recompute custom query fields length based on filtered results.
+        // When a search filter is active, pageIndex is relative to the
+        // filtered rows, so customQueryFieldsLength must reflect the count
+        // of custom/VRL fields that pass the filter — not the total.
+        const filterTerm = dashboardPanelData.meta.stream.filterField
+          ?.toLowerCase()
+          ?.trim();
+        if (!filterTerm) {
+          customQueryFieldsLength.value =
+            dashboardPanelData.meta.stream.customQueryFields.length +
+            dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
+        } else {
+          const matchingCustom =
+            dashboardPanelData.meta.stream.customQueryFields.filter(
+              (f: any) => f.name?.toLowerCase().includes(filterTerm),
+            ).length;
+          const matchingVrl =
+            dashboardPanelData.meta.stream.vrlFunctionFieldList.filter(
+              (f: any) => f.name?.toLowerCase().includes(filterTerm),
+            ).length;
+          customQueryFieldsLength.value = matchingCustom + matchingVrl;
+        }
       },
     );
 

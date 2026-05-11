@@ -58,7 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!hasResults"
                 >
                   <template v-if="true">
-                    <q-icon name="view_column" size="16px" class="tw:mr-1" />
+                    <q-icon name="view_column"
+size="16px"
+class="tw:mr-1" />
                     {{ t('search.showHideColumns') }}
                   </template>
                 </OButton>
@@ -130,9 +132,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Show skeleton while loading -->
       <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
-        <q-skeleton type="rect" width="200px" height="32px" />
-        <q-skeleton type="rect" width="200px" height="32px" />
-        <q-skeleton type="rect" width="200px" height="32px" />
+        <q-skeleton type="rect"
+width="200px"
+height="32px" />
+        <q-skeleton type="rect"
+width="200px"
+height="32px" />
+        <q-skeleton type="rect"
+width="200px"
+height="32px" />
       </div>
 
       <!-- Results Summary Row -->
@@ -179,6 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-stream-fields="selectedFields"
           :hide-search-term-actions="hideSearchTermActions"
           :hide-view-related-button="hideViewRelatedButton"
+          class="tw:overflow-y-auto!"
           @click:dataRow="handleRowClick"
           @copy="handleCopy"
           @sendToAiChat="handleSendToAiChat"
@@ -249,6 +258,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import { date, copyToClipboard, useQuasar } from "quasar";
@@ -276,6 +286,7 @@ const store = useStore();
 const router = useRouter();
 const $q = useQuasar();
 const { searchObj } = searchState();
+const { loadKeyFields } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
@@ -306,6 +317,7 @@ const expandedRows = ref<any[]>([]);
 const selectedFields = ref<any[]>([]);
 const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
+const defaultLogFields = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
 let isSaving = false; // Prevent recursive saves
 let isUpdatingFromTable = false; // Prevent recursive updates from table
@@ -346,9 +358,16 @@ const saveColumnState = () => {
   }
 };
 
-// Load state on component mount
-onMounted(() => {
+// Load state and key fields config on component mount
+onMounted(async () => {
   loadColumnState();
+  try {
+    const keyFieldsConfig = await loadKeyFields();
+   let _defaultLogFields = keyFieldsConfig?.["logs"]?.fields ?? [];
+   defaultLogFields.value = _defaultLogFields;
+  } catch {
+    defaultLogFields.value = [];
+  }
 });
 
 // Watch for changes and save to localStorage
@@ -577,25 +596,53 @@ const areSomeColumnsSelected = computed(() => {
   return selectableFields.some((field) => visibleColumns.value.has(field));
 });
 
+// Initialize visibleColumns based on available fields and key fields config.
+// Shows _timestamp + any key fields that exist in the data.
+// Falls back to just _timestamp if no key fields match or key fields haven't loaded yet.
+const initializeVisibleColumns = (fields: string[]) => {
+  if (fields.length === 0) return;
+
+  const defaults = new Set<string>();
+  const timestampField = fields.find((f) => f === "_timestamp");
+  if (timestampField) defaults.add(timestampField);
+
+  for (const keyField of defaultLogFields.value) {
+    if (fields.includes(keyField)) defaults.add(keyField);
+  }
+
+  visibleColumns.value = defaults;
+};
+
 // Watch for new fields and initialize visibleColumns and columnOrder
-// By default, only show timestamp (which will trigger source column display)
 watch(
   availableFields,
   (fields) => {
-    if (fields.length > 0 && visibleColumns.value.size === 0) {
-      // Only show timestamp by default - this will display timestamp + source columns
-      const timestampField = fields.find((f) => f === "_timestamp");
-      if (timestampField) {
-        visibleColumns.value = new Set([timestampField]);
-      }
-    }
+    if (fields.length === 0) return;
+    
+    // Added check for <=1 as _timestamp is also stored in localstorage, which is a bydefault column
+    if(visibleColumns.value.size <= 1) initializeVisibleColumns(fields);
+
     // Initialize column order if not set
-    if (fields.length > 0 && columnOrder.value.length === 0) {
+    if (columnOrder.value.length === 0) {
       columnOrder.value = [...fields];
     }
   },
   { immediate: true },
 );
+
+// If key fields load after availableFields, re-initialize to add matching key fields.
+// Only overrides when user hasn't customized columns (empty or only _timestamp).
+watch(defaultLogFields, (keyFields) => {
+  if (keyFields.length === 0 || availableFields.value.length === 0) return;
+
+  const isDefaultOrEmpty =
+    visibleColumns.value.size === 0 ||
+    (visibleColumns.value.size === 1 && visibleColumns.value.has("_timestamp"));
+
+  if (!isDefaultOrEmpty) return;
+
+  initializeVisibleColumns(availableFields.value);
+});
 
 // Generate table columns dynamically from visible fields in custom order
 const tableColumns = computed<ColumnDef<any>[]>(() => {

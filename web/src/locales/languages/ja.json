@@ -123,7 +123,11 @@
     "version": "[バージョン]",
     "create": "作成",
     "resources": "リソース",
-    "updated_at": "更新日"
+    "updated_at": "更新日",
+    "error": "[エラー]",
+    "db": "[データベース]",
+    "discardChanges": "変更を破棄",
+    "unsavedChanges": "未保存の変更"
   },
   "search": {
     "metrics": "メトリクス",
@@ -390,7 +394,8 @@
     "autoRunEnabled": "自動実行有効",
     "selectStreamFirst": "最初にストリームを選択してください",
     "traces": "トレース",
-    "switchToLogs": "クリックしてログに戻る"
+    "switchToLogs": "クリックしてログに戻る",
+    "patternNoValuesAvailable": "使用可能な値はありません"
   },
   "menu": {
     "home": "ホーム",
@@ -2254,6 +2259,8 @@
     "editJson": "アラート JSON の編集",
     "additional_settings": "その他の設定",
     "alertNamePlaceholder": "アラート名",
+    "nameRequired": "アラート名は必須です。",
+    "nameNoSpecialChars": "アラート名に ':', '#', '?', '&', '%', 引用符、スペースは使用できません。代わりにアンダースコア (_) を使用してください。",
     "anomalyNamePlaceholder": "アノマリー名",
     "folder": "フォルダー",
     "selectStreamTypeFirst": "最初にストリームタイプを選択してください",
@@ -2934,7 +2941,21 @@
       "minutesAgo": "{n} 分前",
       "hoursAgo": "{n} 時間前",
       "daysAgo": "{n} 日前"
-    }
+    },
+    "noErrorPresent": "このスパンにはエラーはありません",
+    "httpStatusCode": "HTTP ステータスコード",
+    "grpcStatusCode": "gRPC ステータスコード",
+    "dbResponseStatusCode": "DB レスポンスステータスコード",
+    "processExitCode": "プロセス終了コード",
+    "exceptionsWithCount": "例外 ({カウント})",
+    "typeLabel": "タイプ:",
+    "messageLabel": "メッセージ:",
+    "escapedLabel": "エスケープ:",
+    "stacktraceLabel": "スタックトレース:",
+    "copyStacktrace": "スタックトレースをコピー",
+    "noStacktraceAvailable": "スタックトレースはありません",
+    "stacktraceCopied": "スタックトレースをクリップボードにコピーしました",
+    "stacktraceCopyFailed": "スタックトレースをコピーできませんでした"
   },
   "actions": {
     "testAction": "アクションをテスト",

@@ -67,9 +67,9 @@ export function overlayNewDataOnOldOptions(
     if (qStartMs > 0 && qEndMs > 0) {
       for (const series of newOptions.series) {
         if (
-          series.name == null ||
-          !Array.isArray(series.data) ||
-          !series.data.length
+          series?.name == null ||
+          !Array.isArray(series?.data) ||
+          !series?.data?.length
         )
           continue;
         const firstPoint = series.data[0];
@@ -168,10 +168,10 @@ export function overlayNewDataOnOldOptions(
   // in new data are preserved, and old data only fills the stale range.
   for (const newSeries of merged.series) {
     // Skip annotation series (no name — undefined/null, not empty string)
-    if (newSeries.name == null) continue;
+    if (newSeries?.name == null) continue;
 
     const oldSeries = oldOptions.series.find(
-      (s: any) => s.name === newSeries.name,
+      (s: any) => s?.name === newSeries.name,
     );
     if (!oldSeries?.data?.length || !Array.isArray(oldSeries.data)) continue;
 
@@ -278,9 +278,9 @@ export function overlayNewDataOnOldOptions(
   // (e.g. old 1-week series shouldn't expand a 1-day chart).
   const hasValidQueryRange = queryStartMs > 0 && queryEndMs > 0;
   for (const oldSeries of oldOptions.series) {
-    if (oldSeries.name == null) continue;
+    if (oldSeries?.name == null) continue;
     const existsInNew = merged.series.some(
-      (s: any) => s.name === oldSeries.name,
+      (s: any) => s?.name === oldSeries.name,
     );
     if (!existsInNew) {
       const cloned = {
@@ -326,8 +326,8 @@ export function overlayNewDataOnOldOptions(
   // Recalculate legend to include all visible series
   if (merged.legend) {
     const allNames = merged.series
-      .filter((s: any) => s.name)
-      .map((s: any) => s.name);
+      .filter((s: any) => s?.name)
+      .map((s: any) => s?.name);
     if (Array.isArray(merged.legend)) {
       merged.legend.forEach((l: any) => {
         if (l.data) l.data = allNames;

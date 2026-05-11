@@ -92,20 +92,24 @@ const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
-const LLM_INT64_FIELDS: [&str; 4] = [
-    "llm_usage_tokens_input",
-    "llm_usage_tokens_output",
-    "llm_usage_tokens_total",
-    "llm_completion_start_time",
+
+// Gen-AI semantic-convention column names produced by the OTEL processor after
+// dot→underscore flattening. Must stay in sync with GEN_AI_SCHEMA_FIELDS in
+// service/db/schema.rs.
+const GEN_AI_INT64_FIELDS: [&str; 3] = [
+    "gen_ai_usage_input_tokens",
+    "gen_ai_usage_output_tokens",
+    "gen_ai_usage_total_tokens",
 ];
-const LLM_FLOAT64_FIELDS: [&str; 3] = [
-    "llm_usage_cost_input",
-    "llm_usage_cost_output",
-    "llm_usage_cost_total",
+const GEN_AI_FLOAT64_FIELDS: [&str; 4] = [
+    "gen_ai_response_time_to_first_chunk",
+    "gen_ai_usage_cost",
+    "gen_ai_usage_cost_input",
+    "gen_ai_usage_cost_output",
 ];
 
 fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
-    for field in LLM_INT64_FIELDS {
+    for &field in GEN_AI_INT64_FIELDS.iter() {
         if let Some(value) = record_val.get_mut(field)
             && value.as_i64().is_none()
         {
@@ -113,7 +117,7 @@ fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
         }
     }
 
-    for field in LLM_FLOAT64_FIELDS {
+    for &field in GEN_AI_FLOAT64_FIELDS.iter() {
         if let Some(value) = record_val.get_mut(field)
             && !value.is_f64()
         {
@@ -1232,13 +1236,13 @@ mod tests {
     #[test]
     fn test_normalize_llm_field_types() {
         let mut record = json!({
-            "llm_usage_tokens_input": "12",
-            "llm_usage_tokens_output": 34.8,
-            "llm_usage_tokens_total": true,
-            "llm_completion_start_time": "123456789",
-            "llm_usage_cost_input": "0.25",
-            "llm_usage_cost_output": 1,
-            "llm_usage_cost_total": false,
+            "gen_ai_usage_input_tokens": "12",
+            "gen_ai_usage_output_tokens": 34.8,
+            "gen_ai_usage_total_tokens": true,
+            "gen_ai_response_time_to_first_chunk": "123456789",
+            "gen_ai_usage_cost_input": "0.25",
+            "gen_ai_usage_cost_output": 1,
+            "gen_ai_usage_cost": false,
             "unrelated": "value"
         })
         .as_object()
@@ -1249,38 +1253,42 @@ mod tests {
 
         assert_eq!(
             record
-                .get("llm_usage_tokens_input")
+                .get("gen_ai_usage_input_tokens")
                 .and_then(|v| v.as_i64()),
             Some(12)
         );
         assert_eq!(
             record
-                .get("llm_usage_tokens_output")
+                .get("gen_ai_usage_output_tokens")
                 .and_then(|v| v.as_i64()),
             Some(34)
         );
         assert_eq!(
             record
-                .get("llm_usage_tokens_total")
+                .get("gen_ai_usage_total_tokens")
                 .and_then(|v| v.as_i64()),
             Some(1)
         );
         assert_eq!(
             record
-                .get("llm_completion_start_time")
-                .and_then(|v| v.as_i64()),
-            Some(123456789)
+                .get("gen_ai_response_time_to_first_chunk")
+                .and_then(|v| v.as_f64()),
+            Some(123456789.0)
         );
         assert_eq!(
-            record.get("llm_usage_cost_input").and_then(|v| v.as_f64()),
+            record
+                .get("gen_ai_usage_cost_input")
+                .and_then(|v| v.as_f64()),
             Some(0.25)
         );
         assert_eq!(
-            record.get("llm_usage_cost_output").and_then(|v| v.as_f64()),
+            record
+                .get("gen_ai_usage_cost_output")
+                .and_then(|v| v.as_f64()),
             Some(1.0)
         );
         assert_eq!(
-            record.get("llm_usage_cost_total").and_then(|v| v.as_f64()),
+            record.get("gen_ai_usage_cost").and_then(|v| v.as_f64()),
             Some(0.0)
         );
         assert_eq!(

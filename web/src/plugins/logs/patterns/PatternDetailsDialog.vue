@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
+  <div>
+    <q-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
     position="right"
@@ -174,32 +175,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
               <span v-if="tok.kind === 'text'" class="tw-whitespace-pre">{{ tok.value }}</span>
-              <q-chip
+              <span
                 v-else
-                dense
-                size="xs"
-                class="wildcard-chip-detail q-my-none q-mx-none"
-                :class="wildcardChipColor(tok.value)"
+                class="tw:inline-flex"
+                @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
+                @mouseleave="onMouseLeave"
               >
-                {{ tok.value }}
-                <q-tooltip
-                  v-if="tok.sampleValues.length > 0"
-                  anchor="bottom middle"
-                  self="top middle"
-                  :delay="300"
+                <q-chip
+                  dense
+                  size="xs"
+                  class="wildcard-chip-detail q-my-none q-mx-none"
+                  :class="wildcardChipColor(tok.value)"
                 >
-                  <div class="tw-font-mono tw-text-xs">
-                    <div class="tw-font-semibold tw-mb-1">{{ t("search.patternWildcardSampleValues") }}</div>
-                    <div
-                      v-for="(val, vi) in tok.sampleValues.slice(0, 10)"
-                      :key="vi"
-                      class="tw-truncate tw-max-w-[26rem]"
-                    >
-                      {{ val }}
-                    </div>
-                  </div>
-                </q-tooltip>
-              </q-chip>
+                  {{ tok.value }}
+                </q-chip>
+              </span>
             </template>
           </div>
         </div>
@@ -282,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center no-wrap justify-between">
           <div class="col-auto">
             <OButton
-              variant="outline"
+              variant="secondary"
               size="sm"
               data-test="pattern-detail-previous-btn"
               :disabled="selectedPattern.index === 0"
@@ -299,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-auto">
             <OButton
-              variant="outline"
+              variant="secondary"
               size="sm"
               data-test="pattern-detail-next-btn"
               :disabled="selectedPattern.index >= totalPatterns - 1"
@@ -313,6 +303,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
     </q-card>
   </q-dialog>
+
+    <WildcardValuePopover
+      :visible="!!hoveredToken"
+      :token="hoveredToken?.token ?? ''"
+      :displayValues="hoveredToken?.displayValues ?? []"
+      :anchorEl="hoveredToken?.anchorEl ?? null"
+      @popoverEnter="onPopoverEnter"
+      @popoverLeave="onPopoverLeave"
+      @filter-value="(value, action) => $emit('filter-value', value, action)"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -327,6 +328,8 @@ import {
   wildcardChipColor,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
+import WildcardValuePopover from "./WildcardValuePopover.vue";
+import useWildcardHover from "./useWildcardHover";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -337,10 +340,19 @@ const props = defineProps<{
 defineEmits<{
   (e: "update:modelValue", value: boolean): void;
   (e: "navigate", next: boolean, prev: boolean): void;
+  (e: "filter-value", value: string, action: "include" | "exclude"): void;
 }>();
 
 const store = useStore();
 const { t } = useI18n();
+
+const {
+  hoveredToken,
+  onMouseEnter,
+  onMouseLeave,
+  onPopoverEnter,
+  onPopoverLeave,
+} = useWildcardHover();
 
 const selectedTemplateTokens = computed(() =>
   tokenizeTemplate(
