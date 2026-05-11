@@ -14,7 +14,7 @@
   </div>
   <Teleport to="body">
   <div
-    class="user-guide scroll o2-input"
+    class="user-guide"
     v-show="showUserGuide"
     style="
       position: fixed;
@@ -24,13 +24,14 @@
       overflow-y: auto;
       border: 1px solid gray;
       border-radius: 5px;
+      pointer-events: auto;
     "
-    @mouseleave="showUserGuide = false"
     :class="
       store.state.theme == 'dark'
         ? 'theme-dark bg-dark'
         : 'theme-light bg-white'
     "
+    @mouseleave="showUserGuide = false"
     ref="userGuideDivRef"
   >
     <p>
