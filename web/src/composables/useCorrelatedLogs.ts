@@ -163,7 +163,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       // Build WHERE clause
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-      queries.push(`SELECT * FROM ${quotedStream} ${whereClause} ORDER BY _timestamp DESC LIMIT ${limit}`);
+      queries.push(`SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY _timestamp DESC LIMIT ${limit}`);
     }
 
     return queries;
@@ -193,6 +193,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     loading.value = true;
     error.value = null;
     searchResults.value = []; // Clear previous results
+    totalHits.value = 0; // Reset before accumulating multi-stream results
+    took.value = 0;
 
     try {
       // Build SQL queries for ALL correlated log streams
@@ -238,8 +240,10 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             if (response.type === 'search_response_metadata') {
               const results = response.content?.results;
               if (results) {
-                totalHits.value = results.total || 0;
-                took.value = results.took || 0;
+                // Accumulate across multi-stream metadata events
+                // Each correlated stream emits its own metadata, so we sum totals and took
+                totalHits.value += results.total || 0;
+                took.value += results.took || 0;
               }
             }
 
