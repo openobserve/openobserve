@@ -241,7 +241,7 @@ pub async fn delete_function_bulk(
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
         {

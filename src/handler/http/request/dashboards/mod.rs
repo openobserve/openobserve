@@ -367,7 +367,7 @@ pub async fn delete_dashboard_bulk(
             "DELETE",
             Some(&_folder_id),
             false,
-            false,
+            true,
             false,
         )
         .await

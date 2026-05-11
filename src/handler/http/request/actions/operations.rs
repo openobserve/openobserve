@@ -68,7 +68,7 @@ pub async fn test_action(
         None,
         false,
         false,
-        false,
+        true,
     )
     .await
     {

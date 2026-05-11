@@ -71,7 +71,7 @@ pub async fn list(
         "model_pricing",
         "LIST",
         None,
-        false,
+        true,
         false,
         false,
     )
@@ -183,7 +183,7 @@ pub async fn get(
         "model_pricing",
         "GET",
         None,
-        false,
+        true,
         false,
         false,
     )
@@ -236,7 +236,7 @@ pub async fn create(
         "model_pricing",
         "PUT",
         None,
-        false,
+        true,
         false,
         false,
     )
@@ -320,7 +320,7 @@ pub async fn update(
         "model_pricing",
         "PUT",
         None,
-        false,
+        true,
         false,
         false,
     )
@@ -391,7 +391,7 @@ pub async fn delete(
         "model_pricing",
         "DELETE",
         None,
-        false,
+        true,
         false,
         false,
     )
@@ -474,7 +474,7 @@ pub async fn get_built_in(
         "model_pricing",
         "LIST",
         None,
-        false,
+        true,
         false,
         false,
     )
@@ -564,7 +564,7 @@ pub async fn refresh_built_in(
         "model_pricing",
         "PUT",
         None,
-        false,
+        true,
         false,
         false,
     )
@@ -698,7 +698,7 @@ pub async fn test_model_match(
         "model_pricing",
         "LIST",
         None,
-        false,
+        true,
         false,
         false,
     )

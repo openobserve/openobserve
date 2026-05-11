@@ -373,8 +373,11 @@ where
             Some(r) => r,
             None => {
                 // Route not yet in ROUTE_PERMISSIONS table.
-                // Let the validator handle it - root users will bypass
-                // in check_permissions, non-root users will be rejected there.
+                // Root users bypass in check_permissions; non-root users are denied
+                // via is_allowed with empty method/o2_type/org_id.
+                log::warn!(
+                    "route missing from ROUTE_PERMISSIONS: {method} {path} — non-root users will be denied"
+                );
                 let auth_str = extract_auth_str_from_headers(&parts.headers).await;
                 if auth_str.is_empty() {
                     return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
@@ -1064,6 +1067,9 @@ mod tests {
             "dashboard",
             "GET",
             None,
+            false,
+            false,
+            false,
         )
         .await;
 

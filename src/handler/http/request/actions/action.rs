@@ -158,7 +158,7 @@ pub async fn delete_action_bulk(
                 return MetaHttpResponse::bad_request(format!("invalid action id {id}"));
             };
             if !check_permissions(
-                id, &org_id, &user_id, "actions", "DELETE", None, false, false, false,
+                id, &org_id, &user_id, "actions", "DELETE", None, false, false, true,
             )
             .await
             {
@@ -746,7 +746,7 @@ pub async fn upload_zipped_action(
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
         {

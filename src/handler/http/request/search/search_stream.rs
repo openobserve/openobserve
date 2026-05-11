@@ -408,7 +408,7 @@ pub async fn search_http2_stream(
                 None,
                 false,
                 false,
-                false,
+                true,
             )
             .await
             {

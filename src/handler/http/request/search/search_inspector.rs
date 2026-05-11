@@ -257,7 +257,7 @@ pub async fn get_search_profile(
                         parent_id: "".to_string(),
                         use_all_org: false,
                         use_self_context: false,
-                        use_self_parent: false,
+                        use_self_parent: true,
                     },
                     user.role,
                     user.is_external,

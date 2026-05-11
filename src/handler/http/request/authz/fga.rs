@@ -192,7 +192,7 @@ pub async fn delete_role_bulk(
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
         {
@@ -1097,7 +1097,7 @@ pub async fn delete_group_bulk(
             None,
             false,
             false,
-            false,
+            true,
         )
         .await
         {
