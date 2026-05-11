@@ -27,7 +27,7 @@
     @click:neutral="addcolorBySeries"
     @click:primary="applycolorBySeries"
   >
-    <div data-test="dashboard-color-by-series-popup">
+    <div data-test="dashboard-color-by-series-popup" :style="containerStyle">
       <draggable
         v-model="editColorBySeries"
         :options="dragOptions"
@@ -48,7 +48,11 @@
             />
           </div>
           <div class="draggable-content tw:flex tw:gap-x-6">
-            <div class="input-container tw:flex-1">
+            <div
+              class="input-container tw:flex-1"
+              @focusin="focusedSeriesIndex = index"
+              @focusout="focusedSeriesIndex = -1"
+            >
               <CommonAutoComplete
                 v-model="series.value"
                 :items="seriesDataItems"
@@ -175,6 +179,25 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const { t } = useI18n();
 
+    // Tracks which row's "Select series" input is focused so we can
+    // grow the container to prevent the absolutely-positioned dropdown
+    // from being clipped by the dialog body's overflow-y:auto.
+    // Row height ≈ 56 px; dropdown top offset = 42 px; dropdown max-height = 100 px.
+    const focusedSeriesIndex = ref(-1);
+    const containerStyle = computed(() => {
+      if (focusedSeriesIndex.value < 0) return undefined;
+      // bottom of dropdown = rows above focused row + dropdownOffset + dropdownMaxHeight
+      // The focused row itself is already in the natural flow, so only index * ROW_HEIGHT is needed.
+      const ROW_HEIGHT = 46;
+      const DROPDOWN_OFFSET = 42;
+      const DROPDOWN_MAX_HEIGHT = 100;
+      const minH =
+        focusedSeriesIndex.value * ROW_HEIGHT +
+        DROPDOWN_OFFSET +
+        DROPDOWN_MAX_HEIGHT;
+      return { minHeight: `${minH}px` };
+    });
+
     // Initialize with colorBySeries (edited data) if available, otherwise default empty
     const editColorBySeries = ref(
       props.colorBySeries?.length
@@ -278,6 +301,8 @@ export default defineComponent({
 
     return {
       t,
+      focusedSeriesIndex,
+      containerStyle,
       addcolorBySeries,
       removecolorBySeriesByIndex,
       dragOptions,
