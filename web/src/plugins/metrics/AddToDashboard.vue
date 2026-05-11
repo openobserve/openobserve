@@ -12,7 +12,7 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-    <q-form ref="addToDashboardForm" @submit.stop="onSubmit.execute" class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 tw:px-4 tw:py-4">
+    <q-form ref="addToDashboardForm" @submit.stop="onSubmit.execute" class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 q-px-md q-py-sm">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
