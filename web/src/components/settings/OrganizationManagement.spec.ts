@@ -26,7 +26,10 @@ import { nextTick } from "vue";
 vi.mock("@/services/organizations", () => ({
   default: {
     get_admin_org: vi.fn(),
-    extend_trial_period: vi.fn()
+    extend_trial_period: vi.fn(),
+    create_external_contract: vi.fn(),
+    extend_external_contract: vi.fn(),
+    revoke_external_contract: vi.fn(),
   }
 }));
 
@@ -53,7 +56,7 @@ vi.mock("@/components/shared/grid/NoData.vue", () => ({
 
 vi.mock("@/components/shared/grid/Pagination.vue", () => ({
   default: {
-    name: "QTablePagination", 
+    name: "QTablePagination",
     template: "<div>Pagination</div>",
     props: ["scope", "pageTitle", "position", "resultTotal", "perPageOptions"],
     emits: ["update:changeRecordPerPage"]
@@ -79,11 +82,11 @@ const i18n = createI18n({
     en: {
       settings: {
         organizationManagement: "Organization Management",
-        searchOrgs: "Search Organizations", 
+        searchOrgs: "Search Organizations",
         paginationOrganizationLabel: "Organizations",
         org_name: "Name",
         org_identifier: "Identifier",
-        subscription_status: "Subscription Status", 
+        subscription_status: "Subscription Status",
         created_on: "Created On",
         trial_expiry: "Trial Expiry",
         actions: "Actions",
@@ -96,18 +99,75 @@ const i18n = createI18n({
   }
 });
 
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so
+// we can assert on forwarded props and emit the click events the component
+// listens to (`click:primary`, `click:secondary`, `update:open`).
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      class="o-dialog-stub"
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-sub-title="subTitle"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+      v-if="open"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-dialog-stub-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-stub-secondary"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+    </div>
+  `,
+};
+
 describe("OrganizationManagement.vue", () => {
   let wrapper: any;
   let mockQuasarNotify: any;
   let mockGetAdminOrg: any;
   let mockExtendTrialPeriod: any;
-  
+  let mockCreateExternalContract: any;
+  let mockExtendExternalContract: any;
+  let mockRevokeExternalContract: any;
+
   // Global setup to ensure consistent timestamp behavior across environments
   beforeAll(() => {
     // Set a global base time to prevent CI/CD environment timestamp issues
     process.env.TZ = 'UTC';
   });
-  
+
   afterAll(() => {
     delete process.env.TZ;
   });
@@ -115,18 +175,24 @@ describe("OrganizationManagement.vue", () => {
   beforeEach(async () => {
     // Reset all mocks
     vi.clearAllMocks();
-    
+
     // Get the mocked service
     const { default: mockedOrgService } = await import("@/services/organizations");
     mockGetAdminOrg = mockedOrgService.get_admin_org;
     mockExtendTrialPeriod = mockedOrgService.extend_trial_period;
-    
+    mockCreateExternalContract = (mockedOrgService as any).create_external_contract;
+    mockExtendExternalContract = (mockedOrgService as any).extend_external_contract;
+    mockRevokeExternalContract = (mockedOrgService as any).revoke_external_contract;
+
     mockQuasarNotify = vi.fn().mockReturnValue(vi.fn());
-    
+
     // Setup default mock responses
     mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
     mockExtendTrialPeriod.mockResolvedValue({ data: true });
-    
+    mockCreateExternalContract?.mockResolvedValue?.({ data: true });
+    mockExtendExternalContract?.mockResolvedValue?.({ data: true });
+    mockRevokeExternalContract?.mockResolvedValue?.({ data: true });
+
     // Setup default store state
     store.state.selectedOrganization = {
       label: "Meta Organization",
@@ -135,7 +201,7 @@ describe("OrganizationManagement.vue", () => {
       user_email: "admin@example.com",
       subscription_type: "premium"
     };
-    
+
     store.state.zoConfig = {
       ...store.state.zoConfig,
       meta_org: "default"
@@ -151,7 +217,7 @@ describe("OrganizationManagement.vue", () => {
 
   const createWrapper = (propsData = {}) => {
     const mockQuasarNotifyInstance = vi.fn();
-    
+
     return mount(OrganizationManagement, {
       global: {
         plugins: [
@@ -167,18 +233,20 @@ describe("OrganizationManagement.vue", () => {
         ],
         mocks: {
           $q: {
-            notify: mockQuasarNotifyInstance
+            notify: mockQuasarNotifyInstance,
+            dialog: vi.fn().mockReturnValue({ onOk: (cb: any) => { cb(); return { onCancel: vi.fn() }; } })
           }
         },
         stubs: {
+          ODialog: ODialogStub,
           'q-page': {
             template: '<div class="q-page"><slot /></div>'
           },
           'q-table': {
             template: `
-              <div 
-                class="q-table" 
-                :data-test="$attrs['data-test']" 
+              <div
+                class="q-table"
+                :data-test="$attrs['data-test']"
                 :loading="loading"
               >
                 <slot name="top" :scope="{pagination: {rowsPerPage: 20}}" />
@@ -203,34 +271,12 @@ describe("OrganizationManagement.vue", () => {
           },
           'q-input': {
             template: '<input class="q-input" v-model="modelValue" :placeholder="placeholder" :data-test="$attrs[\'data-test\']" />',
-            props: ['modelValue', 'borderless', 'filled', 'dense', 'class', 'placeholder'],
+            props: ['modelValue', 'borderless', 'filled', 'dense', 'class', 'placeholder', 'outlined', 'type'],
             emits: ['update:modelValue']
           },
           'q-icon': {
             template: '<i class="q-icon"></i>',
             props: ['name', 'class']
-          },
-          'q-dialog': {
-            template: '<div class="q-dialog" v-if="modelValue"><slot /></div>',
-            props: ['modelValue'],
-            emits: ['update:modelValue']
-          },
-          'q-card': {
-            template: '<div class="q-card"><slot /></div>',
-            props: ['class', 'style']
-          },
-          'q-toolbar': {
-            template: '<div class="q-toolbar"><slot /></div>'
-          },
-          'q-toolbar-title': {
-            template: '<div class="q-toolbar-title"><slot /></div>'
-          },
-          'q-card-section': {
-            template: '<div class="q-card-section"><slot /></div>'
-          },
-          'q-card-actions': {
-            template: '<div class="q-card-actions"><slot /></div>',
-            props: ['align', 'class']
           },
           'NoData': {
             template: '<div>No Data</div>'
@@ -308,6 +354,13 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.filterQuery).toBe("");
     });
+
+    it("should initialize contract state with defaults", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.contractPrompt).toBe(false);
+      expect(wrapper.vm.contractMode).toBe("create");
+      expect(wrapper.vm.contractEndDate).toBe("");
+    });
   });
 
   describe("Mount Lifecycle", () => {
@@ -316,20 +369,20 @@ describe("OrganizationManagement.vue", () => {
         data: { data: [] }
       };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       expect(mockGetAdminOrg).toHaveBeenCalledWith("default");
     });
 
     it("should redirect to general when meta_org doesn't match selected org", async () => {
       const routerPushSpy = vi.spyOn(router, 'replace');
       store.state.zoConfig = { ...store.state.zoConfig, meta_org: "different" };
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       expect(routerPushSpy).toHaveBeenCalledWith({
         name: "general",
         query: {
@@ -340,10 +393,10 @@ describe("OrganizationManagement.vue", () => {
 
     it("should not call getData when redirected", async () => {
       store.state.zoConfig = { ...store.state.zoConfig, meta_org: "different" };
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       // Since it redirects, getData shouldn't be called
       expect(mockGetAdminOrg).not.toHaveBeenCalled();
     });
@@ -358,24 +411,24 @@ describe("OrganizationManagement.vue", () => {
     it("should set loading to true when called", async () => {
       const mockResponse = { data: { data: [] } };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
-      
+
       const getDataPromise = wrapper.vm.getData();
       expect(wrapper.vm.loading).toBe(true);
-      
+
       await getDataPromise;
     });
 
     it("should show loading notification", async () => {
       const mockResponse = { data: { data: [] } };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
       await wrapper.vm.getData();
-      
+
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           spinner: true,
@@ -387,10 +440,10 @@ describe("OrganizationManagement.vue", () => {
     it("should call mockGetAdminOrg with correct identifier", async () => {
       const mockResponse = { data: { data: [] } };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getData();
-      
+
       expect(mockGetAdminOrg).toHaveBeenCalledWith("default");
     });
 
@@ -408,7 +461,7 @@ describe("OrganizationManagement.vue", () => {
             },
             {
               id: 2,
-              name: "Test Org 2", 
+              name: "Test Org 2",
               identifier: "test-org-2",
               plan: "2",
               created_at: 1234567890000000,
@@ -418,10 +471,10 @@ describe("OrganizationManagement.vue", () => {
         }
       };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getData();
-      
+
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
         "#": 1,
@@ -445,35 +498,35 @@ describe("OrganizationManagement.vue", () => {
         }
       };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getData();
-      
+
       expect(wrapper.vm.resultTotal).toBe(1);
     });
 
     it("should set loading to false after success", async () => {
       const mockResponse = { data: { data: [] } };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getData();
-      
+
       expect(wrapper.vm.loading).toBe(false);
     });
 
     it("should handle API error and show notification", async () => {
       const error = { status: 500, response: { data: { message: "Server Error" } } };
       mockGetAdminOrg.mockRejectedValue(error);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
-      
+
       await flushPromises(); // Wait for initial loading to complete
-      
+
       await wrapper.vm.getData();
       await flushPromises(); // Wait for async error handling
-      
+
       expect(wrapper.vm.loading).toBe(false);
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -493,13 +546,13 @@ describe("OrganizationManagement.vue", () => {
     it("should handle API error without response message", async () => {
       const error = { status: 500 };
       mockGetAdminOrg.mockRejectedValue(error);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
-      
+
       await wrapper.vm.getData();
       await flushPromises(); // Wait for async error handling
-      
+
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           spinner: true,
@@ -518,21 +571,21 @@ describe("OrganizationManagement.vue", () => {
     it("should not show notification for 403 error", async () => {
       const error = { status: 403 };
       mockGetAdminOrg.mockRejectedValue(error);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
       await wrapper.vm.getData();
-      
+
       expect(notifyMock).toHaveBeenCalledTimes(1); // Only loading notification
     });
 
     it("should handle empty response data", async () => {
       const mockResponse = { data: { data: [] } };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getData();
-      
+
       expect(wrapper.vm.tabledata).toEqual([]);
       expect(wrapper.vm.resultTotal).toBe(0);
     });
@@ -542,14 +595,14 @@ describe("OrganizationManagement.vue", () => {
     it("should update selectedPerPage", () => {
       wrapper = createWrapper();
       wrapper.vm.changePagination({ label: "50", value: 50 });
-      
+
       expect(wrapper.vm.selectedPerPage).toBe(50);
     });
 
     it("should update pagination.rowsPerPage", () => {
       wrapper = createWrapper();
       wrapper.vm.changePagination({ label: "50", value: 50 });
-      
+
       expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
     });
 
@@ -557,9 +610,9 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       const setPaginationSpy = vi.fn();
       wrapper.vm.qTable = { setPagination: setPaginationSpy };
-      
+
       wrapper.vm.changePagination({ label: "10", value: 10 });
-      
+
       expect(setPaginationSpy).toHaveBeenCalledWith({ rowsPerPage: 10 });
     });
   });
@@ -568,26 +621,26 @@ describe("OrganizationManagement.vue", () => {
     it("should set extendTrialPrompt to true", () => {
       wrapper = createWrapper();
       const row = { id: 1, name: "Test Org" };
-      
+
       wrapper.vm.toggleExtendTrialDialog(row);
-      
+
       expect(wrapper.vm.extendTrialPrompt).toBe(true);
     });
 
     it("should set extendTrialDataRow", () => {
       wrapper = createWrapper();
       const row = { id: 1, name: "Test Org", identifier: "test-org" };
-      
+
       wrapper.vm.toggleExtendTrialDialog(row);
-      
+
       expect(wrapper.vm.extendTrialDataRow).toEqual(row);
     });
 
     it("should handle empty row data", () => {
       wrapper = createWrapper();
-      
+
       wrapper.vm.toggleExtendTrialDialog({});
-      
+
       expect(wrapper.vm.extendTrialPrompt).toBe(true);
       expect(wrapper.vm.extendTrialDataRow).toEqual({});
     });
@@ -609,7 +662,7 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(1);
       const expected = (fixedTime + 7 * 24 * 60 * 60 * 1000) * 1000;
-      
+
       expect(result).toBe(expected);
     });
 
@@ -617,7 +670,7 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(2);
       const expected = (fixedTime + 2 * 7 * 24 * 60 * 60 * 1000) * 1000;
-      
+
       expect(result).toBe(expected);
     });
 
@@ -625,7 +678,7 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(4);
       const expected = (fixedTime + 4 * 7 * 24 * 60 * 60 * 1000) * 1000;
-      
+
       expect(result).toBe(expected);
     });
 
@@ -633,7 +686,7 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(0);
       const expected = fixedTime * 1000;
-      
+
       expect(result).toBe(expected);
     });
 
@@ -641,7 +694,7 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(-1);
       const expected = (fixedTime - 7 * 24 * 60 * 60 * 1000) * 1000;
-      
+
       expect(result).toBe(expected);
     });
   });
@@ -654,24 +707,24 @@ describe("OrganizationManagement.vue", () => {
     it("should set loading to true", async () => {
       const mockResponse = { data: true };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       wrapper.vm.loading = false;
-      
+
       const updatePromise = wrapper.vm.updateTrialPeriod("test-org", 2);
       expect(wrapper.vm.loading).toBe(true);
-      
+
       await updatePromise;
     });
 
     it("should show loading notification", async () => {
       const mockResponse = { data: true };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
       await wrapper.vm.updateTrialPeriod("test-org", 2);
-      
+
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           spinner: true,
@@ -683,20 +736,20 @@ describe("OrganizationManagement.vue", () => {
     it("should call extend_trial_period with correct payload", async () => {
       const mockResponse = { data: true };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
-      
+
       const fixedTime = 1704067200000; // January 1, 2024 00:00:00 UTC
       const mockDateNow = vi.spyOn(Date, 'now').mockReturnValue(fixedTime);
-      
+
       wrapper = createWrapper();
       await wrapper.vm.updateTrialPeriod("test-org", 2);
-      
+
       const expectedPayload = {
         new_end_date: (fixedTime + 2 * 7 * 24 * 60 * 60 * 1000) * 1000,
         org_id: "test-org"
       };
-      
+
       expect(mockExtendTrialPeriod).toHaveBeenCalledWith("default", expectedPayload);
-      
+
       mockDateNow.mockRestore();
     });
 
@@ -704,12 +757,12 @@ describe("OrganizationManagement.vue", () => {
       const mockResponse = { data: true };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
       mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
-      
+
       await wrapper.vm.updateTrialPeriod("test-org", 2);
-      
+
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "positive",
@@ -722,14 +775,14 @@ describe("OrganizationManagement.vue", () => {
       const mockResponse = { data: true };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
       mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
-      
+
       wrapper = createWrapper();
       wrapper.vm.extendTrialPrompt = true;
       wrapper.vm.extendTrialDataRow = { id: 1 };
       wrapper.vm.extendedTrial = 3;
-      
+
       await wrapper.vm.updateTrialPeriod("test-org", 2);
-      
+
       expect(wrapper.vm.extendTrialPrompt).toBe(false);
       expect(wrapper.vm.extendTrialDataRow).toEqual({});
       expect(wrapper.vm.extendedTrial).toBe(1);
@@ -739,16 +792,16 @@ describe("OrganizationManagement.vue", () => {
       const mockResponse = { data: true };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
       mockGetAdminOrg.mockResolvedValue({ data: { data: [{ id: 1, name: "Test Org" }] } });
-      
+
       wrapper = createWrapper();
       await flushPromises(); // Wait for initial onMounted getData call
-      
+
       // Clear the initial mock calls
       mockGetAdminOrg.mockClear();
-      
+
       await wrapper.vm.updateTrialPeriod("test-org", 2);
       await flushPromises(); // Wait for async completion
-      
+
       // Verify getData was called indirectly by checking mockGetAdminOrg was called again
       expect(mockGetAdminOrg).toHaveBeenCalledTimes(1);
     });
@@ -757,23 +810,23 @@ describe("OrganizationManagement.vue", () => {
       const mockResponse = { data: true };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
       mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
-      
+
       wrapper = createWrapper();
       await wrapper.vm.updateTrialPeriod("test-org", 2);
-      
+
       expect(wrapper.vm.loading).toBe(false);
     });
 
     it("should handle API error and show notification", async () => {
       const error = { status: 500, response: { data: { message: "Extension failed" } } };
       mockExtendTrialPeriod.mockRejectedValue(error);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
-      
+
       await wrapper.vm.updateTrialPeriod("test-org", 2);
       await flushPromises(); // Wait for async error handling
-      
+
       expect(wrapper.vm.loading).toBe(false);
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -793,13 +846,13 @@ describe("OrganizationManagement.vue", () => {
     it("should handle API error without response message", async () => {
       const error = { status: 500 };
       mockExtendTrialPeriod.mockRejectedValue(error);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
-      
+
       await wrapper.vm.updateTrialPeriod("test-org", 2);
       await flushPromises(); // Wait for async error handling
-      
+
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           spinner: true,
@@ -818,22 +871,22 @@ describe("OrganizationManagement.vue", () => {
     it("should not show notification for 403 error", async () => {
       const error = { status: 403 };
       mockExtendTrialPeriod.mockRejectedValue(error);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
       await wrapper.vm.updateTrialPeriod("test-org", 2);
-      
+
       expect(notifyMock).toHaveBeenCalledTimes(1); // Only loading notification
     });
 
     it("should handle response without data", async () => {
       const mockResponse = { data: false };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
       await wrapper.vm.updateTrialPeriod("test-org", 2);
-      
+
       expect(wrapper.vm.loading).toBe(false);
       expect(notifyMock).toHaveBeenCalledTimes(1); // Only loading notification
     });
@@ -849,7 +902,7 @@ describe("OrganizationManagement.vue", () => {
     it("should filter by organization name (case insensitive)", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData(mockRows, "test");
-      
+
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("Test Organization");
     });
@@ -857,7 +910,7 @@ describe("OrganizationManagement.vue", () => {
     it("should filter by organization identifier (case insensitive)", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData(mockRows, "demo");
-      
+
       expect(result).toHaveLength(1);
       expect(result[0].identifier).toBe("demo-co");
     });
@@ -865,7 +918,7 @@ describe("OrganizationManagement.vue", () => {
     it("should filter by plan (case insensitive)", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData(mockRows, "enterprise");
-      
+
       expect(result).toHaveLength(1);
       expect(result[0].plan).toBe("Enterprise");
     });
@@ -873,21 +926,21 @@ describe("OrganizationManagement.vue", () => {
     it("should return multiple matches", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData(mockRows, "co");
-      
+
       expect(result).toHaveLength(2);
     });
 
     it("should return empty array when no matches", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData(mockRows, "nonexistent");
-      
+
       expect(result).toHaveLength(0);
     });
 
     it("should handle empty search terms", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData(mockRows, "");
-      
+
       expect(result).toHaveLength(3);
     });
 
@@ -901,14 +954,14 @@ describe("OrganizationManagement.vue", () => {
     it("should handle empty rows array", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData([], "test");
-      
+
       expect(result).toEqual([]);
     });
 
     it("should be case insensitive", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.filterData(mockRows, "TEST");
-      
+
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("Test Organization");
     });
@@ -933,36 +986,337 @@ describe("OrganizationManagement.vue", () => {
       expect(searchInput.exists()).toBe(true);
     });
 
-    it("should render extend trial dialog when extendTrialPrompt is true", async () => {
+    it("should render ODialog stub when extendTrialPrompt is true", async () => {
       wrapper = createWrapper();
       wrapper.vm.extendTrialPrompt = true;
       wrapper.vm.extendTrialDataRow = { name: "Test Org" };
       await nextTick();
-      
-      const dialog = wrapper.find(".q-dialog");
-      expect(dialog.exists()).toBe(true);
+
+      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      expect(dialogs.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("should not render extend trial dialog when extendTrialPrompt is false", async () => {
+    it("should not render extend trial ODialog stub when extendTrialPrompt is false", async () => {
       wrapper = createWrapper();
       wrapper.vm.extendTrialPrompt = false;
       await nextTick();
-      
-      expect(wrapper.vm.extendTrialPrompt).toBe(false);
+
+      // ODialog stub is rendered only when `open` is truthy
+      const openDialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
+      // Either contract dialog may be open separately; ensure none for extendTrial
+      const titles = openDialogs.map((d: any) => d.attributes('data-title'));
+      expect(titles.every((t: string) => !t || !t.startsWith('Extend Trial'))).toBe(true);
     });
 
     it("should show loading state in table", async () => {
       // Setup store to prevent onMounted from calling getData
       store.state.zoConfig.meta_org = "different_org";
-      
+
       wrapper = createWrapper();
       wrapper.vm.loading = true;
       await nextTick();
-      
+
       expect(wrapper.vm.loading).toBe(true);
-      
+
       // Reset for other tests
       store.state.zoConfig.meta_org = "default";
+    });
+  });
+
+  describe("ODialog Extend Trial bindings", () => {
+    it("should forward title, subTitle and labels to the extend-trial ODialog", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.extendTrialPrompt = true;
+      wrapper.vm.extendTrialDataRow = { name: "Acme", identifier: "acme" };
+      wrapper.vm.extendedTrial = 2;
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')
+        .find((d: any) => (d.attributes('data-title') || '').startsWith('Extend Trial'));
+      expect(dialog?.exists()).toBe(true);
+      expect(dialog!.attributes('data-title')).toBe('Extend Trial for Acme');
+      expect(dialog!.attributes('data-sub-title')).toBe('Set the new trial extension period.');
+      expect(dialog!.attributes('data-primary-label')).toBe('Extend trial by 2 week(s)');
+      expect(dialog!.attributes('data-secondary-label')).toBe('Cancel');
+      expect(dialog!.attributes('data-size')).toBe('sm');
+    });
+
+    it("should close the extend-trial dialog when secondary is clicked", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.extendTrialPrompt = true;
+      wrapper.vm.extendTrialDataRow = { name: "Acme", identifier: "acme" };
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')
+        .find((d: any) => (d.attributes('data-title') || '').startsWith('Extend Trial'));
+      expect(dialog?.exists()).toBe(true);
+
+      await dialog!.find('[data-test="o-dialog-stub-secondary"]').trigger('click');
+      expect(wrapper.vm.extendTrialPrompt).toBe(false);
+    });
+
+    it("should call updateTrialPeriod when primary is clicked on the extend-trial dialog", async () => {
+      mockExtendTrialPeriod.mockResolvedValue({ data: true });
+      wrapper = createWrapper();
+      wrapper.vm.extendTrialPrompt = true;
+      wrapper.vm.extendTrialDataRow = { name: "Acme", identifier: "acme-id" };
+      wrapper.vm.extendedTrial = 3;
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')
+        .find((d: any) => (d.attributes('data-title') || '').startsWith('Extend Trial'));
+      expect(dialog?.exists()).toBe(true);
+
+      await dialog!.find('[data-test="o-dialog-stub-primary"]').trigger('click');
+      await flushPromises();
+
+      expect(mockExtendTrialPeriod).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ org_id: "acme-id" }),
+      );
+    });
+  });
+
+  describe("ODialog Contract bindings", () => {
+    it("should forward title and labels to the contract ODialog when creating", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')
+        .find((d: any) => (d.attributes('data-title') || '').includes('External Contract'));
+      expect(dialog?.exists()).toBe(true);
+      expect(dialog!.attributes('data-title')).toBe('Create External Contract for Acme');
+      expect(dialog!.attributes('data-primary-label')).toBe('Create Contract');
+      expect(dialog!.attributes('data-secondary-label')).toBe('Cancel');
+    });
+
+    it("should forward title and labels to the contract ODialog when extending", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "extend");
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')
+        .find((d: any) => (d.attributes('data-title') || '').includes('External Contract'));
+      expect(dialog?.exists()).toBe(true);
+      expect(dialog!.attributes('data-title')).toBe('Extend External Contract for Acme');
+      expect(dialog!.attributes('data-primary-label')).toBe('Extend Contract');
+    });
+
+    it("should close the contract dialog when secondary is clicked", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')
+        .find((d: any) => (d.attributes('data-title') || '').includes('External Contract'));
+      expect(dialog?.exists()).toBe(true);
+
+      await dialog!.find('[data-test="o-dialog-stub-secondary"]').trigger('click');
+      expect(wrapper.vm.contractPrompt).toBe(false);
+    });
+
+    it("should invoke submitContract when primary is clicked", async () => {
+      mockCreateExternalContract?.mockResolvedValue?.({ data: true });
+      wrapper = createWrapper();
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+      wrapper.vm.contractEndDate = "2030-12-31";
+      await nextTick();
+
+      const dialog = wrapper.findAll('[data-test="o-dialog-stub"]')
+        .find((d: any) => (d.attributes('data-title') || '').includes('External Contract'));
+      expect(dialog?.exists()).toBe(true);
+
+      await dialog!.find('[data-test="o-dialog-stub-primary"]').trigger('click');
+      await flushPromises();
+
+      expect(mockCreateExternalContract).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ org_id: "acme" }),
+      );
+    });
+  });
+
+  describe("toggleContractDialog Function", () => {
+    it("should open the contract dialog in create mode and reset the end date", () => {
+      wrapper = createWrapper();
+      wrapper.vm.contractEndDate = "2025-01-01";
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+
+      expect(wrapper.vm.contractPrompt).toBe(true);
+      expect(wrapper.vm.contractMode).toBe("create");
+      expect(wrapper.vm.contractDataRow).toEqual({ name: "Acme", identifier: "acme" });
+      expect(wrapper.vm.contractEndDate).toBe("");
+    });
+
+    it("should open the contract dialog in extend mode", () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleContractDialog({ name: "Beta", identifier: "beta" }, "extend");
+
+      expect(wrapper.vm.contractPrompt).toBe(true);
+      expect(wrapper.vm.contractMode).toBe("extend");
+      expect(wrapper.vm.contractDataRow).toEqual({ name: "Beta", identifier: "beta" });
+    });
+  });
+
+  describe("submitContract Function", () => {
+    it("should warn and return when create mode has no end date", async () => {
+      wrapper = createWrapper();
+      const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+      wrapper.vm.contractEndDate = "";
+
+      await wrapper.vm.submitContract();
+      await flushPromises();
+
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: "End date is required.",
+        }),
+      );
+      expect(mockCreateExternalContract).not.toHaveBeenCalled();
+    });
+
+    it("should warn and return when extend mode has no end date", async () => {
+      wrapper = createWrapper();
+      const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "extend");
+      wrapper.vm.contractEndDate = "";
+
+      await wrapper.vm.submitContract();
+      await flushPromises();
+
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: "New end date is required.",
+        }),
+      );
+      expect(mockExtendExternalContract).not.toHaveBeenCalled();
+    });
+
+    it("should call create_external_contract with the correct payload in create mode", async () => {
+      mockCreateExternalContract.mockResolvedValue({ data: true });
+      wrapper = createWrapper();
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+      wrapper.vm.contractEndDate = "2030-12-31";
+
+      await wrapper.vm.submitContract();
+      await flushPromises();
+
+      expect(mockCreateExternalContract).toHaveBeenCalledTimes(1);
+      const [orgArg, payload] = mockCreateExternalContract.mock.calls[0];
+      expect(orgArg).toBe("default");
+      expect(payload.org_id).toBe("acme");
+      expect(typeof payload.end_date).toBe("number");
+      expect(payload.end_date).toBeGreaterThan(0);
+    });
+
+    it("should close the dialog and refresh data after create success", async () => {
+      mockCreateExternalContract.mockResolvedValue({ data: true });
+      mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
+      wrapper = createWrapper();
+      await flushPromises();
+      mockGetAdminOrg.mockClear();
+
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+      wrapper.vm.contractEndDate = "2030-12-31";
+      await wrapper.vm.submitContract();
+      await flushPromises();
+
+      expect(wrapper.vm.contractPrompt).toBe(false);
+      expect(mockGetAdminOrg).toHaveBeenCalledTimes(1);
+    });
+
+    it("should show a negative notification when create_external_contract fails", async () => {
+      mockCreateExternalContract.mockRejectedValue({
+        response: { data: { message: "create failed" } },
+      });
+      wrapper = createWrapper();
+      const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+      wrapper.vm.contractEndDate = "2030-12-31";
+
+      await wrapper.vm.submitContract();
+      await flushPromises();
+
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: "create failed",
+          timeout: 5000,
+        }),
+      );
+      expect(wrapper.vm.loading).toBe(false);
+    });
+
+    it("should fall back to a default message when create_external_contract fails without a message", async () => {
+      mockCreateExternalContract.mockRejectedValue({});
+      wrapper = createWrapper();
+      const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
+      wrapper.vm.toggleContractDialog({ name: "Acme", identifier: "acme" }, "create");
+      wrapper.vm.contractEndDate = "2030-12-31";
+
+      await wrapper.vm.submitContract();
+      await flushPromises();
+
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: "Failed to create external contract.",
+        }),
+      );
+    });
+
+    it("should call extend_external_contract with the correct payload in extend mode", async () => {
+      mockExtendExternalContract.mockResolvedValue({ data: true });
+      wrapper = createWrapper();
+      wrapper.vm.toggleContractDialog({ name: "Beta", identifier: "beta" }, "extend");
+      wrapper.vm.contractEndDate = "2030-12-31";
+
+      await wrapper.vm.submitContract();
+      await flushPromises();
+
+      expect(mockExtendExternalContract).toHaveBeenCalledTimes(1);
+      const [orgArg, payload] = mockExtendExternalContract.mock.calls[0];
+      expect(orgArg).toBe("default");
+      expect(payload.org_id).toBe("beta");
+      expect(typeof payload.new_end_date).toBe("number");
+    });
+
+    it("should show a negative notification when extend_external_contract fails", async () => {
+      mockExtendExternalContract.mockRejectedValue({
+        response: { data: { message: "extend failed" } },
+      });
+      wrapper = createWrapper();
+      const notifyMock = vi.spyOn(wrapper.vm.$q, 'notify');
+      wrapper.vm.toggleContractDialog({ name: "Beta", identifier: "beta" }, "extend");
+      wrapper.vm.contractEndDate = "2030-12-31";
+
+      await wrapper.vm.submitContract();
+      await flushPromises();
+
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: "extend failed",
+          timeout: 5000,
+        }),
+      );
+    });
+  });
+
+  describe("formatMicrosToDate Function", () => {
+    it("should return '-' for falsy values", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.formatMicrosToDate(0)).toBe("-");
+      expect(wrapper.vm.formatMicrosToDate(undefined as any)).toBe("-");
+    });
+
+    it("should return a formatted date for positive timestamps", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.formatMicrosToDate(1234567890000000)).toBe("2023-12-01");
     });
   });
 
@@ -973,7 +1327,7 @@ describe("OrganizationManagement.vue", () => {
       wrapper.vm.extendTrialDataRow = { name: "Test Org" };
       wrapper.vm.extendedTrial = 3;
       await nextTick();
-      
+
       expect(wrapper.vm.extendedTrial).toBe(3);
       expect(wrapper.vm.extendTrialPrompt).toBe(true);
     });
@@ -983,10 +1337,10 @@ describe("OrganizationManagement.vue", () => {
       wrapper.vm.extendTrialPrompt = true;
       wrapper.vm.extendTrialDataRow = { name: "Test Org" };
       await nextTick();
-      
+
       wrapper.vm.extendedTrial = 4;
       await nextTick();
-      
+
       expect(wrapper.vm.extendedTrial).toBe(4);
     });
 
@@ -995,7 +1349,7 @@ describe("OrganizationManagement.vue", () => {
       wrapper.vm.extendTrialPrompt = true;
       wrapper.vm.extendTrialDataRow = { name: "Test Org" };
       await nextTick();
-      
+
       expect(wrapper.vm.extendTrialPrompt).toBe(true);
       expect(wrapper.vm.extendTrialDataRow.name).toBe("Test Org");
     });
@@ -1006,7 +1360,7 @@ describe("OrganizationManagement.vue", () => {
       store.state.selectedOrganization = { identifier: undefined };
       store.state.zoConfig = { meta_org: "default" };
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -1014,33 +1368,33 @@ describe("OrganizationManagement.vue", () => {
       store.state.selectedOrganization = { identifier: "test" };
       store.state.zoConfig = { meta_org: undefined };
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle malformed API response", async () => {
       const mockResponse = { data: null };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       store.state.zoConfig = { meta_org: "default" };
       store.state.selectedOrganization = { identifier: "default" };
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getData();
-      
+
       expect(wrapper.vm.tabledata).toEqual([]);
     });
 
     it("should handle API response without data property", async () => {
       const mockResponse = {};
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       store.state.zoConfig = { meta_org: "default" };
       store.state.selectedOrganization = { identifier: "default" };
-      
+
       wrapper = createWrapper();
       await wrapper.vm.getData();
-      
+
       expect(wrapper.vm.tabledata).toEqual([]);
     });
   });
@@ -1049,7 +1403,7 @@ describe("OrganizationManagement.vue", () => {
     it("should complete full extend trial workflow", async () => {
       store.state.zoConfig = { meta_org: "default" };
       store.state.selectedOrganization = { identifier: "default" };
-      
+
       const getOrgResponse = {
         data: {
           data: [{
@@ -1063,32 +1417,32 @@ describe("OrganizationManagement.vue", () => {
         }
       };
       const extendResponse = { data: true };
-      
+
       mockGetAdminOrg.mockResolvedValue(getOrgResponse);
       mockExtendTrialPeriod.mockResolvedValue(extendResponse);
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       const row = wrapper.vm.tabledata[0];
       wrapper.vm.toggleExtendTrialDialog(row);
       expect(wrapper.vm.extendTrialPrompt).toBe(true);
-      
+
       await wrapper.vm.updateTrialPeriod("test-org", 2);
-      
+
       expect(wrapper.vm.extendTrialPrompt).toBe(false);
     });
 
     it("should handle pagination change and table update", async () => {
       store.state.zoConfig = { meta_org: "default" };
       store.state.selectedOrganization = { identifier: "default" };
-      
+
       wrapper = createWrapper();
       const mockSetPagination = vi.fn();
       wrapper.vm.qTable = { setPagination: mockSetPagination };
-      
+
       wrapper.vm.changePagination({ label: "50", value: 50 });
-      
+
       expect(wrapper.vm.selectedPerPage).toBe(50);
       expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
       expect(mockSetPagination).toHaveBeenCalled();
@@ -1097,7 +1451,7 @@ describe("OrganizationManagement.vue", () => {
     it("should handle search filtering with real data", async () => {
       store.state.zoConfig = { meta_org: "default" };
       store.state.selectedOrganization = { identifier: "default" };
-      
+
       const mockResponse = {
         data: {
           data: [
@@ -1108,10 +1462,10 @@ describe("OrganizationManagement.vue", () => {
         }
       };
       mockGetAdminOrg.mockResolvedValue(mockResponse);
-      
+
       wrapper = createWrapper();
       await flushPromises();
-      
+
       const filtered = wrapper.vm.filterData(wrapper.vm.tabledata, "alpha");
       expect(filtered).toHaveLength(1);
       expect(filtered[0].name).toBe("Alpha Corp");

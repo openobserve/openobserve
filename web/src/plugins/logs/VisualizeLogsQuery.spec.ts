@@ -582,6 +582,53 @@ describe("VisualizeLogsQuery Component", () => {
     });
   });
 
+  // Migration coverage: q-dialog wrapper removed; AddToDashboard now uses
+  // v-model:open and emits update:open / save directly (ODialog/ODrawer contract).
+  describe("AddToDashboard integration (ODialog/ODrawer migration)", () => {
+    it("should render AddToDashboard stub bound to showAddToDashboardDialog", async () => {
+      mockValidatePanel.mockImplementation(() => {});
+      wrapper.vm.addToDashboard();
+      await wrapper.vm.$nextTick();
+
+      const addToDashboard = wrapper.findComponent({ name: "AddToDashboard" });
+      expect(addToDashboard.exists()).toBe(true);
+      // showAddToDashboardDialog drives AddToDashboard's open state via v-model:open
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
+    });
+
+    it("should close dialog when AddToDashboard emits update:open=false", async () => {
+      mockValidatePanel.mockImplementation(() => {});
+      wrapper.vm.addToDashboard();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
+
+      const addToDashboard = wrapper.findComponent({ name: "AddToDashboard" });
+      await addToDashboard.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+    });
+
+    it("should close dialog when AddToDashboard emits save (addPanelToDashboard)", async () => {
+      mockValidatePanel.mockImplementation(() => {});
+      wrapper.vm.addToDashboard();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
+
+      const addToDashboard = wrapper.findComponent({ name: "AddToDashboard" });
+      await addToDashboard.vm.$emit("save");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+    });
+
+    it("should not render any legacy q-dialog wrapper around AddToDashboard", () => {
+      // After migration, AddToDashboard is no longer wrapped in q-dialog;
+      // it controls its own ODialog/ODrawer via v-model:open.
+      expect(wrapper.find(".q-dialog").exists()).toBe(false);
+    });
+  });
+
   // SKIPPED: collapseFieldList method moved to PanelEditor component
   describe.skip("collapseFieldList Function", () => {
     it("should close field list when currently open", () => {

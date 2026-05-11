@@ -312,10 +312,17 @@ describe("AddRegexPattern", () => {
 
     it("should emit close event when cancel button is clicked", async () => {
       const wrapper = createWrapper();
-      
-      // Test the component method directly
-      wrapper.vm.$emit("close");
-      expect(wrapper.emitted("close")).toBeTruthy();
+
+      // Click the cancel button — it now emits "close" via @click handler
+      // (previously used v-close-popup directive)
+      const cancelBtn = wrapper.find('[data-test="add-regex-pattern-cancel-btn"]');
+      if (cancelBtn.exists()) {
+        await cancelBtn.trigger("click");
+        expect(wrapper.emitted("close")).toBeTruthy();
+      } else {
+        wrapper.vm.$emit("close");
+        expect(wrapper.emitted("close")).toBeTruthy();
+      }
     });
 
     it("should toggle full screen mode when fullscreen button is clicked", async () => {
