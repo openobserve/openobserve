@@ -64,8 +64,11 @@ export class LogsPage {
         this.savedViewsExpand = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.saveViewButton = 'button'; // filter by text in method
         this.savedViewNameInput = '[data-test="add-alert-name-input"]';
-        // Saved view dialog migrated from q-dialog to ODialog (SearchBar.vue:1654) — built-in primary button replaces the old custom button
-        this.savedViewDialogSave = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"]';
+        // Saved view dialog (SearchBar.vue:1654) and saved function dialog (SearchBar.vue:1703) were both migrated
+        // from q-dialog to ODialog. Tests historically shared a single save-button selector because the legacy
+        // q-dialog used the same data-test on both. With ODialog each dialog has its own primary button, so the
+        // selector matches whichever dialog is currently open (they are mutually exclusive).
+        this.savedViewDialogSave = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
         // ConfirmDialog migrated to ODialog — primary button is now scoped inside the dialog panel
@@ -79,7 +82,7 @@ export class LogsPage {
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
         this.closeDialog = '[data-test="close-dialog"]';
-        this.savedViewDialogSaveContent = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.savedViewDialogSaveContent = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewByLabel = '.q-item__label';
         this.notificationMessage = '.q-notification__message';
         this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
@@ -233,16 +236,18 @@ export class LogsPage {
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
         // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
+        // TracesAnalysisDashboard.vue now renders inside <ODrawer data-test="traces-analysis-dashboard-drawer">
+        // The drawer's panel exposes that data-test on the root element; close button is from ODrawer's slot.
         this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
-        this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
+        this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
+        this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
         // Dimension sidebar (visible by default in analysis dashboard, not a dialog)
         this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
         this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
         this.dimensionSearchInput = '[data-test="dimension-search-input"]';
-        this.analysisDashboardCard = '.analysis-dashboard-card';
         // Analysis dashboard states
-        this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
-        this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
+        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] .q-spinner-hourglass, [data-test="traces-analysis-dashboard-drawer"] .q-spinner';
+        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] .q-banner--top-padding';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -5118,7 +5123,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async hasAnalysisDashboardCharts() {
-        const chartPanel = this.page.locator('.analysis-dashboard-card canvas, .analysis-dashboard-card [data-test*="chart"]');
+        const chartPanel = this.page.locator('[data-test="traces-analysis-dashboard-drawer"] canvas, [data-test="traces-analysis-dashboard-drawer"] [data-test*="chart"]');
         return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
     }
 
