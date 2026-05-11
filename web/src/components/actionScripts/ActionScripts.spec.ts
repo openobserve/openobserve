@@ -124,6 +124,38 @@ describe("ActionScripts", () => {
             ],
             emits: ["update:changeRecordPerPage"],
           },
+          ODialog: {
+            name: "ODialog",
+            template:
+              '<div data-test="o-dialog" :data-open="open ? \'true\' : \'false\'"><slot name="header-left" /><slot name="header" /><slot /><slot name="footer" /></div>',
+            props: [
+              "open",
+              "persistent",
+              "size",
+              "title",
+              "subTitle",
+              "showClose",
+              "width",
+              "primaryButtonLabel",
+              "secondaryButtonLabel",
+              "neutralButtonLabel",
+              "primaryButtonVariant",
+              "secondaryButtonVariant",
+              "neutralButtonVariant",
+              "primaryButtonDisabled",
+              "secondaryButtonDisabled",
+              "neutralButtonDisabled",
+              "primaryButtonLoading",
+              "secondaryButtonLoading",
+              "neutralButtonLoading",
+            ],
+            emits: [
+              "update:open",
+              "click:primary",
+              "click:secondary",
+              "click:neutral",
+            ],
+          },
         },
       },
     });
@@ -908,6 +940,102 @@ describe("ActionScripts", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.resultTotal).toBe(1);
+    });
+  });
+
+  describe("Clone ODialog migration", () => {
+    const findODialog = () => wrapper.findComponent({ name: "ODialog" });
+
+    it("should mount the ODialog component (Quasar q-dialog migration)", () => {
+      const dialog = findODialog();
+      expect(dialog.exists()).toBe(true);
+      // The stub renders regardless of `open` so we can verify slot wiring.
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(true);
+    });
+
+    it("should pass the persistent, size and showClose migration props", () => {
+      const dialog = findODialog();
+      // `persistent` is a boolean shorthand attribute → Vue passes "" to a stub
+      // that declares it as an untyped prop. Both truthy values are acceptable.
+      expect(["", true]).toContain(dialog.props("persistent"));
+      expect(dialog.props("size")).toBe("md");
+      expect(dialog.props("showClose")).toBe(false);
+    });
+
+    it("should pass i18n-resolved title and button label props", () => {
+      const dialog = findODialog();
+      expect(typeof dialog.props("title")).toBe("string");
+      expect((dialog.props("title") as string).length).toBeGreaterThan(0);
+      expect(typeof dialog.props("primaryButtonLabel")).toBe("string");
+      expect((dialog.props("primaryButtonLabel") as string).length).toBeGreaterThan(0);
+      expect(typeof dialog.props("secondaryButtonLabel")).toBe("string");
+      expect((dialog.props("secondaryButtonLabel") as string).length).toBeGreaterThan(0);
+    });
+
+    it("should reflect isSubmitting via primaryButtonDisabled prop", async () => {
+      wrapper.vm.isSubmitting = true;
+      await wrapper.vm.$nextTick();
+      expect(findODialog().props("primaryButtonDisabled")).toBe(true);
+
+      wrapper.vm.isSubmitting = false;
+      await wrapper.vm.$nextTick();
+      expect(findODialog().props("primaryButtonDisabled")).toBe(false);
+    });
+
+    it("should declare the expected ODialog migration emits", () => {
+      const dialog = findODialog();
+      const emitsOption = (dialog.vm.$options as any).emits;
+      expect(emitsOption).toEqual(
+        expect.arrayContaining([
+          "update:open",
+          "click:primary",
+          "click:secondary",
+        ]),
+      );
+    });
+
+    it("should not throw when click:primary is emitted from ODialog", async () => {
+      const dialog = findODialog();
+      expect(() => dialog.vm.$emit("click:primary")).not.toThrow();
+      await wrapper.vm.$nextTick();
+      // Component should remain mounted regardless
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should not throw when click:secondary is emitted from ODialog", async () => {
+      const dialog = findODialog();
+      await dialog.vm.$emit("click:secondary");
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should not throw when update:open is emitted from ODialog", async () => {
+      const dialog = findODialog();
+      await dialog.vm.$emit("update:open", false);
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should render the back button inside the header-left slot", () => {
+      const backBtn = wrapper.find('[data-test="add-action-back-btn"]');
+      expect(backBtn.exists()).toBe(true);
+    });
+
+    it("should keep component mounted when back button in header-left is clicked", async () => {
+      const backBtn = wrapper.find('[data-test="add-action-back-btn"]');
+      expect(backBtn.exists()).toBe(true);
+      await backBtn.trigger("click");
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should render clone form fields inside the ODialog default slot", () => {
+      expect(
+        wrapper.find('[data-test="to-be-clone-action-name"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="to-be-clone-stream-type"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="to-be-clone-stream-name"]').exists(),
+      ).toBe(true);
     });
   });
 

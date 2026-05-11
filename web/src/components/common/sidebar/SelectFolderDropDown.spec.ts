@@ -49,17 +49,87 @@ function setStoreFolders(type: string, folders: any[]) {
   };
 }
 
+// ─── Stubs ────────────────────────────────────────────────────────────────────
+
+// ODrawer stub: mirrors the migrated ODrawer surface — v-model:open, button labels,
+// and click:primary/click:secondary emits. Renders default slot only when open.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "showClose",
+    "title",
+    "subTitle",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+    "persistent",
+    "size",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div v-if="open" class="o-drawer-stub" :data-test="$attrs['data-test']">
+      <button
+        class="o-drawer-primary"
+        :data-test="'o-drawer-primary'"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        class="o-drawer-secondary"
+        :data-test="'o-drawer-secondary'"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+      <slot />
+    </div>
+  `,
+};
+
+// OButton stub: emits click on native button so [data-test] selectors keep working
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled"],
+  emits: ["click"],
+  template: `
+    <button
+      :data-test="$attrs['data-test']"
+      :disabled="disabled"
+      @click="$emit('click', $event)"
+    ><slot /></button>
+  `,
+};
+
+// AddFolder stub: exposes a submit() method so we can verify it's called when
+// the drawer fires click:primary.
+const submitSpy = vi.fn();
+const AddFolderStub = {
+  name: "AddFolder",
+  props: ["type", "editMode"],
+  emits: ["update:modelValue", "close"],
+  template: '<div class="add-folder-stub" />',
+  setup(_: any, { expose }: any) {
+    expose({ submit: submitSpy });
+    return {};
+  },
+};
+
 // ─── Global mount config ──────────────────────────────────────────────────────
 
 const globalConfig = {
   plugins: [i18n],
   stubs: {
-    AddFolder: { template: '<div class="add-folder-stub" />' },
-    "q-dialog": {
-      template:
-        '<div v-if="modelValue" class="q-dialog-stub"><slot /></div>',
-      props: ["modelValue"],
-    },
+    AddFolder: AddFolderStub,
+    ODrawer: ODrawerStub,
+    OButton: OButtonStub,
     "q-select": {
       template: `
         <div class="q-select-stub" :data-test="$attrs['data-test']">
@@ -69,11 +139,6 @@ const globalConfig = {
         </div>`,
       props: ["modelValue", "options", "label", "disable"],
       emits: ["update:modelValue"],
-    },
-    "q-btn": {
-      template:
-        '<button :data-test="$attrs[\'data-test\']" :disabled="disable" @click="$emit(\'click\')"><slot /><q-icon v-if="$attrs.name" /></button>',
-      props: ["disable"],
     },
     "q-icon": { template: '<i :class="name" />', props: ["name", "size"] },
     "q-item": { template: "<div class='q-item-stub'><slot /></div>" },
@@ -88,6 +153,7 @@ describe("SelectFolderDropDown.vue", () => {
 
   beforeEach(() => {
     setStoreFolders("alerts", MOCK_FOLDERS);
+    submitSpy.mockClear();
     vi.clearAllMocks();
   });
 
@@ -195,7 +261,7 @@ describe("SelectFolderDropDown.vue", () => {
     });
   });
 
-  // ─── showAddFolderDialog ─────────────────────────────────────────────────────
+  // ─── showAddFolderDialog (ODrawer) ───────────────────────────────────────────
 
   describe("showAddFolderDialog", () => {
     it("initializes showAddFolderDialog to false", () => {
@@ -203,21 +269,105 @@ describe("SelectFolderDropDown.vue", () => {
       expect((wrapper.vm as any).showAddFolderDialog).toBe(false);
     });
 
-    it("opens dialog when add button is clicked", async () => {
+    it("does not render ODrawer content while closed", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find(".o-drawer-stub").exists()).toBe(false);
+    });
+
+    it("opens the ODrawer when add button is clicked", async () => {
       wrapper = createWrapper();
       const addBtn = wrapper.find(`[data-test="alerts-folder-move-new-add"]`);
       await addBtn.trigger("click");
+      await nextTick();
       expect((wrapper.vm as any).showAddFolderDialog).toBe(true);
+      expect(wrapper.find(".o-drawer-stub").exists()).toBe(true);
     });
 
-    it("does NOT open the dialog when dropdown is disabled", async () => {
+    it("does NOT render ODrawer when dropdown is disabled (v-if guard)", async () => {
       wrapper = createWrapper({ disableDropdown: true });
-      const addBtn = wrapper.find(`[data-test="alerts-folder-move-new-add"]`);
-      // In the template the button also has :disable="disableDropdown" — even if
-      // click fires, the dialog guard prevents rendering
-      expect(wrapper.find("q-dialog").exists() || !(wrapper.vm as any).showAddFolderDialog).toBe(
-        true
-      );
+      // Drawer is rendered with v-if="!disableDropdown" — should never appear
+      expect(wrapper.findComponent(ODrawerStub).exists()).toBe(false);
+      expect(wrapper.find(".o-drawer-stub").exists()).toBe(false);
+    });
+  });
+
+  // ─── ODrawer interactions ────────────────────────────────────────────────────
+
+  describe("ODrawer interactions", () => {
+    it("closes the drawer when click:secondary is emitted", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.showAddFolderDialog = true;
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+
+      await drawer.vm.$emit("click:secondary");
+      await nextTick();
+      expect(vm.showAddFolderDialog).toBe(false);
+    });
+
+    it("invokes addFolderRef.submit() when click:primary is emitted", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.showAddFolderDialog = true;
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+
+      await drawer.vm.$emit("click:primary");
+      await nextTick();
+      expect(submitSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not throw when click:primary is emitted with no addFolderRef", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.showAddFolderDialog = true;
+      await nextTick();
+      // Force ref to null to verify optional-chaining guard
+      vm.addFolderRef = null;
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
+    });
+
+    it("passes the correct primary/secondary button labels to ODrawer", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.showAddFolderDialog = true;
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("primaryButtonLabel")).toBeTruthy();
+      expect(drawer.props("secondaryButtonLabel")).toBeTruthy();
+    });
+
+    it("passes width=30 and showClose=false to ODrawer", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.showAddFolderDialog = true;
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("showClose")).toBe(false);
+    });
+
+    it("closes the drawer when AddFolder emits 'close'", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.showAddFolderDialog = true;
+      await nextTick();
+
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.exists()).toBe(true);
+      await addFolder.vm.$emit("close");
+      await nextTick();
+      expect(vm.showAddFolderDialog).toBe(false);
     });
   });
 

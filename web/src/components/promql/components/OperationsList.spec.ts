@@ -26,6 +26,43 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
+// ── Stubs ────────────────────────────────────────────────────────────────────
+
+const oDialogStub = {
+  template:
+    '<div data-test="o-dialog" v-if="open">' +
+    '<slot name="header" />' +
+    "<slot />" +
+    '<slot name="footer" />' +
+    '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button>' +
+    '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondaryButtonLabel }}</button>' +
+    '<button data-test="o-dialog-neutral" @click="$emit(\'click:neutral\')">{{ neutralButtonLabel }}</button>' +
+    '<button data-test="o-dialog-close" @click="$emit(\'update:open\', false)">close</button>' +
+    "</div>",
+  props: [
+    "open",
+    "persistent",
+    "size",
+    "title",
+    "subTitle",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "primaryButtonVariant",
+    "primaryButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLabel",
+    "secondaryButtonVariant",
+    "secondaryButtonDisabled",
+    "secondaryButtonLoading",
+    "neutralButtonLabel",
+    "neutralButtonVariant",
+    "neutralButtonDisabled",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+};
+
 describe("OperationsList", () => {
   let wrapper: any;
 
@@ -70,6 +107,9 @@ describe("OperationsList", () => {
       },
       global: {
         plugins: [i18n, store],
+        stubs: {
+          ODialog: oDialogStub,
+        },
         mocks: {
           $t: (key: string) => key,
         },
@@ -229,13 +269,61 @@ describe("OperationsList", () => {
   });
 
   describe("Operation Selector Dialog", () => {
-    it("should show operation selector dialog", async () => {
+    it("should show operation selector dialog when add button clicked", async () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
+
+      const addButton = wrapper.find('[data-test="promql-add-operation"]');
+      await addButton.trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(true);
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(true);
+    });
+
+    it("should pass correct props to ODialog", async () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-operation"]');
       await addButton.trigger("click");
+      await flushPromises();
 
-      expect(wrapper.vm.showOperationSelector).toBe(true);
+      const dialog = wrapper.findComponent(oDialogStub);
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("size")).toBe("sm");
+      expect(dialog.props("title")).toBe("Add Operation");
+      expect(dialog.props("primaryButtonLabel")).toBe("Close");
+    });
+
+    it("should close dialog when primary button (Close) is clicked via emit", async () => {
+      wrapper = createWrapper();
+
+      // Open the dialog first
+      wrapper.vm.showOperationSelector = true;
+      await flushPromises();
+
+      const dialog = wrapper.findComponent(oDialogStub);
+      expect(dialog.exists()).toBe(true);
+
+      // Drive the primary close action via the emit
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(false);
+    });
+
+    it("should close dialog when update:open is emitted with false", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showOperationSelector = true;
+      await flushPromises();
+
+      const dialog = wrapper.findComponent(oDialogStub);
+      await dialog.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(false);
     });
 
     it("should close dialog after adding operation", () => {
@@ -329,7 +417,6 @@ describe("OperationsList", () => {
     it("should display parameter hints for select type", () => {
       wrapper = createWrapper();
 
-      const text = wrapper.html();
       // Should show hint when labels are available
       expect(wrapper.vm.availableLabels.length).toBeGreaterThan(0);
     });
