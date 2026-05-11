@@ -141,7 +141,7 @@ import { getImageURL } from "../../../utils/zincutils";
 export default defineComponent({
   name: "QTablePagination",
   components: { OButtonGroup, OButton },
-  // eslint-disable-next-line vue/require-prop-types
+   
   props: [
     "scope",
     "pageTitle",
