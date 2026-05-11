@@ -21,8 +21,12 @@ export class IamPage {
 
         this.deleteButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td//button[@data-test='service-accounts-delete']`;
 
-        this.confirmOkButton = '[data-test="confirm-button"]';
-        this.cancelButton = '[data-test="cancel-button"]';
+        // After ODialog migration, ServiceAccountsList delete/refresh dialogs
+        // use ODialog's built-in primary/secondary buttons. Only one dialog is
+        // open at a time, so we target by the common slug rather than the
+        // (different) parent slugs of delete vs. refresh dialogs.
+        this.confirmOkButton = '[data-test="o-dialog-primary-btn"]';
+        this.cancelButton = '[data-test="o-dialog-secondary-btn"]';
 
         this.refreshButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td//button[@data-test='service-accounts-refresh']`;
 
@@ -150,8 +154,10 @@ export class IamPage {
 
     async clickCopyToken() {
 
-        await this.page.locator('#q-portal--dialog--2').getByRole('button', { name: 'Copy Token' }).click();
-        // await this.page.locator('#q-portal--dialog--3').getByRole('button', { name: 'Copy Token' }).click();
+        // ODialog renders via reka-ui's DialogPortal, not a Quasar
+        // #q-portal--dialog--N container, so scope by the token dialog's
+        // own data-test attribute instead.
+        await this.page.locator('[data-test="service-accounts-list-token-dialog"]').getByRole('button', { name: 'Copy Token' }).click();
 
     }
 
@@ -161,13 +167,15 @@ export class IamPage {
 
         const downloadPromise = this.page.waitForEvent('download');
 
-        await this.page.getByRole('button', { name: 'Download Token' }).click();
+        await this.page.locator('[data-test="service-accounts-list-token-dialog"]').getByRole('button', { name: 'Download Token' }).click();
 
     }
 
     async clickServiceAccountPopUpClosed() {
 
-        await this.page.locator('[data-test="sa-cancel-button"]').click();
+        // The post-creation token popup is an ODialog. Close it via the
+        // built-in × button scoped to the token dialog instance.
+        await this.page.locator('[data-test="service-accounts-list-token-dialog"] [data-test="o-dialog-close-btn"]').click();
 
     }
 
