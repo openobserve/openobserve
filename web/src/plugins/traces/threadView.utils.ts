@@ -35,7 +35,7 @@
  */
 export function getOp(span: any): string {
   return String(
-    span?.gen_ai_operation_name || span?.llm_observation_type || "",
+    span?.gen_ai_operation_name || "",
   ).toUpperCase();
 }
 
