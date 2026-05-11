@@ -25,7 +25,8 @@ export class AlertTemplatesPage {
         this.templateDeleteButton = '[data-test="alert-template-list-{templateName}-delete-template"]';
         this.templateUpdateButton = '[data-test="alert-template-list-{templateName}-update-template"]';
         this.deleteConfirmText = 'Delete Template';
-        this.confirmButton = '[data-test="confirm-button"]';
+        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.confirmDialog = '[data-test="confirm-dialog"]';
         this.templateDeletedMessage = 'Template %s deleted successfully';
         this.templateInUseMessage = 'Template is in use for destination';
         this.templateCountText = 'Templates';
@@ -319,7 +320,7 @@ export class AlertTemplatesPage {
 
         // Click delete button using the correct locator
         await this.page.locator(this.templateDeleteButton.replace('{templateName}', templateName)).click();
-        await expect(this.page.getByText(this.deleteConfirmText, { exact: true })).toBeVisible();
+        await expect(this.page.locator(this.confirmDialog)).toBeVisible();
         await this.page.locator(this.confirmButton).click();
         await this.page.waitForTimeout(4000);
 
