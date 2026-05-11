@@ -3754,6 +3754,7 @@
     "save": "Salva",
     "update": "Aggiornamento",
     "awsStsCloudInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. È necessario aggiungere l'account Openobserve AWS come tipo di entità attendibile per questo ruolo nella console AWS. Contatta il team di Openobserve per ottenere le informazioni sull'account o per ulteriore assistenza nella configurazione.",
-    "awsStsSelfHostedInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. Assicurati di aver configurato le credenziali aws nell'ambiente di installazione che hanno accesso a questo ruolo."
+    "awsStsSelfHostedInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. Assicurati di aver configurato le credenziali aws nell'ambiente di installazione che hanno accesso a questo ruolo.",
+    "externalIdRequired": "È richiesto un ID esterno"
   }
 }

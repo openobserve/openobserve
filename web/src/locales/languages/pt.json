@@ -3745,6 +3745,7 @@
     "save": "Salvar",
     "update": "Atualizar",
     "awsStsCloudInfo": "Isso usa o AWS sts para assumir funções e realizar operações. Você deve adicionar a conta Openobserve da AWS como tipo de entidade confiável para essa função no console da AWS. Entre em contato com a equipe da Openobserve para obter as informações da conta ou para obter mais ajuda para configurá-la.",
-    "awsStsSelfHostedInfo": "Isso usa o AWS sts para assumir funções e realizar operações. Verifique se você configurou as credenciais da AWS no ambiente de instalação que tem acesso a essa função."
+    "awsStsSelfHostedInfo": "Isso usa o AWS sts para assumir funções e realizar operações. Verifique se você configurou as credenciais da AWS no ambiente de instalação que tem acesso a essa função.",
+    "externalIdRequired": "É necessário um ID externo"
   }
 }
