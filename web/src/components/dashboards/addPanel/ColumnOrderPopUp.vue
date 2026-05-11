@@ -194,6 +194,10 @@ export default defineComponent({
     };
 
     const cancelEdit = () => {
+      // Reset in-progress edits so re-opening the popup starts from the persisted
+      // column order — the component stays mounted across open/close cycles, so
+      // onMounted/availableColumns-watch wouldn't otherwise re-initialise.
+      initializeColumnOrder();
       emit("cancel");
     };
 

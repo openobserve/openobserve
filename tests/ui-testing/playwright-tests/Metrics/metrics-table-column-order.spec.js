@@ -287,19 +287,15 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await expect(columnOrderPopup).toBeVisible({ timeout: 5000 });
     testLogger.info('Column Order popup opened successfully');
 
-    // Verify the popup has a title
-    const popupTitle = columnOrderPopup.locator('.q-table__title');
-    await expect(popupTitle).toBeVisible();
-    testLogger.info('Column Order popup has title section');
-
-    // Verify description text is present
+    // Verify description text is present (ODialog header carries the title via :title prop,
+    // it doesn't render a .q-table__title block any more — assert the body's caption instead).
     const descriptionText = columnOrderPopup.locator('.text-caption').first();
     await expect(descriptionText).toBeVisible();
     testLogger.info('Column Order popup has description text');
 
-    // Verify Save and Cancel buttons are present
-    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    // Verify Save and Cancel buttons are present (ODialog footer primary/secondary)
+    const saveButton = columnOrderPopup.locator('[data-test="o-dialog-primary-btn"]');
+    const cancelButton = columnOrderPopup.locator('[data-test="o-dialog-secondary-btn"]');
     await expect(saveButton).toBeVisible();
     await expect(cancelButton).toBeVisible();
     testLogger.info('Save and Cancel buttons are visible');
@@ -359,7 +355,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column order changed successfully using move up button');
 
     // Cancel to close the popup
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(300);
   });
@@ -401,7 +397,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column order changed successfully using move down button');
 
     // Cancel to close the popup
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(300);
   });
@@ -431,7 +427,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Drag handles are visible and properly configured');
 
     // Close the popup
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(300);
   });
@@ -470,7 +466,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await page.waitForTimeout(500);
 
     // Save the new order
-    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
+    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
     await saveButton.click();
     await page.waitForTimeout(1000);
     testLogger.info('Saved column order');
@@ -527,7 +523,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     expect(changedFirstColumnName).not.toBe(initialFirstColumnName);
 
     // Click Cancel
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(500);
     testLogger.info('Clicked cancel button');
@@ -570,8 +566,8 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await page.waitForTimeout(500);
     testLogger.info('Made column order change');
 
-    // Click the close icon
-    const closeIcon = page.locator('[data-test="dashboard-column-order-cancel"]');
+    // Click the close (×) icon — ODialog renders it as o-dialog-close-btn
+    const closeIcon = page.locator('[data-test="dashboard-column-order-popup"] [data-test="o-dialog-close-btn"]');
     await expect(closeIcon).toBeVisible();
     await closeIcon.click();
     await page.waitForTimeout(500);
@@ -628,7 +624,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 3: Save the column order
     testLogger.info('Saving column order');
-    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
+    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
     await saveButton.click();
     await page.waitForTimeout(2000);
     testLogger.info('Column order saved');
@@ -691,7 +687,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info(`Expected column after reorder: "${expectedColumnName}"`);
 
     // Save the column order
-    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
+    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
     await saveButton.click();
     await page.waitForTimeout(2000);
     testLogger.info('Column order saved');
@@ -757,7 +753,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info(`Expected column: "${expectedColumnName}"`);
 
     // Save the column order
-    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
+    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
     await saveButton.click();
     await page.waitForTimeout(2000);
     testLogger.info('Column order saved');
@@ -808,7 +804,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     if (initialColumnCount < 2) {
       testLogger.warn('Not enough columns to test');
-      const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+      const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
       await cancelButton.click();
       return;
     }
@@ -824,7 +820,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info(`Expected column (should be 2nd in table): "${expectedColumnName}"`);
 
     // Save the column order
-    const saveButton = page.locator('[data-test="dashboard-column-order-save-btn"]');
+    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
     await saveButton.click();
     await page.waitForTimeout(2000);
     testLogger.info('Column order saved');
@@ -890,7 +886,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Move up button is correctly disabled for first column');
 
     // Close the popup
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(300);
   });
@@ -922,7 +918,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Move down button is correctly disabled for last column');
 
     // Close the popup
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(300);
   });
@@ -977,7 +973,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
       testLogger.info(`Column Order popup displays ${columnCount} columns in Aggregate mode`);
 
       // Close the popup
-      const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+      const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
       await cancelButton.click();
       await page.waitForTimeout(300);
     } else {
@@ -1032,7 +1028,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     }
 
     // Close the popup
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(300);
   });
@@ -1069,7 +1065,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column numbers update correctly and remain sequential');
 
     // Close the popup
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(300);
   });
@@ -1098,7 +1094,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Empty state is correctly not shown when columns are available');
 
     // Close the popup
-    const cancelButton = page.locator('[data-test="dashboard-column-order-cancel-btn"]');
+    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
     await cancelButton.click();
     await page.waitForTimeout(300);
   });
