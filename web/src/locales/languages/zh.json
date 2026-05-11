@@ -125,7 +125,9 @@
     "resources": "资源",
     "updated_at": "更新于",
     "error": "错误",
-    "db": "数据库"
+    "db": "数据库",
+    "discardChanges": "放弃更改",
+    "unsavedChanges": "未保存的更改"
   },
   "search": {
     "selectIndex": "选择数据流",

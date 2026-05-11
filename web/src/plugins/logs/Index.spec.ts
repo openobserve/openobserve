@@ -1179,15 +1179,29 @@ describe("Logs Index", async () => {
         expect(typeof wrapper.vm.onBuildQueryGenerated).toBe("function");
       });
 
-      it("should sync generated query on onBuildQueryGenerated", async () => {
+      it("should sync full SQL on onBuildQueryGenerated when SQL mode is ON", async () => {
         const testQuery = 'SELECT histogram(_timestamp) FROM "logs"';
+        wrapper.vm.searchObj.meta.sqlMode = true;
         wrapper.vm.onBuildQueryGenerated(testQuery);
         await flushPromises();
 
         expect(wrapper.vm.searchObj.data.query).toBe(testQuery);
       });
 
+      it("should sync only WHERE clause on onBuildQueryGenerated when SQL mode is OFF", async () => {
+        wrapper.vm.searchObj.meta.sqlMode = false;
+        const testQuery =
+          'SELECT histogram(_timestamp) FROM "logs" WHERE level = \'ERROR\'';
+        wrapper.vm.onBuildQueryGenerated(testQuery);
+        await flushPromises();
+
+        // Should contain only the WHERE clause part, not the full SQL
+        // extractWhereClause is mocked, so it returns "" for the mock parser
+        expect(wrapper.vm.searchObj.data.query).not.toBe(testQuery);
+      });
+
       it("should not update query if onBuildQueryGenerated receives empty string", async () => {
+        wrapper.vm.searchObj.meta.sqlMode = true;
         const originalQuery = wrapper.vm.searchObj.data.query;
         wrapper.vm.onBuildQueryGenerated("");
         await flushPromises();

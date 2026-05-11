@@ -125,7 +125,9 @@
     "resources": "Ressourcen",
     "updated_at": "Aktualisiert am",
     "error": "Fehler",
-    "db": "Datenbank"
+    "db": "Datenbank",
+    "discardChanges": "Änderungen verwerfen",
+    "unsavedChanges": "Ungespeicherte Änderungen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

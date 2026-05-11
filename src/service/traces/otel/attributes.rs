@@ -128,6 +128,9 @@ impl GenAiAttributes {
     // Gen-AI Response
     pub const RESPONSE_MODEL: &'static str = "gen_ai.response.model";
     pub const RESPONSE_FINISH_REASONS: &'static str = "gen_ai.response.finish_reasons";
+    /// Time to first chunk in a streaming response (seconds, Float64).
+    /// Note: spec status is Development at the time of writing; subject to churn.
+    pub const RESPONSE_TIME_TO_FIRST_CHUNK: &'static str = "gen_ai.response.time_to_first_chunk";
 
     // Gen-AI Prompt
     pub const PROMPT_NAME: &'static str = "gen_ai.prompt.name";
@@ -158,8 +161,27 @@ impl GenAiAttributes {
     // Gen-AI System
     pub const SYSTEM: &'static str = "gen_ai.system";
 
+    // Gen-AI System Instructions (separate from input.messages)
+    pub const SYSTEM_INSTRUCTIONS: &'static str = "gen_ai.system_instructions";
+
     // Gen-AI Provider
     pub const PROVIDER_NAME: &'static str = "gen_ai.provider.name";
+}
+
+/// OpenObserve extensions in the `gen_ai.*` namespace.
+/// These attributes are NOT defined by the OTEL Gen-AI spec; OpenObserve emits
+/// them so per-direction cost is queryable as first-class columns. They follow
+/// the project rule of using the `gen_ai_` prefix for all LLM-stream columns,
+/// spec-defined or not.
+pub struct GenAiExtensions;
+
+impl GenAiExtensions {
+    /// Input-side cost (Float64). OO extension — spec only defines a single total
+    /// `gen_ai.usage.cost`.
+    pub const USAGE_COST_INPUT: &'static str = "gen_ai.usage.cost.input";
+    /// Output-side cost (Float64). OO extension — spec only defines a single total
+    /// `gen_ai.usage.cost`.
+    pub const USAGE_COST_OUTPUT: &'static str = "gen_ai.usage.cost.output";
 }
 
 pub struct LLMAttributes;

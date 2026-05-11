@@ -132,8 +132,13 @@ export function filterDimensionsForCorrelation(
     return allDimensions;
   }
 
-  // Always include "service" field if present + selected fields
-  const fieldsToKeep = new Set([...selectedFields, "service"]);
+  // Include selected fields. Add "service" only when not in service_optional mode —
+  // including it would make the backend take the service-name fast path and ignore the
+  // service_optional toggle (which only triggers when `service` is absent from input).
+  const fieldsToKeep = new Set<string>(selectedFields);
+  if (!identityConfig.service_optional) {
+    fieldsToKeep.add("service");
+  }
 
   // Filter dimensions to only include fields we need
   const filtered = Object.fromEntries(

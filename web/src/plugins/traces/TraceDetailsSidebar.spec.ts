@@ -1398,6 +1398,15 @@ describe("TraceDetailsSidebar", async () => {
       llm_output: '{"choices": [{"message": {"content": "Hi there!"}}]}',
       llm_observation_type: "LLM",
       llm_model_name: "gpt-4",
+      // Component reads OTEL Gen-AI fields directly (gen_ai_*) — legacy
+      // llm_* fields above are kept for any other test paths but the
+      // preview tab + LLMContentRenderer panes bind to these.
+      gen_ai_operation_name: "chat",
+      gen_ai_response_model: "gpt-4",
+      gen_ai_input_messages:
+        '{"messages": [{"role": "user", "content": "Hello"}]}',
+      gen_ai_output_messages:
+        '{"choices": [{"message": {"content": "Hi there!"}}]}',
     };
 
     let llmWrapper: any;

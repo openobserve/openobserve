@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:p-3 tw:flex tw:flex-col tw:gap-3">
           <!-- Service name source banner -->
           <div
+            v-if="!serviceOptional"
             class="tw:rounded-lg tw:border tw:overflow-hidden tw:transition-all"
             :class="
               serviceNameDetected
@@ -289,6 +290,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-card-actions>
             </q-card>
           </q-dialog>
+
+          <!-- Service Optional toggle -->
+          <div data-test="service-identity-service-optional" class="tw:mb-3">
+            <q-toggle
+              data-test="service-identity-service-optional-btn"
+              v-model="serviceOptional"
+              :label="t('settings.correlation.serviceOptionalLabel')"
+              size="sm"
+              dense
+              class="tw:text-[13px] tw:font-semibold"
+            />
+            <div
+              class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-grey-5'
+                  : 'tw:text-grey-6'
+              "
+            >
+              {{ t("settings.correlation.serviceOptionalHelp") }}
+            </div>
+          </div>
 
           <!-- Disambiguation Fields -->
           <div>
@@ -1643,6 +1666,7 @@ import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TagInput from "@/components/alerts/TagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { Plus } from "lucide-vue-next";
 import type {
@@ -1793,6 +1817,9 @@ const currentIdentityConfig = ref<ServiceIdentityConfig | null>(null);
 
 /** Tracked alias group IDs — limits which groups are written to discovered service records */
 const trackedAliasIds = ref<string[]>([]);
+
+/** When true, correlation matches streams without requiring the `service` dimension */
+const serviceOptional = ref<boolean>(false);
 
 // Computed value for the right pane based on selected stream
 const activeStreamValues = computed(() => {
@@ -3057,10 +3084,13 @@ const DEFAULT_TRACKED_OPTIONS = [
 const trackedAliasOptions = computed(() => {
   const groups = availableGroups.value;
   if (groups.length > 0) {
-    return groups.map((g: FoundGroup) => ({
-      label: g.display,
-      value: g.group_id,
-    }));
+    // Backend rejects "service" — it is always tracked implicitly
+    return groups
+      .filter((g: FoundGroup) => g.group_id !== "service")
+      .map((g: FoundGroup) => ({
+        label: g.display,
+        value: g.group_id,
+      }));
   }
   return DEFAULT_TRACKED_OPTIONS;
 });
@@ -3564,6 +3594,9 @@ const isDirty = computed(() => {
   if (savedTracked.length !== currentTracked.length) return true;
   if (savedTracked.some((id, i) => id !== currentTracked[i])) return true;
 
+  // Compare service_optional flag
+  if ((saved?.service_optional ?? false) !== serviceOptional.value) return true;
+
   // Compare setDistinguishBy against saved sets
   const savedSets: Record<string, string[]> = {};
   for (const set of saved?.sets ?? []) {
@@ -3633,6 +3666,10 @@ async function loadData() {
     // Populate tracked alias IDs from loaded config
     trackedAliasIds.value =
       currentIdentityConfig.value?.tracked_alias_ids ?? [];
+
+    // Populate service_optional flag from loaded config (defaults to false)
+    serviceOptional.value =
+      currentIdentityConfig.value?.service_optional ?? false;
 
     // 3. Initial suggestion for active env if no config exists for it
     // Guard: skip if activeEnvironment is the placeholder "all" key (set before real config loads)
@@ -3720,15 +3757,31 @@ async function saveConfig() {
       return;
     }
 
+    // "service" is always tracked implicitly by the backend; strip it to avoid 400.
+    // Also drop orphan ids that no longer correspond to any known group (e.g. the
+    // group was deleted from Field Mappings after being added to tracked aliases).
+    const knownGroupIds = new Set([
+      ...availableGroups.value.map(g => g.group_id),
+      ...trackedAliasOptions.value.map(o => o.value),
+    ]);
+    const sanitizedTrackedAliasIds = trackedAliasIds.value.filter(id =>
+      id !== "service" && knownGroupIds.has(id)
+    );
     const payload: ServiceIdentityConfig = {
       sets,
-      tracked_alias_ids: trackedAliasIds.value,
+      tracked_alias_ids: sanitizedTrackedAliasIds,
+      service_optional: serviceOptional.value,
     };
 
     await serviceStreamsService.saveIdentityConfig(
       props.orgIdentifier,
       payload,
     );
+
+    // Invalidate the shared identity-config cache so other parts of the app
+    // (logs/traces correlation) pick up the new config immediately instead of
+    // waiting up to 5 minutes for the TTL to expire.
+    clearIdentityConfigCache(props.orgIdentifier);
 
     // Sync baseline so isDirty resets to false
     currentIdentityConfig.value = payload;
