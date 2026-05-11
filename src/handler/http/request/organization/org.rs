@@ -223,7 +223,7 @@ pub async fn all_organizations(
         let org_storage_enabled =
             crate::service::db::org_storage_providers::get_for_org(&org.identifier)
                 .await
-                .unwrap_org_default()
+                .unwrap_or_default()
                 .is_some();
         let org = AllOrgListDetails {
             id,

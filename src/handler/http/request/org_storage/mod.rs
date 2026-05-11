@@ -229,17 +229,16 @@ pub async fn update(Path(org_id): Path<String>, Json(req): Json<SetupStorageRequ
         }
     }
 
-    let mut existing =
-        match crate::service::org_storage_providers::get_redacted_config(&org_id).await {
-            Ok(Some(v)) => v,
-            Ok(None) => {
-                return HttpResponse::bad_request("org level storage is not set, cannot edit it");
-            }
-            Err(e) => {
-                log::info!("error in getting redacted storage config for org : {org_id}");
-                return HttpResponse::internal_error(e);
-            }
-        };
+    let mut existing = match crate::service::db::org_storage_providers::get_for_org(&org_id).await {
+        Ok(Some(v)) => v,
+        Ok(None) => {
+            return HttpResponse::bad_request("org level storage is not set, cannot edit it");
+        }
+        Err(e) => {
+            log::info!("error in getting redacted storage config for org : {org_id}");
+            return HttpResponse::internal_error(e);
+        }
+    };
 
     if existing.provider_type != req.provider {
         return HttpResponse::bad_request("cannot change provider type after initial setup");
