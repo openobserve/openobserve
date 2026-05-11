@@ -62,7 +62,12 @@ const passthroughProps = computed(() => {
         <OCheckbox
           v-bind="{ ...$attrs, ...passthroughProps }"
           :model-value="field.state.value"
-          @update:model-value="field.handleChange"
+          @update:model-value="
+            (v: CheckboxModelValue) => {
+              field.handleChange(v);
+              field.handleBlur();
+            }
+          "
         >
           <template v-if="$slots.label" #label>
             <slot name="label" />

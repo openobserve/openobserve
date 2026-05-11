@@ -60,7 +60,12 @@ const passthroughProps = computed(() => {
         <OSwitch
           v-bind="{ ...$attrs, ...passthroughProps }"
           :model-value="field.state.value"
-          @update:model-value="field.handleChange"
+          @update:model-value="
+            (v: SwitchValue) => {
+              field.handleChange(v);
+              field.handleBlur();
+            }
+          "
         >
           <template v-if="$slots.label" #label>
             <slot name="label" />
