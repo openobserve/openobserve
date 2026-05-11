@@ -131,6 +131,14 @@
     --color-checkbox-disabled-bg: var(--color-surface-subtle);
     --color-checkbox-disabled-border: var(--color-border-default);
 
+    /* Radio (ORadio) */
+    --color-radio-bg: var(--color-surface-panel);
+    --color-radio-border: var(--color-border-strong);
+    --color-radio-checked-border: var(--color-primary-500);
+    --color-radio-checked-dot: var(--color-primary-500);
+    --color-radio-disabled-bg: var(--color-surface-subtle);
+    --color-radio-disabled-border: var(--color-border-default);
+
     /* Dialog */
     --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
     --color-dialog-bg: var(--color-grey-900);

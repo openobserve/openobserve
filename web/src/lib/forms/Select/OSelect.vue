@@ -29,6 +29,7 @@ import {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "reka-ui";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   computed,
   onBeforeUnmount,
@@ -109,8 +110,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   const rawLabel = option[props.labelKey];
 
   // Group header: items with header:true or isTab:true are non-selectable labels
-  const isHeader =
-    Boolean(option["header"]) || Boolean(option["isTab"]);
+  const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
     return {
       label:
@@ -322,6 +322,20 @@ onBeforeUnmount(() => {
   if (filterDebounceTimer.value) clearTimeout(filterDebounceTimer.value);
 });
 
+// ── Virtual scroll (listbox mode) ─────────────────────────────────────────
+// Items are virtualised whenever the listbox has more than 50 entries, keeping
+// DOM nodes minimal even for 20 000+ option datasets.
+const listboxScrollEl = ref<HTMLElement | null>(null);
+
+const virtualizer = useVirtualizer(
+  computed(() => ({
+    count: filteredOptions.value.length,
+    getScrollElement: () => listboxScrollEl.value,
+    estimateSize: () => 36,
+    overscan: 8,
+  })),
+);
+
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "tw:h-8 tw:text-sm",
   md: "tw:h-10 tw:text-sm",
@@ -379,56 +393,56 @@ const fieldWidthClass = computed(() => {
               heightClasses[size ?? 'md'],
             ]"
           >
-              <slot name="trigger" :value="modelValue">
-                <template v-if="multiple && selectedLabels.length > 0">
-                  <div
-                    class="tw:flex-1 tw:flex tw:flex-wrap tw:gap-1 tw:py-1 tw:pe-2"
+            <slot name="trigger" :value="modelValue">
+              <template v-if="multiple && selectedLabels.length > 0">
+                <div
+                  class="tw:flex-1 tw:flex tw:flex-wrap tw:gap-1 tw:py-1 tw:pe-2"
+                >
+                  <slot
+                    v-for="(labelText, idx) in selectedLabels"
+                    name="chip"
+                    :label="labelText"
+                    :value="selectedValues[idx]"
                   >
-                    <slot
-                      v-for="(labelText, idx) in selectedLabels"
-                      name="chip"
-                      :label="labelText"
-                      :value="selectedValues[idx]"
+                    <span
+                      :key="labelText"
+                      class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text"
                     >
-                      <span
-                        :key="labelText"
-                        class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text"
-                      >
-                        {{ labelText }}
-                      </span>
-                    </slot>
-                  </div>
-                </template>
-                <span
-                  v-else
-                  :class="[
-                    'tw:flex-1 tw:text-start tw:truncate',
-                    hasSelection
-                      ? 'tw:text-select-text'
-                      : 'tw:text-select-placeholder',
-                  ]"
-                >
-                  {{ hasSelection ? triggerDisplayLabel : placeholder }}
-                </span>
-              </slot>
-
+                      {{ labelText }}
+                    </span>
+                  </slot>
+                </div>
+              </template>
               <span
-                aria-hidden="true"
-                class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:pe-2 tw:text-select-icon"
+                v-else
+                :class="[
+                  'tw:flex-1 tw:text-start tw:truncate',
+                  hasSelection
+                    ? 'tw:text-select-text'
+                    : 'tw:text-select-placeholder',
+                ]"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                  class="tw:size-4"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M5.22 10.22a.75.75 0 0 1 1.06 0L8 11.94l1.72-1.72a.75.75 0 1 1 1.06 1.06l-2.25 2.25a.75.75 0 0 1-1.06 0l-2.25-2.25a.75.75 0 0 1 0-1.06ZM10.78 5.78a.75.75 0 0 1-1.06 0L8 4.06 6.28 5.78a.75.75 0 0 1-1.06-1.06l2.25-2.25a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1 0 1.06Z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
+                {{ hasSelection ? triggerDisplayLabel : placeholder }}
               </span>
+            </slot>
+
+            <span
+              aria-hidden="true"
+              class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:pe-2 tw:text-select-icon"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                class="tw:size-4"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M5.22 10.22a.75.75 0 0 1 1.06 0L8 11.94l1.72-1.72a.75.75 0 1 1 1.06 1.06l-2.25 2.25a.75.75 0 0 1-1.06 0l-2.25-2.25a.75.75 0 0 1 0-1.06ZM10.78 5.78a.75.75 0 0 1-1.06 0L8 4.06 6.28 5.78a.75.75 0 0 1-1.06-1.06l2.25-2.25a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1 0 1.06Z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </span>
           </PopoverTrigger>
 
           <button
@@ -485,7 +499,8 @@ const fieldWidthClass = computed(() => {
               :disabled="disabled"
               @update:model-value="handleListboxUpdate"
             >
-              <div class="tw:max-h-60 tw:overflow-auto">
+              <!-- Virtual scroll container -->
+              <div ref="listboxScrollEl" class="tw:max-h-60 tw:overflow-auto">
                 <div
                   v-if="filteredOptions.length === 0"
                   class="tw:px-3 tw:py-2 tw:text-sm tw:text-select-placeholder"
@@ -493,29 +508,47 @@ const fieldWidthClass = computed(() => {
                   <slot name="empty">No options found</slot>
                 </div>
 
-                <template v-if="filteredOptions.length > 0">
-                  <template v-for="opt in filteredOptions" :key="String(opt.value)">
-                    <!-- Group header — non-selectable label row -->
-                    <ListboxGroup v-if="opt.header">
+                <!-- Virtualised list — spacer div with absolutely positioned rows -->
+                <div
+                  v-if="filteredOptions.length > 0"
+                  :style="{
+                    height: `${virtualizer.getTotalSize()}px`,
+                    position: 'relative',
+                  }"
+                >
+                  <div
+                    v-for="vRow in virtualizer.getVirtualItems()"
+                    :key="vRow.key"
+                    :style="{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${vRow.size}px`,
+                      transform: `translateY(${vRow.start}px)`,
+                    }"
+                  >
+                    <!-- Group header -->
+                    <ListboxGroup v-if="filteredOptions[vRow.index].header">
                       <ListboxGroupLabel
                         :class="[
-                          'tw:flex tw:w-full tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
+                          'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
                           'tw:text-select-placeholder tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
-                          'tw:select-none tw:pointer-events-none tw:sticky tw:top-0',
+                          'tw:select-none tw:pointer-events-none',
                         ]"
                       >
-                        {{ opt.label }}
+                        {{ filteredOptions[vRow.index].label }}
                       </ListboxGroupLabel>
                     </ListboxGroup>
 
                     <!-- Regular item -->
                     <ListboxItem
                       v-else
-                      :value="String(opt.value)"
-                      :disabled="opt.disabled"
+                      :value="String(filteredOptions[vRow.index].value)"
+                      :disabled="filteredOptions[vRow.index].disabled"
                       :class="[
-                        'tw:relative tw:flex tw:items-center tw:w-full',
-                        'tw:ps-8 tw:pe-3 tw:py-1.5 tw:text-sm',
+                        'tw:relative tw:flex tw:items-center tw:w-full tw:h-full',
+                        'tw:ps-8 tw:pe-3 tw:text-sm',
                         'tw:text-select-item-text tw:rounded-sm',
                         'tw:cursor-pointer tw:select-none tw:outline-none',
                         'tw:transition-colors tw:duration-100',
@@ -541,10 +574,12 @@ const fieldWidthClass = computed(() => {
                           />
                         </svg>
                       </ListboxItemIndicator>
-                      <span class="tw:truncate">{{ opt.label }}</span>
+                      <span class="tw:truncate">{{
+                        filteredOptions[vRow.index].label
+                      }}</span>
                     </ListboxItem>
-                  </template>
-                </template>
+                  </div>
+                </div>
               </div>
             </ListboxRoot>
           </PopoverContent>
