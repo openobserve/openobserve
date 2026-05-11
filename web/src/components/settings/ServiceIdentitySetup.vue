@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Service name source banner -->
         <div
+          v-if="!serviceOptional"
           class="tw:rounded-lg tw:border tw:overflow-hidden tw:transition-all"
           :class="serviceNameDetected
             ? (store.state.theme === 'dark' ? 'tw:bg-sky-900/10 tw:border-sky-300/30' : 'tw:bg-sky-50/80 tw:border-sky-200')
@@ -203,6 +204,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-card-actions>
         </q-card>
       </q-dialog>
+
+      <!-- Service Optional toggle -->
+      <div data-test="service-identity-service-optional" class="tw:mb-3">
+        <q-toggle
+          data-test="service-identity-service-optional-btn"
+          v-model="serviceOptional"
+          :label="t('settings.correlation.serviceOptionalLabel')"
+          size="sm"
+          dense
+          class="tw:text-[13px] tw:font-semibold"
+        />
+        <div
+          class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
+          :class="
+            store.state.theme === 'dark'
+              ? 'tw:text-grey-5'
+              : 'tw:text-grey-6'
+          "
+        >
+          {{ t("settings.correlation.serviceOptionalHelp") }}
+        </div>
+      </div>
 
       <!-- Disambiguation Fields -->
       <div>
@@ -1001,6 +1024,7 @@ import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TagInput from "@/components/alerts/TagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import type {
   ServiceIdentityConfig,
   IdentitySet,
@@ -1146,6 +1170,9 @@ const currentIdentityConfig = ref<ServiceIdentityConfig | null>(null);
 
 /** Tracked alias group IDs — limits which groups are written to discovered service records */
 const trackedAliasIds = ref<string[]>([]);
+
+/** When true, correlation matches streams without requiring the `service` dimension */
+const serviceOptional = ref<boolean>(false);
 
 // Computed value for the right pane based on selected stream
 const activeStreamValues = computed(() => {
@@ -2678,6 +2705,9 @@ const isDirty = computed(() => {
   if (savedTracked.length !== currentTracked.length) return true;
   if (savedTracked.some((id, i) => id !== currentTracked[i])) return true;
 
+  // Compare service_optional flag
+  if ((saved?.service_optional ?? false) !== serviceOptional.value) return true;
+
   // Compare setDistinguishBy against saved sets
   const savedSets: Record<string, string[]> = {};
   for (const set of saved?.sets ?? []) {
@@ -2736,6 +2766,10 @@ async function loadData() {
 
     // Populate tracked alias IDs from loaded config
     trackedAliasIds.value = currentIdentityConfig.value?.tracked_alias_ids ?? [];
+
+    // Populate service_optional flag from loaded config (defaults to false)
+    serviceOptional.value =
+      currentIdentityConfig.value?.service_optional ?? false;
 
     // 3. Initial suggestion for active env if no config exists for it
     // Guard: skip if activeEnvironment is the placeholder "all" key (set before real config loads)
@@ -2822,9 +2856,18 @@ async function saveConfig() {
     const sanitizedTrackedAliasIds = trackedAliasIds.value.filter(id =>
       id !== "service" && knownGroupIds.has(id)
     );
-    const payload: ServiceIdentityConfig = { sets, tracked_alias_ids: sanitizedTrackedAliasIds };
+    const payload: ServiceIdentityConfig = {
+      sets,
+      tracked_alias_ids: sanitizedTrackedAliasIds,
+      service_optional: serviceOptional.value,
+    };
 
     await serviceStreamsService.saveIdentityConfig(props.orgIdentifier, payload);
+
+    // Invalidate the shared identity-config cache so other parts of the app
+    // (logs/traces correlation) pick up the new config immediately instead of
+    // waiting up to 5 minutes for the TTL to expire.
+    clearIdentityConfigCache(props.orgIdentifier);
 
     // Sync baseline so isDirty resets to false
     currentIdentityConfig.value = payload;

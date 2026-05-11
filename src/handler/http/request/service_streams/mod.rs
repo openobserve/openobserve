@@ -201,7 +201,7 @@ pub async fn correlate_streams(
             identity_config.tracked_alias_ids
         );
         let semantic_groups =
-            o2_enterprise::enterprise::common::semantic_config::load_defaults_from_file();
+            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
 
         // Enhanced debug logging for correlation troubleshooting
         log::debug!(

@@ -497,15 +497,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               mode="embedded"
               :trace-id-prop="extractedTraceId || ''"
               :stream-name-prop="
-                traceStreams && traceStreams[0]
-                  ? traceStreams[0].stream_name
+                sortedTraceStreams[0]
+                  ? sortedTraceStreams[0].stream_name
                   : ''
               "
               :span-list-prop="traceSpanList"
               :start-time-prop="computedTraceStartTime"
               :end-time-prop="computedTraceEndTime"
               :correlated-log-stream="
-                logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+                sortedLogStreams[0] ? sortedLogStreams[0].stream_name : ''
               "
               :show-back-button="false"
               :show-timeline="false"
@@ -1007,13 +1007,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             mode="embedded"
             :trace-id-prop="extractedTraceId || ''"
             :stream-name-prop="
-              traceStreams && traceStreams[0] ? traceStreams[0].stream_name : ''
+              sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''
             "
             :span-list-prop="traceSpanList"
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
             :correlated-log-stream="
-              logStreams && logStreams[0] ? logStreams[0].stream_name : ''
+              sortedLogStreams[0] ? sortedLogStreams[0].stream_name : ''
             "
             :show-back-button="false"
             :show-timeline="false"
@@ -1271,6 +1271,10 @@ import {
   DEFAULT_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
 import type { StreamInfo } from "@/services/service_streams";
+import {
+  enrichStreamsWithOverlap,
+  sortStreamsByOverlap,
+} from "@/utils/streamTimeOverlap";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
@@ -1341,6 +1345,40 @@ const groupDefs = computed(
   () => props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS,
 );
 const groupIds = computed(() => groupDefs.value.map((g) => g.id));
+
+// Sort related streams so those with confirmed data overlap in props.timeRange
+// come first; streams without overlap (or missing stats) sink to the bottom.
+// Source: stream stats (doc_time_min/doc_time_max) cached in the streams store.
+const sortedMetricStreams = computed<StreamInfo[]>(() =>
+  sortStreamsByOverlap(
+    enrichStreamsWithOverlap(
+      props.metricStreams ?? [],
+      "metrics",
+      props.timeRange,
+      store.state.streams,
+    ),
+  ),
+);
+const sortedLogStreams = computed<StreamInfo[]>(() =>
+  sortStreamsByOverlap(
+    enrichStreamsWithOverlap(
+      props.logStreams ?? [],
+      "logs",
+      props.timeRange,
+      store.state.streams,
+    ),
+  ),
+);
+const sortedTraceStreams = computed<StreamInfo[]>(() =>
+  sortStreamsByOverlap(
+    enrichStreamsWithOverlap(
+      props.traceStreams ?? [],
+      "traces",
+      props.timeRange,
+      store.state.streams,
+    ),
+  ),
+);
 
 // Check if embedded tabs mode
 const isEmbeddedTabs = computed(() => props.mode === "embedded-tabs");
@@ -1597,7 +1635,7 @@ const applyUnstableDimensionDefaults = (
 };
 
 const uniqueMetricStreams = computed(() => {
-  return getUniqueStreams(props.metricStreams);
+  return getUniqueStreams(sortedMetricStreams.value);
 });
 
 // Selected metric streams — prefer curated defaults from group definitions,
@@ -1606,7 +1644,7 @@ const uniqueMetricStreams = computed(() => {
 const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
     (() => {
-      const unique = getUniqueStreams(props.metricStreams);
+      const unique = getUniqueStreams(sortedMetricStreams.value);
       const defs =
         props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
       const defaults = getDefaultMetricSelections(defs, unique);
@@ -1950,8 +1988,8 @@ const loadDashboard = async () => {
       serviceName: props.serviceName,
       matchedDimensions: activeDimensions.value,
       metricStreams: selectedMetricStreams.value,
-      logStreams: props.logStreams,
-      traceStreams: props.traceStreams,
+      logStreams: sortedLogStreams.value,
+      traceStreams: sortedTraceStreams.value,
       orgIdentifier: currentOrgIdentifier.value,
       timeRange: props.timeRange,
       sourceStream: props.sourceStream,
@@ -2053,8 +2091,8 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         serviceName: props.serviceName,
         matchedDimensions: activeDimensions.value,
         metricStreams: streamsNeedingGeneration,
-        logStreams: props.logStreams,
-        traceStreams: props.traceStreams,
+        logStreams: sortedLogStreams.value,
+        traceStreams: sortedTraceStreams.value,
         orgIdentifier: currentOrgIdentifier.value,
         timeRange: props.timeRange,
         sourceStream: props.sourceStream,
@@ -2124,8 +2162,8 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       serviceName: props.serviceName,
       matchedDimensions: activeDimensions.value,
       metricStreams: selectedMetricStreams.value,
-      logStreams: props.logStreams,
-      traceStreams: props.traceStreams,
+      logStreams: sortedLogStreams.value,
+      traceStreams: sortedTraceStreams.value,
       orgIdentifier: currentOrgIdentifier.value,
       timeRange: props.timeRange,
       sourceStream: props.sourceStream,
@@ -2487,11 +2525,11 @@ const isValidTraceId = (value: string): boolean => {
  * Fetch full trace details (all spans) for a specific trace_id
  */
 const fetchTraceByTraceId = async (traceId: string) => {
-  if (!props.traceStreams?.length) {
+  if (!sortedTraceStreams.value.length) {
     return null;
   }
 
-  const streamName = props.traceStreams[0].stream_name;
+  const streamName = sortedTraceStreams.value[0].stream_name;
 
   // Use a wider time range when searching by specific trace_id
   // Since we have an exact trace_id, we can search across a larger window (24 hours before to now)
@@ -2555,11 +2593,11 @@ const fetchTraceByTraceId = async (traceId: string) => {
  * Fetch traces via dimension-based correlation using HTTP streaming (/latest_stream)
  */
 const fetchTracesByDimensions = (): Promise<any[]> => {
-  if (!props.traceStreams?.length) {
+  if (!sortedTraceStreams.value.length) {
     return Promise.resolve([]);
   }
 
-  const traceStreamInfo = props.traceStreams[0];
+  const traceStreamInfo = sortedTraceStreams.value[0];
   const streamName = traceStreamInfo.stream_name;
 
   const filterParts: string[] = [];
@@ -2638,8 +2676,8 @@ const openTraceInNewWindow = (trace) => {
   if (!targetTraceId) return;
 
   const org = store.state.selectedOrganization.identifier;
-  const traceStream = props.traceStreams?.[0]?.stream_name || "default";
-  const logStream = props.logStreams?.[0]?.stream_name;
+  const traceStream = sortedTraceStreams.value[0]?.stream_name || "default";
+  const logStream = sortedLogStreams.value[0]?.stream_name;
 
   const queryParams: any = {
     stream: traceStream,
@@ -2672,11 +2710,11 @@ const openTraceInNewWindow = (trace) => {
  */
 const openTracesPage = () => {
   const org = store.state.selectedOrganization.identifier;
-  const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+  const traceStream = sortedTraceStreams.value[0]?.stream_name || "default";
 
   // Build filter query using all filters from trace stream
   const filterParts: string[] = [];
-  const traceStreamInfo = props.traceStreams?.[0];
+  const traceStreamInfo = sortedTraceStreams.value[0];
 
   if (traceStreamInfo?.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
