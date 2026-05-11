@@ -126,25 +126,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </draggable>
     </div>
 
-    <ODrawer
+    <AddTab
       v-model:open="showAddTabDialog"
-      size="md"
-      :show-close="false"
+      :edit-mode="isTabEditMode"
+      :tabId="selectedTabIdToEdit"
+      :dashboard-id="currentDashboardData.data.dashboardId"
       data-test="dashboard-tab-settings-add-tab-dialog"
-      :secondary-button-label="t('dashboard.cancel')"
-      :primary-button-label="t('dashboard.save')"
-      @click:secondary="showAddTabDialog = false"
-      @click:primary="addTabRef?.submit()"
-    >
-      <AddTab
-        ref="addTabRef"
-        :edit-mode="isTabEditMode"
-        :tabId="selectedTabIdToEdit"
-        :dashboard-id="currentDashboardData.data.dashboardId"
-        @refresh="refreshRequired"
-        @close="showAddTabDialog = false"
-      />
-    </ODrawer>
+      @refresh="refreshRequired"
+    />
     <!-- delete tab dialog -->
     <TabsDeletePopUp
       v-model="deletePopupVisible"
@@ -173,7 +162,6 @@ import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import { updateDashboard } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -183,7 +171,6 @@ export default defineComponent({
     AddTab,
     TabsDeletePopUp,
     OButton,
-    ODrawer,
   },
   emits: ["refresh"],
   setup(props, { emit }) {
@@ -191,7 +178,6 @@ export default defineComponent({
     const route = useRoute();
 
     const showAddTabDialog = ref(false);
-    const addTabRef: any = ref(null);
     const isTabEditMode = ref(false);
     const selectedTabIdToEdit: any = ref("");
 
@@ -388,7 +374,6 @@ export default defineComponent({
       outlinedDelete,
       addNewItem,
       showAddTabDialog,
-      addTabRef,
       isTabEditMode,
       selectedTabIdToEdit,
       currentDashboardData,
