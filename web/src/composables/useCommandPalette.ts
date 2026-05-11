@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /* global localStorage */
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import useAutoNavigation from "@/composables/useAutoNavigation";
 
 export interface PaletteItem {
   name: string;
@@ -26,16 +27,31 @@ export interface PaletteItem {
   icon: string;
   section: string;
   keywords: string[];
+  type: "page" | "entity" | "command" | "ai_action";
+  prompt?: string;
+}
+
+export interface SlashCommand {
+  pattern: string;
+  label: string;
+  description: string;
+  icon: string;
+  section: string;
 }
 
 const STORAGE_KEY = "o2_recent_pages";
+const DEBOUNCE_MS = 250;
 
-/**
- * Score a page item against a query string.
- * Returns 0 when the item should be excluded from results.
- * Scoring is locale-agnostic: `title` is already the localised string,
- * and `keywords` contains both English terms and localised tab labels.
- */
+const SLASH_COMMANDS: SlashCommand[] = [
+  {
+    pattern: "/ai",
+    label: "AI Assistant",
+    description: "Ask the AI assistant anything",
+    icon: "psychology",
+    section: "AI Actions",
+  },
+];
+
 function scoreItem(item: PaletteItem, query: string): number {
   const q = query.toLowerCase().trim();
   if (!q) return 0;
@@ -56,6 +72,27 @@ function scoreItem(item: PaletteItem, query: string): number {
   return score;
 }
 
+function isSlashQuery(q: string): boolean {
+  return q.trim().startsWith("/");
+}
+
+function detectSlashCommand(q: string): SlashCommand | null {
+  const trimmed = q.trim().toLowerCase();
+  for (const cmd of SLASH_COMMANDS) {
+    if (trimmed === cmd.pattern || trimmed.startsWith(cmd.pattern + " ")) {
+      return cmd;
+    }
+  }
+  return null;
+}
+
+function extractAiPrompt(q: string): string {
+  const match = q.trim().match(/^\/ai\s+(.+)/);
+  return match ? match[1].trim() : "";
+}
+
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 const useCommandPalette = () => {
   const store = useStore();
   const router = useRouter();
@@ -63,59 +100,34 @@ const useCommandPalette = () => {
 
   const query = ref("");
   const activeIndex = ref(0);
+  const isSearching = ref(false);
+  const entityResults = ref<PaletteItem[]>([]);
+  const aiPrompt = ref("");
 
   // ─── Page index ────────────────────────────────────────────────────────────
 
-  /**
-   * Build the searchable page index from registered routes.
-   * Only routes with `meta.searchable === true` are included.
-   *
-   * Multi-language support
-   * ─────────────────────
-   * Route meta can carry two optional i18n fields:
-   *
-   *   titleKey?: string
-   *     An i18n key whose translation becomes the page title shown in the
-   *     palette AND searched against.  When the user switches to Chinese the
-   *     computed re-runs automatically (locale is a dependency) and every
-   *     title updates — no manual translation work required.
-   *     Example:  titleKey: "menu.search"  →  "Logs" / "日志" / "Journaux" …
-   *
-   *   keywordKeys?: string[]
-   *     Array of i18n keys for tab labels or section names that live on the
-   *     page.  They are resolved to the current locale and appended to the
-   *     static English `keywords` array so users can search in their language.
-   *     Example:  keywordKeys: ["alerts.scheduled", "alerts.realTime"]
-   *               → adds "Scheduled"/"轮询" and "Realtime"/"实时" as keywords.
-   */
   const pageIndex = computed<PaletteItem[]>(() => {
     const org = store.state.selectedOrganization?.identifier ?? "default";
     const routes = router.getRoutes();
     const items: PaletteItem[] = [];
 
-    // Reading locale.value makes this computed reactive to locale changes.
     void locale.value;
 
     for (const route of routes) {
       if (!route.meta?.searchable) continue;
 
-      // Replace :org_identifier param with current org when present
       const path = route.path.includes(":org_identifier")
         ? route.path.replace(":org_identifier", org)
         : route.path;
 
-      // Prefer the i18n-translated title; fall back to the static string.
       const title = route.meta.titleKey
         ? t(String(route.meta.titleKey))
         : String(route.meta.title ?? route.name ?? "");
 
-      // Resolve keywordKeys to localized strings (tab labels, section names).
       const localizedKwds = Array.isArray(route.meta.keywordKeys)
         ? (route.meta.keywordKeys as string[]).map((k) => t(k))
         : [];
 
-      // Merge static English keywords with localised keyword-key resolutions.
-      // Deduplication is intentionally omitted — minor overhead, simpler code.
       const keywords = [
         ...(Array.isArray(route.meta.keywords)
           ? (route.meta.keywords as string[])
@@ -130,10 +142,26 @@ const useCommandPalette = () => {
         icon: String(route.meta.icon ?? "circle"),
         section: String(route.meta.section ?? ""),
         keywords,
+        type: "page" as const,
       });
     }
 
     return items;
+  });
+
+  // ─── Slash command items ───────────────────────────────────────────────────
+
+  const slashCommandItems = computed<PaletteItem[]>(() => {
+    return SLASH_COMMANDS.map((cmd) => ({
+      name: cmd.pattern,
+      path: "",
+      title: cmd.label,
+      icon: cmd.icon,
+      section: cmd.section,
+      keywords: [cmd.description, cmd.pattern],
+      type: "command" as const,
+      prompt: "",
+    }));
   });
 
   // ─── Recents ───────────────────────────────────────────────────────────────
@@ -145,17 +173,15 @@ const useCommandPalette = () => {
       const recents: { name: string; path: string; title: string }[] =
         JSON.parse(stored);
       return recents.map((r) => {
-        // Enrich from page index when possible (picks up localised title too)
         const match = pageIndex.value.find((p) => p.name === r.name);
         return {
           name: r.name,
           path: r.path,
-          // Show the current-locale title when the page is indexed; fall back
-          // to the stored English title for pages that were removed from index.
           title: match?.title ?? r.title,
           icon: match?.icon ?? "history",
           section: match?.section ?? "",
           keywords: match?.keywords ?? [],
+          type: "page" as const,
         };
       });
     } catch {
@@ -176,15 +202,21 @@ const useCommandPalette = () => {
       .map(({ item }) => item);
   });
 
+  const filteredCommands = computed<PaletteItem[]>(() => {
+    const q = query.value.trim().toLowerCase();
+    if (!q || !q.startsWith("/")) return [];
+    return slashCommandItems.value.filter(
+      (cmd) =>
+        cmd.name.startsWith(q) || cmd.keywords.some((k) => k.toLowerCase().includes(q)),
+    );
+  });
+
   const TOP_PAGES_COUNT = 10;
 
-  /**
-   * Items currently visible in the palette.
-   * When query is empty → show recents first, then fill up to TOP_PAGES_COUNT with top pages.
-   * When query is non-empty → show filtered page results.
-   */
   const visibleItems = computed<PaletteItem[]>(() => {
     const q = query.value.trim();
+
+    // Default view: recents + top pages
     if (!q) {
       const recents = recentPages.value;
       const recentNames = new Set(recents.map((r) => r.name));
@@ -193,16 +225,151 @@ const useCommandPalette = () => {
         .slice(0, Math.max(0, TOP_PAGES_COUNT - recents.length));
       return [...recents, ...topPages].slice(0, TOP_PAGES_COUNT);
     }
-    return filteredPages.value;
+
+    // Slash command mode: show matching commands
+    if (isSlashQuery(q)) {
+      const slashCmd = detectSlashCommand(q);
+      if (slashCmd && extractAiPrompt(q)) {
+        // /ai with prompt — show the AI action item
+        return [
+          {
+            name: "/ai",
+            path: "",
+            title: `Ask AI: "${extractAiPrompt(q)}"`,
+            icon: "psychology",
+            section: "AI Actions",
+            keywords: [],
+            type: "ai_action" as const,
+            prompt: extractAiPrompt(q),
+          },
+        ];
+      }
+      // Just "/" or "/ai" — show matching commands
+      return filteredCommands.value;
+    }
+
+    // Normal search: pages + entities (if any)
+    const pages = filteredPages.value;
+    const entities = entityResults.value.filter(
+      (e) =>
+        e.title.toLowerCase().includes(q.toLowerCase()) ||
+        e.keywords.some((k) => k.toLowerCase().includes(q.toLowerCase())),
+    );
+    return [...pages, ...entities];
   });
 
   const hasResults = computed(() => visibleItems.value.length > 0);
 
-  /**
-   * Whether we are in the "empty query, default view" mode.
-   * Used by the UI to render RECENTS + PAGES section labels.
-   */
   const isDefaultView = computed(() => !query.value.trim());
+
+  const activeSlashCommand = computed(() => {
+    return isSlashQuery(query.value) ? detectSlashCommand(query.value) : null;
+  });
+
+  // ─── Grouped results for rendering ─────────────────────────────────────────
+
+  interface ResultGroup {
+    label: string;
+    items: PaletteItem[];
+  }
+
+  const groupedResults = computed<ResultGroup[]>(() => {
+    const items = visibleItems.value;
+    if (!items.length) return [];
+
+    const q = query.value.trim();
+    if (!q) {
+      // Default view: group recents + top pages
+      const groups: ResultGroup[] = [];
+      const recents = items.filter(
+        (i) => recentPages.value.some((r) => r.name === i.name),
+      );
+      const pages = items.filter(
+        (i) => !recentPages.value.some((r) => r.name === i.name),
+      );
+      if (recents.length) groups.push({ label: "Recents", items: recents });
+      if (pages.length) groups.push({ label: "Pages", items: pages });
+      return groups;
+    }
+
+    if (isSlashQuery(q)) {
+      return [{ label: "Commands", items }];
+    }
+
+    // Group by section
+    const map = new Map<string, PaletteItem[]>();
+    for (const item of items) {
+      const section = item.section || "Results";
+      if (!map.has(section)) map.set(section, []);
+      map.get(section)!.push(item);
+    }
+    return Array.from(map.entries()).map(([label, groupItems]) => ({
+      label,
+      items: groupItems,
+    }));
+  });
+
+  // ─── Dynamic entity search (debounced) ─────────────────────────────────────
+
+  async function fetchEntitySearch(q: string) {
+    if (!q || q.length < 2) {
+      entityResults.value = [];
+      return;
+    }
+
+    isSearching.value = true;
+    try {
+      const org = store.state.selectedOrganization?.identifier ?? "default";
+      // Backend API integration point — uses existing stream nameList endpoint.
+      // Replace with unified entity search API when available.
+      const streamService = (await import("@/services/stream")).default;
+      const res = await streamService.nameList(
+        org,
+        undefined,
+        true,
+        0,
+        10,
+        q,
+        undefined,
+        undefined,
+      );
+      const streams = res?.data?.list ?? [];
+      entityResults.value = streams.map((s: any) => ({
+        name: `stream-${s.name}`,
+        path: `/${org}/logs?stream=${encodeURIComponent(s.name)}`,
+        title: s.name,
+        icon: s.stream_type === "metrics" ? "query_stats" : s.stream_type === "traces" ? "timeline" : "article",
+        section: "Streams",
+        keywords: [s.name, s.stream_type ?? "logs"],
+        type: "entity" as const,
+      }));
+    } catch {
+      entityResults.value = [];
+    } finally {
+      isSearching.value = false;
+    }
+  }
+
+  function triggerEntitySearch(q: string) {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      fetchEntitySearch(q);
+    }, DEBOUNCE_MS);
+  }
+
+  // Watch query for entity search
+  watch(
+    () => query.value,
+    (newVal) => {
+      const q = newVal.trim();
+      if (!isSlashQuery(q) && q.length >= 2) {
+        triggerEntitySearch(q);
+      } else {
+        entityResults.value = [];
+        isSearching.value = false;
+      }
+    },
+  );
 
   // ─── Keyboard navigation ──────────────────────────────────────────────────
 
@@ -223,10 +390,28 @@ const useCommandPalette = () => {
 
   // ─── Navigation ───────────────────────────────────────────────────────────
 
+  const { navigate } = useAutoNavigation();
+
   function navigateTo(item: PaletteItem) {
-    const org = store.state.selectedOrganization?.identifier ?? "default";
+    // AI action: emit prompt and close
+    if (item.type === "ai_action" && item.prompt) {
+      aiPrompt.value = item.prompt;
+      store.dispatch("commandPalette/close");
+      window.dispatchEvent(
+        new CustomEvent("o2:ai-prompt", { detail: { prompt: item.prompt } }),
+      );
+      return;
+    }
+
+    // Slash command without prompt — fill the query for further input
+    if (item.type === "command") {
+      query.value = item.name + " ";
+      return;
+    }
+
+    // Page or entity navigation — uses shared AutoNavigation
     store.dispatch("commandPalette/close");
-    router.push({ path: item.path, query: { org_identifier: org } });
+    navigate({ path: item.path });
   }
 
   function navigateSelected() {
@@ -238,6 +423,8 @@ const useCommandPalette = () => {
 
   function open() {
     query.value = "";
+    aiPrompt.value = "";
+    entityResults.value = [];
     resetActiveIndex();
     store.dispatch("commandPalette/open");
   }
@@ -255,9 +442,14 @@ const useCommandPalette = () => {
     recentPages,
     filteredPages,
     visibleItems,
+    groupedResults,
     hasResults,
     isDefaultView,
     isOpen,
+    isSearching,
+    entityResults,
+    aiPrompt,
+    activeSlashCommand,
     open,
     close,
     moveUp,
@@ -265,10 +457,12 @@ const useCommandPalette = () => {
     resetActiveIndex,
     navigateTo,
     navigateSelected,
-    // Exposed for testing
     scoreItem,
+    detectSlashCommand,
+    extractAiPrompt,
   };
 };
 
-export { scoreItem };
+export { scoreItem, detectSlashCommand, extractAiPrompt, SLASH_COMMANDS };
+export type { SlashCommand };
 export default useCommandPalette;
