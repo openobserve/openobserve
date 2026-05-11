@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Show search controls only when not on Service Graph or Services Catalog -->
+        <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&

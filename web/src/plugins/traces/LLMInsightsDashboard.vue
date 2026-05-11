@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         data-test="llm-insights-retry-btn"
-        @click="load()"
+        @click="loadInsights()"
       >
         Retry
       </OButton>
@@ -188,10 +188,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useLLMInsights } from "./composables/useLLMInsights";
+import {
+  computeTrend,
+  trendArrow,
+  splitNumberWithUnit,
+  splitDuration,
+  splitCost,
+  type KpiTrend,
+} from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
 import LLMTrendPanel from "./LLMTrendPanel.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
@@ -221,6 +229,7 @@ const {
   loading,
   error,
   fetchAll,
+  cancelAll,
   hasLoadedOnce,
   availableStreams,
   streamsLoaded,
@@ -279,15 +288,6 @@ const streamHasNoLLMFields = computed(() => {
   return /No field named\s+gen_ai_/i.test(msg);
 });
 
-import {
-  computeTrend,
-  trendArrow,
-  splitNumberWithUnit,
-  splitDuration,
-  splitCost,
-  type KpiTrend,
-} from "./llmInsightsDashboard.utils";
-
 interface KpiCard {
   label: string;
   value: string;
@@ -311,9 +311,9 @@ const kpiCards = computed<KpiCard[]>(() => {
       ? (kpiPrev.value.errorCount / kpiPrev.value.requestCount) * 100
       : 0;
 
-  // Cost comes straight from SUM(llm_usage_cost_total) on the KPI summary —
-  // same source the Traces tab uses. If it's 0, either there are no LLM spans
-  // or the SDK isn't emitting cost; either way we render "$0".
+  // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary.
+  // If it's 0, either there are no LLM spans in the window or the SDK
+  // isn't emitting cost; either way we render "$0".
   const costTrend = computeTrend(
     kpi.value.totalCost,
     kpiPrev.value.totalCost,
@@ -372,7 +372,7 @@ const kpiCards = computed<KpiCard[]>(() => {
 // Single fetch entry point. Always pulls from the current props (which the
 // parent keeps in sync via `recomputeInsightsTimeRange`). Stream selector
 // changes, refresh button, and onMounted all funnel through here.
-async function load(startTime?: number, endTime?: number) {
+async function loadInsights(startTime?: number, endTime?: number) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!activeStream.value || !start || !end) return;
@@ -381,14 +381,14 @@ async function load(startTime?: number, endTime?: number) {
 }
 
 function onStreamChange() {
-  load();
+  loadInsights();
 }
 
 // Parent calls this on Run Query / Refresh / date-range change, passing
 // the freshly computed start/end so we don't have to wait for Vue's
 // next-tick prop propagation.
 async function refresh(startTime?: number, endTime?: number) {
-  await load(startTime, endTime);
+  await loadInsights(startTime, endTime);
 }
 
 defineExpose({ refresh });
@@ -400,8 +400,16 @@ onMounted(async () => {
     activeStream.value = availableStreams.value[0] || "";
   }
   if (activeStream.value) {
-    load();
+    loadInsights();
   }
+});
+
+// Cancel any in-flight stream queries when the dashboard goes away
+// (tab switch, org switch, full page nav). Without this, the server
+// keeps streaming results to a component that's no longer there and
+// the user pays for work they don't see.
+onUnmounted(() => {
+  cancelAll();
 });
 </script>
 
