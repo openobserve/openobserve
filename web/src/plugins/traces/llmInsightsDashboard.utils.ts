@@ -134,6 +134,33 @@ export function splitDuration(micros: number): {
 }
 
 /**
+ * Format a window duration (microseconds) as a short relative label
+ * for the KPI trend chip — `"15m"`, `"12h"`, `"3d"`, etc. Used to
+ * tell the user *what* "prev" refers to (so the chip reads
+ * "▲ 100% vs prev 12h" instead of an ambiguous "▲ 100% vs prev").
+ *
+ * Boundaries are inclusive on the right so a 60-second window reads
+ * as "1m", not "60s".
+ *
+ * @example formatWindowLabel(30 * 1_000_000)            // "30s"
+ * @example formatWindowLabel(15 * 60 * 1_000_000)       // "15m"
+ * @example formatWindowLabel(12 * 60 * 60 * 1_000_000)  // "12h"
+ * @example formatWindowLabel(7 * 86400 * 1_000_000)     // "7d"
+ * @example formatWindowLabel(0)                          // ""  (defensive)
+ */
+export function formatWindowLabel(durationMicros: number): string {
+  if (!durationMicros || durationMicros <= 0) return "";
+  const seconds = durationMicros / 1_000_000;
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const minutes = seconds / 60;
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  const hours = minutes / 60;
+  if (hours < 24) return `${Math.round(hours)}h`;
+  const days = hours / 24;
+  return `${Math.round(days)}d`;
+}
+
+/**
  * Split a USD cost into `{ value: "$X.XX", unit }` for the cost KPI.
  * The `$` prefix is part of the value (so the unit suffix can be a
  * separate "K"/"M" multiplier).

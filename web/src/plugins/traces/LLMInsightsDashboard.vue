@@ -154,7 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="`kpi-trend--${card.trend.sentiment}`"
             >
               <span class="kpi-trend-arrow">{{ trendArrow(card.trend.direction) }}</span>
-              <span>{{ card.trend.deltaPct.toFixed(card.trend.deltaPct < 10 ? 1 : 0) }}% vs prev</span>
+              <span>
+                {{ card.trend.deltaPct.toFixed(card.trend.deltaPct < 10 ? 1 : 0) }}%
+                vs prev{{ previousWindowLabel ? " " + previousWindowLabel : "" }}
+              </span>
             </div>
           </div>
           <KpiSparkline
@@ -198,6 +201,7 @@ import {
   splitNumberWithUnit,
   splitDuration,
   splitCost,
+  formatWindowLabel,
   type KpiTrend,
 } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
@@ -278,6 +282,14 @@ async function loadTraceStreams() {
 }
 
 const hasData = computed(() => kpi.value.requestCount > 0);
+
+// Short label for the comparison window — drives the KPI trend chip
+// text, e.g. "▲ 100% vs prev 12h". Computed from the current
+// time-range props rather than the user-picked relative period so it
+// stays correct for absolute ranges too.
+const previousWindowLabel = computed(() =>
+  formatWindowLabel(props.endTime - props.startTime),
+);
 
 // DataFusion returns "Schema error: No field named gen_ai_..." when the
 // chosen stream lacks LLM instrumentation. Detect that specific case so we
