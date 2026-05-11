@@ -97,20 +97,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const hasError = computed(() => !!error.value);
   const isEmpty = computed(() => !loading.value && !error.value && !hasResults.value);
 
-  // Get the primary stream to query
-  const primaryStream = computed(() => {
-    // Use sourceStream if it's a logs stream
-    if (props.sourceStream && props.sourceType === 'logs') {
-      return props.sourceStream;
-    }
-
-    // Otherwise, use first log stream from correlation response
-    if (props.logStreams && props.logStreams.length > 0) {
-      return props.logStreams[0].stream_name;
-    }
-
-    return '';
-  });
+  // Number of correlated log streams available
+  const logStreamsCount = computed(() => props.logStreams.length);
 
   // REMOVED: getDefaultSemanticPatterns() function
   // No longer needed - we use exact field names from StreamInfo.filters
@@ -123,79 +111,68 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   // The /_correlate API (or fallback) provides the correct field names for each stream
 
   /**
-   * Build SQL query with proper escaping for special characters and SQL injection prevention
-   * Note: Time range is handled by the search API's start_time/end_time parameters, not in SQL WHERE clause
+   * Build SQL queries for ALL correlated log streams.
+   * Each stream gets its own independent query using its exact field names from StreamInfo.filters.
+   * Time range is handled by the search API's start_time/end_time parameters, not in SQL WHERE clause.
    *
-   * IMPORTANT: Uses exact field names from StreamInfo.filters (provided by /_correlate API or fallback)
-   * These filters already have the correct field names that exist in the stream schema.
-   * NO semantic mapping needed - just use the field names as-is.
+   * IMPORTANT: Uses exact field names from each StreamInfo.filters (provided by /_correlate API or fallback).
+   * Since each stream has its own field names, we CANNOT use a SQL UNION — the column sets may differ.
+   * Instead, independent queries are sent to _search_multi_stream which executes them in parallel.
    */
-  const buildSQLQuery = async (
-    streamName: string,
-    _filters: Record<string, string>, // Unused: we use StreamInfo.filters instead
-    _timeRange: TimeRange, // Unused: time range handled by API parameters
-    limit: number = 100
-  ): Promise<string> => {
-    const conditions: string[] = [];
+  const buildSQLQueries = (limit: number = 100): string[] => {
+    const queries: string[] = [];
 
-    // Find the matching StreamInfo from logStreams to get exact field names
-    const streamInfo = props.logStreams.find(s => s.stream_name === streamName);
+    for (const streamInfo of props.logStreams) {
+      const conditions: string[] = [];
 
-    if (!streamInfo) {
-      console.warn(`[useCorrelatedLogs] No StreamInfo found for stream "${streamName}"`);
-      console.warn(`[useCorrelatedLogs] Available log streams:`, props.logStreams.map(s => s.stream_name));
-      // Return empty query that will return no results
-      return `SELECT * FROM "${streamName}" WHERE 1=0`;
+      // ALWAYS use the exact filters from StreamInfo - the /_correlate API has the correct field names
+      // Note: backend omits `filters` when empty (skip_serializing_if = "HashMap::is_empty"), so default to {}
+      const exactFilters = streamInfo.filters ?? {};
+
+      // Add dimension filters using exact field names from StreamInfo
+      for (const [field, value] of Object.entries(exactFilters)) {
+        // Skip wildcard values (SELECT_ALL_VALUE = "_o2_all_")
+        if (value === SELECT_ALL_VALUE) {
+          continue;
+        }
+
+        // Skip internal fields (start with underscore)
+        if (field.startsWith('_')) {
+          continue;
+        }
+
+        // Skip null/undefined values
+        if (value === null || value === undefined || value === '') {
+          continue;
+        }
+
+        // Quote field names if they contain special characters (dots, hyphens, etc.)
+        const quotedField = /[^a-zA-Z0-9_]/.test(field)
+          ? `"${field.replace(/"/g, '""')}"`
+          : field;
+
+        // Escape single quotes in values
+        const escapedValue = String(value).replace(/'/g, "''");
+
+        conditions.push(`${quotedField} = '${escapedValue}'`);
+      }
+
+      // Always quote stream name to match dashboard behavior
+      const quotedStream = `"${streamInfo.stream_name.replace(/"/g, '""')}"`;
+
+      // Build WHERE clause
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      queries.push(`SELECT * FROM ${quotedStream} ${whereClause} ORDER BY _timestamp DESC LIMIT ${limit}`);
     }
 
-    // ALWAYS use the exact filters from StreamInfo - never use the provided filters parameter
-    // The StreamInfo.filters come from the /_correlate API (or fallback) and have the correct field names
-    // Note: backend omits `filters` when empty (skip_serializing_if = "HashMap::is_empty"), so default to {}
-    const exactFilters = streamInfo.filters ?? {};
-
-    // Add dimension filters using exact field names from StreamInfo
-    for (const [field, value] of Object.entries(exactFilters)) {
-      // Skip wildcard values (SELECT_ALL_VALUE = "_o2_all_")
-      if (value === SELECT_ALL_VALUE) {
-        continue;
-      }
-
-      // Skip internal fields (start with underscore)
-      if (field.startsWith('_')) {
-        continue;
-      }
-
-      // Skip null/undefined values
-      if (value === null || value === undefined || value === '') {
-        continue;
-      }
-
-      // Use the field name directly from StreamInfo.filters (already correct for this stream)
-      // Quote field names if they contain special characters (dots, hyphens, etc.)
-      const quotedField = /[^a-zA-Z0-9_]/.test(field)
-        ? `"${field.replace(/"/g, '""')}"`
-        : field;
-
-      // Escape single quotes in values
-      const escapedValue = String(value).replace(/'/g, "''");
-
-      conditions.push(`${quotedField} = '${escapedValue}'`);
-    }
-
-    // Always quote stream name to match dashboard behavior
-    // This ensures consistency with working queries
-    const quotedStream = `"${streamName.replace(/"/g, '""')}"`;
-
-    // Build WHERE clause
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    const sqlQuery = `SELECT * FROM ${quotedStream} ${whereClause} ORDER BY _timestamp DESC LIMIT ${limit}`;
-
-    return sqlQuery;
+    return queries;
   };
 
   /**
-   * Fetch correlated logs from search API using HTTP streaming
+   * Fetch correlated logs from all correlated streams using multi-stream search API
+   * Sends independent SQL queries for each stream to _search_multi_stream
+   * Results are sorted by _timestamp descending on complete
    */
   const fetchCorrelatedLogs = async () => {
     // Cancel previous request if exists
@@ -206,9 +183,9 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       });
     }
 
-    // Validate stream name
-    if (!primaryStream.value) {
-      console.error('[useCorrelatedLogs] No primary stream available');
+    // Validate that we have log streams
+    if (!props.logStreams || props.logStreams.length === 0) {
+      console.error('[useCorrelatedLogs] No log streams available');
       error.value = 'No log stream available for correlation';
       return;
     }
@@ -218,13 +195,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     searchResults.value = []; // Clear previous results
 
     try {
-      // Build SQL query (now async to support dynamic semantic group loading)
-      const sqlQuery = await buildSQLQuery(
-        primaryStream.value,
-        currentFilters.value,
-        currentTimeRange.value,
-        pageSize.value
-      );
+      // Build SQL queries for ALL correlated log streams
+      const sqlQueries = buildSQLQueries(pageSize.value);
 
       // Prepare search query
       // Note: timestamps in timeRange are in microseconds
@@ -237,10 +209,12 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       const traceId = traceContext?.traceId || '';
       currentTraceId = traceId;
 
-      // Build search query - clean structure matching logs page format
+      // Build search query with array of SQL queries
+      // The streaming composable auto-detects multi-stream mode when sql is an array (not a string)
+      // and routes to _search_multi_stream endpoint
       const searchQuery = {
         query: {
-          sql: sqlQuery,
+          sql: sqlQueries, // string[] — triggers multi-stream mode in useHttpStreaming
           sql_mode: 'full',
           start_time: startTimeMicros,
           end_time: endTimeMicros,
@@ -277,7 +251,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
               const resultsObj = response.content?.results;
               const hits = resultsObj?.hits || [];
 
-              // Append hits (streaming can send multiple chunks)
+              // Append hits from any stream (streaming can send multiple chunks)
               if (hits.length > 0) {
                 searchResults.value.push(...hits);
               } else {
@@ -293,6 +267,10 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             totalHits.value = 0;
           },
           complete: (_data: any) => {
+            // Sort merged results from all streams by _timestamp descending
+            // _search_multi_stream streams results per-query as they complete,
+            // so hits arrive in arbitrary order and need a final global sort
+            searchResults.value.sort((a, b) => b._timestamp - a._timestamp);
             loading.value = false;
             currentTraceId = null;
           },
@@ -432,7 +410,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     currentTimeRange: computed(() => currentTimeRange.value),
     currentPage: computed(() => currentPage.value),
     pageSize: computed(() => pageSize.value),
-    primaryStream: computed(() => primaryStream.value),
+    logStreamsCount: computed(() => logStreamsCount.value),
 
     // Computed
     hasResults,
