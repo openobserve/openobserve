@@ -37,14 +37,16 @@ describe("getOp", () => {
     expect(getOp({ gen_ai_operation_name: "chat" })).toBe("CHAT");
   });
 
-  // Falls back to legacy when gen_ai is missing — keeps historical
-  // traces (ingested before the rename) rendering.
-  it("falls back to llm_observation_type when gen_ai is missing", () => {
-    expect(getOp({ llm_observation_type: "GENERATION" })).toBe("GENERATION");
+  // `getOp` deliberately does NOT fall back to legacy
+  // `llm_observation_type` — we standardised on the OTEL field after
+  // the gen_ai_* migration. Legacy-only spans return empty string and
+  // the classifier treats them as "other".
+  it("does not fall back to legacy llm_observation_type", () => {
+    expect(getOp({ llm_observation_type: "GENERATION" })).toBe("");
   });
 
   // Empty / missing fields → empty string (not undefined / NaN).
-  it("returns empty string for spans without either field", () => {
+  it("returns empty string for spans without gen_ai_operation_name", () => {
     expect(getOp({})).toBe("");
     expect(getOp(null)).toBe("");
     expect(getOp(undefined)).toBe("");
