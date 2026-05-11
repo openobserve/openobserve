@@ -182,12 +182,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseleave="onMouseLeave"
               >
                 <q-chip
-                  dense
-                  size="xs"
                   class="wildcard-chip-detail q-my-none q-mx-none"
-                  :class="wildcardChipColor(tok.value)"
+                  :class="wildcardChipColor(tok.value, tok.sampleValues)"
                 >
-                  {{ tok.value }}
+                  {{ wildcardLabel(tok.value, tok.sampleValues) }}
                 </q-chip>
               </span>
             </template>
@@ -326,6 +324,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,
+  wildcardLabel,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
@@ -392,11 +391,12 @@ const variableColumns = computed(() => [
 
 .wildcard-chip-detail {
   font-family: monospace;
-  font-size: 11px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 3px;
-  line-height: 18px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  height: 1.125rem;
+  padding: 0 0.3125rem;
+  border-radius: 0.1875rem;
+  line-height: 1.125rem;
   flex-shrink: 0;
 }
 </style>
