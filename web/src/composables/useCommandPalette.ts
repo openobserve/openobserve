@@ -27,7 +27,7 @@ export interface PaletteItem {
   icon: string;
   section: string;
   keywords: string[];
-  type: "page" | "entity" | "command" | "ai_action";
+  type: "page" | "entity" | "command" | "ai_action" | "create";
   prompt?: string;
 }
 
@@ -149,6 +149,49 @@ const useCommandPalette = () => {
     return items;
   });
 
+  // ─── Create index ─────────────────────────────────────────────────────────
+
+  const createIndex = computed<PaletteItem[]>(() => {
+    const org = store.state.selectedOrganization?.identifier ?? "default";
+    const routes = router.getRoutes();
+    const items: PaletteItem[] = [];
+
+    void locale.value;
+
+    for (const route of routes) {
+      const createMeta = route.meta?.create as
+        | { label?: string; labelKey?: string; icon?: string; keywords?: string[] }
+        | undefined;
+      if (!createMeta) continue;
+
+      const path = route.path.includes(":org_identifier")
+        ? route.path.replace(":org_identifier", org)
+        : route.path;
+
+      const title = createMeta.labelKey
+        ? t(String(createMeta.labelKey))
+        : String(createMeta.label ?? route.meta?.title ?? route.name ?? "");
+
+      const icon = createMeta.icon ?? String(route.meta?.icon ?? "add_circle");
+
+      const keywords = [
+        ...(Array.isArray(createMeta.keywords) ? createMeta.keywords : []),
+      ];
+
+      items.push({
+        name: String(route.name ?? ""),
+        path,
+        title,
+        icon,
+        section: "Create",
+        keywords,
+        type: "create" as const,
+      });
+    }
+
+    return items;
+  });
+
   // ─── Slash command items ───────────────────────────────────────────────────
 
   const slashCommandItems = computed<PaletteItem[]>(() => {
@@ -216,14 +259,15 @@ const useCommandPalette = () => {
   const visibleItems = computed<PaletteItem[]>(() => {
     const q = query.value.trim();
 
-    // Default view: recents + top pages
+    // Default view: create items + recents + top pages
     if (!q) {
+      const creates = createIndex.value;
       const recents = recentPages.value;
       const recentNames = new Set(recents.map((r) => r.name));
       const topPages = pageIndex.value
         .filter((p) => !recentNames.has(p.name))
-        .slice(0, Math.max(0, TOP_PAGES_COUNT - recents.length));
-      return [...recents, ...topPages].slice(0, TOP_PAGES_COUNT);
+        .slice(0, Math.max(0, TOP_PAGES_COUNT - recents.length - creates.length));
+      return [...creates, ...recents, ...topPages].slice(0, TOP_PAGES_COUNT + creates.length);
     }
 
     // Slash command mode: show matching commands
@@ -248,14 +292,19 @@ const useCommandPalette = () => {
       return filteredCommands.value;
     }
 
-    // Normal search: pages + entities (if any)
+    // Normal search: pages + create items + entities (if any)
     const pages = filteredPages.value;
+    const creates = createIndex.value
+      .map((item) => ({ item, score: scoreItem(item, q) }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(({ item }) => item);
     const entities = entityResults.value.filter(
       (e) =>
         e.title.toLowerCase().includes(q.toLowerCase()) ||
         e.keywords.some((k) => k.toLowerCase().includes(q.toLowerCase())),
     );
-    return [...pages, ...entities];
+    return [...creates, ...pages, ...entities];
   });
 
   const hasResults = computed(() => visibleItems.value.length > 0);
@@ -279,14 +328,16 @@ const useCommandPalette = () => {
 
     const q = query.value.trim();
     if (!q) {
-      // Default view: group recents + top pages
+      // Default view: group create items + recents + top pages
       const groups: ResultGroup[] = [];
+      const creates = items.filter((i) => i.type === "create");
       const recents = items.filter(
-        (i) => recentPages.value.some((r) => r.name === i.name),
+        (i) => i.type !== "create" && recentPages.value.some((r) => r.name === i.name),
       );
       const pages = items.filter(
-        (i) => !recentPages.value.some((r) => r.name === i.name),
+        (i) => i.type !== "create" && !recentPages.value.some((r) => r.name === i.name),
       );
+      if (creates.length) groups.push({ label: t("commandPalette.create"), items: creates });
       if (recents.length) groups.push({ label: "Recents", items: recents });
       if (pages.length) groups.push({ label: "Pages", items: pages });
       return groups;

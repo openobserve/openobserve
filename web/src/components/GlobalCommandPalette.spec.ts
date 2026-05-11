@@ -479,6 +479,53 @@ describe("GlobalCommandPalette.vue", () => {
     });
   });
 
+  describe("when palette is open with create items", () => {
+    const createItems: PaletteItem[] = [
+      makePaletteItem({
+        name: "addAlert",
+        title: "New Alert",
+        path: "/default/alerts/add",
+        icon: "notifications",
+        section: "Create",
+        keywords: ["new alert", "create alert"],
+        type: "create",
+      }),
+      makePaletteItem({
+        name: "createPipeline",
+        title: "New Pipeline",
+        path: "/default/pipeline/pipelines/add",
+        icon: "account_tree",
+        section: "Create",
+        keywords: ["new pipeline", "add pipeline"],
+        type: "create",
+      }),
+    ];
+
+    beforeEach(() => {
+      vi.mocked(useCommandPalette).mockReturnValue({
+        ...defaultMockReturn(),
+        isOpen: ref(true),
+        visibleItems: ref(createItems),
+        groupedResults: computed(() => [{ label: "Create", items: createItems }]),
+        hasResults: computed(() => true),
+      } as any);
+      wrapper = mountPalette();
+    });
+
+    it("should render create items in results", async () => {
+      await flushPromises();
+      await nextTick();
+      const items = wrapper.findAll('[data-test="command-palette-result-item"]');
+      expect(items.length).toBe(createItems.length);
+    });
+
+    it("should show Create section label", async () => {
+      await flushPromises();
+      await nextTick();
+      expect(wrapper.text()).toContain("Create");
+    });
+  });
+
   describe("with slash command active", () => {
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
