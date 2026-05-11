@@ -409,7 +409,27 @@ pub async fn get_metrics() -> impl IntoResponse {
 
 /// Proxy handler
 pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
-    let client = reqwest::Client::new();
+    // SSRF protection: validate the target URL (incl. DNS resolution) before issuing
+    // the proxied request. The reqwest client is built via `build_safe_client` so
+    // redirect chains and connect-time DNS are re-validated too.
+    if let Err(e) = crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
+        &params.target_url,
+    )
+    .await
+    {
+        return (StatusCode::BAD_REQUEST, format!("URL blocked: {e}")).into_response();
+    }
+    let client =
+        match crate::common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
+            Ok(c) => c,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to build HTTP client: {e}"),
+                )
+                    .into_response();
+            }
+        };
     match client.get(&params.target_url).send().await {
         Ok(resp) => {
             let status = StatusCode::from_u16(resp.status().as_u16())

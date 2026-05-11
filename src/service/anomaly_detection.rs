@@ -1616,13 +1616,21 @@ pub async fn send_anomaly_alert(
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
 
-    let client = if endpoint.skip_tls_verify {
-        reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?
+    // SSRF protection: validate the URL (incl. DNS) before sending and build the
+    // client through `build_safe_client` so redirects + connect-time resolution
+    // are re-validated.
+    if let Err(e) =
+        crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
+            .await
+    {
+        return Err(anyhow::anyhow!("Webhook URL blocked by SSRF guard: {e}"));
+    }
+    let builder = if endpoint.skip_tls_verify {
+        reqwest::Client::builder().danger_accept_invalid_certs(true)
     } else {
-        reqwest::Client::new()
+        reqwest::Client::builder()
     };
+    let client = crate::common::utils::ssrf_guard::build_safe_client(builder)?;
 
     let mut req = client.post(&endpoint.url);
 
