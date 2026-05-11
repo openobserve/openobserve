@@ -88,6 +88,27 @@ const labelSize: Record<NonNullable<RangeProps["size"]>, string> = {
 
 const resolvedSize = computed(() => props.size ?? "md");
 
+/**
+ * Dynamic z-index for the two thumbs.
+ *
+ * When both values converge (e.g. both at `props.max`), the thumb on top is
+ * the only one the user can grab. With max permanently on top and
+ * `handleMax` clamping via `Math.max(v, currentMin)`, the user can never
+ * drag min back down. Fix: when min has crossed past the midpoint of the
+ * range, lift it above max so it's reachable for a "drag back" gesture.
+ *
+ * Tracking the last-interacted thumb is also valid; the position-based
+ * heuristic is simpler and handles the most common stuck case (both at the
+ * right edge of the track).
+ */
+const minOnTop = computed(() => minPercent.value > 50);
+const minZClass = computed(() =>
+  minOnTop.value ? "tw:z-20" : "tw:z-10",
+);
+const maxZClass = computed(() =>
+  minOnTop.value ? "tw:z-10" : "tw:z-20",
+);
+
 function clamp(v: number) {
   return Math.max(props.min, Math.min(props.max, v));
 }
@@ -189,7 +210,8 @@ const displayValue = computed(() => {
         :aria-invalid="hasError || undefined"
         :class="[
           'o2-range-input',
-          'tw:absolute tw:left-0 tw:right-0 tw:z-10 tw:w-full tw:bg-transparent tw:appearance-none',
+          'tw:absolute tw:left-0 tw:right-0 tw:w-full tw:bg-transparent tw:appearance-none',
+          minZClass,
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full',
           trackHeight[resolvedSize],
           disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
@@ -212,7 +234,8 @@ const displayValue = computed(() => {
         :aria-invalid="hasError || undefined"
         :class="[
           'o2-range-input',
-          'tw:absolute tw:left-0 tw:right-0 tw:z-20 tw:w-full tw:bg-transparent tw:appearance-none',
+          'tw:absolute tw:left-0 tw:right-0 tw:w-full tw:bg-transparent tw:appearance-none',
+          maxZClass,
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full',
           trackHeight[resolvedSize],
           disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',

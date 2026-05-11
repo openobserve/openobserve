@@ -32,7 +32,6 @@ import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   computed,
   onBeforeUnmount,
-  onMounted,
   provide,
   ref,
   useSlots,
@@ -373,16 +372,39 @@ const triggerWrapperRef = ref<HTMLElement | null>(null);
 const triggerWidth = ref(0);
 let triggerResizeObserver: ResizeObserver | null = null;
 
-onMounted(() => {
-  if (!triggerWrapperRef.value) return;
-  triggerWidth.value = triggerWrapperRef.value.clientWidth;
-  triggerResizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      triggerWidth.value = entry.contentRect.width;
+/*
+ * Why watch instead of onMounted: `triggerWrapperRef` lives inside a
+ * `v-if="listboxModeEnabled"` branch. If a consumer toggles `multiple` /
+ * `searchable` at runtime, the listbox wrapper mounts *after* the parent
+ * component's `onMounted` already ran — so a one-shot observer setup
+ * would leave `triggerWidth` stuck at 0 forever. Watching the ref lets us
+ * attach the observer whenever the element comes into existence (and tear
+ * it down when it goes away). `flush: 'post'` ensures the DOM node is
+ * already painted so `clientWidth` is meaningful.
+ */
+watch(
+  triggerWrapperRef,
+  (el, _prev, onCleanup) => {
+    triggerResizeObserver?.disconnect();
+    triggerResizeObserver = null;
+    if (!el) {
+      triggerWidth.value = 0;
+      return;
     }
-  });
-  triggerResizeObserver.observe(triggerWrapperRef.value);
-});
+    triggerWidth.value = el.clientWidth;
+    triggerResizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        triggerWidth.value = entry.contentRect.width;
+      }
+    });
+    triggerResizeObserver.observe(el);
+    onCleanup(() => {
+      triggerResizeObserver?.disconnect();
+      triggerResizeObserver = null;
+    });
+  },
+  { flush: "post" },
+);
 
 onBeforeUnmount(() => {
   triggerResizeObserver?.disconnect();
