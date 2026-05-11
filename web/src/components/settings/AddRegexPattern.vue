@@ -15,49 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: Remove store.state.theme based styling as we moved towards having at central place that is app.scss so we plan this whole to that place -->
 <template>
-  <div
-    class="q-pt-md"
-    :class="[
-      store.state.theme === 'dark'
-        ? 'bg-dark add-regex-pattern-dark'
-        : 'bg-white add-regex-pattern-light',
-    ]"
-    :style="{
-      width: isFullScreen
-        ? '100vw'
-        : store.state.isAiChatEnabled
-          ? '70vw'
-          : '40vw',
-    }"
+  <ODrawer
+    :open="open"
+    @update:open="$emit('update:open', $event)"
+    :title="isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')"
+    :width="isFullScreen ? 100 : store.state.isAiChatEnabled ? 70 : 40"
+    :primary-button-label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
+    :secondary-button-label="t('regex_patterns.cancel')"
+    :primary-button-disabled="isFormEmpty || isSaving"
+    @click:primary="saveRegexPattern"
+    @click:secondary="handleClose"
+    data-test="add-regex-pattern-drawer"
   >
-    <div
-      class="add-regex-pattern-header q-px-md tw:flex tw:items-center tw:justify-between"
-    >
-      <div class="tw:flex tw:items-center tw:justify-between">
+    <template #header-right>
+      <div class="tw:flex tw:items-center tw:gap-2">
         <OButton
-          data-test="add-regex-pattern-back-btn"
-          @click="closeAddRegexPatternDialog"
-          variant="ghost"
-          size="icon"
-        >
-          <q-icon name="arrow_back" size="14px" />
-        </OButton>
-        <div
-          class="add-regex-pattern-title"
-          data-test="add-regex-pattern-title"
-        >
-          {{
-            isEdit
-              ? t("regex_patterns.edit_regex_pattern")
-              : t("regex_patterns.create_regex_pattern")
-          }}
-        </div>
-      </div>
-      <div class="tw:flex tw:items-center tw:justify-between tw:gap-2">
-        <OButton
-          v-if="
-            config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-          "
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           variant="ghost"
           size="icon-toolbar"
           @click="toggleAIChat"
@@ -67,9 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
-          <div class="row items-center no-wrap tw:gap-2">
-            <img :src="getBtnLogo" class="header-icon ai-icon" />
-          </div>
+          <img :src="getBtnLogo" class="header-icon ai-icon" />
         </OButton>
         <OButton
           data-test="add-regex-pattern-fullscreen-btn"
@@ -83,19 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :color="isFullScreen ? 'primary' : undefined"
           />
         </OButton>
-        <OButton
-          variant="ghost"
-          size="icon"
-          data-test="add-regex-pattern-close-btn"
-          @click="closeAddRegexPatternDialog"
-        >
-          <q-icon name="cancel" size="14px" />
-        </OButton>
       </div>
-    </div>
-    <q-separator class="q-mb-md q-mt-sm" />
+    </template>
     <!-- form inputs starts here -->
-    <div class="tw:flex tw:w-[100%]">
+    <div class="tw:flex tw:w-[100%] tw:h-full">
       <div
         :class="
           store.state.isAiChatEnabled
@@ -108,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-form
           @submit="saveRegexPattern"
           class="tw:flex tw:flex-col tw:gap-4"
-          style="overflow: auto; height: calc(100vh - 150px)"
         >
           <div class="tw:flex tw:flex-col">
             <q-input
@@ -343,35 +304,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </q-form>
-        <div
-          class="tw:flex tw:gap-2 tw:justify-end tw:mt-2"
-          style="position: sticky; bottom: 0; right: 0"
-        >
-          <OButton
-            @click="$emit('close')"
-            variant="outline"
-            size="sm-action"
-            data-test="add-regex-pattern-cancel-btn"
-          >
-            {{ t("regex_patterns.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            @click="saveRegexPattern"
-            :disabled="isFormEmpty || isSaving"
-            data-test="add-regex-pattern-save-btn"
-          >
-            {{
-              isSaving
-                ? "Saving..."
-                : isEdit
-                  ? t("regex_patterns.update_close")
-                  : t("regex_patterns.create_close")
-            }}
-          </OButton>
-        </div>
       </div>
       <div
         class="q-ml-sm"
@@ -396,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -418,6 +350,7 @@ import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
@@ -425,7 +358,7 @@ import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "AddRegexPattern",
-  emits: ["close"],
+  emits: ["close", "update:list", "update:open"],
   props: {
     data: {
       type: Object,
@@ -435,12 +368,17 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emit: ["close", "update:list"],
+  emit: ["close", "update:list", "update:open"],
   components: {
     FullViewContainer,
     O2AIChat,
     OButton,
+    ODrawer,
   },
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -634,6 +572,11 @@ export default defineComponent({
       emit("close");
     };
 
+    const handleClose = () => {
+      emit("update:open", false);
+      emit("close");
+    };
+
     return {
       t,
       store,
@@ -659,6 +602,7 @@ export default defineComponent({
       goToAILogo,
       inputContext,
       closeAddRegexPatternDialog,
+      handleClose,
     };
   },
 });

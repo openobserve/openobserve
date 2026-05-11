@@ -181,9 +181,14 @@
           @update:cancel="confirmBulkDelete = false"
           v-model="confirmBulkDelete"
         />
-        <ODrawer data-test="regex-pattern-list-add-regex-pattern-drawer" v-model:open="showAddRegexPatternDialog.show" :width="store.state.isAiChatEnabled ? 70 : 40" :show-close="false">
-          <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
-        </ODrawer>
+        <AddRegexPattern
+          data-test="regex-pattern-list-add-regex-pattern-drawer"
+          v-model:open="showAddRegexPatternDialog.show"
+          :data="showAddRegexPatternDialog.data"
+          :is-edit="showAddRegexPatternDialog.isEdit"
+          @update:list="getRegexPatterns"
+          @close="closeAddRegexPatternDialog"
+        />
       </q-page>
   </template>
 
@@ -206,7 +211,6 @@
     import NoData from "@/components/shared/grid/NoData.vue";
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import OButton from "@/lib/core/Button/OButton.vue";
-    import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
     import { Pencil, Trash2, Download } from "lucide-vue-next";
 
     export default defineComponent({
@@ -219,7 +223,6 @@
             ImportRegexPattern,
             NoData,
             OButton,
-            ODrawer,
             Pencil,
             Trash2,
             Download,
