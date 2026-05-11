@@ -1,22 +1,21 @@
 <template>
   <ODialog data-test="add-annotation-dialog" v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
-    <div class="q-pa-md">
+    <div class="tw:flex tw:flex-col">
         <q-input
           v-model="annotationData.title"
           label="Title *"
           stack-label
-          class="q-py-md showLabelOnTop"
+          class="showLabelOnTop"
           dense
           borderless
           hide-bottom-space
-          style="margin-bottom: 10px"
           :rules="[(val) => !!val || 'Title is required.']"
         />
         <q-input
           v-model="annotationData.text"
           label="Description"
           stack-label
-          class="q-py-md showLabelOnTop"
+          class="showLabelOnTop"
           dense
           type="textarea"
           :rows="3"
@@ -24,8 +23,7 @@
           hide-bottom-space
         />
 
-        <div class="q-mt-md">
-          <q-select
+        <q-select
             hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
             v-model="selectedPanels"
             :options="groupedPanelsOptions"
@@ -71,7 +69,6 @@
               </q-item>
             </template>
           </q-select>
-        </div>
         <div class="text-caption q-mt-md">
           Timestamp: {{ annotationDateString }}
         </div>
