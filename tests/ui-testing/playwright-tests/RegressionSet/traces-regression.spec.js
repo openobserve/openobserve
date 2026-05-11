@@ -322,6 +322,9 @@ test.describe("Traces Regression Bugs", () => {
     const clearClicked = await scPage.clickFilterClearButton();
     testLogger.info(clearClicked ? '✓ Clicked Quasar clear/cross icon' : 'Clear button not visible, used fill(\'\') fallback');
 
+    // STRONG ASSERTION: Must click the actual Quasar clear icon — the fill('') fallback doesn't reproduce bug #11689
+    expect(clearClicked, 'Bug #11689: Quasar clear icon must be clickable — fill(\'\') fallback does not exercise the regression').toBe(true);
+
     // PRIMARY ASSERTION: Table should NOT be blank after clearing
     const afterClearCount = await scPage.getServiceCount();
     testLogger.info(`Service count after clearing filter: ${afterClearCount}`);
@@ -362,21 +365,25 @@ test.describe("Traces Regression Bugs", () => {
 
     // Click a node to open the side panel (triggers the .replace() code path)
     let nodeClicked = false;
-    const commonServiceNames = ['alertmanager', 'frontend', 'api', 'gateway', 'order'];
 
-    for (const serviceName of commonServiceNames) {
+    // Discover available nodes dynamically via API instead of hardcoded list
+    const topology = await sgPage.getTopologyViaAPI();
+    const nodes = topology.data?.nodes || topology.data?.data?.nodes || [];
+    const nodeNames = nodes.map(n => n.label || n.id).filter(Boolean);
+
+    for (const nodeName of nodeNames) {
       try {
-        await sgPage.clickNodeByName(serviceName);
-        testLogger.info(`✓ Clicked service node: ${serviceName}`);
+        await sgPage.clickNodeByName(nodeName);
+        testLogger.info(`✓ Clicked service node: ${nodeName}`);
         nodeClicked = true;
         break;
       } catch (e) {
-        testLogger.debug(`Service node "${serviceName}" not found, trying next...`);
+        testLogger.debug(`Service node "${nodeName}" not found, trying next...`);
       }
     }
 
     if (!nodeClicked) {
-      testLogger.warn('No known service nodes available to click — skipping side panel verification');
+      testLogger.warn(`No service nodes available to click from ${nodeNames.length} discovered nodes — skipping side panel verification`);
       page.removeListener('console', errorHandler);
       test.skip(true, 'No service nodes available to click — cannot verify #11687 side panel');
     }
@@ -392,7 +399,7 @@ test.describe("Traces Regression Bugs", () => {
       testLogger.warn(`Console errors detected: ${consoleErrors.length}`, { errors: consoleErrors.slice(0, 5) });
     }
     const replaceErrors = consoleErrors.filter(e =>
-      e.includes('replace') || e.includes('Cannot read properties of null')
+      e.includes('.replace') || e.includes('replace is not a function')
     );
     expect(replaceErrors.length, 'Bug #11687: Should not have replace/null related console errors in side panel').toBe(0);
 

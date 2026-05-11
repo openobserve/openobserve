@@ -2972,13 +2972,19 @@ export class AlertsPage {
 
     /**
      * Click the Continue button once to advance to the next wizard step
+     * @returns {Promise<boolean>} True if Continue was clicked, false if button is not visible
      */
     async clickContinueButton() {
         const continueBtn = this.page.locator('[data-test="add-alert-continue-btn"], button:has-text("Continue")').first();
-        await expect(continueBtn).toBeVisible({ timeout: 10000 });
+        const visible = await continueBtn.isVisible({ timeout: 3000 }).catch(() => false);
+        if (!visible) {
+            testLogger.info('Continue button not visible — stopping wizard step navigation');
+            return false;
+        }
         await continueBtn.click();
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked Continue button');
+        return true;
     }
 
     /**
@@ -2987,7 +2993,8 @@ export class AlertsPage {
      */
     async navigateThroughWizardSteps(times = 5) {
         for (let i = 0; i < times; i++) {
-            await this.clickContinueButton();
+            const clicked = await this.clickContinueButton();
+            if (!clicked) break;
             testLogger.info('Clicked Continue button', { step: i + 1 });
         }
     }

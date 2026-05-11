@@ -287,7 +287,6 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Click the Group By "add" button to create a field combobox
     // Find the add button within the Group By row (button next to "Group by" label)
-    const groupByAddBtn = page.locator('button').filter({ hasText: 'add' }).filter({ has: page.locator('text=add') }).first();
     // Try alternative: find the button directly by its icon content
     const groupByRow = page.locator('text=Group by').locator('..');
     const addBtn = groupByRow.locator('button').first();
@@ -554,8 +553,8 @@ test.describe("Alerts Regression Bugs", () => {
     await templateSelect.click();
     await page.waitForTimeout(500);
 
-    // Select first available template using role-based selector (more robust)
-    const templateOption = page.getByRole('option').first();
+    // Select first available template from the visible dropdown menu (scoped to avoid matching other QSelect menus)
+    const templateOption = pm.alertsPage.getFirstMenuItem();
     if (!(await templateOption.isVisible({ timeout: 3000 }).catch(() => false))) {
       testLogger.warn('No template options available — skipping');
       test.skip(true, 'No template options available');
