@@ -43,7 +43,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             v-if="tok.kind === 'text'"
             :class="wrap ? 'tw:whitespace-pre-wrap tw:break-all' : 'tw:whitespace-pre'"
-          >{{ tok.value }}</span>
+          >
+            <template v-for="(seg, si) in highlightLevels(tok.value)" :key="si">
+              <span
+                v-if="seg.color"
+                :style="{ color: seg.color }"
+                class="tw:font-bold"
+              >{{ seg.text }}</span>
+              <span v-else>{{ seg.text }}</span>
+            </template>
+          </span>
           <span
             v-else
             class="tw:inline-flex"
@@ -175,6 +184,34 @@ const isDark = computed(() => store.state.theme === "dark");
 const statusColor = computed(() =>
   extractStatusFromTemplate(props.pattern.template ?? "", isDark.value).color,
 );
+
+const LEVEL_RE = /\b(emergency|emerg|fatal|alert|critical|crit|error|err|warning|warn|notice|info|information|debug|trace|verbose)\b/gi;
+
+interface HighlightSegment {
+  text: string;
+  color: string | null;
+}
+
+function highlightLevels(text: string): HighlightSegment[] {
+  const segments: HighlightSegment[] = [];
+  let lastIndex = 0;
+  const re = new RegExp(LEVEL_RE.source, "gi");
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, match.index), color: null });
+    }
+    segments.push({
+      text: match[0],
+      color: extractStatusFromTemplate(match[0], isDark.value).color,
+    });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex), color: null });
+  }
+  return segments;
+}
 </script>
 
 <style scoped lang="scss">
