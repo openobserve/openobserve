@@ -120,29 +120,44 @@ pub async fn test_provider(provider: &dyn ObjectStore) -> Result<(), anyhow::Err
 pub fn _merge_aws_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
     let mut existing: AwsCredentials = serde_json::from_str(existing)?;
     let new: AwsCredentials = serde_json::from_str(new)?;
-    existing.access_key = new.access_key;
-    existing.secret_key = new.secret_key;
+    if !new.access_key.is_empty() {
+        existing.access_key = new.access_key;
+    }
+    if !new.secret_key.is_empty() {
+        existing.secret_key = new.secret_key;
+    }
     Ok(serde_json::to_string(&existing)?)
 }
 
 pub fn _merge_gcp_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
     let mut existing: GcpCredentials = serde_json::from_str(existing)?;
     let new: GcpCredentials = serde_json::from_str(new)?;
-    existing.access_key = new.access_key;
+    if !new.access_key.is_empty() {
+        existing.access_key = new.access_key;
+    }
     Ok(serde_json::to_string(&existing)?)
 }
 
 pub fn _merge_azure_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
     let mut existing: AzureCredentials = serde_json::from_str(existing)?;
     let new: AzureCredentials = serde_json::from_str(new)?;
-    existing.access_key = new.access_key;
-    existing.secret_key = new.secret_key;
+    if !new.access_key.is_empty() {
+        existing.access_key = new.access_key;
+    }
+    if !new.secret_key.is_empty() {
+        existing.secret_key = new.secret_key;
+    }
     Ok(serde_json::to_string(&existing)?)
 }
 
 pub fn _merge_aws_role_arn(existing: &str, new: &str) -> Result<String, anyhow::Error> {
     let mut existing: AwsRoleArn = serde_json::from_str(existing)?;
     let new: AwsRoleArn = serde_json::from_str(new)?;
-    existing.role_arn = new.role_arn;
+    if !new.role_arn.is_empty() {
+        existing.role_arn = new.role_arn;
+    }
+    if !new.external_id.is_empty() {
+        existing.external_id = new.external_id;
+    }
     Ok(serde_json::to_string(&existing)?)
 }

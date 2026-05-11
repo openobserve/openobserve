@@ -58,7 +58,7 @@ pub async fn add(entry: OrgStorageProvider) -> Result<(), anyhow::Error> {
 
 pub async fn get_for_org(org_id: &str) -> Result<Option<OrgStorageProvider>, anyhow::Error> {
     {
-        let cache = CACHE.write().await;
+        let cache = CACHE.read().await;
         if let Some(v) = cache.get(org_id) {
             return Ok(v.clone());
         }
