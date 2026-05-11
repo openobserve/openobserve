@@ -539,7 +539,7 @@ describe("Dashboards.vue", () => {
       const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
       expect(drawer).toBeTruthy();
       expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("width")).toBe(40);
       expect(drawer.props("primaryButtonLabel")).toBe("Save");
       expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
     });
