@@ -15,11 +15,112 @@
 
 use std::sync::Arc;
 
-use infra::{db, table::org_ingestion_tokens};
+use bytes::Bytes;
+use infra::{
+    db::{self, delete_from_db_coordinator, get_coordinator, put_into_db_coordinator},
+    table::org_ingestion_tokens::{self, OrgIngestionTokenListRecord, OrgIngestionTokenRecord},
+};
 
 use crate::common::infra::config::ORG_INGESTION_TOKENS;
 
 const ORG_INGESTION_TOKENS_KEY_PREFIX: &str = "/org_ingestion_tokens/";
+
+#[inline]
+pub fn cache_key(org_id: &str, token: &str) -> String {
+    format!("{}/{}", org_id, token)
+}
+
+fn event_key(org_id: &str, token: &str) -> String {
+    format!("{ORG_INGESTION_TOKENS_KEY_PREFIX}{}/{}", org_id, token)
+}
+
+/// Insert a new org ingestion token and notify the cluster.
+pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), anyhow::Error> {
+    org_ingestion_tokens::add(record).await?;
+    let key = event_key(&record.org_id, &record.token);
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_ingestion_token_put(&key).await?;
+    Ok(())
+}
+
+/// Rotate a token's value and notify the cluster.
+pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Error> {
+    let existing = org_ingestion_tokens::get_by_name(org_id, name)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
+
+    let new_token = org_ingestion_tokens::rotate_token(org_id, name).await?;
+
+    // Notify about old token removal
+    let old_key = event_key(org_id, &existing.token);
+    let _ = delete_from_db_coordinator(&old_key, false, true, None).await;
+
+    // Notify about new token
+    let new_key = event_key(org_id, &new_token);
+    let _ = put_into_db_coordinator(&new_key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    {
+        super_cluster::org_ingestion_token_delete(&old_key).await?;
+        super_cluster::org_ingestion_token_put(&new_key).await?;
+    }
+    Ok(new_token)
+}
+
+/// Enable or disable a named token and notify the cluster.
+pub async fn set_enabled(
+    org_id: &str,
+    name: &str,
+    enabled: bool,
+) -> Result<(), anyhow::Error> {
+    let existing = org_ingestion_tokens::get_by_name(org_id, name)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
+
+    org_ingestion_tokens::set_enabled(org_id, name, enabled).await?;
+
+    let key = event_key(org_id, &existing.token);
+    if enabled {
+        let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+        #[cfg(feature = "enterprise")]
+        super_cluster::org_ingestion_token_put(&key).await?;
+    } else {
+        let _ = delete_from_db_coordinator(&key, false, true, None).await;
+        #[cfg(feature = "enterprise")]
+        super_cluster::org_ingestion_token_delete(&key).await?;
+    }
+    Ok(())
+}
+
+/// Find a token by org_id and token value.
+pub async fn find_by_token(
+    org_id: &str,
+    token: &str,
+) -> Result<Option<OrgIngestionTokenRecord>, anyhow::Error> {
+    org_ingestion_tokens::find_by_token(org_id, token)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+/// Get a single token record by org_id and name.
+pub async fn get_by_name(
+    org_id: &str,
+    name: &str,
+) -> Result<Option<OrgIngestionTokenRecord>, anyhow::Error> {
+    org_ingestion_tokens::get_by_name(org_id, name)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+/// List all tokens for an org.
+pub async fn list_by_org(
+    org_id: &str,
+) -> Result<Vec<OrgIngestionTokenListRecord>, anyhow::Error> {
+    org_ingestion_tokens::list_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
 
 /// Bootstrap the org ingestion token cache from the database.
 pub async fn cache() -> Result<(), anyhow::Error> {
@@ -27,14 +128,17 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for (org_id, token, name) in records {
         ORG_INGESTION_TOKENS.insert(cache_key(&org_id, &token), name);
     }
-    log::info!("Org ingestion tokens cached: {}", ORG_INGESTION_TOKENS.len());
+    log::info!(
+        "Org ingestion tokens cached: {}",
+        ORG_INGESTION_TOKENS.len()
+    );
     Ok(())
 }
 
 /// Watch for cluster-wide cache invalidation events.
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = ORG_INGESTION_TOKENS_KEY_PREFIX;
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching org_ingestion_tokens");
@@ -49,13 +153,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                // Key format: "org_id/token" — fetch name from DB, then cache.
                 let parts: Vec<&str> = item_key.splitn(2, '/').collect();
                 if parts.len() == 2 {
+                    // find_by_token only returns enabled tokens.
+                    // If found → token is enabled → cache it.
+                    // If not found → token is disabled/missing → remove from cache.
                     if let Ok(Some(record)) =
                         org_ingestion_tokens::find_by_token(parts[0], parts[1]).await
                     {
                         ORG_INGESTION_TOKENS.insert(item_key.to_string(), record.name);
+                    } else {
+                        ORG_INGESTION_TOKENS.remove(item_key);
                     }
                 }
             }
@@ -69,9 +177,43 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[inline]
-pub fn cache_key(org_id: &str, token: &str) -> String {
-    format!("{}/{}", org_id, token)
+#[cfg(feature = "enterprise")]
+mod super_cluster {
+    use infra::errors::Error;
+
+    pub async fn org_ingestion_token_put(key: &str) -> Result<(), Error> {
+        if o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+        {
+            o2_enterprise::enterprise::super_cluster::queue::put(
+                key,
+                bytes::Bytes::new(),
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub async fn org_ingestion_token_delete(key: &str) -> Result<(), Error> {
+        if o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+        {
+            o2_enterprise::enterprise::super_cluster::queue::delete(
+                key,
+                false,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -91,8 +233,8 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_key_empty_org() {
-        let key = cache_key("", "o2oi_token");
-        assert_eq!(key, "/o2oi_token");
+    fn test_event_key_format() {
+        let key = event_key("default", "o2oi_abc123");
+        assert_eq!(key, "/org_ingestion_tokens/default/o2oi_abc123");
     }
 }
