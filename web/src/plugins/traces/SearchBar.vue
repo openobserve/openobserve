@@ -64,7 +64,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
+          <!--
+            Hidden when no traces stream has `is_llm_stream === true`.
+            The parent (`Index.vue`) computes `hasLLMStreams` once
+            after `getStreams` resolves; until then the prop defaults
+            to `true` so the toggle doesn't flicker on first mount.
+            We also keep the toggle visible when the user is already
+            on the LLM Insights tab (e.g., navigated via URL) so the
+            active selection isn't orphaned mid-session.
+          -->
           <OToggleGroupItem
+            v-if="hasLLMStreams || searchObj.meta.searchMode === 'llm-insights'"
             data-test="traces-search-mode-llm-insights-btn"
             value="llm-insights"
             size="sm"
@@ -518,6 +528,16 @@ export default defineComponent({
     isLLMSpanPresent: {
       type: Boolean,
       default: false,
+    },
+    // True when the parent (`Index.vue`) has confirmed at least one
+    // traces stream is flagged `is_llm_stream === true`. Drives the
+    // LLM Insights tab visibility — we hide the toggle entirely when
+    // no org has opted in (avoids a dead button that opens an empty
+    // dashboard). Defaults to `true` so the tab doesn't flicker
+    // during the brief window before streams resolve on first mount.
+    hasLLMStreams: {
+      type: Boolean,
+      default: true,
     },
   },
   methods: {

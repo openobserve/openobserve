@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
               :isLLMSpanPresent="isLLMSpanPresent"
+              :hasLLMStreams="hasLLMStreams"
               class="card-container"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
@@ -484,6 +485,17 @@ function recomputeInsightsTimeRange() {
 
 const isLLMSpanPresent = ref(false);
 
+// True when the org has at least one traces stream marked as an LLM
+// stream (or any stream that hasn't been explicitly opted out via
+// `settings.is_llm_stream === false`). Drives the LLM Insights tab
+// visibility in `SearchBar` — we hide the tab entirely when there's
+// nothing for the dashboard to show.
+//
+// Default `true` so the tab doesn't briefly flicker on first mount
+// while we resolve the streams list. Set to false only after we have
+// a definitive empty result.
+const hasLLMStreams = ref(true);
+
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
   const { sqlParser }: any = useSqlParser.default();
@@ -531,6 +543,16 @@ async function getStreamList() {
     return getStreams("traces", false)
       .then(async (res) => {
         searchObj.data.streamResults = res;
+
+        // Strict opt-in check: the LLM Insights tab is visible only
+        // when an admin has explicitly flagged at least one traces
+        // stream with `settings.is_llm_stream === true`. Legacy
+        // streams (no flag set) do NOT make the tab appear — they
+        // would still render inside the dashboard if the tab were
+        // visible, but the entry point itself requires explicit opt-in.
+        hasLLMStreams.value = (res.list || []).some(
+          (s: any) => s?.settings?.is_llm_stream === true,
+        );
 
         if (res.list.length > 0) {
           if (config.isCloud == "true") {
