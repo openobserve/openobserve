@@ -312,9 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ></PanelSchemaRenderer>
     </div>
 
-    <ODialog v-model:open="showViewPanel" :show-close="false" :width="80" @close="showViewPanel = false" data-test="query-inspector-dialog">
-      <QueryInspector :metaData="metaData" :data="props.data" @close="showViewPanel = false"></QueryInspector>
-    </ODialog>
+    <QueryInspector v-model:open="showViewPanel" :metaData="metaData" :data="props.data" data-test="query-inspector-dialog" />
 
     <ODialog data-test="panel-container-legends-dialog" v-model:open="showLegendsDialog" :show-close="false" size="lg">
       <ShowLegendsPopup
