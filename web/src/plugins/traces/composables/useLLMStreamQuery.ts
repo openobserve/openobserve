@@ -71,6 +71,13 @@ export function useLLMStreamQuery() {
       activeTraceIds.add(traceId);
       const accumulated: any[] = [];
 
+      // Honour the SQL's own LIMIT as the request `size` so the
+      // backend doesn't scan more rows than the panel actually wants.
+      // Recent-errors panel uses LIMIT 10; latency raw uses LIMIT
+      // 50000. Falls back to 1000 for queries without LIMIT.
+      const limitMatch = sql.match(/\bLIMIT\s+(\d+)\b/i);
+      const size = limitMatch ? parseInt(limitMatch[1], 10) : 1000;
+
       // Match the rest of the codebase: only base64-encode when the
       // org/instance has sql_base64_enabled. Plain SQL is fine otherwise.
       const useBase64 = store.state.zoConfig?.sql_base64_enabled;
@@ -82,7 +89,7 @@ export function useLLMStreamQuery() {
               start_time: startTime,
               end_time: endTime,
               from: 0,
-              size: 1000,
+              size,
             },
             ...(useBase64 ? { encoding: "base64" } : {}),
           },
