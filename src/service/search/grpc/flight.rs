@@ -251,10 +251,10 @@ pub async fn search(
         let mut storage_idx_optimize_rule = idx_optimize_rule.clone();
         (tantivy_file_list, file_list) = handle_tantivy_optimize(
             &trace_id,
-            req,
             &mut storage_idx_optimize_rule, // pass by mutable reference
             file_list,
             index_updated_at,
+            query_params.time_range,
         )
         .await?;
         log::info!(
@@ -691,10 +691,10 @@ async fn get_file_list_by_ids(
 
 async fn handle_tantivy_optimize(
     trace_id: &str,
-    req: &FlightSearchRequest,
     idx_optimize_rule: &mut Option<IndexOptimizeMode>,
     file_list: Vec<FileKey>,
     index_updated_at: i64,
+    time_range: (i64, i64),
 ) -> Result<(Vec<FileKey>, Vec<FileKey>), Error> {
     // early return if not simple count, histogram or topn
     if !matches!(
@@ -709,12 +709,18 @@ async fn handle_tantivy_optimize(
 
     let index_updated_at = update_index_updated_at(idx_optimize_rule, index_updated_at).await;
 
-    let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
-        file_list,
-        req.search_info.start_time,
-        req.search_info.end_time,
-        index_updated_at,
-    );
+    // TODO: support IndexOptimizeMode::SimpleDistinct for add timestamp
+    // filter to tantivy search
+    let time_range = if matches!(
+        idx_optimize_rule,
+        Some(IndexOptimizeMode::SimpleDistinct(..))
+    ) {
+        Some(time_range)
+    } else {
+        None
+    };
+    let (tantivy_files, datafusion_files) =
+        split_file_list_by_time_range(file_list, index_updated_at, time_range);
     // set optimize rule to None, because datafusion should not use it
     *idx_optimize_rule = None;
 
@@ -757,15 +763,14 @@ async fn update_index_updated_at(
 // (tantivy group, datafusion group)
 fn split_file_list_by_time_range(
     file_list: Vec<FileKey>,
-    start_time: i64,
-    end_time: i64,
     index_updated_at: i64,
+    time_range: Option<(i64, i64)>,
 ) -> (Vec<FileKey>, Vec<FileKey>) {
     file_list.into_iter().partition(|file| {
-        file.meta.min_ts >= start_time
-            && file.meta.max_ts <= end_time
-            && file.meta.min_ts >= index_updated_at
+        file.meta.min_ts >= index_updated_at
             && file.meta.index_size > 0
+            && time_range
+                .is_none_or(|(start, end)| file.meta.min_ts >= start && file.meta.max_ts <= end)
     })
 }
 
@@ -779,4 +784,156 @@ fn collect_stats(files: &[FileKey]) -> ScanStats {
         scan_stats.idx_scan_size += file.meta.index_size;
     }
     scan_stats
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::stream::{FileKey, FileMeta};
+    use datafusion::{
+        execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
+        prelude::SessionConfig,
+    };
+
+    use super::*;
+    use crate::service::search::{
+        datafusion::{
+            optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
+            table_provider::empty_table::NewEmptyTable, udf::histogram_udf,
+        },
+        index::Condition,
+    };
+
+    fn make_file(min_ts: i64, max_ts: i64, index_size: i64) -> FileKey {
+        FileKey {
+            meta: FileMeta {
+                min_ts,
+                max_ts,
+                index_size,
+                records: 10,
+                original_size: 100,
+                compressed_size: 50,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_split_file_list_empty() {
+        let (tantivy, datafusion) = split_file_list_by_time_range(vec![], 0, None);
+        assert!(tantivy.is_empty());
+        assert!(datafusion.is_empty());
+    }
+
+    #[test]
+    fn test_split_file_list_all_tantivy() {
+        let files = vec![make_file(100, 200, 512), make_file(300, 400, 1024)];
+        let (tantivy, datafusion) = split_file_list_by_time_range(files, 0, None);
+        assert_eq!(tantivy.len(), 2);
+        assert!(datafusion.is_empty());
+    }
+
+    #[test]
+    fn test_split_file_list_no_index_goes_to_datafusion() {
+        let files = vec![make_file(100, 200, 0)]; // index_size == 0
+        let (tantivy, datafusion) = split_file_list_by_time_range(files, 0, None);
+        assert!(tantivy.is_empty());
+        assert_eq!(datafusion.len(), 1);
+    }
+
+    #[test]
+    fn test_split_file_list_before_index_updated_at() {
+        let files = vec![make_file(100, 200, 512)];
+        let (tantivy, datafusion) = split_file_list_by_time_range(files, 500, None);
+        assert!(tantivy.is_empty());
+        assert_eq!(datafusion.len(), 1);
+    }
+
+    #[test]
+    fn test_collect_stats_empty() {
+        let stats = collect_stats(&[]);
+        assert_eq!(stats.files, 0);
+        assert_eq!(stats.records, 0);
+        assert_eq!(stats.original_size, 0);
+        assert_eq!(stats.compressed_size, 0);
+        assert_eq!(stats.idx_scan_size, 0);
+    }
+
+    #[test]
+    fn test_collect_stats_aggregates() {
+        let files = vec![make_file(0, 100, 10), make_file(100, 200, 20)];
+        let stats = collect_stats(&files);
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.records, 20); // 10 + 10
+        assert_eq!(stats.original_size, 200); // 100 + 100
+        assert_eq!(stats.compressed_size, 100); // 50 + 50
+        assert_eq!(stats.idx_scan_size, 30); // 10 + 20
+    }
+
+    #[tokio::test]
+    async fn test_optimizer_physical_plan_detects_histogram_with_index_filter() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("kubernetes_namespace_name", DataType::Utf8, false),
+        ]));
+        let start_time = 1757401694060000;
+        let end_time = 1757402594060000;
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_optimizer_rule(Arc::new(RewriteHistogram::new(start_time, end_time, 60)))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("default", schema.clone());
+        ctx.register_table("default", Arc::new(provider)).unwrap();
+        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+
+        let logical_plan = ctx
+            .state()
+            .create_logical_plan(
+                "SELECT histogram(_timestamp) as ts, count(*) as cnt \
+                 FROM default \
+                 WHERE kubernetes_namespace_name = 'ziox' \
+                 GROUP BY ts ORDER BY ts",
+            )
+            .await
+            .unwrap();
+        let physical_plan = ctx
+            .state()
+            .create_physical_plan(&logical_plan)
+            .await
+            .unwrap();
+        let index_condition_ref = Arc::new(Mutex::new(None));
+        let index_optimizer_rule_ref = Arc::new(Mutex::new(None));
+
+        let _plan = optimizer_physical_plan(
+            physical_plan,
+            &ctx,
+            &schema,
+            (start_time, end_time),
+            vec![],
+            vec!["kubernetes_namespace_name".to_string()],
+            index_condition_ref.clone(),
+            index_optimizer_rule_ref.clone(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            index_condition_ref.lock().clone(),
+            Some(IndexCondition {
+                conditions: vec![Condition::Equal(
+                    "kubernetes_namespace_name".to_string(),
+                    "ziox".to_string(),
+                )],
+            })
+        );
+        assert!(matches!(
+            index_optimizer_rule_ref.lock().clone(),
+            Some(IndexOptimizeMode::SimpleHistogram(..))
+        ));
+    }
 }
