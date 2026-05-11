@@ -206,7 +206,16 @@ describe("PanelContainer", () => {
           'ChartRenderer': { template: '<div data-test="chart-renderer"></div>' },
           'TableRenderer': { template: '<div data-test="table-renderer"></div>' },
           'ViewPanel': { template: '<div data-test="view-panel"></div>' },
-          'QueryInspector': { template: '<div data-test="query-inspector"></div>' },
+          'QueryInspector': {
+            name: 'QueryInspector',
+            inheritAttrs: false,
+            props: ['open', 'metaData', 'data'],
+            emits: ['update:open', 'close'],
+            template: `<div
+              data-test="query-inspector"
+              :data-open="String(open)"
+            ></div>`,
+          },
           'PanelSchemaRenderer': {
             template: '<div data-test="panel-schema-renderer"></div>',
             props: ['panelSchema', 'selectedTimeObj', 'width', 'height']
@@ -1534,11 +1543,11 @@ describe("PanelContainer", () => {
   });
 
   describe("ODialog wiring (post-migration)", () => {
-    // Helper: find the query-inspector ODialog stub by its data-test attribute.
-    const findQueryInspectorDialog = (w: any) =>
-      w.findAllComponents({ name: "ODialog" }).find(
-        (d: any) => d.attributes("data-test") === "query-inspector-dialog"
-      );
+    // The QueryInspector child now owns its own ODialog internally, so the
+    // contract from PanelContainer's perspective is the `open` prop and
+    // `update:open` event on the QueryInspector stub.
+    const findQueryInspector = (w: any) =>
+      w.findComponent({ name: "QueryInspector" });
 
     // Helper: legends ODialog has no data-test attribute on the source so it
     // is the only ODialog with `data-test` absent. We identify it by size="lg".
@@ -1547,74 +1556,38 @@ describe("PanelContainer", () => {
         (d: any) => d.props("size") === "lg"
       );
 
-    it("should render ODialog instances for query inspector and legends", () => {
+    it("should render QueryInspector and legends ODialog", () => {
       wrapper = createWrapper();
 
-      // Two ODialogs are owned directly by PanelContainer (query inspector +
-      // legends). Additional ODialogs may come from nested components such as
-      // ConfirmDialog, so we assert the two we own are present rather than
-      // a strict total count.
-      expect(findQueryInspectorDialog(wrapper)).toBeTruthy();
+      expect(findQueryInspector(wrapper).exists()).toBe(true);
       expect(findLegendsDialog(wrapper)).toBeTruthy();
     });
 
-    it("should render query inspector ODialog closed by default", () => {
+    it("should render QueryInspector closed by default", () => {
       wrapper = createWrapper();
 
-      const dialog = findQueryInspectorDialog(wrapper);
-      expect(dialog).toBeTruthy();
-      expect(dialog.props("open")).toBe(false);
+      const inspector = findQueryInspector(wrapper);
+      expect(inspector.exists()).toBe(true);
+      expect(inspector.props("open")).toBe(false);
     });
 
-    it("should configure query inspector ODialog with width=80 and showClose=false", () => {
-      wrapper = createWrapper();
-
-      const dialog = findQueryInspectorDialog(wrapper);
-      expect(dialog.props("width")).toBe(80);
-      expect(dialog.props("showClose")).toBe(false);
-    });
-
-    it("should open query inspector ODialog when showViewPanel becomes true", async () => {
+    it("should open QueryInspector when showViewPanel becomes true", async () => {
       wrapper = createWrapper();
 
       wrapper.vm.showViewPanel = true;
       await wrapper.vm.$nextTick();
 
-      const dialog = findQueryInspectorDialog(wrapper);
-      expect(dialog.props("open")).toBe(true);
+      const inspector = findQueryInspector(wrapper);
+      expect(inspector.props("open")).toBe(true);
     });
 
-    it("should close query inspector when ODialog emits update:open with false", async () => {
+    it("should close QueryInspector when it emits update:open with false", async () => {
       wrapper = createWrapper();
       wrapper.vm.showViewPanel = true;
       await wrapper.vm.$nextTick();
 
-      const dialog = findQueryInspectorDialog(wrapper);
-      await dialog.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showViewPanel).toBe(false);
-    });
-
-    it("should close query inspector when ODialog emits close event", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.showViewPanel = true;
-      await wrapper.vm.$nextTick();
-
-      const dialog = findQueryInspectorDialog(wrapper);
-      await dialog.vm.$emit("close");
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showViewPanel).toBe(false);
-    });
-
-    it("should close query inspector when inner QueryInspector emits close", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.showViewPanel = true;
-      await wrapper.vm.$nextTick();
-
-      const queryInspector = wrapper.findComponent('[data-test="query-inspector"]');
-      await queryInspector.vm.$emit("close");
+      const inspector = findQueryInspector(wrapper);
+      await inspector.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showViewPanel).toBe(false);
