@@ -14,17 +14,123 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+
+const DESTINATION_NAME = 'e2e_template_override_dest';
+const TEMPLATE_NAME = 'e2e_template_override_tpl';
 
 test.describe("Alerts Regression Bugs — Batch 1", () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
+
+  // ============================================================================
+  // Setup: Create a template and destination via API so the Add Alert button
+  // is enabled and templates are available for the override select.
+  // ============================================================================
+  test.beforeAll(async ({ browser }) => {
+    testLogger.info('Setting up prerequisites for template override test (beforeAll)');
+
+    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+    const page = await context.newPage();
+
+    try {
+      const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+      const org = getOrgIdentifier() || 'default';
+      const authToken = Buffer.from(
+        `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
+      ).toString('base64');
+
+      // Create template via API
+      const templatePayload = {
+        name: TEMPLATE_NAME,
+        body: JSON.stringify({ text: "Alert: {alert_name}" }),
+        isDefault: false,
+      };
+
+      const tplResp = await page.evaluate(
+        async ({ baseUrl, org, authToken, templatePayload }) => {
+          const r = await fetch(`${baseUrl}/api/${org}/alerts/templates`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Basic ${authToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(templatePayload),
+          });
+          return { status: r.status };
+        },
+        { baseUrl, org, authToken, templatePayload },
+      );
+      testLogger.info('Template creation', { status: tplResp.status });
+
+      // Create destination via API (references the template)
+      const destPayload = {
+        name: DESTINATION_NAME,
+        url: 'https://httpbin.org/post',
+        method: 'post',
+        skip_tls_verify: false,
+        template: TEMPLATE_NAME,
+        headers: {},
+      };
+
+      const destResp = await page.evaluate(
+        async ({ baseUrl, org, authToken, destPayload }) => {
+          const r = await fetch(`${baseUrl}/api/${org}/alerts/destinations`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Basic ${authToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(destPayload),
+          });
+          return { status: r.status };
+        },
+        { baseUrl, org, authToken, destPayload },
+      );
+      testLogger.info('Destination creation', { status: destResp.status });
+
+      testLogger.info('Prerequisites setup completed');
+    } finally {
+      await page.close();
+      await context.close();
+    }
+  });
+
+  // ============================================================================
+  // Cleanup: Remove created template and destination
+  // ============================================================================
+  test.afterAll(async ({ browser }) => {
+    testLogger.info('Cleaning up test prerequisites (afterAll)');
+
+    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+    const page = await context.newPage();
+    const cleanupPm = new PageManager(page);
+
+    try {
+      await page.goto(
+        `${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`,
+      );
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+      await cleanupPm.alertDestinationsPage
+        .deleteDestinationByName(DESTINATION_NAME)
+        .catch((e) => testLogger.warn('Could not delete destination', { error: e.message }));
+      await cleanupPm.alertTemplatesPage
+        .deleteTemplateAndVerify(TEMPLATE_NAME)
+        .catch((e) => testLogger.warn('Could not delete template', { error: e.message }));
+
+      testLogger.info('Test suite cleanup completed');
+    } finally {
+      await page.close();
+      await context.close();
+    }
+  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
     testLogger.info('Alerts regression batch-1 setup completed');
   });
 
@@ -43,18 +149,11 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('✓ Navigated to alerts page');
 
-    // Click "Add Alert" button
-    const addAlertBtn = page.locator(pm.alertsPage.addAlertButton);
-    const addAlertBtnVisible = await addAlertBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    // Click "Add Alert" button (should be enabled now that beforeAll created a destination)
+    const addAlertBtnVisible = await page.locator(pm.alertsPage.addAlertButton).isVisible({ timeout: 5000 }).catch(() => false);
     if (!addAlertBtnVisible) {
       testLogger.warn('Add Alert button not visible — skipping');
       test.skip(true, 'Add Alert button not available');
-      return;
-    }
-    const addAlertBtnEnabled = await addAlertBtn.isEnabled().catch(() => false);
-    if (!addAlertBtnEnabled) {
-      testLogger.warn('Add Alert button is disabled (no destinations configured) — skipping');
-      test.skip(true, 'Add Alert button disabled — no destinations available');
       return;
     }
     await pm.alertsPage.clickAddAlertButton();
@@ -102,7 +201,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await templateOverrideSelect.click();
     await page.waitForTimeout(500);
 
-    const templateOption = page.getByRole('option').first();
+    const templateOption = pm.alertsPage.getFirstMenuItem();
     if (!(await templateOption.isVisible({ timeout: 3000 }).catch(() => false))) {
       testLogger.warn('No template option available — skipping');
       test.skip(true, 'No template options available');
