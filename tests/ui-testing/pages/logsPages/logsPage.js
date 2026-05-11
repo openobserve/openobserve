@@ -3722,7 +3722,11 @@ export class LogsPage {
     }
 
     async clickConfirmDialogOkButton() {
-        return await this.page.locator('[data-test="logs-search-bar-confirm-dialog-ok-btn"]').click();
+        // Custom download dialog is now an ODialog scoped by `search-bar-custom-download-dialog`;
+        // the OK action is the ODialog primary footer button.
+        return await this.page
+            .locator('[data-test="search-bar-custom-download-dialog"] [data-test="o-dialog-primary-btn"]')
+            .click();
     }
 
     async expectCustomDownloadDialogVisible() {
