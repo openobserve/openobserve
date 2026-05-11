@@ -199,13 +199,12 @@ pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
     need_all_term_fields: HashSet<tantivy::schema::Field>,
-    need_fast_field: Option<String>,
+    need_fast_field: HashSet<String>,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
     let mut warm_up_terms_futures = Vec::new();
     let mut warm_up_fast_fields_futures = Vec::new();
-    let mut warmed_segments = HashSet::new();
     for (field, terms) in terms_grouped_by_field {
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(*field)?;
@@ -233,16 +232,13 @@ pub async fn warm_up_terms(
     }
 
     // warm up fast fields if needed
-    if let Some(field_name) = need_fast_field {
+    if !need_fast_field.is_empty() {
         for segment_reader in searcher.segment_readers() {
-            // only warm up fast fields once per segment
-            let field_name = field_name.clone();
-            let segment_id = segment_reader.segment_id();
-            if !warmed_segments.contains(&segment_id) {
+            for field_name in &need_fast_field {
                 let fast_field_reader = segment_reader.fast_fields();
-                warm_up_fast_fields_futures
-                    .push(async move { warm_up_fastfield(fast_field_reader, field_name).await });
-                warmed_segments.insert(segment_id);
+                warm_up_fast_fields_futures.push(async move {
+                    warm_up_fastfield(fast_field_reader, field_name.clone()).await
+                });
             }
         }
     }
@@ -603,7 +599,13 @@ mod tests {
 
         // Test with empty terms
         let terms_grouped_by_field = HashbrownHashMap::new();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
+        let result = warm_up_terms(
+            &searcher,
+            &terms_grouped_by_field,
+            HashSet::new(),
+            HashSet::new(),
+        )
+        .await;
         assert!(result.is_ok());
     }
 
@@ -640,7 +642,13 @@ mod tests {
         field_terms.insert(term, false);
         terms_grouped_by_field.insert(text_field, field_terms);
 
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
+        let result = warm_up_terms(
+            &searcher,
+            &terms_grouped_by_field,
+            HashSet::new(),
+            HashSet::new(),
+        )
+        .await;
         assert!(result.is_ok());
     }
 
@@ -676,7 +684,7 @@ mod tests {
             &searcher,
             &terms_grouped_by_field,
             HashSet::from([text_field]),
-            None,
+            HashSet::new(),
         )
         .await;
         assert!(result.is_ok());
@@ -714,7 +722,7 @@ mod tests {
             &searcher,
             &terms_grouped_by_field,
             HashSet::new(),
-            Some(TIMESTAMP_COL_NAME.to_string()),
+            HashSet::from([TIMESTAMP_COL_NAME.to_string()]),
         )
         .await;
         // This might fail if _timestamp field is not present, which is expected in this simple test
@@ -760,7 +768,13 @@ mod tests {
         terms_grouped_by_field.insert(text_field, field_terms);
 
         let start = Instant::now();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
+        let result = warm_up_terms(
+            &searcher,
+            &terms_grouped_by_field,
+            HashSet::new(),
+            HashSet::new(),
+        )
+        .await;
         let duration = start.elapsed();
 
         assert!(result.is_ok());
