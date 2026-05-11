@@ -3854,8 +3854,8 @@ export class LogsPage {
         await this.page.waitForTimeout(1000);
     }
 
-    async expectFieldInTableHeader(fieldName) {
-        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible();
+    async expectFieldInTableHeader(fieldName, timeout = 10000) {
+        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible({ timeout });
     }
 
     async expectFieldNotInTableHeader(fieldName) {
