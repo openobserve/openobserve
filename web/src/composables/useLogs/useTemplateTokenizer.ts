@@ -282,7 +282,7 @@ export function inferTypeFromValues(rawValues: any[]): string {
   if (ts >= threshold) return "ts";
   if (hex >= threshold) return "hex";
   // Check combined int+float first so mixed numeric values say "num"
-  if (int + float >= threshold) return "num";
+  if (int + float >= threshold && int > 0) return "num";
   if (float >= threshold) return "float";
   if (int >= threshold) return "num";
 

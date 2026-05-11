@@ -182,8 +182,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseleave="onMouseLeave"
               >
                 <q-chip
-                  dense
-                  size="xs"
                   class="wildcard-chip-detail q-my-none q-mx-none"
                   :class="wildcardChipColor(tok.value, tok.sampleValues)"
                 >

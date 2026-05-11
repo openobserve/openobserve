@@ -60,8 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @mouseleave="onMouseLeave"
           >
             <q-chip
-              dense
-              size="xs"
               class="wildcard-chip q-my-none q-mx-none"
               :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
@@ -220,7 +218,7 @@ function highlightLevels(text: string): HighlightSegment[] {
 
 .pattern-template-text {
   font-family: monospace;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 // Add explicit hover styles

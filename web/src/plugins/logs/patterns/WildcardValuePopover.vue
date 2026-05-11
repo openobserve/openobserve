@@ -283,7 +283,7 @@ watch(
 
 .wildcard-popover-header-token {
   font-family: monospace;
-  font-weight: 600;
+  font-weight: bold;
   font-size: 0.75rem;
   line-height: 1.4;
 }
