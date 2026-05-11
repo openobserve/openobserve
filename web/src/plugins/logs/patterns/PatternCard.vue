@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Count & Percentage Column -->
     <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:text-right">
       <div
-        class="tw:text-[var(--o2-text-4)]"
+        class="tw:text-[var(--o2-text-4)] tw:font-bold"
         :data-test="`pattern-card-${index}-frequency`"
       >
         {{ pattern.frequency.toLocaleString() }}
@@ -237,12 +237,12 @@ function highlightLevels(text: string): HighlightSegment[] {
 @import "@/assets/styles/log-highlighting.css";
 .wildcard-chip {
   font-family: monospace;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: bold;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 3px;
-  line-height: 18px;
+  height: 1.125rem;
+  padding: 0 0.3125rem;
+  border-radius: 0.1875rem;
+  line-height: 1.125rem;
   // Prevent chips from inheriting the truncate overflow of the parent row
   flex-shrink: 0;
 }
