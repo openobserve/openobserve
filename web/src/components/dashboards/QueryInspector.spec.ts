@@ -39,10 +39,71 @@ import { colorizeQuery } from "@/utils/query/colorizeQuery";
 
 installQuasar();
 
+// ── ODialog / OButton stubs ──────────────────────────────────────────────────
+// Stub preserves the slot content (so child rendering can be asserted) and
+// re-emits the events that the component listens for: update:open.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "width",
+    "title",
+    "subTitle",
+    "showClose",
+    "persistent",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test-stub="o-dialog"
+      :data-open="open"
+      :data-title="title"
+      :data-sub-title="subTitle"
+      :data-width="width"
+    >
+      <div data-test-stub="o-dialog-header">
+        <span data-test-stub="o-dialog-title">{{ title }}</span>
+        <span data-test-stub="o-dialog-subtitle">{{ subTitle }}</span>
+        <slot name="header-left" />
+        <slot name="header-right" />
+      </div>
+      <slot />
+      <slot name="footer" />
+    </div>
+  `,
+};
+
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled", "loading"],
+  emits: ["click"],
+  inheritAttrs: false,
+  template: `<button
+    data-test-stub="o-button"
+    :data-test="$attrs['data-test']"
+    :disabled="disabled"
+    @click="$emit('click', $event)"
+  ><slot name="icon-left" /><slot /></button>`,
+};
+
 describe("QueryInspector", () => {
   let wrapper: any;
 
   const defaultProps = {
+    open: true,
     metaData: {
       queries: [
         {
@@ -117,23 +178,21 @@ describe("QueryInspector", () => {
           $t: (key: string) => key,
         },
         stubs: {
-          QCard: { template: '<div data-test="q-card"><slot /></div>' },
-          QCardSection: { template: '<div data-test="q-card-section"><slot /></div>' },
-          QBtn: {
-            template: '<button data-test="q-btn" @click="$emit(\'click\')" v-bind="$attrs"><slot /></button>',
-            props: ['icon', 'flat', 'round', 'dense', 'color', 'size', 'noCaps'],
-          },
+          ODialog: ODialogStub,
+          OButton: OButtonStub,
           QInput: {
-            template: '<input data-test="q-input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" v-bind="$attrs"><slot name="prepend" /></input>',
-            props: ['modelValue', 'placeholder', 'dense', 'color', 'dark'],
+            template:
+              '<input data-test="q-input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" v-bind="$attrs"><slot name="prepend" /></input>',
+            props: ["modelValue", "placeholder", "dense", "color", "dark"],
+            emits: ["update:modelValue"],
           },
           QIcon: {
             template: '<span data-test="q-icon" :class="name"><slot /></span>',
-            props: ['name', 'size'],
+            props: ["name", "size"],
           },
         },
         directives: {
-          'close-popup': () => {},
+          "close-popup": () => {},
         },
       },
     });
@@ -154,6 +213,7 @@ describe("QueryInspector", () => {
 
       expect(wrapper.vm.$props.metaData).toEqual(defaultProps.metaData);
       expect(wrapper.vm.$props.data).toEqual(defaultProps.data);
+      expect(wrapper.vm.$props.open).toBe(true);
     });
 
     it("should initialize reactive data correctly", async () => {
@@ -190,37 +250,111 @@ describe("QueryInspector", () => {
     });
   });
 
+  describe("ODialog Integration", () => {
+    it("should render ODialog with correct title and subtitle props", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("title")).toBe("Query Inspector");
+      expect(dialog.props("subTitle")).toContain("Panel : Error Analysis Dashboard");
+      expect(dialog.props("subTitle")).toContain("Total Queries: 2");
+      expect(dialog.props("width")).toBe(50);
+    });
+
+    it("should forward open prop to ODialog", async () => {
+      wrapper = createWrapper({ open: true });
+      await flushPromises();
+
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("should reflect closed state via ODialog open prop", async () => {
+      wrapper = createWrapper({ open: false });
+      await flushPromises();
+
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("open")).toBe(false);
+    });
+
+    it("should emit update:open when ODialog emits update:open", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      await dialog.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.emitted("update:open")).toBeTruthy();
+      expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
+    });
+
+    it("should propagate true open value through update:open", async () => {
+      wrapper = createWrapper({ open: false });
+      await flushPromises();
+
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      await dialog.vm.$emit("update:open", true);
+      await flushPromises();
+
+      expect(wrapper.emitted("update:open")?.[0]).toEqual([true]);
+    });
+
+    it("should update subtitle reactively when data title changes", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      await wrapper.setProps({
+        data: { title: "New Dashboard", id: "dashboard-2" },
+      });
+      await flushPromises();
+
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("subTitle")).toContain("Panel : New Dashboard");
+    });
+
+    it("should update subtitle reactively when queries change", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      await wrapper.setProps({
+        metaData: { queries: [defaultProps.metaData.queries[0]] },
+      });
+      await flushPromises();
+
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("subTitle")).toContain("Total Queries: 1");
+    });
+  });
+
   describe("Template Rendering", () => {
-    it("should display query inspector title", async () => {
+    it("should display query inspector title via ODialog props", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Query Inspector");
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("title")).toBe("Query Inspector");
     });
 
-    it("should display panel title", async () => {
+    it("should display panel title via ODialog subtitle", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Panel : Error Analysis Dashboard");
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("subTitle")).toContain("Panel : Error Analysis Dashboard");
     });
 
-    it("should display total queries count", async () => {
+    it("should display total queries count via ODialog subtitle", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Total Queries: 2");
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("subTitle")).toContain("Total Queries: 2");
     });
 
-    it("should render close button", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const closeBtn = wrapper.find('[data-test="query-inspector-close-btn"]');
-      expect(closeBtn.exists()).toBe(true);
-    });
-
-    it("should render search input", async () => {
+    it("should render search input in header-right slot", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
@@ -263,7 +397,8 @@ describe("QueryInspector", () => {
       });
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Panel :");
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("subTitle")).toContain("Panel :");
     });
   });
 
@@ -277,6 +412,12 @@ describe("QueryInspector", () => {
       const props = QueryInspector.props;
       expect(props.data.required).toBe(true);
       expect(props.data.type).toBe(Object);
+    });
+
+    it("should default open prop to false", () => {
+      const props = QueryInspector.props;
+      expect(props.open.type).toBe(Boolean);
+      expect(props.open.default).toBe(false);
     });
   });
 
@@ -581,7 +722,7 @@ describe("QueryInspector", () => {
       wrapper.vm.searchQuery = "test";
 
       // Mock a regex that might throw
-      const spy = vi.spyOn(String.prototype, 'replace').mockImplementationOnce(() => {
+      const spy = vi.spyOn(String.prototype, "replace").mockImplementationOnce(() => {
         throw new Error("Regex error");
       });
 
@@ -634,31 +775,30 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const allButtons = wrapper.findAll('button');
-      const copyButton = allButtons.find((btn: any) => btn.text().includes("Copy"));
+      const copyButtons = wrapper
+        .findAll('[data-test-stub="o-button"]')
+        .filter((btn: any) => btn.text().includes("Copy"));
 
-      if (copyButton) {
-        await copyButton.trigger('click');
-        expect(navigator.clipboard.writeText).toHaveBeenCalled();
-      }
+      expect(copyButtons.length).toBeGreaterThan(0);
+
+      await copyButtons[0].trigger("click");
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalled();
     });
 
     it("should copy executed query when copy button is clicked", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Find all copy buttons and click the one for executed query
-      // OButton renders as native <button> elements with text "Copy"
-      const allButtons = wrapper.findAll('button');
-      const copyButtons = allButtons.filter(btn => btn.text().includes("Copy"));
+      const copyButtons = wrapper
+        .findAll('[data-test-stub="o-button"]')
+        .filter((btn: any) => btn.text().includes("Copy"));
 
       // There should be multiple copy buttons (one for originalQuery, one for query per query item)
-      // Find the button that would copy the executed query
       for (const btn of copyButtons) {
-        await btn.trigger('click');
+        await btn.trigger("click");
       }
 
-      // Verify clipboard writeText was called
       expect(navigator.clipboard.writeText).toHaveBeenCalled();
     });
   });

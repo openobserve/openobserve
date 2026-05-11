@@ -42,6 +42,52 @@ vi.mock('@/utils/commons', () => ({
   addPanel: vi.fn().mockResolvedValue(undefined)
 }));
 
+// ── ODialog stub ─────────────────────────────────────────────────────────────
+// Stub preserves slot content (so QueryInspector / ShowLegendsPopup mounting
+// can be asserted) and re-emits update:open + click:* events that the
+// migrated component listens for. Each stub instance carries a stable
+// `data-test` attribute so multiple ODialog usages can be queried separately.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "width",
+    "title",
+    "subTitle",
+    "showClose",
+    "persistent",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral", "close"],
+  inheritAttrs: false,
+  template: `
+    <div
+      data-test-stub="o-dialog"
+      :data-test="$attrs['data-test']"
+      :data-open="open"
+      :data-size="size"
+      :data-width="width"
+      :data-show-close="showClose"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+    </div>
+  `,
+};
+
 const mockPanelData = {
   id: "panel-1",
   title: "Test Panel",
@@ -156,6 +202,7 @@ describe("PanelContainer", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
+          ODialog: ODialogStub,
           'ChartRenderer': { template: '<div data-test="chart-renderer"></div>' },
           'TableRenderer': { template: '<div data-test="table-renderer"></div>' },
           'ViewPanel': { template: '<div data-test="view-panel"></div>' },
@@ -1483,6 +1530,139 @@ describe("PanelContainer", () => {
       await wrapper.find('[data-test="dashboard-panel-container"]').trigger('mouseover');
 
       expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(false);
+    });
+  });
+
+  describe("ODialog wiring (post-migration)", () => {
+    // Helper: find the query-inspector ODialog stub by its data-test attribute.
+    const findQueryInspectorDialog = (w: any) =>
+      w.findAllComponents({ name: "ODialog" }).find(
+        (d: any) => d.attributes("data-test") === "query-inspector-dialog"
+      );
+
+    // Helper: legends ODialog has no data-test attribute on the source so it
+    // is the only ODialog with `data-test` absent. We identify it by size="lg".
+    const findLegendsDialog = (w: any) =>
+      w.findAllComponents({ name: "ODialog" }).find(
+        (d: any) => d.props("size") === "lg"
+      );
+
+    it("should render ODialog instances for query inspector and legends", () => {
+      wrapper = createWrapper();
+
+      // Two ODialogs are owned directly by PanelContainer (query inspector +
+      // legends). Additional ODialogs may come from nested components such as
+      // ConfirmDialog, so we assert the two we own are present rather than
+      // a strict total count.
+      expect(findQueryInspectorDialog(wrapper)).toBeTruthy();
+      expect(findLegendsDialog(wrapper)).toBeTruthy();
+    });
+
+    it("should render query inspector ODialog closed by default", () => {
+      wrapper = createWrapper();
+
+      const dialog = findQueryInspectorDialog(wrapper);
+      expect(dialog).toBeTruthy();
+      expect(dialog.props("open")).toBe(false);
+    });
+
+    it("should configure query inspector ODialog with width=80 and showClose=false", () => {
+      wrapper = createWrapper();
+
+      const dialog = findQueryInspectorDialog(wrapper);
+      expect(dialog.props("width")).toBe(80);
+      expect(dialog.props("showClose")).toBe(false);
+    });
+
+    it("should open query inspector ODialog when showViewPanel becomes true", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showViewPanel = true;
+      await wrapper.vm.$nextTick();
+
+      const dialog = findQueryInspectorDialog(wrapper);
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("should close query inspector when ODialog emits update:open with false", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.showViewPanel = true;
+      await wrapper.vm.$nextTick();
+
+      const dialog = findQueryInspectorDialog(wrapper);
+      await dialog.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showViewPanel).toBe(false);
+    });
+
+    it("should close query inspector when ODialog emits close event", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.showViewPanel = true;
+      await wrapper.vm.$nextTick();
+
+      const dialog = findQueryInspectorDialog(wrapper);
+      await dialog.vm.$emit("close");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showViewPanel).toBe(false);
+    });
+
+    it("should close query inspector when inner QueryInspector emits close", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.showViewPanel = true;
+      await wrapper.vm.$nextTick();
+
+      const queryInspector = wrapper.findComponent('[data-test="query-inspector"]');
+      await queryInspector.vm.$emit("close");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showViewPanel).toBe(false);
+    });
+
+    it("should render legends ODialog closed by default with size=lg and showClose=false", () => {
+      wrapper = createWrapper();
+
+      const dialog = findLegendsDialog(wrapper);
+      expect(dialog).toBeTruthy();
+      expect(dialog.props("open")).toBe(false);
+      expect(dialog.props("size")).toBe("lg");
+      expect(dialog.props("showClose")).toBe(false);
+    });
+
+    it("should open legends ODialog when showLegendsDialog becomes true", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const dialog = findLegendsDialog(wrapper);
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("should open legends ODialog when PanelSchemaRenderer emits show-legends", async () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.showLegendsDialog).toBe(false);
+
+      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
+      await panelRenderer.vm.$emit("show-legends");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showLegendsDialog).toBe(true);
+      const dialog = findLegendsDialog(wrapper);
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("should close legends ODialog when it emits update:open with false", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const dialog = findLegendsDialog(wrapper);
+      await dialog.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showLegendsDialog).toBe(false);
     });
   });
 });
