@@ -56,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[320px] tw:text-center"
     >
       <q-icon name="auto_awesome" size="3rem" color="grey-5" class="tw:mb-3" />
-      <div class="tw:text-base tw:text-[var(--o2-text-2)] tw:mb-2">
+      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
         No LLM streams found
       </div>
       <div
-        class="tw:text-sm tw:text-[var(--o2-text-3)] tw:mb-3 tw:max-w-[30rem]"
+        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
       >
         LLM Insights aggregates spans from traces streams that capture
         <code>gen_ai_*</code> attributes. Either no traces stream has been
@@ -82,11 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[300px]"
     >
       <q-icon name="auto_awesome" size="3rem" color="grey-5" class="tw:mb-3" />
-      <div class="tw:text-base tw:text-[var(--o2-text-2)] tw:mb-2">
+      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
         No LLM data in <b>{{ activeStream }}</b>
       </div>
       <div
-        class="tw:text-sm tw:text-[var(--o2-text-3)] tw:mb-3 tw:max-w-[28rem] tw:text-center"
+        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[28rem] tw:text-center"
       >
         This stream doesn't have any LLM (<code>gen_ai_*</code>) fields. Pick a
         different stream above, or instrument your service with the OpenTelemetry
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
     >
       <q-icon name="info" size="3rem" color="grey-5" class="tw:mb-3" />
-      <div class="tw:text-base tw:text-[var(--o2-text-3)]">
+      <div class="tw:text-base tw:text-[var(--o2-text-muted)]">
         No LLM data found for the selected time range
       </div>
     </div>
@@ -134,16 +134,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="kpi-card card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
         >
           <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
-            <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-3)]">
+            <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
               {{ card.label }}
             </div>
             <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-              <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-1)]">
+              <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
                 {{ card.value }}
               </span>
               <span
                 v-if="card.unit"
-                class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+                class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
               >
                 {{ card.unit }}
               </span>
@@ -433,10 +433,10 @@ onUnmounted(() => {
     color: #16a34a;
   }
   &--bad {
-    color: #dc2626;
+    color: var(--o2-status-error-text);
   }
   &--neutral {
-    color: var(--o2-text-3);
+    color: var(--o2-text-muted);
   }
 }
 
