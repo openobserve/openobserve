@@ -616,13 +616,11 @@ pub struct SearchPartitionResponse {
     pub is_histogram_eligible: bool,
     #[serde(default)]
     pub is_non_ts_order_by: bool,
-    /// Primary ORDER BY column for non-ts queries; only valid when `is_non_ts_order_by` is true.
-    /// Only the first ORDER BY column is stored — ties from secondary columns are not preserved.
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub non_ts_order_by_col: Option<String>,
-    /// Sort direction for `non_ts_order_by_col`; true = DESC, false = ASC.
+    /// All ORDER BY columns for non-ts queries; only valid when `is_non_ts_order_by` is true.
+    /// Each entry is (column_name, is_descending). The heap honors all columns in order so
+    /// that ties on the primary column are broken correctly by secondary columns.
     #[serde(default)]
-    pub order_by_desc: bool,
+    pub non_ts_order_by_cols: Vec<(String, bool)>,
 }
 
 /// Request parameters for querying search history
@@ -2941,8 +2939,7 @@ mod tests {
             streaming_id: Some("stream123".to_string()),
             is_histogram_eligible: false,
             is_non_ts_order_by: false,
-            non_ts_order_by_col: None,
-            order_by_desc: true,
+            non_ts_order_by_cols: vec![],
         };
 
         response

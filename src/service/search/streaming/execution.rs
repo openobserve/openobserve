@@ -108,11 +108,7 @@ pub async fn do_partitioned_search(
     }
 
     let is_non_ts_order_by = partition_resp.is_non_ts_order_by;
-    let order_by_col = partition_resp
-        .non_ts_order_by_col
-        .clone()
-        .unwrap_or_default();
-    let order_by_desc = partition_resp.order_by_desc;
+    let non_ts_order_by_cols = partition_resp.non_ts_order_by_cols.clone();
     let original_from = req.query.from as usize;
     let original_size = if req.query.size > 0 {
         req.query.size as usize
@@ -125,8 +121,7 @@ pub async fn do_partitioned_search(
     let mut topk_heap = if is_non_ts_order_by {
         Some(TopKHeap::new(
             original_from + original_size,
-            &order_by_col,
-            order_by_desc,
+            &non_ts_order_by_cols,
         ))
     } else {
         None
