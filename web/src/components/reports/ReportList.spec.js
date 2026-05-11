@@ -122,16 +122,20 @@ installQuasar({
 
 // ODrawer stub: mirrors props/events from the real component so tests can drive
 // open/close via v-model:open and the @close emit (q-dialog → ODrawer migration).
+// Props are exposed via `data-stub-*` to avoid colliding with the parent's
+// `data-test` attr which fallthroughs to the stub root.
 const ODrawerStub = {
   name: "ODrawer",
   props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent"],
   emits: ["update:open", "close"],
+  inheritAttrs: false,
   template: `
     <div
       v-if="open"
-      data-test="o-drawer-stub"
-      :data-size="size"
-      :data-show-close="showClose"
+      class="o-drawer-stub"
+      :data-stub-size="size"
+      :data-stub-show-close="String(showClose)"
+      v-bind="$attrs"
     >
       <slot />
     </div>
@@ -680,7 +684,11 @@ describe("ReportList Component", () => {
   describe("Move-to-folder ODrawer", () => {
     it("should keep showMoveDialog false on initial render", () => {
       expect(wrapper.vm.showMoveDialog).toBe(false);
-      expect(wrapper.find('[data-test="o-drawer-stub"]').exists()).toBe(false);
+      expect(
+        wrapper.find(
+          '[data-test="report-move-to-another-folder-dialog"]',
+        ).exists(),
+      ).toBe(false);
     });
 
     it("should open drawer with single row's report id and folder", async () => {
@@ -703,10 +711,12 @@ describe("ReportList Component", () => {
     it("should render ODrawer with size lg and show-close false when open", async () => {
       wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
       await nextTick();
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
+      const drawer = wrapper.find(
+        '[data-test="report-move-to-another-folder-dialog"]',
+      );
       expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-size")).toBe("lg");
-      expect(drawer.attributes("data-show-close")).toBe("false");
+      expect(drawer.attributes("data-stub-size")).toBe("lg");
+      expect(drawer.attributes("data-stub-show-close")).toBe("false");
     });
 
     it("should render MoveAcrossFolders inside the drawer when open", async () => {
@@ -731,8 +741,17 @@ describe("ReportList Component", () => {
     it("should close drawer when ODrawer emits @close", async () => {
       wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
       await nextTick();
-      const drawer = wrapper.findComponent('[data-test="o-drawer-stub"]');
-      expect(drawer.exists()).toBe(true);
+      // Multiple ODrawer stubs may exist (some descendants render their own).
+      // Pick the one carrying our own data-test attribute (fallthrough from
+      // the template's `data-test="report-move-to-another-folder-dialog"`).
+      const drawer = wrapper
+        .findAllComponents(ODrawerStub)
+        .find(
+          (c) =>
+            c.attributes("data-test") ===
+            "report-move-to-another-folder-dialog",
+        );
+      expect(drawer).toBeTruthy();
       await drawer.vm.$emit("close");
       await nextTick();
       expect(wrapper.vm.showMoveDialog).toBe(false);
@@ -741,7 +760,7 @@ describe("ReportList Component", () => {
     it("should close drawer when MoveAcrossFolders emits @close", async () => {
       wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
       await nextTick();
-      const child = wrapper.findComponent('[data-test="move-across-folders-stub"]');
+      const child = wrapper.findComponent(MoveAcrossFoldersStub);
       expect(child.exists()).toBe(true);
       await child.vm.$emit("close");
       await nextTick();
@@ -751,11 +770,13 @@ describe("ReportList Component", () => {
     it("should run onMoveUpdated when MoveAcrossFolders emits @updated", async () => {
       wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "from-f" });
       await nextTick();
-      const child = wrapper.findComponent('[data-test="move-across-folders-stub"]');
+      const child = wrapper.findComponent(MoveAcrossFoldersStub);
       expect(child.exists()).toBe(true);
       vi.mocked(reports.listByFolderId).mockClear();
-      vi.mocked(reports.listByFolderId).mockResolvedValueOnce({ data: [] });
-      await child.vm.$emit("updated", "from-f", "to-f");
+      vi.mocked(reports.listByFolderId).mockResolvedValue({ data: [] });
+      // Pass the active folder ("default") as the source folder so its cache
+      // is invalidated and loadReports() goes back to the API instead of cache.
+      await child.vm.$emit("updated", "default", "to-f");
       await flushPromises();
       expect(wrapper.vm.showMoveDialog).toBe(false);
       expect(wrapper.vm.selectedReports).toEqual([]);
