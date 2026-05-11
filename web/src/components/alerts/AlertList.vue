@@ -738,7 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template>
-      <ODialog
+      <ODialog data-test="alert-list-form-dialog"
         v-model:open="showForm"
         persistent
         size="sm"

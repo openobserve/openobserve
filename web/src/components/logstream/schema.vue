@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="schema-drawer"
     :open="open"
     :width="60"
     :title='t("logStream.schemaHeader")'
@@ -1041,7 +1041,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h5>Wait while loading...</h5>
     </div>
   </ODrawer>
-  <ODrawer v-model:open="patternAssociationDialog.show" size="lg" :show-close="false">
+  <ODrawer data-test="schema-pattern-association-drawer" v-model:open="patternAssociationDialog.show" size="lg" :show-close="false">
     <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
   </ODrawer>
 

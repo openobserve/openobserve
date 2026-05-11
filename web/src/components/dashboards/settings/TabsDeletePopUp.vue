@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <ODialog
+  <ODialog data-test="tabs-delete-popup-dialog"
     v-model:open="open"
     size="md"
     :title="`Delete ${dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.name}`"

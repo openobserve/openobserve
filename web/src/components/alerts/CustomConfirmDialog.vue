@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog
+  <ODialog data-test="custom-confirm-dialog"
     v-model:open="isVisible"
     size="sm"
     :title="title"

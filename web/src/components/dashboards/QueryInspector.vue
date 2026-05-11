@@ -1,5 +1,5 @@
 <template>
-  <ODialog
+  <ODialog data-test="query-inspector"
     :open="open"
     @update:open="$emit('update:open', $event)"
     title="Query Inspector"

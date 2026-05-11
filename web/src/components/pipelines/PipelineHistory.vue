@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <ODialog v-model:open="detailsDialog" size="lg" title="Pipeline Execution Details" primary-button-label="Close" @click:primary="detailsDialog = false">
+    <ODialog data-test="pipeline-history-details-dialog" v-model:open="detailsDialog" size="lg" title="Pipeline Execution Details" primary-button-label="Close" @click:primary="detailsDialog = false">
       <div
         class="scroll"
         style="max-height: 70vh"
@@ -530,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Error Dialog -->
-    <ODialog
+    <ODialog data-test="pipeline-history-error-dialog"
       v-model:open="errorDialog"
       size="sm"
       :title="errorMessage?.pipeline_name"

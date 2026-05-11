@@ -19,7 +19,7 @@
 
 
     <template>
-        <ODrawer
+        <ODrawer data-test="enrichment-schema-drawer"
         :open="open"
         size="lg"
         :title="t('logStream.schemaHeader')"

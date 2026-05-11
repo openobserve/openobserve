@@ -179,7 +179,7 @@
         </div>
       </div>
     </div>
-    <ODialog v-model:open="showLegendsDialog" :show-close="false" size="lg">
+    <ODialog data-test="view-panel-legends-dialog" v-model:open="showLegendsDialog" :show-close="false" size="lg">
       <ShowLegendsPopup
         :panelData="currentPanelData"
         @close="showLegendsDialog = false"

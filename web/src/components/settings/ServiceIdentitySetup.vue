@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Field Mapping Dialog -->
-          <ODialog
+          <ODialog data-test="service-identity-setup-field-mapping-dialog"
             v-model:open="showFieldMappingDialog"
             size="sm"
             :title="t('settings.correlation.customizeFieldMappings')"
@@ -1049,7 +1049,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Workload Insight Sidebar -->
-        <ODrawer
+        <ODrawer data-test="service-identity-setup-insight-drawer"
           v-model:open="insightDialogOpen"
           :width="insightPanelWidthPct"
         >
@@ -1355,7 +1355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Field Details Dialog -->
-      <ODialog
+      <ODialog data-test="service-identity-setup-details-dialog"
         v-model:open="detailsDialogVisible"
         @update:open="(v) => { if (!v) { preselectedValue = ''; popupPrimaryValue = ''; popupColumnSelections = []; } }"
         size="md"

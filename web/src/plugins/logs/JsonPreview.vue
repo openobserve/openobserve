@@ -263,7 +263,7 @@
         </div>
       </div>
     </div>
-    <ODialog
+    <ODialog data-test="json-preview-regex-pattern-dialog"
       v-if="config.isEnterprise == 'true'"
       v-model:open="typeOfRegexPattern"
       size="lg"

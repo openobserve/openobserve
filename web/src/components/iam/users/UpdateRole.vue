@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="update-role-dialog"
     :open="open"
     size="lg"
     :title="t('user.editUser')"

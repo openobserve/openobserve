@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="add-dashboard-from-github-drawer"
     v-model:open="show"
     side="right"
     size="lg"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
     <!-- Folder Selection Dialog -->
-    <ODialog
+    <ODialog data-test="add-dashboard-from-github-folder-selection-dialog"
       v-model:open="showFolderSelection"
       persistent
       size="sm"

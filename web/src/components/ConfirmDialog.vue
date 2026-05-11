@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     v-model:open="open"
+    data-test="confirm-dialog"
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"
     :secondary-button-label="t('confirmDialog.cancel')"

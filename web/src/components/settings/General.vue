@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="lg"
     color="primary"
   ></q-spinner-hourglass>
-  <ODialog
+  <ODialog data-test="general-delete-image-dialog"
     v-model:open="confirmDeleteImage"
     size="xs"
     :secondary-button-label="t('confirmDialog.cancel')"
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <p>{{ t('settings.deleteLogoMessage') }}</p>
   </ODialog>
 
-  <ODialog
+  <ODialog data-test="general-color-picker-dialog"
     v-model:open="showColorPicker"
     @update:open="(v) => !v && onColorPickerClose()"
     size="xs"

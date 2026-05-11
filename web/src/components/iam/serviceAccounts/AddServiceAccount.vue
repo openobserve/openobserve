@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="add-service-account-dialog"
     :open="open"
     size="lg"
     :title="beingUpdated ? t('serviceAccounts.update') : t('serviceAccounts.add')"

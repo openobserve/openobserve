@@ -15,12 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog
+  <ODialog data-test="time-range-editor-dialog"
     :open="modelValue"
     @update:open="(v) => { $emit('update:modelValue', v); if (!v) handleClose(); }"
     size="sm"
     :title="t('correlation.logs.timeRange.title')"
-    data-test="time-range-editor-dialog"
     :secondary-button-label="t('common.cancel')"
     :neutral-button-label="t('common.reset')"
     :primary-button-label="t('common.apply')"

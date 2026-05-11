@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog v-model:open="showDialog" size="full" :title="t('search.queryPlan')" @update:open="(v) => !v && onClose()">
+  <ODialog v-model:open="showDialog" data-test="query-plan-dialog" size="full" :title="t('search.queryPlan')" @update:open="(v) => !v && onClose()">
     <div class="query-plan-content full-height q-pa-none">
         <q-splitter v-model="splitterPosition" class="full-height">
           <!-- Left Pane: SQL Query -->

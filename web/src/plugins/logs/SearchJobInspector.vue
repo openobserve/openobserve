@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <ODrawer v-model:open="showSqlDialog" size="lg" title="SQL Query">
+    <ODrawer data-test="search-job-inspector-sql-drawer" v-model:open="showSqlDialog" size="lg" title="SQL Query">
       <template #header-right>
         <OButton
           v-if="profileData?.sql"
@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODrawer>
 
     <!-- Trace ID Dialog -->
-    <ODialog v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
+    <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
       <div class="tw:flex tw:items-center tw:gap-3">
         <div class="tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:p-3 tw:rounded tw:border"
              :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">

@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
     <template>
-      <ODialog
+      <ODialog data-test="action-scripts-form-dialog"
         v-model:open="showForm"
         persistent
         size="md"

@@ -149,7 +149,7 @@
     </div>
 
     <!-- Operation Selector Dialog -->
-    <ODialog v-model:open="showOperationSelector" size="sm" title="Add Operation"
+    <ODialog data-test="operations-list-operation-selector-dialog" v-model:open="showOperationSelector" size="sm" title="Add Operation"
       primary-button-label="Close"
       @click:primary="showOperationSelector = false"
     >

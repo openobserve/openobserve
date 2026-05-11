@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
 
               <!-- Pattern Examples Dialog -->
-              <ODialog v-model:open="showExamples" size="sm"
+              <ODialog data-test="model-pricing-editor-examples-dialog" v-model:open="showExamples" size="sm"
                 :title="t('modelPricing.patternExamplesTitle')"
                 :sub-title="t('modelPricing.patternExamplesDesc')"
               >

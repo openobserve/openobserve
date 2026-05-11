@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="add-stream-dialog"
     :open="open"
     size="md"
     :title="t('logStream.add')"

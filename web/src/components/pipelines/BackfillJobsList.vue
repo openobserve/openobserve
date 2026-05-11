@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Error Dialog -->
-    <ODialog
+    <ODialog data-test="backfill-jobs-list-error-dialog"
       v-model:open="errorDialogVisible"
       size="md"
       title="Backfill Job Error"

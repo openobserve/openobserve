@@ -1,5 +1,5 @@
 <template>
-  <ODrawer
+  <ODrawer data-test="dashboard-json-editor-drawer"
     :open="open"
     :width="70"
     persistent

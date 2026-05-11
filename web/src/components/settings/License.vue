@@ -400,7 +400,7 @@
     </div>
 
     <!-- License Key Modal -->
-    <ODialog
+    <ODialog data-test="license-key-modal-dialog"
       v-model:open="showLicenseKeyModal"
       persistent
       size="md"

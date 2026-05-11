@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </q-table>
-    <ODrawer
+    <ODrawer data-test="associated-stream-function-index-schema-drawer"
       v-model:open="showIndexSchemaDialog"
       size="lg"
     >

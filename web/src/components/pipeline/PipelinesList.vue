@@ -510,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <router-view v-else />
 
-  <ODrawer v-model:open="showCreatePipeline" size="lg">
+  <ODrawer data-test="pipelines-list-create-pipeline-drawer" v-model:open="showCreatePipeline" size="lg">
     <stream-selection @save="savePipeline" />
   </ODrawer>
 
@@ -540,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 
   <!-- Pipeline Error Dialog -->
-  <ODialog
+  <ODialog data-test="pipelines-list-error-dialog"
     v-model:open="errorDialog.show"
     @update:open="(v) => !v && closeErrorDialog()"
     size="md"

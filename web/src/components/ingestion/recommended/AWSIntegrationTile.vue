@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card-actions>
 
     <!-- Unified Integration Method Selection Dialog -->
-    <ODialog v-model:open="showTemplateDialog" size="sm" title="Choose Integration Method"
+    <ODialog data-test="aws-integration-tile-template-dialog" v-model:open="showTemplateDialog" size="sm" title="Choose Integration Method"
       secondary-button-label="Cancel"
       @click:secondary="showTemplateDialog = false"
     >
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Component Display Dialog -->
-    <ODialog v-model:open="showComponentContent" size="xl" :title="selectedComponentTitle">
+    <ODialog data-test="aws-integration-tile-content-dialog" v-model:open="showComponentContent" size="xl" :title="selectedComponentTitle">
       <component
         :is="selectedComponent"
         :currOrgIdentifier="organizationId"

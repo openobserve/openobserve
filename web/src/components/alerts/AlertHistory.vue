@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <ODialog
+    <ODialog data-test="alert-history-details-dialog"
       v-model:open="detailsDialog"
       :width="55"
       title="Alert Execution Details"
@@ -513,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Error Dialog -->
-    <ODialog
+    <ODialog data-test="alert-history-error-dialog"
       v-model:open="errorDialog"
       size="md"
       :title="errorMessage.alert_name"

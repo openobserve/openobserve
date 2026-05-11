@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </base-import>
 
   <!-- Group Details Dialog -->
-  <ODialog
+  <ODialog data-test="import-semantic-groups-group-dialog"
     v-model:open="showGroupDialog"
     size="md"
     :title="selectedGroup?.display"
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <ODialog
+  <ODialog data-test="import-semantic-groups-modification-dialog"
     v-model:open="showModificationDialog"
     size="lg"
     :title="selectedModification?.proposed.display"

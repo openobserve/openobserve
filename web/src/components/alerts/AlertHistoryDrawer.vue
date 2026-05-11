@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="alert-history-drawer"
     :open="open"
     :width="55"
     :title="t('alert_list.alert_history')"

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <ODialog v-model:open="open" size="sm" :title="title"
+  <ODialog data-test="single-panel-move-dialog" v-model:open="open" size="sm" :title="title"
     :secondary-button-label="t('confirmDialog.cancel')"
     primary-button-label="Move"
     :primary-button-disabled="selectedMoveTabId === null"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left><q-icon name="add" /></template>
           <q-tooltip>Add Tab</q-tooltip>
         </OButton>
-        <ODrawer
+        <ODrawer data-test="single-panel-move-add-tab-drawer"
           v-model:open="showAddTabDialog"
           size="md"
           :show-close="false"

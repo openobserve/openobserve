@@ -1,5 +1,5 @@
 <template>
-  <ODialog v-model:open="dialogVisible" persistent size="md" :show-close="false"
+  <ODialog data-test="cross-link-dialog" v-model:open="dialogVisible" persistent size="md" :show-close="false"
     :title="isEditing ? t('crossLinks.editCrossLink') : t('crossLinks.addCrossLink')"
     :secondary-button-label="t('common.cancel')"
     :primary-button-label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"

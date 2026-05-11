@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODrawer data-test="add-user-dialog"
     :open="open"
     size="lg"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-form>
     </div>
   </ODrawer>
-  <ODialog
+  <ODialog data-test="add-user-logout-confirm-dialog"
     v-model:open="logout_confirm"
     persistent
     size="xs"

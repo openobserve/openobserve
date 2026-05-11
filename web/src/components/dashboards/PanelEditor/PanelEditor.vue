@@ -536,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             /></template>
                             Example Charts
                           </OButton>
-                          <ODialog v-model:open="showCustomChartTypeSelector" :show-close="false" :width="95">
+                          <ODialog data-test="panel-editor-custom-chart-type-selector-dialog" v-model:open="showCustomChartTypeSelector" :show-close="false" :width="95">
                             <CustomChartTypeSelector
                               @select="handleChartTypeSelection"
                               @close="showCustomChartTypeSelector = false"
@@ -646,7 +646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Legends Dialog -->
-    <ODialog v-model:open="showLegendsDialog" :show-close="false" size="lg">
+    <ODialog data-test="panel-editor-legends-dialog" v-model:open="showLegendsDialog" :show-close="false" size="lg">
       <ShowLegendsPopup
         :panelData="currentPanelData"
         @close="showLegendsDialog = false"

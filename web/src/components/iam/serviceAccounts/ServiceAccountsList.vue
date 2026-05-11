@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="addMember"
     />
 
-    <ODialog
+    <ODialog data-test="service-accounts-list-refresh-dialog"
       v-model:open="confirmRefresh"
       size="xs"
       :title="t('serviceAccounts.confirmRefreshHead')"
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>{{ t('serviceAccounts.confirmRefreshMsg') }}</p>
     </ODialog>
 
-    <ODialog
+    <ODialog data-test="service-accounts-list-delete-dialog"
       v-model:open="confirmDelete"
       size="xs"
       :title="t('serviceAccounts.confirmDeleteHead')"
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>{{ t('serviceAccounts.confirmDeleteMsg') }}</p>
     </ODialog>
 
-    <ODialog
+    <ODialog data-test="service-accounts-list-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
       size="xs"
       title="Delete Service Accounts"
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</p>
     </ODialog>
 
-    <ODialog
+    <ODialog data-test="service-accounts-list-token-dialog"
       v-model:open="isShowToken"
       persistent
       size="md"

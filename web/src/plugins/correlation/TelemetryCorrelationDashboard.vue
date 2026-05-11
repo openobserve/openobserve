@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Dialog Mode -->
-  <ODrawer
+  <ODrawer data-test="telemetry-correlation-dashboard-drawer"
     v-if="props.mode === 'dialog'"
     v-model:open="isOpen"
     side="right"
@@ -1068,7 +1068,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- Metric Stream Selector Dialog -->
-  <ODialog v-model:open="showMetricSelector" size="md" :title="t('correlation.selectMetrics')">
+  <ODialog data-test="telemetry-correlation-dashboard-metric-selector-dialog" v-model:open="showMetricSelector" size="md" :title="t('correlation.selectMetrics')">
     <!-- Search Input -->
     <q-input
       v-model="metricSearchText"
