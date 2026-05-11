@@ -35,27 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
 
-        <!-- Occurrence Column Header -->
+        <!-- Count & Percentage Column Header -->
         <div
-          class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right"
+          class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right"
         >
           <span
             class="tw:font-bold"
             :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
           >
             {{ t("search.occurrenceColumnHeader") }}
-          </span>
-        </div>
-
-        <!-- Percentage Column Header -->
-        <div
-          class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right"
-        >
-          <span
-            class="tw:font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
-          >
-            {{ t("search.percentageColumnHeader") }}
           </span>
         </div>
 
