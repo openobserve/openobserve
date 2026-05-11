@@ -181,7 +181,7 @@ height="32px" />
           :expanded-rows="expandedRows"
           :highlight-timestamp="-1"
           :default-columns="showingDefaultColumns"
-          :jsonpreview-stream-name="primaryStream"
+          :jsonpreview-stream-name="jsonPreviewStreamName"
           :highlight-query="highlightQuery"
           :selected-stream-fts-keys="ftsFields"
           :selected-stream-fields="selectedFields"
@@ -297,7 +297,7 @@ const {
   took,
   currentFilters,
   currentTimeRange,
-  primaryStream,
+  logStreamsCount,
   hasResults,
   isLoading,
   hasError,
@@ -310,6 +310,17 @@ const {
   isMatchedDimension,
   isAdditionalDimension,
 } = useCorrelatedLogs(props);
+
+// Stream name for JSON preview — use first correlated stream, or source stream
+const jsonPreviewStreamName = computed(() => {
+  if (props.logStreams && props.logStreams.length > 0) {
+    return props.logStreams[0].stream_name;
+  }
+  if (props.sourceStream) {
+    return props.sourceStream;
+  }
+  return '';
+});
 
 // Component state
 const wrapTableCells = ref(false);
@@ -603,7 +614,7 @@ const initializeVisibleColumns = (fields: string[]) => {
   if (fields.length === 0) return;
 
   const defaults = new Set<string>();
-  const timestampField = fields.find((f) => f === "_timestamp");
+  const timestampField = fields.find((f) => f === (store.state.zoConfig.timestamp_column || "_timestamp"));
   if (timestampField) defaults.add(timestampField);
 
   for (const keyField of defaultLogFields.value) {
