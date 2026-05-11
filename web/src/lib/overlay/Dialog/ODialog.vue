@@ -56,7 +56,9 @@ function handleOpenChange(v: boolean) {
 function handleEscapeKeyDown(e: KeyboardEvent) {
   if (props.persistent) {
     e.preventDefault();
+    return;
   }
+  clearBodyValidation();
 }
 
 function handleInteractOutside(e: Event) {
@@ -80,7 +82,9 @@ function handleInteractOutside(e: Event) {
     target?.closest(".q-menu") // Quasar portals (q-select, q-btn-dropdown, …)
   ) {
     e.preventDefault();
+    return;
   }
+  clearBodyValidation();
 }
 
 // Header renders when there is a header slot, a title, any sub-slot, OR a visible close button.
@@ -153,6 +157,23 @@ const contentStyle = computed(() =>
   props.width != null ? { width: `${props.width}vw` } : undefined,
 );
 
+// ── Validation reset on cancel-path close ───────────────────────────────────
+/** Reset Quasar q-field validation for every field in the body slot so that
+ *  cancel-path closes (Cancel button, ×, Escape, overlay click) never surface
+ *  lazy-rules validation errors to the user. */
+function clearBodyValidation() {
+  const body = bodyRef.value;
+  if (!body) return;
+  body.querySelectorAll<HTMLElement>('.q-field').forEach((el) => {
+    const vm = (el as any).__vueParentComponent;
+    if (vm?.ctx?.resetValidation) {
+      vm.ctx.resetValidation();
+    } else if (typeof vm?.exposed?.resetValidation === 'function') {
+      vm.exposed.resetValidation();
+    }
+  });
+}
+
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
@@ -162,8 +183,14 @@ function handleOpenAutoFocus(event: Event) {
   nextTick(() => {
     const body = bodyRef.value;
     if (body) {
-      const firstField = body.querySelector<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"]',
+      const candidates = body.querySelectorAll<HTMLElement>(
+        [
+          'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
+          'textarea:not([disabled])',
+        ].join(', ')
+      );
+      const firstField = Array.from(candidates).find(
+        (el) => !el.closest('.q-select, .o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]')
       );
       if (firstField) {
         firstField.focus();
@@ -311,6 +338,7 @@ watch(internalOpen, (open) => {
             <button
               type="button"
               aria-label="Close dialog"
+              @mousedown.prevent
               :class="[
                 'tw:shrink-0 tw:flex tw:items-center tw:justify-center',
                 'tw:h-7 tw:w-7 tw:rounded-md',
@@ -397,6 +425,7 @@ watch(internalOpen, (open) => {
                 size="sm-action"
                 :disabled="secondaryEffectivelyDisabled"
                 :loading="secondaryButtonLoading"
+                @mousedown.prevent
                 @click="emit('click:secondary')"
               >
                 {{ secondaryButtonLabel }}
