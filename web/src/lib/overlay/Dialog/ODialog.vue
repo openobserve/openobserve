@@ -10,9 +10,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, useSlots, computed, nextTick } from "vue";
+import { ref, watch, useSlots, computed, nextTick, useAttrs } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+// Forward the consumer's `data-test` from <ODialog data-test="…"> onto the
+// rendered panel so e2e selectors can scope to the specific dialog instance
+// using the audit pattern: [data-test="<parent>"] [data-test="o-dialog-*-btn"].
+// (DialogRoot is renderless, so default attribute inheritance would lose it.)
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<DialogProps>(), {
   persistent: false,
@@ -242,7 +250,7 @@ watch(internalOpen, (open) => {
       <!-- Dialog panel -->
       <DialogContent
         data-o2-dialog
-        data-test="o-dialog-panel"
+        :data-test="parentDataTest || 'o-dialog-panel'"
         :style="contentStyle"
         :class="[
           // Positioning — centered in viewport

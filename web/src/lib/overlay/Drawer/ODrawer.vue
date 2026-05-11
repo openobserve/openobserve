@@ -10,9 +10,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, useSlots, computed, inject, provide, nextTick } from "vue";
+import { ref, watch, useSlots, computed, inject, provide, nextTick, useAttrs } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+// Forward the consumer's `data-test` from <ODrawer data-test="…"> onto the
+// rendered panel so e2e selectors can scope to the specific drawer instance
+// using the audit pattern: [data-test="<parent>"] [data-test="o-drawer-*-btn"].
+// (DialogRoot is renderless, so default attribute inheritance would lose it.)
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<DrawerProps>(), {
   persistent: false,
@@ -250,7 +258,7 @@ watch(internalOpen, (open) => {
       <!-- Drawer panel -->
       <DialogContent
         data-o2-drawer
-        data-test="o-drawer-panel"
+        :data-test="parentDataTest || 'o-drawer-panel'"
         :style="contentStyle"
         :class="[
           // Full-height, anchored to chosen edge
