@@ -125,7 +125,9 @@
     "resources": "Recursos",
     "updated_at": "Atualizado em",
     "error": "Erro",
-    "db": "Banco de dados"
+    "db": "Banco de dados",
+    "discardChanges": "Descartar alterações",
+    "unsavedChanges": "Alterações não salvas"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
