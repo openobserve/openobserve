@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row items-center tw:flex-nowrap!" data-test="trace-row-service">
+  <div class="row items-center tw:flex-nowrap!" :data-test="dataTest || 'trace-row-service'">
     <!-- Service type icon -->
     <img
       data-test="trace-row-service-icon"
@@ -48,6 +48,7 @@ import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 
 const props = defineProps<{
   item: Record<string, any>;
+  dataTest?: string;
 }>();
 
 const $q = useQuasar();

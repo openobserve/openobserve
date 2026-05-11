@@ -294,6 +294,118 @@ test.describe("Traces Regression Bugs", () => {
     testLogger.info('✓ PASSED: Pagination cursor persistence test completed');
   });
 
+  // ==========================================================================
+  // Bug #11689: Service Catalog: clearing search filter with cross icon blanks out the page
+  // https://github.com/openobserve/openobserve/issues/11689
+  // ==========================================================================
+  test("Clearing search filter should not blank out Service Catalog table", {
+    tag: ['@bug-11689', '@P0', '@regression', '@tracesRegression', '@serviceCatalog']
+  }, async ({ page }) => {
+    testLogger.info('Test: Verify clearing search filter does not blank Service Catalog (Bug #11689)');
+
+    const scPage = pm.servicesCatalogPage;
+
+    // Navigate to Service Catalog
+    await scPage.clickServiceCatalogTab();
+    await scPage.waitForLoad();
+
+    // STRONG ASSERTION: Services should be loaded
+    const initialCount = await scPage.getServiceCount();
+    testLogger.info(`Initial service count: ${initialCount}`);
+    expect(initialCount, 'Bug #11689: Service Catalog should have services loaded').toBeGreaterThan(0);
+
+    // Type in the filter to trigger the clear button appearance
+    await scPage.filterByServiceName('alert');
+    testLogger.info('✓ Typed "alert" in search filter');
+
+    // Click the actual Quasar clear/cross icon (this was the bug trigger — Quasar sets value to null)
+    const clearClicked = await scPage.clickFilterClearButton();
+    testLogger.info(clearClicked ? '✓ Clicked Quasar clear/cross icon' : 'Clear button not visible, used fill(\'\') fallback');
+
+    // STRONG ASSERTION: Must click the actual Quasar clear icon — the fill('') fallback doesn't reproduce bug #11689
+    expect(clearClicked, 'Bug #11689: Quasar clear icon must be clickable — fill(\'\') fallback does not exercise the regression').toBe(true);
+
+    // PRIMARY ASSERTION: Table should NOT be blank after clearing
+    const afterClearCount = await scPage.getServiceCount();
+    testLogger.info(`Service count after clearing filter: ${afterClearCount}`);
+    expect(afterClearCount, 'Bug #11689: Service count should be maintained after clearing filter (table should not go blank)').toBeGreaterThan(0);
+
+    // SECONDARY ASSERTION: Table should still be visible
+    const tableVisible = await scPage.isTableVisible();
+    expect(tableVisible, 'Bug #11689: Services table should remain visible after clearing filter').toBe(true);
+
+    testLogger.info('✓ PASSED: Service Catalog clear filter test completed');
+  });
+
+  // ==========================================================================
+  // Bug #11687: String.replace $ pattern vulnerability in ServiceGraphNodeSidePanel
+  // https://github.com/openobserve/openobserve/issues/11687
+  // ==========================================================================
+  test("Service graph node side panel should render without errors after $ pattern fix", {
+    tag: ['@bug-11687', '@P0', '@regression', '@tracesRegression', '@serviceGraph']
+  }, async ({ page }) => {
+    testLogger.info('Test: Verify service graph side panel renders without errors (Bug #11687)');
+
+    // Collect console errors from this point forward
+    const consoleErrors = [];
+    const errorHandler = msg => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    };
+    page.on('console', errorHandler);
+
+    // Navigate to Service Graph
+    const sgPage = pm.serviceGraphPage;
+    await sgPage.navigateToServiceGraph();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // STRONG ASSERTION: Service graph should be visible
+    const graphVisible = await sgPage.isServiceGraphVisible();
+    expect(graphVisible, 'Bug #11687: Service graph should be visible').toBe(true);
+    testLogger.info('✓ Service graph loaded');
+
+    // Click a node to open the side panel (triggers the .replace() code path)
+    let nodeClicked = false;
+
+    // Discover available nodes dynamically via API instead of hardcoded list
+    const topology = await sgPage.getTopologyViaAPI();
+    const nodes = topology.data?.nodes || topology.data?.data?.nodes || [];
+    const nodeNames = nodes.map(n => n.label || n.id).filter(Boolean);
+
+    for (const nodeName of nodeNames) {
+      try {
+        await sgPage.clickNodeByName(nodeName);
+        testLogger.info(`✓ Clicked service node: ${nodeName}`);
+        nodeClicked = true;
+        break;
+      } catch (e) {
+        testLogger.debug(`Service node "${nodeName}" not found, trying next...`);
+      }
+    }
+
+    if (!nodeClicked) {
+      testLogger.warn(`No service nodes available to click from ${nodeNames.length} discovered nodes — skipping side panel verification`);
+      page.removeListener('console', errorHandler);
+      test.skip(true, 'No service nodes available to click — cannot verify #11687 side panel');
+    }
+
+    // PRIMARY ASSERTION: Side panel should be visible after node click
+    const sidePanelVisible = await sgPage.isSidePanelVisible();
+    expect(sidePanelVisible, 'Bug #11687: Side panel should be visible after clicking a service node').toBe(true);
+    testLogger.info('✓ Side panel rendered successfully');
+
+    // SECONDARY ASSERTION: No replace/trim related console errors
+    page.removeListener('console', errorHandler);
+    if (consoleErrors.length > 0) {
+      testLogger.warn(`Console errors detected: ${consoleErrors.length}`, { errors: consoleErrors.slice(0, 5) });
+    }
+    const replaceErrors = consoleErrors.filter(e =>
+      e.includes('.replace') || e.includes('replace is not a function')
+    );
+    expect(replaceErrors.length, 'Bug #11687: Should not have replace/null related console errors in side panel').toBe(0);
+
+    testLogger.info('✓ PASSED: Service graph side panel $ pattern fix test completed');
+  });
+
   test.afterEach(async () => {
     testLogger.info('Traces regression test completed');
   });

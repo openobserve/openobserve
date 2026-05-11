@@ -281,7 +281,7 @@ export class AlertCreationWizard {
 
         // Forcefully remove any remaining q-portal elements that intercept clicks
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { el.style.display = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
@@ -1556,6 +1556,8 @@ export class AlertCreationWizard {
         await expect(this.page.getByRole('option', { name: 'metrics' })).toBeVisible({ timeout: 10000 });
         await this.page.getByRole('option', { name: 'metrics' }).locator('div').nth(2).click();
         await this.page.waitForTimeout(1000);
+        // Wait for stream listing API to complete after type change
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Selected stream type: metrics');
 
         // Select metrics stream name
@@ -1614,7 +1616,7 @@ export class AlertCreationWizard {
         // Forcefully remove any remaining q-portal elements that intercept clicks
         // (q-dialog uses q-portal which can leave aria-hidden overlays in the DOM)
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { el.style.display = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
         testLogger.info('Closed PromQL Editor dialog — portal cleaned up');
@@ -1629,7 +1631,7 @@ export class AlertCreationWizard {
         // The outer flex container holds both the label div and controls div as siblings
         const promqlConditionRow = promqlConditionLabel.locator('..');
 
-        // Select operator — click the inner control area for proper q-select popup
+        // Select operator (portals are hidden so Q-Select receives click)
         const promqlOperatorSelect = promqlConditionRow.locator('.q-select').first();
         await promqlOperatorSelect.locator('.q-field__control').click({ timeout: 10000 });
         await this.page.waitForTimeout(800);
