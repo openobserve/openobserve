@@ -258,14 +258,14 @@ export function inferTypeFromValues(rawValues: any[]): string {
   for (const v of values) {
     // Check if the value itself looks like a log pattern template
     if (templateRe.test(v)) { pattern++; continue; }
+    // Timestamp — check before IP (time strings like 10:30:00 can match IPv6 regex)
+    if (TS_DATE_RE.test(v) || TS_TIME_RE.test(v)) { ts++; continue; }
     // Structural patterns
     if (IPV4_RE.test(v) || IPV6_RE.test(v)) { ip++; continue; }
     if (HTTP_METHODS.has(v.toUpperCase())) { method++; continue; }
     if (UUID_RE.test(v)) { uuid++; continue; }
     if (EMAIL_RE.test(v)) { email++; continue; }
     if (/^https?:\/\//.test(v)) { url++; continue; }
-    // Timestamp — must check before generic number patterns
-    if (TS_DATE_RE.test(v) || TS_TIME_RE.test(v)) { ts++; continue; }
     // Numeric — check float before int (float pattern is more specific)
     if (FLOAT_RE.test(v)) { float++; continue; }
     if (INT_RE.test(v)) { int++; continue; }
@@ -281,9 +281,10 @@ export function inferTypeFromValues(rawValues: any[]): string {
   if (email >= threshold) return "email";
   if (ts >= threshold) return "ts";
   if (hex >= threshold) return "hex";
+  // Check combined int+float first so mixed numeric values say "num"
+  if (int + float >= threshold) return "num";
   if (float >= threshold) return "float";
   if (int >= threshold) return "num";
-  if (int + float >= threshold) return "num";
 
   return "str";
 }
