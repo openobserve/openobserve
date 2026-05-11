@@ -32,6 +32,7 @@ import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   computed,
   onBeforeUnmount,
+  onMounted,
   provide,
   ref,
   useSlots,
@@ -63,6 +64,8 @@ const props = withDefaults(defineProps<SelectProps>(), {
   searchPlaceholder: "Search...",
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
+  // Intentionally no default — when undefined, the chip count is computed
+  // from the live trigger width. Pass a number to force a fixed cap.
 });
 
 const emit = defineEmits<SelectEmits>();
@@ -342,10 +345,125 @@ const virtualizer = useVirtualizer(
   })),
 );
 
+// md was h-10 (40px); reduced to h-9 (36px) so the trigger matches the
+// compact OInput density and the in-dropdown search filter.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "tw:h-8 tw:text-sm",
-  md: "tw:h-10 tw:text-sm",
+  md: "tw:h-9 tw:text-sm",
 };
+
+// Open-state tracking. Reka's PopoverTrigger / SelectTrigger expose
+// `data-state="open"`, but Vue can't reach across components with a
+// CSS group selector without extra wiring — track a ref instead and
+// bind the chevron's rotation class to it.
+const selectOpen = ref(false);
+
+const isOpen = computed(() =>
+  listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
+);
+
+// ── Chip overflow (width-aware) ──────────────────────────────────────────
+// In multi-select mode, fit as many chips as the trigger width allows; the
+// rest collapse into a "+N more" indicator. When `maxVisibleChips` is set,
+// that becomes a hard upper bound; otherwise the count is computed live
+// from the trigger's measured width via ResizeObserver.
+
+/** The outer wrapper around the trigger. Measured to size the chip row. */
+const triggerWrapperRef = ref<HTMLElement | null>(null);
+const triggerWidth = ref(0);
+let triggerResizeObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+  if (!triggerWrapperRef.value) return;
+  triggerWidth.value = triggerWrapperRef.value.clientWidth;
+  triggerResizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      triggerWidth.value = entry.contentRect.width;
+    }
+  });
+  triggerResizeObserver.observe(triggerWrapperRef.value);
+});
+
+onBeforeUnmount(() => {
+  triggerResizeObserver?.disconnect();
+  triggerResizeObserver = null;
+});
+
+/**
+ * Estimate a chip's rendered width in pixels from its label.
+ * Chip styling: `tw:px-2 tw:py-0.5 tw:text-xs` (12px font), max-w-40 = 160px.
+ * Roughly 6.5px per character at 12px font + 16px horizontal padding.
+ */
+function estimateChipWidth(label: string): number {
+  const labelW = Math.min(Math.ceil(label.length * 6.5), 144); // cap to 160-16 padding
+  return labelW + 16; // px-2 each side
+}
+
+// Space reserved inside the trigger for non-chip content: left ps-3 padding,
+// trailing chevron icon, optional clear button. Approximated; the
+// ResizeObserver makes minor mis-estimates self-correct on the next layout.
+const reservedTriggerSpace = computed(() => {
+  let reserved = 12 + 32; // ps-3 (12px) + chevron + its padding (~32px)
+  if (props.clearable && hasSelection.value) reserved += 32; // clear btn + gap
+  return reserved;
+});
+
+const overflowChipEstimatedWidth = 70; // "+N more" pill width approximation
+const chipGap = 4; // tw:gap-1 between chips
+
+/**
+ * Number of chips that actually fit in the current trigger width. If
+ * `maxVisibleChips` is set on the prop, it caps the result. Always returns
+ * at least 1 so the user can see something is selected.
+ */
+const dynamicMaxChips = computed(() => {
+  const total = selectedLabels.value.length;
+  if (total === 0) return 0;
+
+  // No measurement yet (SSR / pre-mount) — fall back to the prop or a safe
+  // default so we don't render nothing.
+  if (triggerWidth.value === 0) {
+    return Math.min(props.maxVisibleChips ?? 3, total);
+  }
+
+  const available = Math.max(0, triggerWidth.value - reservedTriggerSpace.value);
+  let used = 0;
+  let count = 0;
+
+  for (let i = 0; i < total; i++) {
+    const chipW = estimateChipWidth(selectedLabels.value[i]);
+    const remaining = total - i - 1;
+    // If there'll be hidden chips after this one, reserve space for the
+    // "+N more" pill so it can still fit on the row.
+    const overflowReserve =
+      remaining > 0 ? overflowChipEstimatedWidth + chipGap : 0;
+    const needed = chipW + (i > 0 ? chipGap : 0) + overflowReserve;
+    if (used + needed > available) break;
+    used += chipW + (i > 0 ? chipGap : 0);
+    count++;
+  }
+
+  const fit = Math.max(1, count);
+  // Honour an explicit cap when provided.
+  if (props.maxVisibleChips !== undefined) {
+    return Math.min(fit, props.maxVisibleChips);
+  }
+  return fit;
+});
+
+const visibleSelectedLabels = computed(() =>
+  selectedLabels.value.slice(0, dynamicMaxChips.value),
+);
+const overflowSelectedCount = computed(() =>
+  Math.max(0, selectedLabels.value.length - dynamicMaxChips.value),
+);
+
+// Trigger right-padding: leave more space when the clear button is visible,
+// so the arrow + clear no longer overlap (was `pe-7` which sat directly on
+// the arrow icon).
+const triggerEndPadding = computed(() =>
+  props.clearable && hasSelection.value ? "tw:pe-14" : "tw:pe-9",
+);
 
 const fieldWidthClass = computed(() => {
   switch (props.width) {
@@ -379,7 +497,10 @@ const fieldWidthClass = computed(() => {
         v-model:open="popoverOpen"
         @update:open="(v) => emit(v ? 'open' : 'close')"
       >
-        <div class="tw:relative tw:flex tw:items-center">
+        <div
+          ref="triggerWrapperRef"
+          class="tw:relative tw:flex tw:items-center"
+        >
           <PopoverTrigger
             type="button"
             :id="id"
@@ -395,28 +516,35 @@ const fieldWidthClass = computed(() => {
               'tw:focus:ring-2 tw:focus:ring-select-focus-ring',
               'tw:transition-colors tw:duration-150',
               'tw:disabled:bg-select-disabled-bg tw:disabled:opacity-60 tw:disabled:cursor-not-allowed',
-              clearable && hasSelection ? 'tw:pe-7' : 'tw:pe-8',
+              triggerEndPadding,
               heightClasses[size ?? 'md'],
             ]"
           >
             <slot name="trigger" :value="modelValue">
               <template v-if="multiple && selectedLabels.length > 0">
                 <div
-                  class="tw:flex-1 tw:flex tw:flex-wrap tw:gap-1 tw:py-1 tw:pe-2"
+                  class="tw:flex-1 tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:overflow-hidden tw:pe-2"
                 >
                   <slot
-                    v-for="(labelText, idx) in selectedLabels"
+                    v-for="(labelText, idx) in visibleSelectedLabels"
                     name="chip"
                     :label="labelText"
                     :value="selectedValues[idx]"
                   >
                     <span
                       :key="labelText"
-                      class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text"
+                      class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
                     >
                       {{ labelText }}
                     </span>
                   </slot>
+                  <span
+                    v-if="overflowSelectedCount > 0"
+                    class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-hover-bg tw:text-select-text tw:shrink-0"
+                    data-test="o-select-overflow-chip"
+                  >
+                    +{{ overflowSelectedCount }} more
+                  </span>
                 </div>
               </template>
               <span
@@ -434,8 +562,13 @@ const fieldWidthClass = computed(() => {
 
             <span
               aria-hidden="true"
-              class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:pe-2 tw:text-select-icon"
+              :class="[
+                'tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:pe-2 tw:text-select-icon',
+                'tw:transition-transform tw:duration-150',
+                isOpen ? 'tw:rotate-180' : '',
+              ]"
             >
+              <!-- chevron-down — rotates 180° when the popover is open -->
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
@@ -444,7 +577,7 @@ const fieldWidthClass = computed(() => {
               >
                 <path
                   fill-rule="evenodd"
-                  d="M5.22 10.22a.75.75 0 0 1 1.06 0L8 11.94l1.72-1.72a.75.75 0 1 1 1.06 1.06l-2.25 2.25a.75.75 0 0 1-1.06 0l-2.25-2.25a.75.75 0 0 1 0-1.06ZM10.78 5.78a.75.75 0 0 1-1.06 0L8 4.06 6.28 5.78a.75.75 0 0 1-1.06-1.06l2.25-2.25a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1 0 1.06Z"
+                  d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"
                   clip-rule="evenodd"
                 />
               </svg>
@@ -457,7 +590,7 @@ const fieldWidthClass = computed(() => {
             tabindex="-1"
             aria-label="Clear selection"
             :class="[
-              'tw:absolute tw:end-7 tw:flex tw:items-center tw:justify-center',
+              'tw:absolute tw:end-8 tw:flex tw:items-center tw:justify-center',
               'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
               'tw:transition-colors tw:size-4',
             ]"
@@ -502,7 +635,13 @@ const fieldWidthClass = computed(() => {
                 v-if="inputEnabled"
                 v-model="searchTerm"
                 auto-focus
-                class="tw:w-full tw:h-9 tw:px-3 tw:mb-1 tw:rounded-md tw:border tw:bg-input-bg tw:border-input-border tw:text-input-text tw:placeholder:text-input-placeholder tw:outline-none tw:focus:ring-2 tw:focus:ring-input-focus-ring"
+                :class="[
+                  'tw:w-full tw:px-3 tw:mb-1 tw:rounded-md tw:border',
+                  'tw:bg-input-bg tw:border-input-border tw:text-input-text',
+                  'tw:placeholder:text-input-placeholder tw:outline-none',
+                  'tw:focus:ring-2 tw:focus:ring-input-focus-ring',
+                  heightClasses[size ?? 'md'],
+                ]"
                 :placeholder="searchPlaceholder"
                 @keydown.enter="handleCreateFromInput"
               />
@@ -556,18 +695,56 @@ const fieldWidthClass = computed(() => {
                       :value="String(filteredOptions[vRow.index].value)"
                       :disabled="filteredOptions[vRow.index].disabled"
                       :class="[
-                        'tw:relative tw:flex tw:items-center tw:w-full tw:h-full',
-                        'tw:ps-8 tw:pe-3 tw:text-sm',
+                        'tw:relative tw:flex tw:items-center tw:w-full tw:h-full tw:gap-2',
+                        'tw:ps-3 tw:pe-3 tw:text-sm',
                         'tw:text-select-item-text tw:rounded-sm',
                         'tw:cursor-pointer tw:select-none tw:outline-none',
                         'tw:transition-colors tw:duration-100',
                         'tw:data-highlighted:bg-select-item-hover-bg',
-                        'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
+                        multiple
+                          ? ''
+                          : 'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
                         'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
                       ]"
                     >
+                      <!-- Multi-select: always-visible checkbox indicator -->
+                      <template v-if="multiple">
+                        <span
+                          :class="[
+                            'tw:flex tw:items-center tw:justify-center tw:shrink-0',
+                            'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
+                            selectedValues.includes(
+                              filteredOptions[vRow.index].value,
+                            )
+                              ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
+                              : 'tw:bg-checkbox-bg tw:border-checkbox-border',
+                          ]"
+                          aria-hidden="true"
+                        >
+                          <svg
+                            v-if="
+                              selectedValues.includes(
+                                filteredOptions[vRow.index].value,
+                              )
+                            "
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 12 12"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
+                          >
+                            <polyline points="2,6 5,9 10,3" />
+                          </svg>
+                        </span>
+                      </template>
+
+                      <!-- Single-select: checkmark indicator (shown only when checked) -->
                       <ListboxItemIndicator
-                        class="tw:absolute tw:start-2 tw:flex tw:items-center tw:justify-center"
+                        v-else
+                        class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:size-3.5"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -602,7 +779,12 @@ const fieldWidthClass = computed(() => {
       :disabled="disabled"
       :name="name"
       @update:model-value="handleUpdate"
-      @update:open="(v) => emit(v ? 'open' : 'close')"
+      @update:open="
+        (v) => {
+          selectOpen = v;
+          emit(v ? 'open' : 'close');
+        }
+      "
     >
       <div class="tw:relative tw:flex tw:items-center">
         <SelectTrigger
@@ -617,7 +799,7 @@ const fieldWidthClass = computed(() => {
             'tw:focus:ring-2 tw:focus:ring-select-focus-ring',
             'tw:transition-colors tw:duration-150',
             'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:opacity-60 tw:data-disabled:cursor-not-allowed',
-            clearable && hasSelection ? 'tw:pe-7' : 'tw:pe-8',
+            triggerEndPadding,
             heightClasses[size ?? 'md'],
           ]"
         >
@@ -635,8 +817,13 @@ const fieldWidthClass = computed(() => {
 
           <span
             aria-hidden="true"
-            class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:pe-2 tw:text-select-icon"
+            :class="[
+              'tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:pe-2 tw:text-select-icon',
+              'tw:transition-transform tw:duration-150',
+              isOpen ? 'tw:rotate-180' : '',
+            ]"
           >
+            <!-- chevron-down — rotates 180° when the dropdown is open -->
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
@@ -645,7 +832,7 @@ const fieldWidthClass = computed(() => {
             >
               <path
                 fill-rule="evenodd"
-                d="M5.22 10.22a.75.75 0 0 1 1.06 0L8 11.94l1.72-1.72a.75.75 0 1 1 1.06 1.06l-2.25 2.25a.75.75 0 0 1-1.06 0l-2.25-2.25a.75.75 0 0 1 0-1.06ZM10.78 5.78a.75.75 0 0 1-1.06 0L8 4.06 6.28 5.78a.75.75 0 0 1-1.06-1.06l2.25-2.25a.75.75 0 0 1 1.06 0l2.25 2.25a.75.75 0 0 1 0 1.06Z"
+                d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"
                 clip-rule="evenodd"
               />
             </svg>
@@ -658,7 +845,7 @@ const fieldWidthClass = computed(() => {
           tabindex="-1"
           aria-label="Clear selection"
           :class="[
-            'tw:absolute tw:end-7 tw:flex tw:items-center tw:justify-center',
+            'tw:absolute tw:end-8 tw:flex tw:items-center tw:justify-center',
             'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
             'tw:transition-colors tw:size-4',
           ]"
