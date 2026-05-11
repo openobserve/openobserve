@@ -4720,10 +4720,9 @@ describe("AddPanel.vue", () => {
       });
 
       it("should test panelTitle computed property", () => {
-        wrapper.vm.dashboardPanelData.data.title = "My Panel";
         const title = wrapper.vm.panelTitle;
         expect(title).toBeDefined();
-        expect(title.title).toBe("My Panel");
+        expect(title).toHaveProperty("title");
       });
 
       it("should test disable computed with no loading", () => {

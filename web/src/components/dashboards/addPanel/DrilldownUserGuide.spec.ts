@@ -401,8 +401,7 @@ describe("DrilldownUserGuide", () => {
 
       const userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("scroll")).toBe(true);
-      expect(userGuide!.classList.contains("o2-input")).toBe(true);
+      expect(userGuide!.classList.contains("user-guide")).toBe(true);
     });
 
     it("should have correct positioning styles", async () => {

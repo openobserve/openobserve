@@ -58,6 +58,8 @@ const ODrawerStub = {
   template: `
     <div data-test-stub="o-drawer" :data-open="open">
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-header-left"><slot name="header-left" /></div>
+      <div data-test-stub="o-drawer-header-right"><slot name="header-right" /></div>
       <div data-test-stub="o-drawer-body"><slot /></div>
       <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
     </div>
@@ -219,9 +221,6 @@ describe("AlertHistoryDrawer.vue", () => {
         wrapper.find('[data-test="alert-details-title"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="alert-details-close-btn"]').exists(),
-      ).toBe(true);
-      expect(
         wrapper
           .find('[data-test="alert-history-drawer-date-picker"]')
           .exists(),
@@ -242,17 +241,6 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Close Button", () => {
-    it("should emit update:open=false when the close button is clicked", async () => {
-      await mountComponent();
-      await wrapper
-        .find('[data-test="alert-details-close-btn"]')
-        .trigger("click");
-      await flushPromises();
-      const events = wrapper.emitted("update:open");
-      expect(events).toBeTruthy();
-      expect(events![events!.length - 1]).toEqual([false]);
-    });
-
     it("should propagate ODrawer's update:open emit to the parent", async () => {
       await mountComponent();
       const drawer = wrapper.findComponent({ name: "ODrawer" });
