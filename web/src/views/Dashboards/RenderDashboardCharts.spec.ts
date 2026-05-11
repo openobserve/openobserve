@@ -27,6 +27,48 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
+// Stub ODialog so tests are deterministic (no Portal/Teleport) and so we
+// can drive open/close + button click emits without touching the real
+// dialog implementation.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-show-close="String(showClose)"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <slot name="trigger" />
+    </div>
+  `,
+};
+
 // Mock GridStack
 const mockGridStackInstance = {
   init: vi.fn(),
@@ -118,7 +160,7 @@ describe("RenderDashboardCharts", () => {
     }
   });
 
-  const createWrapper = (props = {}) => {
+  const createWrapper = (props = {}, options: any = {}) => {
     return shallowMount(RenderDashboardCharts, {
       props: {
         ...defaultProps,
@@ -130,6 +172,10 @@ describe("RenderDashboardCharts", () => {
           $t: (key) => key,
           $route: { params: {}, query: {} },
           $router: { push: vi.fn(), replace: vi.fn() },
+        },
+        stubs: {
+          ODialog: ODialogStub,
+          ...(options.stubs || {}),
         },
       },
     });
@@ -510,38 +556,71 @@ describe("RenderDashboardCharts", () => {
     });
   });
 
-  describe("View Panel Dialog", () => {
-    it("should handle view panel dialog opening", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle view panel dialog closing", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should pass correct props to ViewPanel component", async () => {
+  describe("View Panel Dialog (ODialog migration)", () => {
+    it("renders the ODialog wrapper with the migrated props", async () => {
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.exists()).toBe(true);
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("size")).toBe("full");
+      expect(dialog.props("showClose")).toBe(false);
     });
 
-    it("should handle view panel date selection", async () => {
+    it("starts with the ODialog closed (open=false)", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(false);
+    });
+
+    it("opens the ODialog when onViewPanel is invoked", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+      (wrapper.vm as any).onViewPanel("panel-1");
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(true);
+      expect((wrapper.vm as any).viewPanelId).toBe("panel-1");
+    });
+
+    it("closes the ODialog when it emits update:open with false", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+      (wrapper.vm as any).showViewPanel = true;
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(true);
+
+      await dialog.vm.$emit("update:open", false);
+      await nextTick();
+      expect(dialog.props("open")).toBe(false);
+      expect((wrapper.vm as any).showViewPanel).toBe(false);
+    });
+
+    it("passes selectedDateForViewPanel through to the dialog content", async () => {
       const selectedDate = { start: "2024-01-01", end: "2024-01-02" };
       wrapper = createWrapper({ selectedDateForViewPanel: selectedDate });
+      await nextTick();
       expect(wrapper.props("selectedDateForViewPanel")).toEqual(selectedDate);
     });
 
-    it("should handle view panel variable updates", async () => {
+    it("keeps the ODialog mounted regardless of open state (so transitions stay smooth)", async () => {
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.exists()).toBe(true);
+      // Closed
+      expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
+      // Open
+      (wrapper.vm as any).showViewPanel = true;
+      await nextTick();
+      expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
     });
 
-    it("should handle view panel lifecycle", () => {
+    it("does not render the legacy q-dialog / q-card markup after migration", async () => {
       wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
+      await nextTick();
+      // The migrated markup must not include the old Quasar dialog selectors
+      expect(wrapper.find("q-dialog-stub").exists()).toBe(false);
+      expect(wrapper.find("q-card-stub").exists()).toBe(false);
     });
   });
 

@@ -144,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t('correlation.logs.filters.noAdditionalDimensions') }}
         </div>
-      </q-card-section>
 
   </ODialog>
 </template>

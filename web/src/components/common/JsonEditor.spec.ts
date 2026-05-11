@@ -505,6 +505,26 @@ describe("JsonEditor", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="json-editor-cancel"]').exists()).toBe(true);
     });
+
+    it("emits 'close' when the close icon is clicked", async () => {
+      wrapper = createWrapper();
+      await wrapper.find('[data-test="json-editor-close"]').trigger("click");
+      expect(wrapper.emitted("close")).toBeTruthy();
+      expect(wrapper.emitted("close")!.length).toBe(1);
+    });
+
+    it("emits 'close' when the cancel button is clicked", async () => {
+      wrapper = createWrapper();
+      await wrapper.find('[data-test="json-editor-cancel"]').trigger("click");
+      expect(wrapper.emitted("close")).toBeTruthy();
+      expect(wrapper.emitted("close")!.length).toBe(1);
+    });
+
+    it("does not emit 'close' when the save button is clicked", async () => {
+      wrapper = createWrapper({ data: { id: "1" }, type: "alerts" });
+      await wrapper.find('[data-test="json-editor-save"]').trigger("click");
+      expect(wrapper.emitted("close")).toBeFalsy();
+    });
   });
 
   // ─── Monaco editor stub ───────────────────────────────────────────────────────
