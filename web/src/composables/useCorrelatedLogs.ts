@@ -163,7 +163,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       // Build WHERE clause
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-      queries.push(`SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY _timestamp DESC LIMIT ${limit}`);
+      queries.push(`SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY ${store.state.zoConfig.timestamp_column || '_timestamp'} DESC LIMIT ${limit}`);
     }
 
     return queries;
@@ -220,7 +220,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
           sql_mode: 'full',
           start_time: startTimeMicros,
           end_time: endTimeMicros,
-          size: pageSize.value,
+          size: props.logStreams.length * pageSize.value,
         },
       };
 
@@ -274,7 +274,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             // Sort merged results from all streams by _timestamp descending
             // _search_multi_stream streams results per-query as they complete,
             // so hits arrive in arbitrary order and need a final global sort
-            searchResults.value.sort((a, b) => b._timestamp - a._timestamp);
+            const timestamp = store.state.zoConfig.timestamp_column || '_timestamp';
+            searchResults.value.sort((a, b) => b[timestamp] - a[timestamp]);
             loading.value = false;
             currentTraceId = null;
           },
