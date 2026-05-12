@@ -1,5 +1,5 @@
 ﻿<template>
-    <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
+    <OPage class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
     <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
@@ -184,7 +184,7 @@
         <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
           <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
         </q-dialog>
-      </q-page>
+      </OPage>
   </template>
 
 <script lang="ts">

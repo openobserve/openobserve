@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Injections for Components with a QPage root Element
+ * Injections for Components with a Page root Element
  */
 export function qLayoutInjections() {
   return {

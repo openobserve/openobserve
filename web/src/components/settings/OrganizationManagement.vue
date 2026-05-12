@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <OPage class="q-pa-none" style="min-height: inherit">
     <div>
       <q-table
         data-test="org-management-list-table"
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </q-page>
+  </OPage>
 </template>
 <script lang="ts">
 import {

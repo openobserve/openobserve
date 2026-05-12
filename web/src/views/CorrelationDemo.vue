@@ -1,5 +1,5 @@
 <template>
-  <q-page class="q-pa-md">
+  <OPage class="q-pa-md">
     <div class="row q-col-gutter-md">
       <!-- Left: Simulated Log Viewer -->
       <div class="col-8">
@@ -144,7 +144,7 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </q-page>
+  </OPage>
 </template>
 
 <script setup lang="ts">

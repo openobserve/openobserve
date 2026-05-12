@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="backfill-jobs-list-page">
+  <OPage data-test="backfill-jobs-list-page">
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header -->
       <div class="card-container tw:mb-[0.625rem]">
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="confirmDialog.onConfirm"
       @update:cancel="resetConfirmDialog"
     />
-  </q-page>
+  </OPage>
 </template>
 
 <script setup lang="ts">

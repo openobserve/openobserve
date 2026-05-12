@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier" class="tw:h-full">
+  <OPage :key="store.state.selectedOrganization.identifier" class="tw:h-full">
     <div
       ref="fullscreenDiv"
       :class="{
@@ -342,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-dialog>
     </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

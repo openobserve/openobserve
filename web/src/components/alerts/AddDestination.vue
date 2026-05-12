@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
+  <OPage
     class="q-pa-none o2-custom-bg"
     style="
       height: calc(100vh - 48px);
@@ -583,7 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :template-content="previewContent"
       data-test="destination-preview-modal"
     />
-  </q-page>
+  </OPage>
 </template>
 <script lang="ts" setup>
 import {

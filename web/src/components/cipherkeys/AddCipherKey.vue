@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
+  <OPage class="q-pa-none" style="min-height: inherit;">
     <div class="row items-center no-wrap q-mx-md q-pt-sm">
       <div class="flex items-center tw:py-2">
         <div
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="dialog.okCallback"
       @update:cancel="dialog.show = false"
     />
-  </q-page>
+  </OPage>
 </template>
 <script lang="ts" setup>
 import { ref, onBeforeMount, onActivated, computed } from "vue";
