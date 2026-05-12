@@ -46,21 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Right-side actions: View Logs + Column Visibility -->
           <div class="tw:flex tw:items-center tw:gap-2 tw:pr-4">
-            <!-- <OButton
-              v-if="props.logStreams.length > 0"
-              variant="outline"
-              size="sm"
-              data-test="correlated-logs-table-view-logs-btn"
-              @click="navigateToLogs"
-            >
-              <template v-if="true">
-                <q-icon name="open_in_new"
-	size="16px"
-	class="tw:mr-1" />
-                {{ t('correlation.logs.viewLogs') }}
-              </template>
-            </OButton> -->
-
             <!-- Column Visibility Dropdown -->
             <ODropdown
               side="bottom"
@@ -281,8 +266,6 @@ import { date, copyToClipboard, useQuasar } from "quasar";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
-import { b64EncodeUnicode } from "@/utils/zincutils";
-import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { searchState } from "@/composables/useLogs/searchState";
 
 // Props
@@ -304,7 +287,7 @@ const store = useStore();
 const router = useRouter();
 const $q = useQuasar();
 const { searchObj } = searchState();
-const { loadKeyFields, loadSemanticGroups } = useServiceCorrelation();
+const { loadKeyFields } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
@@ -1030,45 +1013,6 @@ const handleViewTrace = (log: any) => {
 const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
   console.log("[CorrelatedLogsTable] Nested correlation disabled");
-};
-
-const navigateToLogs = async () => {
-  const conditions = new Map<string, string>();
-  const usedGroups = new Set<string>();
-
-  const semanticGroups = await loadSemanticGroups();
-  const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
-
-  for (const streamInfo of props.logStreams) {
-    const filters = streamInfo.filters ?? {};
-    for (const [field, value] of Object.entries(filters)) {
-      if (!value || value === SELECT_ALL_VALUE || field.startsWith("_"))
-        continue;
-      const groupId = fieldToGroupId.get(field.toLowerCase()) ?? field;
-      if (usedGroups.has(groupId)) continue;
-      usedGroups.add(groupId);
-
-      const escapedValue = String(value).replace(/'/g, "''");
-      conditions.set(groupId, `${field} = '${escapedValue}'`);
-    }
-  }
-
-  const queryString = Array.from(conditions.values()).join(" and ");
-  const encodedQuery = b64EncodeUnicode(queryString);
-  const streamNames = props.logStreams.map((s) => s.stream_name).join(",");
-
-  router.push({
-    name: "logs",
-    query: {
-      sql_mode: "false",
-      query: encodedQuery,
-      stream: streamNames,
-      from: String(props.timeRange.startTime),
-      to: String(props.timeRange.endTime),
-      stream_type: "logs",
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
 };
 
 // Lifecycle
