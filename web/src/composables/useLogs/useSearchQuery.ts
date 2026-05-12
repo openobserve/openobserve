@@ -407,7 +407,6 @@ export const useSearchQuery = () => {
         return handleNonSqlMode(query, req);
       }
     } catch (e: any) {
-      console.log(e);
       notificationMsg.value =
         "An error occurred while constructing the search query.";
       return null;
