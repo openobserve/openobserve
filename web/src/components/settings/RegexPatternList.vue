@@ -55,7 +55,7 @@
             <NoData />
           </div>
           <div v-else class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
-            <q-spinner-hourglass size="50px" color="primary" style="margin-top: 20vh" />
+            <OSpinner size="lg" class="tw:mt-[20vh]" />
 
           </div>
         </template>
@@ -212,6 +212,7 @@
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import OButton from "@/lib/core/Button/OButton.vue";
     import { Pencil, Trash2, Download } from "lucide-vue-next";
+    import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -226,6 +227,7 @@
             Pencil,
             Trash2,
             Download,
+            OSpinner,
         },
     setup() {
 

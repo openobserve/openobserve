@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-if="loadingLicense" class="tw:text-center tw:py-8">
-              <q-spinner size="40px" color="primary" />
+              <OSpinner size="md" />
               <div class="tw:mt-3 tw:text-sm tw:opacity-70">{{ t("about.loading_license_info") }}</div>
             </div>
 
@@ -281,12 +281,14 @@ import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "PageAbout",
   components: {
     FeatureComparisonTable,
     OButton,
+    OSpinner,
   },
   setup() {
     const store = useStore();

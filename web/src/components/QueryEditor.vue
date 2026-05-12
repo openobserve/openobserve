@@ -13,7 +13,7 @@
       <!-- Show streaming status with spinner + stop button -->
       <div v-if="isGenerating" :class="aiBarStreamingClass">
         <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
-        <q-spinner-dots color="primary" size="1.2em" />
+        <OSpinner variant="dots" size="xs" />
         <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
           variant="ghost-destructive"
@@ -123,6 +123,7 @@ import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/ts/interfaces/chat';
 import config from '@/aws-exports';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 type Language = 'sql' | 'promql' | 'vrl' | 'javascript';
 

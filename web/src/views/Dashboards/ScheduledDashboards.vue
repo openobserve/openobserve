@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
           >
-            <q-spinner-hourglass color="primary" size="lg" />
+            <OSpinner size="md" />
           </div>
         </template>
         <template v-else>
@@ -123,6 +123,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { Database, CalendarClock } from "lucide-vue-next";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   open: {

@@ -112,7 +112,7 @@
           <!-- Show streaming status with spinner -->
           <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
-            <q-spinner-dots color="primary" size="1.2em" />
+            <OSpinner variant="dots" size="xs" />
             <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
@@ -162,6 +162,7 @@ import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
 import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
 import { getImageURL } from '@/utils/zincutils';
 import config from '@/aws-exports';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Props {
   // Query props

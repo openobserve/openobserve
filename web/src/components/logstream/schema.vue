@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
           style="max-width: 450px"
         >
-          <q-spinner-hourglass color="primary" size="lg" />
+          <OSpinner size="md" />
         </div>
         <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
         <div v-else class="indexDetailsContainer" style="height: calc(100vh - 120px)">
@@ -1117,6 +1117,7 @@ import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const defaultValue: any = () => {
   return {
@@ -1161,6 +1162,7 @@ export default defineComponent({
     X,
     Plus,
     Trash2,
+    OSpinner,
   },
   setup({ modelValue }) {
     type PatternAssociation = {

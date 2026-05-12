@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading State -->
     <div v-if="loading && models.length === 0" class="text-center q-pa-xl">
-      <q-spinner-hourglass color="primary" size="50px" />
+      <OSpinner size="lg" />
       <div class="q-mt-md">{{ t("modelPricing.loadingModels") }}</div>
     </div>
 
@@ -197,6 +197,7 @@ import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface ModelTier {
   name: string;
@@ -216,7 +217,7 @@ interface BuiltInModel {
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
-  components: { OButton },
+  components: { OButton, OSpinner },
   emits: ["import-models"],
   setup(props, { emit }) {
     const { t } = useI18n();

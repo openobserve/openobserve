@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
                 >
-                  <q-spinner-hourglass size="20px" />
+                  <OSpinner size="xs" />
                   {{ t("confirmDialog.loading") }}
                 </div>
               </slot>
@@ -1045,6 +1045,7 @@ import {
   PIVOT_TABLE_ROW_KEY_SEPARATOR,
 } from "@/utils/dashboard/constants";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export interface StreamField {
   name: string;

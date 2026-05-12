@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Loading -->
           <div v-if="trendLoading" class="trend-state">
-            <q-spinner color="primary" size="sm" />
+            <OSpinner size="xs" />
             <span>Loading data…</span>
           </div>
 
@@ -236,12 +236,13 @@ import serviceGraphService from '@/services/service_graph';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
-  components: { OButton, OToggleGroup, OToggleGroupItem },
+  components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner },
   props: {
     selectedEdge: {
       type: Object as PropType<{

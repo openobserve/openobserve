@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
               >
-                <q-spinner-hourglass size="1.8rem" color="primary" />
+                <OSpinner size="sm" />
                 {{ t("traces.loadingStream") }}
               </div>
             </q-td>
@@ -163,6 +163,7 @@ import { applyCollapseFilter } from "@/utils/fieldCategories";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -170,6 +171,7 @@ export default defineComponent({
     BasicValuesFilter,
     FieldRow,
     OButton,
+    OSpinner,
   },
   emits: ["update:changeStream", "update:selectedFields"],
   props: {

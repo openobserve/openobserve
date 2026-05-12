@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="sql-status-bar__msg">{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
-                        <q-spinner size="10px" style="flex-shrink:0;" />
+                        <OSpinner size="xs" class="tw:shrink-0" />
                         <span>Fetching results...</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- Loading -->
                   <div v-else-if="runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:gap-2">
-                    <q-spinner-hourglass color="primary" size="36px" />
+                    <OSpinner size="md" />
                     <span class="tw:text-sm tw:opacity-60">{{ t('search.fetchingResults') }}</span>
                   </div>
                   <!-- Results -->
@@ -392,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- Loading -->
                   <div v-else-if="runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:gap-2">
-                    <q-spinner-hourglass color="primary" size="36px" />
+                    <OSpinner size="md" />
                     <span class="tw:text-sm tw:opacity-60">{{ t('search.fetchingResults') }}</span>
                   </div>
                   <!-- Results -->
@@ -455,6 +455,7 @@ import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   modelValue: {

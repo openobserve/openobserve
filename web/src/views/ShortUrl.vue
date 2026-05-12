@@ -3,7 +3,7 @@
     data-test="loading-container"
     class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center"
   >
-    <q-spinner data-test="spinner" color="primary" size="3em" :thickness="2" />
+    <OSpinner size="lg" data-test="spinner" />
     <div data-test="message" class="message">Redirecting...</div>
   </div>
 </template>
@@ -13,9 +13,11 @@ import { defineComponent, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import shortURL from "@/services/short_url";
 import { useStore } from "vuex";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "ShortUrl",
+  components: { OSpinner },
   props: {
     id: {
       type: String,

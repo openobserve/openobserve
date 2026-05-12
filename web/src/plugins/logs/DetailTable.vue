@@ -269,12 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
           <div class="tw:text-center">
-            <q-spinner-hourglass
-              v-if="correlationLoading"
-              color="primary"
-              size="3rem"
-              class="tw:mb-4"
-            />
+            <OSpinner size="lg" class="tw:mb-4" />
             <div
               v-else-if="correlationError"
               class="tw:text-base tw:text-red-500"
@@ -311,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
@@ -341,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
@@ -432,6 +427,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const defaultValue: any = () => {
   return {
@@ -442,7 +438,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator },
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSpinner },
   emits: [
     "showPrevDetail",
     "showNextDetail",
