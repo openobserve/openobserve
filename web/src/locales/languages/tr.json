@@ -395,7 +395,8 @@
     "selectStreamFirst": "Önce bir yayın seçin",
     "traces": "İzleri",
     "switchToLogs": "Günlüklere geri dönmek için tıklayın",
-    "patternNoValuesAvailable": "Mevcut değer yok"
+    "patternNoValuesAvailable": "Mevcut değer yok",
+    "selectLogStream": "Günlükler akışını seçin"
   },
   "menu": {
     "home": "Ana Sayfa",
