@@ -39,23 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-icon name="add" />
     </OButton>
-    <ODrawer data-test="inline-select-folder-dropdown-dialog"
+    <AddFolder
+      v-if="!disable"
+      data-test="inline-select-folder-dropdown-dialog"
       v-model:open="showDialog"
-      :width="30"
-      :show-close="false"
-      secondary-button-label="Cancel"
-      primary-button-label="Save"
-      @click:secondary="showDialog = false"
-      @click:primary="addFolderRef?.submit()"
-    >
-      <AddFolder
-        ref="addFolderRef"
-        :type="type"
-        :edit-mode="false"
-        @update:modelValue="onFolderAdded"
-        @close="showDialog = false"
-      />
-    </ODrawer>
+      :type="type"
+      :edit-mode="false"
+      @update:modelValue="onFolderAdded"
+    />
   </div>
 </template>
 
@@ -64,12 +55,11 @@ import { defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
 import AddFolder from "./AddFolder.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getFoldersListByType } from "@/utils/commons";
 
 export default defineComponent({
   name: "InlineSelectFolderDropdown",
-  components: { AddFolder, OButton, ODrawer },
+  components: { AddFolder, OButton },
   emits: ["update:modelValue"],
   props: {
     modelValue: {
@@ -88,7 +78,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const showDialog = ref(false);
-    const addFolderRef: any = ref(null);
 
     const folderOptions = computed(() =>
       store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
@@ -111,7 +100,6 @@ export default defineComponent({
     return {
       store,
       showDialog,
-      addFolderRef,
       folderOptions,
       onFolderAdded,
     };

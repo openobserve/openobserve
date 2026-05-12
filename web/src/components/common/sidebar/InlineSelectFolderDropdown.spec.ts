@@ -102,13 +102,13 @@ const ODrawerStub = {
   `,
 };
 
-// Stub AddFolder so we don't pull in its dependencies and we can spy on
-// `submit()` (called via a template ref when ODrawer primary is clicked).
+// Stub AddFolder: mirrors the self-contained AddFolder that owns its own
+// ODrawer. Receives `open` via v-model:open and emits `update:open` to close.
 const addFolderSubmitSpy = vi.fn();
 const AddFolderStub = {
   name: "AddFolder",
-  props: ["type", "editMode"],
-  emits: ["update:modelValue", "close"],
+  props: ["type", "editMode", "open"],
+  emits: ["update:modelValue", "update:open"],
   template: `<div data-test="add-folder-stub"></div>`,
   setup() {
     return { submit: addFolderSubmitSpy };
@@ -303,90 +303,22 @@ describe("InlineSelectFolderDropdown.vue", () => {
       expect((wrapper.vm as any).showDialog).toBe(true);
     });
 
-    it("forwards open=true to ODrawer after the add button is clicked", async () => {
+    it("forwards open=true to AddFolder after the add button is clicked", async () => {
       wrapper = createWrapper();
       await wrapper.find('[data-test="o-button-stub"]').trigger("click");
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("open")).toBe(true);
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.props("open")).toBe(true);
     });
 
-    it("forwards open=false to ODrawer initially", () => {
+    it("AddFolder open is false initially", () => {
       wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("open")).toBe(false);
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.props("open")).toBe(false);
     });
   });
 
   // ─── ODrawer prop forwarding ────────────────────────────────────────────────
 
-  describe("ODrawer Prop Forwarding", () => {
-    it("renders the ODrawer wrapper", () => {
-      wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.exists()).toBe(true);
-    });
-
-    it("forwards width=30 to ODrawer", () => {
-      wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(30);
-    });
-
-    it("forwards showClose=false to ODrawer", () => {
-      wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("showClose")).toBe(false);
-    });
-
-    it("forwards primaryButtonLabel='Save'", () => {
-      wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("primaryButtonLabel")).toBe("Save");
-    });
-
-    it("forwards secondaryButtonLabel='Cancel'", () => {
-      wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
-    });
-  });
-
-  // ─── ODrawer event wiring ───────────────────────────────────────────────────
-
-  describe("ODrawer Event Wiring", () => {
-    it("closes the drawer when ODrawer emits click:secondary", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.find('[data-test="o-button-stub"]').trigger("click");
-      expect((wrapper.vm as any).showDialog).toBe(true);
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("click:secondary");
-
-      expect((wrapper.vm as any).showDialog).toBe(false);
-    });
-
-    it("calls AddFolder.submit() when ODrawer emits click:primary", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.find('[data-test="o-button-stub"]').trigger("click");
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("click:primary");
-
-      expect(addFolderSubmitSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it("safely handles click:primary when the AddFolder ref is null (optional chaining)", async () => {
-      wrapper = createWrapper();
-
-      (wrapper.vm as any).addFolderRef = null;
-      await nextTick();
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
-    });
-  });
 
   // ─── Drawer slot content (AddFolder) ────────────────────────────────────────
 
@@ -409,13 +341,13 @@ describe("InlineSelectFolderDropdown.vue", () => {
       expect(addFolder.props("editMode")).toBe(false);
     });
 
-    it("closes the drawer when AddFolder emits 'close'", async () => {
+    it("closes the drawer when AddFolder emits update:open=false", async () => {
       wrapper = createWrapper();
       (wrapper.vm as any).showDialog = true;
       await nextTick();
 
       const addFolder = wrapper.findComponent(AddFolderStub);
-      await addFolder.vm.$emit("close");
+      await addFolder.vm.$emit("update:open", false);
 
       expect((wrapper.vm as any).showDialog).toBe(false);
     });
