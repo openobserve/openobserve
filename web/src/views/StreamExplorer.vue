@@ -1,5 +1,5 @@
 <template>
-  <q-page>
+  <OPage>
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
@@ -31,7 +31,7 @@
         />
       </template>
     </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

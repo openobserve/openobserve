@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage q-pt-xs">
+  <OPage class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage q-pt-xs">
     <div class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto">
       <div class="q-px-sm q-py-sm tw:h-full">
         <!-- Hero Section -->
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

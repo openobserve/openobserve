@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:h-[calc(100vh)] tw:overflow-auto tw:w-[40vw]"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <q-page>
+    <OPage>
       <div class="o2-input">
         <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
           <div class="flex items-center tw:w-full">
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </q-page>
+    </OPage>
   </div>
   <confirm-dialog
     v-model="dialog.show"

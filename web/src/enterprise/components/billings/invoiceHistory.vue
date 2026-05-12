@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-py-md" style="min-height: inherit;">
+  <OPage class="q-py-md" style="min-height: inherit;">
     <div class="row q-px-sm q-table__title tw:font-[600]">
       {{ t("billing.invoiceHistory") }}
     </div>
     <div>
       <invoice-table></invoice-table>
     </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

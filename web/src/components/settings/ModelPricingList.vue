@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
+  <OPage
     class="q-pa-none"
     style="min-height: inherit; height: calc(100vh - 88px)"
   >
@@ -921,7 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="confirmDialogMeta.onConfirm()"
       @update:cancel="resetConfirmDialog"
     />
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts" setup>
