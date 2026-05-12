@@ -211,13 +211,27 @@ pub async fn save(
     ),
     tag = "RePattern"
 )]
-pub async fn get(Path((_org_id, _id)): Path<(String, String)>) -> Response {
+pub async fn get(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "vectorscan")]
     {
-        let pattern = match infra::table::re_pattern::get(&_id).await {
+        use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
+
+        match get_pattern_manager().await {
+            Ok(mgr) if mgr.get_pattern_org(&id).as_deref() == Some(org_id.as_str()) => {}
+            Ok(_) => {
+                return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
+            }
+            Err(e) => {
+                return MetaHttpResponse::internal_error(format!(
+                    "Cannot get pattern manager : {e:?}"
+                ));
+            }
+        }
+
+        let pattern = match infra::table::re_pattern::get(&id).await {
             Ok(Some(k)) => k,
             Ok(None) => {
-                return MetaHttpResponse::not_found(format!("Pattern with id {_id} not found"));
+                return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
             }
             Err(e) => return MetaHttpResponse::internal_error(e),
         };
@@ -227,6 +241,8 @@ pub async fn get(Path((_org_id, _id)): Path<(String, String)>) -> Response {
     }
     #[cfg(not(feature = "vectorscan"))]
     {
+        drop(org_id);
+        drop(id);
         MetaHttpResponse::forbidden("not supported")
     }
 }
@@ -301,6 +317,10 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
                 ));
             }
         };
+
+        if mgr.get_pattern_org(&id).as_deref() != Some(org_id.as_str()) {
+            return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
+        }
         let pattern_usage = mgr.get_pattern_usage(&id);
         let (pattern_streams, extra) = if pattern_usage.len() > 5 {
             (
@@ -466,21 +486,25 @@ pub async fn delete_bulk(
     tag = "RePattern"
 )]
 pub async fn update(
-    Path((_org_id, id)): Path<(String, String)>,
+    Path((org_id, id)): Path<(String, String)>,
     Json(req): Json<PatternCreateRequest>,
 ) -> Response {
     #[cfg(feature = "vectorscan")]
     {
         use infra::table::re_pattern_stream_map::PatternPolicy;
-        use o2_enterprise::enterprise::re_patterns::PatternManager;
+        use o2_enterprise::enterprise::re_patterns::{PatternManager, get_pattern_manager};
 
-        match infra::table::re_pattern::get(&id).await {
-            Ok(Some(k)) => k,
-            Ok(None) => {
+        match get_pattern_manager().await {
+            Ok(mgr) if mgr.get_pattern_org(&id).as_deref() == Some(org_id.as_str()) => {}
+            Ok(_) => {
                 return MetaHttpResponse::not_found(format!("Pattern with id {id} not found"));
             }
-            Err(e) => return MetaHttpResponse::internal_error(e),
-        };
+            Err(e) => {
+                return MetaHttpResponse::internal_error(format!(
+                    "Cannot get pattern manager : {e:?}"
+                ));
+            }
+        }
 
         match PatternManager::test_pattern(
             req.pattern.clone(),
@@ -500,6 +524,7 @@ pub async fn update(
     }
     #[cfg(not(feature = "vectorscan"))]
     {
+        drop(org_id);
         drop(id);
         drop(req);
         MetaHttpResponse::forbidden("not supported")
@@ -587,6 +612,8 @@ pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
     tag = "RePattern"
 )]
 pub async fn get_built_in_patterns(
+    // _org_id intentionally unused: this endpoint fetches public patterns from GitHub,
+    // no per-org resource is accessed, so there is no IDOR risk.
     Path(_org_id): Path<String>,
     Query(query): Query<BuiltInPatternsQuery>,
 ) -> Response {

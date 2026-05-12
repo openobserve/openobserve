@@ -536,7 +536,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
         tokio::task::spawn(db::pipeline::watch());
+    } else {
+        // On nodes that do not run the heavy pipeline watch (e.g. routers), still maintain
+        // PIPELINE_ID_TO_ORG so HTTP handlers can perform cross-org IDOR checks in O(1).
+        tokio::task::spawn(db::pipeline::watch_id_to_org());
     }
+
+    // Dashboard id->org cache: maintained on every node type so HTTP handlers (e.g.
+    // timed annotations) can perform cross-org IDOR checks in O(1).
+    tokio::task::spawn(db::dashboards::watch_id_to_org());
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
@@ -969,6 +977,11 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
     db::pipeline::cache().await.expect("Pipeline cache failed");
+
+    // Lightweight dashboard id->org cache for cross-org IDOR checks. Runs on every node.
+    db::dashboards::cache_id_to_org()
+        .await
+        .expect("Dashboard id->org cache failed");
 
     Ok(())
 }
