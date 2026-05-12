@@ -164,13 +164,14 @@ describe("useCorrelatedLogs", () => {
     it("should compute isLoading correctly", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(
         (_params: any, callbacks: any) => {
-          // Simulate metadata and complete
-          callbacks.data(null, {
-            type: 'search_response_metadata',
-            content: { results: { total: 0, took: 5 } }
+          // Schedule callbacks asynchronously so loading state can be observed
+          return Promise.resolve().then(() => {
+            callbacks.data(null, {
+              type: 'search_response_metadata',
+              content: { results: { total: 0, took: 5 } }
+            });
+            callbacks.complete(null);
           });
-          callbacks.complete(null);
-          return Promise.resolve();
         }
       );
 
