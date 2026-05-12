@@ -15,125 +15,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
-    :open="props.open"
-    @update:open="(v) => { if (!v) emit('cancel:hideform'); }"
-    :width="80"
-    :show-close="true"
-    :title="t('pipeline.query')"
-    @keydown.stop
+  <div
+    data-test="add-stream-query-routing-section "
+    class="full-width stream-routing-section tw:h-full"
+    :class="[
+      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+      { 'fullscreen-mode': isFullscreenMode },
+    ]"
   >
-    <template #header-right>
-      <div v-if="scheduledPipelineRef" class="tw:flex tw:items-center tw:gap-2">
-        <OButton
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          variant="ghost"
-          size="icon-toolbar"
-          @click="scheduledPipelineRef.toggleAIChat()"
-          data-test="menu-link-ai-item"
-          class="ai-hover-btn q-mr-sm"
-          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        >
-          <div class="row items-center no-wrap tw:gap-2">
-            <img :src="scheduledPipelineRef.getBtnLogo" class="header-icon ai-icon" />
-          </div>
-        </OButton>
-        <div class="flex items-center app-tabs-container tw:h-[36px] q-mr-sm">
-          <AppTabs
-            data-test="scheduled-pipeline-tabs"
-            :tabs="scheduledPipelineRef.tabOptions"
-            :active-tab="scheduledPipelineRef.tab"
-            class="tabs-selection-container"
-            @update:active-tab="scheduledPipelineRef.updateTab"
+    <q-separator />
+
+    <div class="stream-routing-container q-px-md">
+      <q-form ref="queryFormRef">
+        <div class="full-width">
+          <scheduled-pipeline
+            ref="scheduledPipelineRef"
+            :columns="filteredColumns"
+            :conditions="[]"
+            :alertData="streamRoute"
+            :disableThreshold="true"
+            :disableVrlFunction="true"
+            :isValidSqlQuery="isValidSqlQuery"
+            :disableQueryTypeSelection="true"
+            :expandedLogs="expandedLogs"
+            :validatingSqlQuery="validatingSqlQuery"
+            v-model:trigger="streamRoute.trigger_condition"
+            v-model:sql="streamRoute.query_condition.sql"
+            v-model:promql="streamRoute.query_condition.promql"
+            v-model:delay="streamRoute.delay"
+            v-model:promql_condition="
+              streamRoute.query_condition.promql_condition
+            "
+            v-model:query_type="streamRoute.query_condition.type"
+            v-model:aggregation="streamRoute.query_condition.aggregation"
+            v-model:stream_type="streamRoute.stream_type"
+            v-model:isAggregationEnabled="isAggregationEnabled"
+            v-model:streamType="streamRoute.stream_type"
+            @validate-sql="validateSqlQuery"
+            @submit:form="saveQueryData"
+            @cancel:form="openCancelDialog"
+            @delete:node="openDeleteDialog"
+            @update:fullscreen="updateFullscreenMode"
+            @update:stream_type="updateStreamType"
+            @expandLog="toggleExpandLog"
+            @update:delay="updateDelay"
+            class="q-mt-sm"
           />
         </div>
-        <DateTime
-          style="height: 34px !important; border-radius: 3px"
-          @on:date-change="scheduledPipelineRef.updateDateChange"
-          class="q-mr-sm"
-        />
-        <OButton
-          data-test="logs-search-bar-refresh-btn"
-          data-cy="search-bar-refresh-button"
-          variant="primary"
-          size="sm-action"
-          class="q-mr-sm"
-          :disabled="!scheduledPipelineRef.selectedStreamName"
-          @click="scheduledPipelineRef.runQueryFromHeader()"
-        >
-          {{ t("search.runQuery") }}
-          <q-tooltip
-            v-if="!scheduledPipelineRef.selectedStreamName"
-            anchor="bottom middle"
-            self="top middle"
-          >
-            {{ t("search.selectStreamFirst") }}
-          </q-tooltip>
-        </OButton>
-        <OButton
-          data-test="add-function-fullscreen-btn"
-          variant="ghost"
-          size="icon-xs-sq"
-          @click="scheduledPipelineRef.handleFullScreen()"
-        >
-          <template #icon-left>
-            <Maximize2 v-if="!scheduledPipelineRef.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
-            <Minimize2 v-else class="tw:size-3.5 tw:shrink-0" />
-          </template>
-        </OButton>
-      </div>
-    </template>
-
-    <div
-      data-test="add-stream-query-routing-section"
-      class="full-width stream-routing-section tw:h-full"
-      :class="[
-        store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-        { 'fullscreen-mode': isFullscreenMode },
-      ]"
-    >
-      <q-separator />
-      <div class="stream-routing-container q-px-md">
-        <q-form ref="queryFormRef">
-          <div class="full-width">
-            <scheduled-pipeline
-              ref="scheduledPipelineRef"
-              :columns="filteredColumns"
-              :conditions="[]"
-              :alertData="streamRoute"
-              :disableThreshold="true"
-              :disableVrlFunction="true"
-              :isValidSqlQuery="isValidSqlQuery"
-              :disableQueryTypeSelection="true"
-              :expandedLogs="expandedLogs"
-              :validatingSqlQuery="validatingSqlQuery"
-              v-model:trigger="streamRoute.trigger_condition"
-              v-model:sql="streamRoute.query_condition.sql"
-              v-model:promql="streamRoute.query_condition.promql"
-              v-model:delay="streamRoute.delay"
-              v-model:promql_condition="
-                streamRoute.query_condition.promql_condition
-              "
-              v-model:query_type="streamRoute.query_condition.type"
-              v-model:aggregation="streamRoute.query_condition.aggregation"
-              v-model:stream_type="streamRoute.stream_type"
-              v-model:isAggregationEnabled="isAggregationEnabled"
-              v-model:streamType="streamRoute.stream_type"
-              @validate-sql="validateSqlQuery"
-              @submit:form="saveQueryData"
-              @cancel:form="openCancelDialog"
-              @delete:node="openDeleteDialog"
-              @update:fullscreen="updateFullscreenMode"
-              @update:stream_type="updateStreamType"
-              @expandLog="toggleExpandLog"
-              @update:delay="updateDelay"
-              class="q-mt-sm"
-            />
-          </div>
-        </q-form>
-      </div>
+      </q-form>
     </div>
-  </ODrawer>
+  </div>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -163,12 +94,6 @@ import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
-import DateTime from "@/components/DateTime.vue";
-import { Maximize2, Minimize2 } from "lucide-vue-next";
-import config from "@/aws-exports";
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
@@ -212,10 +137,6 @@ interface StreamRoute {
 }
 
 const props = defineProps({
-  open: {
-    type: Boolean,
-    default: false,
-  },
   streamName: {
     type: String,
     required: true,
