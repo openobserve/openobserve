@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4">
-      <q-form ref="addOrganizationForm" @submit="onSubmit">
+      <q-form ref="addOrganizationForm" @submit="onSubmit" lazy-rules="ondemand">
           <q-input
             v-if="beingUpdated"
             v-model="organizationData.id"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import organizationService from "@/services/organizations";
@@ -138,7 +138,7 @@ export default defineComponent({
     };
   },
   emits: ["update:modelValue", "updated", "finish", "update:open"],
-  setup() {
+  setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
     const beingUpdated: any = ref(false);
@@ -155,6 +155,24 @@ export default defineComponent({
       return orgNameRegex.test(organizationData.value.name);
     });
 
+    watch(
+      () => props.modelValue,
+      (newVal) => {
+        if (newVal && newVal.id) {
+          beingUpdated.value = true;
+          disableColor.value = "grey-5";
+          organizationData.value = {
+            id: newVal.id,
+            name: newVal.name,
+          };
+        } else {
+          beingUpdated.value = false;
+          disableColor.value = "";
+          organizationData.value = defaultValue();
+        }
+      },
+      { deep: true, immediate: true },
+    );
 
     return {
       t,
@@ -170,27 +188,7 @@ export default defineComponent({
       isValidOrgName,
     };
   },
-  created() {
-    if (this.modelValue && this.modelValue.id) {
-      this.beingUpdated = true;
-      this.disableColor = "grey-5";
-      this.organizationData = {
-        id: this.modelValue.id,
-        name: this.modelValue.name,
-      };
-    }
 
-    // this.store.state.organizations.forEach((organization: any) => {
-    //   if (
-    //     (organization.hasOwnProperty("CustomerBillingObj") &&
-    //       organization.CustomerBillingObj.subscription_type ==
-    //         config.freePlan) ||
-    //     !organization.hasOwnProperty("CustomerBillingObj")
-    //   ) {
-    //     this.proPlanRequired = true;
-    //   }
-    // });
-  },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
       this.$q.notify({

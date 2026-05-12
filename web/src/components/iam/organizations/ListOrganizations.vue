@@ -456,6 +456,12 @@ export default defineComponent({
     }, { immediate: true });
 
     const renameOrganization = (props: any) => {
+      toBeUpdatedOrganization.value = {
+        id: props.row.identifier,
+        name: props.row.name,
+        identifier: props.row.identifier,
+      };
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "update",
@@ -463,13 +469,7 @@ export default defineComponent({
           to_be_updated_org_id: props.row.identifier,
           to_be_updated_org_name: props.row.name,
         },
-      })
-      toBeUpdatedOrganization.value = {
-        id: props.row.identifier,
-        name: props.row.name,
-        identifier: props.row.identifier,
-      };
-
+      });
     };
 
     return {

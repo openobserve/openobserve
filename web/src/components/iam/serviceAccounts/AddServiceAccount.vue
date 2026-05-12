@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4">
-      <q-form ref="updateUserForm" @submit.prevent="onSubmit">
+      <q-form ref="updateUserForm" @submit.prevent="onSubmit" lazy-rules="ondemand">
           <q-input
             v-if="!beingUpdated"
             v-model="formData.email"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated } from "vue";
+import { defineComponent, ref, onActivated, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
@@ -131,6 +131,24 @@ export default defineComponent({
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
 
+    watch(
+      () => props.modelValue,
+      (newVal) => {
+        if (newVal && newVal.email) {
+          beingUpdated.value = true;
+          formData.value = { ...newVal };
+          firstName.value = newVal.first_name ?? "";
+        } else {
+          beingUpdated.value = props.isUpdated;
+          formData.value = defaultValue();
+          formData.value.organization =
+            store.state.selectedOrganization.identifier;
+          firstName.value = "";
+        }
+      },
+      { deep: true, immediate: true },
+    );
+
     return {
       t,
       $q,
@@ -148,20 +166,7 @@ export default defineComponent({
       track,
     };
   },
-  created() {
-    this.formData = { ...defaultValue, ...this.modelValue };
-    this.beingUpdated = this.isUpdated;
 
-    if (
-      this.modelValue &&
-      this.modelValue.email != undefined &&
-      this.modelValue.email != ""
-    ) {
-      this.beingUpdated = true;
-      this.formData = { ...this.modelValue };
-      this.firstName = this.modelValue?.first_name;
-    }
-  },
   methods: {
     onSubmit() {
       const dismiss = this.$q.notify({

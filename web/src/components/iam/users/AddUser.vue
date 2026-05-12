@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4 tw:w-full">
-        <q-form ref="updateUserForm" @submit.prevent="onSubmit">
+        <q-form ref="updateUserForm" @submit.prevent="onSubmit" lazy-rules="ondemand">
           <!-- <p class="q-pt-sm tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
@@ -381,6 +381,35 @@ export default defineComponent({
       { deep: true },
     );
 
+    watch(
+      () => props.modelValue,
+      (newVal) => {
+        if (newVal && newVal.email != undefined && newVal.email != "") {
+          beingUpdated.value = true;
+          existingUser.value = false;
+          formData.value = { ...newVal, change_password: false, password: "" };
+          if (config.isEnterprise == "true" || config.isCloud == true) {
+            const orgId = store.state.selectedOrganization.identifier;
+            userServiece
+              .getUserRoles(orgId, newVal.email)
+              .then((response: any) => {
+                formData.value.custom_role = response.data;
+              })
+              .catch((error: any) => {
+                console.error("Error fetching user roles:", error);
+              });
+          }
+        } else {
+          beingUpdated.value = props.isUpdated;
+          existingUser.value = true;
+          formData.value = defaultValue();
+          formData.value.organization =
+            store.state.selectedOrganization.identifier;
+        }
+      },
+      { deep: true, immediate: true },
+    );
+
     const setOrganizationOptions = () => {
       organizationOptions.value = [];
       loadingOrganizations.value = !store.state.organizations.length;
@@ -434,25 +463,6 @@ export default defineComponent({
       },
       track,
     };
-  },
-  created() {
-    this.formData = { ...defaultValue, ...this.modelValue };
-    this.beingUpdated = this.isUpdated;
-
-    if (
-      this.modelValue &&
-      this.modelValue.email != undefined &&
-      this.modelValue.email != ""
-    ) {
-      this.existingUser = false;
-      this.beingUpdated = true;
-      this.formData = { ...this.modelValue };
-      this.formData.change_password = false;
-      this.formData.password = "";
-      if (config.isEnterprise == "true" || config.isCloud == true) {
-        this.fetchUserRoles(this.modelValue.email);
-      }
-    }
   },
   methods: {
     signout() {
