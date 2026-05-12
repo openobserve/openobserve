@@ -163,7 +163,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       // Build WHERE clause
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-      queries.push(`SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY ${store.state.zoConfig.timestamp_column || '_timestamp'} DESC limit ${limit}`);
+      queries.push(`SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY ${store.state.zoConfig.timestamp_column || '_timestamp'} DESC`);
     }
 
     return queries;
@@ -197,9 +197,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     took.value = 0;
 
     try {
-      const limitPerStream = Math.floor(pageSize.value / logStreamsCount.value);
       // Build SQL queries for ALL correlated log streams
-      const sqlQueries = buildSQLQueries(limitPerStream);
+      const sqlQueries = buildSQLQueries();
 
       // Prepare search query
       // Note: timestamps in timeRange are in microseconds
