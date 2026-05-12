@@ -15,33 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="import-drawer-container tw:w-[45rem]">
-    <!-- Header -->
-    <div class="drawer-header q-pa-md">
-      <div class="row items-center">
-        <div class="col">
-          <div class="text-h6">Import Semantic Groups</div>
-          <div class="text-caption text-grey-7">
-            Upload JSON file to import semantic field groups
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            round
-            dense
-            variant="ghost"
-            size="icon-circle-sm"
-            @click="handleClose"
-            data-test="import-drawer-close-btn"
-          >
-            <q-icon name="close" />
-          </OButton>
-        </div>
-      </div>
-    </div>
-
-    <q-separator />
-
+  <div class="import-drawer-container">
     <!-- Content -->
     <div class="drawer-content q-pa-md">
       <!-- File Upload -->
