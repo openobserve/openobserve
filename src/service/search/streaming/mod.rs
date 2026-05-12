@@ -304,10 +304,6 @@ pub async fn process_search_stream_request(
         );
 
         // handle cache responses and deltas
-        // TODO(non-ts-order-by): if is_non_ts_order_by && !deltas.is_empty() &&
-        // !cached_resp.is_empty(), fall back to full do_partitioned_search() so the global
-        // k-way merge produces correct order. Partial hits for non-ts ORDER BY were already
-        // broken before this fix (time-based interleave); this would promote them to correct.
         if !cached_resp.is_empty() && cached_hits > 0 {
             // `max_query_range` is used initialize `remaining_query_range`
             // set max_query_range to `end_time - start_time` as hour if it is 0, to ensure
