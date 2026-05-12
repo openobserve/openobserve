@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-sm q-my-sm scroll" style="width: 60vw">
+        <div class="q-mx-sm q-my-sm scroll">
           <OTabPanels
             v-model="activeTab"
             animated
