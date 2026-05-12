@@ -453,8 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-result-detail-dialog"
         v-model:open="searchObj.meta.showDetailTab"
         :width="85"
-        :show-close="false"
-        @close="searchObj.meta.showDetailTab = false"
+        :title="t('search.rowDetail')"
         @update:open="(v) => !v && reDrawChart()"
       >
         <DetailTable

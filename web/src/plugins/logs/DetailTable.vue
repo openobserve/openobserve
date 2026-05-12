@@ -15,29 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
+  <div
     class="column full-height no-wrap searchdetaildialog"
     data-test="dialog-box"
-    :style="{ borderTop: `4px solid ${statusColor}` }"
   >
-    <q-card-section class="q-px-md q-pb-sm">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold" data-test="log-detail-title-text">
-            {{ t("search.rowDetail") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            @click="$emit('close')"
-            variant="ghost"
-            size="icon-sm"
-            data-test="close-dialog"
-          ><q-icon name="cancel" size="16px" /></OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
     <!-- Single Tab Row -->
     <div class="row justify-between q-pt-sm items-center">
       <div class="col tw:flex tw:items-center tw:gap-2">
@@ -421,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </q-card-section>
-  </q-card>
+  </div>
 </template>
 
 <script lang="ts">
@@ -473,7 +454,7 @@ export default defineComponent({
     "sendToAiChat",
     "closeTable",
     "show-correlation",
-    "load-correlation" // New event for lazy loading correlation data
+    "load-correlation", // New event for lazy loading correlation data
   ],
   props: {
     modelValue: {
