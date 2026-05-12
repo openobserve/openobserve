@@ -27,6 +27,18 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 
+// Hoisted mock references — available inside vi.mock factories so individual
+// tests can assert against them without re-mocking entire modules.
+const {
+  mockLoadSemanticGroups,
+  mockBuildQueryDetails,
+  mockNavigateToLogs,
+} = vi.hoisted(() => ({
+  mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
+  mockBuildQueryDetails: vi.fn().mockReturnValue({}),
+  mockNavigateToLogs: vi.fn(),
+}));
+
 vi.mock("@/utils/traces/convertTraceData", () => ({
   getServiceIconDataUrl: vi
     .fn()
@@ -36,8 +48,8 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
     searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
-    buildQueryDetails: vi.fn(),
-    navigateToLogs: vi.fn(),
+    buildQueryDetails: mockBuildQueryDetails,
+    navigateToLogs: mockNavigateToLogs,
   }),
 }));
 
@@ -51,6 +63,7 @@ vi.mock("@/aws-exports", () => ({
 vi.mock("@/composables/useServiceCorrelation", () => ({
   useServiceCorrelation: () => ({
     findRelatedTelemetry: vi.fn().mockResolvedValue(null),
+    loadSemanticGroups: mockLoadSemanticGroups,
   }),
 }));
 
@@ -65,6 +78,7 @@ import componentSource from "@/plugins/traces/TraceDetailsSidebar.vue?raw";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -260,8 +274,7 @@ function mountSidebar(propsOverrides: Record<string, unknown> = {}) {
       ...propsOverrides,
     },
     global: {
-      plugins: [i18n, router],
-      provide: { store: mockStore },
+      plugins: [i18n, router, mockStore],
       stubs: { ...baseStubs },
     },
   });
@@ -372,19 +385,96 @@ describe("TraceDetailsSidebar", async () => {
     expect(wrapper.emitted("close")).toBeTruthy();
   });
 
-  it("should trigger view logs functionality when view logs button is clicked", async () => {
-    const viewLogsBtn = wrapper.find(
-      '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
-    );
-    expect(viewLogsBtn.exists()).toBe(true);
+  describe("viewSpanLogs", () => {
+    let dispatchSpy: ReturnType<typeof vi.spyOn>;
+    let pushSpy: ReturnType<typeof vi.spyOn>;
 
-    await viewLogsBtn.trigger("click");
+    afterEach(() => {
+      dispatchSpy?.mockRestore();
+      pushSpy?.mockRestore();
+      // Restore the default enterprise setting for subsequent tests
+      config.isEnterprise = "true";
+    });
 
-    // The component should call viewSpanLogs function which uses useTraces composable
-    // to navigate to logs page with span-specific query parameters
-    // Since we can't easily mock the composable in this test setup,
-    // we just verify the button click doesn't throw an error
-    expect(viewLogsBtn.exists()).toBe(true);
+    describe("when isEnterprise is true (enterprise branch)", () => {
+      beforeEach(() => {
+        // correlationProps is null by default because loadCorrelation() has not
+        // been called. navigateToCorrelatedLogs() iterates correlationProps.value.logStreams,
+        // so we must provide a valid value. No public API exists to set correlationProps
+        // — we set vm state directly.
+        wrapper.vm.correlationProps = {
+          logStreams: [
+            { stream_name: "test-stream", filters: { service_name: "test-svc" } },
+          ],
+          timeRange: { startTime: 1000000, endTime: 2000000 },
+        };
+        // Spy on store.dispatch and router.push to prevent real navigation and
+        // assert they are called with the expected arguments.
+        dispatchSpy = vi
+          .spyOn(mockStore, "dispatch")
+          .mockResolvedValue(undefined);
+        pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      });
+
+      it("should call loadSemanticGroups and navigate to /logs with query", async () => {
+        const viewLogsBtn = wrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        expect(viewLogsBtn.exists()).toBe(true);
+
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockLoadSemanticGroups).toHaveBeenCalled();
+        expect(dispatchSpy).toHaveBeenCalledWith(
+          "logs/setIsInitialized",
+          false,
+        );
+        expect(pushSpy).toHaveBeenCalled();
+        const pushArgs = pushSpy.mock.calls[0][0];
+        expect(pushArgs.path).toBe("/logs");
+        expect(pushArgs.query.query).toBeDefined();
+        expect(pushArgs.query.stream).toBe("test-stream");
+      });
+
+      it("should not call buildQueryDetails or navigateToLogs in enterprise path", async () => {
+        const viewLogsBtn = wrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockBuildQueryDetails).not.toHaveBeenCalled();
+        expect(mockNavigateToLogs).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when isEnterprise is false (non-enterprise branch)", () => {
+      beforeEach(() => {
+        config.isEnterprise = "false";
+      });
+
+      it("should call buildQueryDetails with the span and navigateToLogs", async () => {
+        const viewLogsBtn = wrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        expect(viewLogsBtn.exists()).toBe(true);
+
+        await viewLogsBtn.trigger("click");
+
+        expect(mockBuildQueryDetails).toHaveBeenCalledWith(mockSpan);
+        expect(mockNavigateToLogs).toHaveBeenCalled();
+      });
+
+      it("should not call loadSemanticGroups", async () => {
+        const viewLogsBtn = wrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        await viewLogsBtn.trigger("click");
+
+        expect(mockLoadSemanticGroups).not.toHaveBeenCalled();
+      });
+    });
   });
 
   it("should copy span ID when copy button is clicked", async () => {

@@ -44,9 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Right-side actions: View Logs + Column Visibility -->
-          <div class="tw:flex tw:items-center tw:gap-2 tw:pr-4">
-            <!-- Column Visibility Dropdown -->
+          <!-- Column Visibility Dropdown -->
+          <div class="tw:pr-4">
             <ODropdown
               side="bottom"
               align="end"
