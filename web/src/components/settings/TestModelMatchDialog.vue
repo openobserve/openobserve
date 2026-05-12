@@ -2,7 +2,7 @@
   <ODialog
     v-model:open="internalValue"
     persistent
-    size="xl"
+    :width="50"
     data-test="test-model-match-dialog"
     :title="t('modelPricing.testMatchTitle')"
     :sub-title="t('modelPricing.testMatchSubtitle')"
