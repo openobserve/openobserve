@@ -23,10 +23,9 @@
               <img :src="o2AiTitleLogo" />
             </q-avatar>
 
-            <q-btn
-              flat
-              dense
-              no-caps
+            <OButton
+              variant="ghost"
+              size="sm"
               class="chat-title-dropdown"
               @click="loadHistory"
             >
@@ -99,17 +98,15 @@
                                 {{ formatTime(chat.timestamp) }}
                               </div>
                             </div>
-                            <q-btn
-                              flat
-                              round
-                              dense
-                              size="xs"
-                              icon="delete"
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-circle"
                               class="delete-history-btn"
                               @click.stop="deleteChat(chat.id)"
                             >
+                              <q-icon name="delete" />
                               <q-tooltip :delay="500">Delete chat</q-tooltip>
-                            </q-btn>
+                            </OButton>
                           </div>
                         </q-item-section>
                       </q-item>
@@ -127,18 +124,20 @@
                     class="clear-all-container"
                   >
                     <q-separator />
-                    <q-btn
-                      flat
-                      no-caps
+                    <OButton
+                      variant="ghost"
                       class="clear-all-btn"
-                      icon="delete_sweep"
-                      label="Clear all conversations"
                       @click.stop="clearAllConversations"
-                    />
+                    >
+                      <template #icon-left>
+                        <q-icon name="delete_sweep" />
+                      </template>
+                      Clear all conversations
+                    </OButton>
                   </div>
                 </div>
               </q-menu>
-            </q-btn>
+            </OButton>
           </div>
 
           <div class="tw:flex tw:items-center tw:gap-1 chat-header-actions">
@@ -1618,6 +1617,7 @@ import {
   MAX_IMAGE_SIZE_BYTES,
   ALLOWED_IMAGE_TYPES,
 } from "@/ts/interfaces/chat";
+import OButton from "@/lib/core/Button/OButton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import RichTextInput, { ReferenceChip } from "@/components/RichTextInput.vue";
 import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
@@ -1663,6 +1663,7 @@ function renderMarkdown(content: any) {
 export default defineComponent({
   name: "O2AIChat",
   components: {
+    OButton,
     ConfirmDialog,
     RichTextInput,
     O2AIConfirmDialog,
