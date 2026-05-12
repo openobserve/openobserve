@@ -48,6 +48,12 @@ export interface SelectProps {
   searchDebounce?: number;
   /** Hides already selected options in multiple mode */
   hideSelected?: boolean;
+  /**
+   * Renders a "Select All" master row at the top of the dropdown (multi-select
+   * listbox mode only). Shows an indeterminate dash when only some options are
+   * selected, a check when all are, and toggles the entire selection on click.
+   */
+  selectAll?: boolean;
   /** Allows creating new values by typing — emits @create event */
   creatable?: boolean;
   /** Optional dropdown content style passthrough */

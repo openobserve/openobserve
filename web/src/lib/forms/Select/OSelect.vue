@@ -143,6 +143,16 @@ const normalizedOptions = computed<NormalizedOption[]>(() => {
     .filter((opt): opt is NormalizedOption => opt !== null);
 });
 
+// Mirror prop-supplied options into valueMap so resolveListboxValue can recover
+// their original type. Without this, numeric values like `1` round-trip as `"1"`
+// (Reka stores listbox values as strings) and strict-equality checks against
+// the typed option value — e.g. the multi-select checkbox indicator — never match.
+watchEffect(() => {
+  for (const o of normalizedOptions.value) {
+    if (!o.header) valueMap.set(String(o.value), o.value);
+  }
+});
+
 const searchTerm = ref("");
 const popoverOpen = ref(false);
 const filterDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
@@ -313,6 +323,38 @@ function handleClear() {
   searchTerm.value = "";
 }
 
+// ── Select-all (multi-select listbox) ─────────────────────────────────────
+// Operates on all enabled, non-header options — not just the currently
+// filtered subset — so the master state stays predictable regardless of the
+// search term.
+const selectableOptions = computed<NormalizedOption[]>(() =>
+  normalizedOptions.value.filter((o: NormalizedOption) => !o.header && !o.disabled),
+);
+
+const allSelected = computed(() => {
+  const all = selectableOptions.value;
+  if (all.length === 0) return false;
+  return all.every((o: NormalizedOption) => selectedValues.value.includes(o.value));
+});
+
+const partiallySelected = computed(() => {
+  if (allSelected.value) return false;
+  return selectableOptions.value.some((o: NormalizedOption) =>
+    selectedValues.value.includes(o.value),
+  );
+});
+
+function toggleAllSelections() {
+  if (allSelected.value) {
+    emit("update:modelValue", []);
+  } else {
+    emit(
+      "update:modelValue",
+      selectableOptions.value.map((o: NormalizedOption) => o.value),
+    );
+  }
+}
+
 function handleCreateFromInput() {
   if (!props.creatable) return;
   const term = searchTerm.value.trim();
@@ -421,12 +463,13 @@ function estimateChipWidth(label: string): number {
   return labelW + 16; // px-2 each side
 }
 
-// Space reserved inside the trigger for non-chip content: left ps-3 padding,
-// trailing chevron icon, optional clear button. Approximated; the
-// ResizeObserver makes minor mis-estimates self-correct on the next layout.
+// Space reserved inside the trigger for non-chip content: left ps-3 padding +
+// right padding (which contains the absolutely-positioned chevron, and the
+// clear button when shown). Mirrors `triggerEndPadding` so the chip-fit
+// calculation matches the actual squeeze on the content area.
 const reservedTriggerSpace = computed(() => {
-  let reserved = 12 + 32; // ps-3 (12px) + chevron + its padding (~32px)
-  if (props.clearable && hasSelection.value) reserved += 32; // clear btn + gap
+  let reserved = 12 + 28; // ps-3 (12px) + pe-7 (28px) — chevron-only
+  if (props.clearable && hasSelection.value) reserved += 20; // pe-12 - pe-7
   return reserved;
 });
 
@@ -480,11 +523,12 @@ const overflowSelectedCount = computed(() =>
   Math.max(0, selectedLabels.value.length - dynamicMaxChips.value),
 );
 
-// Trigger right-padding: leave more space when the clear button is visible,
-// so the arrow + clear no longer overlap (was `pe-7` which sat directly on
-// the arrow icon).
+// Trigger right padding. Chevron + clear icons live in an absolutely-positioned
+// flex container at the trigger's right edge, so changing this padding only
+// squeezes the content area — it does not shift the chevron position when the
+// clear button toggles into view.
 const triggerEndPadding = computed(() =>
-  props.clearable && hasSelection.value ? "tw:pe-14" : "tw:pe-9",
+  props.clearable && hasSelection.value ? "tw:pe-12" : "tw:pe-7",
 );
 
 const fieldWidthClass = computed(() => {
@@ -581,11 +625,48 @@ const fieldWidthClass = computed(() => {
                 {{ hasSelection ? triggerDisplayLabel : placeholder }}
               </span>
             </slot>
+          </PopoverTrigger>
+
+          <!--
+            Trailing icons: clear (left) then chevron (right).
+            Container is absolutely positioned and pointer-events:none so the
+            chevron alone never blocks the trigger click. The clear button
+            re-enables its own pointer events. Because the chevron's position
+            is anchored to the container's right edge, toggling the clear
+            button in or out does not shift the chevron.
+          -->
+          <div
+            class="tw:absolute tw:end-2.5 tw:flex tw:items-center tw:gap-1.5 tw:pointer-events-none"
+          >
+            <button
+              v-if="clearable && hasSelection"
+              type="button"
+              tabindex="-1"
+              aria-label="Clear selection"
+              :class="[
+                'tw:flex tw:items-center tw:justify-center tw:size-3.5',
+                'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
+                'tw:transition-colors tw:pointer-events-auto',
+              ]"
+              @click.stop="handleClear"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                class="tw:size-3.5"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"
+                />
+              </svg>
+            </button>
 
             <span
               aria-hidden="true"
               :class="[
-                'tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:pe-2 tw:text-select-icon',
+                'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
                 'tw:transition-transform tw:duration-150',
                 isOpen ? 'tw:rotate-180' : '',
               ]"
@@ -604,32 +685,7 @@ const fieldWidthClass = computed(() => {
                 />
               </svg>
             </span>
-          </PopoverTrigger>
-
-          <button
-            v-if="clearable && hasSelection"
-            type="button"
-            tabindex="-1"
-            aria-label="Clear selection"
-            :class="[
-              'tw:absolute tw:end-8 tw:flex tw:items-center tw:justify-center',
-              'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
-              'tw:transition-colors tw:size-4',
-            ]"
-            @click.stop="handleClear"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              class="tw:size-3.5"
-              aria-hidden="true"
-            >
-              <path
-                d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"
-              />
-            </svg>
-          </button>
+          </div>
         </div>
 
         <PopoverPortal>
@@ -667,6 +723,68 @@ const fieldWidthClass = computed(() => {
                 :placeholder="searchPlaceholder"
                 @keydown.enter="handleCreateFromInput"
               />
+
+              <!--
+                Select-all master row. Indeterminate (dash) when only some
+                options are checked, full check when all are. Toggles the
+                whole selection. Rendered as a plain button so it sits
+                outside the listbox's keyboard navigation while remaining
+                focusable.
+              -->
+              <div
+                v-if="selectAll && multiple && selectableOptions.length > 0"
+                role="button"
+                tabindex="0"
+                aria-label="Toggle all options"
+                :aria-checked="
+                  allSelected
+                    ? 'true'
+                    : partiallySelected
+                      ? 'mixed'
+                      : 'false'
+                "
+                :class="[
+                  'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2',
+                  'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
+                  'tw:text-select-item-text tw:rounded-sm',
+                  'tw:cursor-pointer tw:select-none tw:outline-none',
+                  'tw:hover:bg-select-item-hover-bg',
+                  'tw:focus-visible:bg-select-item-hover-bg',
+                  'tw:transition-colors tw:duration-100',
+                  'tw:border-b tw:border-select-content-border tw:mb-1 tw:pb-1.5',
+                ]"
+                data-test="o-select-all"
+                @click="toggleAllSelections"
+                @keydown.enter.prevent="toggleAllSelections"
+                @keydown.space.prevent="toggleAllSelections"
+              >
+                <span
+                  :class="[
+                    'tw:flex tw:items-center tw:justify-center tw:shrink-0',
+                    'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
+                    allSelected
+                      ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
+                      : 'tw:bg-checkbox-bg tw:border-checkbox-border',
+                  ]"
+                  aria-hidden="true"
+                >
+                  <svg
+                    v-if="allSelected"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
+                  >
+                    <polyline points="2,6 5,9 10,3" />
+                  </svg>
+                </span>
+                <span class="tw:truncate tw:font-medium">Select all</span>
+              </div>
+
               <!-- Virtual scroll container -->
               <div ref="listboxScrollEl" class="tw:max-h-60 tw:overflow-auto">
                 <div
@@ -836,11 +954,42 @@ const fieldWidthClass = computed(() => {
           >
             <slot name="trigger" :value="modelValue" />
           </SelectValue>
+        </SelectTrigger>
+
+        <!-- Trailing icons: clear (left) then chevron (right). See note in
+             the listbox branch above for the pointer-events strategy. -->
+        <div
+          class="tw:absolute tw:end-2.5 tw:flex tw:items-center tw:gap-1.5 tw:pointer-events-none"
+        >
+          <button
+            v-if="clearable && hasSelection"
+            type="button"
+            tabindex="-1"
+            aria-label="Clear selection"
+            :class="[
+              'tw:flex tw:items-center tw:justify-center tw:size-3.5',
+              'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
+              'tw:transition-colors tw:pointer-events-auto',
+            ]"
+            @click.stop="handleClear"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              class="tw:size-3.5"
+              aria-hidden="true"
+            >
+              <path
+                d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"
+              />
+            </svg>
+          </button>
 
           <span
             aria-hidden="true"
             :class="[
-              'tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:pe-2 tw:text-select-icon',
+              'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
               'tw:transition-transform tw:duration-150',
               isOpen ? 'tw:rotate-180' : '',
             ]"
@@ -859,32 +1008,7 @@ const fieldWidthClass = computed(() => {
               />
             </svg>
           </span>
-        </SelectTrigger>
-
-        <button
-          v-if="clearable && hasSelection"
-          type="button"
-          tabindex="-1"
-          aria-label="Clear selection"
-          :class="[
-            'tw:absolute tw:end-8 tw:flex tw:items-center tw:justify-center',
-            'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
-            'tw:transition-colors tw:size-4',
-          ]"
-          @click.stop="handleClear"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 16 16"
-            fill="currentColor"
-            class="tw:size-3.5"
-            aria-hidden="true"
-          >
-            <path
-              d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"
-            />
-          </svg>
-        </button>
+        </div>
       </div>
 
       <SelectPortal>
