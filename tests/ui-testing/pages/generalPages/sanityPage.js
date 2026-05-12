@@ -27,7 +27,7 @@ export class SanityPage {
         
         // Pagination and Results locators
         this.resultColumnSource = '[data-test="log-table-column-0-source"]';
-        this.closeDialog = '[data-test="close-dialog"]';
+        this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         
         // Histogram locators
         this.histogramToggleButton = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
