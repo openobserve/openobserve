@@ -63,7 +63,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: "Test content",
-          observationType: "SPAN",
+          observationType: "span",
           contentType: "input",
           viewMode: "formatted",
         },
@@ -76,7 +76,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "SPAN",
+          observationType: "span",
           contentType: "input",
           viewMode: "formatted",
         },
@@ -89,7 +89,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: "",
-          observationType: "SPAN",
+          observationType: "span",
           contentType: "input",
           viewMode: "formatted",
         },
@@ -102,7 +102,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: "null",
-          observationType: "SPAN",
+          observationType: "span",
           contentType: "input",
           viewMode: "formatted",
         },
@@ -124,7 +124,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "TOOL",
+          observationType: "execute_tool",
           contentType: "input",
           span: mockSpan,
           viewMode: "formatted",
@@ -146,7 +146,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "TOOL",
+          observationType: "execute_tool",
           contentType: "input",
           span: mockSpan,
           viewMode: "formatted",
@@ -166,7 +166,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "TOOL",
+          observationType: "execute_tool",
           contentType: "output",
           span: mockSpan,
           viewMode: "formatted",
@@ -186,7 +186,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "TOOL",
+          observationType: "execute_tool",
           contentType: "input",
           span: mockSpan,
           viewMode: "formatted",
@@ -213,7 +213,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "TOOL",
+          observationType: "execute_tool",
           contentType: "input",
           span: mockSpan,
           viewMode: "formatted",
@@ -593,7 +593,7 @@ describe("LLMContentRenderer", () => {
         },
       });
 
-      expect(wrapper.props("observationType")).toBe("SPAN");
+      expect(wrapper.props("observationType")).toBe("span");
     });
 
     it("should use default contentType", () => {
@@ -966,7 +966,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "TOOL",
+          observationType: "execute_tool",
           contentType: "input",
           span: mockSpan,
         },
@@ -979,7 +979,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "TOOL",
+          observationType: "execute_tool",
           contentType: "input",
           span: { gen_ai_tool_call_arguments: "null" },
         },
@@ -1194,7 +1194,7 @@ describe("LLMContentRenderer", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: null,
-          observationType: "TOOL",
+          observationType: "execute_tool",
           contentType: "input",
           span: mockSpan,
         },

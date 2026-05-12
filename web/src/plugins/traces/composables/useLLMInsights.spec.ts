@@ -341,6 +341,9 @@ describe("useLLMInsights — fetchAll error path", () => {
 
 describe("useLLMInsights — sparklines accumulation", () => {
   // Single-row response → 1-element series across all 5 metrics.
+  // Window 100→200µs falls into the "10 seconds" bucket; the pre-built
+  // grid produces a single key "1970-01-01T00:00:00", so the row's ts
+  // must match it for the data to land in the series.
   it("populates 5 series from a single bucket row", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
@@ -356,7 +359,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
         results: {
           hits: [
             {
-              ts: "2026-05-08T12:00:00Z",
+              ts: "1970-01-01T00:00:00",
               request_count: 10,
               trace_count: 5,
               error_count: 1,
@@ -379,10 +382,13 @@ describe("useLLMInsights — sparklines accumulation", () => {
     expect(sparklines.value.errorRate).toEqual([10]);
   });
 
-  // Multiple rows → series in row order, same length across all metrics.
+  // Multiple rows → series in grid order, same length across all metrics.
+  // Window 1µs→20s (in µs) at "10 seconds" interval = grid of 2 keys:
+  //   "1970-01-01T00:00:00" and "1970-01-01T00:00:10".
+  // Start must be non-zero — `fetchAll` bails on `!startTime`.
   it("preserves bucket ordering across multiple rows", async () => {
     const { fetchAll, sparklines } = useLLMInsights();
-    const promise = fetchAll("default", 100, 200);
+    const promise = fetchAll("default", 1, 20_000_000);
 
     const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(
       ([, c]: any) => c,
@@ -393,8 +399,8 @@ describe("useLLMInsights — sparklines accumulation", () => {
       content: {
         results: {
           hits: [
-            { ts: "T1", request_count: 10, error_count: 2, total_tokens: 100, total_cost: 1, p95_duration: 1, trace_count: 1 },
-            { ts: "T2", request_count: 20, error_count: 0, total_tokens: 200, total_cost: 2, p95_duration: 2, trace_count: 2 },
+            { ts: "1970-01-01T00:00:00", request_count: 10, error_count: 2, total_tokens: 100, total_cost: 1, p95_duration: 1, trace_count: 1 },
+            { ts: "1970-01-01T00:00:10", request_count: 20, error_count: 0, total_tokens: 200, total_cost: 2, p95_duration: 2, trace_count: 2 },
           ],
         },
       },
@@ -422,7 +428,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
       content: {
         results: {
           hits: [
-            { ts: "T1", request_count: 0, error_count: 5, total_tokens: 0, total_cost: 0, p95_duration: 0, trace_count: 0 },
+            { ts: "1970-01-01T00:00:00", request_count: 0, error_count: 5, total_tokens: 0, total_cost: 0, p95_duration: 0, trace_count: 0 },
           ],
         },
       },

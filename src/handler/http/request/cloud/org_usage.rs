@@ -58,15 +58,8 @@ pub async fn get_org_usage(
     };
     let unit = query.get("data_type").map(|h| h.as_str()).unwrap_or("mb");
 
-    match org_usage::get_org_usage(&org_id, &usage_range).await {
+    match org_usage::get_org_usage(&org_id, &usage_range, unit).await {
         Err(e) => e.into_http_response(),
-        Ok(org_usage) => {
-            let mut body = GetOrgUsageResponseBody {
-                data: org_usage.into_iter().map(From::from).collect(),
-                range: usage_range.to_string(),
-            };
-            body.convert_to_unit(unit);
-            MetaHttpResponse::json(body)
-        }
+        Ok(body) => MetaHttpResponse::json(body),
     }
 }

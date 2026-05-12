@@ -39,6 +39,17 @@ const config = {
   ddClientToken: import.meta.env.VITE_DD_CLIENT_TOKEN,
   ddSite: import.meta.env.VITE_DD_SITE,
   REO_CLIENT_KEY: import.meta.env.VITE_REODOTDEV_CLIENT_KEY || "",
+  // Master switch for the LLM Observability UI (LLM Insights tab on
+  // the traces page + Thread tab inside trace details).
+  //
+  // Default behaviour: SHOWN. The feature is hidden only when the
+  // env var is explicitly set to the string "false" — every other
+  // value (unset, "true", "1", "yes", etc.) keeps the UI visible.
+  // Consumers check `config.showLLMUI !== 'false'` so a typo or a
+  // missing env file can't accidentally hide the feature.
+  showLLMUI: import.meta.env.VITE_SHOW_LLM_UI
+    ? import.meta.env.VITE_SHOW_LLM_UI
+    : "true",
 };
 
 export default config;

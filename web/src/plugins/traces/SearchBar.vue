@@ -64,7 +64,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
+          <!--
+            Two-gate visibility:
+              1. The deployment-wide `VITE_SHOW_LLM_UI` env flag must
+                 NOT be `"false"`. Unset (default), `"true"`, or any
+                 other value keeps the UI visible — only the literal
+                 string `"false"` hides it. Prevents accidental hide
+                 on typo / missing .env file.
+              2. The org must have at least one traces stream flagged
+                 `is_llm_stream === true` (resolved by `Index.vue` and
+                 passed as `hasLLMStreams`).
+            We also keep the toggle visible when the user is already
+            on the LLM Insights tab (e.g., navigated via URL) so the
+            active selection isn't orphaned mid-session.
+          -->
           <OToggleGroupItem
+            v-if="
+              config.showLLMUI !== 'false' &&
+              (hasLLMStreams || searchObj.meta.searchMode === 'llm-insights')
+            "
             data-test="traces-search-mode-llm-insights-btn"
             value="llm-insights"
             size="sm"
@@ -76,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Show search controls only when not on Service Graph or Services Catalog -->
+        <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
@@ -518,6 +536,16 @@ export default defineComponent({
     isLLMSpanPresent: {
       type: Boolean,
       default: false,
+    },
+    // True when the parent (`Index.vue`) has confirmed at least one
+    // traces stream is flagged `is_llm_stream === true`. Drives the
+    // LLM Insights tab visibility — we hide the toggle entirely when
+    // no org has opted in (avoids a dead button that opens an empty
+    // dashboard). Defaults to `true` so the tab doesn't flicker
+    // during the brief window before streams resolve on first mount.
+    hasLLMStreams: {
+      type: Boolean,
+      default: true,
     },
   },
   methods: {

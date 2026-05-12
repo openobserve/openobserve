@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
               :isLLMSpanPresent="isLLMSpanPresent"
+              :hasLLMStreams="hasLLMStreams"
               class="card-container"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
@@ -484,6 +485,21 @@ function recomputeInsightsTimeRange() {
 
 const isLLMSpanPresent = ref(false);
 
+// True when the org has at least one traces stream marked as an LLM
+// stream (strict opt-in: `settings.is_llm_stream === true`). Drives
+// the LLM Insights tab visibility in `SearchBar` — we hide the tab
+// entirely when nothing is opted in.
+//
+// Implemented as a `computed` (not a `ref`) so resolving `streamResults`
+// doesn't fire an extra reactive write inside `getStreamList`'s async
+// chain — that would force an unrelated re-render and surface latent
+// reactivity assumptions elsewhere on the page.
+const hasLLMStreams = computed(() =>
+  (searchObj.data.streamResults?.list || []).some(
+    (s: any) => s?.settings?.is_llm_stream === true,
+  ),
+);
+
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
   const { sqlParser }: any = useSqlParser.default();
@@ -531,6 +547,9 @@ async function getStreamList() {
     return getStreams("traces", false)
       .then(async (res) => {
         searchObj.data.streamResults = res;
+        // `hasLLMStreams` is a computed that reads from
+        // `searchObj.data.streamResults` — no explicit write needed
+        // here. See the computed's declaration above for why.
 
         if (res.list.length > 0) {
           if (config.isCloud == "true") {
