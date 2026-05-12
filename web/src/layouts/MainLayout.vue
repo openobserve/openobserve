@@ -16,11 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OLayout
-    :class="[store.state.printMode === true ? 'printMode' : '', 'oo_app']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'oo_app', 'tw:min-h-screen']"
   >
-    <header class="oo_header">
+    <header class="oo_header tw:shrink-0">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <div class="oo_banner">
+      <div
+        class="oo_banner tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
+      >
         <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
       </div>
 
@@ -59,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </header>
 
-    <div class="oo_body">
+    <div class="oo_body tw:flex-1 tw:flex tw:min-h-0">
       <ONavbar
         :links-list="linksList"
         :mini-mode="miniMode"
@@ -67,10 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
-      <OPageContainer class="oo_content-wrapper">
+      <OPageContainer class="oo_content-wrapper tw:flex-1 tw:min-w-0 tw:flex">
         <!-- Main Panel -->
         <main
-          class="oo_main"
+          class="oo_main tw:flex tw:flex-col tw:min-h-0"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -78,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <div class="oo_content-scroll">
+          <div class="oo_content-scroll tw:flex-1 tw:overflow-y-auto">
             <div
               v-show="isLoading"
               :key="store.state.selectedOrganization?.identifier"
@@ -93,14 +95,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="oo_sidebar oo_right"
+          class="oo_sidebar oo_right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,36px)] tw:self-start tw:shrink-0"
           :class="[
             store.state.theme == 'dark'
               ? 'dark-mode-chat-container'
               : 'light-mode-chat-container',
             { 'oo_sidebar--expanded': store.state.isAiChatExpanded },
           ]"
-          :style="
+          :style="[
+            {
+              height: 'calc(100vh - var(--navbar-height, 36px))',
+            },
             store.state.isAiChatExpanded
               ? {
                   position: 'fixed',
@@ -116,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: '25%',
                   maxWidth: '100%',
                   minWidth: '75px',
-                }
-          "
+                },
+          ]"
         >
           <O2AIChat
             :header-height="42.5"
@@ -1300,8 +1305,6 @@ export default defineComponent({
 
 <style lang="scss">
 @import "../styles/app.scss";
-@import "../styles/menu-variables";
-@import "../styles/menu-animations";
 
 // Logo container
 .logo-container {
@@ -1342,20 +1345,6 @@ export default defineComponent({
   }
 }
 
-@media print {
-  .tw:h-full,
-  .tw:h-\[calc\(100vh-105px\)\],
-  .tw:overflow-y-auto {
-    overflow: visible !important;
-  }
-}
-
-.left-drawer {
-  border-radius: 0.625rem;
-  flex-shrink: 0;
-  overflow-y: auto;
-}
-
 // Always show left drawer on screens above 500px
 @media (min-width: 501px) {
   .left-drawer {
@@ -1364,10 +1353,12 @@ export default defineComponent({
   }
 }
 
-.oo_content-wrapper {
-  flex: 1;
-  min-width: 0;
-  display: flex;
+@media print {
+  .tw:h-full,
+  .tw:h-\[calc\(100vh-105px\)\],
+  .tw:overflow-y-auto {
+    overflow: visible !important;
+  }
 }
 
 .warning-msg {
@@ -1426,11 +1417,6 @@ export default defineComponent({
 .q-item {
   min-height: 30px;
   padding: 3px 8px;
-}
-
-.o2-bg-color {
-  // background-color: rgba(89, 96, 178, 0.08);
-  background: transparent;
 }
 
 .q-list {
@@ -1552,59 +1538,6 @@ export default defineComponent({
   }
 }
 
-.headerMenu {
-  margin-right: 1rem;
-
-  .block {
-    font-weight: 700;
-    color: #404040;
-  }
-}
-.q-list {
-  // &.leftNavList {
-  //   .q-item {
-  //     .q-icon {
-  //       height: 1rem;
-  //       width: 1rem;
-  //     }
-
-  //     &.q-router-link--active {
-  //       .q-icon img {
-  //         filter: brightness(100);
-  //       }
-  //     }
-  //   }
-  // }
-
-  .flagIcon img {
-    border-radius: 3px;
-    object-fit: cover;
-    display: block;
-    height: 16px;
-    width: 24px;
-  }
-
-  .q-item {
-    &__section {
-      &--avatar {
-        padding-right: 0.875rem;
-        min-width: 1.5rem;
-      }
-    }
-
-    &__label {
-      font-weight: 400;
-    }
-
-    &.activeLang {
-      &__label {
-        font-weight: 600;
-        color: $primary;
-      }
-    }
-  }
-}
-
 .userInfo {
   align-items: flex-start;
   flex-direction: column;
@@ -1623,33 +1556,6 @@ export default defineComponent({
     color: #565656;
     font-weight: 600;
   }
-}
-
-.dark-mode {
-  background-color: $dark-page;
-}
-
-.languagelist {
-  .q-item {
-    padding: 4px 8px;
-  }
-}
-
-.text-powered-by {
-  float: left;
-  display: inline-block;
-  position: absolute;
-  margin-top: 16px;
-  margin-left: 0px;
-}
-
-.custom-text-logo {
-  display: inline-block;
-  float: left;
-  position: absolute;
-  margin-left: 72px !important;
-  margin-top: 16px !important;
-  width: 80px !important;
 }
 
 .header-menu {
@@ -1695,16 +1601,6 @@ body.ai-chat-open {
 .oo_app {
   width: 100%;
   transition: width 0.3s ease;
-}
-
-.o2-button {
-  border-radius: 4px;
-  padding: 0px 8px;
-  color: white;
-}
-.dark-mode-chat-container {
-}
-.light-mode-chat-container {
 }
 
 .ai-btn-active {
