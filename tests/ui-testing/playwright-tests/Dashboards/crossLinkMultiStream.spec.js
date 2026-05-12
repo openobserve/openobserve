@@ -392,28 +392,23 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         const crossLinkNameA = `CL-DashA-${Date.now()}`;
         const crossLinkNameB = `CL-DashB-${Date.now()}`;
 
-        // Step 1: Set up cross-links on both streams
-        const featureEnabledA = await setupStreamCrossLink(page, pm, STREAM_A, {
-            name: crossLinkNameA,
-            url: 'https://dash-union-a.example.com/${field.__value}',
-            fields: ['kubernetes_container_name']
-        });
-        if (!featureEnabledA) {
+        // Step 1: Feature-gate check — navigate to STREAM_A only to verify cross-linking
+        // is enabled, without fully configuring it yet. The actual cross-link setup is
+        // deferred until right before the result_schema call (see Step 3) to minimise
+        // the window in which crossLinking.spec.js — which runs in parallel on CI and
+        // repeatedly calls deleteAllCrossLinks() on e2e_automate — can wipe the link.
+        const featureCheckResult = await (async () => {
+            await pm.crossLinkPage.navigateToStreams();
+            await pm.crossLinkPage.searchStream(STREAM_A);
+            await pm.crossLinkPage.openStreamDetail();
+            return pm.crossLinkPage.isCrossLinkingTabVisible();
+        })();
+        if (!featureCheckResult) {
             test.skip(true, 'Cross-linking feature not enabled');
         }
 
-        const featureEnabledB = await setupStreamCrossLink(page, pm, STREAM_B, {
-            name: crossLinkNameB,
-            url: 'https://dash-union-b.example.com/${field.__value}',
-            fields: ['kubernetes_container_name']
-        });
-        if (!featureEnabledB) {
-            test.skip(true, 'Cross-linking feature not enabled on second stream');
-        }
-
-        testLogger.info('Both stream cross-links configured for dashboard UNION test', { crossLinkNameA, crossLinkNameB });
-
-        // Step 2: Create a dashboard with a table panel using custom UNION ALL SQL
+        // Step 2: Create a dashboard with a table panel using custom UNION ALL SQL.
+        // Cross-links are intentionally NOT set up yet.
         const dashboardName = `CL-Union-Dash-${Date.now()}`;
         const orgId = process.env["ORGNAME"] || 'default';
         await page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/dashboards?org_identifier=${orgId}`);
@@ -441,49 +436,107 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await page.waitForTimeout(500);
         testLogger.info('UNION ALL dashboard query entered', { query: unionQuery });
 
-        // Apply query to execute and render the table
+        // Apply and save the panel — cross-links are set up AFTER this.
         await pm.dashboardPanelActions.applyDashboardBtn();
-        await page.waitForTimeout(5000);
-
-        // Arm a response waiter for the cross_linking result_schema call that the
-        // dashboard view fires when it remounts after save. This is more reliable
-        // than counting responses with a manual `page.on('response', ...)` listener
-        // because Playwright's waitForResponse resolves with the actual response
-        // and races correctly with savePanel().
-        const crossLinkResponsePromise = page
-            .waitForResponse(
-                (resp) =>
-                    resp.url().includes('result_schema') &&
-                    resp.url().includes('cross_linking=true') &&
-                    resp.request().method() === 'POST',
-                { timeout: 30000 }
-            )
-            .catch(() => null);
-
-        // Save the panel
+        await page.waitForTimeout(3000);
         await pm.dashboardPanelActions.savePanel();
         await page.waitForTimeout(3000);
 
-        testLogger.info('Dashboard with UNION ALL table panel created');
+        testLogger.info('Dashboard with UNION ALL table panel saved');
 
-        // Step 3: Wait for the table panel to render with data in dashboard view
+        // Confirm the table panel rendered with data rows so we know the query works.
         const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
         await tablePanel.waitFor({ state: 'visible', timeout: 15000 });
-
         await page.waitForFunction(() => {
             const table = document.querySelector('[data-test="dashboard-panel-table"]');
             if (!table) return false;
             const cells = table.querySelectorAll('td');
             return Array.from(cells).some(cell => cell.offsetParent !== null && cell.textContent.trim());
         }, { timeout: 15000 });
-        testLogger.info('Table panel has data rows');
+        testLogger.info('Table panel confirmed with data rows');
 
-        // Wait for the dashboard view's result_schema cross-link API call to resolve.
-        // The watcher in usePanelDrilldown.ts populates crossLinksData only after this
-        // response arrives — clicking a cell before it lands yields an empty drilldown.
-        const crossLinkResponse = await crossLinkResponsePromise;
-        testLogger.info('Cross-link API resolved', { status: crossLinkResponse?.status() ?? 'timeout' });
-        // Allow Vue's reactive update + nextTick to settle so drilldownArray sees the new data.
+        // Capture the dashboard view URL so we can reload it after cross-link setup.
+        const dashboardViewUrl = page.url();
+
+        // Step 3: Set up cross-links as late as possible — immediately before
+        // navigating back to the dashboard so result_schema fires with both links
+        // still present. Set up STREAM_B first (safe: no concurrent test touches it)
+        // then STREAM_A last (minimises the gap between A's save and result_schema call).
+        const featureEnabledB = await setupStreamCrossLink(page, pm, STREAM_B, {
+            name: crossLinkNameB,
+            url: 'https://dash-union-b.example.com/${field.__value}',
+            fields: ['kubernetes_container_name']
+        });
+        if (!featureEnabledB) {
+            test.skip(true, 'Cross-linking feature not enabled on second stream');
+        }
+
+        // Step 3b: Retry loop — set up A's cross-link, immediately reload the
+        // dashboard, and verify the result_schema response body contains both links.
+        // If crossLinking.spec.js deletes A's link in the small window between setup
+        // and the API response, we re-setup and retry (up to 3 attempts total).
+        let crossLinkResponseData = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            // (Re-)set up A's cross-link immediately before navigating back.
+            const featureEnabledA = await setupStreamCrossLink(page, pm, STREAM_A, {
+                name: crossLinkNameA,
+                url: 'https://dash-union-a.example.com/${field.__value}',
+                fields: ['kubernetes_container_name']
+            });
+            if (!featureEnabledA) {
+                test.skip(true, 'Cross-linking feature not enabled');
+            }
+
+            testLogger.info(`Attempt ${attempt}: cross-links set up, navigating to dashboard`, {
+                crossLinkNameA, crossLinkNameB
+            });
+
+            // Arm the waiter BEFORE the navigation so we don't miss a fast response.
+            const crossLinkResponsePromise = page
+                .waitForResponse(
+                    (resp) =>
+                        resp.url().includes('result_schema') &&
+                        resp.url().includes('cross_linking=true') &&
+                        resp.request().method() === 'POST',
+                    { timeout: 20000 }
+                )
+                .catch(() => null);
+
+            // Navigate back to the saved dashboard — this remounts the panel and
+            // fires the result_schema cross-link call.
+            await page.goto(dashboardViewUrl);
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+            const crossLinkResponse = await crossLinkResponsePromise;
+            if (!crossLinkResponse) {
+                testLogger.warn(`Attempt ${attempt}: result_schema response timed out`);
+                continue;
+            }
+
+            // Inspect the response body to decide whether to retry.
+            crossLinkResponseData = await crossLinkResponse.json().catch(() => null);
+            const streamLinks = crossLinkResponseData?.cross_links?.stream_links ?? [];
+            const hasAInResponse = streamLinks.some((l) => l.name === crossLinkNameA);
+            const hasBInResponse = streamLinks.some((l) => l.name === crossLinkNameB);
+
+            testLogger.info(`Attempt ${attempt}: result_schema cross-link check`, {
+                hasA: hasAInResponse, hasB: hasBInResponse,
+                streamLinkNames: streamLinks.map((l) => l.name)
+            });
+
+            if (hasAInResponse && hasBInResponse) {
+                testLogger.info('Both cross-links confirmed in result_schema response');
+                break;
+            }
+
+            if (attempt < 3) {
+                testLogger.warn(`Attempt ${attempt}: cross-link(s) missing — retrying`, {
+                    missingA: !hasAInResponse, missingB: !hasBInResponse
+                });
+            }
+        }
+
+        // Allow Vue's reactive update + nextTick to settle after the response.
         await page.waitForTimeout(1500);
 
         // Step 4: Intercept window.open
@@ -497,12 +550,9 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         });
 
         try {
-            // Step 5 & 6: Open the drilldown menu and verify BOTH cross-link items appear.
-            //
-            // expect.poll wraps the cell-click + menu-content check in a retry loop.
-            // If the menu opens but crossLinksData hasn't been wired into drilldownArray
-            // yet (rare CI race), the poller closes the menu, re-clicks, and re-checks.
-            // This makes the test self-healing without weakening assertions.
+            // Step 5 & 6: Click a table cell and verify BOTH cross-link items appear in the
+            // drilldown menu. expect.poll provides automatic retry if the menu opens before
+            // Vue has finished wiring the freshly-loaded crossLinksData into drilldownArray.
             const drilldownMenu = page.locator('.crosslink-drilldown-menu');
             const crossLinkMenuItemA = drilldownMenu
                 .locator('.crosslink-drilldown-menu-item')
@@ -514,14 +564,11 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
             await expect
                 .poll(
                     async () => {
-                        // If menu is already open, close it first so the click re-opens it
-                        // with the freshest drilldownArray state.
                         if (await drilldownMenu.isVisible().catch(() => false)) {
                             await page.mouse.move(0, 0);
                             await page.waitForTimeout(300);
                         }
 
-                        // Click the first visible data cell in the table panel.
                         await page.evaluate(() => {
                             const table = document.querySelector('[data-test="dashboard-panel-table"]');
                             if (!table) return;
@@ -534,7 +581,6 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
                             }
                         });
 
-                        // Give the menu a moment to render the latest drilldownArray.
                         await page.waitForTimeout(800);
 
                         const menuVisible = await drilldownMenu.isVisible().catch(() => false);
@@ -548,8 +594,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
                         return { menuVisible, hasA, hasB };
                     },
                     {
-                        timeout: 30000,
-                        intervals: [1000, 1500, 2000],
+                        timeout: 15000,
+                        intervals: [800, 1200, 1500],
                         message:
                             'Drilldown menu should show cross-links from both streams in UNION ALL panel',
                     }
