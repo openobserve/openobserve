@@ -25,7 +25,7 @@ ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
 root_dir = Path(__file__).parent.parent.parent
 
 
-def wait_for_ingestion_count(session, base_url, stream, expected, timeout=120, interval=2):
+def wait_for_ingestion_count(session, base_url, stream, expected, org_id, timeout=120, interval=2):
     """Poll _search until COUNT(*) for the stream reaches `expected`.
 
     Replaces fixed sleeps that try to wait out indexing delay; returns as soon as
@@ -100,7 +100,7 @@ def test_ingest_data(create_session, base_url_sc, stream_name, org_id):
         f"Data ingestion failed with status code: {resp_ing.status_code}"
     )
 
-    wait_for_ingestion_count(session, base_url_sc, stream_name, expected=3848)
+    wait_for_ingestion_count(session, base_url_sc, stream_name, expected=3848, org_id=org_id)
 
     # Join stream data
 
@@ -124,7 +124,7 @@ def test_ingest_join(create_session, base_url_sc, stream_join, org_id):
         f"Data ingestion failed for join with status code: {resp_ing_join.status_code}"
     )
 
-    wait_for_ingestion_count(session, base_url_sc, stream_join, expected=3848)
+    wait_for_ingestion_count(session, base_url_sc, stream_join, expected=3848, org_id=org_id)
 
 
 def test_disable_streaming(create_session, base_url, org_id):
