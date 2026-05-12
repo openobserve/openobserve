@@ -6,7 +6,10 @@ export class ThemePage {
 
         // Predefined Themes Dialog
         this.predefinedThemesMenuItem = '[data-test="menu-link-predefined-themes-item"]';
-        this.predefinedThemesDialog = '.predefined-theme-card';
+        // Was `.predefined-theme-card` — that class was removed in
+        // PredefinedThemes.vue when the markup moved to `theme-card-compact`.
+        // Use the drawer's parent data-test slug instead (stable identifier).
+        this.predefinedThemesDialog = '[data-test="predefined-themes-drawer"]';
         this.resetThemeBtn = 'button:has-text("Reset")';
         // PredefinedThemes.vue migrated to ODrawer — its close (×) button
         // is now the common o-drawer-close-btn inside the parent slug.
