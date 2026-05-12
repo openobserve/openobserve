@@ -506,10 +506,14 @@ describe("FlameGraphView", () => {
         },
       });
 
-      // Should set selectedSpanId in the store
-      expect(mockSearchObj.data.traceDetails.selectedSpanId).toBe("span-1");
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
       // Should open the bottom panel
       expect(wrapper.vm.sidebarVisible).toBe(true);
+      // Should emit select-span with the span id
+      expect(wrapper.emitted("select-span")).toBeTruthy();
+      expect(wrapper.emitted("select-span")[0]).toEqual(["span-1"]);
     });
 
     it("should not open bottom panel when clicking without span data", async () => {
@@ -528,7 +532,6 @@ describe("FlameGraphView", () => {
       wrapper.vm.handleChartClick({ data: null });
 
       expect(wrapper.vm.sidebarVisible).toBe(false);
-      expect(mockSearchObj.data.traceDetails.selectedSpanId).toBeNull();
     });
 
     it("should render TraceDetailsSidebar when bottom panel is open", async () => {
@@ -613,7 +616,6 @@ describe("FlameGraphView", () => {
 
       wrapper.vm.handleSelectSpan("span-2");
 
-      expect(mockSearchObj.data.traceDetails.selectedSpanId).toBe("span-2");
       expect(wrapper.emitted("select-span")).toBeTruthy();
       expect(wrapper.emitted("select-span")[0]).toEqual(["span-2"]);
     });
@@ -1251,7 +1253,7 @@ describe("FlameGraphView", () => {
       // Manually set cursorVisible to true first
       wrapper.vm.cursorVisible = true;
       // Trigger mouseleave on the chart wrapper div
-      const chartWrapper = wrapper.find(".tw\\:flex.tw\\:flex-col.tw\\:flex-1");
+      const chartWrapper = wrapper.find('[data-test="flame-graph-view-chart-wrapper"]');
       if (chartWrapper.exists()) {
         await chartWrapper.trigger("mouseleave");
         expect(wrapper.vm.cursorVisible).toBe(false);

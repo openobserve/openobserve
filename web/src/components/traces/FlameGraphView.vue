@@ -28,6 +28,7 @@
 
       <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
       <div
+        data-test="flame-graph-view-chart-wrapper"
         class="tw:flex tw:flex-col tw:flex-1"
         style="min-height: 0"
         @mousemove="handleChartMouseMove"
