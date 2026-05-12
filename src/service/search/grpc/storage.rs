@@ -840,13 +840,20 @@ async fn search_tantivy_index(
         need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
     }
 
+    let start = std::time::Instant::now();
     warm_up_terms(
+        trace_id,
+        &ttv_file_name,
         &searcher,
         &warm_terms,
         need_all_term_fields,
         need_fast_field,
     )
     .await?;
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, warm up terms took: {} ms",
+        start.elapsed().as_millis()
+    );
 
     // search the index
     let trace_id_clone = trace_id.to_string();

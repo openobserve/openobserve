@@ -196,15 +196,19 @@ impl Directory for PuffinDirReader {
 
 /// preload the terms in the index
 pub async fn warm_up_terms(
+    trace_id: &str,
+    file_name: &str,
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
     need_all_term_fields: HashSet<tantivy::schema::Field>,
     need_fast_field: HashSet<String>,
 ) -> anyhow::Result<()> {
+    let mut warm_up_terms_futures = Vec::new();
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
-    let mut warm_up_terms_futures = Vec::new();
     let mut warm_up_fast_fields_futures = Vec::new();
+
+    // warm up specific terms
     for (field, terms) in terms_grouped_by_field {
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(*field)?;
@@ -219,7 +223,7 @@ pub async fn warm_up_terms(
         }
     }
 
-    // warn up the all term fields
+    // warm up all term fields (full postings + dictionary)
     for field in need_all_term_fields {
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(field)?;
@@ -231,7 +235,7 @@ pub async fn warm_up_terms(
         }
     }
 
-    // warm up fast fields if needed
+    // warm up fast fields
     if !need_fast_field.is_empty() {
         for segment_reader in searcher.segment_readers() {
             for field_name in &need_fast_field {
@@ -243,18 +247,34 @@ pub async fn warm_up_terms(
         }
     }
 
-    if !warm_up_fields_futures.is_empty() {
-        try_join_all(warm_up_fields_futures).await?;
-    }
-    if !warm_up_fields_term_futures.is_empty() {
-        try_join_all(warm_up_fields_term_futures).await?;
-    }
-    if !warm_up_terms_futures.is_empty() {
-        try_join_all(warm_up_terms_futures).await?;
-    }
-    if !warm_up_fast_fields_futures.is_empty() {
-        try_join_all(warm_up_fast_fields_futures).await?;
-    }
+    // Run ALL warm-up categories in parallel (matching Quickwit's warmup pattern)
+    let start = std::time::Instant::now();
+    tokio::try_join!(
+        async {
+            try_join_all(warm_up_terms_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async {
+            try_join_all(warm_up_fields_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async {
+            try_join_all(warm_up_fields_term_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async {
+            try_join_all(warm_up_fast_fields_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+    )?;
+    log::info!(
+        "[trace_id {trace_id}] warm up terms: file_name: {file_name}, total duration: {:?}",
+        start.elapsed()
+    );
     Ok(())
 }
 
@@ -600,6 +620,8 @@ mod tests {
         // Test with empty terms
         let terms_grouped_by_field = HashbrownHashMap::new();
         let result = warm_up_terms(
+            "test",
+            "test_file",
             &searcher,
             &terms_grouped_by_field,
             HashSet::new(),
@@ -643,6 +665,8 @@ mod tests {
         terms_grouped_by_field.insert(text_field, field_terms);
 
         let result = warm_up_terms(
+            "test",
+            "test_file",
             &searcher,
             &terms_grouped_by_field,
             HashSet::new(),
@@ -681,6 +705,8 @@ mod tests {
         // Test with prefix field
         let terms_grouped_by_field = HashbrownHashMap::new();
         let result = warm_up_terms(
+            "test",
+            "test_file",
             &searcher,
             &terms_grouped_by_field,
             HashSet::from([text_field]),
@@ -719,6 +745,8 @@ mod tests {
         // Test with fast fields enabled
         let terms_grouped_by_field = HashbrownHashMap::new();
         let result = warm_up_terms(
+            "test",
+            "test_file",
             &searcher,
             &terms_grouped_by_field,
             HashSet::new(),
@@ -769,6 +797,8 @@ mod tests {
 
         let start = Instant::now();
         let result = warm_up_terms(
+            "test",
+            "test_file",
             &searcher,
             &terms_grouped_by_field,
             HashSet::new(),
