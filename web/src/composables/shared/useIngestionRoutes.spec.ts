@@ -152,7 +152,6 @@ describe("useIngestionRoutes", () => {
       expect(childNames).toContain("servers");
       expect(childNames).toContain("message-queues");
       expect(childNames).toContain("languages");
-      expect(childNames).toContain("ai-integrations");
       expect(childNames).toContain("others");
     });
   });
@@ -577,27 +576,6 @@ describe("useIngestionRoutes", () => {
       
       expect(airflowRoute.path).toBe("airflow");
       expect(vercelRoute.path).toBe("vercel");
-    });
-  });
-
-  describe("ai integrations routes configuration", () => {
-    it("should have proper ai-integrations route configuration", () => {
-      const routes = useIngestionRoutes();
-      const aiRoute = routes[0].children.find((child: any) => child.name === "ai-integrations");
-
-      expect(aiRoute).toBeDefined();
-      expect(aiRoute.path).toBe("ai-integrations");
-      expect(aiRoute.component).toBeDefined();
-      expect(typeof aiRoute.beforeEnter).toBe("function");
-      expect(Array.isArray(aiRoute.children)).toBe(true);
-    });
-
-    it("should have ai integration child routes", () => {
-      const routes = useIngestionRoutes();
-      const aiRoute = routes[0].children.find((child: any) => child.name === "ai-integrations");
-      const aiRouteNames = aiRoute.children.map((child: any) => child.name);
-
-      expect(aiRouteNames).toContain("ai-agno");
     });
   });
 
