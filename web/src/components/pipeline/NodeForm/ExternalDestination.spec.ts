@@ -81,6 +81,15 @@ const sampleDestinations = [
   { name: "dest2", url: "http://dest2.example.com", destination_type_name: "splunk" },
 ];
 
+// ODrawer stub — renders slot content and the title prop so inner elements
+// and title text are accessible in tests.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "size", "showClose", "title", "width", "persistent"],
+  emits: ["update:open"],
+  template: '<div class="o-drawer-stub"><div class="o-drawer-title">{{ title }}</div><slot /></div>',
+};
+
 // --------------------------------------------------------------------------
 // Factory helper
 // --------------------------------------------------------------------------
@@ -113,6 +122,7 @@ function createWrapper(pipelineObjOverrides: Record<string, any> = {}) {
         QItemSection: true,
         QItemLabel: true,
         ConfirmDialog: true,
+        ODrawer: ODrawerStub,
         CreateDestinationForm: {
           name: "CreateDestinationForm",
           template: '<div data-test="create-destination-form" />',
@@ -654,15 +664,18 @@ describe("ExternalDestination.vue", () => {
       expect(wrapper.find('[data-test="add-destination-delete-btn"]').exists()).toBe(true);
     });
 
-    it("11.9 emits 'close' when the header close OButton is clicked", async () => {
-      // Header close button is the first OButton (variant=ghost, size=icon)
-      // After migration to ODialog/ODrawer, this button now emits 'close'
-      // (previously used v-close-popup).
-      const headerCloseBtn = wrapper.findAllComponents({ name: "OButton" })[0];
-      expect(headerCloseBtn.exists()).toBe(true);
-      await headerCloseBtn.trigger("click");
-      expect(wrapper.emitted("close")).toBeTruthy();
-      expect(wrapper.emitted("close")).toHaveLength(1);
+    it("11.9 emits 'cancel:hideform' when the ODrawer close event fires", async () => {
+      // The close button is inside ODrawer's header (showClose prop).
+      // Simulate it by emitting update:open=false on the ODrawer component.
+      vi.useFakeTimers();
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+      drawer.vm.$emit("update:open", false);
+      vi.advanceTimersByTime(400);
+      await nextTick();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+      expect(wrapper.emitted("cancel:hideform")).toHaveLength(1);
+      vi.useRealTimers();
     });
 
     it("11.10 does NOT emit 'close' on cancel button click (cancel emits cancel:hideform)", async () => {

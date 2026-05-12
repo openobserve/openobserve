@@ -80,6 +80,15 @@ function makePipelineObj(overrides = {}) {
   };
 }
 
+// ODrawer stub — renders slot content so inner elements are accessible in tests.
+// The real ODrawer is a portal/teleport; stubbing it keeps tests fast and isolated.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "size", "showClose", "title", "width", "persistent"],
+  emits: ["update:open"],
+  template: '<div class="o-drawer-stub"><slot /></div>',
+};
+
 function createWrapper(pipelineObjOverrides = {}) {
   mockPipelineObj = makePipelineObj(pipelineObjOverrides);
 
@@ -96,6 +105,7 @@ function createWrapper(pipelineObjOverrides = {}) {
       stubs: {
         AddStream:     true,
         ConfirmDialog: true,
+        ODrawer:       ODrawerStub,
       },
     },
   });
@@ -852,23 +862,12 @@ describe("Stream Component", () => {
 
   // -------------------------------------------------------------------------
   describe("Header close button", () => {
-    // The header close button is the OButton inside the title row containing
-    // t("pipeline.streamTitle"). It has no data-test attribute; we locate it
-    // by scoping to the `.stream-routing-title` container, which holds
-    // exactly one <button> (the close icon button) and is separate from the
-    // form-footer save/cancel/delete buttons rendered later in the template.
-    function findHeaderCloseButton(wrapper) {
-      const titleRow = wrapper.find(".stream-routing-title");
-      expect(titleRow.exists()).toBe(true);
-      const buttons = titleRow.findAll("button");
-      expect(buttons).toHaveLength(1);
-      // Sanity-check the button contains the cancel q-icon (rendered as an
-      // <i class="q-icon ..."> with text content "cancel"). This guards
-      // against accidentally matching a different button if markup changes.
-      const icon = buttons[0].find("i.q-icon");
-      expect(icon.exists()).toBe(true);
-      expect(icon.text()).toBe("cancel");
-      return buttons[0];
+    // The close button is now part of ODrawer's header (via showClose prop).
+    // We simulate it by emitting update:open=false on the ODrawer component.
+    function closeViaDrawer(wrapper) {
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+      drawer.vm.$emit("update:open", false);
     }
 
     it("has NOT emitted cancel:hideform before the header close button is clicked", async () => {
@@ -878,34 +877,31 @@ describe("Stream Component", () => {
     });
 
     it("emits cancel:hideform exactly once when the header close button is clicked", async () => {
+      vi.useFakeTimers();
       const wrapper = createWrapper();
       await flushPromises();
-      // Pre-condition: no emit yet
       expect(wrapper.emitted("cancel:hideform")).toBeUndefined();
 
-      const closeBtn = findHeaderCloseButton(wrapper);
-      await closeBtn.trigger("click");
+      closeViaDrawer(wrapper);
+      vi.advanceTimersByTime(400);
       await nextTick();
 
       const emits = wrapper.emitted("cancel:hideform");
       expect(emits).toBeTruthy();
       expect(emits).toHaveLength(1);
-      // The emit carries no payload
       expect(emits[0]).toEqual([]);
+      vi.useRealTimers();
     });
 
     it("does NOT trigger save/delete/cancel-dialog flows (no addNode / deletePipelineNode / dialog)", async () => {
       const wrapper = createWrapper({ isEditNode: true });
       await flushPromises();
 
-      const closeBtn = findHeaderCloseButton(wrapper);
-      await closeBtn.trigger("click");
+      closeViaDrawer(wrapper);
       await nextTick();
 
       expect(mockAddNode).not.toHaveBeenCalled();
       expect(mockDeletePipelineNode).not.toHaveBeenCalled();
-      // openCancelDialog/openDeleteDialog set dialog.show = true; the header
-      // close button must bypass that confirmation flow entirely.
       expect(wrapper.vm.dialog.show).toBe(false);
     });
   });

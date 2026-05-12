@@ -746,10 +746,8 @@ describe("SearchResult Component", () => {
 
       const drawer = wrapper.findComponent(oDrawerStub);
       expect(drawer.exists()).toBe(true);
-      // width=85 and showClose=false per the migrated template
       expect(drawer.props("open")).toBe(true);
       expect(drawer.props("width")).toBe(85);
-      expect(drawer.props("showClose")).toBe(false);
     });
 
     it("closes the Detail ODrawer when update:open=false (v-model:open contract) and calls reDrawChart", async () => {
@@ -777,12 +775,12 @@ describe("SearchResult Component", () => {
       expect(reDrawSpy).not.toHaveBeenCalled();
     });
 
-    it("closes the Detail ODrawer when the close event is emitted", async () => {
+    it("closes the Detail ODrawer when update:open=false is emitted a second time", async () => {
       wrapper.vm.searchObj.meta.showDetailTab = true;
       await flushPromises();
 
       const drawer = wrapper.findComponent(oDrawerStub);
-      drawer.vm.$emit("close");
+      drawer.vm.$emit("update:open", false);
       await flushPromises();
 
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);

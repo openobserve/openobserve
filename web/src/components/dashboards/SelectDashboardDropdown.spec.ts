@@ -227,10 +227,10 @@ describe("SelectDashboardDropdown", () => {
       expect(drawer.props("open")).toBe(true);
     });
 
-    it("should use size 'lg' on ODrawer", () => {
+    it("should use width 20 on ODrawer", () => {
       const wrapper = mountComponent({}, store);
       const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("size")).toBe("lg");
+      expect(drawer.props("width")).toBe(20);
     });
 
     it("should pass 'New dashboard' title to ODrawer", () => {

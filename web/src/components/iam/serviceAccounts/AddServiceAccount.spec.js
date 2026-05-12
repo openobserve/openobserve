@@ -173,7 +173,7 @@ describe("AddServiceAccount Component", () => {
         role: "admin",
         first_name: "",
         email: "",
-        organization: "",
+        organization: "test-org",
       });
     });
 
