@@ -486,15 +486,19 @@ function recomputeInsightsTimeRange() {
 const isLLMSpanPresent = ref(false);
 
 // True when the org has at least one traces stream marked as an LLM
-// stream (or any stream that hasn't been explicitly opted out via
-// `settings.is_llm_stream === false`). Drives the LLM Insights tab
-// visibility in `SearchBar` — we hide the tab entirely when there's
-// nothing for the dashboard to show.
+// stream (strict opt-in: `settings.is_llm_stream === true`). Drives
+// the LLM Insights tab visibility in `SearchBar` — we hide the tab
+// entirely when nothing is opted in.
 //
-// Default `true` so the tab doesn't briefly flicker on first mount
-// while we resolve the streams list. Set to false only after we have
-// a definitive empty result.
-const hasLLMStreams = ref(true);
+// Implemented as a `computed` (not a `ref`) so resolving `streamResults`
+// doesn't fire an extra reactive write inside `getStreamList`'s async
+// chain — that would force an unrelated re-render and surface latent
+// reactivity assumptions elsewhere on the page.
+const hasLLMStreams = computed(() =>
+  (searchObj.data.streamResults?.list || []).some(
+    (s: any) => s?.settings?.is_llm_stream === true,
+  ),
+);
 
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
@@ -543,16 +547,9 @@ async function getStreamList() {
     return getStreams("traces", false)
       .then(async (res) => {
         searchObj.data.streamResults = res;
-
-        // Strict opt-in check: the LLM Insights tab is visible only
-        // when an admin has explicitly flagged at least one traces
-        // stream with `settings.is_llm_stream === true`. Legacy
-        // streams (no flag set) do NOT make the tab appear — they
-        // would still render inside the dashboard if the tab were
-        // visible, but the entry point itself requires explicit opt-in.
-        hasLLMStreams.value = (res.list || []).some(
-          (s: any) => s?.settings?.is_llm_stream === true,
-        );
+        // `hasLLMStreams` is a computed that reads from
+        // `searchObj.data.streamResults` — no explicit write needed
+        // here. See the computed's declaration above for why.
 
         if (res.list.length > 0) {
           if (config.isCloud == "true") {
