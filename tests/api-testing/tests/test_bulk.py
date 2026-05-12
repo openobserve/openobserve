@@ -1,12 +1,11 @@
 import json
 
-def test_e2e_bulk_ingest(create_session, base_url):
+def test_e2e_bulk_ingest(create_session, base_url, org_id):
     """
     Running an E2E test for bulk ingestion using the _bulk API.
     This includes both positive (valid payload) and negative (invalid payload) cases.
     """
     session = create_session
-    org_id = "default"
     url = f"{base_url}api/{org_id}/_bulk"
     headers = {"Content-Type": "application/json"}
 

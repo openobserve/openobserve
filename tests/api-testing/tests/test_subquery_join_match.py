@@ -44,12 +44,11 @@ def query_timeframe():
 
 
 @pytest.fixture
-def execute_search_query(create_session, base_url):
+def execute_search_query(create_session, base_url, org_id):
     """Shared fixture to execute search queries and return response."""
     def _execute(sql_query, start_time, end_time, size=50):
         session = create_session
         url = base_url
-        org_id = "default"
         
         # Log the query being executed for debugging
         logging.debug(f"Executing SQL query: {sql_query.strip()}")

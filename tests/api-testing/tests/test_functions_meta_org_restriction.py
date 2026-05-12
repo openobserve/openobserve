@@ -41,10 +41,9 @@ class TestMetaOrgJavaScriptRestriction:
         # Cleanup
         session.delete(f"{base_url}api/{org_id}/functions/test_js_meta")
 
-    def test_create_js_function_in_default_org_blocked(self, create_session, base_url):
+    def test_create_js_function_in_default_org_blocked(self, create_session, base_url, org_id):
         """JavaScript function creation should fail in default org."""
         session = create_session
-        org_id = "default"
 
         payload = {
             "name": "test_js_default",
@@ -84,10 +83,9 @@ class TestMetaOrgJavaScriptRestriction:
             f"but got {resp.status_code}: {resp.content}"
         )
 
-    def test_test_js_function_in_default_org_blocked(self, create_session, base_url):
+    def test_test_js_function_in_default_org_blocked(self, create_session, base_url, org_id):
         """Testing JavaScript function should fail in default org."""
         session = create_session
-        org_id = "default"
 
         payload = {
             "function": "row.count = (row.count || 0) + 1;",
@@ -106,7 +104,7 @@ class TestMetaOrgJavaScriptRestriction:
         response_text = resp.text
         assert "JavaScript functions are only allowed in the '_meta' organization" in response_text
 
-    def test_update_vrl_to_js_in_default_org_blocked(self, create_session, base_url):
+    def test_update_vrl_to_js_in_default_org_blocked(self, create_session, base_url, org_id):
         """
         Test that updating a VRL function to JavaScript in default org is BLOCKED.
 
@@ -117,7 +115,6 @@ class TestMetaOrgJavaScriptRestriction:
         The backend enforces JS restriction on both create AND update operations.
         """
         session = create_session
-        org_id = "default"
 
         # Cleanup any leftover from previous runs
         session.delete(f"{base_url}api/{org_id}/functions/test_update_to_js")
@@ -187,10 +184,9 @@ class TestVRLFunctionsAllOrganizations:
         # Cleanup
         session.delete(f"{base_url}api/{org_id}/functions/test_vrl_meta")
 
-    def test_create_vrl_function_in_default_org(self, create_session, base_url):
+    def test_create_vrl_function_in_default_org(self, create_session, base_url, org_id):
         """VRL function creation should succeed in default org."""
         session = create_session
-        org_id = "default"
 
         payload = {
             "name": "test_vrl_default",
@@ -228,10 +224,9 @@ class TestVRLFunctionsAllOrganizations:
                 f"but got {resp.status_code}: {resp.content}"
             )
 
-    def test_update_vrl_function_in_default_org(self, create_session, base_url):
+    def test_update_vrl_function_in_default_org(self, create_session, base_url, org_id):
         """Updating VRL function should work in default org."""
         session = create_session
-        org_id = "default"
 
         # Create VRL function
         create_payload = {
@@ -269,10 +264,9 @@ class TestVRLFunctionsAllOrganizations:
 class TestTransTypeAutoDetection:
     """Test trans_type auto-detection behavior."""
 
-    def test_auto_detect_vrl_in_default_org(self, create_session, base_url):
+    def test_auto_detect_vrl_in_default_org(self, create_session, base_url, org_id):
         """Auto-detection should default to VRL in default org."""
         session = create_session
-        org_id = "default"
 
         payload = {
             "function": ".test = true",
@@ -309,10 +303,9 @@ class TestTransTypeAutoDetection:
 class TestErrorMessages:
     """Test error message quality and consistency."""
 
-    def test_error_message_content(self, create_session, base_url):
+    def test_error_message_content(self, create_session, base_url, org_id):
         """Error message should be clear and actionable."""
         session = create_session
-        org_id = "default"
 
         payload = {
             "name": "test_error_msg",
@@ -332,10 +325,9 @@ class TestErrorMessages:
         assert "organization" in response_text, "Error should mention organization"
         assert "VRL" in response_text, "Error should suggest VRL alternative"
 
-    def test_error_message_consistency(self, create_session, base_url):
+    def test_error_message_consistency(self, create_session, base_url, org_id):
         """Error message should be consistent across save and test endpoints."""
         session = create_session
-        org_id = "default"
 
         # Test save endpoint (camelCase for Transform struct)
         save_payload = {
@@ -365,10 +357,9 @@ class TestErrorMessages:
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
-    def test_empty_function_code(self, create_session, base_url):
+    def test_empty_function_code(self, create_session, base_url, org_id):
         """Empty JavaScript function should still be blocked in default org."""
         session = create_session
-        org_id = "default"
 
         payload = {
             "name": "test_empty",
@@ -385,10 +376,9 @@ class TestEdgeCases:
             f"but got {resp.status_code}"
         )
 
-    def test_invalid_trans_type_value(self, create_session, base_url):
+    def test_invalid_trans_type_value(self, create_session, base_url, org_id):
         """Invalid trans_type should be handled gracefully."""
         session = create_session
-        org_id = "default"
 
         payload = {
             "function": ".test = true",

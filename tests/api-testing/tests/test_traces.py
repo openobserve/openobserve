@@ -87,12 +87,11 @@ def valid_trace():
     return json.loads(json_str)
 
 
-def test_e2e_valid_trace_ingestion(create_session, base_url):
+def test_e2e_valid_trace_ingestion(create_session, base_url, org_id):
     """Valid trace should get ingested."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     trace = valid_trace()
     
@@ -102,12 +101,11 @@ def test_e2e_valid_trace_ingestion(create_session, base_url):
         resp_post_trace.status_code == 200
     ), f"Post trace expected 200, but got {resp_post_trace.status_code} {resp_post_trace.content}"
 
-def test_e2e_old_trace_ingestion(create_session, base_url):
+def test_e2e_old_trace_ingestion(create_session, base_url, org_id):
     """Traces outside the time range should get be skipped."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     trace = valid_trace()
     trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["startTimeUnixNano"] = "1724898237575000000"
@@ -124,11 +122,10 @@ def test_e2e_old_trace_ingestion(create_session, base_url):
     ), f"Invalid trace span time expected 1 rejected span, but got {content}"
 
 # This is specifically for https://github.com/openobserve/openobserve/issues/4371
-def test_e2e_invalid_trace_ingestion(create_session, base_url):
+def test_e2e_invalid_trace_ingestion(create_session, base_url, org_id):
     """Invalid structure JSON trace should return proper error"""
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json={})
     assert (
@@ -154,12 +151,11 @@ def test_e2e_invalid_trace_ingestion(create_session, base_url):
     ), f"Invalid trace json response expected to contain incorrect field, but got {content}"
 
 
-def test_e2e_trace_invalid_ids(create_session, base_url):
+def test_e2e_trace_invalid_ids(create_session, base_url, org_id):
     """Traces links with invalid ids should get be skipped."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     
     start_time = int(time.time()*1000000)
     start_time = start_time - 10000000

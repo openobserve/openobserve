@@ -14,6 +14,30 @@ BASE_URL = os.environ["ZO_BASE_URL"]
 DEFAULT_ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 root_dir = Path(__file__).parent.parent.parent
 
+@pytest.fixture(scope="session")
+def worker_id(request):
+    """Return worker id when running under xdist, 'master' otherwise.
+
+    When pytest-xdist distributes tests across worker processes, each worker
+    gets a unique id (e.g., 'gw0', 'gw1'). When not using xdist, returns
+    'master' so tests use the default org without changes.
+    """
+    if hasattr(request.config, 'workerinput'):
+        return request.config.workerinput['workerid']
+    return 'master'
+
+@pytest.fixture(scope="session")
+def session_org_id(worker_id):
+    """Return isolated org ID per xdist worker for data ingestion scope.
+
+    Each worker gets its own org (e.g., 'pytest_gw0', 'pytest_gw1'),
+    ensuring tests running in parallel cannot collide on org-level resources
+    like streams, users, alerts, and dashboards.
+    """
+    if worker_id == "master":
+        return DEFAULT_ORG_ID
+    return f"pytest_{worker_id}"
+
 @pytest.fixture(scope="module")
 def random_string():
     """Generate a random string of specified length."""
@@ -57,17 +81,27 @@ def base_url():
 
 
 @pytest.fixture(scope="module")
-def org_id():
+def org_id(session_org_id):
     """Return the organization ID for testing.
 
-    Can be overridden via TEST_ORG_ID environment variable.
+    Isolated per xdist worker. When running in parallel, each worker
+    gets a unique org like 'pytest_gw0'. When running sequentially,
+    falls back to DEFAULT_ORG_ID.
+
+    Can be overridden per-test-module by defining a module-scoped
+    org_id fixture in the test file.
     """
-    return DEFAULT_ORG_ID
+    return session_org_id
 
 
 @pytest.fixture(scope="session", autouse=True)
-def ingest_data():
-    """Ingest data into the openobserve running instance."""
+def ingest_data(session_org_id):
+    """Ingest data into the openobserve running instance.
+
+    Each xdist worker ingests into its own isolated org ('pytest_gw0',
+    'pytest_gw1', etc.), so tests running in parallel cannot interfere
+    with each other's data.
+    """
     import time
 
     # Use v2 session for consistent auth header
@@ -78,7 +112,7 @@ def ingest_data():
         data = f.read()
 
     stream_name = "stream_pytest_data"
-    org = DEFAULT_ORG_ID
+    org = session_org_id
     base_url_with_slash = BASE_URL if BASE_URL.endswith('/') else BASE_URL + '/'
     url = f"{base_url_with_slash}api/{org}/{stream_name}/_json"
     resp1 = session.post(url, data=data, headers={"Content-Type": "application/json"})

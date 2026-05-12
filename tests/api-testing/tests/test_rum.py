@@ -9,11 +9,10 @@ def parse_json(input_str):
     return json.loads(input_str)
 
 
-def test_e2e_rumtoken(create_session, base_url):
+def test_e2e_rumtoken(create_session, base_url, org_id):
     """Running an E2E test for get rum token."""
 
     session = create_session
-    org_id = "default"
 
     resp_get_rumtoken = session.get(f"{base_url}api/{org_id}/rumtoken")
 

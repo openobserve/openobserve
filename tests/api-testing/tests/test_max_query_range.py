@@ -20,13 +20,10 @@ import pytest
 import time
 import json
 import logging
-import os
 from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 
 # ========== SHARED CONSTANTS ==========
 DEFAULT_MAX_QUERY_RANGE_HOURS = 1

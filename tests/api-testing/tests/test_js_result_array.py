@@ -22,10 +22,9 @@ import pytest
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_result_array_filtering_all_filtered(create_session, base_url):
+def test_js_result_array_filtering_all_filtered(create_session, base_url, org_id):
     """Test JavaScript #ResultArray# function that filters out all rows"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """#ResultArray#
@@ -65,10 +64,9 @@ for (var i = 0; i < filtered.length; i++) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_result_array_filtering_mixed(create_session, base_url):
+def test_js_result_array_filtering_mixed(create_session, base_url, org_id):
     """Test JavaScript #ResultArray# function with mixed data (some pass filter, some don't)"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """#ResultArray#
@@ -129,10 +127,9 @@ for (var i = 0; i < filtered.length; i++) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_result_array_enrichment(create_session, base_url):
+def test_js_result_array_enrichment(create_session, base_url, org_id):
     """Test JavaScript #ResultArray# function that enriches all rows"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """#ResultArray#
@@ -175,10 +172,9 @@ for (var i = 0; i < rows.length; i++) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_result_array_expansion(create_session, base_url):
+def test_js_result_array_expansion(create_session, base_url, org_id):
     """Test JavaScript #ResultArray# function that expands rows (1 input -> multiple outputs)"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """#ResultArray#
@@ -227,10 +223,9 @@ if (rows.length > 0) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_result_array_empty_input(create_session, base_url):
+def test_js_result_array_empty_input(create_session, base_url, org_id):
     """Test JavaScript #ResultArray# function with empty input array"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """#ResultArray#
@@ -259,10 +254,9 @@ for (var i = 0; i < rows.length; i++) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_regular_function_without_result_array(create_session, base_url):
+def test_js_regular_function_without_result_array(create_session, base_url, org_id):
     """Test regular JavaScript function (without #ResultArray#) processes rows individually"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """// Regular function (no #ResultArray#)
@@ -302,10 +296,9 @@ row.doubled = (row.value || 0) * 2;""",
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_result_array_aggregation(create_session, base_url):
+def test_js_result_array_aggregation(create_session, base_url, org_id):
     """Test JavaScript #ResultArray# function with aggregation across all rows"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """#ResultArray#
@@ -354,7 +347,7 @@ for (var i = 0; i < rows.length; i++) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_result_array_with_explicit_trans_type(create_session, base_url):
+def test_js_result_array_with_explicit_trans_type(create_session, base_url, org_id):
     """Test that trans_type must be explicitly specified for JavaScript #ResultArray# functions
 
     Note: #ResultArray# marker alone is ambiguous - it's used by both VRL and JavaScript.
@@ -362,7 +355,6 @@ def test_js_result_array_with_explicit_trans_type(create_session, base_url):
     JavaScript functions with #ResultArray# MUST specify trans_type=1.
     """
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """#ResultArray#

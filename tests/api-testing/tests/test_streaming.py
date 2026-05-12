@@ -21,7 +21,6 @@ now = datetime.now(timezone.utc)
 end_time = int(now.timestamp() * 1000000)
 ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
 
-org_id = "default"
 
 root_dir = Path(__file__).parent.parent.parent
 
@@ -86,7 +85,7 @@ def base_url_sc():
     return ZO_BASE_URL_SC
 
 
-def test_ingest_data(create_session, base_url_sc):
+def test_ingest_data(create_session, base_url_sc, org_id):
     """Ingest data into the openobserve running instance."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
@@ -110,7 +109,7 @@ def test_ingest_data(create_session, base_url_sc):
     # Join stream data
 
 
-def test_ingest_join(create_session, base_url_sc):
+def test_ingest_join(create_session, base_url_sc, org_id):
     """Ingest join data into the openobserve running instance."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
@@ -132,7 +131,7 @@ def test_ingest_join(create_session, base_url_sc):
     wait_for_ingestion_count(session, base_url_sc, stream_join, expected=3848)
 
 
-def test_disable_streaming(create_session, base_url):
+def test_disable_streaming(create_session, base_url, org_id):
     """Fixture to disable Streaming and return cookies."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
@@ -241,7 +240,7 @@ def test_histogram(
     hist_query,
     expected_total_hits_results_histg,
     expected_zo_sql_num_histg,
-):
+    org_id):
     """Running an E2E test for histogram queries with Parameterized data when websocket is disabled."""
 
     session = create_session
@@ -632,8 +631,7 @@ test_data_sql = [
 @pytest.mark.skip(reason="temporarily disabled till this issue is fixed")
 # @pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
 def test_sql(
-    create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp
-):
+    create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp, org_id):
     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
 
     session = create_session
@@ -708,7 +706,7 @@ def test_sql(
     )
 
 
-def test_update_max_query_range(create_session, base_url):
+def test_update_max_query_range(create_session, base_url, org_id):
     session = create_session
     url = f"{base_url}api/{org_id}/streams/{stream_name}/settings?type=logs"
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
@@ -732,7 +730,7 @@ def test_update_max_query_range(create_session, base_url):
     # Add more assertions as needed to validate the response content
 
 
-def test_sql_query_range(create_session, base_url):
+def test_sql_query_range(create_session, base_url, org_id):
     """Running an E2E test for sql max query range."""
 
     session = create_session
@@ -808,7 +806,7 @@ def test_sql_query_range(create_session, base_url):
     )
 
 
-def test_search_partition(create_session, base_url):
+def test_search_partition(create_session, base_url, org_id):
     """Test the search partition API."""
     session = create_session
     url = base_url
@@ -885,7 +883,7 @@ def test_search_partition(create_session, base_url):
     assert response_data["streaming_id"] is None, "Unexpected 'streaming_id' value"
 
 
-def test_values_endpoint(create_session, base_url):
+def test_values_endpoint(create_session, base_url, org_id):
     session = create_session
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
@@ -920,7 +918,7 @@ def test_values_endpoint(create_session, base_url):
 
 
 # Define test data with different queries and expected response details for streaming enable
-def test_enable_streaming(create_session, base_url):
+def test_enable_streaming(create_session, base_url, org_id):
     """Fixture to enable Streaming"""
     session = create_session
     url = base_url
@@ -955,7 +953,7 @@ def test_streaming_histogram(
     hist_query,
     expected_total_hits_results_histg,
     expected_zo_sql_num_histg,
-):
+    org_id):
     """Running an E2E test for histogram queries with Parameterized data when streaming is enabled."""
 
     session = create_session
@@ -1062,7 +1060,7 @@ def test_streaming_histogram(
 
 # TODO Uncomment the following test cases after the issue (https://github.com/openobserve/openobserve/issues/7858) is fixed
 @pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
-def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp):
+def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp, org_id):
     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
 
     session = create_session
@@ -1131,7 +1129,7 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_f
 # Define the test function
 
 
-def test_values_streaming_endpoint(create_session, base_url):
+def test_values_streaming_endpoint(create_session, base_url, org_id):
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
     now = datetime.now(timezone.utc)
@@ -1188,7 +1186,7 @@ def test_values_streaming_endpoint(create_session, base_url):
 
 
 # # Define the test function
-def test_values_streaming_endpoint_cache(create_session, base_url):
+def test_values_streaming_endpoint_cache(create_session, base_url, org_id):
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
     now = datetime.now(timezone.utc)
@@ -1245,7 +1243,7 @@ def test_values_streaming_endpoint_cache(create_session, base_url):
         assert isinstance(hit['values'], list)  # Check that values is a list
 
 
-def test_streaming_sql_query_range(create_session, base_url):
+def test_streaming_sql_query_range(create_session, base_url, org_id):
     """Running an E2E test for sql max query range with streaming enabled."""
 
     session = create_session
@@ -1327,7 +1325,7 @@ def test_streaming_sql_query_range(create_session, base_url):
     ), "Expected error message not found in function_error"
 
 
-def test_delete_stream(create_session, base_url):
+def test_delete_stream(create_session, base_url, org_id):
     """Running an E2E test for deleting the created stream."""
     session = create_session
     url = base_url
@@ -1342,7 +1340,7 @@ def test_delete_stream(create_session, base_url):
     print(f"Successfully deleted stream {stream_name}")
 
 
-def test_delete_stream_join(create_session, base_url):
+def test_delete_stream_join(create_session, base_url, org_id):
     """Running an E2E test for deleting the created join stream."""
     session = create_session
     url = base_url

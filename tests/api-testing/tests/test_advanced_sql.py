@@ -7,12 +7,11 @@ from datetime import datetime, timezone, timedelta
 import time
 
 
-def test_e2e_error_rate_analysis(create_session, base_url):
+def test_e2e_error_rate_analysis(create_session, base_url, org_id):
     """Running an E2E test for error rate analysis query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -65,12 +64,11 @@ def test_e2e_error_rate_analysis(create_session, base_url):
         logging.warning("⚠️  No hits found for info rate analysis query")
 
 
-def test_e2e_performance_percentiles(create_session, base_url):
+def test_e2e_performance_percentiles(create_session, base_url, org_id):
     """Running an E2E test for performance percentiles query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -125,12 +123,11 @@ def test_e2e_performance_percentiles(create_session, base_url):
         logging.warning("⚠️  No hits found for performance percentiles query")
 
 
-def test_e2e_log_volume_analysis(create_session, base_url):
+def test_e2e_log_volume_analysis(create_session, base_url, org_id):
     """Running an E2E test for log volume analysis query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -181,12 +178,11 @@ def test_e2e_log_volume_analysis(create_session, base_url):
         logging.warning("⚠️  No hits found for log volume analysis query")
 
 
-def test_e2e_source_analysis(create_session, base_url):
+def test_e2e_source_analysis(create_session, base_url, org_id):
     """Running an E2E test for source analysis query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -232,12 +228,11 @@ def test_e2e_source_analysis(create_session, base_url):
         logging.warning("⚠️  No hits found for source analysis query")
 
 
-def test_e2e_host_performance(create_session, base_url):
+def test_e2e_host_performance(create_session, base_url, org_id):
     """Running an E2E test for host performance analysis query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -287,12 +282,11 @@ def test_e2e_host_performance(create_session, base_url):
         logging.warning("⚠️  No hits found for host performance query")
 
 
-def test_e2e_component_percentiles(create_session, base_url):
+def test_e2e_component_percentiles(create_session, base_url, org_id):
     """Running an E2E test for component performance percentiles query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -347,12 +341,11 @@ def test_e2e_component_percentiles(create_session, base_url):
         logging.warning("⚠️  No hits found for component percentiles query")
 
 
-def test_e2e_api_log_analysis(create_session, base_url):
+def test_e2e_api_log_analysis(create_session, base_url, org_id):
     """Running an E2E test for API log analysis query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -402,12 +395,11 @@ def test_e2e_api_log_analysis(create_session, base_url):
         logging.warning("⚠️  No hits found for API log analysis query")
 
 
-def test_e2e_error_categorization(create_session, base_url):
+def test_e2e_error_categorization(create_session, base_url, org_id):
     """Running an E2E test for error categorization query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -472,12 +464,11 @@ def test_e2e_error_categorization(create_session, base_url):
         logging.warning("⚠️  No hits found for error categorization query")
 
 
-def test_e2e_metadata_extraction(create_session, base_url):
+def test_e2e_metadata_extraction(create_session, base_url, org_id):
     """Running an E2E test for metadata extraction query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -521,12 +512,11 @@ def test_e2e_metadata_extraction(create_session, base_url):
         logging.warning("⚠️  No hits found for caller extraction query")
 
 
-def test_e2e_time_series_window_functions(create_session, base_url):
+def test_e2e_time_series_window_functions(create_session, base_url, org_id):
     """Running an E2E test for time-series analysis with window functions."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -622,12 +612,11 @@ def test_e2e_time_series_window_functions(create_session, base_url):
         logging.warning("⚠️  No hits found for time-series window functions query")
 
 
-def test_e2e_advanced_regex_json_path(create_session, base_url):
+def test_e2e_advanced_regex_json_path(create_session, base_url, org_id):
     """Running an E2E test for advanced regex with JSON path extraction."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -703,12 +692,11 @@ def test_e2e_advanced_regex_json_path(create_session, base_url):
         logging.warning("⚠️  No hits found for advanced regex JSON path query")
 
 
-def test_e2e_complex_nested_aggregation(create_session, base_url):
+def test_e2e_complex_nested_aggregation(create_session, base_url, org_id):
     """Running an E2E test for complex nested aggregation with cross-environment analysis."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)

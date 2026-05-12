@@ -23,12 +23,11 @@ def sample_payload():
     ]
 
 
-def test_e2e_metrics_ingest_validjson(create_session, base_url, sample_payload):
+def test_e2e_metrics_ingest_validjson(create_session, base_url, sample_payload, org_id):
     """Running an E2E test for missing request id in response."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_ingestmetrics = session.post(
         f"{url}api/{org_id}/ingest/metrics/_json", json=sample_payload
@@ -40,12 +39,11 @@ def test_e2e_metrics_ingest_validjson(create_session, base_url, sample_payload):
     ), f"valid json upload 200 , but got {resp_ingestmetrics.status_code} {resp_ingestmetrics.content}"
 
 
-def test_e2e_metrics_ingest_invalijson(create_session, base_url):
+def test_e2e_metrics_ingest_invalijson(create_session, base_url, org_id):
     """Running an E2E test for missing request id in response."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     payload = [
         {
@@ -87,11 +85,10 @@ def test_e2e_metrics_ingest_invalijson(create_session, base_url):
 #     assert resp_metricsquery.status_code == 200, f"valid query upload 200, but got {resp_metricsquery.status_code} {resp_metricsquery.content}"
 
 
-def test_e2e_metrics_invalidquery(create_session, base_url):
+def test_e2e_metrics_invalidquery(create_session, base_url, org_id):
     """Running an E2E test for metrics query."""
 
     session = create_session
-    org_id = "default"
 
     resp_metricsquery = session.get(
         f"{base_url}api/{org_id}/prometheus/api/v1/format_query?query=%7B__name__%3D%22%22%7D"
@@ -103,11 +100,10 @@ def test_e2e_metrics_invalidquery(create_session, base_url):
     ), f"Invalid query upload 400, but got {resp_metricsquery.status_code} {resp_metricsquery.content}"
 
 
-def test_e2e_metrics_query(create_session, base_url):
+def test_e2e_metrics_query(create_session, base_url, org_id):
     """Running an E2E test for metrics query."""
 
     session = create_session
-    org_id = "default"
 
     resp_metricsquery = session.get(
         f"{base_url}api/{org_id}/prometheus/api/v1/format_query?query=%7B__name__%3D%22prometheus_tsdb_tombstone_cleanup_seconds_count%22%7D"

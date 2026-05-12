@@ -1,8 +1,7 @@
-def test_e2e_folder(create_session, base_url):
+def test_e2e_folder(create_session, base_url, org_id):
     """Running an E2E test for all xfunctions."""
 
     session = create_session
-    org_id = "default"
 
     resp_get_allfunctions = session.get(f"{base_url}api/{org_id}/functions")
 
@@ -12,12 +11,11 @@ def test_e2e_folder(create_session, base_url):
     ), f"Get all functions list 200, but got {resp_get_allfunctions.status_code} {resp_get_allfunctions.content}"
 
 
-def test_e2e_createdeletefunction(create_session, base_url):
+def test_e2e_createdeletefunction(create_session, base_url, org_id):
     """Running an E2E test for create and delete functions."""
 
     session = create_session
     # Create a function
-    org_id = "default"
     payload = {
         "function": ".a=190025552",
         "name": "pytestfunction",
@@ -41,12 +39,11 @@ def test_e2e_createdeletefunction(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
 
 
-def test_e2e_invalidfunction(create_session, base_url):
+def test_e2e_invalidfunction(create_session, base_url, org_id):
     """Running an E2E test for invalid function creation"""
 
     session = create_session
     # Create a function
-    org_id = "default"
     payload = {"name": "...", "function": "...",
                "params": "row", "transType": 0}
 
@@ -60,12 +57,11 @@ def test_e2e_invalidfunction(create_session, base_url):
     ), f"Invalid function creation, but got {resp_create_function.status_code} {resp_create_function.content}"
 
 
-def test_e2e_updatingfunction(create_session, base_url):
+def test_e2e_updatingfunction(create_session, base_url, org_id):
     """Running an E2E test for update and delete an existing function."""
 
     session = create_session
     # Create a function
-    org_id = "default"
     payload = {
         "name": "pytestfunctions",
         "function": ".a=190022",
@@ -82,8 +78,6 @@ def test_e2e_updatingfunction(create_session, base_url):
         resp_create_function.status_code == 200
     ), f"Expected 200, but got {resp_create_function.status_code} {resp_create_function.content}"
     session = create_session
-    # Create a function
-    org_id = "default"
     payload = {
         "name": "pytestfunctions",
         "function": ".a=1900",
@@ -106,12 +100,11 @@ def test_e2e_updatingfunction(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
 
 
-def test_e2e_duplicatefunction(create_session, base_url):
+def test_e2e_duplicatefunction(create_session, base_url, org_id):
     """Running an E2E test for function already exists."""
 
     session = create_session
     # Create a function
-    org_id = "default"
     payload = {
         "name": "pytestfunctions",
         "function": ".a=190022",
@@ -131,8 +124,6 @@ def test_e2e_duplicatefunction(create_session, base_url):
         f"{base_url}api/{org_id}/functions/pytestfunction"
     )
     session = create_session
-    # Create a function
-    org_id = "default"
     payload = {
         "name": "pytestfunctions",
         "function": ".a=190022",
@@ -156,12 +147,11 @@ def test_e2e_duplicatefunction(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
 
 
-def test_e2e_functionnotfound(create_session, base_url):
+def test_e2e_functionnotfound(create_session, base_url, org_id):
     """Running an E2E test for function not found."""
 
     session = create_session
     # Create a function
-    org_id = "default"
 
     resp_delete_function = session.delete(
         f"{base_url}api/{org_id}/functions/pytestfunctionsss"
@@ -171,15 +161,12 @@ def test_e2e_functionnotfound(create_session, base_url):
     ), f"Function not found, but got {resp_delete_function.status_code} {resp_delete_function.content}"
 
 
-def test_e2e_addDeleteStreamFunction(create_session, base_url):
+def test_e2e_addDeleteStreamFunction(create_session, base_url, org_id):
     """Running an E2E test for add stream to a function and delete."""
 
     session = create_session
-    org_id = "default"
     stream_name = "test"
 
-    # Create a function
-    org_id = "default"
     payload = {
         "function": ".a=190025552",
         "name": "pytestfunction",
@@ -204,11 +191,10 @@ def test_e2e_addDeleteStreamFunction(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_function.status_code} {resp_delete_function.content}"
 
 
-def test_e2e_testinvalidfunction(create_session, base_url):
+def test_e2e_testinvalidfunction(create_session, base_url, org_id):
     """Running an E2E test for invalid test function"""
 
     session = create_session
-    org_id = "default"
     payload = {
         "function": ".test=2jehwkhhe\n.",
         "events": [
@@ -237,11 +223,10 @@ def test_e2e_testinvalidfunction(create_session, base_url):
     ), f"Invalid function creation, but got {resp_test_function.status_code} {resp_test_function.content}"
 
 
-def test_e2e_onlytextfunction(create_session, base_url):
+def test_e2e_onlytextfunction(create_session, base_url, org_id):
     """Running an E2E test for invalid test function"""
 
     session = create_session
-    org_id = "default"
     payload = {
         "function": "test",
         "events": [
@@ -271,11 +256,10 @@ def test_e2e_onlytextfunction(create_session, base_url):
 
 
 
-def test_e2e_testonlyspecialcharfunction(create_session, base_url):
+def test_e2e_testonlyspecialcharfunction(create_session, base_url, org_id):
     """Running an E2E test for invalid test function"""
 
     session = create_session
-    org_id = "default"
     payload = {
         "function": "=====",
         "events": [
@@ -303,12 +287,11 @@ def test_e2e_testonlyspecialcharfunction(create_session, base_url):
         resp_test_function.status_code == 400
     ), f"Invalid function creation, but got {resp_test_function.status_code} {resp_test_function.content}"
 
-def test_e2e_testfunction(create_session, base_url):
+def test_e2e_testfunction(create_session, base_url, org_id):
     """Running an E2E test for the test function"""
 
     session = create_session
     # Define organization ID and payload
-    org_id = "default"
     payload = {
         "function": ".test=2\n.",
         "events": [

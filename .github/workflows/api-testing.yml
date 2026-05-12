@@ -196,7 +196,7 @@ jobs:
           wait_for_server
 
           # Run all other tests (excluding regression and feature flag tests)
-          rye run pytest --ignore=tests/test_subquery_join_match.py --ignore=tests/test_logs_to_logs_join.py --force-sugar
+          rye run pytest -n 4 --dist loadfile --ignore=tests/test_subquery_join_match.py --ignore=tests/test_logs_to_logs_join.py --force-sugar
 
           # Kill the server
           kill $SERVER_PID_DEFAULT || true

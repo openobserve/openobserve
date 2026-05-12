@@ -8,11 +8,10 @@ import pytest
         ("pipeline67890", "stream_other_data", "disable", 200),  # Action: Disable
     ]
 )
-def test_pipeline_creation_and_action_realtime(create_session, base_url, pipeline_name, stream_name, action, expected_status):
+def test_pipeline_creation_and_action_realtime(create_session, base_url, pipeline_name, stream_name, action, expected_status, org_id):
     """Running an E2E test for pipeline creation and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Payload for pipeline creation
     pipeline_payload = {
@@ -119,11 +118,10 @@ def test_pipeline_creation_and_action_realtime(create_session, base_url, pipelin
     ]
 )
 
-def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pipeline_name, stream_name, action, expected_status, schedule_enabled):
+def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pipeline_name, stream_name, action, expected_status, schedule_enabled, org_id):
     """Running an E2E test for pipeline creation with scheduling and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Payload for scheduled pipeline creation
     pipeline_payload = {
@@ -249,11 +247,10 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     ]
 )
 
-def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pipeline_name, stream_name, action, expected_status, schedule_enabled):
+def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pipeline_name, stream_name, action, expected_status, schedule_enabled, org_id):
     """Running an E2E test for pipeline creation with scheduling and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Payload for scheduled pipeline creation
     pipeline_payload = {
@@ -352,11 +349,10 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     ]
 )
 
-def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline_name, stream_name, action, expected_status):
+def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline_name, stream_name, action, expected_status, org_id):
     """Running an E2E test for pipeline creation and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Payload for pipeline creation
     pipeline_payload = {
@@ -1088,7 +1084,7 @@ def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline
     assert resp_create_pipeline.status_code == 400, "Invalid pipeline: After Flatten must be checked if a previous FunctionNode already checked it in the same branch."
 
 
-def test_e2e_pipeline_history(create_session, base_url):
+def test_e2e_pipeline_history(create_session, base_url, org_id):
     """Running an E2E test for pipeline history API.
 
     This test validates:
@@ -1105,7 +1101,6 @@ def test_e2e_pipeline_history(create_session, base_url):
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     headers = {"Content-Type": "application/json"}
 

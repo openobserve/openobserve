@@ -22,10 +22,9 @@ import pytest
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_enrichment_basic_lookup(create_session, base_url):
+def test_js_enrichment_basic_lookup(create_session, base_url, org_id):
     """Test JavaScript function with enrichment table lookup - basic usage"""
     session = create_session
-    org_id = "default"
 
     # First, create a test enrichment table
     # Note: This assumes enrichment table API is available
@@ -73,10 +72,9 @@ if (userData) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_enrichment_auto_detection(create_session, base_url):
+def test_js_enrichment_auto_detection(create_session, base_url, org_id):
     """Test auto-detection of enrichment tables from JavaScript code"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """
@@ -115,10 +113,9 @@ if (category) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_enrichment_explicit_tables(create_session, base_url):
+def test_js_enrichment_explicit_tables(create_session, base_url, org_id):
     """Test explicit enrichment_tables parameter"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """
@@ -146,10 +143,9 @@ if (user) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_enrichment_with_result_array(create_session, base_url):
+def test_js_enrichment_with_result_array(create_session, base_url, org_id):
     """Test JavaScript #ResultArray# with enrichment tables"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """#ResultArray#
@@ -191,10 +187,9 @@ for (var i = 0; i < rows.length; i++) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_enrichment_table_not_found(create_session, base_url):
+def test_js_enrichment_table_not_found(create_session, base_url, org_id):
     """Test graceful handling when enrichment table doesn't exist"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """
@@ -233,10 +228,9 @@ if (data === null || data === undefined) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_enrichment_key_not_found(create_session, base_url):
+def test_js_enrichment_key_not_found(create_session, base_url, org_id):
     """Test graceful handling when key doesn't exist in enrichment table"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """
@@ -274,10 +268,9 @@ if (userData === null || userData === undefined) {
 
 
 @pytest.mark.skip(reason="Temporarily disabled - failing test")
-def test_js_enrichment_multiple_lookups(create_session, base_url):
+def test_js_enrichment_multiple_lookups(create_session, base_url, org_id):
     """Test multiple enrichment table lookups in single function"""
     session = create_session
-    org_id = "default"
 
     payload = {
         "function": """
@@ -330,10 +323,9 @@ if (store) {
     assert "enrichment_count" in event, f"Missing enrichment_count in event: {event}"
 
 
-def test_js_enrichment_vrl_comparison(create_session, base_url):
+def test_js_enrichment_vrl_comparison(create_session, base_url, org_id):
     """Test that VRL functions still work (no regression)"""
     session = create_session
-    org_id = "default"
 
     # VRL function (trans_type=0 or auto-detected)
     payload = {

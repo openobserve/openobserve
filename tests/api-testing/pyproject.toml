@@ -21,6 +21,7 @@ dependencies = [
     "ruff>=0.1.8",
     "tink>=1.10.0",
     "protobuf",
+    "pytest-xdist>=3.0",
 ]
 
 [build-system]

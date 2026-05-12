@@ -1,9 +1,8 @@
-def test_e2e_ingestlogs(create_session, base_url):
+def test_e2e_ingestlogs(create_session, base_url, org_id):
     """Running an E2E test logs ingestion."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     stream_name = "newpy_tests"
     payload = [
         {
@@ -34,12 +33,11 @@ def test_e2e_ingestlogs(create_session, base_url):
     ), f"Get all alerts list 200, but got {resp.status_code} {resp.content}"
 
 
-def test_e2e_nostreamname(create_session, base_url):
+def test_e2e_nostreamname(create_session, base_url, org_id):
     """Running an E2E test for adding logs without stream name."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     stream_name = ""
     payload = [
         {
@@ -69,12 +67,11 @@ def test_e2e_nostreamname(create_session, base_url):
     ), f"Stream name is empty 400, but got {resp.status_code} {resp.content}"
 
 
-def test_e2e_invalidstreamname(create_session, base_url):
+def test_e2e_invalidstreamname(create_session, base_url, org_id):
     """Running an E2E test for adding invalid stream name."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     stream_name = "newpy#$#$#$#$2@2"
     payload = [
         {
@@ -104,11 +101,10 @@ def test_e2e_invalidstreamname(create_session, base_url):
     ), f"Invalid stream name 404, but got {resp.status_code} {resp.content}"
 
 
-def test_e2e_vrl(create_session, base_url):
+def test_e2e_vrl(create_session, base_url, org_id):
     """Running an E2E test for log search with VRL function."""
 
     session = create_session
-    org_id = "default"
     stream_name = "newpy_tests"
   
     payload = {
@@ -133,12 +129,11 @@ def test_e2e_vrl(create_session, base_url):
     ), f"VRL query 200, but got {resp.status_code} {resp.content}"
 
 
-def test_e2e_getallstreams(create_session, base_url):
+def test_e2e_getallstreams(create_session, base_url, org_id):
     """Running an E2E test for get all the streams list."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_allstreams = session.get(f"{url}api/{org_id}/streams")
 
@@ -148,12 +143,11 @@ def test_e2e_getallstreams(create_session, base_url):
     ), f"Get all streams 200, but got {resp_get_allstreams.status_code} {resp_get_allstreams.content}"
 
 
-def test_e2e_getschema(create_session, base_url):
+def test_e2e_getschema(create_session, base_url, org_id):
     """Running an E2E test for get stream schema."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_streamschema = session.get(f"{url}api/{org_id}/streams/newpy_tests/schema")
 
@@ -163,12 +157,11 @@ def test_e2e_getschema(create_session, base_url):
     ), f"Get stream schema 200, but got {resp_get_streamschema.status_code} {resp_get_streamschema.content}"
 
 
-def test_e2e_deleteinvalidstreams(create_session, base_url):
+def test_e2e_deleteinvalidstreams(create_session, base_url, org_id):
     """Running an E2E test for delete invalid stream."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_deletestreams = session.delete(f"{url}api/{org_id}/streams/invalidstream")
 
@@ -178,12 +171,11 @@ def test_e2e_deleteinvalidstreams(create_session, base_url):
     ), f"Invalid stream 404, but got {resp_get_deletestreams.status_code} {resp_get_deletestreams.content}"
 
 
-def test_e2e_incorrectstreamesettings(create_session, base_url):
+def test_e2e_incorrectstreamesettings(create_session, base_url, org_id):
     """Running an E2E test for invalid stream settings."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     resp_get_streamssettings = session.put(f"{url}api/{org_id}/streams/newpy_tests/settings")
 
     print(resp_get_streamssettings.content)
@@ -192,12 +184,11 @@ def test_e2e_incorrectstreamesettings(create_session, base_url):
     ), f"Invalid stream settings 415, but got {resp_get_streamssettings.status_code} {resp_get_streamssettings.content}"
 
 
-def test_e2e_deletevalidstreams(create_session, base_url):
+def test_e2e_deletevalidstreams(create_session, base_url, org_id):
     """Running an E2E test for delete streams."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_allstreams = session.delete(f"{url}api/{org_id}/streams/newpy_tests")
 

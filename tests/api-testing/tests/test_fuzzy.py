@@ -36,10 +36,9 @@ def post_query(session, base_url, org_id, query, retries=3, delay=2):
     ],
 )
 @pytest.mark.skip
-def test_e2e_fuzzy(create_session, base_url, sql_query):
+def test_e2e_fuzzy(create_session, base_url, sql_query, org_id):
     """Running E2E tests for various SQL queries with retries."""
     session = create_session
-    org_id = "default"
     one_min_ago, end_time = get_dynamic_timestamps()
 
     query = {

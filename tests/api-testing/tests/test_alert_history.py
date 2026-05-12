@@ -18,24 +18,21 @@ import pytest
 import time
 import requests
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
-ORG_ID = os.environ.get("TEST_ORG_ID", "default")
 
-
-def triggers_stream_exists(session, base_url):
+def triggers_stream_exists(session, base_url, org_id):
     """Check if the triggers stream exists (alert history is available)."""
-    resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?size=1")
+    resp = session.get(f"{base_url}api/v2/{org_id}/alerts/history?size=1")
     if resp.status_code == 500 and "stream not found" in resp.text.lower():
         return False
     return resp.status_code == 200
 
 
 @pytest.fixture(scope="module")
-def setup_alert_history(create_session, base_url):
+def setup_alert_history(create_session, base_url, org_id):
     """
     Setup fixture that creates an alert and triggers it to populate the triggers stream.
     This ensures alert history tests can run in fresh CI environments.
@@ -43,7 +40,7 @@ def setup_alert_history(create_session, base_url):
     session = create_session
 
     # Check if triggers stream already exists
-    if triggers_stream_exists(session, base_url):
+    if triggers_stream_exists(session, base_url, org_id):
         logger.info("Triggers stream already exists, skipping setup")
         yield
         return
@@ -67,7 +64,7 @@ def setup_alert_history(create_session, base_url):
             "isDefault": False,
         }
         resp = session.post(
-            f"{base_url}api/{ORG_ID}/alerts/templates",
+            f"{base_url}api/{org_id}/alerts/templates",
             json=template_payload,
             headers=headers,
         )
@@ -83,7 +80,7 @@ def setup_alert_history(create_session, base_url):
             "name": destination_name,
         }
         resp = session.post(
-            f"{base_url}api/{ORG_ID}/alerts/destinations",
+            f"{base_url}api/{org_id}/alerts/destinations",
             json=destination_payload,
             headers=headers,
         )
@@ -97,7 +94,7 @@ def setup_alert_history(create_session, base_url):
             {"level": "ERROR", "message": "Third error to ensure threshold is met"},
         ]
         resp = session.post(
-            f"{base_url}api/{ORG_ID}/{stream_name}/_json",
+            f"{base_url}api/{org_id}/{stream_name}/_json",
             json=log_payload,
             headers=headers,
         )
@@ -133,7 +130,7 @@ def setup_alert_history(create_session, base_url):
             "description": "Setup alert for history tests",
         }
         resp = session.post(
-            f"{base_url}api/v2/{ORG_ID}/alerts",
+            f"{base_url}api/v2/{org_id}/alerts",
             json=alert_payload,
             headers=headers,
         )
@@ -141,7 +138,7 @@ def setup_alert_history(create_session, base_url):
         logger.info(f"Created alert: {alert_name}")
 
         # Get alert ID for cleanup
-        resp_list = session.get(f"{base_url}api/v2/{ORG_ID}/alerts")
+        resp_list = session.get(f"{base_url}api/v2/{org_id}/alerts")
         if resp_list.status_code == 200:
             for alert in resp_list.json().get("list", []):
                 if alert["name"] == alert_name:
@@ -170,31 +167,31 @@ def setup_alert_history(create_session, base_url):
 
         # Delete alert using v2 API with alert_id
         if alert_id:
-            resp = session.delete(f"{base_url}api/v2/{ORG_ID}/alerts/{alert_id}")
+            resp = session.delete(f"{base_url}api/v2/{org_id}/alerts/{alert_id}")
             logger.info(f"Deleted alert: {resp.status_code}")
 
         time.sleep(2)
 
         # Delete destination
-        resp = session.delete(f"{base_url}api/{ORG_ID}/alerts/destinations/{destination_name}")
+        resp = session.delete(f"{base_url}api/{org_id}/alerts/destinations/{destination_name}")
         logger.info(f"Deleted destination: {resp.status_code}")
 
         # Delete template
-        resp = session.delete(f"{base_url}api/{ORG_ID}/alerts/templates/{template_name}")
+        resp = session.delete(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
         logger.info(f"Deleted template: {resp.status_code}")
 
         # Delete stream
-        resp = session.delete(f"{base_url}api/{ORG_ID}/streams/{stream_name}?type=logs")
+        resp = session.delete(f"{base_url}api/{org_id}/streams/{stream_name}?type=logs")
         logger.info(f"Deleted stream: {resp.status_code}")
 
 
 @pytest.fixture(scope="module")
-def ensure_triggers_stream(setup_alert_history, create_session, base_url):
+def ensure_triggers_stream(setup_alert_history, create_session, base_url, org_id):
     """
     Fixture that ensures triggers stream exists before tests run.
     Uses setup_alert_history to create the stream if needed, then skips if still not available.
     """
-    if not triggers_stream_exists(create_session, base_url):
+    if not triggers_stream_exists(create_session, base_url, org_id):
         pytest.skip("Triggers stream could not be created - alert may not have triggered")
 
 
@@ -202,11 +199,11 @@ def ensure_triggers_stream(setup_alert_history, create_session, base_url):
 class TestAlertHistoryContract:
     """Contract tests for Alert History API - validates response schemas."""
 
-    def test_response_schema_structure(self, create_session, base_url):
+    def test_response_schema_structure(self, create_session, base_url, org_id):
         """Validate GET /api/v2/{org_id}/alerts/history response has required fields."""
         session = create_session
 
-        resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?size=5")
+        resp = session.get(f"{base_url}api/v2/{org_id}/alerts/history?size=5")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
         body = resp.json()
@@ -223,11 +220,11 @@ class TestAlertHistoryContract:
 
         logger.info(f"Contract validation passed: total={body['total']}, size={body['size']}")
 
-    def test_history_entry_schema(self, create_session, base_url):
+    def test_history_entry_schema(self, create_session, base_url, org_id):
         """Validate individual history entry has all required fields."""
         session = create_session
 
-        resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?size=1")
+        resp = session.get(f"{base_url}api/v2/{org_id}/alerts/history?size=1")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
         body = resp.json()
@@ -279,11 +276,11 @@ class TestAlertHistorySorting:
         "source_node",
         "query_took",
     ])
-    def test_sort_by_valid_fields(self, create_session, base_url, sort_field):
+    def test_sort_by_valid_fields(self, create_session, base_url, org_id, sort_field):
         """Validate all documented sort_by fields are accepted."""
         session = create_session
 
-        resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by={sort_field}&size=5")
+        resp = session.get(f"{base_url}api/v2/{org_id}/alerts/history?sort_by={sort_field}&size=5")
         assert resp.status_code == 200, (
             f"Expected 200 for sort_by={sort_field}, got {resp.status_code}: {resp.text}"
         )
@@ -293,12 +290,12 @@ class TestAlertHistorySorting:
         logger.info(f"sort_by={sort_field}: returned {len(body['hits'])} entries")
 
     @pytest.mark.parametrize("sort_order", ["asc", "desc", "ASC", "DESC"])
-    def test_sort_order_valid_values(self, create_session, base_url, sort_order):
+    def test_sort_order_valid_values(self, create_session, base_url, org_id, sort_order):
         """Validate asc/desc sort_order values (case-insensitive)."""
         session = create_session
 
         resp = session.get(
-            f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=timestamp&sort_order={sort_order}&size=5"
+            f"{base_url}api/v2/{org_id}/alerts/history?sort_by=timestamp&sort_order={sort_order}&size=5"
         )
         assert resp.status_code == 200, (
             f"Expected 200 for sort_order={sort_order}, got {resp.status_code}: {resp.text}"
@@ -308,12 +305,12 @@ class TestAlertHistorySorting:
         assert "hits" in body, f"Response missing 'hits' for sort_order={sort_order}"
         logger.info(f"sort_order={sort_order}: returned {len(body['hits'])} entries")
 
-    def test_sort_by_timestamp_desc_ordering(self, create_session, base_url):
+    def test_sort_by_timestamp_desc_ordering(self, create_session, base_url, org_id):
         """Verify descending sort by timestamp returns entries in correct order."""
         session = create_session
 
         resp = session.get(
-            f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=timestamp&sort_order=desc&size=10"
+            f"{base_url}api/v2/{org_id}/alerts/history?sort_by=timestamp&sort_order=desc&size=10"
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
@@ -330,12 +327,12 @@ class TestAlertHistorySorting:
         else:
             logger.warning("Not enough entries to verify ordering")
 
-    def test_sort_by_timestamp_asc_ordering(self, create_session, base_url):
+    def test_sort_by_timestamp_asc_ordering(self, create_session, base_url, org_id):
         """Verify ascending sort by timestamp returns entries in correct order."""
         session = create_session
 
         resp = session.get(
-            f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=timestamp&sort_order=asc&size=10"
+            f"{base_url}api/v2/{org_id}/alerts/history?sort_by=timestamp&sort_order=asc&size=10"
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
@@ -357,44 +354,44 @@ class TestAlertHistorySorting:
 class TestAlertHistoryErrors:
     """Error path tests for Alert History API."""
 
-    def test_invalid_sort_by_field(self, create_session, base_url):
+    def test_invalid_sort_by_field(self, create_session, base_url, org_id):
         """Invalid sort_by field should return 400."""
         session = create_session
 
         resp = session.get(
-            f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=invalid_field"
+            f"{base_url}api/v2/{org_id}/alerts/history?sort_by=invalid_field"
         )
         assert resp.status_code == 400, (
             f"Expected 400 for invalid sort_by, got {resp.status_code}: {resp.text}"
         )
         logger.info("Invalid sort_by correctly rejected with 400")
 
-    def test_invalid_sort_order_value(self, create_session, base_url):
+    def test_invalid_sort_order_value(self, create_session, base_url, org_id):
         """Invalid sort_order value should return 400."""
         session = create_session
 
         resp = session.get(
-            f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_order=invalid"
+            f"{base_url}api/v2/{org_id}/alerts/history?sort_order=invalid"
         )
         assert resp.status_code == 400, (
             f"Expected 400 for invalid sort_order, got {resp.status_code}: {resp.text}"
         )
         logger.info("Invalid sort_order correctly rejected with 400")
 
-    def test_unauthorized_access(self, base_url):
+    def test_unauthorized_access(self, base_url, org_id):
         """Verify 401 for unauthenticated requests."""
         # Use raw requests without auth
-        resp = requests.get(f"{base_url}api/v2/{ORG_ID}/alerts/history")
+        resp = requests.get(f"{base_url}api/v2/{org_id}/alerts/history")
         assert resp.status_code == 401, (
             f"Expected 401 for unauthenticated request, got {resp.status_code}"
         )
         logger.info("Unauthorized request correctly rejected with 401")
 
-    def test_negative_from_parameter(self, create_session, base_url):
+    def test_negative_from_parameter(self, create_session, base_url, org_id):
         """Negative from parameter should be treated as 0."""
         session = create_session
 
-        resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?from=-10&size=5")
+        resp = session.get(f"{base_url}api/v2/{org_id}/alerts/history?from=-10&size=5")
         assert resp.status_code == 200, (
             f"Expected 200 (negative from clamped), got {resp.status_code}: {resp.text}"
         )
@@ -403,11 +400,11 @@ class TestAlertHistoryErrors:
         assert body["from"] == 0, f"Expected from=0 (clamped), got {body['from']}"
         logger.info("Negative from parameter correctly clamped to 0")
 
-    def test_zero_size_parameter(self, create_session, base_url):
+    def test_zero_size_parameter(self, create_session, base_url, org_id):
         """Zero size parameter should be clamped to minimum (1)."""
         session = create_session
 
-        resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?size=0")
+        resp = session.get(f"{base_url}api/v2/{org_id}/alerts/history?size=0")
         assert resp.status_code == 200, (
             f"Expected 200 (zero size clamped), got {resp.status_code}: {resp.text}"
         )
@@ -421,29 +418,29 @@ class TestAlertHistoryErrors:
 class TestAlertHistoryPaginationEdgeCases:
     """Edge case tests for pagination parameters."""
 
-    def test_offset_beyond_total(self, create_session, base_url):
+    def test_offset_beyond_total(self, create_session, base_url, org_id):
         """Offset beyond total should return empty hits."""
         session = create_session
 
         # First get total count
-        resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?size=1")
+        resp = session.get(f"{base_url}api/v2/{org_id}/alerts/history?size=1")
         assert resp.status_code == 200
         total = resp.json()["total"]
 
         # Request with offset beyond total
-        resp = session.get(f"{base_url}api/v2/{ORG_ID}/alerts/history?from={total + 100}&size=10")
+        resp = session.get(f"{base_url}api/v2/{org_id}/alerts/history?from={total + 100}&size=10")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
         body = resp.json()
         assert len(body["hits"]) == 0, f"Expected empty hits, got {len(body['hits'])}"
         logger.info(f"Offset beyond total ({total + 100}) correctly returned empty hits")
 
-    def test_combined_sort_and_pagination(self, create_session, base_url):
+    def test_combined_sort_and_pagination(self, create_session, base_url, org_id):
         """Test sort_by and pagination work together correctly."""
         session = create_session
 
         resp = session.get(
-            f"{base_url}api/v2/{ORG_ID}/alerts/history?sort_by=timestamp&sort_order=desc&from=0&size=5"
+            f"{base_url}api/v2/{org_id}/alerts/history?sort_by=timestamp&sort_order=desc&from=0&size=5"
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
@@ -453,7 +450,7 @@ class TestAlertHistoryPaginationEdgeCases:
         assert len(body["hits"]) <= 5, f"Expected at most 5 hits, got {len(body['hits'])}"
         logger.info("Combined sort and pagination working correctly")
 
-    def test_time_range_with_sorting(self, create_session, base_url):
+    def test_time_range_with_sorting(self, create_session, base_url, org_id):
         """Test time range filtering with sort parameters."""
         session = create_session
 
@@ -461,7 +458,7 @@ class TestAlertHistoryPaginationEdgeCases:
         start_time = int((datetime.now(timezone.utc) - timedelta(days=1)).timestamp() * 1_000_000)
 
         resp = session.get(
-            f"{base_url}api/v2/{ORG_ID}/alerts/history"
+            f"{base_url}api/v2/{org_id}/alerts/history"
             f"?start_time={start_time}&end_time={end_time}"
             f"&sort_by=timestamp&sort_order=asc&size=10"
         )

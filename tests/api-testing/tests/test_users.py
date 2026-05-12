@@ -1,9 +1,8 @@
-def test_e2e_users(create_session, base_url):
+def test_e2e_users(create_session, base_url, org_id):
     """Running an E2E test for get all the users list."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_allusers = session.get(f"{url}api/{org_id}/users")
 
@@ -13,12 +12,11 @@ def test_e2e_users(create_session, base_url):
     ), f"Get all functions list 200, but got {resp_get_allusers.status_code} {resp_get_allusers.content}"
 
 
-def test_e2e_createusers(create_session, base_url):
+def test_e2e_createusers(create_session, base_url, org_id):
     """Running an E2E test for new user creation. This user will be part of default org."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     payload = {
         "organization": "e2e",
         "email": "pytests@gmail.com",
@@ -40,12 +38,11 @@ def test_e2e_createusers(create_session, base_url):
     ), f"Deleting this user, but got {resp_delete_users.status_code} {resp_delete_users.content}"
 
 
-def test_e2e_createusers_invalid_password(create_session, base_url):
+def test_e2e_createusers_invalid_password(create_session, base_url, org_id):
     """Running an E2E test for new user creation with password length less than 8"""
 
     session = create_session
     url = base_url
-    org_id = "default"
     payload = {
         "organization": "e2e",
         "email": "pytests@gmail.com",
@@ -86,12 +83,11 @@ def test_e2e_createusers_invalid_password(create_session, base_url):
 #     assert resp_delete_users.status_code == 200, f"Deleting this user, but got {resp_delete_users.status_code} {resp_delete_users.content}"
 
 
-def test_e2e_invalidrole(create_session, base_url):
+def test_e2e_invalidrole(create_session, base_url, org_id):
     """Running an E2E test for invalid role added."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     payload = {
         "organization": "e2e",
         "email": "pytests@gmail.com",
@@ -135,12 +131,11 @@ def test_e2e_invalidorganization(create_session, base_url):
     ), f"Deleting this user, but got {resp_delete_users.status_code} {resp_delete_users.content}"
 
 
-def test_e2e_addinvalidusertoOrg(create_session, base_url):
+def test_e2e_addinvalidusertoOrg(create_session, base_url, org_id):
     """Running an E2E test for invalid user added to org."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     payload = {
         "organization": "e2e",
         "email": "py@gmail.com",
@@ -160,12 +155,11 @@ def test_e2e_addinvalidusertoOrg(create_session, base_url):
     ), f"Invalid user returning 422, but got {resp_create_users.status_code} {resp_create_users.content}"
 
 
-def test_e2e_updateuser(create_session, base_url):
+def test_e2e_updateuser(create_session, base_url, org_id):
     """Running an E2E test for adding, updating & deleting user ."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     payload = {
         "organization": "e2e",
         "email": "py@gmail.com",
@@ -202,12 +196,11 @@ def test_e2e_updateuser(create_session, base_url):
     ), f"Deleting this user, but got {resp_delete_users.status_code} {resp_delete_users.content}"
 
 
-def test_e2e_updateusernotfound(create_session, base_url):
+def test_e2e_updateusernotfound(create_session, base_url, org_id):
     """Running an E2E test for user not found for updating values."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     payload = {
         "organization": "e2e",
         "email": "py@gmail.com",
@@ -244,12 +237,11 @@ def test_e2e_updateusernotfound(create_session, base_url):
     ), f"Update this user 400, but got {resp_update_users.status_code} {resp_update_users.content}"
 
 
-def test_e2e_updateuserexists(create_session, base_url):
+def test_e2e_updateuserexists(create_session, base_url, org_id):
     """Running an E2E test for user already exists."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     payload = {
         "organization": "default",
         "email": "py@gmail.com",

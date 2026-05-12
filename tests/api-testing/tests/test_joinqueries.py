@@ -24,12 +24,11 @@ orders_payload = [
 ]
 
 @pytest.mark.parametrize("test_name, sql_query", [(query["test_name"], query["sql_query"]) for query in queries])
-def test_e2e_join_queries(create_session, base_url, test_name, sql_query):
+def test_e2e_join_queries(create_session, base_url, org_id, test_name, sql_query):
     """Parameterized E2E test for various join SQL queries."""
     
     session = create_session
     url = base_url
-    org_id = "default"
     stream_name_users = "u1"
     stream_name_orders = "orders"
 

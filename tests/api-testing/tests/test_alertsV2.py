@@ -7,12 +7,11 @@ import requests
 import logging
 
 
-def test_get_alertsnew(create_session, base_url):
+def test_get_alertsnew(create_session, base_url, org_id):
     """Running an E2E test for getting all the new alerts list."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
 
@@ -21,7 +20,7 @@ def test_get_alertsnew(create_session, base_url):
         resp_get_allalertsnew.status_code == 200
     ), f"Get all new alerts list 200, but got {resp_get_allalertsnew.status_code} {resp_get_allalertsnew.content}"
 
-def test_new_alert_create(create_session, base_url):
+def test_new_alert_create(create_session, base_url, org_id):
     """Running an E2E test for create a new alert."""
 
     alert_name = f"newalert_{random.randint(1000, 9999)}"  # Make the name unique
@@ -29,7 +28,6 @@ def test_new_alert_create(create_session, base_url):
     
     session = create_session
     url = base_url
-    org_id = "default"
 
 
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
@@ -195,12 +193,11 @@ def test_new_alert_create(create_session, base_url):
     print(f"Alert {alert_name} created successfully")
 
 
-def test_get_alertnew(create_session, base_url):
+def test_get_alertnew(create_session, base_url, org_id):
     """Running an E2E test for getting particular new alert ID."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
@@ -229,7 +226,7 @@ def test_get_alertnew(create_session, base_url):
         assert resp_get_alertnew.status_code == 200, f"Failed to get details for alert {alert_id}"
         print(f"Successfully fetched details for alert {alert_id}")
 
-def test_put_alertnew_update(create_session, base_url):
+def test_put_alertnew_update(create_session, base_url, org_id):
     """Running an E2E test for updating the new alert."""
 
     alert_name = f"newalert_{random.randint(1000, 9999)}"  # Make the name unique
@@ -237,7 +234,6 @@ def test_put_alertnew_update(create_session, base_url):
     
     session = create_session
     url = base_url
-    org_id = "default"
 
 
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
@@ -510,12 +506,11 @@ def test_put_alertnew_update(create_session, base_url):
         # Now you can assert or further handle the 'alert_description'
             assert alert_description == "Test Updated", f"Expected 'Test Updated', but got {alert_description}"
 
-def test_put_alertnew_disable(create_session, base_url):
+def test_put_alertnew_disable(create_session, base_url, org_id):
     """Running an E2E test for getting the new alert disable."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
@@ -567,12 +562,11 @@ def test_put_alertnew_disable(create_session, base_url):
         # Now you can assert or further handle the 'alert_disabled'
             assert alert_disabled == "False", f"Expected 'False', but got {alert_disabled}"
 
-def test_put_alertnew_enable(create_session, base_url):
+def test_put_alertnew_enable(create_session, base_url, org_id):
     """Running an E2E test for getting the new alert enable."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
@@ -625,12 +619,11 @@ def test_put_alertnew_enable(create_session, base_url):
         # Now you can assert or further handle the 'alert_enabled'
             assert alert_enabled == "True", f"Expected 'True', but got {alert_enabled}"
 
-def test_put_alertnew_trigger(create_session, base_url, caplog):
+def test_put_alertnew_trigger(create_session, base_url, caplog, org_id):
     """Running an E2E test for getting the new alert trigger."""
     caplog.set_level('INFO')
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Create a logger
     logger = logging.getLogger(__name__)
@@ -689,12 +682,11 @@ def test_put_alertnew_trigger(create_session, base_url, caplog):
         alert_data = resp_check.json()
         # assert alert_data["last_triggered_at"] is not None, "Alert was not triggered" after resolving issues 5745
     
-def test_delete_alertnew(create_session, base_url):
+def test_delete_alertnew(create_session, base_url, org_id):
     """Running an E2E test for deleting the new alert."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
@@ -810,11 +802,10 @@ def _cleanup_vrl_test_resources(session, url, org_id, resources, alert_id=None):
         session.delete(f"{url}api/v2/{org_id}/folders/{resources['folder_id']}")
 
 
-def test_alert_with_vrl_empty_array(create_session, base_url):
+def test_alert_with_vrl_empty_array(create_session, base_url, org_id):
     """Test that an alert with VRL returning empty array is stored correctly."""
     session = create_session
     url = base_url
-    org_id = "default"
     alert_id = None
     resources = {}
 
@@ -880,11 +871,10 @@ def test_alert_with_vrl_empty_array(create_session, base_url):
         print("Cleanup completed for test_alert_with_vrl_empty_array")
 
 
-def test_alert_with_vrl_object_array(create_session, base_url):
+def test_alert_with_vrl_object_array(create_session, base_url, org_id):
     """Test that an alert with VRL returning object array is stored correctly."""
     session = create_session
     url = base_url
-    org_id = "default"
     alert_id = None
     resources = {}
 
@@ -950,11 +940,10 @@ def test_alert_with_vrl_object_array(create_session, base_url):
         print("Cleanup completed for test_alert_with_vrl_object_array")
 
 
-def test_update_alert_vrl_function(create_session, base_url):
+def test_update_alert_vrl_function(create_session, base_url, org_id):
     """Test that an alert's VRL function can be updated."""
     session = create_session
     url = base_url
-    org_id = "default"
     alert_id = None
     resources = {}
 

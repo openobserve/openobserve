@@ -10,11 +10,10 @@ def retrieve_new_dashboard_folders(session, base_url, org_id, folder_id):
     ), f"Retrieve these dashboards: Expected 200, but got {resp_get_dashboard_folders.status_code} {resp_get_dashboard_folders.content}"
 
 
-def test_new_dashboards_folders(create_session, base_url):
+def test_new_dashboards_folders(create_session, base_url, org_id):
     """Running an E2E test for all new dashboards."""
 
     session = create_session
-    org_id = "default"
 
     resp_new_dashboards_folders = session.get(f"{base_url}api/v2/{org_id}/folders/dashboards")
 
@@ -23,12 +22,11 @@ def test_new_dashboards_folders(create_session, base_url):
         resp_new_dashboards_folders.status_code == 200
     ), f"Retrieve all functions list 200, but got {resp_new_dashboards_folders.status_code} {resp_new_dashboards_folders.content}"
 
-def test_new_create_update_delete_dashboards_folders(create_session, base_url):
+def test_new_create_update_delete_dashboards_folders(create_session, base_url, org_id):
     """Running an E2E test for create and delete dashboards folder."""
 
     session = create_session
     # Create a dashboards folder
-    org_id = "default"
     url = base_url
     payload = {"description": "newfoldernvp", "name": "pytest-automationtests"}
     resp_create_new_dashboards_folders = session.post(
@@ -76,7 +74,6 @@ def folder_id():
     return ""  
 
 def test_retrieve_dashboard_folders_Unauthorized(session, base_url, org_id, folder_id):
-    org_id = "default"
     resp_get_dashboard_folders_Unauthorize = session.get(
         f"{base_url}api/v2/{org_id}/folders/dashboards/{folder_id}"
     )
@@ -86,8 +83,7 @@ def test_retrieve_dashboard_folders_Unauthorized(session, base_url, org_id, fold
     )
     
 
-def test_create_dashboard_folders_400_empty_name(create_session, base_url):
-    org_id = "default" # Empty org_id to test the case
+def test_create_dashboard_folders_400_empty_name(create_session, base_url, org_id):
     payload = {"description": "newfoldernvp", "name": ""}
     
     # Use create_session instead of session
@@ -116,8 +112,7 @@ def test_create_dashboard_folders_404_empty_org(create_session, base_url):
 
 
 
-def test_invalid_folder_id_retrieve_dashboard(create_session, base_url):
-    org_id = "default"
+def test_invalid_folder_id_retrieve_dashboard(create_session, base_url, org_id):
     invalid_folder_id = "e56454545dfd@43232"  # Folder ID that doesn't exist
     
     resp_get_dashboard_folders_invalid = create_session.get(
@@ -147,11 +142,10 @@ def retrieve_new_alerts_folder(session, base_url, org_id, folder_id):
     ), f"Retrieve this folder alert: Expected 200, but got {resp_get_alert_folder.status_code} {resp_get_alert_folder.content}"
 
 
-def test_new_alerts_folders(create_session, base_url):
+def test_new_alerts_folders(create_session, base_url, org_id):
     """Running an E2E test for all new alerts."""
 
     session = create_session
-    org_id = "default"
 
     resp_new_all_alerts_folders = session.get(f"{base_url}api/v2/{org_id}/folders/alerts")
 
@@ -160,12 +154,11 @@ def test_new_alerts_folders(create_session, base_url):
         resp_new_all_alerts_folders.status_code == 200
     ), f"Retrieve all functions list 200, but got {resp_new_all_alerts_folders.status_code} {resp_new_all_alerts_folders.content}"
 
-def test_new_create_alerts_update_delete_folders(create_session, base_url):
+def test_new_create_alerts_update_delete_folders(create_session, base_url, org_id):
     """Running an E2E test for create, update and delete alerts folder."""
 
     session = create_session
     # Create a alerts folder
-    org_id = "default"
     url = base_url
     payload = {"description": "newfoldernvp", "name": "pytest-automationtests"}
     resp_create_new_alerts_folders = session.post(
@@ -202,7 +195,6 @@ def test_new_create_alerts_update_delete_folders(create_session, base_url):
 
 
 def test_retrieve_alerts_folders_Unauthorized(session, base_url, org_id, folder_id):
-    org_id = "default"
     resp_get_alerts_folders_Unauthorize = session.get(
         f"{base_url}api/v2/{org_id}/folders/alerts/{folder_id}"
     )
@@ -212,8 +204,7 @@ def test_retrieve_alerts_folders_Unauthorized(session, base_url, org_id, folder_
     )   
 
 
-def test_create_alerts_folders_400_empty_name(create_session, base_url):
-    org_id = "default" # Empty org_id to test the case
+def test_create_alerts_folders_400_empty_name(create_session, base_url, org_id):
     payload = {"description": "newfoldernvp", "name": ""}
     
     # Use create_session instead of session
@@ -226,8 +217,7 @@ def test_create_alerts_folders_400_empty_name(create_session, base_url):
         f"{resp_create_new_alerts_folders_blank.content}"
     )
 
-def test_invalid_folder_id_retrieve_alerts(create_session, base_url):
-    org_id = "default"
+def test_invalid_folder_id_retrieve_alerts(create_session, base_url, org_id):
     invalid_folder_id = "e56454545dfd@43232"  # Folder ID that doesn't exist
     
     resp_get_alerts_folders_invalid = create_session.get(

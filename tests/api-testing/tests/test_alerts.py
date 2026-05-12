@@ -1,12 +1,11 @@
 import pytest
 import time
 
-def test_e2e_destinations(create_session, base_url):
+def test_e2e_destinations(create_session, base_url, org_id):
     """Running an E2E test for get all the destination list under alerts."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_alldestinations = session.get(f"{url}api/{org_id}/alerts/destinations")
 
@@ -16,12 +15,11 @@ def test_e2e_destinations(create_session, base_url):
     ), f"Get all alerts list 200, but got {resp_get_alldestinations.status_code} {resp_get_alldestinations.content}"
 
 
-def test_e2e_deleteinvaliddestination(create_session, base_url):
+def test_e2e_deleteinvaliddestination(create_session, base_url, org_id):
     """Running an E2E test for deleting destination that does not exist ."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     resp_delete_destination = session.delete(
         f"{url}api/{org_id}/alerts/destinations/destinationname"
     )
@@ -30,12 +28,11 @@ def test_e2e_deleteinvaliddestination(create_session, base_url):
     ), f"Deleting this destination, but got {resp_delete_destination.status_code} {resp_delete_destination.content}"
 
 
-def test_e2e_templates(create_session, base_url):
+def test_e2e_templates(create_session, base_url, org_id):
     """Running an E2E test for get all the alerts list."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_alltemplates = session.get(f"{url}api/{org_id}/alerts/templates")
 
@@ -46,13 +43,12 @@ def test_e2e_templates(create_session, base_url):
 
 
 # TODO - Change body and add 2 other testcases once bug #1702 is fixed
-def test_e2e_templatescreation(create_session, base_url):
+def test_e2e_templatescreation(create_session, base_url, org_id):
     """Running an E2E test for get all the alerts list."""
     template_name = "newtemp"
 
     session = create_session
     url = base_url
-    org_id = "default"
     payload = {"body": "invalid", "ise2e": True, "name": template_name}
     # create template under alerts
     resp_get_alltemplates = session.post(
@@ -73,12 +69,11 @@ def test_e2e_templatescreation(create_session, base_url):
 
 
 
-def test_e2e_createdestination(create_session, base_url):
+def test_e2e_createdestination(create_session, base_url, org_id):
     """Running an E2E test for create a new destination."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     skip_tls_verify_value = False
 
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
@@ -149,7 +144,7 @@ def test_e2e_createdestination(create_session, base_url):
     ), f"Deleting this function, but got {resp_delete_template.status_code} {resp_delete_template.content}"
 
 
-def test_e2e_alert_history(create_session, base_url):
+def test_e2e_alert_history(create_session, base_url, org_id):
     """Running an E2E test for alert history API.
 
     This test validates:
@@ -166,7 +161,6 @@ def test_e2e_alert_history(create_session, base_url):
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     headers = {"Content-Type": "application/json"}
 

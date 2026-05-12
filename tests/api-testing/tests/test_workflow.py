@@ -18,10 +18,9 @@ ZO_BASE_URL_SC2 = os.environ.get("ZO_BASE_URL_SC2")  # Use environment variable
 
 
 total_count = 2
-org_id = "default"
 stream_name = "stream_pytest_data"
 
-def test_workflow(create_session, base_url):
+def test_workflow(create_session, base_url, org_id):
 
    create_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, total_count)
    # verify_objects(create_session, base_url, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD, org_id, stream_name, total_count)

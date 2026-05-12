@@ -6,12 +6,11 @@ from datetime import datetime, timezone, timedelta
 import time
 
 
-def test_e2e_getsearch(create_session, base_url):
+def test_e2e_getsearch(create_session, base_url, org_id):
     """Running an E2E test no payload."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs")
 
@@ -20,12 +19,11 @@ def test_e2e_getsearch(create_session, base_url):
         resp_get_allsearch.status_code == 415
     ), f"Expected request with `Content-Type: application/json`, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
-def test_e2e_query(create_session, base_url):
+def test_e2e_query(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -74,12 +72,11 @@ def test_e2e_query(create_session, base_url):
     ), f"Sql mode added 400, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_limitadded(create_session, base_url):
+def test_e2e_limitadded(create_session, base_url, org_id):
     """Running an E2E test add limit to sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -102,12 +99,11 @@ def test_e2e_limitadded(create_session, base_url):
     ), f"Sql mode added  with limit 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_validhistogram(create_session, base_url):
+def test_e2e_validhistogram(create_session, base_url, org_id):
     """Running an E2E test for valid histogram."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -132,12 +128,11 @@ def test_e2e_validhistogram(create_session, base_url):
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_histogramwithlimit(create_session, base_url):
+def test_e2e_histogramwithlimit(create_session, base_url, org_id):
     """Running an E2E test for query with limit  list."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -162,12 +157,11 @@ def test_e2e_histogramwithlimit(create_session, base_url):
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_matchallhistogram(create_session, base_url):
+def test_e2e_matchallhistogram(create_session, base_url, org_id):
     """Running an E2E test for valid match all histogram query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -189,12 +183,11 @@ def test_e2e_matchallhistogram(create_session, base_url):
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_matchallindexhistogram(create_session, base_url):
+def test_e2e_matchallindexhistogram(create_session, base_url, org_id):
     """Running an E2E test for valid match all histogram query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -273,12 +266,11 @@ def test_e2e_matchallindexhistogram(create_session, base_url):
 #     ), f"histogram mode added 500, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_matchallsql(create_session, base_url):
+def test_e2e_matchallsql(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -376,12 +368,11 @@ def test_e2e_matchallsql(create_session, base_url):
 
 
 
-def test_e2e_sqlaggregationquery(create_session, base_url):
+def test_e2e_sqlaggregationquery(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -404,12 +395,11 @@ def test_e2e_sqlaggregationquery(create_session, base_url):
 
         
 
-def test_e2e_sqlgroupbytimestamp(create_session, base_url):
+def test_e2e_sqlgroupbytimestamp(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -430,12 +420,11 @@ def test_e2e_sqlgroupbytimestamp(create_session, base_url):
     response_data = resp_get_allsearch.json()
 
 
-def test_e2e_sqlcountaggregationquery(create_session, base_url):
+def test_e2e_sqlcountaggregationquery(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -458,12 +447,11 @@ def test_e2e_sqlcountaggregationquery(create_session, base_url):
     response_data = resp_get_countquery.json()
 
 
-def test_e2e_sqlmatchquery(create_session, base_url):
+def test_e2e_sqlmatchquery(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -485,12 +473,11 @@ def test_e2e_sqlmatchquery(create_session, base_url):
     response_data = resp_get_matchquery.json()
 
 
-def test_e2e_sqlmaxquery(create_session, base_url):
+def test_e2e_sqlmaxquery(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -512,12 +499,11 @@ def test_e2e_sqlmaxquery(create_session, base_url):
         
 
 
-def test_e2e_inquery(create_session, base_url):
+def test_e2e_inquery(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -676,12 +662,11 @@ def test_e2e_inquery(create_session, base_url):
 
 
 @pytest.mark.skip
-def test_e2e_cachedscenario(create_session, base_url):
+def test_e2e_cachedscenario(create_session, base_url, org_id):
     """Running an E2E test for valid SQL query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -729,12 +714,11 @@ def test_e2e_cachedscenario(create_session, base_url):
     assert cached_ratio2 > 0, f"Expected cached_ratio to be greater than 0, but got {cached_ratio2}"
 
 @pytest.mark.skip
-def test_e2e_cachedmultistreams(create_session, base_url):
+def test_e2e_cachedmultistreams(create_session, base_url, org_id):
     """Running an E2E test for valid SQL query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -795,12 +779,11 @@ def test_e2e_cachedmultistreams(create_session, base_url):
     assert cached_ratio2 > 0, f"Expected cached_ratio to be greater than 0, but got {cached_ratio2}"
 
 
-def test_e2e_eventtimestamp(create_session, base_url):
+def test_e2e_eventtimestamp(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -829,12 +812,11 @@ def test_e2e_eventtimestamp(create_session, base_url):
     assert len(eventtimes) == len(set(eventtimes)), "eventtime1 values are not unique"
 
 
-def test_e2e_distinctqueries(create_session, base_url):
+def test_e2e_distinctqueries(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -856,12 +838,11 @@ def test_e2e_distinctqueries(create_session, base_url):
     response_data = resp_get_inquery.json()
 
 
-def test_e2e_countcase(create_session, base_url):
+def test_e2e_countcase(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -882,12 +863,11 @@ def test_e2e_countcase(create_session, base_url):
     response_data = resp_get_inquery.json()
 
 
-def test_e2e_coalesce(create_session, base_url):
+def test_e2e_coalesce(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -908,12 +888,11 @@ def test_e2e_coalesce(create_session, base_url):
     response_data = resp_get_inquery.json()
 
 
-def test_e2e_percentile(create_session, base_url):
+def test_e2e_percentile(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -934,12 +913,11 @@ def test_e2e_percentile(create_session, base_url):
     response_data = resp_get_inquery.json()
 
 
-def test_e2e_float(create_session, base_url):
+def test_e2e_float(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -961,12 +939,11 @@ def test_e2e_float(create_session, base_url):
 
 
     
-def test_e2e_matchallsinglechar(create_session, base_url):
+def test_e2e_matchallsinglechar(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -987,12 +964,11 @@ def test_e2e_matchallsinglechar(create_session, base_url):
     response_data = resp_get_inquery.json()
 
 
-def test_e2e_floatvalue(create_session, base_url):
+def test_e2e_floatvalue(create_session, base_url, org_id):
     """Running an E2E test for valid sql query."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -1013,12 +989,11 @@ def test_e2e_floatvalue(create_session, base_url):
     response_data = resp_get_inquery.json()
 
 
-def test_e2e_where_condition_validation(create_session, base_url):
+def test_e2e_where_condition_validation(create_session, base_url, org_id):
     """Test WHERE condition query and validate all hits have the expected data."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -1065,12 +1040,11 @@ def test_e2e_where_condition_validation(create_session, base_url):
     print(f"Query executed in {took_time}ms and found {total_hits} total matching records")
 
 
-def test_e2e_match_all_validation(create_session, base_url):
+def test_e2e_match_all_validation(create_session, base_url, org_id):
     """Test WHERE level = 'info' query and validate that results contain the expected field value."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -1115,12 +1089,11 @@ def test_e2e_match_all_validation(create_session, base_url):
 
 
 
-def test_e2e_timestamp_ordering_validation(create_session, base_url):
+def test_e2e_timestamp_ordering_validation(create_session, base_url, org_id):
     """Test ORDER BY timestamp and validate proper ordering."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -1166,12 +1139,11 @@ def test_e2e_timestamp_ordering_validation(create_session, base_url):
     print(f"ORDER BY query executed in {took_time}ms and found {total_hits} total matching records")
 
 
-def test_e2e_limit_validation(create_session, base_url):
+def test_e2e_limit_validation(create_session, base_url, org_id):
     """Test LIMIT clause and validate result count."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -1211,12 +1183,11 @@ def test_e2e_limit_validation(create_session, base_url):
 
 
 
-def test_e2e_cte_query_validation(create_session, base_url):
+def test_e2e_cte_query_validation(create_session, base_url, org_id):
     """Test CTE (Common Table Expression) query and validate results."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -1261,7 +1232,7 @@ def test_e2e_cte_query_validation(create_session, base_url):
     print(f"CTE query executed in {took_time}ms and found {total_hits} total matching records")
 
 
-def test_e2e_group_by_where_container_name_validation(create_session, base_url):
+def test_e2e_group_by_where_container_name_validation(create_session, base_url, org_id):
     """Test GROUP BY with WHERE clause to ensure only specified container_name is returned.
     
     This test validates the bug fix where GROUP BY queries with WHERE clauses
@@ -1271,7 +1242,6 @@ def test_e2e_group_by_where_container_name_validation(create_session, base_url):
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -1345,7 +1315,7 @@ def test_e2e_group_by_where_container_name_validation(create_session, base_url):
     print(f"GROUP BY WHERE kubernetes_container_name query executed in {took_time}ms and found {total_hits} total matching records")
 
 
-def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base_url):
+def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base_url, org_id):
     """Test str_match_ignore_case function with coalesce and validate all returned hits contain expected data.
     
     This test validates the str_match_ignore_case function works correctly with coalesce
@@ -1355,7 +1325,6 @@ def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
@@ -1425,12 +1394,11 @@ def test_e2e_str_match_ignore_case_with_coalesce_validation(create_session, base
 
 
 
-def test_e2e_camel_case_edge_cases(create_session, base_url):
+def test_e2e_camel_case_edge_cases(create_session, base_url, org_id):
     """Test edge cases for camel case tokenization like numbers, special characters."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -1510,12 +1478,11 @@ def test_e2e_camel_case_edge_cases(create_session, base_url):
             print(f"⚠️  No hits found for edge case search '{test_case['search_term']}'")
 
 
-def test_e2e_camel_case_backward_compatibility(create_session, base_url):
+def test_e2e_camel_case_backward_compatibility(create_session, base_url, org_id):
     """Test that existing non-camel case searches still work correctly."""
 
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -1568,11 +1535,10 @@ def test_e2e_camel_case_backward_compatibility(create_session, base_url):
     print("✅ All backward compatibility tests passed - existing searches still work")
 
 
-def test_e2e_camel_case_full_token_search(create_session, base_url):
+def test_e2e_camel_case_full_token_search(create_session, base_url, org_id):
     """Test camel case full token search - DbException should be found"""
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -1599,11 +1565,10 @@ def test_e2e_camel_case_full_token_search(create_session, base_url):
     assert len(hits) > 0, "Should find logs containing 'DbException'"
 
 
-def test_e2e_camel_case_atomic_token_search(create_session, base_url):
+def test_e2e_camel_case_atomic_token_search(create_session, base_url, org_id):
     """Test camel case search - 'UserAccountService' should be found"""
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -1630,11 +1595,10 @@ def test_e2e_camel_case_atomic_token_search(create_session, base_url):
     assert len(hits) > 0, "Should find logs containing 'UserAccountService'"
 
 
-def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
+def test_e2e_camel_case_xml_acronym_search(create_session, base_url, org_id):
     """Test camel case XML acronym search - 'XMLHttpRequest' should be found"""
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -1661,11 +1625,10 @@ def test_e2e_camel_case_xml_acronym_search(create_session, base_url):
     assert len(hits) > 0, "Should find logs containing 'XMLHttpRequest'"
 
 
-def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
+def test_e2e_camel_case_oauth2_number_search(create_session, base_url, org_id):
     """Test camel case with numbers - 'OAuth2TokenHandler' should be found"""
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -1692,11 +1655,10 @@ def test_e2e_camel_case_oauth2_number_search(create_session, base_url):
     assert len(hits) > 0, "Should find logs containing 'OAuth2TokenHandler'"
 
 
-def test_e2e_camel_case_multi_token_search(create_session, base_url):
+def test_e2e_camel_case_multi_token_search(create_session, base_url, org_id):
     """Test camel case multi-word search - 'UserManagementService' should be found"""
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
@@ -1776,7 +1738,7 @@ def _assert_histogram_interval(response_data, expected_interval, context_msg="")
     return returned_interval
 
 
-def test_histogram_interval_weekly_preserved(create_session, base_url):
+def test_histogram_interval_weekly_preserved(create_session, base_url, org_id):
     """Test that weekly histogram interval (7 days = 604800 seconds) is preserved.
 
     This is the main regression test for PR #10169. Previously, the backend was
@@ -1788,7 +1750,6 @@ def test_histogram_interval_weekly_preserved(create_session, base_url):
     """
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     # Use 30 days range to ensure weekly intervals make sense
@@ -1826,7 +1787,7 @@ def test_histogram_interval_weekly_preserved(create_session, base_url):
     print(f"✅ Weekly histogram interval correctly preserved: {returned_interval}s (7 days)")
 
 
-def test_histogram_interval_multiples_of_24h_preserved(create_session, base_url):
+def test_histogram_interval_multiples_of_24h_preserved(create_session, base_url, org_id):
     """Test that various multiples of 24 hours are preserved (2, 7, 14, 30, 90 days).
 
     All intervals that are exact multiples of 24 hours should be returned as-is,
@@ -1834,7 +1795,6 @@ def test_histogram_interval_multiples_of_24h_preserved(create_session, base_url)
     """
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     # Use 180 days range to accommodate 90-day intervals
@@ -1878,14 +1838,13 @@ def test_histogram_interval_multiples_of_24h_preserved(create_session, base_url)
     print(f"✅ All multiples of 24h correctly preserved")
 
 
-def test_histogram_interval_factors_of_24h_preserved(create_session, base_url):
+def test_histogram_interval_factors_of_24h_preserved(create_session, base_url, org_id):
     """Test that factors of 24 hours are preserved (1h, 2h, 4h, 6h, 8h, 12h).
 
     Intervals that divide evenly into 24 hours should be returned as-is.
     """
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
@@ -1928,7 +1887,7 @@ def test_histogram_interval_factors_of_24h_preserved(create_session, base_url):
     print(f"✅ All factors of 24h correctly preserved")
 
 
-def test_histogram_interval_invalid_adjusted_to_nearest_factor(create_session, base_url):
+def test_histogram_interval_invalid_adjusted_to_nearest_factor(create_session, base_url, org_id):
     """Test that invalid intervals (not factor or multiple of 24h) are adjusted.
 
     Intervals like 5 hours or 25 hours that don't divide evenly into 24h
@@ -1936,7 +1895,6 @@ def test_histogram_interval_invalid_adjusted_to_nearest_factor(create_session, b
     """
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
@@ -1978,7 +1936,7 @@ def test_histogram_interval_invalid_adjusted_to_nearest_factor(create_session, b
     print(f"✅ All invalid intervals correctly adjusted")
 
 
-def test_histogram_interval_with_human_readable_format(create_session, base_url):
+def test_histogram_interval_with_human_readable_format(create_session, base_url, org_id):
     """Test histogram intervals using human-readable format (e.g., '7 day', '1 week').
 
     Verifies that the backend correctly parses and preserves intervals specified
@@ -1986,7 +1944,6 @@ def test_histogram_interval_with_human_readable_format(create_session, base_url)
     """
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     thirty_days_ago = int((now - timedelta(days=30)).timestamp() * 1000000)
@@ -2028,7 +1985,7 @@ def test_histogram_interval_with_human_readable_format(create_session, base_url)
     print(f"✅ All human-readable intervals correctly processed")
 
 
-def test_histogram_interval_consistency_across_requests(create_session, base_url):
+def test_histogram_interval_consistency_across_requests(create_session, base_url, org_id):
     """Test that histogram interval is consistent across multiple requests.
 
     This verifies that caching doesn't cause inconsistent interval handling.
@@ -2036,7 +1993,6 @@ def test_histogram_interval_consistency_across_requests(create_session, base_url
     """
     session = create_session
     url = base_url
-    org_id = "default"
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     thirty_days_ago = int((now - timedelta(days=30)).timestamp() * 1000000)

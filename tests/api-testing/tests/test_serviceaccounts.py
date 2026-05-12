@@ -4,12 +4,11 @@ import pytest
 import json
 import requests
 from typing import Dict, Any
-def test_get_service_accounts(create_session, base_url):
+def test_get_service_accounts(create_session, base_url, org_id):
     """Running an E2E test for get all the service_accounts list."""
 
     session = create_session
     url = base_url
-    org_id = "default"
 
     resp_get_service_accounts = session.get(f"{url}api/{org_id}/service_accounts")
 
@@ -18,11 +17,10 @@ def test_get_service_accounts(create_session, base_url):
         resp_get_service_accounts.status_code == 200
     ), f"Get all service accounts list 200, but got {resp_get_service_accounts.status_code} {resp_get_service_accounts.content}"
 
-def test_get_service_account(create_session, base_url):
+def test_get_service_account(create_session, base_url, org_id):
     """Running an E2E test for get all the service_accounts list."""
     session = create_session
     url = base_url
-    org_id = "default"
 
     response = session.get(f"{url}api/{org_id}/service_accounts")
 
@@ -37,7 +35,7 @@ def test_get_service_account(create_session, base_url):
 
 
 
-def test_e2e_createdeleteserviceaccounts(create_session, base_url):
+def test_e2e_createdeleteserviceaccounts(create_session, base_url, org_id):
     """Running an E2E test for create and delete service account."""
 
     email_id = f"email_{random.randint(1000, 9999)}@gmail.com"  # Make the name unique
@@ -45,7 +43,6 @@ def test_e2e_createdeleteserviceaccounts(create_session, base_url):
 
     session = create_session
     # Create a service account
-    org_id = "default"
     payload = {
         "email":email_id,
         "organization":"default",
@@ -69,7 +66,7 @@ def test_e2e_createdeleteserviceaccounts(create_session, base_url):
         resp_delete_serviceaccount.status_code == 200
     ), f"Deleting this service account, but got {resp_delete_serviceaccount.status_code} {resp_delete_serviceaccount.content}"
 
-def test_e2e_creategetdeleteserviceaccounts(create_session, base_url):
+def test_e2e_creategetdeleteserviceaccounts(create_session, base_url, org_id):
     """Running an E2E test for create and delete service account."""
 
     email_id = f"email_{random.randint(1000, 9999)}@gmail.com"  # Make the name unique
@@ -77,7 +74,6 @@ def test_e2e_creategetdeleteserviceaccounts(create_session, base_url):
 
     session = create_session
     # Create a service account
-    org_id = "default"
     payload = {
         "email":email_id,
         "organization":"default",
@@ -107,7 +103,7 @@ def test_e2e_creategetdeleteserviceaccounts(create_session, base_url):
         resp_delete_serviceaccount.status_code == 200
     ), f"Deleting this service account, but got {resp_delete_serviceaccount.status_code} {resp_delete_serviceaccount.content}"
 
-def test_e2e_creategetupdatedeleteserviceaccounts(create_session, base_url):
+def test_e2e_creategetupdatedeleteserviceaccounts(create_session, base_url, org_id):
     """Running an E2E test for create, get, update and delete service account."""
 
     email_id = f"email_{random.randint(1000, 9999)}@gmail.com"  # Make the name unique
@@ -115,7 +111,6 @@ def test_e2e_creategetupdatedeleteserviceaccounts(create_session, base_url):
 
     session = create_session
     # Create a service account
-    org_id = "default"
     payload = {
         "email":email_id,
         "organization":"default",
@@ -155,7 +150,7 @@ def test_e2e_creategetupdatedeleteserviceaccounts(create_session, base_url):
         resp_delete_serviceaccount.status_code == 200
     ), f"Deleting this service account, but got {resp_delete_serviceaccount.status_code} {resp_delete_serviceaccount.content}"
 
-def test_e2e_creategetrefreshdeleteserviceaccounts(create_session, base_url):
+def test_e2e_creategetrefreshdeleteserviceaccounts(create_session, base_url, org_id):
     """Running an E2E test for create, get, refresh and delete service account."""
 
     email_id = f"email_{random.randint(1000, 9999)}@gmail.com"  # Make the name unique
@@ -163,7 +158,6 @@ def test_e2e_creategetrefreshdeleteserviceaccounts(create_session, base_url):
 
     session = create_session
     # Create a service account
-    org_id = "default"
     payload = {
         "email":email_id,
         "organization":"default",
@@ -207,8 +201,7 @@ def service_account_payload():
         "last_name": ""
     }
 
-def create_service_account(session, base_url, payload):
-    org_id = "default"
+def create_service_account(session, base_url, payload, org_id):
     response = session.post(
         f"{base_url}api/{org_id}/service_accounts",
         json=payload
@@ -216,8 +209,7 @@ def create_service_account(session, base_url, payload):
     assert response.status_code == HTTPStatus.OK
     return response.json()
 
-def delete_service_account(session, base_url, email):
-    org_id = "default"
+def delete_service_account(session, base_url, email, org_id):
     response = session.delete(
         f"{base_url}api/{org_id}/service_accounts/{email}"
     )

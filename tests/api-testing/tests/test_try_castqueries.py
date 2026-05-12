@@ -54,11 +54,10 @@ test_data = [
 ]
 
 @pytest.mark.parametrize("test_name, sql_query, expected_size", test_data)
-def test_e2e_try_cast_queries(create_session, base_url, test_name, sql_query, expected_size):
+def test_e2e_try_cast_queries(create_session, base_url, test_name, sql_query, expected_size, org_id):
     """Parameterized E2E test for various try_cast SQL queries."""
     session = create_session
     url = base_url
-    org_id = "default"
     
     # Define time range for the query
     now = datetime.now(timezone.utc)
