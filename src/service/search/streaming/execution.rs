@@ -253,9 +253,8 @@ pub async fn do_partitioned_search(
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
         }
 
-        // add top k values for values search (not applicable for non-ts ORDER BY)
-        if !is_non_ts_order_by
-            && req.search_type == Some(SearchEventType::Values)
+        // reformat per-partition GROUP BY results into values API response shape
+        if req.search_type == Some(SearchEventType::Values)
             && let Some(values_ctx) = values_ctx.as_ref()
         {
             let search_stream_span = tracing::info_span!(
