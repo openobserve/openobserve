@@ -56,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[320px] tw:text-center"
     >
       <q-icon name="auto_awesome" size="3rem" color="grey-5" class="tw:mb-3" />
-      <div class="tw:text-base tw:text-[var(--o2-text-2)] tw:mb-2">
+      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
         No LLM streams found
       </div>
       <div
-        class="tw:text-sm tw:text-[var(--o2-text-3)] tw:mb-3 tw:max-w-[30rem]"
+        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
       >
         LLM Insights aggregates spans from traces streams that capture
         <code>gen_ai_*</code> attributes. Either no traces stream has been
@@ -82,11 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[300px]"
     >
       <q-icon name="auto_awesome" size="3rem" color="grey-5" class="tw:mb-3" />
-      <div class="tw:text-base tw:text-[var(--o2-text-2)] tw:mb-2">
+      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
         No LLM data in <b>{{ activeStream }}</b>
       </div>
       <div
-        class="tw:text-sm tw:text-[var(--o2-text-3)] tw:mb-3 tw:max-w-[28rem] tw:text-center"
+        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[28rem] tw:text-center"
       >
         This stream doesn't have any LLM (<code>gen_ai_*</code>) fields. Pick a
         different stream above, or instrument your service with the OpenTelemetry
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         data-test="llm-insights-retry-btn"
-        @click="load()"
+        @click="loadInsights()"
       >
         Retry
       </OButton>
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[200px]"
     >
       <q-icon name="info" size="3rem" color="grey-5" class="tw:mb-3" />
-      <div class="tw:text-base tw:text-[var(--o2-text-3)]">
+      <div class="tw:text-base tw:text-[var(--o2-text-muted)]">
         No LLM data found for the selected time range
       </div>
     </div>
@@ -134,16 +134,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="kpi-card card-container tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem]"
         >
           <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
-            <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-3)]">
+            <div class="kpi-label tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
               {{ card.label }}
             </div>
             <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-              <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-1)]">
+              <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
                 {{ card.value }}
               </span>
               <span
                 v-if="card.unit"
-                class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+                class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
               >
                 {{ card.unit }}
               </span>
@@ -154,7 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="`kpi-trend--${card.trend.sentiment}`"
             >
               <span class="kpi-trend-arrow">{{ trendArrow(card.trend.direction) }}</span>
-              <span>{{ card.trend.deltaPct.toFixed(card.trend.deltaPct < 10 ? 1 : 0) }}% vs prev</span>
+              <span>
+                {{ card.trend.deltaPct.toFixed(card.trend.deltaPct < 10 ? 1 : 0) }}%
+                vs prev{{ previousWindowLabel ? " " + previousWindowLabel : "" }}
+              </span>
             </div>
           </div>
           <KpiSparkline
@@ -188,10 +191,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useLLMInsights } from "./composables/useLLMInsights";
+import {
+  computeTrend,
+  trendArrow,
+  splitNumberWithUnit,
+  splitDuration,
+  splitCost,
+  formatWindowLabel,
+  type KpiTrend,
+} from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
 import LLMTrendPanel from "./LLMTrendPanel.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
@@ -221,6 +233,7 @@ const {
   loading,
   error,
   fetchAll,
+  cancelAll,
   hasLoadedOnce,
   availableStreams,
   streamsLoaded,
@@ -270,6 +283,14 @@ async function loadTraceStreams() {
 
 const hasData = computed(() => kpi.value.requestCount > 0);
 
+// Short label for the comparison window — drives the KPI trend chip
+// text, e.g. "▲ 100% vs prev 12h". Computed from the current
+// time-range props rather than the user-picked relative period so it
+// stays correct for absolute ranges too.
+const previousWindowLabel = computed(() =>
+  formatWindowLabel(props.endTime - props.startTime),
+);
+
 // DataFusion returns "Schema error: No field named gen_ai_..." when the
 // chosen stream lacks LLM instrumentation. Detect that specific case so we
 // can show a friendly empty state instead of the generic error fallback.
@@ -278,15 +299,6 @@ const streamHasNoLLMFields = computed(() => {
   const msg = String(error.value);
   return /No field named\s+gen_ai_/i.test(msg);
 });
-
-import {
-  computeTrend,
-  trendArrow,
-  splitNumberWithUnit,
-  splitDuration,
-  splitCost,
-  type KpiTrend,
-} from "./llmInsightsDashboard.utils";
 
 interface KpiCard {
   label: string;
@@ -311,9 +323,9 @@ const kpiCards = computed<KpiCard[]>(() => {
       ? (kpiPrev.value.errorCount / kpiPrev.value.requestCount) * 100
       : 0;
 
-  // Cost comes straight from SUM(llm_usage_cost_total) on the KPI summary —
-  // same source the Traces tab uses. If it's 0, either there are no LLM spans
-  // or the SDK isn't emitting cost; either way we render "$0".
+  // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary.
+  // If it's 0, either there are no LLM spans in the window or the SDK
+  // isn't emitting cost; either way we render "$0".
   const costTrend = computeTrend(
     kpi.value.totalCost,
     kpiPrev.value.totalCost,
@@ -372,7 +384,7 @@ const kpiCards = computed<KpiCard[]>(() => {
 // Single fetch entry point. Always pulls from the current props (which the
 // parent keeps in sync via `recomputeInsightsTimeRange`). Stream selector
 // changes, refresh button, and onMounted all funnel through here.
-async function load(startTime?: number, endTime?: number) {
+async function loadInsights(startTime?: number, endTime?: number) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!activeStream.value || !start || !end) return;
@@ -381,14 +393,14 @@ async function load(startTime?: number, endTime?: number) {
 }
 
 function onStreamChange() {
-  load();
+  loadInsights();
 }
 
 // Parent calls this on Run Query / Refresh / date-range change, passing
 // the freshly computed start/end so we don't have to wait for Vue's
 // next-tick prop propagation.
 async function refresh(startTime?: number, endTime?: number) {
-  await load(startTime, endTime);
+  await loadInsights(startTime, endTime);
 }
 
 defineExpose({ refresh });
@@ -400,8 +412,16 @@ onMounted(async () => {
     activeStream.value = availableStreams.value[0] || "";
   }
   if (activeStream.value) {
-    load();
+    loadInsights();
   }
+});
+
+// Cancel any in-flight stream queries when the dashboard goes away
+// (tab switch, org switch, full page nav). Without this, the server
+// keeps streaming results to a component that's no longer there and
+// the user pays for work they don't see.
+onUnmounted(() => {
+  cancelAll();
 });
 </script>
 
@@ -425,10 +445,10 @@ onMounted(async () => {
     color: #16a34a;
   }
   &--bad {
-    color: #dc2626;
+    color: var(--o2-status-error-text);
   }
   &--neutral {
-    color: var(--o2-text-3);
+    color: var(--o2-text-muted);
   }
 }
 

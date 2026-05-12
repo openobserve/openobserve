@@ -65,10 +65,40 @@ describe("useLLMStreamQuery — executeQuery: request envelope", () => {
     expect(payload.queryReq.query.sql).toBe("SELECT 1");
     expect(payload.queryReq.query.start_time).toBe(100);
     expect(payload.queryReq.query.end_time).toBe(200);
-    // The runner uses page-zero with a generous size so a single panel
-    // query rarely needs more than one streamed page.
+    // The runner uses page-zero with a default size of 1000 when the SQL
+    // doesn't specify a LIMIT — a generous safety net for time-series
+    // panels that produce ~30 buckets max.
     expect(payload.queryReq.query.from).toBe(0);
     expect(payload.queryReq.query.size).toBe(1000);
+  });
+
+  // Sizing should honour the SQL's own LIMIT clause: a panel that says
+  // `LIMIT 10` in its SQL doesn't want the backend to scan 1000 rows.
+  it("derives `size` from the SQL's LIMIT clause when present", () => {
+    const { executeQuery } = useLLMStreamQuery();
+    executeQuery("SELECT * FROM x ORDER BY _timestamp DESC LIMIT 10", 1, 2);
+
+    const [payload] = mockFetchQueryDataWithHttpStream.mock.calls[0];
+    expect(payload.queryReq.query.size).toBe(10);
+  });
+
+  // Latency raw query uses LIMIT 50000 — size must match so we don't
+  // truncate the sample silently.
+  it("supports large LIMIT values (e.g. latency raw query)", () => {
+    const { executeQuery } = useLLMStreamQuery();
+    executeQuery("SELECT duration FROM x LIMIT 50000", 1, 2);
+
+    const [payload] = mockFetchQueryDataWithHttpStream.mock.calls[0];
+    expect(payload.queryReq.query.size).toBe(50000);
+  });
+
+  // The LIMIT match is case-insensitive — DataFusion accepts both.
+  it("is case-insensitive when matching LIMIT", () => {
+    const { executeQuery } = useLLMStreamQuery();
+    executeQuery("select * from x limit 25", 1, 2);
+
+    const [payload] = mockFetchQueryDataWithHttpStream.mock.calls[0];
+    expect(payload.queryReq.query.size).toBe(25);
   });
 
   // Without sql_base64_enabled, the SQL goes through verbatim.

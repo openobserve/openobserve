@@ -10,6 +10,7 @@ import {
   splitNumberWithUnit,
   splitDuration,
   splitCost,
+  formatWindowLabel,
   FLAT_THRESHOLD,
 } from "./llmInsightsDashboard.utils";
 
@@ -223,5 +224,41 @@ describe("splitCost", () => {
 
   it("renders $1,000,000 as $1.00M (boundary into M)", () => {
     expect(splitCost(1_000_000)).toEqual({ value: "$1.00", unit: "M" });
+  });
+});
+
+// ===========================================================================
+// formatWindowLabel — used in the KPI trend chip ("vs prev <X>")
+// ===========================================================================
+
+describe("formatWindowLabel", () => {
+  // Each unit branch with values safely inside its range.
+  it.each([
+    [30 * 1_000_000, "30s"],
+    [59 * 1_000_000, "59s"],
+    [60 * 1_000_000, "1m"],          // 1 minute exactly → seconds branch fails (60 < 60 is false) → minutes
+    [5 * 60 * 1_000_000, "5m"],
+    [59 * 60 * 1_000_000, "59m"],
+    [60 * 60 * 1_000_000, "1h"],
+    [12 * 60 * 60 * 1_000_000, "12h"],
+    [23 * 60 * 60 * 1_000_000, "23h"],
+    [24 * 60 * 60 * 1_000_000, "1d"],
+    [7 * 24 * 60 * 60 * 1_000_000, "7d"],
+    [30 * 24 * 60 * 60 * 1_000_000, "30d"],
+  ])("formats %d microseconds as %s", (input, expected) => {
+    expect(formatWindowLabel(input)).toBe(expected);
+  });
+
+  // Sub-second windows round to whole seconds.
+  it("rounds sub-second windows to the nearest whole second", () => {
+    expect(formatWindowLabel(1_500_000)).toBe("2s"); // 1.5s → rounds up
+    expect(formatWindowLabel(400_000)).toBe("0s");   // 0.4s → rounds down
+  });
+
+  // Defensive: zero / negative → empty string so the chip falls back
+  // to plain "vs prev" instead of "vs prev 0s".
+  it("returns empty string for zero / negative input", () => {
+    expect(formatWindowLabel(0)).toBe("");
+    expect(formatWindowLabel(-1)).toBe("");
   });
 });
