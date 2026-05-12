@@ -445,16 +445,20 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.dashboardPanelActions.applyDashboardBtn();
         await page.waitForTimeout(5000);
 
-        // Track result_schema cross-link responses so we can wait for the dashboard
-        // view to finish loading them after save (avoids race condition on CI).
-        const crossLinkResponses = [];
-        const crossLinkResponseHandler = (response) => {
-            if (response.url().includes('result_schema') && response.url().includes('cross_linking=true')) {
-                crossLinkResponses.push(Date.now());
-            }
-        };
-        page.on('response', crossLinkResponseHandler);
-        const crossLinkCountBeforeSave = crossLinkResponses.length;
+        // Arm a response waiter for the cross_linking result_schema call that the
+        // dashboard view fires when it remounts after save. This is more reliable
+        // than counting responses with a manual `page.on('response', ...)` listener
+        // because Playwright's waitForResponse resolves with the actual response
+        // and races correctly with savePanel().
+        const crossLinkResponsePromise = page
+            .waitForResponse(
+                (resp) =>
+                    resp.url().includes('result_schema') &&
+                    resp.url().includes('cross_linking=true') &&
+                    resp.request().method() === 'POST',
+                { timeout: 30000 }
+            )
+            .catch(() => null);
 
         // Save the panel
         await pm.dashboardPanelActions.savePanel();
@@ -474,16 +478,13 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         }, { timeout: 15000 });
         testLogger.info('Table panel has data rows');
 
-        // Wait for the dashboard view's result_schema cross-link API call to complete.
-        // This prevents the race condition on CI where the async fetch hasn't returned
-        // by the time the test clicks a table cell and checks the drilldown menu.
-        const crossLinkDeadline = Date.now() + 20000;
-        while (crossLinkResponses.length <= crossLinkCountBeforeSave && Date.now() < crossLinkDeadline) {
-            await page.waitForTimeout(300);
-        }
-        page.off('response', crossLinkResponseHandler);
-        testLogger.info('Cross-link API loaded', { responseCount: crossLinkResponses.length });
-        await page.waitForTimeout(500);
+        // Wait for the dashboard view's result_schema cross-link API call to resolve.
+        // The watcher in usePanelDrilldown.ts populates crossLinksData only after this
+        // response arrives — clicking a cell before it lands yields an empty drilldown.
+        const crossLinkResponse = await crossLinkResponsePromise;
+        testLogger.info('Cross-link API resolved', { status: crossLinkResponse?.status() ?? 'timeout' });
+        // Allow Vue's reactive update + nextTick to settle so drilldownArray sees the new data.
+        await page.waitForTimeout(1500);
 
         // Step 4: Intercept window.open
         await page.evaluate(() => {
@@ -496,39 +497,66 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         });
 
         try {
-            // Step 5: Click a data cell in the table panel
-            await page.waitForTimeout(2000);
-            await page.evaluate(() => {
-                const table = document.querySelector('[data-test="dashboard-panel-table"]');
-                if (!table) return;
-                const cells = table.querySelectorAll('td');
-                for (const cell of cells) {
-                    if (cell.offsetParent !== null && cell.textContent.trim()) {
-                        cell.click();
-                        return;
-                    }
-                }
-            });
-            await page.waitForTimeout(1500);
-
-            // Step 6: Verify the crosslink-drilldown-menu appears with BOTH cross-links
+            // Step 5 & 6: Open the drilldown menu and verify BOTH cross-link items appear.
+            //
+            // expect.poll wraps the cell-click + menu-content check in a retry loop.
+            // If the menu opens but crossLinksData hasn't been wired into drilldownArray
+            // yet (rare CI race), the poller closes the menu, re-clicks, and re-checks.
+            // This makes the test self-healing without weakening assertions.
             const drilldownMenu = page.locator('.crosslink-drilldown-menu');
-            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+            const crossLinkMenuItemA = drilldownMenu
+                .locator('.crosslink-drilldown-menu-item')
+                .filter({ hasText: crossLinkNameA });
+            const crossLinkMenuItemB = drilldownMenu
+                .locator('.crosslink-drilldown-menu-item')
+                .filter({ hasText: crossLinkNameB });
 
-            expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
-            testLogger.info('Drilldown menu is visible');
+            await expect
+                .poll(
+                    async () => {
+                        // If menu is already open, close it first so the click re-opens it
+                        // with the freshest drilldownArray state.
+                        if (await drilldownMenu.isVisible().catch(() => false)) {
+                            await page.mouse.move(0, 0);
+                            await page.waitForTimeout(300);
+                        }
 
-            const crossLinkMenuItemA = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkNameA });
-            const crossLinkMenuItemB = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkNameB });
+                        // Click the first visible data cell in the table panel.
+                        await page.evaluate(() => {
+                            const table = document.querySelector('[data-test="dashboard-panel-table"]');
+                            if (!table) return;
+                            const cells = table.querySelectorAll('td');
+                            for (const cell of cells) {
+                                if (cell.offsetParent !== null && cell.textContent.trim()) {
+                                    cell.click();
+                                    return;
+                                }
+                            }
+                        });
 
-            const hasA = await crossLinkMenuItemA.isVisible().catch(() => false);
-            const hasB = await crossLinkMenuItemB.isVisible().catch(() => false);
+                        // Give the menu a moment to render the latest drilldownArray.
+                        await page.waitForTimeout(800);
 
-            testLogger.info('Dashboard UNION ALL cross-link visibility in drilldown', { streamA: hasA, streamB: hasB });
+                        const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+                        const hasA = menuVisible
+                            ? await crossLinkMenuItemA.isVisible().catch(() => false)
+                            : false;
+                        const hasB = menuVisible
+                            ? await crossLinkMenuItemB.isVisible().catch(() => false)
+                            : false;
 
-            expect(hasA, `Cross-link "${crossLinkNameA}" from ${STREAM_A} should be visible in dashboard drilldown`).toBe(true);
-            expect(hasB, `Cross-link "${crossLinkNameB}" from ${STREAM_B} should be visible in dashboard drilldown`).toBe(true);
+                        return { menuVisible, hasA, hasB };
+                    },
+                    {
+                        timeout: 30000,
+                        intervals: [1000, 1500, 2000],
+                        message:
+                            'Drilldown menu should show cross-links from both streams in UNION ALL panel',
+                    }
+                )
+                .toEqual({ menuVisible: true, hasA: true, hasB: true });
 
+            testLogger.info('Drilldown menu is visible with both cross-links');
             testLogger.info('PASSED: Both streams cross-links visible in dashboard UNION ALL table panel drilldown');
         } finally {
             await page.evaluate(() => {
