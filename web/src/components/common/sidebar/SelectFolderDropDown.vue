@@ -51,19 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- add folder -->
-    <ODrawer
+    <AddFolder
       v-if="!disableDropdown"
       v-model:open="showAddFolderDialog"
-      :width="30"
-      :show-close="false"
       :data-test="`${type}-folder-move-dialog`"
-      :secondary-button-label="t('dashboard.cancel')"
-      :primary-button-label="t('common.save')"
-      @click:secondary="showAddFolderDialog = false"
-      @click:primary="addFolderRef?.submit()"
-    >
-      <AddFolder ref="addFolderRef" :type="type" @update:modelValue="updateFolderList" @close="showAddFolderDialog = false" :edit-mode="false" />
-    </ODrawer>
+      :type="type"
+      @update:modelValue="updateFolderList"
+      :edit-mode="false"
+    />
   </template>
 
   <script lang="ts">
@@ -75,11 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
-    components: { AddFolder, OButton, ODrawer },
+    components: { AddFolder, OButton },
     emits: ["folder-selected"],
     props: {
       activeFolderId: {
@@ -109,7 +103,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
       const store: any = useStore();
       const route = useRoute();
       const showAddFolderDialog: any = ref(false);
-      const addFolderRef: any = ref(null);
 
       const getInitialFolderValue = () => {
         // priority: activeFolderId > query.folder > default
@@ -171,7 +164,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
         selectedFolder,
         updateFolderList,
         showAddFolderDialog,
-        addFolderRef,
         computedStyle,
       };
     },
