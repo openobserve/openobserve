@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-show="visible"
     role="navigation"
     aria-label="Main navigation"
-    class="oo_sidebar oo_left left-drawer"
+    class="oo_sidebar oo_left left-drawer tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:overflow-y-auto"
     @keydown="handleKeydown"
   >
     <q-list class="leftNavList">

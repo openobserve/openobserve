@@ -18,7 +18,7 @@ defineSlots<PageSlots>();
     :as="as"
     :as-child="asChild"
     v-bind="$attrs"
-    class="oo-page"
+    class="oo-page tw:rounded-md"
     data-o2-page
   >
     <slot />

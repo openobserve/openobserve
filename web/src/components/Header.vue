@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-toolbar>
+  <q-toolbar class="tw:min-h-10">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
@@ -91,10 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="logo-container"
+        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10 tw:min-w-[150px]"
       >
         <img
-          class="openobserve-logo cursor-pointer"
+          class="openobserve-logo cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
           :src="
             getImageURL(
               store.state.theme === 'dark'
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Default OpenObserve logo (when no custom logo) -->
     <div v-else class="flex relative-position q-mr-sm logo-container">
       <img
-        class="openobserve-logo cursor-pointer"
+        class="openobserve-logo cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
         :src="
           getImageURL(
             store.state.theme === 'dark'
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
-      class="headerMenu float-left"
+      class="headerMenu float-left tw:mr-4"
       v-if="store.state.organizationData.quotaThresholdMsg"
     >
       <div
@@ -181,7 +181,7 @@ size="xs" class="warning" />{{
         <q-icon
           name="warning"
           size="24px"
-          class="header-icon"
+          class="header-icon tw:opacity-70"
           :style="{ color: ingestionQuotaColor }"
         />
         <q-tooltip anchor="top middle" self="bottom middle">
@@ -338,7 +338,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" size="20px" class="header-icon" />
+        <component :is="slackIcon" size="20px" class="header-icon tw:opacity-70" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.slack") }}
         </q-tooltip>
@@ -346,7 +346,7 @@ size="xs" class="warning" />{{
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
-        <q-icon name="help_outline" size="20px" class="header-icon" />
+        <q-icon name="help_outline" size="20px" class="header-icon tw:opacity-70" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.help") }}
         </q-tooltip>
@@ -412,7 +412,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
-        <q-icon :name="outlinedSettings" size="20px" class="header-icon" />
+        <q-icon :name="outlinedSettings" size="20px" class="header-icon tw:opacity-70" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.settings") }}
         </q-tooltip>
@@ -427,7 +427,7 @@ size="xs" class="warning" />{{
         <q-icon
           :name="user.picture ? user.picture : 'person'"
           size="20px"
-          class="header-icon"
+          class="header-icon tw:opacity-70"
         />
         <q-tooltip
           anchor="top middle"
