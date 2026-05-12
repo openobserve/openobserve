@@ -39,6 +39,7 @@ function useResizer(options: UseResizerOptions) {
     document.removeEventListener("mouseup", stopResize);
     document.body.classList.remove("no-select");
     isResizing.value = false;
+    if(resizing?.cancel) resizing.cancel();
   };
 
   const stopResize = () => {
@@ -58,7 +59,7 @@ function useResizer(options: UseResizerOptions) {
         direction === "horizontal"
           ? containerRef.value.clientWidth
           : containerRef.value.clientHeight;
-      const deltaPercent = (delta / containerSize) * 100;
+      const deltaPercent = ((invert ? -delta : delta) / containerSize) * 100;
       newValue = initialSize + deltaPercent;
     }
 

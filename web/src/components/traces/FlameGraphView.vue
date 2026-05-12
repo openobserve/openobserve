@@ -177,10 +177,13 @@ import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import useTraces from "@/composables/useTraces";
 import { escapeHtml } from "@/utils/html";
-import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+);
+
+const TraceDetailsSidebar = defineAsyncComponent(
+  () => import("@/plugins/traces/TraceDetailsSidebar.vue")
 );
 
 // Props
@@ -586,7 +589,6 @@ const closeSidebar = () => {
 
 // Handle span selection from within the sidebar (e.g., clicking a link)
 const handleSelectSpan = (spanId: string) => {
-  searchObj.data.traceDetails.selectedSpanId = spanId;
   nextTick(() => scrollToSpan(spanId));
   emit("select-span", spanId);
 };
