@@ -104,7 +104,6 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const tabs = ref("");
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
@@ -114,8 +113,21 @@ export default defineComponent({
       "telegraf",
       "cloudwatchMetrics",
     ];
-    const traceRoutes = ["tracesOTLP"];
+    const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel"];
     const rumRoutes = ["frontendMonitoring"];
+    const allLogRoutes = [
+      "curl", "fluentbit", "fluentd", "kinesisfirehose", "vector",
+      "filebeat", "gcpLogs", "logstash", "syslogNg", "ingestLogsFromOtel",
+    ];
+    const tabs = ref(
+      allLogRoutes.includes(router.currentRoute.value.name as string)
+        ? "ingestLogs"
+        : metricRoutes.includes(router.currentRoute.value.name as string)
+          ? "ingestMetrics"
+          : traceRoutes.includes(router.currentRoute.value.name as string)
+            ? "ingestTraces"
+            : "ingestLogs"
+    );
 
     onBeforeMount(() => {
       const ingestRoutes = [
@@ -132,6 +144,9 @@ export default defineComponent({
         "vector",
         "filebeat",
         "gcpLogs",
+        "logstash",
+        "syslogNg",
+        "ingestLogsFromOtel",
       ];
 
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
