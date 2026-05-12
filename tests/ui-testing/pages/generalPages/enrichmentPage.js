@@ -21,7 +21,7 @@ class EnrichmentPage {
         
         // Logs table locators
         this.timestampColumn = '[data-test="log-table-column-0-_timestamp"]';
-        this.closeDialog = '[data-test="close-dialog"]';
+        this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.expandMenu = '[data-test="table-row-expand-menu"]';
         this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword"]';
         this.dateTimeBtn = '[data-test="date-time-btn"]';
@@ -1545,15 +1545,15 @@ abc, err = get_enrichment_table_record("${fileName}", {
      * ODrawer's handleOpenAutoFocus prevents the default focus move and the
      * detail drawer has no form input or primary button to auto-focus —
      * so pressing Escape from the page does nothing and the overlay
-     * intercepts subsequent clicks. Click DetailTable's explicit close
-     * button (data-test="close-dialog") instead, and wait for the drawer
+     * intercepts subsequent clicks. Click ODrawer's built-in close
+     * button (data-test="o-drawer-close-btn") instead, and wait for the drawer
      * to fully unmount before continuing.
      */
     async closeAnyOpenDialogs() {
         testLogger.debug('Closing any open dialogs');
 
         const detailDrawer = this.page.locator('[data-test="logs-search-result-detail-dialog"]');
-        const closeBtn = detailDrawer.locator('[data-test="close-dialog"]').first();
+        const closeBtn = detailDrawer.locator('[data-test="o-drawer-close-btn"]').first();
 
         if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
             await closeBtn.click();

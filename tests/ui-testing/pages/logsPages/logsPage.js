@@ -81,7 +81,7 @@ export class LogsPage {
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
-        this.closeDialog = '[data-test="close-dialog"]';
+        this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.savedViewDialogSaveContent = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewByLabel = '.q-item__label';
         this.notificationMessage = '.q-notification__message';
@@ -216,7 +216,7 @@ export class LogsPage {
         this.logDetailJsonContent = '[data-test="log-detail-json-content"]';
         this.logDetailTableContent = '[data-test="log-detail-table-content"]';
         this.logDetailTabContainer = '[data-test="log-detail-tab-container"]';
-        this.logDetailCloseButton = '[data-test="close-dialog"]';
+        this.logDetailCloseButton = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
         this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
         this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
