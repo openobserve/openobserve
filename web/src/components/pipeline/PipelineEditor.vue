@@ -99,11 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <ODrawer data-test="pipeline-editor-config-drawer"
-    :open="isNodeConfigDrawerOpen"
-    :title="nodeDrawerTitle"
-    :show-close="true"
-    @update:open="(v) => { if (!v) resetDialog(); }"
+  <ODrawer 
+    data-test="pipeline-editor-config-drawer"
+    v-model:open="pipelineObj.dialog.show"
+    :show-close="false"
     size="xl"
     @keydown.stop
   >
@@ -401,7 +400,7 @@ const hasInputType = computed(() => {
   );
 });
 const isNodeConfigDrawerOpen = computed(
-  () => pipelineObj.dialog.show && pipelineObj.dialog.name !== "query",
+  () => pipelineObj.dialog.show,
 );
 
 const nodeDrawerTitle = computed(() => {

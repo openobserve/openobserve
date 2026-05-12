@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="showAddFolderDialog"
     :title="t('common.addFolder')"
-    :width="30"
+    :width="20"
     data-test="dashboard-folder-move-dialog"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"

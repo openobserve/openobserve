@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- add dashboard -->
   <ODrawer
     v-model:open="showAddDashboardDialog"
-    size="lg"
+    :width="20"
     title="New dashboard"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"

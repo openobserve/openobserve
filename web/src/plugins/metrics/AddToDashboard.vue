@@ -1,7 +1,7 @@
 <template>
   <ODrawer
     :open="open"
-    :width="40"
+    :width="30"
     :title="t('dashboard.addDashboard')"
     secondary-button-label="Cancel"
     :primary-button-label="t('metrics.add')"
