@@ -907,7 +907,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
-            .route("/{org_id}/storage",get(org_storage::get).post(org_storage::save).put(org_storage::update));
+            .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
     }
 
     #[cfg(feature = "cloud")]
