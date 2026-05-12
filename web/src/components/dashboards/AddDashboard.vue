@@ -56,8 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :active-folder-id="selectedFolder.value"
           @folder-selected="selectedFolder = $event"
         />
-
-
+        <span>&nbsp;</span> 
       </q-form>
   </div>
 </template>

@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Dashboard List -->
-        <div v-else class="tw:flex tw:flex-col">
+        <div v-else class="tw:flex tw:flex-col tw:mx-2 tw:my-2">
           <q-input
             v-model="searchQuery"
             placeholder="Search dashboards..."
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-list
             :bordered="filteredDashboards.length > 0"
             dense
-            class="rounded-borders dashboard-list"
+            class="rounded-borders dashboard-list tw:my-2"
           >
             <q-item
               v-for="dashboard in filteredDashboards"
@@ -161,11 +161,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       v-model:open="showAddFolderDialog"
       size="lg"
-      :show-close="false"
+      title="Add New Folder"
+      primary-button-label="Save"
+      secondary-button-label="Cancel"
+      @click:primary="addFolderRef?.submit()"
+      @click:secondary="showAddFolderDialog = false"
       @close="showAddFolderDialog = false"
       data-test="add-dashboard-github-add-folder-dialog"
     >
-      <AddFolder @update:modelValue="updateFolderList" @close="showAddFolderDialog = false" :edit-mode="false" />
+      <AddFolder
+        ref="addFolderRef"
+        @update:modelValue="updateFolderList"
+        @close="showAddFolderDialog = false"
+        :edit-mode="false"
+      />
     </ODrawer>
   </ODrawer>
 </template>
@@ -219,6 +228,7 @@ export default defineComponent({
     const folderOptions = ref<{ label: string; value: string }[]>([]);
     const importing = ref(false);
     const showAddFolderDialog = ref(false);
+    const addFolderRef = ref<InstanceType<typeof AddFolder> | null>(null);
 
     const filteredDashboards = computed(() => {
       if (!searchQuery.value) return dashboards.value;
@@ -546,6 +556,7 @@ export default defineComponent({
       folderOptions,
       importing,
       showAddFolderDialog,
+      addFolderRef,
       isSelected,
       toggleDashboard,
       loadDashboards,
@@ -559,7 +570,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .dashboard-list {
-  flex: 0 1 auto;
+  max-height: calc(100dvh - 230px);
   overflow-y: auto;
 
   .selected-item {
