@@ -1048,12 +1048,15 @@ export class MetricsBuilderPage {
         // Wait for the tab list to auto-load and auto-select (SelectTabDropdown onMounted async fetch)
         await this.page.waitForTimeout(2000);
 
-        // Click the dialog title (a neutral element) to close any open dropdown menus.
-        // Quasar dropdowns close when clicking outside them, so even if the title click
-        // is intercepted by an open menu, that menu will close.
-        const dialogTitle = this.page.locator('[data-test="schema-title-text"]');
-        if (await dialogTitle.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await dialogTitle.click({ force: true });
+        // Click an empty area of the Add-to-Dashboard ODrawer panel to dismiss any
+        // open Quasar menu from prior dropdowns (folder/dashboard). The previous
+        // `schema-title-text` element was removed when AddToDashboard migrated to
+        // ODrawer — the drawer's `data-test="add-to-dashboard-dialog"` slug is
+        // safe to click because it's inside the drawer (so it doesn't trigger
+        // interact-outside) but outside teleported q-menus.
+        const drawerPanel = this.page.locator('[data-test="add-to-dashboard-dialog"]');
+        if (await drawerPanel.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await drawerPanel.click({ position: { x: 5, y: 5 }, force: true }).catch(() => {});
             await this.page.waitForTimeout(300);
         }
 
@@ -1128,13 +1131,22 @@ export class MetricsBuilderPage {
         await dashNameInput.click();
         await dashNameInput.fill(dashboardName);
 
-        // Submit dashboard creation
-        const submitBtn = this.page.locator('[data-test="dashboard-add-submit"]');
+        // Submit dashboard creation — SelectDashboardDropdown wraps AddDashboard in an
+        // ODrawer with `data-test="dashboard-dashboard-add-dialog"`, and the legacy
+        // `dashboard-add-submit` button was removed in favour of the ODrawer footer
+        // primary action (Save) which calls `addDashboardRef?.submit()`.
+        const submitBtn = this.page.locator(
+            '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
+        );
         await submitBtn.waitFor({ state: 'visible', timeout: 5000 });
         await submitBtn.click();
 
-        // Wait for the dialog to close and dashboard to be auto-selected
-        await this.page.locator('[data-test="add-dashboard-name"]').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        // Wait for the inner "New dashboard" drawer to close (parent "Add to Dashboard"
+        // drawer stays open and auto-selects the newly created dashboard).
+        await this.page
+            .locator('[data-test="dashboard-dashboard-add-dialog"]')
+            .waitFor({ state: 'hidden', timeout: 10000 })
+            .catch(() => {});
         await this.page.waitForTimeout(3000);
     }
 
