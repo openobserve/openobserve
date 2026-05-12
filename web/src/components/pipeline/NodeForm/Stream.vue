@@ -23,7 +23,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
+    <div
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+    >
+      {{ t("pipeline.streamTitle") }}
+      <div>
+        <OButton variant="ghost" size="icon" @click="$emit('cancel:hideform')">
+          <q-icon name="cancel" size="14px" />
+        </OButton>
+      </div>
+    </div>
 
+    <q-separator />
 
     <div class="stream-routing-container full-width q-py-md">
       <q-toggle
