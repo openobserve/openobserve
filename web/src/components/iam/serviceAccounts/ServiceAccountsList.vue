@@ -201,7 +201,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog data-test="service-accounts-list-refresh-dialog"
       v-model:open="confirmRefresh"
-      size="xs"
       :title="t('serviceAccounts.confirmRefreshHead')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"
@@ -213,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog data-test="service-accounts-list-delete-dialog"
       v-model:open="confirmDelete"
-      size="xs"
       :title="t('serviceAccounts.confirmDeleteHead')"
       :secondary-button-label="t('user.cancel')"
       :primary-button-label="t('user.ok')"

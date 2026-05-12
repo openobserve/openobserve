@@ -347,13 +347,13 @@ watch(internalOpen, (open) => {
               <slot name="header-left" />
             </div>
 
-            <!-- #header-right sub-slot — grows to fill space, content flows right-to-left before close button -->
-            <div v-if="slots['header-right']" class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:justify-end tw:gap-2">
+            <!-- Spacer — fills gap when #header-left is absent; pushes header-right toward the close button -->
+            <div v-if="!slots['header-left']" class="tw:flex-1" />
+
+            <!-- #header-right sub-slot — shrinks to content width, anchored just before the close button -->
+            <div v-if="slots['header-right']" class="tw:shrink-0 tw:flex tw:items-center tw:gap-2">
               <slot name="header-right" />
             </div>
-
-            <!-- Spacer — when no sub-slots, push close button to right edge (preserves current layout) -->
-            <div v-if="!slots['header-left'] && !slots['header-right']" class="tw:flex-1" />
           </template>
 
           <!-- Close button — shrink-0 so it is never squeezed out by header content -->

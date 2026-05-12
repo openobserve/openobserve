@@ -132,6 +132,42 @@ describe("ODrawer", () => {
     expect(wrapper.findAll("[data-o2-drawer]").length).toBeLessThanOrEqual(1);
   });
 
+  describe("header-right slot", () => {
+    it("renders header-right slot content", () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test" },
+        slots: { "header-right": '<button data-testid="hr-btn">Action</button>' },
+      });
+      expect(wrapper.find('[data-testid="hr-btn"]').exists()).toBe(true);
+    });
+
+    it("header-right wrapper has shrink-0, not flex-1 (no transparent blocking area)", () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test" },
+        slots: { "header-right": '<button data-testid="hr-btn">Action</button>' },
+      });
+      const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
+      expect(hrWrapper.className).toContain("tw:shrink-0");
+      expect(hrWrapper.className).not.toContain("tw:flex-1");
+    });
+
+    it("spacer appears before header-right in DOM (keeps content right-aligned)", () => {
+      const wrapper = mount(ODrawer, {
+        props: { open: true, title: "Test" },
+        slots: { "header-right": '<button data-testid="hr-btn">Action</button>' },
+      });
+      const closeBtn = wrapper.find('button[aria-label="Close drawer"]');
+      const headerEl = closeBtn.element.parentElement!;
+      const children = Array.from(headerEl.children) as HTMLElement[];
+      const spacer = children.find(
+        (el) => el.className.includes("tw:flex-1") && !el.className.includes("tw:min-w-0"),
+      );
+      const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
+      expect(spacer).toBeDefined();
+      expect(children.indexOf(spacer!)).toBeLessThan(children.indexOf(hrWrapper));
+    });
+  });
+
   describe("sticky layout structure", () => {
     it("header has shrink-0 class (pinned, never scrolls)", () => {
       const wrapper = mount(ODrawer, {
