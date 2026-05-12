@@ -1537,13 +1537,31 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     /**
-     * Close any open dialogs/modals by pressing Escape
+     * Close any open dialogs/modals.
+     *
+     * The logs row-detail panel was migrated from q-dialog to an ODrawer
+     * (SearchResult.vue → `logs-search-result-detail-dialog`). Reka UI's
+     * escape-key-down only fires when focus is inside the drawer, but
+     * ODrawer's handleOpenAutoFocus prevents the default focus move and the
+     * detail drawer has no form input or primary button to auto-focus —
+     * so pressing Escape from the page does nothing and the overlay
+     * intercepts subsequent clicks. Click DetailTable's explicit close
+     * button (data-test="close-dialog") instead, and wait for the drawer
+     * to fully unmount before continuing.
      */
     async closeAnyOpenDialogs() {
         testLogger.debug('Closing any open dialogs');
 
-        // Press Escape to close any open dialogs/modals
-        await this.page.keyboard.press('Escape');
+        const detailDrawer = this.page.locator('[data-test="logs-search-result-detail-dialog"]');
+        const closeBtn = detailDrawer.locator('[data-test="close-dialog"]').first();
+
+        if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await closeBtn.click();
+            await detailDrawer.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        } else {
+            // Fallback for other (non-DetailTable) dialogs that still respond to Escape
+            await this.page.keyboard.press('Escape');
+        }
         await this.page.waitForTimeout(500);
 
         testLogger.debug('Dialogs closed');
