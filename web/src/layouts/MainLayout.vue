@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-layout
-    view="hHh Lpr lff"
+  <OLayout
     :class="[store.state.printMode === true ? 'printMode' : '', 'oo_app']"
   >
-    <q-header class="oo_header">
+    <header class="oo_header">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div class="oo_banner">
         <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
@@ -58,32 +57,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @signout="signout"
         />
       </div>
-    </q-header>
+    </header>
 
-    <q-drawer
-      v-model="leftDrawerOpen"
-      show-if-above
-      side="left"
-      :width="84"
-      :breakpoint="500"
-      role="navigation"
-      aria-label="Main navigation"
-      class="oo_sidebar oo_left"
-    >
-      <q-list class="leftNavList">
-        <menu-link
-          v-for="(nav, index) in linksList"
-          :key="nav.title"
-          :link-name="nav.name"
-          :animation-index="index"
-          v-bind="{ ...nav, mini: miniMode }"
-          @mouseenter="handleMenuHover(nav.link)"
-        />
-      </q-list>
-    </q-drawer>
+    <div class="oo_body">
+      <nav
+        v-show="leftDrawerOpen"
+        role="navigation"
+        aria-label="Main navigation"
+        class="oo_sidebar oo_left left-drawer"
+      >
+        <q-list class="leftNavList">
+          <menu-link
+            v-for="(nav, index) in linksList"
+            :key="nav.title"
+            :link-name="nav.name"
+            :animation-index="index"
+            v-bind="{ ...nav, mini: miniMode }"
+            @mouseenter="handleMenuHover(nav.link)"
+          />
+        </q-list>
+      </nav>
 
-    <q-page-container>
-      <div class="oo_body">
+      <OPageContainer class="oo_content-wrapper">
         <!-- Main Panel -->
         <main
           class="oo_main"
@@ -144,23 +139,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aiChatPayload="aiChatPayload"
           />
         </aside>
-      </div>
-    </q-page-container>
+    </OPageContainer>
+    </div>
 
     <q-dialog v-model="showGetStarted"
 maximized full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
     <PredefinedThemes />
-  </q-layout>
+  </OLayout>
 </template>
 
 <script lang="ts">
 import {
-  QPage,
-  QPageContainer,
-  QLayout,
-  QDrawer,
   QList,
   QItem,
   QItemLabel,
@@ -168,13 +159,14 @@ import {
   QBtn,
   QBtnDropdown,
   QToolbarTitle,
-  QHeader,
   QToolbar,
   QAvatar,
   QIcon,
   QSelect,
   useQuasar,
 } from "quasar";
+import OLayout from "@/lib/core/Layout/OLayout.vue";
+import OPageContainer from "@/lib/core/PageContainer/OPageContainer.vue";
 import MenuLink from "../components/MenuLink.vue";
 import Header from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
@@ -259,10 +251,8 @@ export default defineComponent({
     Header,
     WebinarBanner,
     "keep-alive": KeepAlive,
-    "q-page": QPage,
-    "q-page-container": QPageContainer,
-    "q-layout": QLayout,
-    "q-drawer": QDrawer,
+    OLayout,
+    OPageContainer,
     "q-list": QList,
     "q-item": QItem,
     "q-item-label": QItemLabel,
@@ -270,7 +260,6 @@ export default defineComponent({
     "q-btn": QBtn,
     "q-btn-dropdown": QBtnDropdown,
     "q-toolbar-title": QToolbarTitle,
-    "q-header": QHeader,
     "q-toolbar": QToolbar,
     "router-view": RouterView,
     "q-avatar": QAvatar,
@@ -1353,16 +1342,16 @@ export default defineComponent({
   body {
     overflow: auto !important;
   }
-  .q-header {
+  .oo_header {
     display: none;
   }
 
-  .q-drawer {
+  .left-drawer {
     display: none;
   }
 
-  .q-page-container {
-    padding-left: 0px !important;
+  .oo_body {
+    padding-left: 0;
   }
 }
 
@@ -1374,8 +1363,24 @@ export default defineComponent({
   }
 }
 
-.q-drawer {
+.left-drawer {
   border-radius: 0.625rem;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+// Always show left drawer on screens above 500px
+@media (min-width: 501px) {
+  .left-drawer {
+    display: flex !important;
+    flex-direction: column;
+  }
+}
+
+.oo_content-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
 }
 
 .warning-msg {
@@ -1390,11 +1395,11 @@ export default defineComponent({
   border-radius: 5px;
 }
 
-.q-header .q-btn-dropdown__arrow {
+.oo_header .q-btn-dropdown__arrow {
   margin-left: -4px;
 }
 
-.q-header {
+.oo_header {
   color: unset;
 
   .beta-text {
@@ -1694,13 +1699,13 @@ export default defineComponent({
 }
 
 body.ai-chat-open {
-  .q-layout {
+  .oo_app {
     width: 75%;
     transition: width 0.3s ease;
   }
 }
 
-.q-layout {
+.oo_app {
   width: 100%;
   transition: width 0.3s ease;
 }
@@ -1870,7 +1875,7 @@ body.ai-chat-open {
     }
   }
 }
-.q-drawer {
+.left-drawer {
   margin-bottom: 0.675rem;
 }
 </style>
