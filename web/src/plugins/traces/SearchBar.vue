@@ -65,16 +65,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
           <!--
-            Hidden when no traces stream has `is_llm_stream === true`.
-            The parent (`Index.vue`) computes `hasLLMStreams` once
-            after `getStreams` resolves; until then the prop defaults
-            to `true` so the toggle doesn't flicker on first mount.
+            Two-gate visibility:
+              1. The deployment-wide `VITE_SHOW_LLM_UI` env flag must
+                 NOT be `"false"`. Unset (default), `"true"`, or any
+                 other value keeps the UI visible — only the literal
+                 string `"false"` hides it. Prevents accidental hide
+                 on typo / missing .env file.
+              2. The org must have at least one traces stream flagged
+                 `is_llm_stream === true` (resolved by `Index.vue` and
+                 passed as `hasLLMStreams`).
             We also keep the toggle visible when the user is already
             on the LLM Insights tab (e.g., navigated via URL) so the
             active selection isn't orphaned mid-session.
           -->
           <OToggleGroupItem
-            v-if="hasLLMStreams || searchObj.meta.searchMode === 'llm-insights'"
+            v-if="
+              config.showLLMUI !== 'false' &&
+              (hasLLMStreams || searchObj.meta.searchMode === 'llm-insights')
+            "
             data-test="traces-search-mode-llm-insights-btn"
             value="llm-insights"
             size="sm"

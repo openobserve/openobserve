@@ -279,8 +279,16 @@ size="sm">
                 /></template>
                 DAG
               </OToggleGroupItem>
+              <!--
+                Thread tab gated on:
+                  1. `VITE_SHOW_LLM_UI` env flag is NOT explicitly set
+                     to `"false"`. Unset / any other value keeps the
+                     feature visible.
+                  2. The trace actually has LLM spans worth rendering
+                     as a chat (`hasLLMSpans`).
+              -->
               <OToggleGroupItem
-                v-if="hasLLMSpans"
+                v-if="config.showLLMUI !== 'false' && hasLLMSpans"
                 value="thread"
                 size="sm"
                 data-test="trace-details-thread-tab"
@@ -666,9 +674,15 @@ size="14px"
               />
             </div>
 
-            <!-- Thread View — chat-style projection of LLM turns -->
+            <!--
+              Thread View — chat-style projection of LLM turns.
+              Same `config.showLLMUI !== 'false'` gate as the tab
+              toggle above so a stale `activeTab="thread"` (e.g. from
+              a saved URL) can't render the body when the env flag
+              has explicitly disabled the feature.
+            -->
             <div
-              v-if="activeTab === 'thread'"
+              v-if="config.showLLMUI !== 'false' && activeTab === 'thread'"
               style="display: flex; flex: 1; min-height: 0"
               class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
             >
@@ -922,6 +936,7 @@ import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import config from "@/aws-exports";
 import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
@@ -2853,6 +2868,10 @@ export default defineComponent({
     return {
       router,
       t,
+      // Exposed for the template `v-if` gating the LLM Observability
+      // surfaces (Thread tab toggle + ThreadView body) behind
+      // `config.showLLMUI`.
+      config,
       activeTab,
       sidebarActiveTab,
       traceTree,
