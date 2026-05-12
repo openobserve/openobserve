@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4">
-      <q-form ref="updateUserForm" @submit.prevent="onSubmit" lazy-rules="ondemand">
+      <q-form ref="updateUserForm" @submit.prevent="onSubmit">
           <q-input
             v-if="!beingUpdated"
             v-model="formData.email"

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4 tw:w-full">
-        <q-form ref="updateUserForm" @submit.prevent="onSubmit" lazy-rules="ondemand">
+        <q-form ref="updateUserForm" @submit.prevent="onSubmit">
           <!-- <p class="q-pt-sm tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
@@ -303,7 +303,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
-    role: "admin",
+    role: "",
     first_name: "",
     last_name: "",
     email: "",
@@ -381,33 +381,52 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Reset form state only when the dialog transitions from closed → open.
+    // Previously this was a deep watch on modelValue, but parent-side mutations
+    // of selectedUser caused it to fire mid-flight and reset existingUser back
+    // to true, undoing the 422-catch transition from "add existing user" to
+    // "create new user" and hiding the password/name fields.
+    const resetFormFromModelValue = (newVal: any) => {
+      if (newVal && newVal.email != undefined && newVal.email != "") {
+        beingUpdated.value = true;
+        existingUser.value = false;
+        // Row data from the users list doesn't include `organization`; fall back
+        // to the active org so the subsequent PUT lands on the right endpoint.
+        formData.value = {
+          ...newVal,
+          organization:
+            newVal.organization || store.state.selectedOrganization.identifier,
+          change_password: false,
+          password: "",
+        };
+        if (config.isEnterprise == "true" || config.isCloud == true) {
+          const orgId = store.state.selectedOrganization.identifier;
+          userServiece
+            .getUserRoles(orgId, newVal.email)
+            .then((response: any) => {
+              formData.value.custom_role = response.data;
+            })
+            .catch((error: any) => {
+              console.error("Error fetching user roles:", error);
+            });
+        }
+      } else {
+        beingUpdated.value = props.isUpdated;
+        existingUser.value = true;
+        formData.value = defaultValue();
+        formData.value.organization =
+          store.state.selectedOrganization.identifier;
+      }
+    };
+
     watch(
-      () => props.modelValue,
-      (newVal) => {
-        if (newVal && newVal.email != undefined && newVal.email != "") {
-          beingUpdated.value = true;
-          existingUser.value = false;
-          formData.value = { ...newVal, change_password: false, password: "" };
-          if (config.isEnterprise == "true" || config.isCloud == true) {
-            const orgId = store.state.selectedOrganization.identifier;
-            userServiece
-              .getUserRoles(orgId, newVal.email)
-              .then((response: any) => {
-                formData.value.custom_role = response.data;
-              })
-              .catch((error: any) => {
-                console.error("Error fetching user roles:", error);
-              });
-          }
-        } else {
-          beingUpdated.value = props.isUpdated;
-          existingUser.value = true;
-          formData.value = defaultValue();
-          formData.value.organization =
-            store.state.selectedOrganization.identifier;
+      () => props.open,
+      (isOpen, wasOpen) => {
+        if (isOpen && !wasOpen) {
+          resetFormFromModelValue(props.modelValue);
         }
       },
-      { deep: true, immediate: true },
+      { immediate: true },
     );
 
     const setOrganizationOptions = () => {
