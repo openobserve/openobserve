@@ -252,10 +252,10 @@ describe("MoveDashboardToAnotherFolder", () => {
       expect(drawer.props("open")).toBe(false);
     });
 
-    it("should use size 'lg' on ODrawer", () => {
+    it("should use width 30 on ODrawer", () => {
       wrapper = createWrapper();
       const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("size")).toBe("lg");
+      expect(drawer.props("width")).toBe(30);
     });
 
     it("should pass 'Move Dashboard' title to ODrawer", () => {

@@ -757,11 +757,11 @@ describe("AddToDashboard — ODrawer surface", () => {
     expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
   });
 
-  it("passes the configured width (40) to ODrawer", async () => {
+  it("passes the configured width (30) to ODrawer", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     const drawer = wrapper.findComponent(ODrawerStub);
-    expect(drawer.props("width")).toBe(40);
+    expect(drawer.props("width")).toBe(30);
   });
 
   it("disables the primary button when panelTitle is empty", async () => {

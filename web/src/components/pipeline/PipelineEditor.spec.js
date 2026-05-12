@@ -696,23 +696,14 @@ describe("PipelineEditor", () => {
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("ODrawer Migration", () => {
-    it("renders both ODrawer instances (node form + JSON editor)", () => {
+    it("renders the JSON-editor ODrawer instance", () => {
       const drawers = wrapper.findAllComponents(ODrawerStub);
-      expect(drawers.length).toBe(2);
-    });
-
-    it("node-form ODrawer is closed by default and uses size xl with showClose=false", () => {
-      const drawers = wrapper.findAllComponents(ODrawerStub);
-      const nodeFormDrawer = drawers[0];
-
-      expect(nodeFormDrawer.props("open")).toBe(false);
-      expect(nodeFormDrawer.props("size")).toBe("xl");
-      expect(nodeFormDrawer.props("showClose")).toBe(false);
+      expect(drawers.length).toBe(1);
     });
 
     it("JSON-editor ODrawer is closed by default and uses size lg, persistent=true, showClose=false", () => {
       const drawers = wrapper.findAllComponents(ODrawerStub);
-      const jsonDrawer = drawers[1];
+      const jsonDrawer = drawers[0];
 
       expect(jsonDrawer.props("open")).toBe(false);
       expect(jsonDrawer.props("size")).toBe("lg");
@@ -720,32 +711,12 @@ describe("PipelineEditor", () => {
       expect(jsonDrawer.props("showClose")).toBe(false);
     });
 
-    it("node-form ODrawer opens when pipelineObj.dialog.show is set to true", async () => {
-      mockPipelineObj.dialog.show = true;
-      mockPipelineObj.dialog.name = "stream";
-      await flushPromises();
-
-      const drawers = wrapper.findAllComponents(ODrawerStub);
-      expect(drawers[0].props("open")).toBe(true);
-    });
-
     it("JSON-editor ODrawer opens when openJsonEditor() is invoked", async () => {
       wrapper.vm.openJsonEditor();
       await flushPromises();
 
       const drawers = wrapper.findAllComponents(ODrawerStub);
-      expect(drawers[1].props("open")).toBe(true);
-    });
-
-    it("node-form ODrawer update:open=false resets pipelineObj.dialog.show to false", async () => {
-      mockPipelineObj.dialog.show = true;
-      await flushPromises();
-
-      const drawers = wrapper.findAllComponents(ODrawerStub);
-      await drawers[0].vm.$emit("update:open", false);
-      await flushPromises();
-
-      expect(mockPipelineObj.dialog.show).toBe(false);
+      expect(drawers[0].props("open")).toBe(true);
     });
 
     it("JSON-editor ODrawer update:open=false closes the JSON editor", async () => {
@@ -753,7 +724,7 @@ describe("PipelineEditor", () => {
       await flushPromises();
 
       const drawers = wrapper.findAllComponents(ODrawerStub);
-      await drawers[1].vm.$emit("update:open", false);
+      await drawers[0].vm.$emit("update:open", false);
       await flushPromises();
 
       expect(wrapper.vm.showJsonEditorDialog).toBe(false);
@@ -765,7 +736,7 @@ describe("PipelineEditor", () => {
       await flushPromises();
 
       const drawers = wrapper.findAllComponents(ODrawerStub);
-      expect(drawers[1].props("open")).toBe(true);
+      expect(drawers[0].props("open")).toBe(true);
       expect(wrapper.vm.showJsonEditorDialog).toBe(true);
     });
   });

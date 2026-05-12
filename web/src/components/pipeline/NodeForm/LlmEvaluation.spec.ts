@@ -80,11 +80,19 @@ vi.mock("@/composables/useStreams", () => ({
 
 import LlmEvaluation from "./LlmEvaluation.vue";
 
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "size", "showClose", "title", "width", "persistent"],
+  emits: ["update:open"],
+  template: '<div class="o-drawer-stub"><slot /></div>',
+};
+
 function createWrapper(overrides: Record<string, any> = {}): VueWrapper<any> {
   return mount(LlmEvaluation, {
     global: {
       plugins: [i18n, store],
       stubs: {
+        ODrawer: ODrawerStub,
         ConfirmDialog: {
           template: '<div data-test="confirm-dialog-stub"></div>',
           props: ["modelValue", "title", "message"],
@@ -454,14 +462,14 @@ describe("LlmEvaluation - close icon button", () => {
   });
 
   it("emits 'cancel:hideform' when the header close button is clicked", async () => {
-    // The header close button is the first OButton inside the title row.
-    // Previously used v-close-popup; now explicitly emits cancel:hideform.
-    const headerCloseBtn = wrapper
-      .find('.stream-routing-title')
-      .findComponent({ name: "OButton" });
-    expect(headerCloseBtn.exists()).toBe(true);
-    await headerCloseBtn.trigger("click");
+    vi.useFakeTimers();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    expect(drawer.exists()).toBe(true);
+    drawer.vm.$emit("update:open", false);
+    vi.advanceTimersByTime(400);
+    await nextTick();
     expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    vi.useRealTimers();
   });
 });
 

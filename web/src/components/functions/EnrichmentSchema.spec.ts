@@ -292,11 +292,9 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       mockGetStream.mockReset();
       mockGetStream.mockRejectedValueOnce(new Error('API Error'));
 
-      wrapper = mount(EnrichmentSchema, buildMountOptions());
-
-      await nextTick();
-      await nextTick();
-      await nextTick();
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       expect(consoleSpy).toHaveBeenCalled();
       expect(wrapper.find('.q-spinner-hourglass').exists()).toBe(false);
@@ -375,20 +373,18 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
 
   describe('Result Total and Field Count Coverage', () => {
     it('should set resultTotal from schema length after data load', async () => {
-      wrapper = mount(EnrichmentSchema, buildMountOptions());
-
-      await nextTick();
-      await nextTick();
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       expect(vm.resultTotal).toBe(2);
     });
 
     it('should display all-fields count in the display-total-fields element', async () => {
-      wrapper = mount(EnrichmentSchema, buildMountOptions());
-
-      await nextTick();
-      await nextTick();
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       const totalFields = wrapper.find('.display-total-fields');
       expect(totalFields.exists()).toBe(true);
@@ -487,10 +483,9 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
 
   describe('Schema Data Loading Coverage', () => {
     it('should set schemaData correctly after successful load', async () => {
-      wrapper = mount(EnrichmentSchema, buildMountOptions());
-
-      await nextTick();
-      await nextTick();
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       expect(vm.schemaData.name).toBe('test_stream');
@@ -498,10 +493,9 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     });
 
     it('should reset loadingState to false after successful load', async () => {
-      wrapper = mount(EnrichmentSchema, buildMountOptions());
-
-      await nextTick();
-      await nextTick();
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       expect(vm.loadingState).toBe(false);
@@ -510,11 +504,10 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     it('should call getStream with enrichment_tables type', async () => {
       wrapper = mount(
         EnrichmentSchema,
-        buildMountOptions(mockStore, { selectedEnrichmentTable: 'my_table' }),
+        buildMountOptions(mockStore, { selectedEnrichmentTable: 'my_table', open: false }),
       );
-
-      await nextTick();
-      await nextTick();
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       expect(mockGetStream).toHaveBeenCalledWith('my_table', 'enrichment_tables', true);
     });

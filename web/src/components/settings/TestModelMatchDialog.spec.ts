@@ -190,10 +190,10 @@ describe("TestModelMatchDialog", () => {
       );
     });
 
-    it("uses size 'xl' on ODialog", () => {
+    it("uses width 50 on ODialog", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("size")).toBe("xl");
+      expect(dialog.props("width")).toBe(50);
     });
 
     it("marks the dialog as persistent", () => {

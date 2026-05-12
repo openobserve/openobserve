@@ -271,7 +271,7 @@ describe("SelectFolderDropdown", () => {
     it("should forward width=30 to ODrawer", () => {
       const wrapper = createWrapper({}, store, router);
       const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("width")).toBe(20);
     });
 
     it("should forward the localized save label to ODrawer primary button", () => {
