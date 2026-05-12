@@ -99,17 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <!-- Drawer 1: Associate Query — owned by QueryForm itself -->
-  <QueryForm
-    data-test="pipeline-editor-query-drawer"
-    :open="isQueryDrawerOpen"
-    :stream-name="pipeline.stream_name"
-    :stream-type="pipeline.stream_type"
-    :stream-routes="streamRoutes"
-    @cancel:hideform="resetDialog"
-  />
-
-  <!-- Drawer 2: All other node config forms -->
   <ODrawer data-test="pipeline-editor-config-drawer"
     :open="isNodeConfigDrawerOpen"
     :title="nodeDrawerTitle"
@@ -124,6 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @keydown.stop
       tabindex="0"
     >
+      <QueryForm
+        v-if="pipelineObj.dialog.name === 'query'"
+        :stream-name="pipeline.stream_name"
+        :stream-type="pipeline.stream_type"
+        :stream-routes="streamRoutes"
+        @cancel:hideform="resetDialog"
+      />
+
       <ConditionForm
         v-if="pipelineObj.dialog.name === 'condition'"
         @cancel:hideform="resetDialog"
@@ -403,11 +400,6 @@ const hasInputType = computed(() => {
     (node: any) => node.io_type === "input",
   );
 });
-
-const isQueryDrawerOpen = computed(
-  () => pipelineObj.dialog.show && pipelineObj.dialog.name === "query",
-);
-
 const isNodeConfigDrawerOpen = computed(
   () => pipelineObj.dialog.show && pipelineObj.dialog.name !== "query",
 );
