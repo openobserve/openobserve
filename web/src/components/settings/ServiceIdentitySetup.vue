@@ -398,10 +398,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-tooltip>
                     <OButton
                       variant="ghost"
-                      size="icon-xs-circle"
+                      size="icon-xs-sq"
                       @click="removeFieldByIdFromEnv(envKey, fieldId)"
                     >
-                      <q-icon name="cancel" size="12px" />
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     </OButton>
                   </div>
 
@@ -465,13 +465,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-select>
                     <OButton
                       variant="ghost"
-                      size="icon"
+                      size="icon-xs-sq"
                       @click="
                         addingToEnv = '';
                         addFieldValue = '';
                       "
                     >
-                      <q-icon name="close" size="14px" />
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     </OButton>
                   </template>
 
@@ -563,13 +563,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-select>
                   <OButton
                     variant="ghost"
-                    size="icon"
+                    size="icon-xs-sq"
                     @click="
                       addingToEnv = '';
                       addFieldValue = '';
                     "
                   >
-                    <q-icon name="close" size="14px" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                   </OButton>
                 </div>
               </template>
@@ -709,14 +709,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ alias.label }}</span>
                   <OButton
                     variant="ghost"
-                    size="icon-xs-circle"
+                    size="icon-xs-sq"
                     @click="
                       trackedAliasIds = trackedAliasIds.filter(
                         (id) => id !== alias.id,
                       )
                     "
                   >
-                    <q-icon name="cancel" size="12px" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                   </OButton>
                 </div>
                 <!-- Inline add select -->
@@ -739,13 +739,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OButton
                     variant="ghost"
-                    size="icon"
+                    size="icon-xs-sq"
                     @click="
                       addingTrackedAlias = false;
                       addTrackedAliasValue = '';
                     "
                   >
-                    <q-icon name="close" size="14px" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                   </OButton>
                 </template>
                 <!-- Add field button -->
