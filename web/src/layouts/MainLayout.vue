@@ -60,23 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </header>
 
     <div class="oo_body">
-      <nav
-        v-show="leftDrawerOpen"
-        role="navigation"
-        aria-label="Main navigation"
-        class="oo_sidebar oo_left left-drawer"
-      >
-        <q-list class="leftNavList">
-          <menu-link
-            v-for="(nav, index) in linksList"
-            :key="nav.title"
-            :link-name="nav.name"
-            :animation-index="index"
-            v-bind="{ ...nav, mini: miniMode }"
-            @mouseenter="handleMenuHover(nav.link)"
-          />
-        </q-list>
-      </nav>
+      <ONavbar
+        :links-list="linksList"
+        :mini-mode="miniMode"
+        :visible="leftDrawerOpen"
+        @menu-hover="handleMenuHover"
+      />
 
       <OPageContainer class="oo_content-wrapper">
         <!-- Main Panel -->
@@ -152,7 +141,6 @@ maximized full-height>
 
 <script lang="ts">
 import {
-  QList,
   QItem,
   QItemLabel,
   QItemSection,
@@ -167,7 +155,7 @@ import {
 } from "quasar";
 import OLayout from "@/lib/core/Layout/OLayout.vue";
 import OPageContainer from "@/lib/core/PageContainer/OPageContainer.vue";
-import MenuLink from "../components/MenuLink.vue";
+import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import Header from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -247,13 +235,12 @@ export default defineComponent({
   name: "MainLayout",
   mixins: [mainLayoutMixin],
   components: {
-    "menu-link": MenuLink,
     Header,
     WebinarBanner,
     "keep-alive": KeepAlive,
     OLayout,
     OPageContainer,
-    "q-list": QList,
+    ONavbar,
     "q-item": QItem,
     "q-item-label": QItemLabel,
     "q-item-section": QItemSection,
