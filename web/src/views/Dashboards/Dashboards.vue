@@ -499,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- add dashboard -->
               <ODrawer
                 v-model:open="showAddDashboardDialog"
-                :width="40"
+                :width="30"
                 :title="t('dashboard.createdashboard')"
                 data-test="dashboard-add-dialog"
                 :secondary-button-label="t('dashboard.cancel')"

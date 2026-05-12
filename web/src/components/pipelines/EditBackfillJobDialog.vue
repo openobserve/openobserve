@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     v-model:open="show"
-    :width="47"
+    :width="30"
     title="Edit Backfill Job"
     secondary-button-label="Cancel"
     primary-button-label="Update Job"
@@ -26,8 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit"
     data-test="edit-backfill-job-dialog"
   >
-
-    <q-form @submit="onSubmit" id="edit-backfill-form" class="tw-space-y-4">
+    <q-form @submit="onSubmit" id="edit-backfill-form" class="tw:mx-5 tw:my-3">
           <!-- Time Range Section -->
           <div>
             <div class="text-subtitle2 q-mb-sm">
@@ -52,12 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Advanced Options -->
           <q-expansion-item
+          class="tw:mt-2"
             v-model="showAdvanced"
             icon="settings"
             label="Advanced Options"
             data-test="advanced-options-expansion"
           >
-            <q-card flat bordered class="q-pa-md tw-space-y-4">
+            <q-card flat bordered class="q-pa-md tw:space-y-2 tw:mt-2 ">
               <!-- Chunk Period -->
               <div>
                 <div class="text-caption q-mb-xs">
