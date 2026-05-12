@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw-flex tw-items-center tw-justify-center tw-h-full"
       :class="isDarkMode ? 'tw-bg-gray-900/50' : 'tw-bg-white/50'"
     >
-      <q-spinner size="lg" color="primary" />
+      <OSpinner size="md" />
     </div>
 
     <!-- Empty State -->
@@ -100,6 +100,7 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "IncidentServiceGraph",
@@ -107,6 +108,7 @@ export default defineComponent({
     ChartRenderer,
     DropzoneBackground,
     OButton,
+    OSpinner,
   },
   props: {
     topologyContext: {

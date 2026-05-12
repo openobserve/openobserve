@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   <div class="eval-container">
     <!-- Loading state -->
     <div v-if="isLoading" class="eval-loading">
-      <q-spinner color="primary" size="60px" />
+      <OSpinner size="xl" />
       <div class="eval-loading-text">{{ $t("traces.evaluations.loading") }}</div>
     </div>
 
@@ -459,11 +459,13 @@ import { defineComponent, PropType, ref, watch, onMounted } from "vue";
 import { getQualityScoreColor } from "@/utils/llmUtils";
 import LLMContentRenderer from "./LLMContentRenderer.vue";
 import { useStore } from "vuex";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "TraceEvaluationsView",
   components: {
     LLMContentRenderer,
+    OSpinner,
   },
   props: {
     evalData: {

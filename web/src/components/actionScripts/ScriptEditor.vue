@@ -11,7 +11,7 @@
           v-if="loading"
           class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
         >
-          <q-spinner-hourglass size="18px" />
+          <OSpinner size="xs" />
           <div class="tw:relative tw:top-[2px]">
             {{ t("confirmDialog.loading") }}
           </div>
@@ -56,6 +56,7 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import axios from "axios";
 import { useI18n } from "vue-i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   loading: {

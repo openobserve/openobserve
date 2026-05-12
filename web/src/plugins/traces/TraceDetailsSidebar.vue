@@ -821,10 +821,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             "
           >
             <div class="tw:text-center">
-              <q-spinner-hourglass
+              <OSpinner
                 v-if="correlationLoading"
-                color="primary"
-                size="3rem"
+                size="lg"
                 class="tw:mb-4"
               />
               <div
@@ -877,10 +876,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             "
           >
             <div class="tw:text-center">
-              <q-spinner-hourglass
+              <OSpinner
                 v-if="correlationLoading"
-                color="primary"
-                size="3rem"
+                size="lg"
                 class="tw:mb-4"
               />
               <div
@@ -953,6 +951,7 @@ import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1009,7 +1008,8 @@ export default defineComponent({
     AttributeValueCell,
     DeployedCode,
     DbSpanDetails,
-    TraceErrorTab
+    TraceErrorTab,
+    OSpinner,
   },
   emits: [
     "close",

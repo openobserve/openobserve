@@ -33,16 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <div v-if="loading">
-      <q-spinner
+      <OSpinner
         v-if="loading"
-        color="primary"
-        size="40px"
-        style="
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-        "
+        size="md"
+        class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
       />
     </div>
     <div
@@ -238,6 +232,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface RouteCondition {
   column: string;

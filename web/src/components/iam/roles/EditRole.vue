@@ -35,11 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-if="isFetchingInitialRoles">
       <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
-        <q-spinner-hourglass
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
-        />
+        <OSpinner size="md" class="tw:mx-auto tw:block" />
         <div class="text-center full-width">
           Hold on tight, we're fetching your role details...
         </div>
@@ -334,6 +330,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),

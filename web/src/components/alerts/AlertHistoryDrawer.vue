@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isLoadingHistory"
               class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-3"
             >
-              <q-spinner-hourglass size="32px" color="primary" />
+              <OSpinner size="sm" />
               <div
                 class="tw:text-sm"
                 :class="
@@ -537,6 +537,7 @@ import alertsService from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 // Composables
 const { t } = useI18n();

@@ -432,7 +432,7 @@
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
                 <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
-                  <q-spinner-dots color="primary" size="1.5em" />
+                  <OSpinner variant="dots" size="xs" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
                 <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
@@ -1195,7 +1195,7 @@
             :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
           >
             <div class="tool-call-content">
-              <q-spinner-dots color="primary" size="1.5em" />
+              <OSpinner variant="dots" size="xs" />
               <div class="tool-call-info">
                 <span class="tool-call-message">{{
                   activeToolCall.message
@@ -1258,7 +1258,7 @@
             :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
           >
             <div class="tool-call-content">
-              <q-spinner-dots color="primary" size="1.5em" />
+              <OSpinner variant="dots" size="xs" />
               <span class="tool-call-message">{{
                 currentAnalyzingMessage
               }}</span>
@@ -1290,12 +1290,12 @@
       >
         <!-- Show tool call if active -->
         <div v-if="activeToolCall" class="analyzing-content">
-          <q-spinner-dots color="primary" size="1.5em" />
+          <OSpinner variant="dots" size="xs" />
           <span class="analyzing-message">{{ activeToolCall.message }}</span>
         </div>
         <!-- Show analyzing message if loading but no active tool call -->
         <div v-else-if="isLoading" class="analyzing-content">
-          <q-spinner-dots color="primary" size="1.5em" />
+          <OSpinner variant="dots" size="xs" />
           <span class="analyzing-message">{{ currentAnalyzingMessage }}</span>
         </div>
       </div>
@@ -1505,6 +1505,7 @@ import {
 } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -1546,6 +1547,7 @@ export default defineComponent({
     O2AIConfirmDialog,
     OButton,
     ODropdown,
+    OSpinner,
   },
   props: {
     isOpen: {

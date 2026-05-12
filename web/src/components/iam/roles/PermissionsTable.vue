@@ -69,13 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        <q-circular-progress
-          indeterminate
-          rounded
-          size="20px"
-          color="primary"
-          class="q-my-sm q-mx-none q-mr-sm"
-        />
+        <OSpinner size="xs" class="q-my-sm q-mx-none q-mr-sm" />
         <div>Loading Resources...</div>
       </div>
       <div
@@ -262,6 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   selectedPermissionsHash: {

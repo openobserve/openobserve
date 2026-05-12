@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center">
-        <q-spinner-hourglass color="primary" size="lg" />
+        <OSpinner size="md" />
       </div>
       <div
         class="card-container tw:pb-[0.625rem]"
@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr v-if="isRoleLimitsLoading && props.row.uuid == expandedRow">
             <q-td v-for="col in props.cols" :key="col.name">
               <div v-if="col.name == 'create'" class="tw:h-[50vh] tw:w-full tw:flex tw:justify-center tw:items-center">
-              <q-spinner-hourglass color="primary" size="lg" />
+              <OSpinner size="md" />
             </div>
             </q-td>
           </q-tr>
@@ -427,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-table>
       </div>
       <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw:h-[70vh] tw:flex tw:justify-center tw:items-center">
-        <q-spinner-hourglass color="primary" size="lg" />
+        <OSpinner size="md" />
       </div>
       <div
         class="card-container"
@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         class="flex justify-center items-center"
       >
-        <q-spinner-hourglass color="primary" size="lg" />
+        <OSpinner size="md" />
       </div>
       <div
         v-else-if="
@@ -588,6 +588,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import AppTable from "@/components/AppTable.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 export default defineComponent({
   name: "Quota",
   components: {
@@ -600,6 +601,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     NoData,
+    OSpinner,
   },
   setup() {
     const { t } = useI18n();

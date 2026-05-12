@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="prebuilt-form"
             />
             <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
-              <q-spinner color="primary" size="40px" />
+              <OSpinner size="md" />
               <div class="q-mt-sm text-grey-7">Loading destination data...</div>
             </div>
 
@@ -619,6 +619,7 @@ import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   templates: {

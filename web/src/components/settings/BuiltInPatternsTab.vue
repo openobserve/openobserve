@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading State -->
     <div v-if="loading && patterns.length === 0" class="text-center q-pa-xl">
-      <q-spinner-hourglass color="primary" size="50px" />
+      <OSpinner size="lg" />
       <div class="q-mt-md">{{ t("regex_patterns.loading_patterns") }}</div>
     </div>
 
@@ -284,6 +284,7 @@ import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface PatternExample {
   Valid: string[];
@@ -303,7 +304,7 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton },
+  components: { OButton, OSpinner },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();

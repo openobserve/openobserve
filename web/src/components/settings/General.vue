@@ -427,12 +427,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <q-spinner-hourglass
+  <OSpinner
     v-if="loadingState"
-    class="fixed-center"
-    size="lg"
-    color="primary"
-  ></q-spinner-hourglass>
+    size="md"
+    class="tw:fixed tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+  />
   <q-dialog v-model="confirmDeleteImage">
     <q-card>
       <q-card-section>
@@ -496,6 +495,7 @@ import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { X, Check, Pencil, Trash2 } from "lucide-vue-next";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -515,6 +515,7 @@ export default defineComponent({
   components: {
     GroupHeader,
     OButton,
+    OSpinner,
   },
   setup() {
     const { t } = useI18n();

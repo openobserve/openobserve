@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
           >
-            <q-spinner-hourglass color="primary" size="lg" />
+            <OSpinner size="md" />
           </div>
         </template>
         <template v-else>
@@ -129,6 +129,7 @@ import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   reports: {

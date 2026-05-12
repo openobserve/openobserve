@@ -17,7 +17,7 @@
     <div class="correlation-body">
       <!-- Loading State -->
       <div v-if="loading" class="correlation-loading">
-        <q-spinner color="primary" size="md" />
+        <OSpinner size="sm" />
         <span class="loading-text">Finding related data...</span>
       </div>
 
@@ -206,6 +206,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext, CorrelationQuery } from "@/utils/telemetryCorrelation";
 import type { CorrelationResult } from "@/utils/telemetryCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Props {
   show: boolean;

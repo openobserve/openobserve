@@ -815,11 +815,9 @@ size="14px"
       class="flex column items-center justify-center"
       :style="{ height: '100%' }"
     >
-      <q-spinner-hourglass
+      <OSpinner
         data-test="trace-details-loading-spinner"
-        color="primary"
-        size="3em"
-        :thickness="2"
+        size="lg"
       />
       <div data-test="trace-details-loading-text" class="q-pt-sm">
         {{ t("traces.fetchingTrace") }}
@@ -966,6 +964,7 @@ import {
   MessageSquare,
 } from "lucide-vue-next";
 import pipelineService from "@/services/pipelines";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
@@ -1077,6 +1076,7 @@ export default defineComponent({
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
+    OSpinner,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],

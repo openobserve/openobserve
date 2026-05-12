@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <q-spinner-hourglass color="primary" size="1.875rem" />
+      <OSpinner size="sm" />
     </div>
 
     <!-- Error State -->
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Loading state -->
             <template #loading>
               <div class="tw:flex tw:items-center tw:justify-center tw:pb-40">
-                <q-spinner-hourglass color="primary" size="3rem" />
+                <OSpinner size="lg" />
               </div>
             </template>
             <template v-if="refreshing" #no-data>
@@ -615,6 +615,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { RefreshCw } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const emit = defineEmits<{
   (e: "navigate-to-configuration"): void;

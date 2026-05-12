@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <NoData />
         </div>
         <div v-else class="text-center full-width full-height q-mt-lg">
-          <q-spinner-hourglass color="primary" size="lg" />
+          <OSpinner size="md" />
         </div>
       </template>
       <template #header-selection="scope">
@@ -123,12 +123,13 @@ import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { List, X } from 'lucide-vue-next';
 import { getDuration, durationFormatter } from "@/utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 // TODO OK : Define types and interfaces for data properties.
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData, OButton, List, X },
+  components: { QueryList, QTablePagination, NoData, OButton, List, X, OSpinner },
   props: {
     rows: {
       type: Array,

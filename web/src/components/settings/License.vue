@@ -4,7 +4,7 @@
     <div class="text-h6 q-mb-md">{{ t("about.license_management") }}</div>
 
     <div v-if="loading" class="q-pa-md text-center">
-      <q-spinner size="40px" />
+      <OSpinner size="md" />
       <div class="q-mt-md">{{ t("about.loading_license_info") }}</div>
     </div>
     <div
@@ -465,6 +465,7 @@ import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -476,6 +477,7 @@ export default defineComponent({
     LicensePeriod,
     RenderDashboardCharts,
     OButton,
+    OSpinner,
   },
   setup() {
     const $q = useQuasar();

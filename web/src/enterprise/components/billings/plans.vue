@@ -43,12 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="q-mt-md q-mb-sm">
-            <q-linear-progress
+            <OProgressBar
               :value="aiUsageRatio"
-              size="12px"
-              rounded
-              :color="aiUsageRatio >= 1 ? 'negative' : aiUsageRatio >= 0.9 ? 'warning' : 'primary'"
-              track-color="grey-3"
+              size="sm"
+              :variant="aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'"
             />
           </div>
           <div class="usage-data-to-display row items-end">
@@ -74,11 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >{{ store.state.selectedOrganization.note }}
     </div>
     <div v-if="loading">
-      <q-spinner-dots
-        color="primary"
-        size="40px"
-        style="margin: 0 auto; display: block"
-      />
+      <OSpinner size="md" class="tw:mx-auto tw:block" />
     </div>
     <div v-else class="row q-gutter-md justify-center">
       <pro-plan
@@ -110,6 +104,8 @@ import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/z
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
 export default defineComponent({
   name: "plans",
@@ -117,6 +113,8 @@ export default defineComponent({
     EnterprisePlan,
     ProPlan,
     TrialPeriod,
+    OSpinner,
+    OProgressBar,
   },
   emits: ["update:proSubscription"],
   async mounted() {

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-card-section class="q-pa-md" style="max-height: calc(100vh - 100px); overflow-y: auto">
         <div v-if="loading" class="flex justify-center q-pa-lg">
-          <q-spinner color="primary" size="50px" />
+          <OSpinner size="lg" />
         </div>
 
         <div v-else-if="job" class="tw-space-y-6">
@@ -92,12 +92,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw-font-medium">Overall Progress</div>
                 <div class="text-h6">{{ job.progress_percent }}%</div>
               </div>
-              <q-linear-progress
+              <OProgressBar
                 :value="job.progress_percent / 100"
-                :color="getProgressColor(job.deletion_status)"
-                size="12px"
-                rounded
-                class="q-mb-md"
+                :variant="getProgressColor(job.deletion_status) === 'positive' ? 'default' : 'default'"
+                size="sm"
               />
 
               <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
@@ -237,6 +235,8 @@ import { X } from "lucide-vue-next";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
 interface Props {
   modelValue: boolean;

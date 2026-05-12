@@ -354,11 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="1.25rem"
-              class="tw:mx-[0.25rem]"
-            />
+            <OSpinner size="xs" class="tw:mx-[0.25rem]" />
             <span
               class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
             >
@@ -373,11 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="services-catalog-loading"
             class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="1.25rem"
-              class="tw:mr-[0.25rem]"
-            />
+            <OSpinner size="xs" class="tw:mr-[0.25rem]" />
             <span
               class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
             >
@@ -440,6 +432,7 @@ import {
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const { t } = useI18n();
 const store = useStore();

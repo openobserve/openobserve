@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div
                             class="text-subtitle2 text-weight-bold float-left"
                           >
-                            <q-spinner-hourglass size="20px" />
+                            <OSpinner size="xs" />
                             {{ t("confirmDialog.loading") }}
                           </div>
                         </div>
@@ -2070,7 +2070,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="full-width q-pa-sm"
                     >
                       <div class="text-subtitle2 text-weight-bold">
-                        <q-spinner-hourglass size="20px" />
+                        <OSpinner size="xs" />
                         {{ t("confirmDialog.loading") }}
                       </div>
                     </div>
@@ -2377,6 +2377,7 @@ import {
   replaceExistingFieldCondition,
   removeFieldCondition,
 } from "@/plugins/logs/filterUtils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const defaultValue: any = () => {
   return {
@@ -2466,6 +2467,7 @@ export default defineComponent({
     Layers,
     OToggleGroup,
     OToggleGroupItem,
+    OSpinner,
   },
   emits: [
     "searchdata",

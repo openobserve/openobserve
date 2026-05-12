@@ -176,7 +176,7 @@
           >
             <div v-if="loading" class="flex flex-center tw:h-full">
               <div class="text-center tw:flex tw:flex-col tw:items-center">
-                <q-spinner-hourglass color="primary" size="4em" />
+                <OSpinner size="xl" />
                 <div class="text-subtitle1 q-mt-md text-grey-7">
                   Loading service graph...
                 </div>
@@ -315,6 +315,7 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -322,6 +323,7 @@ export default defineComponent({
     ChartRenderer,
     ServiceGraphSidePanel,
     OButton,
+    OSpinner,
   },
   emits: ["view-traces"],
   setup(props, { emit }) {

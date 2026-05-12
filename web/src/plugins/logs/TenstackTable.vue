@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
             >
-              <q-spinner-hourglass size="20px" />
+              <OSpinner size="xs" />
               {{ t("confirmDialog.loading") }}
             </div>
           </td>
@@ -432,6 +432,7 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface StreamField {
   name: string;

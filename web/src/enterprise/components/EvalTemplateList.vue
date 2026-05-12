@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading state -->
           <template #loading>
             <div class="tw:flex tw:items-center tw:justify-center tw:py-20">
-              <q-spinner-hourglass color="primary" size="3rem" />
+              <OSpinner size="lg" />
             </div>
           </template>
 
@@ -246,6 +246,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { Pencil, Trash2 } from 'lucide-vue-next';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Template {
   id: string;

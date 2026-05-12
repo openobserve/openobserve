@@ -48,20 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : noOfRecordsTitle
           }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
-            <q-spinner-hourglass
-              color="primary"
-              size="25px"
-              class="search-spinner"
-            />
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-            >
-              <span class="search-loading-text"
-                >Fetching the search events</span
-              >
-            </q-tooltip>
+            <OSpinner size="xs" class="search-spinner" />
           </span>
           <div
             v-else-if="
@@ -271,11 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
-            <q-spinner-hourglass
-              color="primary"
-              size="25px"
-              class="search-spinner"
-            />
+            <OSpinner size="xs" class="search-spinner" />
           </div>
         </div>
         <div
@@ -592,12 +575,14 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     ORefreshButton,
     OButton,
+    OSpinner,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),

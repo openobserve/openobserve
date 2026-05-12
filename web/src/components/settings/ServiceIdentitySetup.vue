@@ -21,14 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="tw:flex tw:flex-col tw:gap-4 tw:py-4">
-      <q-skeleton type="rect" height="56px" class="tw:rounded-lg" />
-      <q-skeleton type="rect" height="56px" class="tw:rounded-lg" />
-      <q-skeleton
-        type="rect"
-        height="40px"
-        width="160px"
-        class="tw:rounded-lg"
-      />
+      <OSkeleton class="tw:rounded-lg tw:h-14 tw:w-full" />
+      <OSkeleton class="tw:rounded-lg tw:h-14 tw:w-full" />
+      <OSkeleton class="tw:rounded-lg tw:h-10 tw:w-40" />
     </div>
 
     <div v-else>
@@ -1679,6 +1674,7 @@ import type {
   ServiceFieldSource,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

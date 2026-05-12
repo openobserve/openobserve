@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="loading"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner color="primary" size="md" />
+            <OSpinner size="sm" />
             <div class="tw:text-sm tw:opacity-70">
               {{ t("correlation.loadingLogs") }}
             </div>
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="loading"
                     class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
                   >
-                    <q-spinner color="primary" size="md" />
+                    <OSpinner size="sm" />
                     <div class="tw:text-sm tw:opacity-70">
                       {{
                         t("correlation.loadingMetrics", {
@@ -446,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="tracesLoading"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner color="primary" size="md" />
+            <OSpinner size="sm" />
             <div class="tw:text-sm tw:opacity-70">
               {{ t("correlation.loadingTraces") }}
             </div>
@@ -641,7 +641,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3"
           style="flex: 1; min-height: 300px"
         >
-          <q-spinner color="primary" size="md" />
+          <OSpinner size="sm" />
           <div class="tw:text-sm tw:opacity-70">
             {{ t("correlation.loadingLogs") }}
           </div>
@@ -877,7 +877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="loading"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
                 >
-                  <q-spinner color="primary" size="md" />
+                  <OSpinner size="sm" />
                   <div class="tw:text-sm tw:opacity-70">
                     {{
                       t("correlation.loadingMetrics", {
@@ -941,7 +941,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="tracesLoading"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-272px)] tw:py-20"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+          <OSpinner size="xl" class="tw:mb-4" />
           <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
         </div>
 
@@ -1257,6 +1257,7 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),

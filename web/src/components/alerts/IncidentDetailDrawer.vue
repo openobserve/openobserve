@@ -1020,32 +1020,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
-          </div>
-
-          <!-- Error/No Data State -->
-          <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
-            <q-icon
-              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
-              :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
-              size="4rem"
-            />
-            <div class="text-h6 q-mt-md">
-              {{ correlationError || 'No correlated logs found' }}
-            </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
-              The service discovery configuration (disambiguation fields) was changed after this incident was created.
-            </div>
-            <OButton
-              v-if="correlationError && !correlationError.includes('disambiguation fields')"
-              variant="outline"
-              size="md"
-              @click="refreshCorrelation"
-              class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
-          </div>
-
-          <!-- Success State - CorrelatedLogsTable -->
+            <OSpinner size="lg" class="tw:mb-4" />
           <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
             <CorrelatedLogsTable
               :service-name="correlationData.serviceName"
@@ -1070,7 +1045,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
 
@@ -1128,7 +1103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
 
@@ -1177,7 +1152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading state -->
     <div v-if="loading" class="tw:flex-1 tw:flex tw:items-center tw:justify-center">
-      <q-spinner-hourglass size="lg" color="primary" />
+      <OSpinner size="md" />
     </div>
   </div>
   </q-page>
@@ -1214,6 +1189,7 @@ import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1229,6 +1205,7 @@ export default defineComponent({
     IncidentTimeline,
     CustomChartRenderer,
     OButton,
+    OSpinner,
   },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {

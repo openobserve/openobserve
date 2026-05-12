@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
               >
-                <q-spinner-hourglass color="primary" size="lg" />
+                <OSpinner size="md" />
               </div>
             </template>
             <template #body-selection="scope">
@@ -412,6 +412,7 @@ import {
 } from "lucide-vue-next";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { ScrollText, BarChart2, GitFork, Info } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
@@ -424,6 +425,7 @@ export default defineComponent({
     OButton,
     OToggleGroup,
     OToggleGroupItem,
+    OSpinner,
     ScrollText,
     BarChart2,
     GitFork,

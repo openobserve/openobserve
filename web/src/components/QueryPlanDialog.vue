@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div v-if="loading" class="flex flex-center q-pa-xl full-height">
                 <div class="text-center">
-                  <q-spinner-dots color="primary" size="50px" />
+                  <OSpinner variant="dots" size="lg" />
                   <div class="q-mt-md">
                     {{
                       isAnalyzing
@@ -218,6 +218,7 @@ import {
 import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "QueryPlanDialog",
@@ -229,6 +230,7 @@ export default defineComponent({
     MetricsSummaryCard,
     QueryPlanTree,
     OButton,
+    OSpinner,
   },
   props: {
     modelValue: {
