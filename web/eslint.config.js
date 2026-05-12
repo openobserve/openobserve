@@ -139,7 +139,19 @@ export default [
         //   element: 'q-drawer',
         //   message: 'Use <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" instead of <q-drawer>.'
         // }
-      ]
+      ],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'quasar',
+              importNames: ['Notify'],
+              message: 'Use toast() from "@/lib/feedback/Toast/useToast" instead of Quasar Notify.',
+            },
+          ],
+        },
+      ],
     }
   },
   {

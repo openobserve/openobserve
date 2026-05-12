@@ -138,3 +138,27 @@
     --color-toggle-item-active-bg: var(--color-primary-800);
     --color-toggle-item-active-text: var(--color-primary-200);
 }
+
+/* ── Toast (dark) ───────────────────────────────────────── */
+.dark {
+    --color-toast-success-bg:     color-mix(in srgb, var(--color-success-700) 25%, var(--color-grey-900));
+    --color-toast-success-border: var(--color-success-700);
+    --color-toast-success-icon:   var(--color-success-500);
+
+    --color-toast-error-bg:       color-mix(in srgb, var(--color-error-700) 25%, var(--color-grey-900));
+    --color-toast-error-border:   var(--color-error-600);
+    --color-toast-error-icon:     var(--color-error-400);
+
+    --color-toast-warning-bg:     color-mix(in srgb, var(--color-warning-700) 20%, var(--color-grey-900));
+    --color-toast-warning-border: var(--color-warning-500);
+    --color-toast-warning-icon:   var(--color-warning-400);
+
+    --color-toast-info-bg:        color-mix(in srgb, var(--color-primary-800) 40%, var(--color-grey-900));
+    --color-toast-info-border:    var(--color-primary-700);
+    --color-toast-info-icon:      var(--color-primary-400);
+
+    --color-toast-loading-bg:     var(--color-surface-overlay);
+    --color-toast-loading-border: var(--color-border-default);
+    --color-toast-action-text:    var(--color-primary-400);
+    --color-toast-action-hover:   var(--color-primary-300);
+}
