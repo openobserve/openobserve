@@ -144,6 +144,24 @@
     --color-stepper-indicator-done: var(--color-primary-500);
     --color-stepper-connector-done: var(--color-primary-700);
     --color-stepper-trigger-hover: var(--color-surface-subtle-hover);
+
+    /* Spinner */
+    --color-spinner: var(--color-primary-400);
+    --color-spinner-track: var(--color-primary-800);
+
+    /* InnerLoading */
+    --color-inner-loading-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
+    --color-inner-loading-label: var(--color-text-secondary);
+
+    /* Skeleton */
+    --color-skeleton-base: var(--color-grey-700);
+    --color-skeleton-highlight: var(--color-grey-600);
+
+    /* ProgressBar */
+    --color-progress-bar-default: var(--color-primary-500);
+    --color-progress-bar-warning: var(--color-warning-400);
+    --color-progress-bar-danger: var(--color-error-500);
+    --color-progress-bar-track: var(--color-grey-700);
 }
 
 /* ToggleGroup — primary variant dark overrides */

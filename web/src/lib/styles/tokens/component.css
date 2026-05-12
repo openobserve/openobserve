@@ -294,6 +294,25 @@
   --color-toast-action-text:    var(--color-primary-600);
   --color-toast-action-hover:   var(--color-primary-700);
   --shadow-toast:               var(--shadow-lg);
+
+  /* Spinner */
+  --color-spinner: var(--color-primary-600);
+  --color-spinner-track: var(--color-primary-200);
+
+  /* InnerLoading */
+  --color-inner-loading-overlay: color-mix(in srgb, var(--color-surface-base) 70%, transparent);
+  --color-inner-loading-label: var(--color-text-secondary);
+
+  /* Skeleton */
+  --color-skeleton-base: var(--color-grey-200);
+  --color-skeleton-highlight: var(--color-grey-100);
+
+  /* ProgressBar */
+  --color-progress-bar-default: var(--color-primary-600);
+  --color-progress-bar-warning: var(--color-warning-500);
+  --color-progress-bar-danger: var(--color-error-600);
+  --color-progress-bar-track: var(--color-grey-200);
+  --color-progress-bar-label: var(--color-white);
 }
 
 /* ToggleGroup — primary variant (colored tray) */
@@ -559,4 +578,23 @@
   --color-stepper-title-done: var(--color-stepper-title-done);
   --color-stepper-trigger-hover: var(--color-stepper-trigger-hover);
   --color-stepper-trigger-focus-ring: var(--color-stepper-trigger-focus-ring);
+
+  /* Spinner */
+  --color-spinner: var(--color-spinner);
+  --color-spinner-track: var(--color-spinner-track);
+
+  /* InnerLoading */
+  --color-inner-loading-overlay: var(--color-inner-loading-overlay);
+  --color-inner-loading-label: var(--color-inner-loading-label);
+
+  /* Skeleton */
+  --color-skeleton-base: var(--color-skeleton-base);
+  --color-skeleton-highlight: var(--color-skeleton-highlight);
+
+  /* ProgressBar */
+  --color-progress-bar-default: var(--color-progress-bar-default);
+  --color-progress-bar-warning: var(--color-progress-bar-warning);
+  --color-progress-bar-danger: var(--color-progress-bar-danger);
+  --color-progress-bar-track: var(--color-progress-bar-track);
+  --color-progress-bar-label: var(--color-progress-bar-label);
 }
