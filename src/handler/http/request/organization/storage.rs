@@ -21,14 +21,14 @@ use utoipa::ToSchema;
 use crate::common::meta::http::HttpResponse;
 
 #[derive(Deserialize, ToSchema)]
-pub struct SetupStorageRequest {
+pub struct SetupOrgStorageRequest {
     #[schema(value_type = String)]
     provider: ProviderType,
     data: serde_json::Value,
 }
 
 #[derive(Serialize)]
-struct GetStorageResponse {
+struct GetOrgStorageResponse {
     provider: Option<ProviderType>,
     data: serde_json::Value,
     created_at: i64,
@@ -44,7 +44,7 @@ struct GetStorageResponse {
     summary = "Set up org level storage for data",
     description = "Sets up org level storage if enabled for the given org",
     request_body(
-        content = inline(SetupStorageRequest),
+        content = inline(SetupOrgStorageRequest),
         description = "storage credentials",
         content_type = "application/json",
     ),
@@ -65,7 +65,10 @@ struct GetStorageResponse {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn save(Path(org_id): Path<String>, Json(body): Json<SetupStorageRequest>) -> Response {
+pub async fn save(
+    Path(org_id): Path<String>,
+    Json(body): Json<SetupOrgStorageRequest>,
+) -> Response {
     let req = body;
 
     #[cfg(feature = "cloud")]
@@ -161,14 +164,14 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
     match crate::service::org_storage_providers::get_redacted_config(&org_id).await {
         Ok(Some(v)) => {
             let data_json: serde_json::Value = serde_json::from_str(&v.data).unwrap();
-            HttpResponse::json(GetStorageResponse {
+            HttpResponse::json(GetOrgStorageResponse {
                 provider: Some(v.provider_type),
                 data: data_json,
                 created_at: v.created_at,
                 updated_at: v.updated_at,
             })
         }
-        Ok(None) => HttpResponse::json(GetStorageResponse {
+        Ok(None) => HttpResponse::json(GetOrgStorageResponse {
             provider: None,
             data: serde_json::Value::Null,
             created_at: 0,
@@ -193,7 +196,7 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = inline(SetupStorageRequest),
+        content = inline(SetupOrgStorageRequest),
         description = "updated key data",
         content_type = "application/json",
     ),
@@ -211,7 +214,10 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn update(Path(org_id): Path<String>, Json(req): Json<SetupStorageRequest>) -> Response {
+pub async fn update(
+    Path(org_id): Path<String>,
+    Json(req): Json<SetupOrgStorageRequest>,
+) -> Response {
     #[cfg(feature = "cloud")]
     {
         // for cloud, org storage must be enabled first
