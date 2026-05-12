@@ -3,11 +3,8 @@
 <script setup lang="ts">
 import type { LayoutProps, LayoutSlots } from "./OLayout.types";
 import { Primitive } from "reka-ui";
+import { provide } from "vue";
 
-/**
- * Root layout component. Wraps the application shell using a renderless
- * Reka UI Primitive, forwarding attributes and rendering a default slot.
- */
 defineOptions({ inheritAttrs: false });
 
 withDefaults(defineProps<LayoutProps>(), {
@@ -15,6 +12,17 @@ withDefaults(defineProps<LayoutProps>(), {
 });
 
 defineSlots<LayoutSlots>();
+
+// Provide Quasar-compatible layout injections so child Quasar components
+// (q-dialog, q-page, etc.) continue to function during the transition.
+provide("_q_pc_", false);
+provide("_q_l_", {
+  header: { size: 0, offset: 0, space: false },
+  right: { size: 0, offset: 0, space: false },
+  footer: { size: 0, offset: 0, space: false },
+  left: { size: 0, offset: 0, space: false },
+  isContainer: true,
+});
 </script>
 
 <template>
