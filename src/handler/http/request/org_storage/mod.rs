@@ -60,7 +60,7 @@ struct GetStorageResponse {
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Storage",
+    tag = "Organizations",
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -126,7 +126,7 @@ pub async fn save(Path(org_id): Path<String>, Json(body): Json<SetupStorageReque
             HttpResponse::created("successfully setup storage")
         }
         Err(e) => {
-            log::info!(
+            log::error!(
                 "error in setting org level storage of type {} for org {} : {e}",
                 req.provider,
                 org_id
@@ -152,7 +152,7 @@ pub async fn save(Path(org_id): Path<String>, Json(body): Json<SetupStorageReque
             content_type = "application/json",
         ),
     ),
-    tag = "Storage",
+    tag = "Organizations",
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -206,7 +206,7 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Storage",
+    tag = "Organizations",
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
@@ -235,7 +235,7 @@ pub async fn update(Path(org_id): Path<String>, Json(req): Json<SetupStorageRequ
             return HttpResponse::bad_request("org level storage is not set, cannot edit it");
         }
         Err(e) => {
-            log::info!("error in getting redacted storage config for org : {org_id}");
+            log::error!("error in getting redacted storage config for org : {org_id}");
             return HttpResponse::internal_error(e);
         }
     };
@@ -272,7 +272,7 @@ pub async fn update(Path(org_id): Path<String>, Json(req): Json<SetupStorageRequ
             HttpResponse::created("successfully updated storage credentials")
         }
         Err(e) => {
-            log::info!(
+            log::error!(
                 "error in updating org level storage credentials of type {} for org {} : {e}",
                 req.provider,
                 org_id

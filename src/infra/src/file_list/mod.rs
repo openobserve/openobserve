@@ -200,7 +200,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date_range: (String, String),
     ) -> Result<StreamStats>;
-    async fn file_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
 }
 
 pub async fn health_check() -> Result<()> {
@@ -581,8 +581,8 @@ pub async fn query_dump_stats_by_date_range(
 }
 
 #[inline]
-pub async fn file_stats_by_account(org_id: &str, account: &str) -> Result<(i64, i64)> {
-    CLIENT.file_stats_by_account(org_id, account).await
+pub async fn org_stats_by_account(org_id: &str, account: &str) -> Result<(i64, i64)> {
+    CLIENT.org_stats_by_account(org_id, account).await
 }
 
 pub async fn local_cache_gc() -> Result<()> {

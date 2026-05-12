@@ -1422,7 +1422,7 @@ GROUP BY stream;
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
 
-    async fn file_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
         let sql = r#"SELECT 
 SUM(original_size) AS original_size,
 SUM(index_size) AS index_size
