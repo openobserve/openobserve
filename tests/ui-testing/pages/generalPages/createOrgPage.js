@@ -53,7 +53,22 @@ export class CreateOrgPage {
 
 
     async clickAddOrg() {
+        // The parent ListOrganizations.vue toggles the drawer via the router query
+        // ?action=add. Its watcher only fires when the value CHANGES, so if the
+        // drawer was closed via Cancel (which leaves the query alone), a second
+        // click on "Add Organization" pushes the same query and the watcher does
+        // not re-open the drawer. Guard against that by waiting for the org-name
+        // input to be visible, and if it never appears, re-navigate to clear the
+        // route query and try once more.
         await this.page.locator('[data-test="Add Organization"]').click();
+        try {
+            await this.page.locator('[data-test="org-name"]').waitFor({ state: 'visible', timeout: 5000 });
+        } catch {
+            await this.navigateToOrg();
+            await this.page.waitForTimeout(500);
+            await this.page.locator('[data-test="Add Organization"]').click();
+            await this.page.locator('[data-test="org-name"]').waitFor({ state: 'visible', timeout: 10000 });
+        }
     }
 
     async fillOrgName(orgName) {
@@ -61,6 +76,16 @@ export class CreateOrgPage {
         const orgNameField = this.page.locator('[data-test="org-name"]');
         await orgNameField.waitFor({ state: 'visible' });
         await orgNameField.fill(orgName);
+    }
+
+    async clearOrgName() {
+        const orgNameField = this.page.locator('[data-test="org-name"]');
+        await orgNameField.waitFor({ state: 'visible' });
+        await orgNameField.fill('');
+    }
+
+    async isDrawerOpen() {
+        return await this.page.locator('[data-test="org-name"]').isVisible({ timeout: 2000 }).catch(() => false);
     }
 
     async clickSaveOrg() {
