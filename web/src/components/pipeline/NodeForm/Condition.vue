@@ -20,7 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="stream-routing-section full-width"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-
+    <div
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+    >
+      {{ t("pipeline.conditionTitle") }}
+      <div>
+        <OButton variant="ghost" size="icon" @click="openCancelDialog">
+          <q-icon name="cancel" size="14px" />
+        </OButton>
+      </div>
+    </div>
+    <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
       <q-form ref="routeFormRef" @submit.prevent="saveCondition">

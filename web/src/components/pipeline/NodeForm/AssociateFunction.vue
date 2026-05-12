@@ -20,7 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     :style="computedStyleForFunction"
   >
-
+    <div
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+    >
+      {{ t("pipeline.associateFunction") }}
+      <div>
+        <OButton variant="ghost" size="icon" @click="$emit('cancel:hideform')">
+          <q-icon name="cancel" size="14px" />
+        </OButton>
+      </div>
+    </div>
+    <q-separator />
 
     <div v-if="loading">
       <q-spinner

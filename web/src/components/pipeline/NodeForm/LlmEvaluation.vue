@@ -20,7 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     style="width: 100%; height: 100%"
   >
-
+    <div
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+    >
+      {{ t("pipeline.llmEvaluation") }}
+      <div>
+        <OButton variant="ghost" size="icon" @click="$emit('cancel:hideform')">
+          <q-icon name="cancel" size="14px" />
+        </OButton>
+      </div>
+    </div>
+    <q-separator />
 
     <div class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md">
       <q-form @submit="saveLlmEvaluationNode">
