@@ -47,7 +47,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeMount, ref, toRaw, type Ref } from "vue";
+import { defineComponent, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
@@ -98,11 +98,17 @@ export default defineComponent({
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
 
-    onBeforeMount(async () => {
-      // get folders list
-      await getFoldersList(store);
-      // updateDashboardOptions();
-    });
+    // Fetch folders only when the drawer opens (matches old q-dialog behaviour where the
+    // component mounted only on first open). Avoids an eager API call on page load.
+    watch(
+      () => props.open,
+      async (isOpen) => {
+        if (isOpen) {
+          await getFoldersList(store);
+        }
+      },
+      { immediate: true },
+    );
 
     const updateActiveFolderId = (selectedFolder: any) => {
       activeFolderId.value = selectedFolder.value;
