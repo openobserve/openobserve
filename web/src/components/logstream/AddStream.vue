@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emits('update:open', false)"
     @click:primary="submitForm()"
   >
-    <div class="q-px-md add-stream-inputs">
+    <div class="q-px-md q-py-md add-stream-inputs">
       <q-form ref="addStreamFormRef" @submit="saveStream">
         <div data-test="add-stream-name-input">
           <q-input
@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             tabindex="0"
-            style="min-width: 480px"
           />
         </div>
 
@@ -54,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
           />
         </div>
 
@@ -68,7 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             type="number"
             :rules="[(val: any) => val > 0 || 'Field is required!']"
-            style="min-width: 480px"
           />
         </div>
 
