@@ -1351,83 +1351,96 @@ export default defineComponent({
       }
     };
 
+    // Check if any query has valid data for the given panel type.
+    // Returns true as soon as one query passes the field-alias check.
     const handleNoData = (panelType: any) => {
-      const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias || [],
-      );
-      const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias || [],
-      );
-      const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias || [],
-      );
+      return panelSchema.value.queries.some(
+        (query: any, queryIndex: number) => {
+          const queryData = data.value[queryIndex];
+          if (!queryData?.length) return false;
 
-      const firstRow = data.value[0]?.[0];
+          const xAlias = query.fields.x.map((it: any) => it.alias || []);
+          const yAlias = query.fields.y.map((it: any) => it.alias || []);
+          const zAlias = query.fields.z.map((it: any) => it.alias || []);
+          const firstRow = queryData[0];
 
-      switch (panelType) {
-        case "area":
-        case "area-stacked":
-        case "bar":
-        case "h-bar":
-        case "stacked":
-        case "h-stacked":
-        case "line":
-        case "scatter":
-        case "gauge": {
-          return (
-            data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => getDataValue(firstRow, x) != null) &&
-              yAlias.every((y: any) => getDataValue(firstRow, y) != null))
-          );
-        }
-        case "table": {
-          // For tables, simply check if there's any data in the array
-          return (
-            data.value[0]?.length > 1 ||
-            (data.value[0]?.length == 1 &&
-              (xAlias.some((x: any) => getDataValue(firstRow, x) != null) ||
-                yAlias.some((y: any) => getDataValue(firstRow, y) != null)))
-          );
-        }
-        case "metric": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
-          );
-        }
-        case "heatmap": {
-          return (
-            data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => getDataValue(firstRow, x) != null) &&
-              yAlias.every((y: any) => getDataValue(firstRow, y) != null) &&
-              zAlias.every((z: any) => getDataValue(firstRow, z) != null))
-          );
-        }
-        case "pie":
-        case "donut": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
-          );
-        }
-        case "maps":
-        case "geomap": {
-          return true;
-        }
-        case "sankey": {
-          const source = panelSchema.value.queries[0].fields.source.alias;
-          const target = panelSchema.value.queries[0].fields.target.alias;
-          const value = panelSchema.value.queries[0].fields.value.alias;
-          return (
-            data.value[0]?.length > 1 ||
-            source.every((s: any) => getDataValue(firstRow, s) != null) ||
-            target.every((t: any) => getDataValue(firstRow, t) != null) ||
-            value.every((v: any) => getDataValue(firstRow, v) != null)
-          );
-        }
-        default:
-          break;
-      }
+          switch (panelType) {
+            case "area":
+            case "area-stacked":
+            case "bar":
+            case "h-bar":
+            case "stacked":
+            case "h-stacked":
+            case "line":
+            case "scatter":
+            case "gauge":
+              return (
+                queryData.length > 1 ||
+                (xAlias.every(
+                  (x: any) => getDataValue(firstRow, x) != null,
+                ) &&
+                  yAlias.every(
+                    (y: any) => getDataValue(firstRow, y) != null,
+                  ))
+              );
+            case "table":
+              return (
+                queryData.length > 1 ||
+                (queryData.length == 1 &&
+                  (xAlias.some(
+                    (x: any) => getDataValue(firstRow, x) != null,
+                  ) ||
+                    yAlias.some(
+                      (y: any) => getDataValue(firstRow, y) != null,
+                    )))
+              );
+            case "metric":
+              return (
+                queryData.length > 1 ||
+                yAlias.every((y: any) => getDataValue(firstRow, y) != null)
+              );
+            case "heatmap":
+              return (
+                queryData.length > 1 ||
+                (xAlias.every(
+                  (x: any) => getDataValue(firstRow, x) != null,
+                ) &&
+                  yAlias.every(
+                    (y: any) => getDataValue(firstRow, y) != null,
+                  ) &&
+                  zAlias.every(
+                    (z: any) => getDataValue(firstRow, z) != null,
+                  ))
+              );
+            case "pie":
+            case "donut":
+              return (
+                queryData.length > 1 ||
+                yAlias.every((y: any) => getDataValue(firstRow, y) != null)
+              );
+            case "maps":
+            case "geomap":
+              return true;
+            case "sankey": {
+              const source = query.fields.source.alias;
+              const target = query.fields.target.alias;
+              const value = query.fields.value.alias;
+              return (
+                queryData.length > 1 ||
+                source.every(
+                  (s: any) => getDataValue(firstRow, s) != null,
+                ) ||
+                target.every(
+                  (t: any) => getDataValue(firstRow, t) != null,
+                ) ||
+                value.every((v: any) => getDataValue(firstRow, v) != null)
+              );
+            }
+            default:
+              return false;
+          }
+        },
+      );
     };
 
     // Compute the value of the 'noData' variable
@@ -1457,11 +1470,12 @@ export default defineComponent({
         return "";
       }
       // The queryType is not 'promql'
+      // Check if ANY query has data (not just the first one)
       return data.value.length &&
-        data.value[0]?.length &&
+        data.value.some((queryData: any) => queryData?.length) &&
         handleNoData(panelSchema.value.type)
         ? ""
-        : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+        : "No Data";
     });
 
     // when the error changes, emit the error
