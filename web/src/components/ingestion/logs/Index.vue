@@ -167,7 +167,11 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
-    const ingestiontabs = ref("");
+    const ingestiontabs = ref(
+      router.currentRoute.value.name !== "ingestLogs"
+        ? router.currentRoute.value.name as string
+        : "curl"
+    );
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier,
     );

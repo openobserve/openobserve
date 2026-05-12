@@ -107,7 +107,11 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("airflow");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "others"
+        ? router.currentRoute.value.name as string
+        : "airflow"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "others") {

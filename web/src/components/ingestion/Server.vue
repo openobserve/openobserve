@@ -107,7 +107,11 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("nginx");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "servers"
+        ? router.currentRoute.value.name as string
+        : "nginx"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "servers") {

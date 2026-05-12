@@ -113,9 +113,7 @@ export default defineComponent({
   components: {
     OTabs, OTab, ORouteTab,},
   data() {
-    return {
-      ingestiontabs: "",
-    };
+    return {};
   },
   props: {
     currOrgIdentifier: {
@@ -130,6 +128,11 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const ingestiontabs = ref(
+      router.currentRoute.value.name !== "ingestMetrics"
+        ? router.currentRoute.value.name as string
+        : "prometheus"
+    );
 
     onBeforeMount(() => {
       const ingestRoutes = [
@@ -211,6 +214,7 @@ export default defineComponent({
       copyToClipboardFn,
       showUpdateDialogFn,
       confirmUpdate,
+      ingestiontabs,
       getImageURL,
       verifyOrganizationStatus,
     };

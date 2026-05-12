@@ -107,7 +107,11 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("falco");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "security"
+        ? router.currentRoute.value.name as string
+        : "falco"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "security") {

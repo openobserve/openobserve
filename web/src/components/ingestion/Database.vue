@@ -107,7 +107,11 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("sqlserver");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "databases"
+        ? router.currentRoute.value.name as string
+        : "sqlserver"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "databases") {

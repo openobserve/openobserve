@@ -107,7 +107,11 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("jenkins");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "devops"
+        ? router.currentRoute.value.name as string
+        : "jenkins"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "devops") {

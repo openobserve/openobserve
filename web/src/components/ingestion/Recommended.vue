@@ -94,7 +94,11 @@ export default defineComponent({
       store.state.selectedOrganization.identifier,
     );
 
-    const ingestTabType = ref("ingestFromKubernetes");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "recommended"
+        ? router.currentRoute.value.name as string
+        : "ingestFromKubernetes"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "recommended") {

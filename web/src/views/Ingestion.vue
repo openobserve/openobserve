@@ -303,10 +303,16 @@ export default defineComponent({
 
     // Sync ingestTabType from the current route so page refresh on a child
     // route (e.g. ai-agno) selects the correct parent tab (ai-integrations).
+    // Some ORouteTab name props differ from their route names, so map them.
+    const routeToTabName: Record<string, string> = {
+      servers: "server",
+      databases: "database",
+    };
     const syncTabFromRoute = () => {
       const matched = route.matched;
       if (matched.length > 2) {
-        const parentTab = matched[2].name as string;
+        const parentRoute = matched[2].name as string;
+        const parentTab = routeToTabName[parentRoute] ?? parentRoute;
         if (parentTab && parentTab !== ingestTabType.value) {
           ingestTabType.value = parentTab;
         }

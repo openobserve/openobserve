@@ -107,7 +107,11 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("netflow");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "networking"
+        ? router.currentRoute.value.name as string
+        : "netflow"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "networking") {

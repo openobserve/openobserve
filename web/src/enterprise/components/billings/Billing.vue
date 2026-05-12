@@ -148,7 +148,11 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const billingtab = ref("usage");
+    const billingtab = ref(
+      router.currentRoute.value.name !== "billings"
+        ? router.currentRoute.value.name as string
+        : "usage"
+    );
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);

@@ -58,7 +58,11 @@ const { t } = useI18n();
 
 const router = useRouter();
 
-const activeTab = ref("users");
+const activeTab = ref(
+  router.currentRoute.value.name !== "iam"
+    ? router.currentRoute.value.name as string
+    : "users"
+);
 
 const iamRouteTabsRef: any = ref(null);
 

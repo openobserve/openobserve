@@ -107,7 +107,11 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("rabbitmq");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "message-queues"
+        ? router.currentRoute.value.name as string
+        : "rabbitmq"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "message-queues") {

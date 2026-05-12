@@ -107,7 +107,11 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("python");
+    const ingestTabType = ref(
+      router.currentRoute.value.name !== "languages"
+        ? router.currentRoute.value.name as string
+        : "python"
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "languages") {
