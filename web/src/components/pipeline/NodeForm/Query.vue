@@ -15,16 +15,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-stream-query-routing-section "
-    class="full-width stream-routing-section tw:h-full"
-    :class="[
-      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-      { 'fullscreen-mode': isFullscreenMode },
-    ]"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.query')"
+    :width="97"
+    :show-close="true"
+    @keydown.stop
   >
-    <q-separator />
-
+    <template #header-right>
+      <OButton
+        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+        variant="ghost"
+        size="icon-toolbar"
+        @click="scheduledPipelineRef?.toggleAIChat()"
+        data-test="menu-link-ai-item"
+        class="ai-hover-btn"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+      >
+        <div class="row items-center no-wrap">
+          <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon" />
+        </div>
+      </OButton>
+      <div class="flex items-center app-tabs-container">
+        <AppTabs
+          data-test="scheduled-pipeline-tabs"
+          :tabs="scheduledPipelineRef?.tabOptions ?? []"
+          v-model:active-tab="activeTab"
+          class="tabs-selection-container"
+          @update:active-tab="scheduledPipelineRef?.updateTab()"
+        />
+      </div>
+      <DateTime
+        style="height: 34px !important; border-radius: 3px"
+        @on:date-change="(d) => scheduledPipelineRef?.updateDateChange(d)"
+      />
+      <OButton
+        data-test="logs-search-bar-refresh-btn"
+        data-cy="search-bar-refresh-button"
+        variant="primary"
+        size="sm-action"
+        :disabled="!scheduledPipelineRef?.selectedStreamName"
+        @click="onRunQuery"
+      >
+        {{ t('search.runQuery') }}
+        <q-tooltip
+          v-if="!scheduledPipelineRef?.selectedStreamName"
+          anchor="bottom middle"
+          self="top middle"
+        >
+          {{ t('search.selectStreamFirst') }}
+        </q-tooltip>
+      </OButton>
+      <OButton
+        data-test="add-function-fullscreen-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        @click="scheduledPipelineRef?.handleFullScreen()"
+      >
+        <template #icon-left>
+          <Maximize2 v-if="!scheduledPipelineRef?.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
+          <Minimize2 v-else class="tw:size-3.5 tw:shrink-0" />
+        </template>
+      </OButton>
+    </template>
+    <div
+      data-test="add-stream-query-routing-section"
+      class="full-width stream-routing-section"
+      :class="[
+        store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+        { 'fullscreen-mode': isFullscreenMode },
+      ]"
+    >
     <div class="stream-routing-container q-px-md">
       <q-form ref="queryFormRef">
         <div class="full-width">
@@ -64,7 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-  </div>
+    </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -79,6 +142,7 @@ import {
   defineAsyncComponent,
   onMounted,
   ref,
+  watch,
   type Ref,
   onActivated,
 } from "vue";
@@ -88,6 +152,12 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+import DateTime from "@/components/DateTime.vue";
+import { Maximize2, Minimize2 } from "lucide-vue-next";
+import config from "@/aws-exports";
 import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
@@ -137,6 +207,10 @@ interface StreamRoute {
 }
 
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   streamName: {
     type: String,
     required: true,
@@ -171,6 +245,16 @@ const { buildQueryPayload } = useQuery();
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
+
 const isUpdating = ref(false);
 
 const filteredColumns: any = ref([]);
@@ -183,6 +267,22 @@ const expandedLogs = ref([]);
 const validateSqlQueryPromise = ref<Promise<unknown>>();
 
 const scheduledPipelineRef = ref<any>(null);
+
+// Reactive bridge for AppTabs v-model:active-tab — reads/writes into the child ref
+const activeTab = computed({
+  get: () => scheduledPipelineRef.value?.tab ?? "custom",
+  set: (v) => {
+    if (scheduledPipelineRef.value) scheduledPipelineRef.value.tab = v;
+  },
+});
+
+function onRunQuery() {
+  if (scheduledPipelineRef.value) {
+    scheduledPipelineRef.value.expandState.output = true;
+    scheduledPipelineRef.value.expandState.query = false;
+    scheduledPipelineRef.value.runQuery();
+  }
+}
 
 const filteredStreams: Ref<any[]> = ref([]);
 

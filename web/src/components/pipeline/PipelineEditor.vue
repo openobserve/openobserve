@@ -99,54 +99,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <ODrawer 
-    data-test="pipeline-editor-config-drawer"
-    v-model:open="pipelineObj.dialog.show"
-    :show-close="false"
-    size="xl"
-    @keydown.stop
-  >
-    <div
-      data-test="pipeline-nodes-list-dragable"
-      class="stream-routing-dialog-container"
-      @keydown.stop
-      tabindex="0"
-    >
-      <QueryForm
-        v-if="pipelineObj.dialog.name === 'query'"
-        :stream-name="pipeline.stream_name"
-        :stream-type="pipeline.stream_type"
-        :stream-routes="streamRoutes"
-        @cancel:hideform="resetDialog"
-      />
-
-      <ConditionForm
-        v-if="pipelineObj.dialog.name === 'condition'"
-        @cancel:hideform="resetDialog"
-      />
-
-      <AssociateFunction
-        v-if="pipelineObj.dialog.name === 'function'"
-        :functions="functionOptions"
-        :associated-functions="associatedFunctions"
-        @cancel:hideform="resetDialog"
-        @add:function="refreshFunctionList"
-      />
-
-      <StreamNode
-        v-if="pipelineObj.dialog.name === 'stream'"
-        @cancel:hideform="resetDialog"
-      />
-      <ExternalDestination
-        v-if="pipelineObj.dialog.name === 'remote_stream'"
-        @cancel:hideform="resetDialog"
-      />
-      <LlmEvaluation
-        v-if="pipelineObj.dialog.name === 'llm_evaluation'"
-        @cancel:hideform="resetDialog"
-      />
-    </div>
-  </ODrawer>
+  <QueryForm
+    v-if="pipelineObj.dialog.name === 'query'"
+    :open="true"
+    :stream-name="pipeline.stream_name"
+    :stream-type="pipeline.stream_type"
+    :stream-routes="streamRoutes"
+    @cancel:hideform="resetDialog"
+  />
+  <ConditionForm
+    v-if="pipelineObj.dialog.name === 'condition'"
+    :open="true"
+    @cancel:hideform="resetDialog"
+  />
+  <AssociateFunction
+    v-if="pipelineObj.dialog.name === 'function'"
+    :open="true"
+    :functions="functionOptions"
+    :associated-functions="associatedFunctions"
+    @cancel:hideform="resetDialog"
+    @add:function="refreshFunctionList"
+  />
+  <StreamNode
+    v-if="pipelineObj.dialog.name === 'stream'"
+    :open="true"
+    @cancel:hideform="resetDialog"
+  />
+  <ExternalDestination
+    v-if="pipelineObj.dialog.name === 'remote_stream'"
+    :open="true"
+    @cancel:hideform="resetDialog"
+  />
+  <LlmEvaluation
+    v-if="pipelineObj.dialog.name === 'llm_evaluation'"
+    :open="true"
+    @cancel:hideform="resetDialog"
+  />
   <ODrawer data-test="pipeline-editor-json-editor-drawer"
     v-model:open="showJsonEditorDialog"
     size="lg"
@@ -402,17 +390,6 @@ const hasInputType = computed(() => {
 const isNodeConfigDrawerOpen = computed(
   () => pipelineObj.dialog.show,
 );
-
-const nodeDrawerTitle = computed(() => {
-  switch (pipelineObj.dialog.name) {
-    case "condition":      return t("pipeline.conditionTitle");
-    case "function":       return t("pipeline.associateFunction");
-    case "stream":         return t("pipeline.streamTitle");
-    case "remote_stream":  return "External Destination";
-    case "llm_evaluation": return t("pipeline.llmEvaluation");
-    default:               return "";
-  }
-});
 
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
