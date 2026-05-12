@@ -493,6 +493,9 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
 
+    // As there are some UX issues, disabling it for now
+    const enableHoverSelection = false;
+
     // ── Virtualizer ──────────────────────────────────────────────────────────
     const rowVirtualizer = useVirtualizer(
       computed(() => ({

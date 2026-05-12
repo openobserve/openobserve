@@ -68,14 +68,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-item-section avatar>
                     <q-checkbox
                       :model-value="areAllColumnsSelected"
-                      :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
+                      :indeterminate="
+                        areSomeColumnsSelected && !areAllColumnsSelected
+                      "
                       @update:model-value="toggleSelectAll"
                       dense
                     />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label class="tw:font-semibold">
-                      {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
+                      {{
+                        areAllColumnsSelected
+                          ? t("common.deselectAll")
+                          : t("common.selectAll")
+                      }}
                     </q-item-label>
                   </q-item-section>
                 </q-item>
@@ -92,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @dragstart="handleDragStart($event, index)"
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
-                  :class="{ 'dragging': draggedIndex === index }"
+                  :class="{ dragging: draggedIndex === index }"
                   :data-test="`column-item-${field}`"
                   class="column-item"
                 >
@@ -123,9 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Show skeleton while loading -->
       <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
-        <q-skeleton type="rect" width="200px" height="32px" />
-        <q-skeleton type="rect" width="200px" height="32px" />
-        <q-skeleton type="rect" width="200px" height="32px" />
+        <q-skeleton type="rect" width="200px"
+height="32px" />
+        <q-skeleton type="rect" width="200px"
+height="32px" />
+        <q-skeleton type="rect" width="200px"
+height="32px" />
       </div>
 
       <!-- Results Summary Row -->
@@ -166,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :expanded-rows="expandedRows"
           :highlight-timestamp="-1"
           :default-columns="showingDefaultColumns"
-          :jsonpreview-stream-name="primaryStream"
+          :jsonpreview-stream-name="jsonPreviewStreamName"
           :highlight-query="highlightQuery"
           :selected-stream-fts-keys="ftsFields"
           :selected-stream-fields="selectedFields"
@@ -192,9 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="table-skeleton"
         >
           <!-- Loading indicator -->
-          <div
-            class="tw:flex tw:items-center tw:justify-center tw:gap-3"
-          >
+          <div class="tw:flex tw:items-center tw:justify-center tw:gap-3">
             <q-spinner color="primary" size="md" />
             <span class="tw:text-sm tw:opacity-70">
               {{ t("correlation.logs.loading") }}
@@ -208,9 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           data-test="error-state"
         >
-          <p
-            class="tw:text-base tw:opacity-70 tw:max-w-md tw:text-center"
-          >
+          <p class="tw:text-base tw:opacity-70 tw:max-w-md tw:text-center">
             {{ error || t("correlation.logs.errorDetails") }}
           </p>
         </div>
@@ -277,7 +282,7 @@ const {
   took,
   currentFilters,
   currentTimeRange,
-  primaryStream,
+  logStreamsCount,
   hasResults,
   isLoading,
   hasError,
@@ -290,6 +295,17 @@ const {
   isMatchedDimension,
   isAdditionalDimension,
 } = useCorrelatedLogs(props);
+
+// Stream name for JSON preview — use first correlated stream, or source stream
+const jsonPreviewStreamName = computed(() => {
+  if (props.logStreams && props.logStreams.length > 0) {
+    return props.logStreams[0].stream_name;
+  }
+  if (props.sourceStream) {
+    return props.sourceStream;
+  }
+  return "";
+});
 
 // Component state
 const wrapTableCells = ref(false);
@@ -329,7 +345,7 @@ const saveColumnState = () => {
   try {
     localStorage.setItem(
       STORAGE_KEY_COLUMNS,
-      JSON.stringify(Array.from(visibleColumns.value))
+      JSON.stringify(Array.from(visibleColumns.value)),
     );
     localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(columnOrder.value));
   } catch (error) {
@@ -350,7 +366,7 @@ watch(
       saveColumnState();
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 watch(
@@ -360,7 +376,7 @@ watch(
       saveColumnState();
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Pending dimensions - for the apply button pattern
@@ -551,7 +567,7 @@ const orderedFields = computed(() => {
 // Check if all columns (except timestamp) are selected
 const areAllColumnsSelected = computed(() => {
   const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
+    (field) => field !== "_timestamp",
   );
   if (selectableFields.length === 0) return false;
 
@@ -561,7 +577,7 @@ const areAllColumnsSelected = computed(() => {
 // Check if some columns are selected (for indeterminate state)
 const areSomeColumnsSelected = computed(() => {
   const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
+    (field) => field !== "_timestamp",
   );
   if (selectableFields.length === 0) return false;
 
@@ -755,7 +771,7 @@ const handleCopy = (log: any, copyAsJson: boolean = true) => {
       type: "positive",
       message: "Content Copied Successfully!",
       timeout: 1000,
-    })
+    }),
   );
 };
 
@@ -777,7 +793,6 @@ const handleAddSearchTerm = (
 };
 
 const handleAddFieldToTable = (field: string) => {
-
   // Add the field to visible columns if it's not already visible
   if (!visibleColumns.value.has(field)) {
     visibleColumns.value.add(field);
@@ -827,7 +842,7 @@ const toggleColumnVisibility = (field: string) => {
 // Toggle all columns (select all / deselect all)
 const toggleSelectAll = () => {
   const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
+    (field) => field !== "_timestamp",
   );
 
   if (areAllColumnsSelected.value) {
@@ -927,17 +942,14 @@ const handleViewTrace = (log: any) => {
       org_identifier: store.state.selectedOrganization.identifier,
       trace_id:
         log[
-          store.state.organizationData.organizationSettings
-            .trace_id_field_name
+          store.state.organizationData.organizationSettings.trace_id_field_name
         ],
       reload: "true",
     },
   };
 
   query["span_id"] =
-    log[
-      store.state.organizationData.organizationSettings.span_id_field_name
-    ];
+    log[store.state.organizationData.organizationSettings.span_id_field_name];
 
   router.push(query);
 };
