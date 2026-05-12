@@ -30,6 +30,20 @@ import { getDataValue } from "./aliasUtils";
 // Value-mapping helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Strip regex literal delimiters if the user entered `/pattern/flags` syntax.
+ * Returns the raw pattern and any flags so `new RegExp(pattern, flags)` works.
+ */
+export const parseRegexPattern = (
+  input: string,
+): { pattern: string; flags: string } => {
+  const match = input.match(/^\/(.+)\/([gimsuy]*)$/);
+  if (match) {
+    return { pattern: match[1], flags: match[2] };
+  }
+  return { pattern: input, flags: "" };
+};
+
 /** Build a fast-lookup cache from the panel's `config.mappings` array. */
 export const buildValueMappingCache = (
   mappings: any,
@@ -97,9 +111,10 @@ export const lookupValueMapping = (
   // Regex match
   for (const [key, text] of cache.entries()) {
     if (typeof key === "string" && key.startsWith("__regex_")) {
-      const pattern = key.slice(8); // "__regex_".length === 8
+      const rawPattern = key.slice(8); // "__regex_".length === 8
       try {
-        if (new RegExp(pattern).test(strValue)) {
+        const { pattern, flags } = parseRegexPattern(rawPattern);
+        if (new RegExp(pattern, flags).test(strValue)) {
           return text;
         }
       } catch {

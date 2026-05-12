@@ -1,5 +1,6 @@
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import { parseRegexPattern } from "@/utils/dashboard/tableConfigUtils";
 
 // will find first valid mapped value based on given fieldToCheck
 export const findFirstValidMappedValue = (
@@ -24,7 +25,8 @@ export const findFirstValidMappedValue = (
       }
     } else if (v?.type == "regex") {
       try {
-        isMatch = new RegExp(v?.pattern ?? "").test(value);
+        const { pattern, flags } = parseRegexPattern(v?.pattern ?? "");
+        isMatch = new RegExp(pattern, flags).test(value);
       } catch {
         // invalid regex pattern, skip
       }
