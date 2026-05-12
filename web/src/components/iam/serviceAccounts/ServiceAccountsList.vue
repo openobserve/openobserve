@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 
-import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
+import { defineComponent, ref, onBeforeMount, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useStore } from "vuex";
@@ -342,9 +342,19 @@ export default defineComponent({
     const selectedAccounts: any = ref([]);
     const confirmBulkDelete = ref(false);
 
-    onBeforeMount(()=>{
-      getServiceAccountsUsers();
-    })
+    onBeforeMount(async () => {
+      await getServiceAccountsUsers();
+
+      const query = router.currentRoute.value.query;
+      if (query.action === "add") {
+        addUser({}, false);
+      } else if (query.action === "update" && query.email) {
+        const match = serviceAccountsState.service_accounts_users.find(
+          (m: any) => m.email === query.email,
+        );
+        if (match) addUser({ row: match }, true);
+      }
+    });
 
     const columns: any = ref<QTableProps["columns"]>([
       {

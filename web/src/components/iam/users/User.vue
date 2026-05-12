@@ -353,6 +353,17 @@ export default defineComponent({
       // }
 
       updateUserActions();
+
+      // Handle deep-linked / refreshed URL
+      const query = router.currentRoute.value.query;
+      if (query.action === "add") {
+        addUser({}, false);
+      } else if (query.action === "update" && query.email) {
+        const match = usersState.users.find(
+          (m: any) => m.email === query.email,
+        );
+        if (match) addUser({ row: match }, true);
+      }
     });
 
     const columns: any = ref<QTableProps["columns"]>([
