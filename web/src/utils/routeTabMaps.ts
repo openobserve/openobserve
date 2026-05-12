@@ -99,6 +99,14 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     iis: "iis",
   },
 
+  /** ingestion/metrics/Index.vue */
+  ingestMetrics: {
+    prometheus: "prometheus",
+    otelCollector: "otelCollector",
+    telegraf: "telegraf",
+    cloudwatchMetrics: "cloudwatchMetrics",
+  },
+
   /** ingestion/logs/Index.vue */
   ingestLogs: {
     curl: "curl",

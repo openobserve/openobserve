@@ -107,6 +107,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "IngestMetrics",
@@ -129,9 +130,7 @@ export default defineComponent({
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
     const ingestiontabs = ref(
-      router.currentRoute.value.name !== "ingestMetrics"
-        ? router.currentRoute.value.name as string
-        : "prometheus"
+      resolveTab("ingestMetrics", router.currentRoute.value.name as string, "prometheus")
     );
 
     onBeforeMount(() => {
