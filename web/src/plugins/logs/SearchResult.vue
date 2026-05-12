@@ -449,6 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end combined scroll area -->
 
       <ODrawer
+        lazy
         data-test="logs-search-result-detail-dialog"
         v-model:open="searchObj.meta.showDetailTab"
         :width="85"
