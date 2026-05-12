@@ -97,7 +97,7 @@ body:
       description: Select all that apply
       options:
         - label: Login
-        - label: Landing Page
+        - label: Home
         - label: Logs
         - label: Dashboards
         - label: Streams
@@ -109,10 +109,9 @@ body:
         - label: Traces
         - label: Real User Monitoring (RUM)
         - label: Reports
-        - label: Data Sources
         - label: IAM
         - label: Management
-        - label: Cosmetic
-        - label: Not Known / Other
+        - label: UI / Styling
+        - label: Unknown / Other
     validations:
       required: true
