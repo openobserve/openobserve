@@ -30,13 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:flex-row tw:items-center tw:flex-1 tw:min-w-0"
         data-test="dashboard-query-data"
       >
-        <span
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-          class="text-subtitle2 text-weight-bold tw:ml-2"
-          >{{ t("panel.sql") }}</span
-        >
         <div
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
           style="max-width: 600px; overflow: hidden"
         >
           <OTabs
@@ -108,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabs>
         </div>
         <OButton
-          v-if="canAddQuery"
           variant="ghost"
           size="icon"
           @click.stop="addTab"
@@ -464,21 +457,6 @@ export default defineComponent({
     const functionEditorPlaceholderFlag = ref(true);
     const vrlFnEditorRef = ref(null);
 
-    // D2: Controls whether the "+" button is visible
-    const canAddQuery = computed(() => {
-      // PromQL always supports multi-query
-      if (promqlMode.value) return true;
-
-      const type = dashboardPanelData.data.type;
-
-      // Pivot table requires consistent field aliases — single query only
-      const isPivot =
-        type === "table" &&
-        (dashboardPanelData.data.queries?.[0]?.fields?.breakdown?.length ?? 0) > 0;
-      if (isPivot) return false;
-
-      return true;
-    });
 
     // D5: Warning banner for restricted chart types with multiple queries
     const multiQueryWarning = computed(() => {
@@ -870,7 +848,6 @@ export default defineComponent({
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       store,
-      canAddQuery,
       multiQueryWarning,
       handleQueryUpdate,
       handleLanguageChange,
