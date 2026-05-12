@@ -552,7 +552,7 @@ export default defineComponent({
         const response = await streamingSearch.search({
           org_identifier: store.state.selectedOrganization.identifier,
           query: analyzeQueryPayload,
-          page_type: "logs",
+          page_type: searchObj.data.stream.streamType || "logs",
           search_type: "ui",
           traceId,
         });
