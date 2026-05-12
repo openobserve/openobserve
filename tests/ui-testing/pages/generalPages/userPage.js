@@ -86,10 +86,14 @@ export class UserPage {
     }
 
     async verifySuccessMessage(expectedMessage) {
-        // Wait directly for the specific alert — avoids being confused by earlier
-        // "Please wait..." spinner notifications that briefly appear as role=alert.
-        const specificAlert = this.page.getByRole('alert').filter({ hasText: expectedMessage });
-        await expect(specificAlert).toBeVisible({ timeout: 15000 });
+        // Match both Quasar notification toasts (.q-notification__message) and
+        // q-input form validation messages ([role="alert"] inside q-field__bottom).
+        // getByRole('alert') alone can miss the notification when accessibility
+        // tree resolution races against Quasar's notify queue + dialog portals.
+        const specificAlert = this.page
+            .locator('.q-notification__message, [role="alert"]')
+            .filter({ hasText: expectedMessage });
+        await expect(specificAlert.first()).toBeVisible({ timeout: 15000 });
     }
 
     async addUserFirstLast(firstName, lastName) {
