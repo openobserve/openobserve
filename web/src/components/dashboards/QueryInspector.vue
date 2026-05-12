@@ -103,6 +103,7 @@
                     highlightSearch(
                       colorizedQueries[`${index}-Original Query`] ||
                         query.originalQuery,
+                      !!colorizedQueries[`${index}-Original Query`],
                     )
                   "
                 ></div>
@@ -131,6 +132,7 @@
                   v-html="
                     highlightSearch(
                       colorizedQueries[`${index}-Query`] || query.query,
+                      !!colorizedQueries[`${index}-Query`],
                     )
                   "
                 ></div>
@@ -281,6 +283,7 @@ import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OButton from "@/lib/core/Button/OButton.vue";
+import DOMPurify from "dompurify";
 
 export default defineComponent({
   name: "QueryInspector",
@@ -342,8 +345,20 @@ export default defineComponent({
       colorizedQueries.value = newColorized;
     };
 
-    const highlightSearch = (html: string) => {
-      if (!searchQuery.value || !html) return html;
+    const escapeHtml = (s: string) =>
+      s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const highlightSearch = (html: string, isColorized: boolean) => {
+      if (!html) return "";
+      const safeHtml = isColorized
+        ? DOMPurify.sanitize(html)
+        : escapeHtml(html);
+      if (!searchQuery.value) return safeHtml;
 
       try {
         const escapedSearch = searchQuery.value.replace(
@@ -352,13 +367,13 @@ export default defineComponent({
         );
         const regex = new RegExp(`(?![^<]*>)(${escapedSearch})`, "gi");
 
-        return html.replace(
+        return safeHtml.replace(
           regex,
           (match) =>
             `<mark class="tw:bg-yellow-400 tw:text-black tw:rounded-sm tw:shadow-sm">${match}</mark>`,
         );
       } catch (e) {
-        return html;
+        return safeHtml;
       }
     };
 
