@@ -572,10 +572,8 @@ const scrollToSpan = (spanId: string) => {
 // Handle click events from ChartRenderer
 const handleChartClick = (params: any) => {
   if (params.data?.spanData) {
-    searchObj.data.traceDetails.selectedSpanId =
-      params.data.spanData.span_id;
-    sidebarVisible.value = true;
     emit("select-span", params.data.spanData.span_id);
+    sidebarVisible.value = true;
     nextTick(() => scrollToSpan(params.data.spanData.span_id));
   }
 };
