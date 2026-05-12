@@ -17,16 +17,13 @@ ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environme
 # Directory for test data
 root_dir = Path(__file__).parent.parent.parent
 
-def generate_random_string(length=5):
-    """Generate a random string of lowercase letters."""
-    characters = string.ascii_lowercase  # Only lowercase letters
-    return ''.join(random.choice(characters) for _ in range(length))
+@pytest.fixture(scope="session")
+def stream_name():
+    suffix = "".join(random.choices(string.ascii_lowercase, k=5))
+    name = "tdef" + suffix
+    print("Random Stream:", name)
+    return name
 
-# Generate a random stream name
-random_string = generate_random_string()
-
-stream_name = "tdef" + random_string
-print("Random Stream:", stream_name)
 
 @pytest.fixture(scope="module")
 def org_id(create_session, base_url, random_string):
@@ -65,7 +62,7 @@ def org_id(create_session, base_url, random_string):
     print(f"Deleted organization {org_id}")
 
 @pytest.mark.order(1)
-def test_data(create_session, base_url, org_id):
+def test_data(create_session, base_url, stream_name, org_id):
     """Ingest data into the OpenObserve running instance."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)

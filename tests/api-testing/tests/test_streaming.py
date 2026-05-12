@@ -25,13 +25,6 @@ ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
 root_dir = Path(__file__).parent.parent.parent
 
 
-def generate_random_string(length=5):
-    # Define the characters to choose from lower case letters
-    characters = string.ascii_lowercase  # This includes only lowercase letters
-    random_string = "".join(random.choice(characters) for _ in range(length))
-    return random_string
-
-
 def wait_for_ingestion_count(session, base_url, stream, expected, timeout=120, interval=2):
     """Poll _search until COUNT(*) for the stream reaches `expected`.
 
@@ -67,16 +60,19 @@ def wait_for_ingestion_count(session, base_url, stream, expected, timeout=120, i
     )
 
 
-# Generate a random string of length 5
-random_string = generate_random_string()
+@pytest.fixture(scope="session")
+def stream_name():
+    suffix = "".join(random.choices(string.ascii_lowercase, k=5))
+    name = "tdef" + suffix
+    print("Random Stream:", name)
+    return name
 
-stream_name = "tdef" + random_string
 
-stream_join = "join" + random_string
-
-print("Random Stream:", stream_name)
-
-print("String Join:", stream_join)
+@pytest.fixture(scope="session")
+def stream_join(stream_name):
+    name = "join" + stream_name[4:]
+    print("String Join:", name)
+    return name
 
 
 @pytest.fixture
@@ -85,7 +81,7 @@ def base_url_sc():
     return ZO_BASE_URL_SC
 
 
-def test_ingest_data(create_session, base_url_sc, org_id):
+def test_ingest_data(create_session, base_url_sc, stream_name, org_id):
     """Ingest data into the openobserve running instance."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
@@ -109,7 +105,7 @@ def test_ingest_data(create_session, base_url_sc, org_id):
     # Join stream data
 
 
-def test_ingest_join(create_session, base_url_sc, org_id):
+def test_ingest_join(create_session, base_url_sc, stream_join, org_id):
     """Ingest join data into the openobserve running instance."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
@@ -159,70 +155,71 @@ def test_disable_streaming(create_session, base_url, org_id):
 
 
 # Define test data with different queries and expected response details for histogram
+# __STREAM_NAME__ is a placeholder resolved at test runtime via the stream_name fixture
 test_data_histog = [
     (
         "Stream",
-        f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
+        'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "__STREAM_NAME__" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
         3848,
     ),
     (
         "AND",
-        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        "SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"__STREAM_NAME__\" WHERE kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
         1,
         2002,
     ),
     (
         "OR",
-        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        "SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"__STREAM_NAME__\" WHERE kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
         1,
         2002,
     ),
     (
         "Match_all",
-        f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" WHERE match_all(\'ziox\') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
+        'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "__STREAM_NAME__" WHERE match_all(\'ziox\') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
         18,
     ),
     (
         "str_match",
-        f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" WHERE str_match(kubernetes_container_name, \'ziox\') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
+        'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "__STREAM_NAME__" WHERE str_match(kubernetes_container_name, \'ziox\') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
         2002,
     ),
     (
         "Like",
-        f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" WHERE kubernetes_container_name LIKE \'%ziox%\' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
+        'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "__STREAM_NAME__" WHERE kubernetes_container_name LIKE \'%ziox%\' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
         2002,
     ),
     (
         "IN",
-        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        "SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"__STREAM_NAME__\" WHERE kubernetes_container_name IN ('controller', 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
         1,
         2816,
     ),
     (
         "str_match_ignore_case",
-        f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" WHERE str_match_ignore_case(kubernetes_container_name, \'ziox\') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
+        'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "__STREAM_NAME__" WHERE str_match_ignore_case(kubernetes_container_name, \'ziox\') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
         2002,
     ),
     (
         "Count Having",
-        f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
+        'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "__STREAM_NAME__" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
         3848,
     ),
     (
         "Not Null",
-        f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" WHERE kubernetes_container_image IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
+        'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "__STREAM_NAME__" WHERE kubernetes_container_image IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
         3846,
     ),
     (
         "re_match",
-        f'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "{stream_name}" WHERE re_match(kubernetes_container_name, \'ziox\') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
+        'SELECT histogram(_timestamp, \'10 second\') AS "zo_sql_key", COUNT(*) AS "zo_sql_num" FROM "__STREAM_NAME__" WHERE re_match(kubernetes_container_name, \'ziox\') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC',
         1,
         2002,
     ),
@@ -240,8 +237,11 @@ def test_histogram(
     hist_query,
     expected_total_hits_results_histg,
     expected_zo_sql_num_histg,
+    stream_name,
     org_id):
     """Running an E2E test for histogram queries with Parameterized data when websocket is disabled."""
+
+    hist_query = hist_query.replace("__STREAM_NAME__", stream_name)
 
     session = create_session
     url = base_url
@@ -335,24 +335,25 @@ def test_histogram(
 
 
 # Define test data with different queries and expected response details for SQL when websocket is disabled
+# __STREAM_NAME__ and __STREAM_JOIN__ are placeholders resolved at test runtime via fixtures
 test_data_sql = [
     (
         "Stream",
-        f'SELECT * FROM "{stream_name}"',
+        'SELECT * FROM "__STREAM_NAME__"',
         0,
         100,
         100,
     ),
     (
         "AND",
-        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox'",
+        "SELECT * FROM \"__STREAM_NAME__\" where kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox'",
         0,
         100,
         100,
     ),
     (
         "OR",
-        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
+        "SELECT * FROM \"__STREAM_NAME__\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
         0,
         100,
         100,
@@ -360,245 +361,245 @@ test_data_sql = [
     # To Be checked later - 15-07-2025 Shrinath
     # (
     #     "Match_all",
-    #     f"SELECT * FROM \"{stream_name}\" WHERE match_all('ziox')",
+    #     "SELECT * FROM \"__STREAM_NAME__\" WHERE match_all('ziox')",
     #     0,
     #     100,
     #     18,
     # ),
     (
         "Str_match",
-        f"SELECT * FROM \"{stream_name}\" where str_match(kubernetes_container_name, 'ziox')",
+        "SELECT * FROM \"__STREAM_NAME__\" where str_match(kubernetes_container_name, 'ziox')",
         0,
         100,
         100,
     ),
     (
         "Like",
-        f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name LIKE '%ziox%'",
+        "SELECT * FROM \"__STREAM_NAME__\" WHERE kubernetes_container_name LIKE '%ziox%'",
         0,
         100,
         100,
     ),
     (
         "AS",
-        f'SELECT kubernetes_container_name as "breakdown_1" FROM "{stream_name}"',
+        'SELECT kubernetes_container_name as "breakdown_1" FROM "__STREAM_NAME__"',
         0,
         100,
         100,
     ),
     (
         "IN",
-        f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox')",
+        "SELECT * FROM \"__STREAM_NAME__\" WHERE kubernetes_container_name IN ('controller', 'ziox')",
         0,
         100,
         100,
     ),
     (
         "str_match_ignore_case",
-        f"SELECT * FROM \"{stream_name}\" where str_match_ignore_case(kubernetes_container_name, 'ziox')",
+        "SELECT * FROM \"__STREAM_NAME__\" where str_match_ignore_case(kubernetes_container_name, 'ziox')",
         0,
         100,
         100,
     ),
     (
         "Limit",
-        f'SELECT * FROM "{stream_name}" LIMIT 10',
+        'SELECT * FROM "__STREAM_NAME__" LIMIT 10',
         0,
         10,
         10,
     ),
     (
         "DISTINCT",
-        f'SELECT DISTINCT code FROM "{stream_name}"',
+        'SELECT DISTINCT code FROM "__STREAM_NAME__"',
         0,
         100,
         3,
     ),
     (
         "UNION",
-        f'SELECT * FROM "{stream_name}" UNION SELECT * FROM "{stream_join}"',
+        'SELECT * FROM "__STREAM_NAME__" UNION SELECT * FROM "__STREAM_JOIN__"',
         0,
         50,
         50,
     ),
     (
         "UNION ALL",
-        f'SELECT * FROM "{stream_name}" UNION ALL SELECT * FROM "{stream_join}"',
+        'SELECT * FROM "__STREAM_NAME__" UNION ALL SELECT * FROM "__STREAM_JOIN__"',
         0,
         50,
         50,
     ),
     (
         "Join",
-        f'SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM "{stream_name}" as a join "{stream_join}" as b on a.kubernetes_namespace_name  = b.kubernetes_namespace_name',
+        'SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM "__STREAM_NAME__" as a join "__STREAM_JOIN__" as b on a.kubernetes_namespace_name  = b.kubernetes_namespace_name',
         0,
         50,
         50,
     ),
     (
         "LEFT Join",
-        f'SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM "{stream_name}" as a LEFT JOIN "{stream_join}" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id',
+        'SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM "__STREAM_NAME__" as a LEFT JOIN "__STREAM_JOIN__" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id',
         0,
         50,
         50,
     ),
     (
         "RIGHT Join",
-        f'SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM "{stream_name}" as a RIGHT JOIN "{stream_join}" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id',
+        'SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM "__STREAM_NAME__" as a RIGHT JOIN "__STREAM_JOIN__" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id',
         0,
         50,
         50,
     ),
     (
         "FULL Join",
-        f'SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM "{stream_name}" as a FULL JOIN "{stream_join}" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id',
+        'SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM "__STREAM_NAME__" as a FULL JOIN "__STREAM_JOIN__" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id',
         0,
         50,
         50,
     ),
     (
         "Join Where",
-        f"SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM \"{stream_name}\" as a join \"{stream_join}\" as b on a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        "SELECT a.kubernetes_namespace_name , b.kubernetes_namespace_name  FROM \"__STREAM_NAME__\" as a join \"__STREAM_JOIN__\" as b on a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
         0,
         50,
         50,
     ),
     (
         "LEFT Join Where",
-        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a LEFT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        "SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"__STREAM_NAME__\" as a LEFT JOIN \"__STREAM_JOIN__\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
         0,
         50,
         50,
     ),
     (
         "RIGHT Join Where",
-        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a RIGHT JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        "SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"__STREAM_NAME__\" as a RIGHT JOIN \"__STREAM_JOIN__\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
         0,
         50,
         50,
     ),
     (
         "FULL Join",
-        f"SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"{stream_name}\" as a FULL JOIN \"{stream_join}\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
+        "SELECT a.kubernetes_docker_id , b.kubernetes_docker_id FROM \"__STREAM_NAME__\" as a FULL JOIN \"__STREAM_JOIN__\" as b ON a.kubernetes_docker_id  = b.kubernetes_docker_id WHERE a.kubernetes_container_name = 'ziox' AND b.kubernetes_container_name = 'ziox'",
         0,
         50,
         50,
     ),
     (
         "INNER Join Like",
-        f'SELECT "a".kubernetes_docker_id, "b".kubernetes_docker_id FROM "{stream_name}" AS "a" INNER JOIN "{stream_join}" AS "b" ON "a".kubernetes_docker_id = "b".kubernetes_docker_id WHERE "a".kubernetes_container_name LIKE \'%ziox%\'',
+        'SELECT "a".kubernetes_docker_id, "b".kubernetes_docker_id FROM "__STREAM_NAME__" AS "a" INNER JOIN "__STREAM_JOIN__" AS "b" ON "a".kubernetes_docker_id = "b".kubernetes_docker_id WHERE "a".kubernetes_container_name LIKE \'%ziox%\'',
         0,
         50,
         50,
     ),
     (
         "INNER Join Like Limit",
-        f'SELECT "a".kubernetes_docker_id, "b".kubernetes_docker_id FROM "{stream_name}" AS "a" INNER JOIN "{stream_join}" AS "b" ON "a".kubernetes_docker_id = "b".kubernetes_docker_id WHERE "a".kubernetes_container_name LIKE \'%ziox%\' LIMIT 10',
+        'SELECT "a".kubernetes_docker_id, "b".kubernetes_docker_id FROM "__STREAM_NAME__" AS "a" INNER JOIN "__STREAM_JOIN__" AS "b" ON "a".kubernetes_docker_id = "b".kubernetes_docker_id WHERE "a".kubernetes_container_name LIKE \'%ziox%\' LIMIT 10',
         0,
         50,
         10,
     ),
     (
         "INNER Join IN",
-        f'SELECT "a".kubernetes_docker_id, "b".kubernetes_docker_id FROM "{stream_name}" AS "a" INNER JOIN "{stream_join}" AS "b" ON "a".kubernetes_docker_id = "b".kubernetes_docker_id WHERE "a".kubernetes_container_name IN (\'ziox\')',
+        'SELECT "a".kubernetes_docker_id, "b".kubernetes_docker_id FROM "__STREAM_NAME__" AS "a" INNER JOIN "__STREAM_JOIN__" AS "b" ON "a".kubernetes_docker_id = "b".kubernetes_docker_id WHERE "a".kubernetes_container_name IN (\'ziox\')',
         0,
         50,
         50,
     ),
     (
         "INNER Join IN Limit",
-        f'SELECT "a".kubernetes_docker_id, "b".kubernetes_docker_id FROM "{stream_name}" AS "a" INNER JOIN "{stream_join}" AS "b" ON "a".kubernetes_docker_id = "b".kubernetes_docker_id WHERE "a".kubernetes_container_name IN (\'ziox\') LIMIT 10',
+        'SELECT "a".kubernetes_docker_id, "b".kubernetes_docker_id FROM "__STREAM_NAME__" AS "a" INNER JOIN "__STREAM_JOIN__" AS "b" ON "a".kubernetes_docker_id = "b".kubernetes_docker_id WHERE "a".kubernetes_container_name IN (\'ziox\') LIMIT 10',
         0,
         50,
         10,
     ),
     (
         "Count Having",
-        f'SELECT COUNT(_timestamp) as totallogcount FROM "{stream_name}" Having totallogcount > 1000',
+        'SELECT COUNT(_timestamp) as totallogcount FROM "__STREAM_NAME__" Having totallogcount > 1000',
         0,
         -1,
         1,
     ),
     (
         "regexp_match",
-        f"SELECT _timestamp, array_extract(regexp_match(log, '^[^\\\\]\\n]*\\\\]\\\\s+(?P<httpMethod>\\\\w+)(?:[^/\\n]*/){4}(?P<catalogApi>\\\\w+)(?:[^\\n]* ){2}(?P<httpStatusCode>[^ ]+)\\\\s+(?P<apiPayloadSize>[^ ]+)\\\\s+(?P<responseTime>\\\\d+)'), 3) AS status FROM \"{stream_name}\"",
+        "SELECT _timestamp, array_extract(regexp_match(log, '^[^\\\\]\\n]*\\\\]\\\\s+(?P<httpMethod>\\\\w+)(?:[^/\\n]*/){4}(?P<catalogApi>\\\\w+)(?:[^\\n]* ){2}(?P<httpStatusCode>[^ ]+)\\\\s+(?P<apiPayloadSize>[^ ]+)\\\\s+(?P<responseTime>\\\\d+)'), 3) AS status FROM \"__STREAM_NAME__\"",
         0,
         100,
         100,
     ),
     (
         "Count Distinct",
-        f'SELECT count(distinct(kubernetes_container_name)) FROM "{stream_name}"',
+        'SELECT count(distinct(kubernetes_container_name)) FROM "__STREAM_NAME__"',
         0,
         -1,
         1,
     ),
     (
         "MAX",
-        f'SELECT MAX(_timestamp), count(_timestamp) FROM "{stream_name}"',
+        'SELECT MAX(_timestamp), count(_timestamp) FROM "__STREAM_NAME__"',
         0,
         -1,
         1,
     ),
     (
         "Count Aggregate",
-        f'SELECT count(*) FROM "{stream_name}"',
+        'SELECT count(*) FROM "__STREAM_NAME__"',
         0,
         -1,
         1,
     ),
     (
         "Not Null",
-        f'SELECT * FROM "{stream_name}" WHERE kubernetes_container_image IS NOT NULL',
+        'SELECT * FROM "__STREAM_NAME__" WHERE kubernetes_container_image IS NOT NULL',
         0,
         -1,
         1000,
     ),
     (
         "Avg",
-        f'SELECT avg(code) FROM "{stream_name}" WHERE code > 200',
+        'SELECT avg(code) FROM "__STREAM_NAME__" WHERE code > 200',
         0,
         -1,
         1,
     ),
     (
         "re_match",
-        f"SELECT * FROM \"{stream_name}\" WHERE re_match(kubernetes_container_name, 'ziox')",
+        "SELECT * FROM \"__STREAM_NAME__\" WHERE re_match(kubernetes_container_name, 'ziox')",
         0,
         50,
         50,
     ),
     (
         "page_one",
-        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        "SELECT * FROM \"__STREAM_NAME__\" where kubernetes_container_name = 'velero'",
         0,
         100,
         100,
     ),
     (
         "page_two",
-        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        "SELECT * FROM \"__STREAM_NAME__\" where kubernetes_container_name = 'velero'",
         100,
         101,
         101,
     ),
     (
         "page_three",
-        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        "SELECT * FROM \"__STREAM_NAME__\" where kubernetes_container_name = 'velero'",
         200,
         101,
         101,
     ),
     (
         "page_four",
-        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        "SELECT * FROM \"__STREAM_NAME__\" where kubernetes_container_name = 'velero'",
         300,
         101,
         101,
     ),
     (
         "page_five",
-        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'velero'",
+        "SELECT * FROM \"__STREAM_NAME__\" where kubernetes_container_name = 'velero'",
         400,
         101,
         40,
@@ -606,21 +607,21 @@ test_data_sql = [
     # To Be checked later - 15-07-2025 Shrinath
     # (
     #     "match_all query one",
-    #     f"SELECT * FROM \"{stream_name}\" WHERE match_all('zio*')",
+    #     "SELECT * FROM \"__STREAM_NAME__\" WHERE match_all('zio*')",
     #     0,
     #     50,
     #     18,
     # ),
     (
         "match_all query two",
-        f"SELECT * FROM \"{stream_name}\" WHERE match_all('us*')",
+        "SELECT * FROM \"__STREAM_NAME__\" WHERE match_all('us*')",
         0,
         50,
         50,
     ),
     (
         "match_all query three",
-        f"SELECT * FROM \"{stream_name}\" WHERE match_all('ip-10-2-15-197.us-east-2.co*')",
+        "SELECT * FROM \"__STREAM_NAME__\" WHERE match_all('ip-10-2-15-197.us-east-2.co*')",
         0,
         50,
         2,
@@ -706,7 +707,7 @@ def test_sql(
     )
 
 
-def test_update_max_query_range(create_session, base_url, org_id):
+def test_update_max_query_range(create_session, base_url, stream_name, org_id):
     session = create_session
     url = f"{base_url}api/{org_id}/streams/{stream_name}/settings?type=logs"
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
@@ -730,7 +731,7 @@ def test_update_max_query_range(create_session, base_url, org_id):
     # Add more assertions as needed to validate the response content
 
 
-def test_sql_query_range(create_session, base_url, org_id):
+def test_sql_query_range(create_session, base_url, stream_name, org_id):
     """Running an E2E test for sql max query range."""
 
     session = create_session
@@ -806,7 +807,7 @@ def test_sql_query_range(create_session, base_url, org_id):
     )
 
 
-def test_search_partition(create_session, base_url, org_id):
+def test_search_partition(create_session, base_url, stream_name, org_id):
     """Test the search partition API."""
     session = create_session
     url = base_url
@@ -883,7 +884,7 @@ def test_search_partition(create_session, base_url, org_id):
     assert response_data["streaming_id"] is None, "Unexpected 'streaming_id' value"
 
 
-def test_values_endpoint(create_session, base_url, org_id):
+def test_values_endpoint(create_session, base_url, stream_name, org_id):
     session = create_session
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
@@ -953,8 +954,11 @@ def test_streaming_histogram(
     hist_query,
     expected_total_hits_results_histg,
     expected_zo_sql_num_histg,
+    stream_name,
     org_id):
     """Running an E2E test for histogram queries with Parameterized data when streaming is enabled."""
+
+    hist_query = hist_query.replace("__STREAM_NAME__", stream_name)
 
     session = create_session
     url = base_url
@@ -1060,8 +1064,10 @@ def test_streaming_histogram(
 
 # TODO Uncomment the following test cases after the issue (https://github.com/openobserve/openobserve/issues/7858) is fixed
 @pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
-def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp, org_id):
+def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp, stream_name, stream_join, org_id):
     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
+
+    sql_query = sql_query.replace("__STREAM_NAME__", stream_name).replace("__STREAM_JOIN__", stream_join)
 
     session = create_session
     url = base_url
@@ -1129,7 +1135,7 @@ def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_f
 # Define the test function
 
 
-def test_values_streaming_endpoint(create_session, base_url, org_id):
+def test_values_streaming_endpoint(create_session, base_url, stream_name, org_id):
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
     now = datetime.now(timezone.utc)
@@ -1186,7 +1192,7 @@ def test_values_streaming_endpoint(create_session, base_url, org_id):
 
 
 # # Define the test function
-def test_values_streaming_endpoint_cache(create_session, base_url, org_id):
+def test_values_streaming_endpoint_cache(create_session, base_url, stream_name, org_id):
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
     now = datetime.now(timezone.utc)
@@ -1243,7 +1249,7 @@ def test_values_streaming_endpoint_cache(create_session, base_url, org_id):
         assert isinstance(hit['values'], list)  # Check that values is a list
 
 
-def test_streaming_sql_query_range(create_session, base_url, org_id):
+def test_streaming_sql_query_range(create_session, base_url, stream_name, org_id):
     """Running an E2E test for sql max query range with streaming enabled."""
 
     session = create_session
@@ -1325,7 +1331,7 @@ def test_streaming_sql_query_range(create_session, base_url, org_id):
     ), "Expected error message not found in function_error"
 
 
-def test_delete_stream(create_session, base_url, org_id):
+def test_delete_stream(create_session, base_url, stream_name, org_id):
     """Running an E2E test for deleting the created stream."""
     session = create_session
     url = base_url
@@ -1340,7 +1346,7 @@ def test_delete_stream(create_session, base_url, org_id):
     print(f"Successfully deleted stream {stream_name}")
 
 
-def test_delete_stream_join(create_session, base_url, org_id):
+def test_delete_stream_join(create_session, base_url, stream_join, org_id):
     """Running an E2E test for deleting the created join stream."""
     session = create_session
     url = base_url
