@@ -141,7 +141,7 @@
     import {
     defineComponent,
     ref,
-    onMounted,
+    watch,
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
@@ -202,7 +202,7 @@
         ODrawer,
     },
     emits: ['update:open'],
-    setup({ selectedEnrichmentTable }) {
+    setup(props) {
         const { t } = useI18n();
         const store = useStore();
         const q = useQuasar();
@@ -240,19 +240,25 @@
             { label: "50", value: 50 },
         ];
 
-        onMounted(async () => {
-            await getSchemaData();
-        })
+        watch(
+            () => props.open,
+            async (isOpen) => {
+                if (isOpen) await getSchemaData();
+            },
+        );
 
         const getSchemaData = async () => {
             try {
                 loadingState.value = true;
-                const streamData = await getStream(selectedEnrichmentTable, 'enrichment_tables', true);
-                schemaData.value = streamData;
-                resultTotal.value = streamData.schema.length;
-                loadingState.value = false;
+                const streamData = await getStream(props.selectedEnrichmentTable, 'enrichment_tables', true);
+                if (streamData) {
+                    schemaData.value = streamData;
+                    resultTotal.value = streamData.schema.length;
+                }
             } catch (error) {
                 console.error(error);
+                schemaData.value = { ...defaultStreamData, stats: { ...defaultStreamData.stats } };
+            } finally {
                 loadingState.value = false;
             }
         }
@@ -280,7 +286,7 @@
         schemaRows,
         loadingState,
         schemaData,
-        selectedEnrichmentTable,
+        selectedEnrichmentTable: props.selectedEnrichmentTable,
         getStream,
         formatSizeFromMB,
         isCloud,
