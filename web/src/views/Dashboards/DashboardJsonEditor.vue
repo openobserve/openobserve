@@ -81,7 +81,6 @@ const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
 import { getImageURL } from "@/utils/zincutils";
-import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { validateDashboardJson } from "@/utils/dashboard/dashboardValidator";
 
