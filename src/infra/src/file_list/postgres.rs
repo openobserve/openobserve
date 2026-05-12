@@ -2260,7 +2260,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
 
     // 1. Ensure all columns exist
     sqlx::query(&format!(
-        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(256) DEFAULT '' NOT NULL"
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(128) DEFAULT '' NOT NULL"
     ))
     .execute(&mut *tx)
     .await?;
@@ -2665,7 +2665,7 @@ fn file_list_partition_ddl(table: &str) -> String {
         r#"
 CREATE TABLE {table} (
     id              BIGINT GENERATED ALWAYS AS IDENTITY,
-    account         VARCHAR(256) NOT NULL,
+    account         VARCHAR(128) NOT NULL,
     org             VARCHAR(100) NOT NULL,
     stream          VARCHAR(256) NOT NULL,
     date            VARCHAR(16) NOT NULL,
@@ -2755,7 +2755,7 @@ pub async fn create_table() -> Result<()> {
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    account    VARCHAR(256)  not null,
+    account    VARCHAR(128)  not null,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
@@ -2825,7 +2825,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column(
         "file_list_deleted",
         "account",
-        "VARCHAR(256) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column("file_list_jobs", "started_at", "BIGINT default 0 not null").await?;
@@ -2847,13 +2847,13 @@ CREATE TABLE IF NOT EXISTS stream_stats
     // after introducing org_storage, the account can have value of org_id:default,
     // and we restrict org_id to 100 characters so here we change it to 256 from original 32
     for table in &["file_list", "file_list_history", "file_list_deleted"] {
-        log::info!("[POSTGRES] updating account col to 256 for table {table}");
+        log::info!("[POSTGRES] updating account col to 128 for table {table}");
         sqlx::query(&format!(
-            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(256);"
+            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(128);"
         ))
         .execute(&pool)
         .await?;
-        log::info!("[POSTGRES] successfully updated account col to 256 for table {table}");
+        log::info!("[POSTGRES] successfully updated account col to 128 for table {table}");
     }
 
     Ok(())
@@ -3238,7 +3238,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(256) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3262,7 +3262,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_history (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(256) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3286,7 +3286,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_deleted (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(256) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
