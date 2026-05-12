@@ -891,6 +891,7 @@ import {
   type Ref,
   type PropType,
   onMounted,
+  onUnmounted,
   watch,
   defineAsyncComponent,
   onBeforeMount,
@@ -905,6 +906,8 @@ import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
 import { useStore } from "vuex";
+import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
+import { contextRegistry } from "@/composables/contextProviders";
 import {
   formatTimeWithSuffix,
   getImageURL,
@@ -1087,8 +1090,21 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const traceServiceMap: any = ref({});
     const { getStreams, getStream } = useStreams();
+
+    // AI copilot context provider for trace details page
+    const setupContextProvider = () => {
+      const provider = createTracesContextProvider(searchObj, store);
+      contextRegistry.register("traces", provider);
+      contextRegistry.setActive("traces");
+    };
+
+    const cleanupContextProvider = () => {
+      contextRegistry.unregister("traces");
+      contextRegistry.setActive("");
+    };
+
+    const traceServiceMap: any = ref({});
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -1627,6 +1643,7 @@ export default defineComponent({
     };
 
     onMounted(() => {
+      setupContextProvider();
       const params = router.currentRoute.value.query;
       if (params.span_id) {
         updateSelectedSpan(params.span_id as string);
@@ -1637,9 +1654,9 @@ export default defineComponent({
       // window.addEventListener("resize", updateHeight);
     });
 
-    // onBeforeUnmount(() => {
-    //   window.removeEventListener("resize", updateHeight);
-    // });
+    onUnmounted(() => {
+      cleanupContextProvider();
+    });
 
     // watch(
     //   () => spanList.value.length,

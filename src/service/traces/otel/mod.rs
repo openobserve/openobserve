@@ -176,12 +176,12 @@ mod tests {
         );
 
         // Verify enrichment
-        // 1. Observation type should be GENERATION
+        // 1. Observation type should be chat
         assert_eq!(
             span_attributes
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
 
         // 2. Model name should be extracted
@@ -279,7 +279,7 @@ mod tests {
             span_attributes
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
         assert_eq!(
             span_attributes
@@ -335,7 +335,7 @@ mod tests {
             span_attributes
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("TOOL")
+            Some("execute_tool")
         );
         assert!(span_attributes.contains_key(GenAiAttributes::INPUT_MESSAGES));
         assert!(span_attributes.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
@@ -363,10 +363,10 @@ mod tests {
 
         // Verify embedding enrichment
         assert_eq!(
-            span_attributes
+            span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("EMBEDDING")
+            Some("embeddings")
         );
         assert_eq!(
             span_attributes
@@ -498,7 +498,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
         assert_eq!(
             span_attrs
@@ -551,7 +551,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("TOOL")
+            Some("execute_tool")
         );
         assert!(span_attrs.contains_key(GenAiAttributes::INPUT_MESSAGES));
         assert!(span_attrs.contains_key(GenAiAttributes::OUTPUT_MESSAGES));
@@ -580,7 +580,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("EMBEDDING")
+            Some("embeddings")
         );
     }
 
@@ -614,7 +614,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
         assert_eq!(
             span_attrs
@@ -653,7 +653,7 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION")
+            Some("chat")
         );
         assert!(span_attrs.contains_key(GenAiAttributes::USAGE_INPUT_TOKENS));
     }
@@ -741,8 +741,8 @@ mod tests {
             span_attrs
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
-            Some("GENERATION"),
-            "Should detect GENERATION from gen_ai.operation.name=chat"
+            Some("chat"),
+            "Should detect chat from gen_ai.operation.name=chat"
         );
 
         // 2. Model name (response model takes precedence)
