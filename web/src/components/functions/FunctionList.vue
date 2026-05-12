@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom="scope">
-                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
                   <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
                         {{ resultTotal }} {{ t('function.header') }}
                       </div>
