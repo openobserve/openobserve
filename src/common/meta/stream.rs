@@ -279,4 +279,26 @@ mod tests {
         let delete_fields = StreamDeleteFields::default();
         assert!(delete_fields.fields.is_empty());
     }
+
+    #[test]
+    fn test_field_update_nullable_none_absent() {
+        let f = FieldUpdate {
+            name: "col".to_string(),
+            data_type: "Utf8".to_string(),
+            nullable: None,
+        };
+        let json = serde_json::to_value(&f).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("nullable"));
+    }
+
+    #[test]
+    fn test_field_update_nullable_some_present() {
+        let f = FieldUpdate {
+            name: "col".to_string(),
+            data_type: "Utf8".to_string(),
+            nullable: Some(true),
+        };
+        let json = serde_json::to_value(&f).unwrap();
+        assert!(json.as_object().unwrap().contains_key("nullable"));
+    }
 }

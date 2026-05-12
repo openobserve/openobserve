@@ -836,3 +836,453 @@ pub enum LabelPosition {
     InsideBottomRight,
     Outside,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_dashboard() -> Dashboard {
+        serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "title": "V8 Dashboard",
+            "description": "A v8 test dashboard"
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn test_dashboard_fields() {
+        let d = make_dashboard();
+        assert_eq!(d.title, "V8 Dashboard");
+        assert!(d.tabs.is_empty());
+    }
+
+    #[test]
+    fn test_dashboard_into_meta_version_is_8() {
+        let d = make_dashboard();
+        let meta: super::super::Dashboard = d.into();
+        assert_eq!(meta.version, 8);
+        assert!(meta.v8.is_some());
+        assert!(!meta.hash.is_empty());
+    }
+
+    #[test]
+    fn test_dashboard_variables_skip_serializing_if_none() {
+        let d = make_dashboard();
+        assert!(d.variables.is_none());
+        assert!(d.default_datetime_duration.is_none());
+        let json = serde_json::to_value(&d).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("variables"));
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("defaultDatetimeDuration")
+        );
+    }
+
+    #[test]
+    fn test_layout_default_all_zeros() {
+        let layout = Layout::default();
+        assert_eq!(layout.x, 0);
+        assert_eq!(layout.y, 0);
+        assert_eq!(layout.w, 0);
+        assert_eq!(layout.h, 0);
+        assert_eq!(layout.i, 0);
+    }
+
+    #[test]
+    fn test_layout_serde_roundtrip() {
+        let json = serde_json::json!({"x": 1, "y": 2, "w": 10, "h": 5, "i": 3});
+        let layout: Layout = serde_json::from_value(json).unwrap();
+        assert_eq!(layout.x, 1);
+        assert_eq!(layout.h, 5);
+        let back = serde_json::to_value(&layout).unwrap();
+        assert_eq!(back["w"], 10);
+    }
+
+    #[test]
+    fn test_line_interpolation_default_is_smooth() {
+        let v: LineInterpolation = Default::default();
+        assert_eq!(v, LineInterpolation::Smooth);
+        let s = serde_json::to_string(&v).unwrap();
+        assert_eq!(s, "\"smooth\"");
+    }
+
+    #[test]
+    fn test_line_interpolation_step_variants_serialize() {
+        let s = serde_json::to_string(&LineInterpolation::StepStart).unwrap();
+        assert_eq!(s, "\"step-start\"");
+        let e = serde_json::to_string(&LineInterpolation::StepEnd).unwrap();
+        assert_eq!(e, "\"step-end\"");
+        let m = serde_json::to_string(&LineInterpolation::StepMiddle).unwrap();
+        assert_eq!(m, "\"step-middle\"");
+    }
+
+    #[test]
+    fn test_label_position_default_is_top() {
+        let v: LabelPosition = Default::default();
+        assert_eq!(v, LabelPosition::Top);
+    }
+
+    #[test]
+    fn test_promql_operation_param_variants() {
+        let arr: PromQLOperationParam =
+            serde_json::from_value(serde_json::json!(["a", "b"])).unwrap();
+        assert!(matches!(arr, PromQLOperationParam::Array(_)));
+
+        let b: PromQLOperationParam = serde_json::from_value(serde_json::json!(true)).unwrap();
+        assert!(matches!(b, PromQLOperationParam::Bool(true)));
+
+        let s: PromQLOperationParam = serde_json::from_value(serde_json::json!("hello")).unwrap();
+        assert!(matches!(s, PromQLOperationParam::String(_)));
+    }
+
+    #[test]
+    fn test_promql_operation_no_params_skip_serializing() {
+        let op = PromQLOperation {
+            id: "op1".to_string(),
+            params: None,
+        };
+        let json = serde_json::to_value(&op).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("params"));
+    }
+
+    #[test]
+    fn test_axis_type_all_variants_serde() {
+        let cases = [
+            (AxisType::Build, "\"build\""),
+            (AxisType::Raw, "\"raw\""),
+            (AxisType::Custom, "\"custom\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: AxisType = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_absent_when_none() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "color": null
+        }))
+        .unwrap();
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("column"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("functionName"));
+        assert!(!json.contains("sortBy"));
+        assert!(!json.contains("isDerived"));
+        assert!(!json.contains("rawQuery"));
+    }
+
+    #[test]
+    fn test_axis_item_with_type_and_function() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "color": "#ff0",
+            "type": "build",
+            "functionName": "count",
+            "isDerived": false
+        }))
+        .unwrap();
+        assert_eq!(item.typ, Some(AxisType::Build));
+        assert_eq!(item.function_name, Some("count".to_string()));
+        assert_eq!(item.is_derived, Some(false));
+    }
+
+    #[test]
+    fn test_axis_arg_value_wrapper_variants() {
+        let s: AxisArgValueWrapper = serde_json::from_value(serde_json::json!("hello")).unwrap();
+        assert!(matches!(s, AxisArgValueWrapper::String(_)));
+
+        let n: AxisArgValueWrapper = serde_json::from_value(serde_json::json!(3.14)).unwrap();
+        assert!(matches!(n, AxisArgValueWrapper::Number(_)));
+    }
+
+    #[test]
+    fn test_label_position_all_variants_serde() {
+        let cases = [
+            LabelPosition::Top,
+            LabelPosition::Bottom,
+            LabelPosition::Left,
+            LabelPosition::Right,
+            LabelPosition::Inside,
+            LabelPosition::Outside,
+            LabelPosition::InsideLeft,
+            LabelPosition::InsideRight,
+            LabelPosition::InsideTop,
+            LabelPosition::InsideBottom,
+            LabelPosition::InsideTopLeft,
+            LabelPosition::InsideBottomLeft,
+            LabelPosition::InsideTopRight,
+            LabelPosition::InsideBottomRight,
+        ];
+        for variant in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: LabelPosition = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_variable_list_all_optional_fields_absent_when_none() {
+        let vl = VariableList::default();
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(!json.contains("multiSelect"));
+        assert!(!json.contains("hideOnDashboard"));
+        assert!(!json.contains("selectAllValueForMultiSelect"));
+        assert!(!json.contains("customMultiSelectValue"));
+    }
+
+    #[test]
+    fn test_variable_list_optional_fields_present_when_some() {
+        let vl = VariableList {
+            multi_select: Some(true),
+            hide_on_dashboard: Some(true),
+            select_all_value_for_multi_select: Some("all".to_string()),
+            custom_multi_select_value: Some(vec!["a".to_string()]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(json.contains("multiSelect"));
+        assert!(json.contains("hideOnDashboard"));
+        assert!(json.contains("selectAllValueForMultiSelect"));
+        assert!(json.contains("customMultiSelectValue"));
+    }
+
+    #[test]
+    fn test_datetime_options_none_fields_absent() {
+        let opts = DateTimeOptions {
+            typee: "relative".to_string(),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(!json.contains("startTime"));
+        assert!(!json.contains("endTime"));
+    }
+
+    #[test]
+    fn test_color_cfg_default_all_none_absent() {
+        let cfg = ColorCfg::default();
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(!json.contains("mode"));
+        assert!(!json.contains("fixedColor"));
+        assert!(!json.contains("seriesBy"));
+        assert!(!json.contains("colorBySeries"));
+    }
+
+    #[test]
+    fn test_color_by_series_default_all_none_absent() {
+        let cbs = ColorBySeries::default();
+        let json = serde_json::to_string(&cbs).unwrap();
+        assert!(!json.contains("type"));
+        assert!(!json.contains("value"));
+        assert!(!json.contains("color"));
+    }
+
+    #[test]
+    fn test_mapping_default_all_none_absent() {
+        let m = Mapping::default();
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(!json.contains("type"));
+        assert!(!json.contains("value"));
+        assert!(!json.contains("from"));
+        assert!(!json.contains("to"));
+        assert!(!json.contains("pattern"));
+        assert!(!json.contains("match"));
+        assert!(!json.contains("color"));
+        assert!(!json.contains("text"));
+    }
+
+    #[test]
+    fn test_drill_down_default_all_none_absent() {
+        let dd = DrillDown::default();
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(!json.contains("name"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("targetBlank"));
+        assert!(!json.contains("findBy"));
+        assert!(!json.contains("data"));
+    }
+
+    #[test]
+    fn test_mark_line_default_all_none_absent() {
+        let ml = MarkLine::default();
+        let json = serde_json::to_string(&ml).unwrap();
+        assert!(!json.contains("name"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("value"));
+    }
+
+    #[test]
+    fn test_override_config_default_all_none_absent() {
+        let oc = OverrideConfig::default();
+        let json = serde_json::to_string(&oc).unwrap();
+        assert!(!json.contains("field"));
+        assert!(!json.contains("config"));
+    }
+
+    #[test]
+    fn test_drill_down_data_default_all_none_absent() {
+        let dd = DrillDownData::default();
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(!json.contains("url"));
+        assert!(!json.contains("folder"));
+        assert!(!json.contains("dashboard"));
+        assert!(!json.contains("tab"));
+        assert!(!json.contains("passAllVariables"));
+        assert!(!json.contains("variables"));
+        assert!(!json.contains("logsMode"));
+        assert!(!json.contains("logsQuery"));
+    }
+
+    #[test]
+    fn test_time_shift_default_offset_absent() {
+        let ts = TimeShift::default();
+        let json = serde_json::to_string(&ts).unwrap();
+        assert!(!json.contains("offSet"));
+    }
+
+    #[test]
+    fn test_variables_default_show_dynamic_filters_absent() {
+        let v = Variables::default();
+        let json = serde_json::to_string(&v).unwrap();
+        assert!(!json.contains("showDynamicFilters"));
+    }
+
+    #[test]
+    fn test_query_data_default_filter_absent() {
+        let qd = QueryData::default();
+        let json = serde_json::to_string(&qd).unwrap();
+        assert!(!json.contains("filter"));
+    }
+
+    #[test]
+    fn test_drill_down_all_some_present() {
+        let dd = DrillDown {
+            name: Some("nav".to_string()),
+            type_field: Some("link".to_string()),
+            target_blank: Some(true),
+            find_by: Some("field".to_string()),
+            data: Some(DrillDownData::default()),
+        };
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(json.contains("name"));
+        assert!(json.contains("type"));
+        assert!(json.contains("targetBlank"));
+        assert!(json.contains("findBy"));
+        assert!(json.contains("data"));
+    }
+
+    #[test]
+    fn test_mark_line_all_some_present() {
+        let ml = MarkLine {
+            name: Some("avg".to_string()),
+            typee: Some("average".to_string()),
+            value: Some("50".to_string()),
+        };
+        let json = serde_json::to_string(&ml).unwrap();
+        assert!(json.contains("name"));
+        assert!(json.contains("type"));
+        assert!(json.contains("\"value\""));
+    }
+
+    #[test]
+    fn test_drill_down_data_all_some_present() {
+        let dd = DrillDownData {
+            url: Some("https://x.com".to_string()),
+            folder: Some("f".to_string()),
+            dashboard: Some("d".to_string()),
+            tab: Some("t".to_string()),
+            pass_all_variables: Some(false),
+            variables: Some(vec![]),
+            logs_mode: Some("mode".to_string()),
+            logs_query: Some("query".to_string()),
+        };
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(json.contains("url"));
+        assert!(json.contains("folder"));
+        assert!(json.contains("dashboard"));
+        assert!(json.contains("tab"));
+        assert!(json.contains("passAllVariables"));
+        assert!(json.contains("variables"));
+        assert!(json.contains("logsMode"));
+        assert!(json.contains("logsQuery"));
+    }
+
+    #[test]
+    fn test_query_data_filter_some_present() {
+        let qd = QueryData {
+            filter: Some(vec![]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&qd).unwrap();
+        assert!(json.contains("filter"));
+    }
+
+    #[test]
+    fn test_query_config_all_none_absent() {
+        let qc = QueryConfig {
+            promql_legend: String::new(),
+            step_value: None,
+            layer_type: None,
+            weight_fixed: None,
+            limit: None,
+            min: None,
+            max: None,
+            time_shift: None,
+        };
+        let json = serde_json::to_string(&qc).unwrap();
+        assert!(!json.contains("step_value"));
+        assert!(!json.contains("layer_type"));
+        assert!(!json.contains("weight_fixed"));
+        assert!(!json.contains("\"limit\""));
+        assert!(!json.contains("\"min\""));
+        assert!(!json.contains("\"max\""));
+        assert!(!json.contains("timeShift"));
+    }
+
+    #[test]
+    fn test_color_cfg_all_some_present() {
+        let cfg = ColorCfg {
+            mode: Some("fixed".to_string()),
+            fixed_color: Some(vec!["red".to_string()]),
+            series_by: Some("last".to_string()),
+            color_by_series: Some(vec![]),
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("mode"));
+        assert!(json.contains("fixedColor"));
+        assert!(json.contains("seriesBy"));
+        assert!(json.contains("colorBySeries"));
+    }
+
+    #[test]
+    fn test_mapping_all_some_present() {
+        let m = Mapping {
+            typee: Some("value".to_string()),
+            value: Some("0".to_string()),
+            from: Some("0".to_string()),
+            to: Some("1".to_string()),
+            pattern: Some(".*".to_string()),
+            matchh: Some("exact".to_string()),
+            color: Some("red".to_string()),
+            text: Some("zero".to_string()),
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("type"));
+        assert!(json.contains("\"value\""));
+        assert!(json.contains("from"));
+        assert!(json.contains("to"));
+        assert!(json.contains("pattern"));
+        assert!(json.contains("match"));
+        assert!(json.contains("color"));
+        assert!(json.contains("text"));
+    }
+}

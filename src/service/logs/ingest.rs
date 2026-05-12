@@ -1022,11 +1022,110 @@ fn construct_values_from_open_telemetry_v1_metric(
 
 #[cfg(test)]
 mod tests {
+    use config::TIMESTAMP_COL_NAME;
+    use serde_json::json;
+
     use super::{
         decode_and_decompress_to_string, decode_and_decompress_to_vec,
         deserialize_aws_record_from_vec, extract_resource_id_from_amazon_resource_number,
-        get_size_of_var_int_header,
+        get_size_of_var_int_header, get_tuple_from_open_telemetry_key_value, handle_timestamp,
     };
+
+    #[test]
+    fn test_handle_timestamp_valid_in_range() {
+        // 2024-01-15 in microseconds
+        let ts = 1_705_276_800_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: ts});
+        let result = handle_timestamp(&mut val, 0, i64::MAX);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ts);
+    }
+
+    #[test]
+    fn test_handle_timestamp_too_old() {
+        let min_ts = 1_705_276_800_000_000i64;
+        let old_ts = 1_000_000_000_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: old_ts});
+        let result = handle_timestamp(&mut val, min_ts, i64::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_too_future() {
+        let max_ts = 1_705_276_800_000_000i64;
+        let future_ts = 2_000_000_000_000_000i64;
+        let mut val = json!({TIMESTAMP_COL_NAME: future_ts});
+        let result = handle_timestamp(&mut val, 0, max_ts);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_not_object() {
+        let mut val = json!("not an object");
+        let result = handle_timestamp(&mut val, 0, i64::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handle_timestamp_null_timestamp_uses_now() {
+        let mut val = json!({TIMESTAMP_COL_NAME: null});
+        let before = chrono::Utc::now().timestamp_micros();
+        let result = handle_timestamp(&mut val, 0, i64::MAX);
+        let after = chrono::Utc::now().timestamp_micros();
+        assert!(result.is_ok());
+        let ts = result.unwrap();
+        assert!(ts >= before && ts <= after);
+    }
+
+    #[test]
+    fn test_handle_timestamp_missing_field_uses_now() {
+        let mut val = json!({"message": "hello"});
+        let before = chrono::Utc::now().timestamp_micros();
+        let result = handle_timestamp(&mut val, 0, i64::MAX);
+        let after = chrono::Utc::now().timestamp_micros();
+        assert!(result.is_ok());
+        let ts = result.unwrap();
+        assert!(ts >= before && ts <= after);
+        // field should be inserted
+        assert!(val.get(TIMESTAMP_COL_NAME).is_some());
+    }
+
+    #[test]
+    fn test_get_tuple_from_open_telemetry_key_value_string_value() {
+        use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value};
+        let kv = KeyValue {
+            key: "my_key".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue("my_val".to_string())),
+            }),
+        };
+        let result = get_tuple_from_open_telemetry_key_value(kv);
+        assert_eq!(result, Some(("my_key".to_string(), "my_val".to_string())));
+    }
+
+    #[test]
+    fn test_get_tuple_from_open_telemetry_key_value_non_string() {
+        use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value};
+        let kv = KeyValue {
+            key: "my_key".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::IntValue(42)),
+            }),
+        };
+        let result = get_tuple_from_open_telemetry_key_value(kv);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_get_tuple_from_open_telemetry_key_value_no_value() {
+        use opentelemetry_proto::tonic::common::v1::KeyValue;
+        let kv = KeyValue {
+            key: "my_key".to_string(),
+            value: None,
+        };
+        let result = get_tuple_from_open_telemetry_key_value(kv);
+        assert_eq!(result, None);
+    }
 
     #[test]
     fn test_decode_and_decompress_success_string() {

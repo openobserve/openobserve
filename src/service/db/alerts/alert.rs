@@ -17,7 +17,10 @@ use std::{collections::HashSet, str::FromStr};
 
 use config::{
     meta::{
-        alerts::alert::{Alert, ListAlertsParams},
+        alerts::{
+            FrequencyType,
+            alert::{Alert, ListAlertsParams},
+        },
         folder::{DEFAULT_FOLDER, Folder},
         stream::StreamType,
     },
@@ -78,11 +81,29 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
             }
 
             let schedule_key = scheduler_key(alert.id);
+            let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+                match alert.trigger_condition.get_next_trigger_time(
+                    true,
+                    alert.tz_offset,
+                    false,
+                    None,
+                ) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::error!(
+                            "Failed to compute next trigger time for alert {schedule_key}: {e}"
+                        );
+                        now_micros()
+                    }
+                }
+            } else {
+                now_micros()
+            };
             // Get the trigger from scheduler
             let mut trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
                 module_key: schedule_key.clone(),
-                next_run_at: now_micros(),
+                next_run_at,
                 is_realtime: alert.is_real_time,
                 is_silenced: false,
                 ..Default::default()
@@ -158,10 +179,24 @@ pub async fn create<C: TransactionTrait>(
     #[cfg(feature = "enterprise")]
     super_cluster::emit_create_event(org_id, folder_id, alert.clone()).await?;
 
+    let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+        match alert
+            .trigger_condition
+            .get_next_trigger_time(true, alert.tz_offset, false, None)
+        {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
+                now_micros()
+            }
+        }
+    } else {
+        now_micros()
+    };
     let trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
-        next_run_at: now_micros(),
+        next_run_at,
         is_realtime: alert.is_real_time,
         is_silenced: false,
         ..Default::default()
@@ -189,10 +224,24 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     #[cfg(feature = "enterprise")]
     super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
 
+    let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+        match alert
+            .trigger_condition
+            .get_next_trigger_time(true, alert.tz_offset, false, None)
+        {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
+                now_micros()
+            }
+        }
+    } else {
+        now_micros()
+    };
     let mut trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
-        next_run_at: now_micros(),
+        next_run_at,
         is_realtime: alert.is_real_time,
         is_silenced: false,
         ..Default::default()
@@ -441,6 +490,59 @@ pub fn cache_alert_key(org: &str, alert_id: &str) -> String {
 /// Returns the key used to schedule a trigger for the alert.
 pub fn scheduler_key(alert_id: Option<Ksuid>) -> String {
     alert_id.map_or(DEFAULT_FOLDER.to_string(), |id| id.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+    use svix_ksuid::Ksuid;
+
+    use super::*;
+
+    #[test]
+    fn test_cache_stream_key_logs() {
+        let key = cache_stream_key("myorg", StreamType::Logs, "nginx");
+        assert_eq!(key, "myorg/logs/nginx");
+    }
+
+    #[test]
+    fn test_cache_stream_key_metrics() {
+        let key = cache_stream_key("acme", StreamType::Metrics, "cpu_usage");
+        assert_eq!(key, "acme/metrics/cpu_usage");
+    }
+
+    #[test]
+    fn test_cache_stream_key_traces() {
+        let key = cache_stream_key("default", StreamType::Traces, "http_spans");
+        assert_eq!(key, "default/traces/http_spans");
+    }
+
+    #[test]
+    fn test_cache_alert_key() {
+        let key = cache_alert_key("myorg", "alert-123");
+        assert_eq!(key, "myorg/alert-123");
+    }
+
+    #[test]
+    fn test_cache_alert_key_empty_org() {
+        let key = cache_alert_key("", "alert-456");
+        assert_eq!(key, "/alert-456");
+    }
+
+    #[test]
+    fn test_scheduler_key_none_returns_default_folder() {
+        let key = scheduler_key(None);
+        assert_eq!(key, "default");
+    }
+
+    #[test]
+    fn test_scheduler_key_some_ksuid() {
+        use svix_ksuid::KsuidLike;
+        let ksuid = Ksuid::new(None, None);
+        let expected = ksuid.to_string();
+        let key = scheduler_key(Some(ksuid));
+        assert_eq!(key, expected);
+    }
 }
 
 /// Helper functions for sending events to the super cluster queue.

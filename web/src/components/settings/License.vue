@@ -1,154 +1,194 @@
 <template>
   <div class="q-pa-md">
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
-    <div class="text-h6 q-mb-md">{{ t('about.license_management') }}</div>
+    <div class="text-h6 q-mb-md">{{ t("about.license_management") }}</div>
 
     <div v-if="loading" class="q-pa-md text-center">
       <q-spinner size="40px" />
-      <div class="q-mt-md">{{ t('about.loading_license_info') }}</div>
+      <div class="q-mt-md">{{ t("about.loading_license_info") }}</div>
     </div>
-    <div v-else class="tw:grid tw:grid-cols-1 lg:tw:grid-cols-2 tw:gap-4 tw:items-start tw:pb-4">
-
-    <div class="tw:col-span-1 tw:min-h-0" >
-      <div v-if="licenseData.license === null || !licenseData.license">
-        <q-card class="q-mb-md">
-          <q-card-section>
-            <div class="text-h6">{{ t('about.no_license_found') }}</div>
-            <div class="q-mt-sm text-body2">
-              {{ t('about.installation_id') }}: <strong>{{ licenseData.installation_id || 'N/A' }}</strong>
-            </div>
-            <div class="q-mt-md text-body2" v-html="DOMPurify.sanitize(t('about.contact_admin_license'))"></div>
-            <q-btn
-              data-test="no-license-get-license-btn"
-              color="primary"
-              no-caps
-              :label="t('about.get_license')"
-              @click="redirectToGetLicense"
-              class="q-ml-sm q-mt-sm"
-              size="sm"
-              borderless
-            />
-          </q-card-section>
-        </q-card>
-
-        <q-card>
-          <q-card-section>
-            <div class="text-subtitle1 q-mb-md">{{ t('about.enter_license_key') }}</div>
-            <q-input
-              data-test="no-license-key-input"
-              v-model="licenseKey"
-              outlined
-              type="textarea"
-              rows="8"
-              :placeholder="t('about.paste_license_placeholder')"
-              style="height: 200px;"
-            />
-            <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
-              <div class="modern-info-banner">
-                <q-icon name="check_circle" class="text-green-6 q-mr-sm" size="20px" />
-                <span class="text-body2">{{ t('about.license_auto_filled') }}</span>
+    <div
+      v-else
+      class="tw:grid tw:grid-cols-1 lg:tw:grid-cols-2 tw:gap-4 tw:items-start tw:pb-4"
+    >
+      <div class="tw:col-span-1 tw:min-h-0">
+        <div v-if="licenseData.license === null || !licenseData.license">
+          <q-card class="q-mb-md">
+            <q-card-section>
+              <div class="text-h6">{{ t("about.no_license_found") }}</div>
+              <div class="q-mt-sm text-body2">
+                {{ t("about.installation_id") }}:
+                <strong>{{ licenseData.installation_id || "N/A" }}</strong>
               </div>
-            </div>
-            <q-btn
-              data-test="no-license-update-btn"
-              color="primary"
-              :label="t('about.update_license')"
-              @click="updateLicense"
-              :loading="updating"
-              :disable="!licenseKey.trim()"
-            />
-          </q-card-section>
-        </q-card>
-      </div>
-
-      <div v-else>
-        <q-card>
-          <q-card-section>
-            <div class="text-h6 q-mb-md">{{ t('about.license_info') }}</div>
-            <q-markup-table flat bordered dense class="compact-table">
-              <tbody>
-                <tr>
-                  <td class="text-weight-bold">{{ t('about.installation_id') }}</td>
-                  <td>{{ licenseData.installation_id }}</td>
-                </tr>
-                <tr>
-                  <td class="text-weight-bold">{{ t('about.license_id') }}</td>
-                  <td>{{ licenseData.license.license_id }}</td>
-                </tr>
-                <tr>
-                  <td class="text-weight-bold">{{ t('about.status_lbl') }}</td>
-                  <td>
-                    <q-badge :color="licenseData?.expired ? 'red' : 'green'">
-                      {{ licenseData?.expired ? t('about.expired_lbl') : t('about.active_lbl') }}
-                    </q-badge>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="text-weight-bold">{{ t('about.create_at_lbl') }}</td>
-                  <td>{{ formatDate(licenseData.license.created_at) }}</td>
-                </tr>
-                <tr>
-                  <td class="text-weight-bold">{{ t('about.expires_at_lbl') }}</td>
-                  <td>{{ formatDate(licenseData.license.expires_at) }}</td>
-                </tr>
-                <tr>
-                  <td class="text-weight-bold">{{ t('about.company') }}</td>
-                  <td>{{ licenseData.license.company }}</td>
-                </tr>
-                <tr v-if="licenseData.key">
-                  <td class="text-weight-bold">{{ t('about.license_key') }}</td>
-                  <td>
-                    <div class="row items-center q-gutter-sm">
-                      <span>{{ getMaskedLicenseKey() }}</span>
-                      <q-btn
-                        flat
-                        round
-                        dense
-                        icon="visibility"
-                        size="sm"
-                        @click="showLicenseKeyModal = true"
-                        class="q-ml-sm"
-                        data-test="show-license-key-btn"
-                      />
-                    </div>
-                  </td>
-                </tr>
-                <tr v-if="licenseData.license.contact_name">
-                  <td class="text-weight-bold">{{ t('about.contact_name') }}</td>
-                  <td>{{ licenseData.license.contact_name }}</td>
-                </tr>
-                <tr v-if="licenseData.license.contact_email">
-                  <td class="text-weight-bold">{{ t('about.contact_email') }}</td>
-                  <td>{{ licenseData.license.contact_email }}</td>
-                </tr>
-                <tr v-if="licenseData.license.environment_type">
-                  <td class="text-weight-bold">{{ t('about.environment_type') }}</td>
-                  <td>{{ licenseData.license.environment_type }}</td>
-                </tr>
-              </tbody>
-            </q-markup-table>
-            <div class="tw:mt-3 tw:flex tw:gap-3">
-              <q-btn
-                no-caps
-                :label="t('about.request_new_license')"
-                class="o2-primary-button"
+              <div
+                class="q-mt-md text-body2"
+                v-html="DOMPurify.sanitize(t('about.contact_admin_license'))"
+              ></div>
+              <OButton
+                data-test="no-license-get-license-btn"
+                variant="primary"
+                size="sm-action"
+                class="q-ml-sm q-mt-sm"
                 @click="redirectToGetLicense"
-                data-test="request-new-license-btn"
+              >
+                {{ t("about.get_license") }}
+              </OButton>
+            </q-card-section>
+          </q-card>
+
+          <q-card>
+            <q-card-section>
+              <div class="text-subtitle1 q-mb-md">
+                {{ t("about.enter_license_key") }}
+              </div>
+              <q-input
+                data-test="no-license-key-input"
+                v-model="licenseKey"
+                outlined
+                type="textarea"
+                rows="8"
+                :placeholder="t('about.paste_license_placeholder')"
+                style="height: 200px"
               />
-              <q-btn
-                data-test="add-license-key-btn"
-                no-caps
-                class="o2-primary-button"
-                :label="t('about.add_new_license_key')"
-                @click="showUpdateFormAndFocus"
-              />
-            </div>
-          </q-card-section>
-        </q-card>
+              <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
+                <div class="modern-info-banner">
+                  <q-icon
+                    name="check_circle"
+                    class="text-green-6 q-mr-sm"
+                    size="20px"
+                  />
+                  <span class="text-body2">{{
+                    t("about.license_auto_filled")
+                  }}</span>
+                </div>
+              </div>
+              <OButton
+                data-test="no-license-update-btn"
+                variant="primary"
+                size="sm-action"
+                :loading="updating"
+                :disabled="!licenseKey.trim()"
+                @click="updateLicense"
+              >
+                {{ t("about.update_license") }}
+              </OButton>
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <div v-else>
+          <q-card>
+            <q-card-section>
+              <div class="text-h6 q-mb-md">{{ t("about.license_info") }}</div>
+              <q-markup-table flat bordered dense class="compact-table">
+                <tbody>
+                  <tr>
+                    <td class="text-weight-bold">
+                      {{ t("about.installation_id") }}
+                    </td>
+                    <td>{{ licenseData.installation_id }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-weight-bold">
+                      {{ t("about.license_id") }}
+                    </td>
+                    <td>{{ licenseData.license.license_id }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-weight-bold">
+                      {{ t("about.status_lbl") }}
+                    </td>
+                    <td>
+                      <q-badge :color="licenseData?.expired ? 'red' : 'green'">
+                        {{
+                          licenseData?.expired
+                            ? t("about.expired_lbl")
+                            : t("about.active_lbl")
+                        }}
+                      </q-badge>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="text-weight-bold">
+                      {{ t("about.create_at_lbl") }}
+                    </td>
+                    <td>{{ formatDate(licenseData.license.created_at) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-weight-bold">
+                      {{ t("about.expires_at_lbl") }}
+                    </td>
+                    <td>{{ formatDate(licenseData.license.expires_at) }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-weight-bold">{{ t("about.company") }}</td>
+                    <td>{{ licenseData.license.company }}</td>
+                  </tr>
+                  <tr v-if="licenseData.key">
+                    <td class="text-weight-bold">
+                      {{ t("about.license_key") }}
+                    </td>
+                    <td>
+                      <div class="row items-center q-gutter-sm">
+                        <span>{{ getMaskedLicenseKey() }}</span>
+                        <OButton
+                          variant="ghost"
+                          size="icon"
+                          class="q-ml-sm"
+                          data-test="show-license-key-btn"
+                          @click="showLicenseKeyModal = true"
+                        >
+                          <q-icon name="visibility" size="14px" />
+                        </OButton>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-if="licenseData.license.contact_name">
+                    <td class="text-weight-bold">
+                      {{ t("about.contact_name") }}
+                    </td>
+                    <td>{{ licenseData.license.contact_name }}</td>
+                  </tr>
+                  <tr v-if="licenseData.license.contact_email">
+                    <td class="text-weight-bold">
+                      {{ t("about.contact_email") }}
+                    </td>
+                    <td>{{ licenseData.license.contact_email }}</td>
+                  </tr>
+                  <tr v-if="licenseData.license.environment_type">
+                    <td class="text-weight-bold">
+                      {{ t("about.environment_type") }}
+                    </td>
+                    <td>{{ licenseData.license.environment_type }}</td>
+                  </tr>
+                </tbody>
+              </q-markup-table>
+              <div class="tw:mt-3 tw:flex tw:gap-3">
+                <OButton
+                  variant="primary"
+                  size="sm-action"
+                  @click="redirectToGetLicense"
+                  data-test="request-new-license-btn"
+                >
+                  {{ t("about.request_new_license") }}
+                </OButton>
+                <OButton
+                  data-test="add-license-key-btn"
+                  variant="primary"
+                  size="sm-action"
+                  @click="showUpdateFormAndFocus"
+                >
+                  {{ t("about.add_new_license_key") }}
+                </OButton>
+              </div>
+            </q-card-section>
+          </q-card>
 
           <q-card v-show="showUpdateForm" class="q-mt-md">
             <q-card-section>
-              <div class="text-subtitle1 q-mb-sm">{{ t('about.update_license_key') }}</div>
+              <div class="text-subtitle1 q-mb-sm">
+                {{ t("about.update_license_key") }}
+              </div>
               <q-input
                 data-test="update-license-key-input"
                 v-model="licenseKey"
@@ -156,137 +196,224 @@
                 type="textarea"
                 rows="6"
                 :placeholder="t('about.paste_new_license_placeholder')"
-                style="min-height: 150px;"
+                style="min-height: 150px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
                 <div class="modern-info-banner">
-                  <q-icon name="check_circle" class="text-green-6 q-mr-sm" size="20px" />
-                  <span class="text-body2">{{ t('about.license_auto_filled') }}</span>
+                  <q-icon
+                    name="check_circle"
+                    class="text-green-6 q-mr-sm"
+                    size="20px"
+                  />
+                  <span class="text-body2">{{
+                    t("about.license_auto_filled")
+                  }}</span>
                 </div>
               </div>
               <div class="row q-gutter-sm">
-                <q-btn
+                <OButton
                   data-test="cancel-update-license-btn"
-                  no-caps
-                  :label="t('common.cancel')"
-                  class="o2-secondary-button"
-                  @click="showUpdateForm = false; licenseKey = ''"
-                />
-                <q-btn
+                  variant="outline"
+                  size="sm-action"
+                  @click="
+                    showUpdateForm = false;
+                    licenseKey = '';
+                  "
+                >
+                  {{ t("common.cancel") }}
+                </OButton>
+                <OButton
                   data-test="confirm-update-license-btn"
-                  color="primary"
-                  no-caps
-                  :label="t('about.update_license')"
-                  @click="updateLicense"
+                  variant="primary"
+                  size="sm-action"
                   :loading="updating"
-                  :disable="!licenseKey.trim()"
-                />
+                  :disabled="!licenseKey.trim()"
+                  @click="updateLicense"
+                >
+                  {{ t("about.update_license") }}
+                </OButton>
               </div>
             </q-card-section>
           </q-card>
+        </div>
+      </div>
+
+      <div class="tw:col-span-1 tw:self-start">
+        <q-card class="futuristic-card">
+          <q-card-section class="tw:p-3">
+            <div class="futuristic-header">
+              <div class="header-glow"></div>
+              <div class="text-h6 tw:relative tw:z-10">
+                {{ t("about.usage_information") }}
+              </div>
+            </div>
+
+            <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-3">
+              <!-- Summary Message -->
+              <div class="ingestion-summary-compact">
+                <div class="summary-text-compact text-body2">
+                  <!-- Line 1: License Info -->
+                  <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+                    <q-icon name="info" size="18px" class="tw:flex-shrink-0" />
+                    <span
+                      v-html="
+                        DOMPurify.sanitize(
+                          t('about.license_allows_ingestion', {
+                            limit:
+                              !licenseData?.expired &&
+                              licenseData?.license?.limits?.Ingestion?.value
+                                ? licenseData?.license?.limits?.Ingestion?.value
+                                : '50',
+                          }),
+                        )
+                      "
+                    ></span>
+                  </div>
+
+                  <!-- Line 2: Exceeded Status -->
+                  <div class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon
+                      v-if="
+                        licenseData?.ingestion_exceeded &&
+                        licenseData?.ingestion_exceeded >
+                          limitBreachAllowedCount
+                      "
+                      name="warning"
+                      size="18px"
+                      class="text-negative tw:flex-shrink-0"
+                    />
+                    <q-icon
+                      v-else-if="
+                        licenseData?.ingestion_exceeded &&
+                        licenseData?.ingestion_exceeded > 0
+                      "
+                      name="check_circle"
+                      size="18px"
+                      class="text-warning tw:flex-shrink-0"
+                    />
+                    <q-icon
+                      v-else
+                      name="check_circle"
+                      size="18px"
+                      class="text-positive tw:flex-shrink-0"
+                    />
+                    <span>
+                      <span
+                        v-if="
+                          licenseData?.ingestion_exceeded &&
+                          licenseData?.ingestion_exceeded > 0
+                        "
+                      >
+                        <span
+                          v-html="
+                            DOMPurify.sanitize(
+                              t('about.limit_exceeded_days', {
+                                colorClass:
+                                  licenseData?.ingestion_exceeded > 30
+                                    ? 'text-negative'
+                                    : 'text-warning',
+                                days: licenseData?.ingestion_exceeded,
+                                plural:
+                                  licenseData?.ingestion_exceeded > 1
+                                    ? 's'
+                                    : '',
+                              }),
+                            )
+                          "
+                        ></span
+                        ><span
+                          v-if="
+                            licenseData?.ingestion_exceeded >
+                            limitBreachAllowedCount
+                          "
+                          class="warning-message"
+                          v-html="
+                            DOMPurify.sanitize(
+                              t('about.limit_exceeded_warning', {
+                                max: limitBreachAllowedCount,
+                                maxPlural:
+                                  limitBreachAllowedCount > 1 ? 's' : '',
+                              }),
+                            )
+                          "
+                        ></span
+                        ><span
+                          v-else
+                          class="info-message"
+                          v-html="
+                            DOMPurify.sanitize(
+                              t('about.limit_exceeded_info', {
+                                remaining:
+                                  limitBreachAllowedCount -
+                                  licenseData?.ingestion_exceeded,
+                                plural:
+                                  limitBreachAllowedCount -
+                                    licenseData?.ingestion_exceeded >
+                                  1
+                                    ? 's'
+                                    : '',
+                                max: limitBreachAllowedCount,
+                              }),
+                            )
+                          "
+                        ></span
+                        >.
+                      </span>
+                      <span v-else>
+                        {{
+                          t("about.no_limit_exceedances", {
+                            max: limitBreachAllowedCount,
+                          })
+                        }}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chart -->
+              <div v-if="usageDashboardData">
+                <div class="chart-wrapper">
+                  <div class="usage-chart-container">
+                    <RenderDashboardCharts
+                      :key="dashboardRenderKey"
+                      :dashboardData="usageDashboardData"
+                      :currentTimeObj="currentTimeObj"
+                      :viewOnly="true"
+                      :allowAlertCreation="false"
+                      searchType="dashboards"
+                    />
+                  </div>
+                  <div
+                    v-if="isIngestionUnlimited"
+                    class="text-caption text-grey-6 tw:mt-1 tw:text-center"
+                    style="font-size: 10px"
+                  >
+                    {{ t("about.usage_shows_zero_unlimited") }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
       </div>
     </div>
-
-    <div class="tw:col-span-1 tw:self-start">
-            <q-card class="futuristic-card">
-              <q-card-section class="tw:p-3">
-                <div class="futuristic-header">
-                  <div class="header-glow"></div>
-                  <div class="text-h6 tw:relative tw:z-10">{{ t('about.usage_information') }}</div>
-                </div>
-
-                <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-3">
-                  <!-- Summary Message -->
-                  <div class="ingestion-summary-compact">
-                    <div class="summary-text-compact text-body2">
-                      <!-- Line 1: License Info -->
-                      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                        <q-icon
-                          name="info"
-                          size="18px"
-                          class="tw:flex-shrink-0"
-                        />
-                        <span v-html="DOMPurify.sanitize(t('about.license_allows_ingestion', { limit: !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? licenseData?.license?.limits?.Ingestion?.value : '50' }))"></span>
-                      </div>
-
-                      <!-- Line 2: Exceeded Status -->
-                      <div class="tw:flex tw:items-center tw:gap-2">
-                        <q-icon
-                          v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > limitBreachAllowedCount"
-                          name="warning"
-                          size="18px"
-                          class="text-negative tw:flex-shrink-0"
-                        />
-                        <q-icon
-                          v-else-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0"
-                          name="check_circle"
-                          size="18px"
-                          class="text-warning tw:flex-shrink-0"
-                        />
-                        <q-icon
-                          v-else
-                          name="check_circle"
-                          size="18px"
-                          class="text-positive tw:flex-shrink-0"
-                        />
-                        <span>
-                          <span v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0">
-                            <span v-html="DOMPurify.sanitize(t('about.limit_exceeded_days', {
-                              colorClass: licenseData?.ingestion_exceeded > 30 ? 'text-negative' : 'text-warning',
-                              days: licenseData?.ingestion_exceeded,
-                              plural: licenseData?.ingestion_exceeded > 1 ? 's' : ''
-                            }))"></span><span v-if="licenseData?.ingestion_exceeded > limitBreachAllowedCount" class="warning-message" v-html="DOMPurify.sanitize(t('about.limit_exceeded_warning', {
-                              max: limitBreachAllowedCount,
-                              maxPlural: limitBreachAllowedCount > 1 ? 's' : ''
-                            }))"></span><span v-else class="info-message" v-html="DOMPurify.sanitize(t('about.limit_exceeded_info', {
-                              remaining: limitBreachAllowedCount - licenseData?.ingestion_exceeded,
-                              plural: (limitBreachAllowedCount - licenseData?.ingestion_exceeded) > 1 ? 's' : '',
-                              max: limitBreachAllowedCount
-                            }))"></span>.
-                          </span>
-                          <span v-else>
-                            {{ t('about.no_limit_exceedances', { max: limitBreachAllowedCount }) }}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Chart -->
-                  <div v-if="usageDashboardData">
-                    <div class="chart-wrapper">
-                      <div class="usage-chart-container">
-                        <RenderDashboardCharts
-                          :key="dashboardRenderKey"
-                          :dashboardData="usageDashboardData"
-                          :currentTimeObj="currentTimeObj"
-                          :viewOnly="true"
-                          :allowAlertCreation="false"
-                          searchType="dashboards"
-                        />
-                      </div>
-                      <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 tw:mt-1 tw:text-center" style="font-size: 10px;">
-                        {{ t('about.usage_shows_zero_unlimited') }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </q-card-section>
-            </q-card>
-    </div>
-  </div>
 
     <!-- License Key Modal -->
     <q-dialog v-model="showLicenseKeyModal" persistent>
       <q-card style="min-width: 500px">
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">{{ t('about.license_key') }}</div>
+          <div class="text-h6">{{ t("about.license_key") }}</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton variant="ghost" size="icon" v-close-popup>
+            <q-icon name="close" size="14px" />
+          </OButton>
         </q-card-section>
 
         <q-card-section>
-          <div class="text-body2 q-mb-md">{{ t('about.your_complete_license_key') }}</div>
+          <div class="text-body2 q-mb-md">
+            {{ t("about.your_complete_license_key") }}
+          </div>
           <q-input
             data-test="modal-license-key-display"
             v-model="licenseData.key"
@@ -295,26 +422,28 @@
             type="textarea"
             rows="8"
             class="q-mb-md"
-            style="font-family: monospace; font-size: 12px;"
+            style="font-family: monospace; font-size: 12px"
           />
         </q-card-section>
 
-        <q-card-actions align="right" class="q-pt-none">
-          <q-btn
+          <q-card-actions align="right" class="q-pt-none">
+          <OButton
             data-test="license-cancel-btn"
-            no-caps
-            :label="t('common.cancel')"
-            class="o2-secondary-button"
+            variant="outline"
+            size="sm-action"
             v-close-popup
-              />
-          <q-btn
+          >
+            {{ t("common.cancel") }}
+          </OButton>
+          <OButton
             data-test="license-copy-key-btn"
-            color="primary"
-            :label="t('about.copy_key')"
-            no-caps
+            variant="primary"
+            size="sm-action"
+            :disabled="!licenseData.key"
             @click="copyLicenseKey"
-            :disable="!licenseData.key"
-          />
+          >
+            {{ t("about.copy_key") }}
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -322,16 +451,23 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  computed,
+  defineAsyncComponent,
+} from "vue";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
-import DOMPurify from 'dompurify';
+import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
-  () => import("@/views/Dashboards/RenderDashboardCharts.vue")
+  () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
 export default defineComponent({
@@ -339,6 +475,7 @@ export default defineComponent({
   components: {
     LicensePeriod,
     RenderDashboardCharts,
+    OButton,
   },
   setup() {
     const $q = useQuasar();
@@ -382,19 +519,22 @@ export default defineComponent({
         licenseKey.value = "";
         isLicenseKeyAutoFilled.value = false;
         showUpdateForm.value = false;
-        
+
         // Clear URL parameters after successful license update
         const url = new URL(window.location.href);
-        url.searchParams.delete('installation_id');
-        url.searchParams.delete('license_key');
+        url.searchParams.delete("installation_id");
+        url.searchParams.delete("license_key");
         window.history.replaceState({}, document.title, url.toString());
-        
+
         await loadLicenseData();
       } catch (error) {
         console.error("Error updating license:", error);
         $q.notify({
           type: "negative",
-          message: t("about.failed_to_update_license"),
+          message:
+            t("about.failed_to_update_license") +
+            " : " +
+            (error?.response?.data?.message || "unexpected error"),
         });
       } finally {
         updating.value = false;
@@ -404,7 +544,9 @@ export default defineComponent({
     const showUpdateFormAndFocus = () => {
       showUpdateForm.value = true;
       setTimeout(() => {
-        const textarea = document.querySelector('textarea[placeholder="Paste new license key here..."]') as HTMLTextAreaElement;
+        const textarea = document.querySelector(
+          'textarea[placeholder="Paste new license key here..."]',
+        ) as HTMLTextAreaElement;
         if (textarea) {
           textarea.focus();
         }
@@ -412,16 +554,16 @@ export default defineComponent({
     };
 
     const maskKey = (key: string) => {
-      if (!key) return '';
+      if (!key) return "";
       if (key.length <= 10) return key; // If key is too short, show as is
       const start = key.substring(0, 5);
       const end = key.substring(key.length - 5);
-      const masked = '*'.repeat(18);
+      const masked = "*".repeat(18);
       return `${start}${masked}${end}`;
     };
 
     const getMaskedLicenseKey = () => {
-      if (!licenseData.value.key) return '';
+      if (!licenseData.value.key) return "";
       return maskKey(licenseData.value.key);
     };
 
@@ -445,49 +587,55 @@ export default defineComponent({
 
     const redirectToGetLicense = () => {
       const baseUrl = window.location.origin;
-      const installationId = licenseData.value.installation_id || '';
+      const installationId = licenseData.value.installation_id || "";
       const licenseUrl = `${store.state.zoConfig.license_server_url}/user/request-license?base_url=${encodeURIComponent(baseUrl)}&license_id=${encodeURIComponent(installationId)}`;
-      window.open(licenseUrl, '_blank');
+      window.open(licenseUrl, "_blank");
     };
 
     const checkAndAutoFillLicenseFromUrl = () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlInstallationId = urlParams.get('installation_id');
-      const urlLicenseKey = urlParams.get('license_key');
-      
-      if (urlInstallationId && urlLicenseKey && licenseData.value.installation_id) {
+      const urlInstallationId = urlParams.get("installation_id");
+      const urlLicenseKey = urlParams.get("license_key");
+
+      if (
+        urlInstallationId &&
+        urlLicenseKey &&
+        licenseData.value.installation_id
+      ) {
         if (urlInstallationId === licenseData.value.installation_id) {
           // Check if license is already active
           if (licenseData.value.license && licenseData.value.license.active) {
             // License is active, show dialog asking if they want to update
             $q.dialog({
-              title: t('about.license_already_active_title'),
-              message: t('about.license_already_active_msg'),
+              title: t("about.license_already_active_title"),
+              message: t("about.license_already_active_msg"),
               persistent: true,
               ok: {
-                label: t('about.yes_update_license'),
-                color: 'primary',
+                label: t("about.yes_update_license"),
+                color: "primary",
                 noCaps: true,
-                unelevated: true
+                unelevated: true,
               },
               cancel: {
-                label: t('about.no_keep_current'),
-                color: 'grey-7',
+                label: t("about.no_keep_current"),
+                color: "grey-7",
                 noCaps: true,
-                outline: true
-              }
-            }).onOk(() => {
-              // User wants to update, fill the key and show update form
-              licenseKey.value = urlLicenseKey;
-              isLicenseKeyAutoFilled.value = true;
-              showUpdateFormAndFocus();
-            }).onCancel(() => {
-              // User doesn't want to update, clear URL parameters
-              const url = new URL(window.location.href);
-              url.searchParams.delete('installation_id');
-              url.searchParams.delete('license_key');
-              window.history.replaceState({}, document.title, url.toString());
-            });
+                outline: true,
+              },
+            })
+              .onOk(() => {
+                // User wants to update, fill the key and show update form
+                licenseKey.value = urlLicenseKey;
+                isLicenseKeyAutoFilled.value = true;
+                showUpdateFormAndFocus();
+              })
+              .onCancel(() => {
+                // User doesn't want to update, clear URL parameters
+                const url = new URL(window.location.href);
+                url.searchParams.delete("installation_id");
+                url.searchParams.delete("license_key");
+                window.history.replaceState({}, document.title, url.toString());
+              });
           } else {
             // No active license, proceed with normal auto-fill
             licenseKey.value = urlLicenseKey;
@@ -533,22 +681,26 @@ export default defineComponent({
       if (!store.state.zoConfig.license_expiry) return false;
       const now = Date.now();
       const expiryDate = store.state.zoConfig.license_expiry;
-      const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+      const daysUntilExpiry = Math.ceil(
+        (expiryDate - now) / (1000 * 60 * 60 * 24),
+      );
       return daysUntilExpiry < 14;
     });
 
     const getLicenseExpiryMessage = () => {
-      if (!store.state.zoConfig.license_expiry) return '';
+      if (!store.state.zoConfig.license_expiry) return "";
       const now = Date.now();
       const expiryDate = store.state.zoConfig.license_expiry;
-      const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+      const daysUntilExpiry = Math.ceil(
+        (expiryDate - now) / (1000 * 60 * 60 * 24),
+      );
 
       if (daysUntilExpiry > 1) {
         return `${daysUntilExpiry} days remaining until your license expires`;
       } else if (daysUntilExpiry === 1) {
         return `1 day remaining until your license expires`;
       } else {
-        return 'Your license has expired';
+        return "Your license has expired";
       }
     };
 
@@ -556,7 +708,15 @@ export default defineComponent({
     // Similar to TelemetryCorrelationDashboard, we pass microsecond timestamps to Date constructor
     const currentTimeObj = computed(() => {
       const now = new Date();
-      const calendarStartDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const calendarStartDate = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        1,
+        0,
+        0,
+        0,
+        0,
+      );
 
       // Convert to microseconds (16 digits) and pass to Date constructor
       const startTimeMicros = calendarStartDate.getTime() * 1000;
@@ -585,7 +745,6 @@ export default defineComponent({
       // Build the threshold configuration - using correct format for mark_line
       const thresholds: any[] = [];
       if (ingestionLimit !== null && ingestionLimit > 0) {
-
         // Add critical threshold at 100% of limit
         thresholds.push({
           type: "yAxis",
@@ -601,7 +760,15 @@ export default defineComponent({
 
       // Get timestamps in microseconds (16 digits)
       const now = new Date();
-      const calendarStartDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const calendarStartDate = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        1,
+        0,
+        0,
+        0,
+        0,
+      );
       const startTimeMicros = calendarStartDate.getTime() * 1000;
       const endTimeMicros = now.getTime() * 1000;
 
@@ -743,11 +910,11 @@ export default defineComponent({
                   },
                 ],
                 layout: {
-                  "x": 0,
-                  "y": 0,
-                  "w": 192,
-                  "h": 16,
-                  "i": 1
+                  x: 0,
+                  y: 0,
+                  w: 192,
+                  h: 16,
+                  i: 1,
                 },
                 htmlContent: "",
                 markdownContent: "",
@@ -816,11 +983,12 @@ export default defineComponent({
     to right,
     transparent 60%,
     #f7f7ff 70%,
-    #cdf7e4 100%  );
+    #cdf7e4 100%
+  );
 }
 
 .license-expiry-container {
-  border: 1px solid #D7D7D7;
+  border: 1px solid #d7d7d7;
   border-radius: 6px;
 }
 
@@ -837,7 +1005,8 @@ export default defineComponent({
 }
 
 .compact-table {
-  td, th {
+  td,
+  th {
     padding: 8px 12px !important;
     line-height: 1.2;
   }
@@ -850,7 +1019,7 @@ export default defineComponent({
   margin: 0 auto;
 
   .grid-stack-item-content {
-    border: 0px !important; 
+    border: 0px !important;
   }
 }
 
@@ -895,13 +1064,17 @@ export default defineComponent({
   overflow: hidden;
 
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     width: 3px;
     height: 100%;
-    background: linear-gradient(180deg, var(--o2-menu-color) 0%, var(--o2-menu-color) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--o2-menu-color) 0%,
+      var(--o2-menu-color) 100%
+    );
     opacity: 0.6;
   }
 
@@ -912,7 +1085,11 @@ export default defineComponent({
 
     strong {
       font-weight: 700;
-      background: linear-gradient(135deg, var(--o2-menu-color) 0%, var(--o2-menu-color) 100%);
+      background: linear-gradient(
+        135deg,
+        var(--o2-menu-color) 0%,
+        var(--o2-menu-color) 100%
+      );
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -949,12 +1126,13 @@ export default defineComponent({
     background: linear-gradient(
       to right,
       transparent 60%,
-      #24262F 70%,
-      #2C3934 100%  );
+      #24262f 70%,
+      #2c3934 100%
+    );
   }
 
   .license-expiry-container {
-    border: 1px solid #454F5B;
+    border: 1px solid #454f5b;
   }
 
   .modern-info-banner {
@@ -964,11 +1142,16 @@ export default defineComponent({
   }
 
   .futuristic-card {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
+    background: linear-gradient(
+      135deg,
+      rgba(99, 102, 241, 0.08) 0%,
+      rgba(168, 85, 247, 0.08) 100%
+    );
     border: 1px solid rgba(99, 102, 241, 0.25);
 
     &::before {
-      background: linear-gradient(90deg,
+      background: linear-gradient(
+        90deg,
         transparent 0%,
         rgba(99, 102, 241, 0.7) 20%,
         rgba(168, 85, 247, 0.7) 80%,
@@ -979,12 +1162,20 @@ export default defineComponent({
 
   .futuristic-header {
     .header-glow {
-      background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+      background: radial-gradient(
+        ellipse at center,
+        rgba(99, 102, 241, 0.15) 0%,
+        transparent 70%
+      );
     }
   }
 
   .ingestion-summary-compact {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+    background: linear-gradient(
+      135deg,
+      rgba(99, 102, 241, 0.1) 0%,
+      rgba(168, 85, 247, 0.1) 100%
+    );
     border: 1px solid rgba(99, 102, 241, 0.3);
 
     &::before {

@@ -132,6 +132,53 @@ impl fmt::Display for TookWatcher {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_new_has_no_splits() {
+        let w = TookWatcher::new();
+        assert!(w.get_splits().is_empty());
+    }
+
+    #[test]
+    fn test_default_same_as_new() {
+        let w = TookWatcher::default();
+        assert!(w.get_splits().is_empty());
+    }
+
+    #[test]
+    fn test_get_summary_empty_no_splits() {
+        let w = TookWatcher::new();
+        let s = w.get_summary();
+        assert!(s.contains("total:"));
+        assert!(s.contains("breakdown:"));
+    }
+
+    #[test]
+    fn test_record_split_adds_entry() {
+        let mut w = TookWatcher::new();
+        w.record_split("step1");
+        assert_eq!(w.get_splits().len(), 1);
+        assert_eq!(w.get_splits()[0].name, "step1");
+    }
+
+    #[test]
+    fn test_record_split_multiple() {
+        let mut w = TookWatcher::new();
+        w.record_split("a");
+        w.record_split("b");
+        w.record_split("c");
+        assert_eq!(w.get_splits().len(), 3);
+        assert_eq!(w.get_splits()[2].name, "c");
+    }
+
+    #[test]
+    fn test_get_summary_with_splits() {
+        let mut w = TookWatcher::new();
+        w.record_split("op1");
+        let s = w.get_summary();
+        assert!(s.contains("op1"));
+        assert!(s.contains("ms"));
+    }
+
     #[tokio::test]
     async fn test_took_watcher_total_elapsed() {
         let watcher = TookWatcher::new();

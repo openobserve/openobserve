@@ -107,6 +107,25 @@ mod tests {
     }
 
     #[test]
+    fn test_holt_winters_value_none_input() {
+        let result = holt_winters_test_helper(Value::None, 0.5, 0.3).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_holt_winters_invalid_input_returns_err() {
+        let result = holt_winters_test_helper(Value::Float(1.0), 0.5, 0.3);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_holt_winters_calculation_fewer_than_two_samples() {
+        assert!(holt_winters_calculation(&[], 0.5, 0.3).is_none());
+        let one = vec![Sample::new(1000, 10.0)];
+        assert!(holt_winters_calculation(&one, 0.5, 0.3).is_none());
+    }
+
+    #[test]
     fn test_holt_winters_function() {
         // Create a range value with sample data
         let samples = vec![

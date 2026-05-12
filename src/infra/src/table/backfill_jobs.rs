@@ -132,6 +132,53 @@ pub async fn delete(org: &str, job_id: &str) -> Result<(), errors::Error> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_model() -> Model {
+        Model {
+            id: "job-1".to_string(),
+            org: "myorg".to_string(),
+            pipeline_id: "pipe-1".to_string(),
+            start_time: 1000,
+            end_time: 2000,
+            chunk_period_minutes: Some(30),
+            delay_between_chunks_secs: Some(5),
+            delete_before_backfill: true,
+            created_at: 1000,
+            enabled: true,
+        }
+    }
+
+    #[test]
+    fn test_backfill_job_from_model() {
+        let model = make_model();
+        let job = BackfillJob::from(model);
+        assert_eq!(job.id, "job-1");
+        assert_eq!(job.org, "myorg");
+        assert_eq!(job.pipeline_id, "pipe-1");
+        assert_eq!(job.start_time, 1000);
+        assert_eq!(job.end_time, 2000);
+        assert_eq!(job.chunk_period_minutes, Some(30));
+        assert_eq!(job.delay_between_chunks_secs, Some(5));
+        assert!(job.delete_before_backfill);
+        assert!(job.enabled);
+    }
+
+    #[test]
+    fn test_backfill_job_from_model_optional_fields() {
+        let mut model = make_model();
+        model.chunk_period_minutes = None;
+        model.delay_between_chunks_secs = None;
+        model.delete_before_backfill = false;
+        let job = BackfillJob::from(model);
+        assert!(job.chunk_period_minutes.is_none());
+        assert!(job.delay_between_chunks_secs.is_none());
+        assert!(!job.delete_before_backfill);
+    }
+}
+
 pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
 

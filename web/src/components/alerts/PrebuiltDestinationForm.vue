@@ -406,23 +406,25 @@ limitations under the License.
     <!-- Test and Preview Actions -->
     <div v-if="!hideActions" class="col-12 q-py-md">
       <div class="flex items-center q-gutter-sm">
-        <q-btn
+        <OButton
           data-test="destination-preview-button"
-          label="Preview"
-          icon="preview"
-          outline
-          no-caps
+          variant="outline"
+          size="sm"
           @click="$emit('preview')"
-        />
-        <q-btn
+        >
+          <template #icon-left><q-icon name="preview" /></template>
+          Preview
+        </OButton>
+        <OButton
           data-test="destination-test-button"
           :loading="isTesting"
-          label="Test"
-          icon="send"
-          outline
-          no-caps
+          variant="outline"
+          size="sm"
           @click="$emit('test')"
-        />
+        >
+          <template #icon-left><q-icon name="send" /></template>
+          Test
+        </OButton>
       </div>
     </div>
   </div>
@@ -430,6 +432,7 @@ limitations under the License.
 
 <script lang="ts" setup>
 import { computed } from 'vue';
+import OButton from '@/lib/core/Button/OButton.vue';
 import type { PropType } from 'vue';
 
 const props = defineProps({

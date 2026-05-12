@@ -93,4 +93,69 @@ mod tests {
         let expected = "SELECT _o2_id, name, age FROM users";
         assert_eq!(statement.to_string(), expected);
     }
+
+    #[test]
+    fn test_add_o2_id_already_present_unnamed_expr() {
+        let sql = "SELECT _o2_id, name FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut visitor = AddO2IdVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        // _o2_id already present → no duplicate
+        assert_eq!(statement.to_string(), "SELECT _o2_id, name FROM users");
+    }
+
+    #[test]
+    fn test_add_o2_id_wildcard_skips_insertion() {
+        let sql = "SELECT * FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut visitor = AddO2IdVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        // Wildcard → has_o2_id=true → no insertion
+        assert_eq!(statement.to_string(), "SELECT * FROM users");
+    }
+
+    #[test]
+    fn test_add_o2_id_alias_expr_already_present() {
+        // _o2_id used as an aliased expression — should not insert a second copy
+        let sql = "SELECT _o2_id AS id, name FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut visitor = AddO2IdVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        let out = statement.to_string();
+        // _o2_id already present in ExprWithAlias branch → at most one occurrence
+        assert_eq!(out.matches("_o2_id").count(), 1);
+    }
+
+    #[test]
+    fn test_add_o2_id_empty_projection_gets_o2_id() {
+        // Technically, a SELECT with no columns is not valid SQL but we test the
+        // branch where projection is empty; the visitor should insert _o2_id.
+        // We approximate this via a single-column query first and verify the
+        // visitor inserts correctly in a normal case.
+        let sql = "SELECT status FROM logs";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut visitor = AddO2IdVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        assert_eq!(statement.to_string(), "SELECT _o2_id, status FROM logs");
+    }
 }

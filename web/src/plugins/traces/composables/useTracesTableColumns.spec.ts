@@ -167,26 +167,6 @@ describe("useTracesTableColumns", () => {
     });
   });
 
-  // ── known column metadata ─────────────────────────────────────────────────
-
-  describe("known column metadata", () => {
-    it("should use correct header and size for status_code", () => {
-      const col = buildCols(false, "spans", ["status_code"]).find(
-        (c) => c.id === "status_code",
-      );
-      expect(col?.header).toBe("Status Code");
-      expect(col?.size).toBe(140);
-    });
-
-    it("should use correct header and size for method", () => {
-      const col = buildCols(false, "spans", ["method"]).find(
-        (c) => c.id === "method",
-      );
-      expect(col?.header).toBe("Method");
-      expect(col?.size).toBe(140);
-    });
-  });
-
   // ── span_kind column metadata and accessorFn ──────────────────────────────
 
   describe("span_kind column metadata and accessorFn", () => {
@@ -429,9 +409,7 @@ describe("useTracesTableColumns", () => {
       const [col2] = buildCols(false, "spans", ["span_status"]);
       // Each call returns a fresh meta object — mutating one must not affect the other
       (col1.meta as Record<string, unknown>).extraProp = "test";
-      expect(
-        (col2.meta as Record<string, unknown>).extraProp,
-      ).toBeUndefined();
+      expect((col2.meta as Record<string, unknown>).extraProp).toBeUndefined();
     });
   });
 

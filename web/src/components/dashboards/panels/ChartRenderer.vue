@@ -109,6 +109,7 @@ import {
   DataZoomComponent,
   MarkLineComponent,
   MarkAreaComponent,
+  GraphicComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
@@ -136,6 +137,7 @@ import type {
   DataZoomComponentOption,
   MarkLineComponentOption,
   MarkAreaComponentOption,
+  GraphicComponentOption,
 } from "echarts/components";
 
 type ECOption = ComposeOption<
@@ -159,6 +161,7 @@ type ECOption = ComposeOption<
   | DataZoomComponentOption
   | MarkLineComponentOption
   | MarkAreaComponentOption
+  | GraphicComponentOption
 >;
 
 echarts.use([
@@ -173,6 +176,7 @@ echarts.use([
   DataZoomComponent,
   MarkLineComponent,
   MarkAreaComponent,
+  GraphicComponent,
   BarChart,
   LineChart,
   CustomChart,

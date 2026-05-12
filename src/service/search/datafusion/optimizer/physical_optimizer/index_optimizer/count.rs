@@ -128,4 +128,30 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_simple_count_visitor_initial_state() {
+        let visitor = SimpleCountVisitor::new();
+        assert!(!visitor.is_simple_count);
+    }
+
+    #[test]
+    fn test_simple_count_visitor_can_be_set_true() {
+        let mut visitor = SimpleCountVisitor::new();
+        visitor.is_simple_count = true;
+        assert!(visitor.is_simple_count);
+    }
+
+    #[test]
+    fn test_is_simple_count_returns_none_for_empty_exec() {
+        use datafusion::physical_plan::empty::EmptyExec;
+        let schema = Arc::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+            "a",
+            arrow_schema::DataType::Int32,
+            false,
+        )]));
+        let plan: Arc<dyn datafusion::physical_plan::ExecutionPlan> =
+            Arc::new(EmptyExec::new(schema));
+        assert!(is_simple_count(plan).is_none());
+    }
 }

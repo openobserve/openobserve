@@ -250,3 +250,70 @@ pub(super) fn parse_event_key<'a>(
 
     Ok((org_id, name))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PREFIX: &str = "/destinations/";
+
+    #[test]
+    fn test_parse_event_key_valid() {
+        let key = "/destinations/myorg/my-dest";
+        let (org, name) = parse_event_key(PREFIX, key).unwrap();
+        assert_eq!(org, "myorg");
+        assert_eq!(name, "my-dest");
+    }
+
+    #[test]
+    fn test_parse_event_key_missing_prefix() {
+        let key = "myorg/my-dest";
+        let result = parse_event_key(PREFIX, key);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("missing prefix"));
+    }
+
+    #[test]
+    fn test_parse_event_key_too_many_parts() {
+        let key = "/destinations/myorg/my-dest/extra";
+        let result = parse_event_key(PREFIX, key);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_event_key_missing_name() {
+        let key = "/destinations/myorg/";
+        let result = parse_event_key(PREFIX, key);
+        assert!(result.is_ok());
+        let (org, name) = result.unwrap();
+        assert_eq!(org, "myorg");
+        assert_eq!(name, "");
+    }
+
+    #[test]
+    fn test_destination_error_display_empty_name() {
+        let e = DestinationError::EmptyName;
+        assert_eq!(e.to_string(), "Destination name cannot be empty");
+    }
+
+    #[test]
+    fn test_destination_error_display_not_found() {
+        let e = DestinationError::NotFound;
+        assert_eq!(e.to_string(), "Destination not found");
+    }
+
+    #[test]
+    fn test_destination_error_display_used_by_alert() {
+        let e = DestinationError::UsedByAlert("my-alert".to_string());
+        assert!(e.to_string().contains("my-alert"));
+    }
+
+    #[test]
+    fn test_destination_error_display_already_exists() {
+        let e = DestinationError::AlreadyExists;
+        assert_eq!(
+            e.to_string(),
+            "Destination with the same name already exists"
+        );
+    }
+}

@@ -672,7 +672,7 @@ async fn query_service_discovery_key(
             crate::service::db::system_settings::get_service_identity_config(org_id).await;
 
         let semantic_groups =
-            o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+            crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
 
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
@@ -1977,4 +1977,174 @@ pub async fn update_severity(
     }
 
     model_to_incident(updated).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_dimensions_adds_new_keys() {
+        let mut existing = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let new = HashMap::from([("cluster".to_string(), "us-east".to_string())]);
+        let changed = merge_dimensions(&mut existing, &new, "inc-1");
+        assert!(changed);
+        assert_eq!(existing["cluster"], "us-east");
+    }
+
+    #[test]
+    fn test_merge_dimensions_no_change_same_values() {
+        let mut existing = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let new = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let changed = merge_dimensions(&mut existing, &new, "inc-2");
+        assert!(!changed);
+        assert_eq!(existing.len(), 1);
+    }
+
+    #[test]
+    fn test_merge_dimensions_conflict_keeps_existing() {
+        let mut existing = HashMap::from([("region".to_string(), "us-east".to_string())]);
+        let new = HashMap::from([("region".to_string(), "us-west".to_string())]);
+        let changed = merge_dimensions(&mut existing, &new, "inc-3");
+        assert!(!changed);
+        assert_eq!(existing["region"], "us-east");
+    }
+
+    #[test]
+    fn test_merge_dimensions_empty_new() {
+        let mut existing = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let changed = merge_dimensions(&mut existing, &HashMap::new(), "inc-4");
+        assert!(!changed);
+        assert_eq!(existing.len(), 1);
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_no_events_returns_true() {
+        assert!(cooldown_elapsed(&[], 5));
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_no_ai_complete_event_returns_true() {
+        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+        let events = vec![IncidentEvent {
+            timestamp: chrono::Utc::now().timestamp_micros(),
+            event_type: IncidentEventType::Created,
+        }];
+        assert!(cooldown_elapsed(&events, 5));
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_recent_ai_complete_returns_false() {
+        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+        // Timestamp = now - 30 seconds; cooldown = 5 minutes → not elapsed
+        let recent_ts = chrono::Utc::now().timestamp_micros() - 30 * 1_000_000;
+        let events = vec![IncidentEvent {
+            timestamp: recent_ts,
+            event_type: IncidentEventType::AIAnalysisComplete,
+        }];
+        assert!(!cooldown_elapsed(&events, 5));
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_old_ai_complete_returns_true() {
+        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+        // Timestamp = epoch (very old); cooldown = 1 minute → elapsed
+        let events = vec![IncidentEvent {
+            timestamp: 1_000_000, // 1 second after epoch
+            event_type: IncidentEventType::AIAnalysisComplete,
+        }];
+        assert!(cooldown_elapsed(&events, 1));
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_uses_last_ai_complete() {
+        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+        // Two AIAnalysisComplete events: old one and recent one
+        // Should use the last (most recent) one → not elapsed
+        let old_ts = 1_000_000i64;
+        let recent_ts = chrono::Utc::now().timestamp_micros() - 30 * 1_000_000;
+        let events = vec![
+            IncidentEvent {
+                timestamp: old_ts,
+                event_type: IncidentEventType::AIAnalysisComplete,
+            },
+            IncidentEvent {
+                timestamp: chrono::Utc::now().timestamp_micros(),
+                event_type: IncidentEventType::Created,
+            },
+            IncidentEvent {
+                timestamp: recent_ts,
+                event_type: IncidentEventType::AIAnalysisComplete,
+            },
+        ];
+        // last AIAnalysisComplete is at recent_ts (30 seconds ago), cooldown = 5 minutes
+        assert!(!cooldown_elapsed(&events, 5));
+    }
+
+    #[test]
+    fn test_merge_correlation_results_sd_wins_over_semantic() {
+        use config::meta::alerts::incidents::KeyType;
+        let sd = ServiceDiscoveryResult {
+            group_values: [("ns".to_string(), "prod".to_string())].into(),
+            key_type: KeyType::Primary,
+            service_name: "svc-a".to_string(),
+        };
+        let sem = FilteredSemanticResult {
+            group_values: [("region".to_string(), "us-east".to_string())].into(),
+            key_type: KeyType::Secondary,
+        };
+        let (dims, key_type, reason) = merge_correlation_results(&Some(sd), &Some(sem));
+        assert_eq!(dims.get("ns").map(|s| s.as_str()), Some("prod"));
+        assert!(matches!(key_type, KeyType::Primary));
+        assert_eq!(reason, "service_discovery");
+    }
+
+    #[test]
+    fn test_merge_correlation_results_semantic_when_no_sd() {
+        use config::meta::alerts::incidents::KeyType;
+        let sem = FilteredSemanticResult {
+            group_values: [("cluster".to_string(), "us-west".to_string())].into(),
+            key_type: KeyType::Secondary,
+        };
+        let (dims, key_type, reason) = merge_correlation_results(&None, &Some(sem));
+        assert_eq!(dims.get("cluster").map(|s| s.as_str()), Some("us-west"));
+        assert!(matches!(key_type, KeyType::Secondary));
+        assert_eq!(reason, "semantic_extraction");
+    }
+
+    #[test]
+    fn test_merge_correlation_results_fallback_when_both_none() {
+        use config::meta::alerts::incidents::KeyType;
+        let (dims, key_type, reason) = merge_correlation_results(&None, &None);
+        assert!(dims.is_empty());
+        assert!(matches!(key_type, KeyType::AlertId));
+        assert_eq!(reason, "alert_id_fallback");
+    }
+
+    #[test]
+    fn test_extract_service_name_from_sd_result() {
+        use config::meta::alerts::incidents::KeyType;
+        let sd = ServiceDiscoveryResult {
+            group_values: HashMap::new(),
+            key_type: KeyType::Primary,
+            service_name: "payment-service".to_string(),
+        };
+        let labels = HashMap::new();
+        let name = extract_service_name_parallel(&labels, &Some(sd));
+        assert_eq!(name, "payment-service");
+    }
+
+    #[test]
+    fn test_extract_service_name_from_labels_fallback() {
+        let mut labels = HashMap::new();
+        labels.insert("service".to_string(), "billing".to_string());
+        let name = extract_service_name_parallel(&labels, &None);
+        assert_eq!(name, "billing");
+    }
+
+    #[test]
+    fn test_extract_service_name_defaults_to_unknown() {
+        let name = extract_service_name_parallel(&HashMap::new(), &None);
+        assert_eq!(name, "unknown");
+    }
 }

@@ -42,6 +42,7 @@ import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js
 import { MetricsBuilderPage } from "./metricsPages/metricsBuilderPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
+import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
 import { RumPage } from "./logsPages/rumPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
@@ -131,6 +132,7 @@ class PageManager {
     this.metricsBuilderPage = new MetricsBuilderPage(page);
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
+    this.servicesCatalogPage = new ServicesCatalogPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.dataPage = new DataPage(page);

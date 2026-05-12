@@ -349,3 +349,267 @@ pub struct Template {
     #[serde(default)]
     pub title: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::destinations as meta_dest;
+
+    use super::*;
+
+    #[test]
+    fn test_destination_type_from_str_email() {
+        assert_eq!(DestinationType::from("email"), DestinationType::Email);
+    }
+
+    #[test]
+    fn test_destination_type_from_str_sns() {
+        assert_eq!(DestinationType::from("sns"), DestinationType::Sns);
+    }
+
+    #[test]
+    fn test_destination_type_from_str_http() {
+        assert_eq!(DestinationType::from("http"), DestinationType::Http);
+    }
+
+    #[test]
+    fn test_destination_type_from_str_unknown_defaults_to_http() {
+        assert_eq!(DestinationType::from("webhook"), DestinationType::Http);
+        assert_eq!(DestinationType::from(""), DestinationType::Http);
+    }
+
+    #[test]
+    fn test_destination_type_from_str_case_insensitive() {
+        assert_eq!(DestinationType::from("EMAIL"), DestinationType::Email);
+        assert_eq!(DestinationType::from("SNS"), DestinationType::Sns);
+        assert_eq!(DestinationType::from("HTTP"), DestinationType::Http);
+    }
+
+    #[test]
+    fn test_destination_type_display_email() {
+        assert_eq!(DestinationType::Email.to_string(), "email");
+    }
+
+    #[test]
+    fn test_destination_type_display_http() {
+        assert_eq!(DestinationType::Http.to_string(), "http");
+    }
+
+    #[test]
+    fn test_destination_type_display_sns() {
+        assert_eq!(DestinationType::Sns.to_string(), "sns");
+    }
+
+    #[test]
+    fn test_template_from_meta_email_preserves_title() {
+        let meta = meta_dest::Template {
+            id: None,
+            org_id: "org1".to_string(),
+            name: "my_template".to_string(),
+            is_default: false,
+            template_type: meta_dest::TemplateType::Email {
+                title: "Alert Title".to_string(),
+            },
+            body: "body content".to_string(),
+        };
+        let t = Template::from(meta);
+        assert_eq!(t.name, "my_template");
+        assert_eq!(t.body, "body content");
+        assert_eq!(t.title, "Alert Title");
+        assert_eq!(t.template_type, DestinationType::Email);
+    }
+
+    #[test]
+    fn test_template_from_meta_http_has_empty_title() {
+        let meta = meta_dest::Template {
+            id: None,
+            org_id: "org1".to_string(),
+            name: "http_tmpl".to_string(),
+            is_default: true,
+            template_type: meta_dest::TemplateType::Http,
+            body: "{}".to_string(),
+        };
+        let t = Template::from(meta);
+        assert_eq!(t.template_type, DestinationType::Http);
+        assert_eq!(t.title, "");
+        assert_eq!(t.is_default, Some(true));
+    }
+
+    #[test]
+    fn test_template_from_meta_sns_has_empty_title() {
+        let meta = meta_dest::Template {
+            id: None,
+            org_id: "org1".to_string(),
+            name: "sns_tmpl".to_string(),
+            is_default: false,
+            template_type: meta_dest::TemplateType::Sns,
+            body: "sns body".to_string(),
+        };
+        let t = Template::from(meta);
+        assert_eq!(t.template_type, DestinationType::Sns);
+        assert_eq!(t.title, "");
+        assert!(t.is_default.is_none());
+    }
+
+    #[test]
+    fn test_template_into_http_produces_correct_meta() {
+        let t = Template {
+            name: "tmpl".to_string(),
+            body: "body".to_string(),
+            is_default: None,
+            template_type: DestinationType::Http,
+            title: String::new(),
+        };
+        let meta = t.into("myorg");
+        assert_eq!(meta.org_id, "myorg");
+        assert_eq!(meta.name, "tmpl");
+        assert!(!meta.is_default);
+        assert!(matches!(meta.template_type, meta_dest::TemplateType::Http));
+    }
+
+    #[test]
+    fn test_template_into_email_preserves_title() {
+        let t = Template {
+            name: "email_tmpl".to_string(),
+            body: "hi".to_string(),
+            is_default: Some(true),
+            template_type: DestinationType::Email,
+            title: "My Alert".to_string(),
+        };
+        let meta = t.into("org");
+        assert!(meta.is_default);
+        match meta.template_type {
+            meta_dest::TemplateType::Email { title } => assert_eq!(title, "My Alert"),
+            _ => panic!("expected Email template type"),
+        }
+    }
+
+    #[test]
+    fn test_template_into_sns_produces_sns_type() {
+        let t = Template {
+            name: "s".to_string(),
+            body: "b".to_string(),
+            is_default: None,
+            template_type: DestinationType::Sns,
+            title: String::new(),
+        };
+        let meta = t.into("org");
+        assert!(matches!(meta.template_type, meta_dest::TemplateType::Sns));
+    }
+
+    #[test]
+    fn test_destination_optional_fields_absent_when_none() {
+        let d = Destination::default();
+        let json = serde_json::to_value(&d).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("headers"));
+        assert!(!obj.contains_key("template"));
+        assert!(!obj.contains_key("sns_topic_arn"));
+        assert!(!obj.contains_key("aws_region"));
+        assert!(!obj.contains_key("output_format"));
+        assert!(!obj.contains_key("destination_type_name"));
+    }
+
+    #[test]
+    fn test_destination_optional_fields_present_when_some() {
+        let mut hdrs = HashMap::new();
+        hdrs.insert("X-Token".to_string(), "abc".to_string());
+        let d = Destination {
+            headers: Some(hdrs),
+            template: Some("Default".to_string()),
+            sns_topic_arn: Some("arn:aws:sns:us-east-1:123:topic".to_string()),
+            aws_region: Some("us-east-1".to_string()),
+            output_format: Some(meta_dest::HTTPOutputFormat::JSON),
+            destination_type_name: Some("openobserve".to_string()),
+            ..Destination::default()
+        };
+        let json = serde_json::to_value(&d).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("headers"));
+        assert!(obj.contains_key("template"));
+        assert!(obj.contains_key("sns_topic_arn"));
+        assert!(obj.contains_key("aws_region"));
+        assert!(obj.contains_key("output_format"));
+        assert!(obj.contains_key("destination_type_name"));
+    }
+
+    #[test]
+    fn test_destination_into_alert_email() {
+        let d = Destination {
+            name: "email_dest".to_string(),
+            destination_type: DestinationType::Email,
+            emails: vec!["a@b.com".to_string()],
+            template: Some("Default".to_string()),
+            ..Destination::default()
+        };
+        let result = d.into("myorg".to_string(), true);
+        assert!(result.is_ok());
+        let meta = result.unwrap();
+        assert_eq!(meta.name, "email_dest");
+        assert_eq!(meta.org_id, "myorg");
+        match meta.module {
+            meta_dest::Module::Alert {
+                template,
+                destination_type: meta_dest::DestinationType::Email(email),
+            } => {
+                assert_eq!(email.recipients, vec!["a@b.com"]);
+                assert_eq!(template, Some("Default".to_string()));
+            }
+            _ => panic!("expected Alert Email module"),
+        }
+    }
+
+    #[test]
+    fn test_destination_into_alert_http() {
+        let d = Destination {
+            name: "http_dest".to_string(),
+            destination_type: DestinationType::Http,
+            url: "https://example.com/hook".to_string(),
+            method: meta_dest::HTTPType::POST,
+            ..Destination::default()
+        };
+        let result = d.into("org1".to_string(), true);
+        assert!(result.is_ok());
+        let meta = result.unwrap();
+        match meta.module {
+            meta_dest::Module::Alert {
+                destination_type: meta_dest::DestinationType::Http(ep),
+                ..
+            } => {
+                assert_eq!(ep.url, "https://example.com/hook");
+            }
+            _ => panic!("expected Alert Http module"),
+        }
+    }
+
+    #[test]
+    fn test_destination_into_alert_sns_missing_arn_returns_error() {
+        let d = Destination {
+            name: "sns_dest".to_string(),
+            destination_type: DestinationType::Sns,
+            sns_topic_arn: None, // missing → error
+            aws_region: Some("us-east-1".to_string()),
+            ..Destination::default()
+        };
+        let result = d.into("org1".to_string(), true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_destination_into_pipeline() {
+        let d = Destination {
+            name: "pipeline_dest".to_string(),
+            url: "https://pipeline.example.com".to_string(),
+            method: meta_dest::HTTPType::POST,
+            ..Destination::default()
+        };
+        let result = d.into("orgx".to_string(), false);
+        assert!(result.is_ok());
+        let meta = result.unwrap();
+        match meta.module {
+            meta_dest::Module::Pipeline { endpoint } => {
+                assert_eq!(endpoint.url, "https://pipeline.example.com");
+            }
+            _ => panic!("expected Pipeline module"),
+        }
+    }
+}

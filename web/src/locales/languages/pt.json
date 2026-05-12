@@ -123,7 +123,11 @@
     "version": "Versão",
     "create": "Criar",
     "resources": "Recursos",
-    "updated_at": "Atualizado em"
+    "updated_at": "Atualizado em",
+    "error": "Erro",
+    "db": "Banco de dados",
+    "discardChanges": "Descartar alterações",
+    "unsavedChanges": "Alterações não salvas"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -387,7 +391,11 @@
     "liveModeTooltip": "Consulta de execução automática sobre alterações de filtro/hora",
     "turnOnLiveMode": "Ativar o modo Ao vivo",
     "turnOffLiveMode": "Desativar o modo ao vivo",
-    "autoRunEnabled": "Execução automática ativada"
+    "autoRunEnabled": "Execução automática ativada",
+    "selectStreamFirst": "Selecione um stream primeiro",
+    "traces": "Traços",
+    "switchToLogs": "clique para voltar para Logs",
+    "patternNoValuesAvailable": "Não há valores disponíveis"
   },
   "menu": {
     "home": "Início",
@@ -976,7 +984,8 @@
     "fieldName": "Nome do campo",
     "fieldRequired": "O campo é obrigatório!",
     "dataType": "Tipo de dados",
-    "dataTypeRequired": "O tipo de dados é obrigatório!"
+    "dataTypeRequired": "O tipo de dados é obrigatório!",
+    "udsFieldAlreadyInSchema": "Um ou mais campos selecionados já fazem parte do esquema definido"
   },
   "function": {
     "header": "Funções",
@@ -1121,7 +1130,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Registros do Pub/Sub"
+    "pubsub": "Registros do Pub/Sub",
+    "aiLabel": "Integrações de IA"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2237,6 +2247,8 @@
     "editJson": "Editar alerta JSON",
     "additional_settings": "Configurações adicionais",
     "alertNamePlaceholder": "Nome do alerta",
+    "nameRequired": "O nome do alerta é obrigatório.",
+    "nameNoSpecialChars": "O nome do alerta não pode conter ':', '#', '?', '&', '%', aspas ou espaços. Use sublinhados (_) em vez disso.",
     "anomalyNamePlaceholder": "Nome da anomalia",
     "folder": "Pasta",
     "selectStreamTypeFirst": "Selecione primeiro um tipo de stream",
@@ -2283,7 +2295,8 @@
       "addNewDestination": "Adicionar novo destino",
       "destinationRequired": "É necessário pelo menos um destino!",
       "disabledNotificationsInfo": "A detecção de anomalias ainda será executada e gravará os resultados no fluxo _anomalies. Ative as notificações para receber alertas quando forem detectadas anomalias."
-    }
+    },
+    "anomalyName": "Nome da anomalia"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2881,7 +2894,52 @@
       "multiStepAgent": "Agente de várias etapas"
     },
     "noLogsAvailableForService": "Não há registros disponíveis para este serviço",
-    "spansTruncatedWarning": "Mostrando {count} de {total} extensões — o rastreamento pode estar incompleto. Limite o intervalo de tempo ou entre em contato com seu administrador para aumentar o limite de intervalo."
+    "spansTruncatedWarning": "Mostrando {count} de {total} extensões — o rastreamento pode estar incompleto. Limite o intervalo de tempo ou entre em contato com seu administrador para aumentar o limite de intervalo.",
+    "servicesCatalog": {
+      "tabLabel": "Catálogo de serviços",
+      "title": "Catálogo de serviços",
+      "filterPlaceholder": "Filtrar por nome do serviço...",
+      "noServicesFound": "Nenhum serviço foi encontrado no intervalo de tempo selecionado.",
+      "loading": "Carregando serviços...",
+      "columns": {
+        "serviceName": "Serviço",
+        "status": "Status",
+        "requests": "Solicitações",
+        "errorRate": "Taxa de erro",
+        "errors": "Erros",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Latência média",
+        "lastSeen": "Visto pela última vez",
+        "operations": "Operações"
+      },
+      "status": {
+        "healthy": "Saudável",
+        "warning": "Aviso",
+        "degraded": "Degradado"
+      },
+      "viewTraces": "Exibir traços",
+      "exportCsv": "Exportar CSV",
+      "justNow": "Agora mesmo",
+      "minutesAgo": "{n} m atrás",
+      "hoursAgo": "{n} h atrás",
+      "daysAgo": "{n} d atrás"
+    },
+    "noErrorPresent": "Nenhum erro presente neste período",
+    "httpStatusCode": "Código de status HTTP",
+    "grpcStatusCode": "Código de status gRPC",
+    "dbResponseStatusCode": "Código de status de resposta do banco de dados",
+    "processExitCode": "Código de saída do processo",
+    "exceptionsWithCount": "Exceções ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Mensagem:",
+    "escapedLabel": "Escapou:",
+    "stacktraceLabel": "Stacktrace:",
+    "copyStacktrace": "Copiar stacktrace",
+    "noStacktraceAvailable": "Nenhum stacktrace disponível",
+    "stacktraceCopied": "Stacktrace copiado para a área de transferência",
+    "stacktraceCopyFailed": "Falha ao copiar o stacktrace"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3283,7 +3341,9 @@
     "noMetricsDescription": "Nenhuma métrica encontrada para essa correlação no intervalo de tempo selecionado.",
     "errorRetrievingTraces": "Ocorreu um erro ao recuperar os traços.",
     "serviceGroupProtected": "O grupo de serviços não pode ser removido. Você só pode modificar os campos mapeados.",
-    "noDataFound": "Nenhum dado encontrado"
+    "noDataFound": "Nenhum dado encontrado",
+    "isWorkloadType": "Identificador de serviço",
+    "isWorkloadTypeTooltip": "Quando ativado, esse grupo é usado para identificar exclusivamente um serviço (por exemplo, cluster, namespace, implantação). Desative para grupos que descrevem operações por meio de um serviço, como método HTTP ou nome do banco de dados."
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

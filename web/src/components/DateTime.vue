@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,22 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div icon="info" class="justify-between date-time-container">
-    <q-btn
+    <OButton
       :data-test="dataTestName"
       id="date-time-button"
       ref="datetimeBtn"
       data-cy="date-time-button"
-      no-caps
-      :label="getDisplayValue"
-      icon="schedule"
-      icon-right="arrow_drop_down"
+      variant="outline"
       class="date-time-button"
       :class="{
         [selectedType + 'type']: !disableRelative,
         hideRelative: disableRelative,
       }"
-      :disable="disable"
+      :disabled="disable"
     >
+      <template #icon-left><q-icon name="schedule" /></template>
+      <span class="date-time-label">{{ getDisplayValue }}</span>
+      <template #icon-right
+        ><q-icon name="arrow_drop_down" class="date-time-arrow"
+      /></template>
       <q-menu
         id="date-time-menu"
         class="date-time-dialog"
@@ -44,37 +46,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show="onShow"
       >
         <div v-if="!disableRelative" class="flex justify-evenly q-py-sm">
-          <q-btn
+          <OButton
             data-test="date-time-relative-tab"
-            size="md"
-            class="tab-button no-border"
-            color="primary"
-            no-caps
-            :flat="selectedType !== 'relative'"
+            class="tab-button"
+            :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
+            size="sm"
             @click="setDateType('relative')"
           >
             {{ t("common.relative") }}
-          </q-btn>
+          </OButton>
           <q-separator vertical inset />
-          <q-btn
+          <OButton
             data-test="date-time-absolute-tab"
-            size="md"
-            class="tab-button no-border"
-            color="primary"
-            no-caps
-            :flat="selectedType !== 'absolute'"
+            class="tab-button"
+            :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
+            size="sm"
             @click="setDateType('absolute')"
           >
             {{ t("common.absolute") }}
-          </q-btn>
+          </OButton>
         </div>
         <q-separator />
-        <q-tab-panels v-model="selectedType" animated>
-          <q-tab-panel
-            v-if="!disableRelative"
-            name="relative"
-            class="q-pa-none"
-          >
+        <OTabPanels v-model="selectedType" animated>
+          <OTabPanel v-if="!disableRelative" name="relative" class="q-pa-none">
             <div class="date-time-table relative column">
               <div
                 class="relative-row q-pl-md q-py-sm"
@@ -88,8 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="(item, item_index) in relativeDates[period.value]"
                   :key="item"
                 >
-                  <q-btn
-                    :disable="
+                  <OButton
+                    :disabled="
                       relativeDatesInHour[period.value][item_index] >
                         queryRangeRestrictionInHour &&
                       queryRangeRestrictionInHour > 0
@@ -102,13 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'rp-selector-selected'
                         : `rp-selector ${relativePeriod}`
                     "
-                    :label="item"
-                    outline
-                    dense
-                    flat
+                    variant="ghost"
+                    size="xs"
                     @click="setRelativeDate(period.value, item)"
                     :key="'period_' + item_index"
                   >
+                    {{ item }}
                     <q-tooltip
                       style="z-index: 10001; font-size: 14px"
                       anchor="center right"
@@ -122,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ queryRangeRestrictionMsg }}
                     </q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
 
@@ -174,8 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-          </q-tab-panel>
-          <q-tab-panel name="absolute" class="q-pa-none">
+          </OTabPanel>
+          <OTabPanel name="absolute">
             <div class="date-time-table">
               <q-tooltip
                 anchor="center right"
@@ -235,12 +228,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 with-seconds
                               >
                                 <div class="row items-center justify-end">
-                                  <q-btn
+                                  <OButton
                                     v-close-popup
-                                    label="Close"
-                                    color="primary"
-                                    flat
-                                  />
+                                    variant="ghost-primary"
+                                    size="xs"
+                                    >Close</OButton
+                                  >
                                 </div>
                               </q-time>
                             </q-popup-proxy>
@@ -275,12 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :with-seconds="true"
                               >
                                 <div class="row items-center justify-end">
-                                  <q-btn
+                                  <OButton
                                     v-close-popup
-                                    label="Close"
-                                    color="primary"
-                                    flat
-                                  />
+                                    variant="ghost-primary"
+                                    size="xs"
+                                    >Close</OButton
+                                  >
                                 </div>
                               </q-time>
                             </q-popup-proxy>
@@ -292,8 +285,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </tbody>
               </table>
             </div>
-          </q-tab-panel>
-        </q-tab-panels>
+          </OTabPanel>
+        </OTabPanels>
         <q-select
           v-if="!hideRelativeTimezone"
           data-test="datetime-timezone-select"
@@ -322,23 +315,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-select>
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
-          <q-btn
+          <OButton
             data-test="date-time-apply-btn"
-            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
-            no-caps
-            size="sm"
+            variant="primary"
+            size="xs"
+            class="element-box-shadow"
             @click="saveDate(null)"
             v-close-popup
           >
             {{ t("common.apply") }}
-          </q-btn>
+          </OButton>
         </div>
       </q-menu>
-    </q-btn>
+    </OButton>
   </div>
 </template>
 
 <script lang="ts">
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 // @ts-nocheck
 import {
   ref,
@@ -364,6 +360,7 @@ import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
 
 export default defineComponent({
+  components: { OTabPanels, OTabPanel, OButton },
   props: {
     defaultType: {
       type: String,
@@ -1164,34 +1161,27 @@ export default defineComponent({
   border-radius: 0.375rem;
 }
 .date-time-button {
-  height: 100%;
+  height: 30px;
+  min-height: 30px;
   border-radius: 0.375rem;
   padding: 0px 5px;
   font-size: 12px;
   min-width: auto;
-  border: 0.0625rem solid var(--o2-border-color);
+  justify-content: flex-start !important;
 
-  .q-focus-helper {
-    display: none !important;
+  .date-time-label {
+    font-weight: 600;
+    flex: 1;
+    text-align: left;
   }
 
-  &::before {
-    border: none !important;
-  }
-
-  .q-icon.on-right {
+  .date-time-arrow {
     transition: transform 0.25s ease;
+    margin-left: auto;
+    font-size: 18px !important;
   }
-  &.isOpen .q-icon.on-right {
+  &.isOpen .date-time-arrow {
     transform: rotate(180deg);
-  }
-
-  .q-btn__content {
-    justify-content: flex-start;
-
-    .block {
-      font-weight: 600;
-    }
   }
 
   &:hover {
@@ -1271,6 +1261,7 @@ export default defineComponent({
   width: 32px;
   // border: $secondary;
   background: rgba(0, 0, 0, 0.07);
+  font-weight: 700;
 }
 
 .rp-selector-selected {
@@ -1335,7 +1326,7 @@ export default defineComponent({
 }
 .startEndTime {
   margin: 0.5rem 0.4rem 0.3rem 0.4rem;
-  .q-field__control-container{
+  .q-field__control-container {
     min-height: 32px;
     height: 32px;
   }

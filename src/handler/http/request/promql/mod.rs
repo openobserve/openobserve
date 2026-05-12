@@ -1665,3 +1665,176 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- search_timeout ---
+
+    #[test]
+    fn test_search_timeout_none() {
+        assert_eq!(search_timeout(None), 0);
+    }
+
+    #[test]
+    fn test_search_timeout_plain_digits_treated_as_seconds() {
+        // plain digits without unit -> treated as seconds by parse_milliseconds
+        // "5" as seconds: 5*1000ms / 1000 = 5 seconds
+        assert_eq!(search_timeout(Some("5".to_string())), 5);
+    }
+
+    #[test]
+    fn test_search_timeout_ms_suffix() {
+        // "5000ms" -> 5000ms / 1000 = 5 seconds
+        assert_eq!(search_timeout(Some("5000ms".to_string())), 5);
+    }
+
+    #[test]
+    fn test_search_timeout_zero() {
+        assert_eq!(search_timeout(Some("0".to_string())), 0);
+    }
+
+    #[test]
+    fn test_search_timeout_invalid_returns_zero() {
+        assert_eq!(search_timeout(Some("not_a_number".to_string())), 0);
+    }
+
+    // --- get_max_lookback_window ---
+
+    #[test]
+    fn test_max_lookback_invalid_query_returns_zero() {
+        assert_eq!(get_max_lookback_window("this is not promql"), 0);
+    }
+
+    #[test]
+    fn test_max_lookback_instant_query_no_range() {
+        // instant vector, no range selector -> 0
+        assert_eq!(get_max_lookback_window("up"), 0);
+    }
+
+    #[test]
+    fn test_max_lookback_range_query() {
+        // rate over 5m -> should return 5m in micros
+        let result = get_max_lookback_window("rate(http_requests_total[5m])");
+        assert!(result > 0, "5m range query should return positive lookback");
+        // 5 minutes = 300 seconds = 300_000_000 micros
+        assert_eq!(result, 300_000_000);
+    }
+
+    #[test]
+    fn test_max_lookback_single_range_5m() {
+        // Single range selector 5m -> 300s -> 300_000_000 micros
+        let result = get_max_lookback_window("rate(http_requests_total[5m])");
+        assert_eq!(result, 300_000_000);
+    }
+
+    #[test]
+    fn test_max_lookback_10m() {
+        let result = get_max_lookback_window("rate(up[10m])");
+        assert_eq!(result, 600_000_000); // 10m in micros
+    }
+
+    // --- MaxLookbackWindowVisitor ---
+
+    #[test]
+    fn test_visitor_default_range_is_zero() {
+        let v = MaxLookbackWindowVisitor::default();
+        assert_eq!(v.get_range_micros(), 0);
+    }
+
+    #[test]
+    fn test_visitor_new_range_is_zero() {
+        let v = MaxLookbackWindowVisitor::new();
+        assert_eq!(v.get_range_micros(), 0);
+    }
+
+    // --- generate_search_partition ---
+
+    #[test]
+    fn test_partition_start_equals_end() {
+        let result = generate_search_partition("up", 1000, 1000, 60_000_000);
+        assert_eq!(result, vec![(1000, 1000)]);
+    }
+
+    #[test]
+    fn test_partition_start_greater_than_end() {
+        let result = generate_search_partition("up", 2000, 1000, 60_000_000);
+        assert_eq!(result, vec![(2000, 1000)]);
+    }
+
+    #[test]
+    fn test_partition_small_range_returns_single_partition() {
+        // Range smaller than partition step -> single partition
+        let start = 0;
+        let end = 60_000_000; // 1 minute
+        let step = 60_000_000; // 1 minute step
+        let result = generate_search_partition("up", start, end, step);
+        assert!(!result.is_empty());
+        assert_eq!(result.first().unwrap().0, start);
+        assert_eq!(result.last().unwrap().1, end);
+    }
+
+    #[test]
+    fn test_partition_coverage_start_to_end() {
+        // All partitions together must cover [start, end]
+        let start = 0_i64;
+        let end = 7_200_000_000_i64; // 2 hours in micros
+        let step = 60_000_000_i64; // 1 minute step
+        let result = generate_search_partition("up", start, end, step);
+        assert!(!result.is_empty());
+        assert_eq!(result.first().unwrap().0, start);
+        assert_eq!(result.last().unwrap().1, end);
+    }
+
+    #[test]
+    fn test_partition_with_range_query() {
+        let start = 0_i64;
+        let end = 3_600_000_000_i64; // 1 hour
+        let step = 60_000_000_i64; // 1 minute
+        let result = generate_search_partition("rate(req[5m])", start, end, step);
+        assert!(!result.is_empty());
+        assert_eq!(result.first().unwrap().0, start);
+        assert_eq!(result.last().unwrap().1, end);
+    }
+
+    // --- validate_metadata_params ---
+
+    #[test]
+    fn test_validate_metadata_params_all_none() {
+        let result = validate_metadata_params(None, None, None);
+        assert!(result.is_ok());
+        let (selector, start, end) = result.unwrap();
+        assert!(selector.is_none());
+        assert_eq!(start, 0);
+        assert!(end > 0); // end defaults to now_micros()
+    }
+
+    #[test]
+    fn test_validate_metadata_params_invalid_matcher() {
+        let result = validate_metadata_params(Some("!!!invalid".to_string()), None, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_non_vector_selector() {
+        // A range query is not a VectorSelector — should error
+        let result = validate_metadata_params(Some("rate(up[5m])".to_string()), None, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_valid_metric_name() {
+        let result = validate_metadata_params(Some("up".to_string()), None, None);
+        assert!(result.is_ok());
+        let (selector, ..) = result.unwrap();
+        assert!(selector.is_some());
+    }
+
+    #[test]
+    fn test_validate_metadata_params_matcher_missing_name() {
+        // A matcher without a metric name should error
+        let result = validate_metadata_params(Some("{job=\"prometheus\"}".to_string()), None, None);
+        assert!(result.is_err());
+    }
+}

@@ -43,14 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
     </q-select>
-    <!-- <div
-      class="tw:w-full tw:h-[1px] tw:bg-[var(--o2-border-color)] tw:mb-[0.375rem]"
-    ></div> -->
     <div class="index-table tw:h-[calc(100%-2.725rem)]!">
       <q-table
         data-test="log-search-index-list-fields-table"
         :visible-columns="['name']"
-        :rows="normalizedFieldList"
+        :rows="visibleFieldRows"
         row-key="name"
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
@@ -62,16 +59,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
-          <q-tr :props="props" class="hover:tw:bg-[var(--o2-hover-accent)]!">
+          <!-- Group header row -->
+          <q-tr
+            v-if="props.row.label === true"
+            :props="props"
+            class="cursor-pointer text-bold"
+            @click="toggleGroup(props.row.group)"
+          >
+            <q-td
+              class="field_list field-group-header tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'bg-grey-3'"
+            >
+              <div class="tw:w-[calc(100%-1.25rem)] ellipsis">
+                {{ props.row.name }} ({{ groupFieldCount[props.row.group] ?? 0 }})
+              </div>
+              <OButton
+                variant="ghost"
+                size="icon-xs-sq"
+              >
+                <q-icon :name="expandGroupRows[props.row.group] !== false ? 'expand_more' : 'chevron_right'" />
+              </OButton>
+            </q-td>
+          </q-tr>
+          <!-- Field row -->
+          <q-tr
+            v-else
+            :props="props"
+            class="hover:tw:bg-[var(--o2-hover-accent)]!"
+          >
             <q-td
               :props="props"
               class="field_list tw:rounded"
-              :class="
-                props.row.enableVisibility &&
-                searchObj.data.stream.selectedFields.includes(props.row.name)
-                  ? 'selected'
-                  : ''
-              "
+              :class="props.row.enableVisibility && searchObj.data.stream.selectedFields.includes(props.row.name) ? 'selected' : ''"
             >
               <FieldRow
                 :field="props.row"
@@ -86,12 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #expansion="{ field }">
                   <basic-values-filter
                     :row="field"
-                    :active-include-values="
-                      activeIncludeFieldValues?.[props.row.name] ?? []
-                    "
-                    :active-exclude-values="
-                      activeExcludeFieldValues?.[props.row.name] ?? []
-                    "
+                    :active-include-values="activeIncludeFieldValues?.[props.row.name] ?? []"
+                    :active-exclude-values="activeExcludeFieldValues?.[props.row.name] ?? []"
                     :selected-fields="searchObj.data.stream.selectedFields"
                     :show-visibility-toggle="props.row.enableVisibility"
                     @toggle-field="toggleField"
@@ -138,20 +153,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
+import { applyCollapseFilter } from "@/utils/fieldCategories";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: {
     BasicValuesFilter,
     FieldRow,
+    OButton,
   },
   emits: ["update:changeStream", "update:selectedFields"],
   props: {
@@ -215,16 +233,32 @@ export default defineComponent({
     };
 
     const filterFieldFn = (rows: any, terms: any) => {
-      var filtered = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
+      if (!terms) return rows;
+
+      const term = terms.toLowerCase();
+      const labelByGroup: Record<string, any> = {};
+      for (const row of rows) {
+        if (row.label && row.group) labelByGroup[row.group] = row;
+      }
+
+      const seen = new Set<string>();
+      const seenGroups = new Set<string>();
+      const filtered: any[] = [];
+
+      for (const row of rows) {
+        if (row.label) continue;
+        if (row.name.toLowerCase().includes(term) && !seen.has(row.name)) {
+          seen.add(row.name);
+          const group = row.group;
+          if (group && labelByGroup[group] && !seenGroups.has(group)) {
+            seenGroups.add(group);
+            filtered.push(labelByGroup[group]);
           }
+          filtered.push(row);
         }
       }
-      return filtered;
+
+      return filtered.length ? filtered : [{ name: "No matching fields found", label: true, group: "__none__" }];
     };
 
     const addToFilter = (field: any) => {
@@ -244,18 +278,56 @@ export default defineComponent({
       emit("update:changeStream");
     };
 
-    const normalizedFieldList = computed(() =>
-      (props.fieldList as any[]).map((f: any) => ({
-        ...f,
-        isSchemaField: true,
-        enableVisibility: !TRACES_LOCKED_FIELD_NAMES.has(f.name),
-      })),
-    );
-
     // Column ID "status" maps to stream field "span_status" — the only mismatch.
     const TRACES_LOCKED_FIELD_NAMES = new Set(
       [...DEFAULT_TRACE_COLUMNS.traces].map((id) =>
         id === "status" ? "span_status" : id,
+      ),
+    );
+
+    const normalizedFieldList = computed(() =>
+      (props.fieldList as any[]).map((f: any) => ({
+        ...f,
+        isSchemaField: f.label === true ? false : true,
+        enableVisibility: f.label === true ? false : !TRACES_LOCKED_FIELD_NAMES.has(f.name),
+      })),
+    );
+
+    // Per-group expand state — starts expanded for all groups
+    const expandGroupRows = ref<Record<string, boolean>>({});
+
+    watch(
+      normalizedFieldList,
+      (list) => {
+        for (const row of list) {
+          if (row.label === true && row.group && !(row.group in expandGroupRows.value)) {
+            expandGroupRows.value[row.group] = true;
+          }
+        }
+      },
+      { immediate: true },
+    );
+
+    const toggleGroup = (group: string) => {
+      expandGroupRows.value[group] = !expandGroupRows.value[group];
+    };
+
+    // Count of non-label fields per group key (for the header badge)
+    const groupFieldCount = computed(() => {
+      const counts: Record<string, number> = {};
+      for (const row of normalizedFieldList.value) {
+        if (row.label !== true && row.group) {
+          counts[row.group] = (counts[row.group] ?? 0) + 1;
+        }
+      }
+      return counts;
+    });
+
+    const visibleFieldRows = computed(() =>
+      applyCollapseFilter(
+        normalizedFieldList.value,
+        expandGroupRows.value,
+        searchObj.data.stream.filterField ?? "",
       ),
     );
 
@@ -286,6 +358,10 @@ export default defineComponent({
       isFieldEditable,
       toggleField,
       TRACES_LOCKED_FIELD_NAMES,
+      expandGroupRows,
+      toggleGroup,
+      visibleFieldRows,
+      groupFieldCount,
     };
   },
 });
@@ -359,6 +435,12 @@ export default defineComponent({
     position: relative;
     overflow: visible;
     cursor: default;
+
+    &.field-group-header {
+      font-weight: 600;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.325rem;
+    }
 
     .field_label {
       pointer-events: none;

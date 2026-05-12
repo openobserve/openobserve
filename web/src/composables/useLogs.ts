@@ -15,7 +15,7 @@
 
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, onBeforeMount } from "vue";
+import { reactive, onBeforeMount, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -37,6 +37,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import useStreamingSearch from "@/composables/useStreamingSearch";
 
 const useLogs = () => {
   const store = useStore();
@@ -80,6 +81,7 @@ const useLogs = () => {
 
   const { showErrorNotification } = useNotifications();
   const { getStreams } = useStreams();
+  const { cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
 
   const router = useRouter();
 
@@ -185,16 +187,16 @@ const useLogs = () => {
     }
   };
 
-  const processPostPaginationData = () => {
+  const processPostPaginationData = async () => {
     updateFieldValues();
 
     //extract fields from query response
-    extractFields();
+    await extractFields();
 
     //update grid columns
     updateGridColumns();
 
-    filterHitsColumns();
+    await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 
@@ -256,15 +258,35 @@ const useLogs = () => {
     }
   };
 
+  const cancelInflightRequests = () => {
+    const orgId = searchObj.organizationIdentifier;
+    if (searchObj.data.lastSearchTraceId) {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: searchObj.data.lastSearchTraceId,
+        org_id: orgId,
+      });
+      searchObj.data.lastSearchTraceId = "";
+    }
+    if (searchObj.data.lastHistogramTraceId) {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: searchObj.data.lastHistogramTraceId,
+        org_id: orgId,
+      });
+      searchObj.data.lastHistogramTraceId = "";
+    }
+  };
+
   const loadLogsData = async () => {
     try {
+      cancelInflightRequests();
       resetFunctions();
 
       // Create initialStreamSelected variable to handle first time load when api call for function & actions are
       // in-progress and user select stream from dropdown in that case it loads data but it should wait for
       // additional details from the user like filter conditions and time range selection before load data
       // it should work in case of page refresh, navigate user from streams page or short url
-      let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
+      let initialStreamSelected: boolean =
+        searchObj.data.stream.selectedStream.length > 0;
 
       await getStreamList();
       await getFunctions();
@@ -325,6 +347,7 @@ const useLogs = () => {
 
   const handleRunQuery = async (clear_cache = false) => {
     try {
+      cancelInflightRequests();
       searchObj.loading = true;
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
@@ -333,7 +356,7 @@ const useLogs = () => {
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
         (router.currentRoute.value.query.type == "search_history_re_apply" ||
-        router.currentRoute.value.query.type == "ai_chat_query")
+          router.currentRoute.value.query.type == "ai_chat_query")
       ) {
         delete router.currentRoute.value.query.type;
       }
@@ -372,6 +395,10 @@ const useLogs = () => {
 
     if (queryParams.query) {
       searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
+      // Added nextTick() for a purpose, don't remove.
+      // If value of sqlMode is changed, watcher gets called which resets the editor and query value
+      // The editor value and query value assigned below, is overrided by the watcher
+      await nextTick();
       searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
       searchObj.data.query = b64DecodeUnicode(queryParams.query);
     }
@@ -491,7 +518,10 @@ const useLogs = () => {
     }
   };
 
-  const reorderArrayByReference = (arr1: string[], arr2: string[]): string[] => {
+  const reorderArrayByReference = (
+    arr1: string[],
+    arr2: string[],
+  ): string[] => {
     return [...arr1].sort((a, b) => {
       const indexA = arr2.indexOf(a);
       const indexB = arr2.indexOf(b);

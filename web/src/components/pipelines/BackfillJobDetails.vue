@@ -26,14 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="q-pa-md">
         <div class="flex items-center justify-between">
           <div class="text-h6" data-test="dialog-title">Backfill Job Details</div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
+          <OButton
+            variant="ghost"
+            size="icon"
             v-close-popup
             data-test="close-dialog-btn"
-          />
+          >
+            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
+          </OButton>
         </div>
       </q-card-section>
 
@@ -52,14 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="getStatusLabel(job.status, job.deletion_status)"
               class="text-lg q-pa-sm"
             />
-            <q-btn
+            <OButton
               v-if="canCancelJob"
-              label="Cancel Job"
-              color="negative"
-              outline
+              variant="outline-destructive"
+              size="sm-action"
               @click="confirmCancelJob"
               data-test="cancel-job-btn"
-            />
+            >Cancel Job</OButton>
           </div>
 
           <!-- Job Information -->
@@ -233,6 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { X } from "lucide-vue-next";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";

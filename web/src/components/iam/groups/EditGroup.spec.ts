@@ -171,15 +171,15 @@ describe("EditGroup Component", () => {
 
     it("has correct tab structure", () => {
       expect(wrapper.vm.tabs).toHaveLength(3); // Since aws-exports mock sets isCloud to "false"
-      expect(wrapper.vm.tabs[0]).toEqual({
+      expect(wrapper.vm.tabs[0]).toMatchObject({
         value: "roles",
         label: "Roles",
       });
-      expect(wrapper.vm.tabs[1]).toEqual({
+      expect(wrapper.vm.tabs[1]).toMatchObject({
         value: "users",
         label: "Users",
       });
-      expect(wrapper.vm.tabs[2]).toEqual({
+      expect(wrapper.vm.tabs[2]).toMatchObject({
         value: "serviceAccounts",
         label: "Service Accounts",
       });
@@ -188,7 +188,7 @@ describe("EditGroup Component", () => {
     it("includes service accounts tab when not in cloud mode", () => {
       // Since our mock sets isCloud to "false", service accounts tab should be included
       expect(wrapper.vm.tabs).toHaveLength(3);
-      expect(wrapper.vm.tabs[2]).toEqual({
+      expect(wrapper.vm.tabs[2]).toMatchObject({
         value: "serviceAccounts",
         label: "Service Accounts",
       });

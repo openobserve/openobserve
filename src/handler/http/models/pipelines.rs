@@ -318,4 +318,46 @@ mod tests {
 
         assert_eq!(pipeline, deserialized);
     }
+
+    #[test]
+    fn test_pipeline_last_error_none_absent_from_json() {
+        let pipeline = Pipeline {
+            id: "p1".to_string(),
+            version: 1,
+            enabled: false,
+            org: "org".to_string(),
+            name: "name".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::default()),
+            nodes: vec![],
+            edges: vec![],
+            paused_at: None,
+            last_error: None,
+        };
+        let json = serde_json::to_value(&pipeline).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("last_error"));
+    }
+
+    #[test]
+    fn test_pipeline_last_error_some_present_in_json() {
+        let pipeline = Pipeline {
+            id: "p1".to_string(),
+            version: 1,
+            enabled: false,
+            org: "org".to_string(),
+            name: "name".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::default()),
+            nodes: vec![],
+            edges: vec![],
+            paused_at: None,
+            last_error: Some(PipelineErrorInfo {
+                last_error_timestamp: 1000,
+                error_summary: Some("err".to_string()),
+                node_errors: None,
+            }),
+        };
+        let json = serde_json::to_value(&pipeline).unwrap();
+        assert!(json.as_object().unwrap().contains_key("last_error"));
+    }
 }

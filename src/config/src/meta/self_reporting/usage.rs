@@ -1286,6 +1286,233 @@ mod tests {
             assert_eq!(variant, deserialized);
         }
     }
+
+    #[test]
+    fn test_usage_type_is_remote_pipeline() {
+        assert!(UsageType::RemotePipeline.is_remote_pipeline());
+
+        assert!(!UsageType::Pipeline.is_remote_pipeline());
+        assert!(!UsageType::Bulk.is_remote_pipeline());
+        assert!(!UsageType::Search.is_remote_pipeline());
+    }
+
+    #[test]
+    fn test_usage_type_is_incident() {
+        assert!(UsageType::NewIncident.is_incident());
+        assert!(UsageType::IncidentReAnalysis.is_incident());
+
+        assert!(!UsageType::Bulk.is_incident());
+        assert!(!UsageType::Search.is_incident());
+        assert!(!UsageType::Pipeline.is_incident());
+    }
+
+    #[test]
+    fn test_usage_type_display_pipeline_and_incident_variants() {
+        assert_eq!(UsageType::Pipeline.to_string(), "pipeline");
+        assert_eq!(UsageType::RemotePipeline.to_string(), "remote_pipeline");
+        assert_eq!(UsageType::NewIncident.to_string(), "new_incident");
+        assert_eq!(
+            UsageType::IncidentReAnalysis.to_string(),
+            "incident_reanalysis"
+        );
+    }
+
+    #[test]
+    fn test_usage_type_is_pipeline() {
+        assert!(UsageType::Pipeline.is_pipeline());
+
+        assert!(!UsageType::RemotePipeline.is_pipeline());
+        assert!(!UsageType::Bulk.is_pipeline());
+        assert!(!UsageType::Search.is_pipeline());
+    }
+
+    #[test]
+    fn test_usage_type_serde_pipeline_and_incident() {
+        // Pipeline and Incident variants serialize to their serde rename strings
+        let pipeline_json = serde_json::to_string(&UsageType::Pipeline).unwrap();
+        assert_eq!(pipeline_json, "\"pipeline\"");
+
+        let incident_json = serde_json::to_string(&UsageType::NewIncident).unwrap();
+        assert_eq!(incident_json, "\"new_incident\"");
+
+        // Round trip
+        let back: UsageType = serde_json::from_str(&pipeline_json).unwrap();
+        assert_eq!(back, UsageType::Pipeline);
+    }
+
+    #[test]
+    fn test_usage_data_optional_fields_present_when_some() {
+        let data = UsageData::init_for_reflection();
+        let json = serde_json::to_value(&data).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("cached_ratio"));
+        assert!(obj.contains_key("scan_files"));
+        assert!(obj.contains_key("compressed_size"));
+        assert!(obj.contains_key("min_ts"));
+        assert!(obj.contains_key("max_ts"));
+        assert!(obj.contains_key("search_type"));
+        assert!(obj.contains_key("took_wait_in_queue"));
+        assert!(obj.contains_key("result_cache_ratio"));
+        assert!(obj.contains_key("function"));
+        assert!(obj.contains_key("work_group"));
+        assert!(obj.contains_key("node_name"));
+        assert!(obj.contains_key("dashboard_info"));
+        assert!(obj.contains_key("peak_memory_usage"));
+    }
+
+    #[test]
+    fn test_usage_data_optional_fields_absent_when_none() {
+        let data = UsageData {
+            _timestamp: 0,
+            event: UsageEvent::Other,
+            year: 2025,
+            month: 1,
+            day: 1,
+            hour: 0,
+            event_time_hour: "2025010100".to_string(),
+            org_id: "org".to_string(),
+            request_body: "".to_string(),
+            size: 0.0,
+            unit: "MB".to_string(),
+            user_email: "u@example.com".to_string(),
+            response_time: 0.0,
+            stream_type: StreamType::Logs,
+            num_records: 0,
+            dropped_records: 0,
+            stream_name: "test".to_string(),
+            trace_id: None,
+            cached_ratio: None,
+            scan_files: None,
+            compressed_size: None,
+            min_ts: None,
+            max_ts: None,
+            search_type: None,
+            search_event_context: None,
+            took_wait_in_queue: None,
+            result_cache_ratio: None,
+            function: None,
+            is_partial: false,
+            work_group: None,
+            node_name: None,
+            dashboard_info: None,
+            peak_memory_usage: None,
+        };
+        let json = serde_json::to_value(&data).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("trace_id"));
+        assert!(!obj.contains_key("cached_ratio"));
+        assert!(!obj.contains_key("scan_files"));
+        assert!(!obj.contains_key("compressed_size"));
+        assert!(!obj.contains_key("min_ts"));
+        assert!(!obj.contains_key("max_ts"));
+        assert!(!obj.contains_key("search_type"));
+        assert!(!obj.contains_key("took_wait_in_queue"));
+        assert!(!obj.contains_key("result_cache_ratio"));
+        assert!(!obj.contains_key("function"));
+        assert!(!obj.contains_key("work_group"));
+        assert!(!obj.contains_key("node_name"));
+        assert!(!obj.contains_key("dashboard_info"));
+        assert!(!obj.contains_key("peak_memory_usage"));
+    }
+
+    #[test]
+    fn test_trigger_data_skip_serializing_if_none_fields() {
+        let data = TriggerData::default();
+        let json = serde_json::to_value(&data).unwrap();
+        let obj = json.as_object().unwrap();
+        // These 6 fields have skip_serializing_if = "Option::is_none"
+        assert!(!obj.contains_key("skipped_alerts_count"));
+        assert!(!obj.contains_key("dedup_enabled"));
+        assert!(!obj.contains_key("dedup_suppressed"));
+        assert!(!obj.contains_key("dedup_count"));
+        assert!(!obj.contains_key("grouped"));
+        assert!(!obj.contains_key("group_size"));
+    }
+
+    #[test]
+    fn test_trigger_data_skip_serializing_if_some_fields() {
+        let data = TriggerData {
+            skipped_alerts_count: Some(3),
+            dedup_enabled: Some(true),
+            dedup_suppressed: Some(false),
+            dedup_count: Some(5),
+            grouped: Some(true),
+            group_size: Some(10),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&data).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("skipped_alerts_count"));
+        assert_eq!(obj["skipped_alerts_count"], serde_json::json!(3_i64));
+        assert!(obj.contains_key("dedup_enabled"));
+        assert!(obj.contains_key("dedup_suppressed"));
+        assert!(obj.contains_key("dedup_count"));
+        assert!(obj.contains_key("grouped"));
+        assert!(obj.contains_key("group_size"));
+    }
+
+    #[test]
+    fn test_request_stats_optional_fields_absent_when_none() {
+        let stats = RequestStats {
+            node_name: None,
+            ..RequestStats::default()
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("function"));
+        assert!(!obj.contains_key("cached_ratio"));
+        assert!(!obj.contains_key("scan_files"));
+        assert!(!obj.contains_key("compressed_size"));
+        assert!(!obj.contains_key("min_ts"));
+        assert!(!obj.contains_key("max_ts"));
+        assert!(!obj.contains_key("user_email"));
+        assert!(!obj.contains_key("search_type"));
+        assert!(!obj.contains_key("trace_id"));
+        assert!(!obj.contains_key("took_wait_in_queue"));
+        assert!(!obj.contains_key("result_cache_ratio"));
+        assert!(!obj.contains_key("work_group"));
+        assert!(!obj.contains_key("node_name"));
+        assert!(!obj.contains_key("dashboard_info"));
+        assert!(!obj.contains_key("peak_memory_usage"));
+    }
+
+    #[test]
+    fn test_request_stats_optional_fields_present_when_some() {
+        let stats = RequestStats {
+            function: Some("my_fn".to_string()),
+            cached_ratio: Some(75),
+            scan_files: Some(10),
+            compressed_size: Some(1024.0),
+            min_ts: Some(1000),
+            max_ts: Some(2000),
+            user_email: Some("u@example.com".to_string()),
+            search_type: Some(SearchEventType::UI),
+            trace_id: Some("t123".to_string()),
+            took_wait_in_queue: Some(50),
+            result_cache_ratio: Some(80),
+            work_group: Some("wg1".to_string()),
+            node_name: Some("node1".to_string()),
+            peak_memory_usage: Some(256.0),
+            ..RequestStats::default()
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("function"));
+        assert!(obj.contains_key("cached_ratio"));
+        assert!(obj.contains_key("scan_files"));
+        assert!(obj.contains_key("compressed_size"));
+        assert!(obj.contains_key("min_ts"));
+        assert!(obj.contains_key("max_ts"));
+        assert!(obj.contains_key("user_email"));
+        assert!(obj.contains_key("search_type"));
+        assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("took_wait_in_queue"));
+        assert!(obj.contains_key("result_cache_ratio"));
+        assert!(obj.contains_key("work_group"));
+        assert!(obj.contains_key("node_name"));
+        assert!(obj.contains_key("peak_memory_usage"));
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

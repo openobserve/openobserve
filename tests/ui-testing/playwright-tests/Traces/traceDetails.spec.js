@@ -22,9 +22,9 @@ test.describe("Trace Details testcases", () => {
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Try to get to trace details - we have ingested data
-    if (await pm.tracesPage.isStreamSelectVisible()) {
-      await pm.tracesPage.selectTraceStream('default');
-    }
+    await pm.tracesPage.isStreamSelectVisible()
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForTimeout(2000);
 
     // Set time range to last 15 minutes as required for trace visibility
     await pm.tracesPage.setTimeRange('15m');

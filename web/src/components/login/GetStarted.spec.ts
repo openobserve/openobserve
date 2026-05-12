@@ -359,7 +359,7 @@ describe('GetStarted.vue', () => {
 
     it('should render at least one button', () => {
       wrapper = createWrapper();
-      const buttons = wrapper.findAll('.q-btn');
+      const buttons = wrapper.findAll('button');
       expect(buttons.length).toBeGreaterThan(0);
     });
   });

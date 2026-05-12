@@ -456,6 +456,39 @@ mod tests {
         assert!(!is_valid_character_after_escape('a'));
     }
 
+    #[test]
+    fn test_clean_non_meta_escapes_empty() {
+        assert_eq!(clean_non_meta_escapes(""), "");
+    }
+
+    #[test]
+    fn test_clean_non_meta_escapes_valid_escapes_unchanged() {
+        // \d, \w, \s are valid — kept as-is
+        assert_eq!(clean_non_meta_escapes(r"\d+"), r"\d+");
+        assert_eq!(clean_non_meta_escapes(r"\w"), r"\w");
+        assert_eq!(clean_non_meta_escapes(r"\s"), r"\s");
+    }
+
+    #[test]
+    fn test_clean_non_meta_escapes_removes_invalid_backslash() {
+        // \: is invalid in Rust regex — backslash stripped, : kept
+        assert_eq!(clean_non_meta_escapes(r"\:"), ":");
+        // \- is valid (- is meta in regex_syntax 0.8+) — kept as-is
+        assert_eq!(clean_non_meta_escapes(r"\-"), r"\-");
+    }
+
+    #[test]
+    fn test_clean_non_meta_escapes_no_backslash() {
+        let s = "hello world";
+        assert_eq!(clean_non_meta_escapes(s), s);
+    }
+
+    #[test]
+    fn test_clean_non_meta_escapes_double_backslash_kept() {
+        // \\ is a valid escape (literal backslash) — both chars kept
+        assert_eq!(clean_non_meta_escapes(r"\\"), r"\\");
+    }
+
     #[tokio::test]
     async fn test_regexp_match_to_fields_udf() {
         let log_line = r#"2024-02-29 00:15:30 15.128.22.213 GET /Administradores_Elina/service-worker.js - 443"#;
@@ -496,5 +529,27 @@ mod tests {
 
         let test2 = ctx.sql(sqls[1].0).await;
         assert!(test2.is_err());
+    }
+
+    #[test]
+    fn test_regex_pattern_to_fields_with_named_groups() {
+        let result =
+            regex_pattern_to_fields(r"(?P<host>[^\s]+) (?P<method>[^\s]+)", &DataType::Utf8)
+                .unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].name(), "host");
+        assert_eq!(result[1].name(), "method");
+    }
+
+    #[test]
+    fn test_regex_pattern_to_fields_no_named_groups_errors() {
+        let result = regex_pattern_to_fields(r"([^\s]+) ([^\s]+)", &DataType::Utf8);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_regex_pattern_to_fields_empty_pattern_errors() {
+        let result = regex_pattern_to_fields("", &DataType::Utf8);
+        assert!(result.is_err());
     }
 }

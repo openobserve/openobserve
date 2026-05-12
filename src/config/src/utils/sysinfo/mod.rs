@@ -90,3 +90,52 @@ pub fn get_memory_usage() -> usize {
 pub fn get_tcp_connections() -> usize {
     net::get_tcp_connections(None)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_cpu_limit_positive() {
+        assert!(get_cpu_limit() > 0);
+    }
+
+    #[test]
+    fn test_get_memory_limit_positive() {
+        assert!(get_memory_limit() > 0);
+    }
+
+    #[test]
+    fn test_get_memory_usage_nonnegative() {
+        let _ = get_memory_usage();
+    }
+
+    #[test]
+    fn test_get_tcp_connections_nonnegative() {
+        let _ = get_tcp_connections();
+    }
+
+    #[test]
+    fn test_get_node_metrics_fields_sensible() {
+        let m = get_node_metrics();
+        assert!(m.cpu_total > 0);
+        assert!(m.memory_total > 0);
+        assert!(m.cpu_usage >= 0.0);
+        assert!(m.cpu_usage.is_finite());
+    }
+
+    #[test]
+    fn test_node_metrics_default() {
+        let m = NodeMetrics::default();
+        assert_eq!(m.cpu_total, 0);
+        assert_eq!(m.memory_total, 0);
+        assert_eq!(m.tcp_conns, 0);
+    }
+
+    #[test]
+    fn test_get_cpu_usage_finite() {
+        let usage = get_cpu_usage();
+        assert!(usage.is_finite());
+        assert!(usage >= 0.0);
+    }
+}

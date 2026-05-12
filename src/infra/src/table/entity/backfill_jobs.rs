@@ -22,3 +22,30 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "job-1".to_string(),
+            org: "myorg".to_string(),
+            pipeline_id: "pipe-1".to_string(),
+            start_time: 1000,
+            end_time: 2000,
+            chunk_period_minutes: Some(60),
+            delay_between_chunks_secs: None,
+            delete_before_backfill: false,
+            created_at: 1000,
+            enabled: true,
+        };
+        assert_eq!(m.id, "job-1");
+        assert_eq!(m.org, "myorg");
+        assert!(m.enabled);
+        assert!(!m.delete_before_backfill);
+        assert_eq!(m.chunk_period_minutes, Some(60));
+        assert!(m.delay_between_chunks_secs.is_none());
+    }
+}

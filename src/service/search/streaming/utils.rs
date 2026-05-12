@@ -95,9 +95,71 @@ pub fn get_top_k_values(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::sql::OrderBy;
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn test_calculate_progress_percentage_invalid_range_returns_zero() {
+        assert_eq!(
+            calculate_progress_percentage(0, 100, 200, 100, &OrderBy::Asc),
+            0
+        );
+        assert_eq!(
+            calculate_progress_percentage(0, 100, 100, 100, &OrderBy::Asc),
+            0
+        );
+    }
+
+    #[test]
+    fn test_calculate_progress_percentage_asc_start() {
+        // partition_end == req_start → 0% progress
+        let result = calculate_progress_percentage(0, 0, 0, 1000, &OrderBy::Asc);
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_calculate_progress_percentage_asc_end() {
+        // partition_end == req_end → 100%
+        let result = calculate_progress_percentage(0, 1000, 0, 1000, &OrderBy::Asc);
+        assert_eq!(result, 100);
+    }
+
+    #[test]
+    fn test_calculate_progress_percentage_asc_midpoint() {
+        // partition_end at exact midpoint → 50%
+        let result = calculate_progress_percentage(0, 500, 0, 1000, &OrderBy::Asc);
+        assert_eq!(result, 50);
+    }
+
+    #[test]
+    fn test_calculate_progress_percentage_asc_quarter() {
+        // partition_end at 25% → ceil(25) = 25
+        let result = calculate_progress_percentage(0, 250, 0, 1000, &OrderBy::Asc);
+        assert_eq!(result, 25);
+    }
+
+    #[test]
+    fn test_calculate_progress_percentage_desc_full() {
+        // partition_start == req_start → percentage == 1.0 → 100%
+        let result = calculate_progress_percentage(0, 500, 0, 1000, &OrderBy::Desc);
+        assert_eq!(result, 100);
+    }
+
+    #[test]
+    fn test_calculate_progress_percentage_desc_half() {
+        // partition_start at midpoint of range → (1000 - 500) / 1000 = 0.5 → 50
+        let result = calculate_progress_percentage(500, 800, 0, 1000, &OrderBy::Desc);
+        assert_eq!(result, 50);
+    }
+
+    #[test]
+    fn test_calculate_progress_percentage_capped_at_100() {
+        // percentage > 1.0 (partition exceeds req range) should be capped at 100
+        let result = calculate_progress_percentage(0, 2000, 0, 1000, &OrderBy::Asc);
+        assert_eq!(result, 100);
+    }
 
     #[test]
     fn test_get_top_k_values_success() {

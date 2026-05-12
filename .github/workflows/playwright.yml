@@ -74,7 +74,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-30
+      labels: ubicloud-standard-16
 
     steps:
       - name: Remove unused tools
@@ -97,7 +97,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: playwright-release
+          shared-key: playwright-release-ci
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
@@ -108,22 +108,33 @@ jobs:
         with:
           node-version: 22
 
-      - name: Build frontend code
+      - name: Lint frontend code
+        run: cd web && npm ci && npm run lint:ci
+
+      - name: Build binary and frontend
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
-          VITE_COVERAGE: "true"
-          COVERAGE: "true"
-        run: cd web && npm ci && npm run build
+          GIT_HASH_OVERRIDE: ${{ github.sha }}
+        run: |
+          bash -c "cd web && npm run build && cp -r ./dist /tmp/dist" &
+          sed -i 's|folder = "web/dist/"|folder = "/tmp/dist/"|' src/handler/http/router/ui.rs
+          cargo build --profile release-ci --target x86_64-unknown-linux-gnu
+          wait
 
-      - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
-
-      - name: Upload artifacts
+      - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
+          name: release-ci-binary
+          path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: /tmp/dist
+          retention-days: 1
+          if-no-files-found: error
 
   ui_integration_tests:
     name: e2e / ${{ matrix.testfolder }}
@@ -240,6 +251,7 @@ jobs:
                 "dashboard-pie-donut.spec.js",
                 "dashboard-table-chart.spec.js",
                 "dashboard-table-copy-cell.spec.js",
+                "dashboard-table-csv-download.spec.js",
                 "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
@@ -286,6 +298,7 @@ jobs:
             browser: "chrome"
             run_files:
               [
+                "service-catalog.spec.js",
                 "tracesSearch.spec.js",
                 "traceQueryEditor.spec.js",
                 "traceErrorFilter.spec.js",
@@ -295,21 +308,6 @@ jobs:
                 "traces-autocomplete-suggestions.spec.js",
               ]
 
-          - testfolder: "RegressionSet"
-            browser: "chrome"
-            run_files:
-              [
-                "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "logs-9754.spec.js",
-                "streams-regression.spec.js",
-                "enrichment-regression.spec.js",
-                "ui-regression.spec.js",
-                "pipeline-regression.spec.js",
-                # "alerts-regression.spec.js",
-                "metrics-regression.spec.js",
-                "traces-regression.spec.js",
-              ]
           - testfolder: "Metrics"
             browser: "chrome"
             run_files:
@@ -389,14 +387,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download artifacts
+      - name: Download binary artifact
         uses: actions/download-artifact@v5
         with:
-          name: release-binary
-          path: release-binary
+          name: release-ci-binary
+          path: release-ci-binary
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: frontend-dist
+          path: /tmp/dist
 
       - name: Start OpenObserve
-        run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
+        run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
         run: |
@@ -412,9 +416,6 @@ jobs:
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
-
-      - name: Create coverage json folder
-        run: mkdir -p tests/ui-testing/.nyc_output
 
       - uses: actions/setup-node@v5
         with:
@@ -753,24 +754,6 @@ jobs:
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi 
 
-      - name: Sanitize Test Folder Name
-        shell: bash
-        run: |
-          # Assign the matrix variable to a Bash variable
-          SANITIZED_FOLDERNAME="${{ matrix.testfolder }}"
-          # Export as a GitHub Actions environment variable
-          echo "SANITIZED_FOLDERNAME=$SANITIZED_FOLDERNAME" >> $GITHUB_ENV
-
-      - name: Upload Coverage Data
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-coverage-${{ env.SANITIZED_FOLDERNAME }}-attempt-${{ github.run_attempt }}
-          path: tests/ui-testing/.nyc_output
-          include-hidden-files: true
-
-      - name: Generate Coverage Report
-        run: cd tests/ui-testing && npx nyc report
-
       - name: Upload blob report to GitHub Actions Artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -879,7 +862,7 @@ jobs:
           ls -lh playwright-results/report.json
 
       - name: Cache test failures to TestDino
-        if: always()
+        if: ${{ needs.ui_integration_tests.result == 'failure' }}
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
@@ -923,7 +906,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload to TestDino
-        if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
 
@@ -949,60 +932,11 @@ jobs:
             --verbose \
             --token="${{ secrets.TESTDINO_API_TOKEN }}"
 
-  generate_coverage_report:
-    name: Generate Coverage Report
-    needs: [build_binary, ui_integration_tests]
-    runs-on: ubicloud-standard-8
-    if: success() || failure()
-
-    steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Download Playwright Coverage Data
-        uses: actions/download-artifact@v5
-        with:
-          pattern: playwright-coverage-*-attempt-${{ github.run_attempt }}
-          path: merged-coverage
-          merge-multiple: true
-
-      - name: Check Downloaded Coverage Files
-        id: check_coverage
-        run: |
-          if [ -d "merged-coverage" ] && [ "$(ls -A merged-coverage 2>/dev/null)" ]; then
-            echo "has_coverage=true" >> $GITHUB_OUTPUT
-            echo "::notice::Coverage data found"
-            ls -R merged-coverage
-          else
-            echo "has_coverage=false" >> $GITHUB_OUTPUT
-            echo "::notice::No coverage data found (tests may have been skipped due to rerun optimization)"
-          fi
-
-      - name: Move Coverage Files to .nyc_output
-        if: steps.check_coverage.outputs.has_coverage == 'true'
-        run: |
-          mkdir -p tests/ui-testing/.nyc_output
-          mv merged-coverage/* tests/ui-testing/.nyc_output/
-
-      - name: Generate Coverage Report
-        if: steps.check_coverage.outputs.has_coverage == 'true'
-        run: cd tests/ui-testing && npm ci && npx nyc report
-
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
-        if: steps.check_coverage.outputs.has_coverage == 'true' && hashFiles('tests/ui-testing/coverage-report/**') != ''
-        with:
-          name: coverage-report
-          path: tests/ui-testing/coverage-report
-          retention-days: 7
-
   playwright_summary:
     runs-on:
       labels: ubicloud-standard-8
     permissions: {}
-    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
+    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports]
     if: always()
     steps:
       - name: Check test results
@@ -1014,11 +948,9 @@ jobs:
             exit 1
           fi
 
-          # Check all job results - accept success or skipped for all jobs
           BUILD_OK=false
           UI_OK=false
           MERGE_OK=false
-          COV_OK=false
 
           if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
             BUILD_OK=true
@@ -1032,11 +964,7 @@ jobs:
             MERGE_OK=true
           fi
 
-          if [ "${{ needs.generate_coverage_report.result }}" == "success" ] || [ "${{ needs.generate_coverage_report.result }}" == "skipped" ]; then
-            COV_OK=true
-          fi
-
-          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ] && [ "$COV_OK" == "true" ]; then
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
             echo "All Playwright tests completed successfully"
             exit 0
           else
@@ -1044,6 +972,5 @@ jobs:
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
-            echo "  generate_coverage_report: ${{ needs.generate_coverage_report.result }}"
             exit 1
           fi

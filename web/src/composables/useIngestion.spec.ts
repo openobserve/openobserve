@@ -73,6 +73,7 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
       expect(result).toHaveProperty('languagesDocURLs');
       expect(result).toHaveProperty('othersContent');
       expect(result).toHaveProperty('othersDocURLs');
+      expect(result).toHaveProperty('aiContent');
     });
 
     it("should have access to store during initialization", () => {
@@ -466,6 +467,17 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
     });
   });
 
+  describe("AI Content Tests", () => {
+    it("should contain AI content with correct placeholders", () => {
+      const result = useIngestion();
+      const aiContent = result.aiContent;
+
+      expect(aiContent).toContain("OPENOBSERVE_URL=");
+      expect(aiContent).toContain("OPENOBSERVE_ORG=test_org_123");
+      expect(aiContent).toContain("OPENOBSERVE_AUTH_TOKEN=Basic [BASIC_PASSCODE]");
+    });
+  });
+
   describe("Content Consistency Tests", () => {
     it("should have consistent endpoint URLs across all content types", () => {
       const result = useIngestion();
@@ -565,17 +577,17 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
   });
 
   describe("Return Object Structure Validation", () => {
-    it("should return exactly 16 properties", () => {
+    it("should return exactly 18 properties", () => {
       const result = useIngestion();
       const expectedProperties = [
         'endpoint', 'databaseContent', 'databaseDocURLs',
         'securityContent', 'securityDocURLs', 'devopsContent', 'devopsDocURLs',
         'networkingContent', 'networkingDocURLs', 'serverContent', 'serverDocURLs',
         'messageQueuesContent', 'messageQueuesDocURLs', 'languagesContent', 'languagesDocURLs',
-        'othersContent', 'othersDocURLs'
+        'othersContent', 'othersDocURLs', 'aiContent'
       ];
-      
-      expect(Object.keys(result)).toHaveLength(17);
+
+      expect(Object.keys(result)).toHaveLength(18);
       expectedProperties.forEach(prop => {
         expect(result).toHaveProperty(prop);
       });

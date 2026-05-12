@@ -673,8 +673,8 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const copyButtons = wrapper.findAll('[data-test="q-btn"]');
-      const copyButton = copyButtons.find((btn: any) => btn.text().includes("Copy"));
+      const allButtons = wrapper.findAll('button');
+      const copyButton = allButtons.find((btn: any) => btn.text().includes("Copy"));
 
       if (copyButton) {
         await copyButton.trigger('click');
@@ -687,14 +687,14 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       // Find all copy buttons and click the one for executed query
-      const copyButtons = wrapper.findAll('[data-test="q-btn"]');
+      // OButton renders as native <button> elements with text "Copy"
+      const allButtons = wrapper.findAll('button');
+      const copyButtons = allButtons.filter(btn => btn.text().includes("Copy"));
 
       // There should be multiple copy buttons (one for originalQuery, one for query per query item)
       // Find the button that would copy the executed query
       for (const btn of copyButtons) {
-        if (btn.text().includes("Copy")) {
-          await btn.trigger('click');
-        }
+        await btn.trigger('click');
       }
 
       // Verify clipboard writeText was called

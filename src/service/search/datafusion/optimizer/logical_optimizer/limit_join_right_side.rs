@@ -187,12 +187,26 @@ mod tests {
         common::Result,
         datasource::MemTable,
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
+        optimizer::OptimizerRule,
         physical_plan::get_plan_string,
         prelude::{SessionConfig, SessionContext},
     };
 
     use super::LimitJoinRightSide;
     use crate::service::search::datafusion::planner::extension_planner::OpenobserveQueryPlanner;
+
+    #[test]
+    fn test_limit_join_right_side_name() {
+        let rule = LimitJoinRightSide::new(10);
+        assert_eq!(rule.name(), "limit_join_right_side");
+    }
+
+    #[test]
+    fn test_limit_join_right_side_apply_order() {
+        use datafusion::optimizer::optimizer::ApplyOrder;
+        let rule = LimitJoinRightSide::new(10);
+        assert_eq!(rule.apply_order(), Some(ApplyOrder::TopDown));
+    }
 
     #[tokio::test]
     async fn test_subquery() -> Result<()> {
@@ -381,5 +395,16 @@ mod tests {
         assert_eq!(expected, get_plan_string(&physical_plan));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_limit_join_right_side_rule_metadata() {
+        use datafusion::optimizer::OptimizerRule;
+        let rule = LimitJoinRightSide::new(100);
+        assert_eq!(rule.name(), "limit_join_right_side");
+        assert_eq!(
+            rule.apply_order(),
+            Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
+        );
     }
 }

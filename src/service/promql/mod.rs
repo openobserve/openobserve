@@ -137,3 +137,93 @@ pub fn adjust_start_end(start: i64, end: i64, step: i64) -> (i64, i64) {
 
     (start, end)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn secs_micros(s: u64) -> i64 {
+        micros(Duration::from_secs(s))
+    }
+
+    #[test]
+    fn test_round_step_zero_returns_default_step() {
+        assert_eq!(round_step(0), micros(DEFAULT_STEP));
+    }
+
+    #[test]
+    fn test_round_step_sub_second_returns_default_step() {
+        // Sub-second step: less than 1 second → stays as-is (nonzero), but > 0 handled:
+        // Actually step < second means we skip the modulo, but step != 0 so we fall through.
+        // 5 seconds is within 1s..10s range → unchanged
+        let step = secs_micros(5);
+        assert_eq!(round_step(step), step);
+    }
+
+    #[test]
+    fn test_round_step_between_10_and_60s_rounds_to_5s_multiple() {
+        // 23 seconds → rounds down to 20 (nearest lower 5s multiple)
+        let step = secs_micros(23);
+        let expected = secs_micros(20);
+        assert_eq!(round_step(step), expected);
+    }
+
+    #[test]
+    fn test_round_step_above_60s_rounds_to_minute_multiple() {
+        // 90 seconds → rounds down to 60
+        let step = secs_micros(90);
+        let expected = secs_micros(60);
+        assert_eq!(round_step(step), expected);
+    }
+
+    #[test]
+    fn test_round_step_exact_minute_unchanged() {
+        let step = secs_micros(120);
+        assert_eq!(round_step(step), step);
+    }
+
+    #[test]
+    fn test_align_start_end_already_aligned() {
+        let (s, e) = align_start_end(100, 200, 10);
+        assert_eq!(s, 100);
+        assert_eq!(e, 200);
+    }
+
+    #[test]
+    fn test_align_start_end_rounds_start_down() {
+        let (s, _) = align_start_end(105, 200, 10);
+        assert_eq!(s, 100);
+    }
+
+    #[test]
+    fn test_align_start_end_rounds_end_up() {
+        let (_, e) = align_start_end(100, 205, 10);
+        assert_eq!(e, 210);
+    }
+
+    #[test]
+    fn test_align_start_end_both_misaligned() {
+        let (s, e) = align_start_end(13, 27, 10);
+        assert_eq!(s, 10);
+        assert_eq!(e, 30);
+    }
+
+    #[test]
+    fn test_adjust_start_end_too_few_points_no_change() {
+        // 9 points < MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING (10) → no change
+        let (s, e) = adjust_start_end(0, 80, 10);
+        assert_eq!((s, e), (0, 80));
+    }
+
+    #[test]
+    fn test_adjust_start_end_preserves_point_count_and_aligns() {
+        let step = 10i64;
+        let start = 105i64;
+        let end = 205i64;
+        let original_points = (end - start) / step + 1; // 11
+        let (new_start, new_end) = adjust_start_end(start, end, step);
+        let new_points = (new_end - new_start) / step + 1;
+        assert_eq!(new_points, original_points);
+        assert_eq!(new_start % step, 0);
+    }
+}

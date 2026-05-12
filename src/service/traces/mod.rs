@@ -93,6 +93,43 @@ const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
 
+// Gen-AI semantic-convention column names produced by the OTEL processor after
+// dot→underscore flattening. Must stay in sync with GEN_AI_SCHEMA_FIELDS in
+// service/db/schema.rs.
+const GEN_AI_INT64_FIELDS: [&str; 3] = [
+    "gen_ai_usage_input_tokens",
+    "gen_ai_usage_output_tokens",
+    "gen_ai_usage_total_tokens",
+];
+const GEN_AI_FLOAT64_FIELDS: [&str; 4] = [
+    "gen_ai_response_time_to_first_chunk",
+    "gen_ai_usage_cost",
+    "gen_ai_usage_cost_input",
+    "gen_ai_usage_cost_output",
+];
+
+fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
+    for &field in GEN_AI_INT64_FIELDS.iter() {
+        if let Some(value) = record_val.get_mut(field)
+            && value.as_i64().is_none()
+        {
+            *value = json::Value::Number(json::Number::from(json::get_int_value(value)));
+        }
+    }
+
+    for &field in GEN_AI_FLOAT64_FIELDS.iter() {
+        if let Some(value) = record_val.get_mut(field)
+            && !value.is_f64()
+        {
+            let float_value = json::get_float_value(value);
+            *value = json::Value::Number(
+                json::Number::from_f64(float_value)
+                    .unwrap_or_else(|| json::Number::from_f64(0.0).unwrap()),
+            );
+        }
+    }
+}
+
 pub async fn otlp_proto(
     org_id: &str,
     body: Bytes,
@@ -368,8 +405,8 @@ pub async fn handle_otlp_request(
                         start_time,
                     );
 
-                    // check if we have any LLM related attributes
-                    if !is_llm_stream && detect_llm_stream(|k| span_att_map.contains_key(k)) {
+                    // set stream to llm stream if not already set
+                    if !is_llm_stream {
                         is_llm_stream = true;
                         need_mark_llm_stream = true;
                     }
@@ -477,6 +514,7 @@ pub async fn handle_otlp_request(
                             ).into_response());
                         }
                     };
+                    normalize_llm_field_types(&mut record_val);
 
                     if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
                         record_val = crate::service::ingestion::refactor_map(record_val, fields);
@@ -539,6 +577,7 @@ pub async fn handle_otlp_request(
                                     .into_response());
                             }
                         };
+                        normalize_llm_field_types(&mut record_val);
 
                         if let Some(Some(fields)) =
                             user_defined_schema_map.get(&stream_params.stream_name.to_string())
@@ -734,6 +773,7 @@ pub async fn ingest_json(
                     .into_response());
             }
         };
+        normalize_llm_field_types(&mut record_val);
 
         // check if we have any LLM related attributes
         if !is_llm_stream && detect_llm_stream(|k| record_val.contains_key(k)) {
@@ -1191,6 +1231,70 @@ mod tests {
     fn test_get_span_status_none() {
         // Test None status (default case)
         assert_eq!(super::get_span_status(None), "UNSET");
+    }
+
+    #[test]
+    fn test_normalize_llm_field_types() {
+        let mut record = json!({
+            "gen_ai_usage_input_tokens": "12",
+            "gen_ai_usage_output_tokens": 34.8,
+            "gen_ai_usage_total_tokens": true,
+            "gen_ai_response_time_to_first_chunk": "123456789",
+            "gen_ai_usage_cost_input": "0.25",
+            "gen_ai_usage_cost_output": 1,
+            "gen_ai_usage_cost": false,
+            "unrelated": "value"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        super::normalize_llm_field_types(&mut record);
+
+        assert_eq!(
+            record
+                .get("gen_ai_usage_input_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(12)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_output_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(34)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_total_tokens")
+                .and_then(|v| v.as_i64()),
+            Some(1)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_response_time_to_first_chunk")
+                .and_then(|v| v.as_f64()),
+            Some(123456789.0)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_input")
+                .and_then(|v| v.as_f64()),
+            Some(0.25)
+        );
+        assert_eq!(
+            record
+                .get("gen_ai_usage_cost_output")
+                .and_then(|v| v.as_f64()),
+            Some(1.0)
+        );
+        assert_eq!(
+            record.get("gen_ai_usage_cost").and_then(|v| v.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            record.get("unrelated").and_then(|v| v.as_str()),
+            Some("value")
+        );
     }
 
     #[test]

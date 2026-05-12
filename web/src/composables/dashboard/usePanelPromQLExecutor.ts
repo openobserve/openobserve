@@ -186,6 +186,16 @@ export const usePanelPromQLExecutor = (ctx: {
               state.loadingProgressPercentage = res?.content?.percent ?? 0;
               state.isPartialData = true;
             }
+            if (res?.type === "promql_metadata") {
+              // Store PromQL metadata (step in µs, trace_id, etc.)
+              if (!state.resultMetaData[queryIndex]) {
+                state.resultMetaData[queryIndex] = [];
+              }
+              state.resultMetaData[queryIndex][0] = {
+                ...(state.resultMetaData[queryIndex]?.[0] ?? {}),
+                ...res.content,
+              };
+            }
             if (res?.type === "promql_response") {
               const newData = res?.content?.results;
 

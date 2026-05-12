@@ -1,18 +1,16 @@
 <template>
   <div ref="userGuideBtnRef">
-    <q-btn
-      no-caps
+    <OButton
+      variant="ghost"
+      size="icon"
       @click="onUserGuideClick"
-      padding="xs"
-      class="q-ml-md"
-      flat
-      icon="help_outline"
       data-test="dashboard-drilldown-help-btn"
     >
+      <template #icon-left><q-icon name="help_outline" /></template>
       <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
         User Guide
       </q-tooltip>
-    </q-btn>
+    </OButton>
   </div>
   <div
     class="user-guide scroll o2-input"
@@ -150,8 +148,10 @@
 <script lang="ts">
 import { ref } from "vue";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default {
+  components: { OButton },
   name: "DrilldownUserGuide",
   setup() {
     const store = useStore();

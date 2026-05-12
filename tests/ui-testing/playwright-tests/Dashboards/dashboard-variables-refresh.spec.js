@@ -56,7 +56,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
@@ -78,9 +78,9 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     const globalRefreshBtn = page.locator(SELECTORS.REFRESH_BTN);
     await globalRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for the refresh indicator to appear (button should change from outline to filled warning color)
-    // The button should have bg-warning class when variables change
-    await expect(globalRefreshBtn).toHaveClass(/bg-warning/, { timeout: 10000 });
+    // Wait for the refresh indicator to appear (button should change from outline to warning variant)
+    // OButton exposes variant via data-o2-variant attribute
+    await expect(globalRefreshBtn).toHaveAttribute('data-o2-variant', 'warning', { timeout: 10000 });
 
     // Check for visual indicator using helper function
     const hasIndicator = await hasRefreshIndicator(page, "global");
@@ -130,7 +130,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
@@ -177,9 +177,9 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     const panelRefreshBtn = page.locator(SELECTORS.PANEL_REFRESH_BTN);
     await panelRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for the panel refresh button to get warning color
-    // Quasar applies text-warning class for flat buttons with :color="warning"
-    await expect(panelRefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
+    // Wait for the panel refresh button to get warning variant
+    // OButton exposes variant via data-o2-variant attribute
+    await expect(panelRefreshBtn).toHaveAttribute('data-o2-variant', 'ghost-warning', { timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -210,7 +210,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
@@ -285,7 +285,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
@@ -343,8 +343,8 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     const panel1RefreshBtn = page.locator(getPanelRefreshBtn(panelId1));
     await panel1RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
-    // Panel1's refresh button should have warning color since it uses the variable
-    await expect(panel1RefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
+    // Panel1's refresh button should have warning variant since it uses the variable
+    await expect(panel1RefreshBtn).toHaveAttribute('data-o2-variant', 'ghost-warning', { timeout: 10000 });
 
     // Click refresh on Panel1 only
     const reloadTracker = trackPanelReload(
@@ -392,7 +392,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for variable to appear on dashboard with increased timeout using page object helper
@@ -429,17 +429,17 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await pm.dashboardPanelEdit.openQueryInspector("Panel1");
 
     // Wait for Query Inspector dialog to open and load content
-    await page.locator(SELECTORS.DIALOG).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="query-inspector-dialog"]').waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Get all text from Query Inspector dialog (includes query, time, variables)
-    const dialogContent = page.locator(SELECTORS.DIALOG).first();
+    const dialogContent = page.locator('[data-test="query-inspector-dialog"]');
     await dialogContent.waitFor({ state: "visible", timeout: 5000 });
     const queryInspectorBeforeRefresh = await dialogContent.textContent();
 
     // Close Query Inspector dialog
     await page.keyboard.press('Escape');
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="query-inspector-dialog"]', { timeout: 5000 });
 
     // Change variable
     await scopedVars.changeVariableValue(variableName, { monitorApi: true });
@@ -465,7 +465,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await pm.dashboardPanelEdit.openQueryInspector("Panel1");
 
     // Wait for Query Inspector dialog to open and load content
-    await page.locator(SELECTORS.DIALOG).waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-test="query-inspector-dialog"]').waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Get all text from Query Inspector dialog (includes query, time, variables)
@@ -473,7 +473,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
 
     // Close Query Inspector dialog
     await page.keyboard.press('Escape');
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="query-inspector-dialog"]', { timeout: 5000 });
 
     // Verify query inspector content is different - both variable value and time range should have changed
     expect(queryInspectorBeforeRefresh).not.toBe(queryInspectorAfterRefresh);
@@ -519,7 +519,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
@@ -539,7 +539,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
 
     // Wait for the refresh indicator to appear
     const globalRefreshBtn = page.locator(SELECTORS.REFRESH_BTN);
-    await expect(globalRefreshBtn).toHaveClass(/bg-warning/, { timeout: 10000 });
+    await expect(globalRefreshBtn).toHaveAttribute('data-o2-variant', 'warning', { timeout: 10000 });
 
     // Verify indicator shows
     let hasIndicator = await hasRefreshIndicator(page, "global");
@@ -585,7 +585,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
@@ -622,17 +622,17 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     // Wait for any loading to complete before checking refresh indicator
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
-    // Wait for panel refresh button to show warning color
+    // Wait for panel refresh button to show warning variant
     const panelRefreshBtn = page.locator(getPanelRefreshBtn(panelId));
     await panelRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
-    await expect(panelRefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
+    await expect(panelRefreshBtn).toHaveAttribute('data-o2-variant', 'ghost-warning', { timeout: 10000 });
 
     // Click panel refresh
     await panelRefreshBtn.click();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
-    // Verify indicator cleared - button should no longer have warning class
-    await expect(panelRefreshBtn).not.toHaveClass(/text-warning/, { timeout: 10000 });
+    // Verify indicator cleared - button should return to ghost variant
+    await expect(panelRefreshBtn).toHaveAttribute('data-o2-variant', 'ghost', { timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -663,7 +663,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     );
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for settings dialog to be fully closed and network idle
-    await safeWaitForHidden(page, '.q-dialog', { timeout: 5000 });
+    await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for variable to appear on dashboard
     await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 15000 });
@@ -732,16 +732,16 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await panel1RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
     await panel2RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
-    await expect(panel1RefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
-    await expect(panel2RefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
+    await expect(panel1RefreshBtn).toHaveAttribute('data-o2-variant', 'ghost-warning', { timeout: 10000 });
+    await expect(panel2RefreshBtn).toHaveAttribute('data-o2-variant', 'ghost-warning', { timeout: 10000 });
 
     // Click refresh only on Panel1
     await panel1RefreshBtn.click();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Panel1 indicator should clear, Panel2 should remain
-    await expect(panel1RefreshBtn).not.toHaveClass(/text-warning/, { timeout: 10000 });
-    await expect(panel2RefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
+    await expect(panel1RefreshBtn).toHaveAttribute('data-o2-variant', 'ghost', { timeout: 10000 });
+    await expect(panel2RefreshBtn).toHaveAttribute('data-o2-variant', 'ghost-warning', { timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();

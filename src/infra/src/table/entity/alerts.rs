@@ -70,3 +70,61 @@ impl Related<super::folders::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "alert-1".to_string(),
+            org: "myorg".to_string(),
+            folder_id: "folder-1".to_string(),
+            name: "High Error Rate".to_string(),
+            stream_type: "logs".to_string(),
+            stream_name: "default".to_string(),
+            is_real_time: false,
+            destinations: serde_json::json!(["dest-1"]),
+            template: None,
+            context_attributes: None,
+            row_template: None,
+            row_template_type: 0,
+            description: Some("Alert on high error rate".to_string()),
+            enabled: true,
+            tz_offset: 0,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            query_type: 0,
+            query_conditions: None,
+            query_sql: Some("SELECT count(*) FROM logs".to_string()),
+            query_promql: None,
+            query_promql_condition: None,
+            query_aggregation: None,
+            query_vrl_function: None,
+            query_search_event_type: None,
+            query_multi_time_range: None,
+            trigger_threshold_operator: ">".to_string(),
+            trigger_period_seconds: 60,
+            trigger_threshold_count: 10,
+            trigger_frequency_type: 0,
+            trigger_frequency_seconds: 300,
+            trigger_frequency_cron: None,
+            trigger_frequency_cron_timezone: None,
+            trigger_silence_seconds: 600,
+            trigger_tolerance_seconds: None,
+            owner: Some("admin@example.com".to_string()),
+            last_edited_by: None,
+            updated_at: Some(1000),
+            align_time: false,
+            dedup_enabled: false,
+            dedup_time_window_minutes: None,
+            dedup_config: None,
+            creates_incident: false,
+        };
+        assert_eq!(m.id, "alert-1");
+        assert_eq!(m.name, "High Error Rate");
+        assert!(m.enabled);
+        assert!(!m.creates_incident);
+    }
+}

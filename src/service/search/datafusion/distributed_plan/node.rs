@@ -203,3 +203,94 @@ impl SearchInfos {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_file_list_empty_when_search_infos_empty() {
+        let node = RemoteScanNode::default();
+        assert!(node.is_file_list_empty(0));
+    }
+
+    #[test]
+    fn test_is_file_list_empty_false_when_partition_has_files() {
+        let mut node = RemoteScanNode::default();
+        node.search_infos.file_id_list = vec![vec![1, 2, 3]];
+        assert!(!node.is_file_list_empty(0));
+    }
+
+    #[test]
+    fn test_is_file_list_empty_partition_with_empty_list() {
+        let mut node = RemoteScanNode::default();
+        node.search_infos.file_id_list = vec![vec![1, 2], vec![]];
+        assert!(!node.is_file_list_empty(0));
+        assert!(node.is_file_list_empty(1));
+    }
+
+    #[test]
+    fn test_search_infos_get_search_info_empty_file_list() {
+        let infos = SearchInfos {
+            file_id_list: vec![],
+            start_time: 100,
+            end_time: 200,
+            ..Default::default()
+        };
+        let info = infos.get_search_info(0);
+        assert!(info.file_id_list.is_empty());
+        assert_eq!(info.start_time, 100);
+        assert_eq!(info.end_time, 200);
+    }
+
+    #[test]
+    fn test_remote_scan_node_set_plan() {
+        let mut node = RemoteScanNode::default();
+        assert!(node.search_infos.plan.is_empty());
+        node.set_plan(vec![1, 2, 3]);
+        assert_eq!(node.search_infos.plan, vec![1u8, 2, 3]);
+    }
+
+    #[test]
+    fn test_get_flight_search_request_uses_query_identifier() {
+        let mut node = RemoteScanNode::default();
+        node.query_identifier.trace_id = "trace-abc".to_string();
+        node.search_infos.start_time = 100;
+        node.search_infos.end_time = 200;
+        let req = node.get_flight_search_request(0);
+        assert_eq!(req.query_identifier.trace_id, "trace-abc");
+    }
+
+    #[test]
+    fn test_get_flight_search_request_search_info_times() {
+        let mut node = RemoteScanNode::default();
+        node.search_infos.start_time = 500;
+        node.search_infos.end_time = 1000;
+        let req = node.get_flight_search_request(0);
+        assert_eq!(req.search_info.start_time, 500);
+        assert_eq!(req.search_info.end_time, 1000);
+    }
+
+    #[test]
+    fn test_search_infos_get_search_info_with_files() {
+        let infos = SearchInfos {
+            plan: vec![1, 2, 3],
+            file_id_list: vec![vec![10, 20, 30]],
+            start_time: 1000,
+            end_time: 2000,
+            timeout: 30,
+            use_cache: true,
+            histogram_interval: 60,
+            is_analyze: false,
+            ..Default::default()
+        };
+        let info = infos.get_search_info(0);
+        assert_eq!(info.plan, vec![1u8, 2, 3]);
+        assert_eq!(info.file_id_list, vec![10i64, 20, 30]);
+        assert_eq!(info.start_time, 1000);
+        assert_eq!(info.end_time, 2000);
+        assert_eq!(info.timeout, 30);
+        assert!(info.use_cache);
+        assert_eq!(info.histogram_interval, 60);
+    }
+}

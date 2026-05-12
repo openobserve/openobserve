@@ -535,6 +535,41 @@ mod tests {
 
     use super::*;
 
+    fn make_model(version: i32, data: serde_json::Value) -> dashboards::Model {
+        dashboards::Model {
+            id: "id-1".to_string(),
+            dashboard_id: "dash-1".to_string(),
+            folder_id: "folder-1".to_string(),
+            owner: "alice".to_string(),
+            role: None,
+            title: "My Dashboard".to_string(),
+            description: None,
+            data,
+            version,
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+        }
+    }
+
+    #[test]
+    fn test_try_from_unsupported_version_returns_err() {
+        let model = make_model(999, serde_json::json!({}));
+        assert!(Dashboard::try_from(model).is_err());
+    }
+
+    #[test]
+    fn test_try_from_version_zero_returns_err() {
+        let model = make_model(0, serde_json::json!({}));
+        assert!(Dashboard::try_from(model).is_err());
+    }
+
+    #[test]
+    fn test_try_from_data_not_object_version1_returns_err() {
+        // data is null, not an object — injection is skipped, deserialization must fail
+        let model = make_model(1, serde_json::Value::Null);
+        assert!(Dashboard::try_from(model).is_err());
+    }
+
     #[tokio::test]
     async fn list_models_psql() -> Result<(), DbErr> {
         let db = MockDatabase::new(DatabaseBackend::Postgres)

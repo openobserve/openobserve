@@ -123,7 +123,11 @@
     "version": "版本",
     "create": "创建",
     "resources": "资源",
-    "updated_at": "更新于"
+    "updated_at": "更新于",
+    "error": "错误",
+    "db": "数据库",
+    "discardChanges": "放弃更改",
+    "unsavedChanges": "未保存的更改"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -387,7 +391,11 @@
     "liveModeTooltip": "在过滤器/时间更改时自动运行查询",
     "turnOnLiveMode": "开启直播模式",
     "turnOffLiveMode": "关闭直播模式",
-    "autoRunEnabled": "自动运行已启用"
+    "autoRunEnabled": "自动运行已启用",
+    "selectStreamFirst": "先选择一个直播",
+    "traces": "痕迹",
+    "switchToLogs": "点击切换回日志",
+    "patternNoValuesAvailable": "没有可用值"
   },
   "menu": {
     "home": "主页",
@@ -976,7 +984,8 @@
     "fieldName": "字段名",
     "fieldRequired": "字段为必填字段！",
     "dataType": "数据类型",
-    "dataTypeRequired": "数据类型为必填项！"
+    "dataTypeRequired": "数据类型为必填项！",
+    "udsFieldAlreadyInSchema": "一个或多个选定字段已经是定义架构的一部分"
   },
   "function": {
     "header": "函数",
@@ -1121,7 +1130,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub Logs"
+    "pubsub": "Pub/Sub Logs",
+    "aiLabel": "人工智能集成"
   },
   "dashboard": {
     "selectField": "字段",
@@ -2237,6 +2247,8 @@
     "editJson": "编辑警报 JSON",
     "additional_settings": "其他设置",
     "alertNamePlaceholder": "警报名称",
+    "nameRequired": "警报名称不能为空。",
+    "nameNoSpecialChars": "警报名称不能包含 ':'、'#'、'?'、'&'、'%'、引号或空格字符，请使用下划线 (_) 代替。",
     "anomalyNamePlaceholder": "异常名称",
     "folder": "文件夹",
     "selectStreamTypeFirst": "请先选择直播类型",
@@ -2283,7 +2295,8 @@
       "addNewDestination": "添加新目的地",
       "destinationRequired": "至少需要一个目的地！",
       "disabledNotificationsInfo": "异常检测仍将运行并将结果写入 _anomalies 流。启用通知以在检测到异常时接收警报。"
-    }
+    },
+    "anomalyName": "异常名称"
   },
   "alert_templates": {
     "header": "模板",
@@ -2885,7 +2898,52 @@
       "multiStepAgent": "多步代理"
     },
     "noLogsAvailableForService": "此服务没有可用的日志",
-    "spansTruncatedWarning": "显示 {total} 跨度的 {count} — 跟踪可能不完整。缩小时间范围或联系管理员以增加跨度限制。"
+    "spansTruncatedWarning": "显示 {total} 跨度的 {count} — 跟踪可能不完整。缩小时间范围或联系管理员以增加跨度限制。",
+    "servicesCatalog": {
+      "tabLabel": "服务目录",
+      "title": "服务目录",
+      "filterPlaceholder": "按服务名称筛选...",
+      "noServicesFound": "在所选时间范围内未找到任何服务。",
+      "loading": "正在加载服务...",
+      "columns": {
+        "serviceName": "服务",
+        "status": "状态",
+        "requests": "请求",
+        "errorRate": "错误率",
+        "errors": "错误",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "平均延迟",
+        "lastSeen": "上次看到",
+        "operations": "运营"
+      },
+      "status": {
+        "healthy": "健康",
+        "warning": "警告",
+        "degraded": "已降级"
+      },
+      "viewTraces": "查看踪迹",
+      "exportCsv": "导出 CSV",
+      "justNow": "刚才",
+      "minutesAgo": "{n} 我之前",
+      "hoursAgo": "{n} 小时前",
+      "daysAgo": "{n} d 之前"
+    },
+    "noErrorPresent": "此跨度没有错误",
+    "httpStatusCode": "HTTP 状态码",
+    "grpcStatusCode": "gRPC 状态码",
+    "dbResponseStatusCode": "数据库响应状态码",
+    "processExitCode": "进程退出代码",
+    "exceptionsWithCount": "异常 ({count})",
+    "typeLabel": "类型：",
+    "messageLabel": "消息：",
+    "escapedLabel": "逃脱了：",
+    "stacktraceLabel": "堆栈跟踪：",
+    "copyStacktrace": "复制堆栈跟踪",
+    "noStacktraceAvailable": "没有可用的堆栈跟踪",
+    "stacktraceCopied": "Stacktrace 已复制到剪贴板",
+    "stacktraceCopyFailed": "无法复制堆栈跟踪"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3287,7 +3345,9 @@
     "noMetricsDescription": "在所选时间范围内未找到此关联的指标。",
     "errorRetrievingTraces": "检索跟踪时出错。",
     "serviceGroupProtected": "无法删除服务组。您只能修改映射的字段。",
-    "noDataFound": "未找到任何数据"
+    "noDataFound": "未找到任何数据",
+    "isWorkloadType": "服务标识符",
+    "isWorkloadTypeTooltip": "启用后，该组用于唯一标识服务（例如集群、命名空间、部署）。对于描述通过服务（例如 HTTP 方法或数据库名称）操作的群组禁用。"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

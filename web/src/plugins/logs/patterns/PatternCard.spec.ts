@@ -29,7 +29,7 @@ describe("PatternCard", () => {
   let wrapper: any;
   const mockPattern = {
     pattern_id: "pattern-1",
-    template: "User * logged in from IP *",
+    template: "User <*> logged in from IP <*>",
     description: "User login pattern",
     frequency: 1234,
     percentage: 45.67,
@@ -264,16 +264,16 @@ describe("PatternCard", () => {
     });
   });
 
-  describe("LogsHighLighting integration", () => {
-    it("should render a child component for the pattern template text", () => {
-      const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      // LogsHighLighting is used to render the template; the container should exist
-      expect(template.exists()).toBe(true);
+  describe("Wildcard chip hover interactions", () => {
+    it("should render wildcard chips for each wildcard in the template", () => {
+      const chips = wrapper.findAll(".wildcard-chip");
+      expect(chips.length).toBeGreaterThan(0);
     });
 
-    it("should set title attribute on template div to the pattern template string", () => {
+    it("should still render the full template text including wildcard tokens", () => {
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.attributes("title")).toBe(mockPattern.template);
+      expect(template.text()).toContain("User");
+      expect(template.text()).toContain("logged in from IP");
     });
   });
 

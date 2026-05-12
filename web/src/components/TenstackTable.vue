@@ -25,7 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scroll container: grows to fill available height -->
     <div
       ref="parentRef"
-      :class="['container', 'table-container', 'tw:flex-1', 'tw:min-h-0', 'tw:overflow-auto', 'tw:relative', { 'virtual-scroll-active': useVirtualScroll }]"
+      :class="[
+        'container',
+        'table-container',
+        'tw:flex-1',
+        'tw:min-h-0',
+        'tw:overflow-auto',
+        'tw:relative',
+        { 'virtual-scroll-active': useVirtualScroll },
+      ]"
     >
       <table
         v-if="table"
@@ -94,7 +102,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 level.isLeaf
                   ? 'pivot-value-header'
                   : 'pivot-group-header tw:text-center',
-                { 'pivot-section-border': cell.hasBorder && !(stickyColTotals && cell._isTotalHeader) },
+                {
+                  'pivot-section-border':
+                    cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
+                },
                 { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
                 { 'tw:cursor-pointer': cell._sortColumn },
               ]"
@@ -341,15 +352,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:bg-amber-300'
                 "
               >
-                <q-btn
-                  :icon="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'"
-                  dense
-                  size="xs"
-                  flat
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
                   class="q-mr-xs"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="expandFunctionError"
-                ></q-btn
+                >
+                  <q-icon
+                    :name="
+                      isFunctionErrorOpen ? 'expand_more' : 'chevron_right'
+                    "
+                    size="14px"
+                  /> </OButton
                 ><b>
                   <q-icon name="warning" size="15px"></q-icon>
                   {{ t("search.functionErrorLabel") }}</b
@@ -405,9 +420,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :ref="(node: any) => measureDashboardRow(node)"
               class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
-              @click="
-                handleDataRowClick(row.original, idx as number, $event)
-              "
+              data-test="dashboard-data-row"
+              @click="handleDataRowClick(row.original, idx as number, $event)"
             >
               <td
                 v-for="(cell, cellIndex) in row.getVisibleCells()"
@@ -474,31 +488,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   >
                     <!-- Copy button LEFT (right-aligned) -->
-                    <q-btn
+                    <span
                       v-if="
                         enableCellCopy &&
                         (cell.column.columnDef.meta as any)?.align ===
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      :icon="
-                        isCellCopied(idx as number, cell.column.id)
-                          ? 'check'
-                          : 'content_copy'
-                      "
-                      dense
-                      size="xs"
-                      no-caps
-                      flat
                       class="copy-btn q-mr-xs"
-                      @click.stop="
-                        copyCellContent(
-                          getCellDisplayValue(cell),
-                          idx as number,
-                          cell.column.id,
-                        )
-                      "
-                    />
+                    >
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        @click.stop="
+                          copyCellContent(
+                            getCellDisplayValue(cell),
+                            idx as number,
+                            cell.column.id,
+                          )
+                        "
+                      >
+                        <q-icon
+                          :name="
+                            isCellCopied(idx as number, cell.column.id)
+                              ? 'check'
+                              : 'content_copy'
+                          "
+                          size="14px"
+                        />
+                      </OButton>
+                    </span>
                     <!-- JSON field inline renderer -->
                     <JsonFieldRenderer
                       v-if="
@@ -519,31 +538,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ getCellDisplayValue(cell) }}
                     </span>
                     <!-- Copy button RIGHT (left/center-aligned) -->
-                    <q-btn
+                    <span
                       v-if="
                         enableCellCopy &&
                         (cell.column.columnDef.meta as any)?.align !==
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      :icon="
-                        isCellCopied(idx as number, cell.column.id)
-                          ? 'check'
-                          : 'content_copy'
-                      "
-                      dense
-                      size="xs"
-                      no-caps
-                      flat
                       class="copy-btn q-ml-xs"
-                      @click.stop="
-                        copyCellContent(
-                          getCellDisplayValue(cell),
-                          idx as number,
-                          cell.column.id,
-                        )
-                      "
-                    />
+                    >
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        @click.stop="
+                          copyCellContent(
+                            getCellDisplayValue(cell),
+                            idx as number,
+                            cell.column.id,
+                          )
+                        "
+                      >
+                        <q-icon
+                          :name="
+                            isCellCopied(idx as number, cell.column.id)
+                              ? 'check'
+                              : 'content_copy'
+                          "
+                          size="14px"
+                        />
+                      </OButton>
+                    </span>
                   </div>
                 </template>
               </td>
@@ -725,20 +749,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : '',
                     ]"
                   >
-                    <q-btn
+                    <OButton
                       v-if="enableRowExpand && cellIndex == 0"
-                      :icon="
-                        expandedRowIndices.has(virtualRow.index)
-                          ? 'expand_more'
-                          : 'chevron_right'
-                      "
-                      dense
-                      size="xs"
-                      flat
+                      variant="ghost"
+                      size="icon-xs-sq"
                       class="q-mr-xs"
                       data-test="table-row-expand-menu"
                       @click.capture.stop="handleExpandRow(virtualRow.index)"
-                    ></q-btn>
+                    >
+                      <q-icon
+                        :name="
+                          expandedRowIndices.has(virtualRow.index)
+                            ? 'expand_more'
+                            : 'chevron_right'
+                        "
+                        size="14px"
+                      />
+                    </OButton>
                     <slot
                       name="cell-actions"
                       :row="cell.row.original"
@@ -766,31 +793,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <!-- Dashboard: copy button LEFT (right-aligned columns) -->
-                        <q-btn
+                        <span
                           v-if="
                             enableCellCopy &&
                             (cell.column.columnDef.meta as any)?.align ===
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          :icon="
-                            isCellCopied(virtualRow.index, cell.column.id)
-                              ? 'check'
-                              : 'content_copy'
-                          "
-                          dense
-                          size="xs"
-                          no-caps
-                          flat
                           class="copy-btn q-mr-xs"
-                          @click.stop="
-                            copyCellContent(
-                              getCellDisplayValue(cell),
-                              virtualRow.index,
-                              cell.column.id,
-                            )
-                          "
-                        />
+                        >
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-sq"
+                            @click.stop="
+                              copyCellContent(
+                                getCellDisplayValue(cell),
+                                virtualRow.index,
+                                cell.column.id,
+                              )
+                            "
+                          >
+                            <q-icon
+                              :name="
+                                isCellCopied(virtualRow.index, cell.column.id)
+                                  ? 'check'
+                                  : 'content_copy'
+                              "
+                              size="14px"
+                            />
+                          </OButton>
+                        </span>
                         <!-- Dashboard: JSON field inline renderer -->
                         <JsonFieldRenderer
                           v-if="
@@ -841,7 +873,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             cell.column.columnDef.id ===
                               store.state.zoConfig.timestamp_column
                           "
-                          class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                          class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
                           @send-to-ai-chat="
                             sendToAiChat(
                               JSON.stringify(cell.row.original),
@@ -850,31 +882,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         />
                         <!-- Dashboard: copy button RIGHT (left/center-aligned) -->
-                        <q-btn
+                        <span
                           v-if="
                             enableCellCopy &&
                             (cell.column.columnDef.meta as any)?.align !==
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          :icon="
-                            isCellCopied(virtualRow.index, cell.column.id)
-                              ? 'check'
-                              : 'content_copy'
-                          "
-                          dense
-                          size="xs"
-                          no-caps
-                          flat
                           class="copy-btn q-ml-xs"
-                          @click.stop="
-                            copyCellContent(
-                              getCellDisplayValue(cell),
-                              virtualRow.index,
-                              cell.column.id,
-                            )
-                          "
-                        />
+                        >
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-sq"
+                            @click.stop="
+                              copyCellContent(
+                                getCellDisplayValue(cell),
+                                virtualRow.index,
+                                cell.column.id,
+                              )
+                            "
+                          >
+                            <q-icon
+                              :name="
+                                isCellCopied(virtualRow.index, cell.column.id)
+                                  ? 'check'
+                                  : 'content_copy'
+                              "
+                              size="14px"
+                            />
+                          </OButton>
+                        </span>
                       </template>
                     </template>
                   </div>
@@ -996,6 +1033,7 @@ import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import { debounce, copyToClipboard } from "quasar";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
@@ -1450,7 +1488,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     "white-space": "normal",
     "word-break": "break-word",
     // Remove border so shadow aligns with body total column
-    "border": "none",
+    border: "none",
   };
   return style;
 };
@@ -1866,9 +1904,7 @@ const rowVirtualizerOptions = computed(() => {
       if (props.rowHeight) return props.rowHeight;
       // Logs/traces: check for expanded rows
       const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
-      return isExpandedRow
-        ? expandedRowHeights.value[index] || 300
-        : 28;
+      return isExpandedRow ? expandedRowHeights.value[index] || 300 : 28;
     },
     // Dashboard: moderate overscan keeps rows buffered above/below viewport.
     // Logs/traces: high overscan for smooth fast-scroll.

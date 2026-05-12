@@ -89,4 +89,20 @@ mod tests {
         let deserialized: MetaStore = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, MetaStore::Nats);
     }
+
+    #[test]
+    fn test_metastore_all_variants_serde_roundtrip() {
+        for variant in [MetaStore::Sqlite, MetaStore::Nats, MetaStore::PostgreSQL] {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: MetaStore = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_metastore_from_str_uppercase_postgres() {
+        assert_eq!(MetaStore::from("POSTGRES"), MetaStore::PostgreSQL);
+        assert_eq!(MetaStore::from("POSTGRESQL"), MetaStore::PostgreSQL);
+        assert_eq!(MetaStore::from("NATS"), MetaStore::Nats);
+    }
 }

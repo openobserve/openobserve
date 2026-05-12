@@ -384,6 +384,54 @@ describe("convertLogData.ts", () => {
       expect(options.series[0].itemStyle.color).toBe("#1E88E5");
     });
 
+    it("maps numeric severity 6 to info blue (OTEL severity → semantic)", () => {
+      const bd = makeBreakdown([["6", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].itemStyle.color).toBe("#1E88E5");
+    });
+
+    it("maps numeric severity 3 to error red", () => {
+      const bd = makeBreakdown([["3", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].itemStyle.color).toBe("#EF5350");
+    });
+
+    it("maps numeric severity 0 to info blue (OTEL UNSPECIFIED)", () => {
+      const bd = makeBreakdown([["0", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].itemStyle.color).toBe("#1E88E5");
+    });
+
+    it("falls back to palette for numeric string outside 0-7 range (e.g. HTTP 200)", () => {
+      const bd = makeBreakdown([["200", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(["#aaa", "#bbb", "#ccc"]).toContain(options.series[0].itemStyle.color);
+    });
+
+    it("falls back to palette for boolean-like string 'true'", () => {
+      const bd = makeBreakdown([["true", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(["#aaa", "#bbb", "#ccc"]).toContain(options.series[0].itemStyle.color);
+    });
+
+    it("falls back to palette for boolean-like string 'false'", () => {
+      const bd = makeBreakdown([["false", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(["#aaa", "#bbb", "#ccc"]).toContain(options.series[0].itemStyle.color);
+    });
+
+    it("recognizes 'ok' as success green (newly added key)", () => {
+      const bd = makeBreakdown([["ok", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].itemStyle.color).toBe("#43A047");
+    });
+
+    it("recognizes 'emergency' as fatal red (newly added key)", () => {
+      const bd = makeBreakdown([["emergency", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].itemStyle.color).toBe("#E53935");
+    });
+
     it("falls back to palette hash for unknown category labels", () => {
       const bd = makeBreakdown([["unknownXYZ", [1]]]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);

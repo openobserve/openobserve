@@ -43,4 +43,28 @@ mod tests {
         assert_eq!(authz.parent_type, "");
         assert_eq!(authz.parent, "");
     }
+
+    #[test]
+    fn test_authz_default_is_empty() {
+        let authz = Authz::default();
+        assert_eq!(authz.obj_id, "");
+        assert_eq!(authz.parent_type, "");
+        assert_eq!(authz.parent, "");
+    }
+
+    #[test]
+    fn test_authz_new_empty_id() {
+        let authz = Authz::new("");
+        assert_eq!(authz.obj_id, "");
+    }
+
+    #[test]
+    fn test_authz_field_mutation() {
+        let mut authz = Authz::new("obj1");
+        authz.parent_type = "dashboard".to_string();
+        authz.parent = "folder_id".to_string();
+        assert_eq!(authz.obj_id, "obj1");
+        assert_eq!(authz.parent_type, "dashboard");
+        assert_eq!(authz.parent, "folder_id");
+    }
 }

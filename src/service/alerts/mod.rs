@@ -2004,4 +2004,137 @@ mod tests {
 
         println!("✓ All deeply nested group tests with operator precedence passed!");
     }
+
+    // ── build_expr sync unit tests ───────────────────────────────────────────
+
+    fn make_cond(column: &str, operator: Operator, value: Value) -> Condition {
+        Condition {
+            column: column.to_string(),
+            operator,
+            value,
+            ignore_case: false,
+        }
+    }
+
+    #[test]
+    fn test_build_expr_bool_equal_to() {
+        let cond = make_cond("active", Operator::EqualTo, Value::Bool(true));
+        let expr = build_expr(&cond, "", &DataType::Boolean).unwrap();
+        assert_eq!(expr, "\"active\" = true");
+    }
+
+    #[test]
+    fn test_build_expr_bool_not_equal_to() {
+        let cond = make_cond("active", Operator::NotEqualTo, Value::Bool(false));
+        let expr = build_expr(&cond, "", &DataType::Boolean).unwrap();
+        assert_eq!(expr, "\"active\" != false");
+    }
+
+    #[test]
+    fn test_build_expr_bool_bool_as_string_value() {
+        let cond = make_cond(
+            "active",
+            Operator::EqualTo,
+            Value::String("true".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Boolean).unwrap();
+        assert_eq!(expr, "\"active\" = true");
+    }
+
+    #[test]
+    fn test_build_expr_bool_unsupported_operator_returns_error() {
+        let cond = make_cond("active", Operator::Contains, Value::Bool(true));
+        let result = build_expr(&cond, "", &DataType::Boolean);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_expr_int_contains_returns_error() {
+        let cond = make_cond("count", Operator::Contains, Value::Number(1.into()));
+        let result = build_expr(&cond, "", &DataType::Int64);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_expr_float_contains_returns_error() {
+        let cond = make_cond("score", Operator::Contains, Value::Number(1.into()));
+        let result = build_expr(&cond, "", &DataType::Float64);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_expr_unsupported_datatype_returns_error() {
+        let cond = make_cond("ts", Operator::EqualTo, Value::String("x".to_string()));
+        let result = build_expr(&cond, "", &DataType::Date32);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_expr_field_alias_override() {
+        let cond = make_cond(
+            "level",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
+        let expr = build_expr(&cond, "log_level", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"log_level\" = 'error'");
+    }
+
+    #[test]
+    fn test_build_expr_string_not_contains() {
+        let cond = make_cond(
+            "msg",
+            Operator::NotContains,
+            Value::String("spam".to_string()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"msg\" NOT LIKE '%spam%'");
+    }
+
+    #[test]
+    fn test_build_expr_int_greater_than() {
+        let cond = make_cond(
+            "code",
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from(400)),
+        );
+        let expr = build_expr(&cond, "", &DataType::Int32).unwrap();
+        assert_eq!(expr, "\"code\" > 400");
+    }
+
+    #[test]
+    fn test_build_expr_float_less_than_equal() {
+        let cond = make_cond(
+            "rate",
+            Operator::LessThanEquals,
+            Value::Number(serde_json::Number::from_f64(0.5).unwrap()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Float32).unwrap();
+        assert_eq!(expr, "\"rate\" <= 0.5");
+    }
+
+    #[test]
+    fn test_build_expr_int_invalid_string_returns_error() {
+        let cond = make_cond(
+            "n",
+            Operator::EqualTo,
+            Value::String("not_a_number".to_string()),
+        );
+        let result = build_expr(&cond, "", &DataType::Int64);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_expr_float_invalid_string_returns_error() {
+        let cond = make_cond("f", Operator::EqualTo, Value::String("abc".to_string()));
+        let result = build_expr(&cond, "", &DataType::Float64);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_expr_bool_invalid_string_returns_error() {
+        let cond = make_cond("b", Operator::EqualTo, Value::String("maybe".to_string()));
+        let result = build_expr(&cond, "", &DataType::Boolean);
+        assert!(result.is_err());
+    }
 }

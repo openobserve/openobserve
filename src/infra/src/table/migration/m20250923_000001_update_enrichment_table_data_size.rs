@@ -30,3 +30,18 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20250923_000001_update_enrichment_table_data_size"
+        );
+    }
+}

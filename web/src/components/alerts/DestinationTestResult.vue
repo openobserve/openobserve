@@ -103,17 +103,15 @@ limitations under the License. -->
 
         <!-- Retry Button -->
         <div class="result-actions">
-          <q-btn
+          <OButton
             data-test="test-retry-button"
-            flat
-            no-caps
-            dense
-            size="sm"
-            color="primary"
-            :label="t('alerts.retry')"
-            icon="refresh"
+            variant="ghost-primary"
+            size="xs"
             @click="$emit('retry')"
-          />
+          >
+            <template #icon-left><q-icon name="refresh" /></template>
+            {{ t('alerts.retry') }}
+          </OButton>
         </div>
       </div>
     </div>
@@ -154,6 +152,7 @@ limitations under the License. -->
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import OButton from '@/lib/core/Button/OButton.vue';
 import { date } from 'quasar';
 import type { TestResult } from '@/utils/prebuilt-templates/types';
 

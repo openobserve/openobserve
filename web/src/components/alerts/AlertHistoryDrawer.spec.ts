@@ -181,9 +181,8 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Query/Conditions Block", () => {
     const switchToConditionTab = async () => {
-      const buttons = wrapper.findAll(".tab-toggle-btn");
-      const conditionBtn = buttons.find((b) => b.text().includes("Condition"));
-      await conditionBtn!.trigger("click");
+      const conditionBtn = wrapper.find('[data-test="alert-history-tab-condition"]');
+      await conditionBtn.trigger("click");
       await flushPromises();
     };
 

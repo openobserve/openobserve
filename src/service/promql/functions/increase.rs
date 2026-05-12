@@ -64,6 +64,18 @@ mod tests {
     }
 
     #[test]
+    fn test_increase_value_none_input() {
+        let result = increase_test_helper(Value::None).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_increase_invalid_input_returns_err() {
+        let result = increase_test_helper(Value::Float(1.0));
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_increase_function() {
         // Create a range value with increasing counter values
         let samples = vec![Sample::new(1000, 10.0)];

@@ -144,3 +144,54 @@ pub fn create_router() -> Router {
         .route("/api/healthz", get(healthz))
         .route("/api/:org_id/reports/:name/send", put(send_report))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_http_response_internal_server_error_has_500_code() {
+        let r = HttpResponse::internal_server_error("oops".to_string());
+        assert_eq!(r.code, 500);
+        assert_eq!(r.message, "oops");
+        assert!(r.error_detail.is_none());
+        assert!(r.trace_id.is_none());
+    }
+
+    #[test]
+    fn test_http_response_success_has_200_code() {
+        let r = HttpResponse::success("done".to_string());
+        assert_eq!(r.code, 200);
+        assert_eq!(r.message, "done");
+        assert!(r.error_detail.is_none());
+        assert!(r.trace_id.is_none());
+    }
+
+    #[test]
+    fn test_http_response_optional_fields_absent_when_none() {
+        let r = HttpResponse {
+            code: 200,
+            message: "ok".to_string(),
+            error_detail: None,
+            trace_id: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("error_detail"));
+        assert!(!obj.contains_key("trace_id"));
+    }
+
+    #[test]
+    fn test_http_response_optional_fields_present_when_some() {
+        let r = HttpResponse {
+            code: 500,
+            message: "err".to_string(),
+            error_detail: Some("detail".to_string()),
+            trace_id: Some("tid".to_string()),
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("error_detail"));
+        assert!(obj.contains_key("trace_id"));
+    }
+}

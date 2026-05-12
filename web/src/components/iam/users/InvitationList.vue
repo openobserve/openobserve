@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -56,24 +56,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn
-            :label="t('invitation.accept')"
-            class="q-mr-sm o2-primary-button no-hover"
-            no-caps
-            flat
-            dense
+          <OButton
+            variant="primary"
+            size="sm"
+            class="tw:mr-2"
             @click="acceptInvitation(props.row)"
             :data-test="`accept-invitation-${props.row.token}`"
-          />
-          <q-btn
-            :label="t('invitation.reject')"
-            class="o2-secondary-button"
-            no-caps
-            flat
-            dense
+          >
+            {{ t('invitation.accept') }}
+          </OButton>
+          <OButton
+            variant="secondary"
+            size="sm"
             @click="rejectInvitation(props.row)"
             :data-test="`reject-invitation-${props.row.token}`"
-          />
+          >
+            {{ t('invitation.reject') }}
+          </OButton>
         </q-td>
       </template>
 
@@ -111,17 +110,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" no-caps class="q-mr-sm o2-secondary-button">
+          <OButton v-close-popup="true" variant="outline" size="sm-action">
             {{ t("invitation.cancel") }}
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            no-caps
-            class="o2-primary-button"
+            variant="primary"
+            size="sm-action"
             @click="confirmAcceptInvitation"
           >
             {{ t("invitation.accept") }}
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -140,17 +139,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" no-caps class="q-mr-sm o2-secondary-button">
+          <OButton v-close-popup="true" variant="outline" size="sm-action">
             {{ t("invitation.cancel") }}
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            no-caps
-            class="o2-primary-button"
+            variant="primary"
+            size="sm"
             @click="confirmRejectInvitation"
           >
             {{ t("invitation.reject") }}
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -158,7 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import { defineComponent, ref, onMounted } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -172,6 +173,7 @@ export default defineComponent({
   components: {
     NoData,
     QTablePagination,
+    OButton,
   },
   props: {
     userEmail: {

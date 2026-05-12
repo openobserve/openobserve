@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -142,90 +142,74 @@ size="xs" class="warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
       </div>
-      <q-btn
-        color="secondary"
+      <OButton
+        variant="secondary"
         size="sm"
-        style="display: inline; padding: 5px 10px"
-        rounded
-        borderless
-        dense
         class="q-ma-xs"
         @click="router.replace('/billings/plans')"
-        >Upgrade to PRO Plan</q-btn
       >
+        Upgrade to PRO Plan
+      </OButton>
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
     <div class="header-menu">
       <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
-      <q-btn
-        no-caps
-        flat
-        dense
-        class="upgrade-enterprise-btn q-px-sm q-mx-xs"
-        @click="openEnterpriseDialog"
+      <OButton
+        variant="primary"
+        size="xs"
+        class="q-mx-xs"
         data-test="upgrade-to-enterprise-btn"
+        @click="openEnterpriseDialog"
       >
-        <div class="row items-center no-wrap">
-          <q-icon name="card_giftcard"
-size="16px" class="q-mr-xs" />
-          <span class="text-weight-medium">{{ enterpriseButtonText }}</span>
-        </div>
-      </q-btn>
+        <template #icon-left>
+          <q-icon name="card_giftcard" size="16px" />
+        </template>
+        {{ enterpriseButtonText }}
+      </OButton>
 
       <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
-      <q-btn
+      <OButton
         v-if="
           config.isEnterprise == 'true' &&
           store.state.zoConfig.ingestion_quota_used >= 85
         "
-        round
-        flat
-        dense
-        :ripple="false"
+        variant="ghost"
+        size="icon-circle-sm"
         data-test="ingestion-quota-warning-icon"
       >
-        <div class="row items-center no-wrap">
-          <q-icon
-            name="warning"
-            size="24px"
-            class="header-icon"
-            :style="{ color: ingestionQuotaColor }"
-          ></q-icon>
-        </div>
+        <q-icon
+          name="warning"
+          size="24px"
+          class="header-icon"
+          :style="{ color: ingestionQuotaColor }"
+        />
         <q-tooltip anchor="top middle" self="bottom middle">
           Warning: {{ ingestionQuotaPercentage }}% of ingestion limit used
         </q-tooltip>
-      </q-btn>
+      </OButton>
 
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
-      <q-btn
+      <OButton
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-        :ripple="false"
+        variant="ghost"
+        size="icon-circle-sm"
         @click="toggleAIChat"
         data-test="menu-link-ai-item"
-        no-caps
-        :borderless="true"
-        flat
-        dense
-        class="o2-button ai-hover-btn q-px-sm q-py-sm"
+        class="ai-hover-btn"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        style="border-radius: 100%"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
       >
-        <div class="row items-center no-wrap tw:gap-2">
-          <img :src="getBtnLogo" class="header-icon ai-icon" />
-        </div>
-      </q-btn>
+        <img :src="getBtnLogo" class="header-icon ai-icon" />
+      </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
       <div data-test="navbar-organizations-select" class="q-mx-sm row">
-        <q-btn
+        <OButton
+          variant="ghost"
+          size="sm"
           style="max-width: 250px"
-          dense
-          no-caps
-          flat
           class="tw:text-ellipsis tw:overflow-hidden"
         >
           <div class="row items-center no-wrap full-width">
@@ -341,41 +325,31 @@ size="16px" class="q-mr-xs" />
               </q-item>
             </q-list>
           </q-menu>
-        </q-btn>
+        </OButton>
       </div>
 
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
 
       <!-- SLACK COMMUNITY LINK -->
-      <q-btn
-        round
-        flat
-        dense
-        :ripple="false"
-        @click="openSlack"
+      <OButton
+        variant="ghost"
+        size="icon-circle-sm"
         data-test="menu-link-slack-item"
+        @click="openSlack"
       >
-        <div class="row items-center no-wrap">
-          <q-icon
-            ><component :is="slackIcon" size="32px"
-class="header-icon"
-          /></q-icon>
-        </div>
+        <component :is="slackIcon" size="20px" class="header-icon" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.slack") }}
         </q-tooltip>
-      </q-btn>
+      </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
-      <q-btn round flat
-dense :ripple="false" data-test="menu-link-help-item">
-        <div class="row items-center no-wrap">
-          <q-icon name="help_outline" class="header-icon"></q-icon>
-          <q-tooltip anchor="top middle" self="bottom middle">
-            {{ t("menu.help") }}
-          </q-tooltip>
-        </div>
+      <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
+        <q-icon name="help_outline" size="20px" class="header-icon" />
+        <q-tooltip anchor="top middle" self="bottom middle">
+          {{ t("menu.help") }}
+        </q-tooltip>
 
         <q-menu
           fit
@@ -429,50 +403,43 @@ dense :ripple="false" data-test="menu-link-help-item">
             </q-item>
           </q-list>
         </q-menu>
-      </q-btn>
+      </OButton>
 
       <!-- SETTINGS BUTTON -->
-      <q-btn
+      <OButton
+        variant="ghost"
+        size="icon-circle-sm"
         data-test="menu-link-settings-item"
-        round
-        flat
-        dense
-        :ripple="false"
         @click="router.push({ name: 'settings' })"
       >
-        <div class="row items-center no-wrap">
-          <q-icon :name="outlinedSettings" class="header-icon"></q-icon>
-        </div>
+        <q-icon :name="outlinedSettings" size="20px" class="header-icon" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.settings") }}
         </q-tooltip>
-      </q-btn>
+      </OButton>
 
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
-      <q-btn
-        round
-        flat
-        dense
-        :ripple="false"
+      <OButton
+        variant="ghost"
+        size="icon-circle-sm"
         data-test="header-my-account-profile-icon"
       >
-        <div class="row items-center no-wrap">
-          <q-icon
-            :name="user.picture ? user.picture : 'person'"
-            class="header-icon"
-          ></q-icon>
-          <q-tooltip
-            anchor="top middle"
-            self="bottom middle"
-            class="header-user-tooltip"
-          >
-            {{
-              user.given_name
-                ? user.given_name + " " + user.family_name
-                : user.email
-            }}</q-tooltip
-          >
-        </div>
+        <q-icon
+          :name="user.picture ? user.picture : 'person'"
+          size="20px"
+          class="header-icon"
+        />
+        <q-tooltip
+          anchor="top middle"
+          self="bottom middle"
+          class="header-user-tooltip"
+        >
+          {{
+            user.given_name
+              ? user.given_name + " " + user.family_name
+              : user.email
+          }}</q-tooltip
+        >
 
         <q-menu
           fit
@@ -605,7 +572,7 @@ name="exit_to_app" class="padding-none" />
             </q-item>
           </q-list>
         </q-menu>
-      </q-btn>
+      </OButton>
     </div>
 
     <!-- Enterprise Upgrade Dialog -->
@@ -614,10 +581,12 @@ name="exit_to_app" class="padding-none" />
 </template>
 
 <script lang="ts">
+
 import { defineComponent, PropType, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import { getImageURL } from "@/utils/zincutils";
 
@@ -626,6 +595,7 @@ export default defineComponent({
   components: {
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
+    OButton,
   },
   props: {
     // Store instance
@@ -843,48 +813,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.upgrade-enterprise-btn {
-  background: var(--q-primary) !important;
-  color: white !important;
-  border-radius: 4px !important;
-  padding: 0 10px !important;
-  transition: all 0.2s ease !important;
-  height: 28px !important;
-  min-height: 28px !important;
-  font-size: 12px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  align-self: center !important;
-  vertical-align: middle !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-
-  &:hover {
-    opacity: 0.85;
-    filter: brightness(0.9);
-  }
-
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .q-icon {
-    color: white !important;
-    font-size: 14px !important;
-    margin-right: 4px;
-  }
-
-  span {
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 28px;
-    display: inline-block;
-  }
-}
-
 :deep(.header-user-tooltip) {
   width: auto;
   max-width: none;

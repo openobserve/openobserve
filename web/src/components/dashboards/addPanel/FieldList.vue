@@ -70,6 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         "
         :readonly="dashboardPanelDataPageKey === 'logs'"
+        :title="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream
+        "
         hide-bottom-space
       >
         <template
@@ -82,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon
             style="margin-top: 24px"
-            size="xs"
+            size="chip"
             :name="metricsIconMapping[selectedMetricTypeIcon || '']"
           />
         </template>
@@ -108,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-item-section avatar class="metric-explore-metric-icon">
               <q-icon
-                size="xs"
+                size="chip"
                 :name="
                   metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''
                 "
@@ -122,7 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #no-option>
           <q-item>
-            <q-item-section :class="store.state.theme === 'dark' ? 'text-white' : ''">
+            <q-item-section
+              :class="store.state.theme === 'dark' ? 'text-white' : ''"
+            >
               {{ t("search.noResult") }}
             </q-item-section>
           </q-item>
@@ -174,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="props?.row?.isGroup"
                 class="tw:pl-2 tw:py-1 tw:font-semibold field-group-header"
+                :title="props?.row?.groupName"
               >
                 {{ props?.row?.groupName }}
               </div>
@@ -254,40 +262,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )
                   "
                 >
-                  <q-btn
-                    padding="sm"
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddXAxisNotAllowed"
                     @click="addXAxisItem(props.row)"
                     data-test="dashboard-add-x-data"
                   >
-                    <div>
-                      {{
-                        dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y"
-                      }}
-                    </div>
-                  </q-btn>
-                  <q-btn
-                    padding="sm"
+                    {{ dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y" }}
+                  </OButton>
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddYAxisNotAllowed"
                     @click="addYAxisItem(props.row)"
                     data-test="dashboard-add-y-data"
                   >
-                    <div>
-                      {{
-                        dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X"
-                      }}
-                    </div>
-                  </q-btn>
-                  <q-btn
+                    {{ dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X" }}
+                  </OButton>
+                  <OButton
                     v-if="dashboardPanelData.data.type == 'table'"
-                    padding="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddBreakdownNotAllowed"
                     @click="addBreakDownAxisItem(props.row)"
                     data-test="dashboard-add-p-data"
                   >
-                    <div>+P</div>
-                  </q-btn>
-                  <q-btn
+                    +P
+                  </OButton>
+                  <OButton
                     v-if="
                       dashboardPanelData.data.type == 'area' ||
                       dashboardPanelData.data.type == 'bar' ||
@@ -298,43 +301,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dashboardPanelData.data.type == 'area-stacked' ||
                       dashboardPanelData.data.type == 'stacked'
                     "
-                    padding="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddBreakdownNotAllowed"
                     @click="addBreakDownAxisItem(props.row)"
                     data-test="dashboard-add-b-data"
                   >
-                    <div>
-                      {{
-                        dashboardPanelData.data.type != "h-bar" ? "+B" : "+B"
-                      }}
-                    </div>
-                  </q-btn>
-                  <q-btn
+                    +B
+                  </OButton>
+                  <OButton
                     v-if="dashboardPanelData.data.type == 'heatmap'"
-                    padding="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddZAxisNotAllowed"
                     @click="addZAxisItem(props.row)"
                     data-test="dashboard-add-z-data"
                   >
-                    <div>+Z</div>
-                  </q-btn>
-                  <q-btn
+                    +Z
+                  </OButton>
+                  <OButton
                     v-if="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
-                    :disable="
+                    variant="ghost-neutral"
+                    size="chip"
+                    :disabled="
                       !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                         (vrlField: any) => vrlField.name == props.row.name,
                       )
                     "
-                    padding="sm"
                     @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
-                    <div>+F</div>
-                  </q-btn>
+                    +F
+                  </OButton>
                 </div>
                 <div
                   class="field_icons"
@@ -350,61 +352,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.type == 'geomap'
                   "
                 >
-                  <q-btn
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.latitude != null
                     "
-                    no-caps
-                    padding="sm"
                     @click="addLatitude(props.row)"
                     data-test="dashboard-add-latitude-data"
                   >
-                    <div>+Lat</div>
-                  </q-btn>
-                  <q-btn
+                    +Lat
+                  </OButton>
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.longitude != null
                     "
-                    no-caps
-                    padding="sm"
                     @click="addLongitude(props.row)"
                     data-test="dashboard-add-longitude-data"
                   >
-                    <div>+Lng</div>
-                  </q-btn>
-                  <q-btn
+                    +Lng
+                  </OButton>
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.weight != null
                     "
-                    padding="sm"
                     @click="addWeight(props.row)"
                     data-test="dashboard-add-weight-data"
                   >
-                    <div>+W</div>
-                  </q-btn>
-                  <q-btn
+                    +W
+                  </OButton>
+                  <OButton
                     v-if="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
-                    :disable="
+                    variant="ghost-neutral"
+                    size="chip"
+                    :disabled="
                       !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                         (vrlField: any) => vrlField.name == props.row.name,
                       )
                     "
-                    padding="sm"
                     @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
-                    <div>+F</div>
-                  </q-btn>
+                    +F
+                  </OButton>
                 </div>
                 <div
                   class="field_icons"
@@ -420,39 +424,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.type == 'maps'
                   "
                 >
-                  <q-btn
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.name != null
                     "
-                    no-caps
-                    padding="sm"
                     @click="addMapName(props.row)"
                     data-test="dashboard-add-x-data"
                   >
-                    <div>+N</div>
-                  </q-btn>
-                  <q-btn
+                    +N
+                  </OButton>
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.value_for_maps != null
                     "
-                    no-caps
-                    padding="sm"
                     @click="addMapValue(props.row)"
                     data-test="dashboard-add-y-data"
                   >
-                    <div>+V</div>
-                  </q-btn>
-                  <q-btn
-                    padding="sm"
+                    +V
+                  </OButton>
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
-                    <div>+F</div>
-                  </q-btn>
+                    +F
+                  </OButton>
                 </div>
 
                 <div
@@ -469,61 +474,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.type == 'sankey'
                   "
                 >
-                  <q-btn
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.source != null
                     "
-                    no-caps
-                    padding="sm"
                     @click="addSource(props.row)"
                     data-test="dashboard-add-source-data"
                   >
-                    <div>+S</div>
-                  </q-btn>
-                  <q-btn
+                    +S
+                  </OButton>
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.target != null
                     "
-                    no-caps
-                    padding="sm"
                     @click="addTarget(props.row)"
                     data-test="dashboard-add-target-data"
                   >
-                    <div>+T</div>
-                  </q-btn>
-                  <q-btn
+                    +T
+                  </OButton>
+                  <OButton
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.value != null
                     "
-                    padding="sm"
                     @click="addValue(props.row)"
                     data-test="dashboard-add-value-data"
                   >
-                    <div>+V</div>
-                  </q-btn>
-                  <q-btn
+                    +V
+                  </OButton>
+                  <OButton
                     v-if="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
-                    :disable="
+                    variant="ghost-neutral"
+                    size="chip"
+                    :disabled="
                       !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                         (vrlField: any) => vrlField.name == props.row.name,
                       )
                     "
-                    padding="sm"
                     @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
-                    <div>+F</div>
-                  </q-btn>
+                    +F
+                  </OButton>
                 </div>
               </div>
             </q-td>
@@ -571,9 +578,11 @@ import useStreams from "@/composables/useStreams";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "FieldList",
+  components: { OButton },
   props: ["editMode", "hideAllFieldsSelection"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey: any = inject(
@@ -887,15 +896,14 @@ export default defineComponent({
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
           // Check if selected stream for current query exists in index options
           // If not, set the first index option as the selected stream
-          if (
-            dashboardPanelData.meta.stream.streamResults.find(
-              (it: any) =>
-                it.name ==
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream,
-            )
-          ) {
+          const existingStream = dashboardPanelData.meta.stream.streamResults.find(
+            (it: any) =>
+              it.name ==
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream,
+          );
+          if (existingStream) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
@@ -919,6 +927,7 @@ export default defineComponent({
           dashboardPanelData.meta.stream.customQueryFields.length +
           dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
       },
+      { immediate: true },
     );
 
     const flattenGroupedFields = computed(() => {
@@ -1035,9 +1044,28 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.meta.stream.filterField,
       () => {
-        // set the custom query fields length
-        customQueryFieldsLength.value =
-          dashboardPanelData.meta.stream.customQueryFields.length;
+        // Recompute custom query fields length based on filtered results.
+        // When a search filter is active, pageIndex is relative to the
+        // filtered rows, so customQueryFieldsLength must reflect the count
+        // of custom/VRL fields that pass the filter — not the total.
+        const filterTerm = dashboardPanelData.meta.stream.filterField
+          ?.toLowerCase()
+          ?.trim();
+        if (!filterTerm) {
+          customQueryFieldsLength.value =
+            dashboardPanelData.meta.stream.customQueryFields.length +
+            dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
+        } else {
+          const matchingCustom =
+            dashboardPanelData.meta.stream.customQueryFields.filter(
+              (f: any) => f.name?.toLowerCase().includes(filterTerm),
+            ).length;
+          const matchingVrl =
+            dashboardPanelData.meta.stream.vrlFunctionFieldList.filter(
+              (f: any) => f.name?.toLowerCase().includes(filterTerm),
+            ).length;
+          customQueryFieldsLength.value = matchingCustom + matchingVrl;
+        }
       },
     );
 
@@ -1280,7 +1308,7 @@ export default defineComponent({
           cursor: pointer;
         }
 
-        .q-btn {
+        button {
           border-left: 2px solid #d0d0d0;
         }
       }

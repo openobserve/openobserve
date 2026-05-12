@@ -784,6 +784,11 @@ const useStreams = () => {
   };
 
   const addNewStreams = (streamType: string, streamList: any[]) => {
+    // Don't seed the cache with partial results — only merge into an
+    // already-populated cache. Otherwise a paginated fetch (e.g. from the
+    // streams management page) would prevent a full fetch on the logs page.
+    if (!streamsCache[streamType]?.value?.list) return;
+
     // Check if stream exist in store, if not then add it
     const streamsToAdd = [...(streamsCache[streamType].value?.list || [])];
 

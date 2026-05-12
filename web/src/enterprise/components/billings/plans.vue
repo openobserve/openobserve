@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <pro-plan
         :planType="planType"
         :billingProvider="billingProvider"
+        :subscriptionType="subscriptionType"
         :features="proPlanFeatures"
         :pricingError="pricingError"
         @update:proSubscription="onLoadSubscription(config.paidPlan)"
@@ -245,6 +246,7 @@ export default defineComponent({
         );
         this.currentPlanDetail = res.data;
         this.billingProvider = res.data.provider || "";
+        this.subscriptionType = res.data.subscription_type || "";
 
         if (res.data.subscription_type !== "") {
           if (res.data.subscription_type == config.paidPlan) {
@@ -309,6 +311,7 @@ export default defineComponent({
     const proLoading: any = ref(false);
     const currentPlanDetail = ref();
     const billingProvider = ref("");
+    const subscriptionType = ref("");
     const aiUsage = ref<any>(null);
     const aiIcon = computed(() =>
       store.state.theme === "dark"
@@ -367,6 +370,7 @@ export default defineComponent({
       proLoading,
       currentPlanDetail,
       billingProvider,
+      subscriptionType,
       aiUsage,
       aiIcon,
       aiUsageRatio,

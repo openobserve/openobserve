@@ -51,7 +51,8 @@ fn create_cli_app() -> Command {
         .subcommands(&[
             Command::new("reset")
                 .about("reset openobserve data")
-                .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats", true)),
+                .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats, file-list-jobs", true))
+                .arg(arg!("time", 't', "time", "timestamp in microseconds, only used by file-list-jobs (default: 0)")),
             Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
             Command::new("export")
@@ -247,6 +248,46 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     compact::stats::update_stats_from_file_list()
                         .await
                         .expect("file list remote calculate stats failed");
+                }
+                "file-list-jobs" => {
+                    let time = command
+                        .get_one::<String>("time")
+                        .map(|s| s.parse::<i64>().unwrap_or(0))
+                        .unwrap_or(0);
+                    // check if any compactor node is running in the cluster
+                    let nodes = infra::cluster::list_nodes().await.unwrap_or_default();
+                    let compactor_nodes: Vec<_> = nodes
+                        .iter()
+                        .filter(|n| n.is_compactor() && !n.is_single_node())
+                        .collect();
+                    if !compactor_nodes.is_empty() {
+                        let names = compactor_nodes
+                            .iter()
+                            .map(|n| n.name.clone())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        return Err(anyhow::anyhow!(
+                            "compactor node(s) [{names}] are running, please stop them first before running reset"
+                        ));
+                    }
+                    let single_nodes: Vec<_> =
+                        nodes.iter().filter(|n| n.is_single_node()).collect();
+                    if !single_nodes.is_empty() {
+                        let names = single_nodes
+                            .iter()
+                            .map(|n| n.name.clone())
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        println!(
+                            "WARNING: detected single_node node(s) [{names}], please restart them after this reset command finishes"
+                        );
+                    }
+                    // 1. reset file offset in meta table
+                    let n = db::compact::files::reset_offset(time).await?;
+                    println!("reset {n} compact file offsets to {time}");
+                    // 2. set all file list jobs to pending
+                    let rows = infra_file_list::set_job_pending(&[]).await?;
+                    println!("reset {rows} file_list_jobs to pending");
                 }
                 _ => {
                     return Err(anyhow::anyhow!(

@@ -1,48 +1,50 @@
 <template>
   Sort By:
-  <q-btn-group class="el-border">
-    <q-btn
-      :class="[!fieldObj.sortBy ? 'selected' : '', 'tw:px-2.5', 'el-border']"
+  <OButtonGroup>
+    <OButton
+      :active="!fieldObj.sortBy"
+      variant="outline"
+      size="icon-xs"
       @click="updateSortOption(null)"
-      icon="block"
-      size="sm"
       data-test="dashboard-sort-by-item-clear"
-    />
-    <q-btn
-      :class="[
-        fieldObj.sortBy === 'ASC' ? 'selected' : '',
-        'tw:px-2',
-        'custom-border',
-      ]"
+    >
+      <template #icon-left
+        ><q-icon name="block" style="font-size: 16px"
+      /></template>
+    </OButton>
+    <OButton
+      :active="fieldObj.sortBy === 'ASC'"
+      variant="outline"
+      size="icon-xs"
       @click="updateSortOption('ASC')"
       data-test="dashboard-sort-by-item-asc"
     >
-      <AscSort />
-    </q-btn>
-    <q-btn
-      :class="[
-        fieldObj.sortBy === 'DESC' ? 'selected' : '',
-        'tw:px-2.5',
-        'el-border',
-      ]"
+      <template #icon-left><AscSort /></template>
+    </OButton>
+    <OButton
+      :active="fieldObj.sortBy === 'DESC'"
+      variant="outline"
+      size="icon-xs"
       @click="updateSortOption('DESC')"
       data-test="dashboard-sort-by-item-desc"
     >
-      <DescSort />
-    </q-btn>
-  </q-btn-group>
+      <template #icon-left><DescSort /></template>
+    </OButton>
+  </OButtonGroup>
 </template>
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { defineComponent } from "vue";
 import AscSort from "@/components/icons/AscSort.vue";
 import DescSort from "@/components/icons/DescSort.vue";
 import { inject } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "SortByBtnGrp",
-  components: { AscSort, DescSort },
+  components: { OButtonGroup, AscSort, DescSort, OButton },
   props: {
     fieldObj: {
       type: Object,

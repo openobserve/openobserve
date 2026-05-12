@@ -67,6 +67,8 @@ export default {
           thread_id: "5",
           thread_name: "job_runtime",
           trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
+          _end_time_ns: "1755853746921707300",
+          _start_time_ns: "1755853746625720300",
         },
         {
           _timestamp: 1755853746625779,
@@ -96,6 +98,8 @@ export default {
           thread_id: "5",
           thread_name: "job_runtime",
           trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
+          _end_time_ns: "1755853746921702400",
+          _start_time_ns: "1755853746625779000",
         },
         {
           _timestamp: 1755853746625790,
@@ -127,6 +131,8 @@ export default {
           thread_id: "5",
           thread_name: "job_runtime",
           trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
+          _end_time_ns: "1755853746920969200",
+          _start_time_ns: "1755853746625790200",
         },
       ],
     },

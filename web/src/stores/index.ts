@@ -96,6 +96,7 @@ export default createStore({
     allRoleLimitsByOrgIdByRole: {},
     modulesToDisplay: {},
     isAiChatEnabled: false,
+    isAiChatExpanded: false,
     isWebinarBannerVisible: false,
     currentChatTimestamp: null,
     chatUpdated: false,
@@ -274,6 +275,9 @@ export default createStore({
     },
     setIsAiChatEnabled(state, payload) {
       state.isAiChatEnabled = payload;
+    },
+    setIsAiChatExpanded(state, payload) {
+      state.isAiChatExpanded = payload;
     },
     setIsWebinarBannerVisible(state, payload) {
       state.isWebinarBannerVisible = payload;
@@ -480,6 +484,9 @@ export default createStore({
     },
     setIsAiChatEnabled(context, payload) {
       context.commit("setIsAiChatEnabled", payload);
+    },
+    setIsAiChatExpanded(context, payload) {
+      context.commit("setIsAiChatExpanded", payload);
     },
     setIsWebinarBannerVisible(context, payload) {
       context.commit("setIsWebinarBannerVisible", payload);

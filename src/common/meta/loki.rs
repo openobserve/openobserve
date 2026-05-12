@@ -281,4 +281,37 @@ mod tests {
         assert_eq!(stream.stream, labels);
         assert_eq!(stream.values.len(), 1);
     }
+
+    #[test]
+    fn test_loki_entry_structured_metadata_none_absent() {
+        let entry = LokiEntry {
+            timestamp: "0".to_string(),
+            line: "msg".to_string(),
+            structured_metadata: None,
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("structured_metadata")
+        );
+    }
+
+    #[test]
+    fn test_loki_entry_structured_metadata_some_present() {
+        let mut meta = HashMap::new();
+        meta.insert("k".to_string(), "v".to_string());
+        let entry = LokiEntry {
+            timestamp: "0".to_string(),
+            line: "msg".to_string(),
+            structured_metadata: Some(meta),
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        assert!(
+            json.as_object()
+                .unwrap()
+                .contains_key("structured_metadata")
+        );
+    }
 }

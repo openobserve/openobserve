@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row items-center tw:flex-nowrap!" data-test="trace-row-service">
+  <div class="row items-center tw:flex-nowrap!" :data-test="dataTest || 'trace-row-service'">
     <!-- Service type icon -->
     <img
       data-test="trace-row-service-icon"
@@ -48,14 +48,14 @@ import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 
 const props = defineProps<{
   item: Record<string, any>;
+  dataTest?: string;
 }>();
 
 const $q = useQuasar();
-const { searchObj } = useTraces();
-const serviceColors = computed(() => searchObj.meta.serviceColors ?? {});
+const { getOrSetServiceColor } = useTraces();
 
 const rootColor = computed(
-  () => serviceColors.value[props.item.service_name] ?? "#9e9e9e",
+  () => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e",
 );
 
 const serviceIconUrl = computed(() =>
@@ -70,6 +70,6 @@ const extraServices = computed(() => {
   const svcs = props.item.services ?? {};
   return Object.keys(svcs)
     .filter((s) => s !== props.item.service_name)
-    .map((s) => ({ name: s, color: serviceColors.value[s] ?? "#9e9e9e" }));
+    .map((s) => ({ name: s, color: getOrSetServiceColor(s) ?? "#9e9e9e" }));
 });
 </script>

@@ -26,9 +26,9 @@ test.describe("Traces Search testcases", () => {
     await pm.tracesPage.navigateToTraces();
 
     // Select the default stream as data is ingested for it only
-    if (await pm.tracesPage.isStreamSelectVisible()) {
-      await pm.tracesPage.selectTraceStream('default');
-    }
+    await pm.tracesPage.isStreamSelectVisible()
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForTimeout(2000);
 
     testLogger.info('Test setup completed for traces search');
   });
@@ -255,9 +255,9 @@ test.describe("Traces Search testcases", () => {
     testLogger.info('Testing empty search results');
 
     // Select stream if needed using page object
-    if (await pm.tracesPage.isStreamSelectVisible()) {
-      await pm.tracesPage.selectTraceStream('default');
-    }
+    await pm.tracesPage.isStreamSelectVisible()
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForTimeout(2000);
 
     // Set time range
     await pm.tracesPage.setTimeRange('15m');
@@ -309,9 +309,9 @@ test.describe("Traces Search testcases", () => {
       testLogger.info('Testing search with 1 minute time range');
 
       // Setup trace search with very short time range using page object
-      if (await pm.tracesPage.isStreamSelectVisible()) {
-        await pm.tracesPage.selectTraceStream('default');
-      }
+      await pm.tracesPage.isStreamSelectVisible()
+      await pm.tracesPage.selectTraceStream('default');
+      await page.waitForTimeout(2000);
 
       // Set 1 minute time range using page object
       await pm.tracesPage.clickTimeRange1m();

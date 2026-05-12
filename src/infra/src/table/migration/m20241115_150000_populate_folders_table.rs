@@ -136,3 +136,40 @@ mod folder {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_meta_folder_deserialize() {
+        let json = r#"{"folderId":"f1","name":"My Folder","description":"A test folder"}"#;
+        let folder: MetaFolder = serde_json::from_str(json).unwrap();
+        assert_eq!(folder.folder_id, "f1");
+        assert_eq!(folder.name, "My Folder");
+        assert_eq!(folder.description, "A test folder");
+    }
+
+    #[test]
+    fn test_meta_folder_default_folder_id() {
+        let json = r#"{"name":"No ID Folder","description":""}"#;
+        let folder: MetaFolder = serde_json::from_str(json).unwrap();
+        assert!(folder.folder_id.is_empty());
+        assert_eq!(folder.name, "No ID Folder");
+    }
+
+    #[test]
+    fn test_meta_folder_equality() {
+        let json = r#"{"folderId":"x","name":"Test","description":"desc"}"#;
+        let f1: MetaFolder = serde_json::from_str(json).unwrap();
+        let f2 = f1.clone();
+        assert_eq!(f1, f2);
+    }
+
+    #[test]
+    fn test_meta_folder_empty_description_stays_empty() {
+        let json = r#"{"name":"My Folder","description":""}"#;
+        let folder: MetaFolder = serde_json::from_str(json).unwrap();
+        assert!(folder.description.is_empty());
+    }
+}

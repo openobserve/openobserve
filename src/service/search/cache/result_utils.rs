@@ -134,4 +134,73 @@ mod tests {
         let result = get_ts_value("timestamp", &record);
         assert_eq!(result, 0, "Missing timestamp field should return 0");
     }
+
+    #[test]
+    fn test_is_timestamp_field_exact_match() {
+        assert!(is_timestamp_field("_timestamp", "_timestamp"));
+        assert!(!is_timestamp_field("other", "_timestamp"));
+    }
+
+    #[test]
+    fn test_is_timestamp_field_quoted_match() {
+        assert!(is_timestamp_field("\"_timestamp\"", "_timestamp"));
+        assert!(!is_timestamp_field("\"other\"", "_timestamp"));
+    }
+
+    #[test]
+    fn test_has_non_timestamp_ordering_all_timestamp() {
+        let order_by = vec![("_timestamp".to_string(), config::meta::sql::OrderBy::Desc)];
+        assert!(!has_non_timestamp_ordering(&order_by, "_timestamp"));
+    }
+
+    #[test]
+    fn test_has_non_timestamp_ordering_has_non_ts() {
+        let order_by = vec![
+            ("_timestamp".to_string(), config::meta::sql::OrderBy::Desc),
+            ("count".to_string(), config::meta::sql::OrderBy::Desc),
+        ];
+        assert!(has_non_timestamp_ordering(&order_by, "_timestamp"));
+    }
+
+    #[test]
+    fn test_has_non_timestamp_ordering_empty() {
+        let order_by: Vec<(String, config::meta::sql::OrderBy)> = vec![];
+        assert!(!has_non_timestamp_ordering(&order_by, "_timestamp"));
+    }
+
+    #[test]
+    fn test_extract_timestamp_range_time_ordered() {
+        let hits = vec![
+            json!({"_timestamp": 1000i64}),
+            json!({"_timestamp": 2000i64}),
+            json!({"_timestamp": 3000i64}),
+        ];
+        let (min_ts, max_ts) = extract_timestamp_range(&hits, "_timestamp", true);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 3000);
+    }
+
+    #[test]
+    fn test_extract_timestamp_range_not_time_ordered() {
+        let hits = vec![
+            json!({"_timestamp": 3000i64}),
+            json!({"_timestamp": 1000i64}),
+            json!({"_timestamp": 2000i64}),
+        ];
+        let (min_ts, max_ts) = extract_timestamp_range(&hits, "_timestamp", false);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 3000);
+    }
+
+    #[test]
+    fn test_extract_timestamp_range_reverse_ordered() {
+        // time_ordered=true but reversed — function uses first/last min/max
+        let hits = vec![
+            json!({"_timestamp": 3000i64}),
+            json!({"_timestamp": 1000i64}),
+        ];
+        let (min_ts, max_ts) = extract_timestamp_range(&hits, "_timestamp", true);
+        assert_eq!(min_ts, 1000);
+        assert_eq!(max_ts, 3000);
+    }
 }

@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             panelSchema.type == 'table' && panelSchema.queryType === 'promql'
           "
+          ref="tableRendererRef"
           :data="tableRendererData"
           :config="panelSchema.config"
           @row-click="onChartClick"
@@ -103,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <ChartRenderer
           v-else
+          ref="chartRendererRef"
           :data="
             panelSchema.queryType === 'promql' ||
             (panelData.chartType != 'geomap' &&
@@ -187,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @click.stop
       >
-        <q-btn
+        <OButton
           v-if="
             showLegendsButton &&
             noData !== 'No Data' &&
@@ -203,19 +205,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'gauge',
             ].includes(panelSchema.type)
           "
-          color="primary"
-          icon="format_list_bulleted"
-          round
-          outline
-          size="sm"
+          variant="outline"
+          size="icon-circle"
           @click="$emit('show-legends')"
-          class="el-border"
         >
+          <template #icon-left><q-icon name="format_list_bulleted" /></template>
           <q-tooltip anchor="top middle" self="bottom right">
             Show Legends
           </q-tooltip>
-        </q-btn>
-        <q-btn
+        </OButton>
+        <OButton
           v-if="
             [
               'area',
@@ -231,26 +230,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             allowAnnotationsAdd &&
             !viewOnly
           "
-          color="primary"
-          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
-          round
-          outline
-          size="sm"
+          variant="outline"
+          size="icon-circle"
           @click="toggleAddAnnotationMode"
-          class="el-border"
         >
+          <template #icon-left
+            ><q-icon :name="isAddAnnotationMode ? 'cancel' : 'edit'"
+          /></template>
           <q-tooltip anchor="top middle" self="bottom right">
             {{
               isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
             }}
           </q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
       <div
         class="crosslink-drilldown-menu"
         :class="{
           'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
         }"
+        data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
@@ -267,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             class="crosslink-drilldown-menu-item"
+            data-test="drilldown-menu-item"
             @click="openDrilldown(index)"
           >
             <q-icon
@@ -356,12 +356,16 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import { throttle } from "lodash-es";
 import {
   usePanelAlertCreation,
   usePanelDownload,
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
+import {
+  overlayNewDataOnOldOptions,
+  isOverlayEligible,
+} from "@/utils/dashboard/streaming";
+import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -401,6 +405,7 @@ const CustomChartRenderer = defineAsyncComponent(() => {
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
 });
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -416,6 +421,7 @@ export default defineComponent({
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
+    OButton,
   },
   props: {
     selectedTimeObj: {
@@ -584,6 +590,7 @@ export default defineComponent({
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
+    const chartRendererRef: any = ref(null); // holds the ref to the ChartRenderer component
     const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
 
@@ -719,6 +726,48 @@ export default defineComponent({
       };
     });
 
+    // The latest metadata chunk's time_offset.start_time (┬╡s) marks the left boundary
+    // of data received so far. Also pull the full query start so the overlay function
+    // can compute the fraction against the complete query range, not just received data.
+    // Direction-aware boundary for the streaming overlay.
+    //
+    //  - RTL (chunks arrive newest-first): fresh data is to the RIGHT of
+    //    `boundaryTime`. Overlay covers the stale LEFT portion. boundaryTime
+    //    is the LAST entry's time_offset.start_time (earliest received).
+    //  - LTR (chunks arrive earliest-first): fresh data is to the LEFT of
+    //    `boundaryTime`. Overlay covers the stale RIGHT portion. boundaryTime
+    //    is the LAST entry's time_offset.end_time (latest received).
+    //
+    // Times are in microseconds to match resultMetaData; convert to ms downstream.
+    const overlayBoundaryInfo = computed(() => {
+      const resultMeta = resultMetaData.value?.[0];
+      const queryStart = Number(metadata.value?.queries?.[0]?.startTime ?? 0);
+      const queryEnd = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
+      // PromQL always streams LTR (oldest timestamps first), no time_offset.
+      const isPromQL = panelSchema.value?.queryType === "promql";
+
+      if (isPromQL || !resultMeta?.length) {
+        return { boundaryTime: 0, queryStart, queryEnd, isLTR: isPromQL };
+      }
+
+      const firstEntry = resultMeta[0];
+      const lastEntry = resultMeta[resultMeta.length - 1];
+
+      const isLTR =
+        detectChunkingDirection(
+          firstEntry?.time_offset?.start_time ?? 0,
+          firstEntry?.time_offset?.end_time ?? 0,
+          queryStart,
+          queryEnd,
+        ) ?? false;
+
+      const boundaryTime = isLTR
+        ? (lastEntry?.time_offset?.end_time ?? 0)
+        : (lastEntry?.time_offset?.start_time ?? 0);
+
+      return { boundaryTime, queryStart, queryEnd, isLTR };
+    });
+
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef: any = ref(null);
 
@@ -846,13 +895,13 @@ export default defineComponent({
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
     });
-    const convertPanelDataCommon = async () => {
+    const convertPanelDataCommon = async (applyOverlay = false) => {
       if (
         !errorDetail?.value?.message &&
         validatePanelData?.value?.length === 0
       ) {
         try {
-          panelData.value = await convertPanelData(
+          const result = await convertPanelData(
             filteredPanelSchema.value,
             filteredData.value,
             store,
@@ -864,6 +913,117 @@ export default defineComponent({
             annotations,
             loading.value,
           );
+
+          // Apply overlay BEFORE assigning to panelData.value.
+          // This ensures a single watcher trigger with the overlaid options,
+          // avoiding the double-setOption issue (one without graphic, one with).
+          // Even without old data, overlay adds phantom anchor points so the
+          // first streaming chunk doesn't fill the entire chart width.
+          if (applyOverlay) {
+            const hasFullOverlay =
+              previousOptionsSnapshot &&
+              isOverlayEligible(panelSchema.value, previousOptionsSnapshot);
+
+            // Pass container dimensions so the overlay can calculate
+            // graphic width/height and barMaxWidth for bar charts.
+            const containerEl = chartPanelRef.value;
+            const containerSize = containerEl
+              ? {
+                  width: containerEl.clientWidth,
+                  height: containerEl.clientHeight,
+                }
+              : undefined;
+            const boundaryInfo = overlayBoundaryInfo.value;
+            // Resolve the primary theme color using the same priority as App.vue:
+            // 1. Vuex tempThemeColors (live preview)
+            // 2. localStorage saved color
+            // 3. Org settings color
+            // 4. Default theme color from store
+            const _themeMode = store.state.theme === "dark" ? "dark" : "light";
+            const primaryColor: string =
+              (_themeMode === "dark"
+                ? store.state.tempThemeColors?.dark
+                : store.state.tempThemeColors?.light) ||
+              window.localStorage.getItem(
+                _themeMode === "dark" ? "customDarkColor" : "customLightColor",
+              ) ||
+              (_themeMode === "dark"
+                ? store.state?.organizationData?.organizationSettings
+                    ?.dark_mode_theme_color
+                : store.state?.organizationData?.organizationSettings
+                    ?.light_mode_theme_color) ||
+              (_themeMode === "dark"
+                ? store.state.defaultThemeColors?.dark
+                : store.state.defaultThemeColors?.light) ||
+              "#3F7994";
+            const meta = resultMetaData.value?.[0]?.[0];
+            // SQL: histogram_interval in seconds. PromQL: step in µs.
+            const histogramIntervalMs = meta?.histogram_interval
+              ? meta.histogram_interval * 1000
+              : meta?.step
+                ? meta.step / 1000
+                : 0;
+
+            // For PromQL (no time_offset), derive boundaryTime from the
+            // last timestamp in the new series data (LTR: fresh edge).
+            // Convert ms → µs to match the boundaryTime convention.
+            let { boundaryTime } = boundaryInfo;
+            if (!boundaryTime && boundaryInfo.isLTR && result.options?.series) {
+              for (const s of result.options.series) {
+                if (!s.name || !Array.isArray(s.data) || !s.data.length)
+                  continue;
+                const lastPt = s.data[s.data.length - 1];
+                if (!Array.isArray(lastPt)) continue;
+                const t =
+                  typeof lastPt[0] === "number"
+                    ? lastPt[0]
+                    : new Date(lastPt[0]).getTime();
+                if (!isNaN(t) && t * 1000 > boundaryTime) {
+                  boundaryTime = t * 1000; // ms → µs
+                }
+              }
+            }
+
+            // Refresh _gridRect from the live chart so the overlay tracks
+            // the current grid dimensions. The snapshot captured at stream
+            // start can be stale if y-axis labels grew wider (larger values)
+            // or if bottom spacing changed during streaming.
+            if (hasFullOverlay && previousOptionsSnapshot) {
+              try {
+                const chartInstance = chartRendererRef.value?.chart;
+                if (chartInstance) {
+                  const gridModel = chartInstance
+                    ?.getModel()
+                    ?.getComponent("grid");
+                  const freshRect = gridModel?.coordinateSystem?.getRect();
+                  if (freshRect) {
+                    previousOptionsSnapshot._gridRect = {
+                      x: freshRect.x,
+                      y: freshRect.y,
+                      width: freshRect.width,
+                      height: freshRect.height,
+                    };
+                  }
+                }
+              } catch {
+                // Keep existing _gridRect if chart isn't ready
+              }
+            }
+
+            result.options = overlayNewDataOnOldOptions(
+              hasFullOverlay ? previousOptionsSnapshot : null,
+              result.options,
+              containerSize,
+              hasFullOverlay ? boundaryTime : undefined,
+              boundaryInfo.queryStart,
+              boundaryInfo.queryEnd,
+              boundaryInfo.isLTR,
+              primaryColor,
+              histogramIntervalMs,
+            );
+          }
+
+          panelData.value = result;
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
@@ -897,16 +1057,15 @@ export default defineComponent({
       }
     };
 
-    // Track if we've rendered the first chunk with actual data
-    let hasRenderedFirstDataChunk = ref(false);
+    // --- Streaming overlay state ---
+    // Snapshot of old panelData.options taken when streaming starts (for refresh overlay).
+    // Immutable once set — each chunk overlays against the same original.
+    let previousOptionsSnapshot: any = null;
 
-    // Create a throttled version for streaming updates (350ms throttle)
-    // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
-    // This prevents excessive re-renders while showing progressive updates
-    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
-      leading: true, // Call immediately on first invocation
-      trailing: true, // Ensure final call after throttle period
-    });
+    // Guard flag to prevent double final render when the stream ends with a
+    // simultaneous data change. Both watch([data,...]) and watch(loading) fire
+    // in the same tick — this ensures only the first one executes the render.
+    let streamEndRenderPending = false;
 
     // Watch for panel schema changes to re-convert panel data
     watch(
@@ -988,30 +1147,107 @@ export default defineComponent({
           };
 
         // Check if this is the first chunk with actual data
+        // SQL queries have data.value[0] as an array of hits (not an object with .result)
+        // PromQL queries have data.value[0] as an object with .result property
         const hasData =
-          data.value?.length > 0 && data.value[0]?.result?.length > 0;
+          data.value?.length > 0 &&
+          (data.value[0]?.result?.length > 0 ||
+            (Array.isArray(data.value[0]) && data.value[0].length > 0));
 
-        // Use throttled version during loading (streaming), immediate version when complete
-        // This prevents excessive re-renders during PromQL data streaming
         if (loading.value) {
-          // First chunk with actual data: render immediately!
-          if (hasData && !hasRenderedFirstDataChunk.value) {
-            hasRenderedFirstDataChunk.value = true;
-            await convertPanelDataCommon();
-          } else {
-            // Subsequent chunks: throttle to reduce re-render frequency
-            await convertPanelDataThrottled();
+          // ---- STREAMING (chunks arriving) ----
+          // Every chunk overlays against previousOptionsSnapshot (captured
+          // once in the loading watcher when streaming starts), or falls back
+          // to phantom anchors when no snapshot is available.
+          if (hasData) {
+            await convertPanelDataCommon(true);
           }
+          // else: no data yet → skip conversion → loading bar shown
         } else {
-          // Loading complete: immediate final render with full data
-          // Cancel any pending throttled calls and render immediately
-          convertPanelDataThrottled.cancel();
-          hasRenderedFirstDataChunk.value = false; // Reset for next query
+          // ---- LOADING COMPLETE ----
+          // Skip refresh-reset firings: when the executor sets state.data = []
+          // at the start of a new query, this watcher fires with hasData=false
+          // while loading hasn't yet been flipped to true. If we converted here
+          // we'd assign an empty result to panelData.value, destroying the
+          // previous chart before the streaming first-chunk can snapshot it
+          // for the overlay. True zero-result completions are handled by the
+          // watch(loading, ...) handler below.
+          if (!hasData && panelData.value?.options?.series?.length > 0) {
+            return;
+          }
+
+          // Claim the final render before awaiting so that watch(loading),
+          // which fires in the same tick, sees the flag and skips its render.
+          streamEndRenderPending = true;
+
+          // Final render with FULL data — no overlay needed (new data is complete)
           await convertPanelDataCommon();
+
+          streamEndRenderPending = false;
+
+          // Clear streaming state — old snapshot no longer needed
+          if (previousOptionsSnapshot) {
+            previousOptionsSnapshot = null;
+          }
         }
       },
       { deep: true },
     );
+
+    // Watch loading to bookend each streaming session.
+    // Start (false→true): snapshot the current chart for the overlay.
+    //   Every chunk overlays against this same original — the snapshot is
+    //   immutable from here until the stream ends.
+    // End (true→false): do the final render without overlay (unless the
+    //   data watcher already claimed it via streamEndRenderPending) and
+    //   clear the snapshot so the next stream captures fresh.
+    watch(loading, async (newLoading, oldLoading) => {
+      if (oldLoading === false && newLoading === true) {
+        const hasOldChart = panelData.value?.options?.series?.length > 0;
+        if (hasOldChart) {
+          previousOptionsSnapshot = JSON.parse(
+            JSON.stringify(panelData.value.options),
+          );
+          previousOptionsSnapshot._chartType = panelSchema.value?.type;
+          previousOptionsSnapshot._queryCount =
+            panelSchema.value?.queries?.length;
+
+          // Capture actual grid pixel rect from the ECharts instance.
+          // With containLabel: true, the actual plot area differs from raw grid config.
+          // WARNING: getModel().getComponent() is an ECharts internal API, not public.
+          // Validated against echarts 5.6.0. Revisit if ECharts is upgraded.
+          try {
+            const chartInstance = chartRendererRef.value?.chart;
+            if (chartInstance) {
+              const gridModel = chartInstance?.getModel()?.getComponent("grid");
+              const gridRect = gridModel?.coordinateSystem?.getRect();
+              if (gridRect) {
+                previousOptionsSnapshot._gridRect = {
+                  x: gridRect.x,
+                  y: gridRect.y,
+                  width: gridRect.width,
+                  height: gridRect.height,
+                };
+              }
+            }
+          } catch {
+            // Ignore — will fall back to grid config values in overlay
+          }
+        }
+      } else if (oldLoading === true && newLoading === false) {
+        // If the data watcher's else-branch already claimed the final render
+        // (simultaneous data + loading change in the same tick), skip here.
+        if (streamEndRenderPending) return;
+
+        // Final render with complete data — no overlay
+        await convertPanelDataCommon();
+
+        // Clear streaming state
+        if (previousOptionsSnapshot) {
+          previousOptionsSnapshot = null;
+        }
+      }
+    });
 
     const checkIfPanelIsTimeSeries = computed(() => {
       return panelData.value?.extras?.isTimeSeries;
@@ -1156,10 +1392,7 @@ export default defineComponent({
         case "metric": {
           return (
             data.value[0]?.length > 1 ||
-            yAlias.every(
-              (y: any) =>
-                getDataValue(firstRow, y) != null,
-            )
+            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
           );
         }
         case "heatmap": {
@@ -1208,20 +1441,27 @@ export default defineComponent({
         return "";
       }
       // Check if the queryType is 'promql'
-      else if (panelSchema.value?.queryType == "promql") {
+      if (panelSchema.value?.queryType == "promql") {
         // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
         return filteredData.value?.length &&
           filteredData.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
-      } else {
-        // The queryType is not 'promql'
-        return data.value.length &&
-          data.value[0]?.length &&
-          handleNoData(panelSchema.value.type)
-          ? ""
-          : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
+
+      // A rendered chart is already on screen — suppress "No Data" even if
+      // the raw data buffer is momentarily empty. This prevents a flicker on
+      // refresh where the executor resets state.data = [] before loading
+      // flips to true, transiently firing this computed with empty data.
+      if (panelData.value?.options?.series?.length > 0) {
+        return "";
+      }
+      // The queryType is not 'promql'
+      return data.value.length &&
+        data.value[0]?.length &&
+        handleNoData(panelSchema.value.type)
+        ? ""
+        : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
     });
 
     // when the error changes, emit the error
@@ -1264,7 +1504,7 @@ export default defineComponent({
       showErrorNotification,
     });
 
-    const { downloadDataAsCSV, downloadDataAsJSON } = usePanelDownload({
+    const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
       filteredData,
@@ -1325,6 +1565,7 @@ export default defineComponent({
     return {
       store,
       chartPanelRef,
+      chartRendererRef,
       data,
       loading,
       searchRequestTraceIds,
@@ -1356,6 +1597,23 @@ export default defineComponent({
       showPopupsAndOverlays,
       downloadDataAsCSV,
       downloadDataAsJSON,
+      getPanelCsvData: (title: string) => {
+        const csv = getPanelCsvString();
+        if (!csv) return null;
+        return {
+          title: title ?? panelSchema.value?.title ?? "panel",
+          csv,
+        };
+      },
+      logDataAsJSON: (title: string) => {
+        const chartData =
+          panelSchema.value?.queryType === "promql"
+            ? filteredData.value
+            : data.value;
+        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.log(chartData);
+        console.groupEnd();
+      },
       loadingProgressPercentage,
       isPartialData,
       contextMenuVisible,

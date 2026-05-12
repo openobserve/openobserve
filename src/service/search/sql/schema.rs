@@ -538,4 +538,80 @@ mod tests {
         let table_ref3 = TableReference::bare("different_table");
         assert_ne!(table_ref1, table_ref3);
     }
+
+    #[test]
+    fn test_generate_user_defined_schema_basic() {
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new(ID_COL_NAME, DataType::Utf8, false)),
+            Arc::new(Field::new("custom_field", DataType::Utf8, true)),
+        ];
+        let schema_cache = SchemaCache::new(Schema::new(fields));
+        let defined = vec!["custom_field".to_string()];
+
+        let result = generate_user_defined_schema(&schema_cache, defined, false);
+        let schema = result.schema();
+        let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+        assert!(names.contains(TIMESTAMP_COL_NAME));
+        assert!(names.contains(ID_COL_NAME));
+        assert!(names.contains("custom_field"));
+    }
+
+    #[test]
+    fn test_generate_user_defined_schema_field_not_in_schema_is_filtered() {
+        // defined_schema_fields references a field that doesn't exist in the schema
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new(ID_COL_NAME, DataType::Utf8, false)),
+        ];
+        let schema_cache = SchemaCache::new(Schema::new(fields));
+        let defined = vec!["nonexistent_field".to_string()];
+
+        let result = generate_user_defined_schema(&schema_cache, defined, false);
+        let schema = result.schema();
+        let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+        assert!(!names.contains("nonexistent_field"));
+        assert!(names.contains(TIMESTAMP_COL_NAME));
+        assert!(names.contains(ID_COL_NAME));
+    }
+
+    #[test]
+    fn test_generate_user_defined_schema_need_all_column_true() {
+        let cfg = config::get_config();
+        let all_col = cfg.common.column_all.as_str();
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new(ID_COL_NAME, DataType::Utf8, false)),
+            Arc::new(Field::new(all_col, DataType::Utf8, true)),
+            Arc::new(Field::new("f1", DataType::Utf8, true)),
+        ];
+        let schema_cache = SchemaCache::new(Schema::new(fields));
+        let defined = vec!["f1".to_string()];
+
+        let result = generate_user_defined_schema(&schema_cache, defined, true);
+        let schema = result.schema();
+        let names: HashSet<_> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+        assert!(names.contains(all_col));
+        assert!(names.contains("f1"));
+    }
+
+    #[test]
+    fn test_generate_schema_fields_has_match_all_true() {
+        // has_match_all=true enters the FTS branch even when FTS fields list is empty
+        let fields = vec![
+            Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
+            Arc::new(Field::new(ID_COL_NAME, DataType::Utf8, false)),
+            Arc::new(Field::new("field1", DataType::Utf8, true)),
+        ];
+        let schema_cache = SchemaCache::new(Schema::new(fields));
+
+        let mut columns = HashSet::new();
+        columns.insert("field1".to_string());
+
+        let result = generate_schema_fields(columns, &schema_cache, true);
+        let names: HashSet<_> = result.iter().map(|f| f.name().as_str()).collect();
+        assert!(names.contains(TIMESTAMP_COL_NAME));
+        assert!(names.contains(ID_COL_NAME));
+        assert!(names.contains("field1"));
+    }
 }

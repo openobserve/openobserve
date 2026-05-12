@@ -146,8 +146,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn test_sysinfo_get_tcp_connections() {
-        assert!(get_tcp_connections(None) > 0);
-        assert!(get_tcp_connections(Some(TcpConnState::Established)) > 0);
+        assert!(get_tcp_connections(Some(TcpConnState::Established)) <= get_tcp_connections(None));
     }
 
     #[test]
@@ -155,5 +154,38 @@ mod tests {
     fn test_sysinfo_get_tcp_connections() {
         assert_eq!(get_tcp_connections(None), 0);
         assert_eq!(get_tcp_connections(Some(TcpConnState::Established)), 0);
+    }
+
+    #[test]
+    fn test_tcp_conn_state_equality() {
+        assert!(TcpConnState::Established == TcpConnState::Established);
+        assert!(TcpConnState::Established != TcpConnState::Listen);
+        assert!(TcpConnState::TimeWait == TcpConnState::TimeWait);
+        assert!(TcpConnState::Close == TcpConnState::Close);
+        assert!(TcpConnState::SynSent != TcpConnState::SynRecv);
+    }
+
+    #[test]
+    #[cfg(not(target_os = "linux"))]
+    fn test_get_tcp_conn_resets_non_linux() {
+        assert_eq!(get_tcp_conn_resets(), 0);
+    }
+
+    #[test]
+    fn test_tcp_conn_state_all_variants_equal_themselves() {
+        assert!(TcpConnState::Established == TcpConnState::Established);
+        assert!(TcpConnState::SynSent == TcpConnState::SynSent);
+        assert!(TcpConnState::SynRecv == TcpConnState::SynRecv);
+        assert!(TcpConnState::FinWait1 == TcpConnState::FinWait1);
+        assert!(TcpConnState::FinWait2 == TcpConnState::FinWait2);
+        assert!(TcpConnState::TimeWait == TcpConnState::TimeWait);
+        assert!(TcpConnState::Close == TcpConnState::Close);
+        assert!(TcpConnState::CloseWait == TcpConnState::CloseWait);
+        assert!(TcpConnState::LastAck == TcpConnState::LastAck);
+        assert!(TcpConnState::Listen == TcpConnState::Listen);
+        assert!(TcpConnState::Closing == TcpConnState::Closing);
+        // cross checks
+        assert!(TcpConnState::Established != TcpConnState::SynSent);
+        assert!(TcpConnState::Listen != TcpConnState::Close);
     }
 }

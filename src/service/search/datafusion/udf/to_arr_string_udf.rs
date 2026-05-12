@@ -89,6 +89,18 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_to_arr_string_impl_wrong_arg_count_errors() {
+        // Zero args after values_to_arrays gives len 0, then len != 1 check fails
+        let result = to_arr_string_impl(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_to_arr_string_udf_name() {
+        assert_eq!(TO_ARR_STRING_UDF_NAME, "to_array_string");
+    }
+
     #[tokio::test]
     async fn test_to_array_string_valid_arrays() {
         let sqls = [

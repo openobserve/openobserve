@@ -117,3 +117,83 @@ impl CachedData {
         now - self.fetched_at > self.ttl_secs as i64
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[test]
+    fn test_github_service_config_default_values() {
+        let cfg = GitHubServiceConfig::default();
+        assert_eq!(cfg.timeout, Duration::from_secs(30));
+        assert_eq!(cfg.retry_attempts, 3);
+        assert_eq!(cfg.retry_delay_ms, 1000);
+        assert_eq!(cfg.default_ttl_secs, 3600);
+        assert_eq!(cfg.max_cache_size, 100_000_000);
+    }
+
+    #[test]
+    fn test_github_error_display_network() {
+        let e = GitHubError::NetworkError("connection refused".to_string());
+        assert_eq!(e.to_string(), "Network error: connection refused");
+    }
+
+    #[test]
+    fn test_github_error_display_rate_limit() {
+        let e = GitHubError::RateLimitExceeded {
+            reset_at: 1700000000,
+        };
+        assert!(e.to_string().contains("1700000000"));
+    }
+
+    #[test]
+    fn test_github_error_display_http_error() {
+        let e = GitHubError::HttpError {
+            status: 404,
+            message: "not found".to_string(),
+        };
+        assert_eq!(e.to_string(), "HTTP error 404: not found");
+    }
+
+    #[test]
+    fn test_github_error_display_timeout() {
+        let e = GitHubError::Timeout;
+        assert_eq!(e.to_string(), "Request timeout");
+    }
+
+    #[test]
+    fn test_from_serde_json_error() {
+        let json_err = serde_json::from_str::<serde_json::Value>("invalid json").unwrap_err();
+        let gh_err = GitHubError::from(json_err);
+        assert!(matches!(gh_err, GitHubError::ParseError(_)));
+    }
+
+    #[test]
+    fn test_cached_data_not_expired_when_fresh() {
+        let data = CachedData::new(bytes::Bytes::from("hello"), 3600);
+        assert!(!data.is_expired());
+    }
+
+    #[test]
+    fn test_cached_data_expired_with_old_timestamp() {
+        let data = CachedData {
+            data: bytes::Bytes::from("hello"),
+            fetched_at: 0, // Unix epoch — definitely expired
+            ttl_secs: 60,
+        };
+        assert!(data.is_expired());
+    }
+
+    #[test]
+    fn test_cached_data_not_expired_before_ttl() {
+        let now = chrono::Utc::now().timestamp();
+        let data = CachedData {
+            data: bytes::Bytes::from("hello"),
+            fetched_at: now - 30, // 30 seconds ago
+            ttl_secs: 60,         // 60s TTL
+        };
+        assert!(!data.is_expired());
+    }
+}

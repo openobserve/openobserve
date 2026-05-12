@@ -117,4 +117,60 @@ mod tests {
         assert_token(&tokens[3], 5, "happy", 22, 27);
         assert_token(&tokens[4], 6, "searching", 28, 37);
     }
+
+    #[test]
+    fn test_remove_short_all_filtered_returns_empty() {
+        // All single-char tokens are < 2 bytes so all get filtered
+        let tokens = token_stream_helper("a b c");
+        assert_eq!(tokens.len(), 0);
+    }
+
+    #[test]
+    fn test_remove_short_empty_string() {
+        let tokens = token_stream_helper("");
+        assert_eq!(tokens.len(), 0);
+    }
+
+    #[test]
+    fn test_remove_short_exactly_at_limit_passes() {
+        // "ab" is 2 bytes which equals the limit (2), so it passes
+        let tokens = token_stream_helper("ab");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].text, "ab");
+    }
+
+    #[test]
+    fn test_remove_short_limit_zero_passes_everything() {
+        let mut a = TextAnalyzer::builder(SimpleTokenizer::default())
+            .filter(RemoveShortFilter::limit(0))
+            .build();
+        let mut stream = a.token_stream("a b c");
+        let mut tokens: Vec<Token> = vec![];
+        stream.process(&mut |t: &Token| tokens.push(t.clone()));
+        assert_eq!(tokens.len(), 3);
+    }
+
+    #[test]
+    fn test_remove_short_limit_one_passes_one_char() {
+        let mut a = TextAnalyzer::builder(SimpleTokenizer::default())
+            .filter(RemoveShortFilter::limit(1))
+            .build();
+        let mut stream = a.token_stream("a bb ccc");
+        let mut tokens: Vec<Token> = vec![];
+        stream.process(&mut |t: &Token| tokens.push(t.clone()));
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0].text, "a");
+    }
+
+    #[test]
+    fn test_remove_short_token_mut() {
+        let mut a = TextAnalyzer::builder(SimpleTokenizer::default())
+            .filter(RemoveShortFilter::limit(2))
+            .build();
+        let mut stream = a.token_stream("hello world");
+        assert!(stream.advance());
+        let token = stream.token_mut();
+        token.text = "modified".to_string();
+        assert_eq!(stream.token().text, "modified");
+    }
 }

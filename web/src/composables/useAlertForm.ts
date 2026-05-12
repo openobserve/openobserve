@@ -730,7 +730,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return true;
   };
 
+  // Generation counter to discard stale async responses when the user switches
+  // tabs (e.g. builder → SQL) before the API call completes.
+  const generateRequestId = ref(0);
+
   const generateSqlFromBackend = async () => {
+    const requestId = ++generateRequestId.value;
+
     try {
       // If no stream name or not custom mode, nothing to do
       if (!formData.value.stream_name) {
@@ -792,6 +798,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         payload,
       );
 
+      // Discard if a newer request was started (e.g. user changed tabs or
+      // conditions before this response arrived).
+      if (requestId !== generateRequestId.value) return;
+
       if (response.data && response.data.sql) {
         generatedSqlQuery.value = response.data.sql;
         previewQuery.value = response.data.sql;
@@ -800,6 +810,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         previewAlertRef.value?.refreshData();
       }
     } catch (error) {
+      // Discard stale error fallback if a newer request has started.
+      if (requestId !== generateRequestId.value) return;
+
       console.error("Error generating SQL from backend:", error);
       const localSql = generateSqlQueryLocal();
       generatedSqlQuery.value = localSql;
@@ -1081,12 +1094,26 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
+  // Regex matching backend RE_OFGA_UNSUPPORTED_NAME in src/common/utils/auth.rs
+  const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
+
   // Sequential top-to-bottom validation with auto-focus for V3 layout
   const validateAndFocus = async (): Promise<boolean> => {
-    // 1. Alert name
+    // 1. Alert name — empty check
     if (!formData.value.name?.trim()) {
       alertNameError.value = true;
-      q.notify({ type: "negative", message: "Alert name is required.", timeout: 2000 });
+      q.notify({ type: "negative", message: t("alerts.nameRequired"), timeout: 2000 });
+      focusTopbarField(step1Ref);
+      return false;
+    }
+    // 1b. Alert name — unsupported characters (:#?\s'"%&)
+    if (ALERT_NAME_UNSUPPORTED_CHARS.test(formData.value.name)) {
+      alertNameError.value = true;
+      q.notify({
+        type: "negative",
+        message: t("alerts.nameNoSpecialChars"),
+        timeout: 4000,
+      });
       focusTopbarField(step1Ref);
       return false;
     }

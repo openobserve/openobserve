@@ -23,11 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :id="editorId"
     />
     <!-- AI Icon Button -->
-    <q-btn
+    <OButton
       v-if="showAiIcon && !disableAi"
-      round
-      flat
-      size="sm"
+      variant="sidebar-toggle"
+      size="icon-toolbar"
       class="ai-icon-button"
       :class="nlpMode ? 'ai-icon-active' : ''"
       @click="toggleNlpMode"
@@ -42,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
         }}
       </q-tooltip>
-    </q-btn>
+    </OButton>
   </div>
 </template>
 
@@ -80,9 +79,11 @@ import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   inheritAttrs: false,
+  components: { OButton },
   props: {
     editorId: {
       type: String,
@@ -102,7 +103,7 @@ export default defineComponent({
     },
     suggestions: {
       type: Array,
-      default: () => [],
+      default: null,
     },
     debounceTime: {
       type: Number,
@@ -111,6 +112,14 @@ export default defineComponent({
     readOnly: {
       type: Boolean,
       default: false,
+    },
+    showLineNumbers: {
+      type: Boolean,
+      default: true,
+    },
+    stickyScroll: {
+      type: Boolean,
+      default: true,
     },
     language: {
       type: String,
@@ -365,10 +374,10 @@ export default defineComponent({
     });
 
     const suggestions = computed(() => {
-      if (props.language === "sql" && !props.suggestions?.length) {
+      if (props.language === "sql" && props.suggestions == null) {
         return defaultSuggestions;
       }
-      return props.suggestions;
+      return props.suggestions ?? [];
     });
 
     /**
@@ -659,7 +668,7 @@ export default defineComponent({
         folding: enableCodeFolding.value,
         wordWrap: "on",
         automaticLayout: true,
-        lineNumbers: "on",
+        lineNumbers: props.showLineNumbers ? "on" : "off",
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
         fixedOverflowWidgets: true,
@@ -682,6 +691,9 @@ export default defineComponent({
         minimap: { enabled: false },
         readOnly: props.readOnly,
         renderValidationDecorations: "on",
+        stickyScroll: {
+          enabled: props.stickyScroll,
+        },
       });
 
       editorObj.onDidChangeModelContent(
@@ -692,6 +704,8 @@ export default defineComponent({
 
           // Check for natural language after user stops typing (debounced)
           if (newValue) checkForNaturalLanguage(newValue);
+
+          validateDoubleQuotes();
         }, props.debounceTime),
       );
 
@@ -763,6 +777,9 @@ export default defineComponent({
       // Store references for cleanup
       editorObj._windowClickHandler = handleWindowClick;
       editorObj._windowResizeHandler = handleWindowResize;
+
+      // Validate the initial query value on mount
+      validateDoubleQuotes();
     };
 
     onMounted(async () => {
@@ -835,6 +852,16 @@ export default defineComponent({
       () => props.readOnly,
       () => {
         editorObj?.updateOptions({ readOnly: props.readOnly });
+      },
+    );
+
+    // update lineNumbers when prop value changes
+    watch(
+      () => props.showLineNumbers,
+      () => {
+        editorObj?.updateOptions({
+          lineNumbers: props.showLineNumbers ? "on" : "off",
+        });
       },
     );
 
@@ -1059,6 +1086,57 @@ export default defineComponent({
       monaco.editor.setModelMarkers(getModel(), "owner", []);
       monaco.editor.setModelMarkers(getModel(), "owner", markers);
     }
+
+    // Scan the current SQL query for double-quoted string values and mark them
+    // with a warning squiggle + hover tooltip. Double quotes are only valid for
+    // identifiers (table/column names) in SQL; string literals must use single
+    // quotes. Operates independently of addErrorDiagnostics ("owner" markers) so
+    // server-side error markers and these client-side warnings never interfere.
+    const validateDoubleQuotes = () => {
+      if (!editorObj || !monaco || props.language !== "sql") return;
+      const model = editorObj.getModel();
+      if (!model) return;
+
+      const text = model.getValue();
+      const markers: any[] = [];
+
+      // Two patterns are flagged — both only within value position (after a
+      // SQL comparison/membership operator). FROM "table" / SELECT "col" are
+      // intentionally NOT matched.
+      //
+      //  Pattern A — fully double-quoted:  field = "value"
+      //  Pattern B — mismatched quotes:    field = "value'  or  field = 'value"
+      //    Capture group 1: the invalid quoted token
+      const regex =
+        /(?:NOT\s+LIKE|NOT\s+IN\s*\(|!=|<>|>=|<=|=|>|<|LIKE|IN\s*\()\s*("[^'"]*'|'[^'"]*"|"[^"]*")/gi;
+
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        const quotedStr = match[1]; // the invalid quoted token
+        const startOffset = match.index + match[0].length - quotedStr.length;
+        const endOffset = startOffset + quotedStr.length;
+
+        const startPos = model.getPositionAt(startOffset);
+        const endPos = model.getPositionAt(endOffset);
+
+        const isMixed =
+          (quotedStr.startsWith('"') && quotedStr.endsWith("'")) ||
+          (quotedStr.startsWith("'") && quotedStr.endsWith('"'));
+
+        markers.push({
+          severity: monaco.MarkerSeverity.Warning,
+          startLineNumber: startPos.lineNumber,
+          startColumn: startPos.column,
+          endLineNumber: endPos.lineNumber,
+          endColumn: endPos.column,
+          message: isMixed
+            ? "Mismatched quotes. Use matching single quotes for string values."
+            : "Double quotes are not valid for string values. Use single quotes instead.",
+        });
+      }
+
+      monaco.editor.setModelMarkers(model, "dq-validation", markers);
+    };
 
     // Watch isGenerating and emit events to parent
     watch(isGenerating, (newValue) => {

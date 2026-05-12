@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -38,48 +38,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </h2>
         </div>
         <div class="panel-header-actions tw:flex tw:items-center tw:gap-2">
-          <q-btn-dropdown
-            flat
-            dense
-            no-caps
-            size="sm"
-            class="tw:pl-[0.675rem]! tw:border! tw:border-[var(--o2-primary-btn-bg)]! tw:rounded! tw:text-[0.7rem]! tw:tracking-[0.03rem]! tw:text-[var(--o2-primary-btn-bg)]!"
-            label="View Related"
-            data-test="service-graph-node-panel-view-related-btn"
-          >
-            <q-list dense class="tw:min-w-[120px]">
-              <q-item
-                clickable
-                v-close-popup
-                @click="viewRelatedLogs"
-                data-test="service-graph-node-panel-view-related-logs-btn"
+          <ODropdown side="bottom" align="start">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="service-graph-node-panel-view-related-btn"
               >
-                <q-item-section class="tw:text-[var(--o2-text-2)]!"
-                  >Logs</q-item-section
-                >
-              </q-item>
-              <q-item
-                clickable
-                v-close-popup
-                @click="viewRelatedTraces"
-                data-test="service-graph-node-panel-view-related-traces-btn"
-              >
-                <q-item-section class="tw:text-[var(--o2-text-2)]!"
-                  >Traces</q-item-section
-                >
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-          <q-btn
-            flat
-            dense
-            round
-            icon="cancel"
-            size="sm"
-            @click="handleClose"
+                View Related
+                <q-icon name="arrow_drop_down" size="1rem" />
+              </OButton>
+            </template>
+            <ODropdownItem
+              @select="viewRelatedLogs"
+              data-test="service-graph-node-panel-view-related-logs-btn"
+              >Logs</ODropdownItem
+            >
+            <ODropdownItem
+              @select="viewRelatedTraces"
+              data-test="service-graph-node-panel-view-related-traces-btn"
+              >Traces</ODropdownItem
+            >
+          </ODropdown>
+          <OButton
+            variant="ghost"
+            size="icon"
             data-test="service-graph-side-panel-close-btn"
-            class="close-btn"
-          />
+            @click="handleClose"
+          >
+            <q-icon name="cancel" size="1rem" />
+          </OButton>
         </div>
       </div>
 
@@ -131,31 +119,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 >{{ chip.label }}</span
               >
-              <button
-                class="tw:ml-0.5 tw:flex tw:items-center tw:justify-center tw:rounded-full tw:text-[var(--o2-text-secondary)] tw:hover:text-[var(--o2-text-primary)] tw:cursor-pointer tw:border-none tw:bg-transparent tw:p-0"
+              <OButton
+                variant="ghost"
+                size="icon-chip"
+                class="tw:ml-0.5"
                 :data-test="`service-graph-filter-chip-remove-${chip.key}`"
                 @click="removeLocalRangeFilter(chip.key)"
               >
                 <q-icon name="close" size="0.65rem" />
-              </button>
+              </OButton>
             </div>
 
             <!-- Spacer -->
             <div class="tw:flex-1" />
 
             <!-- View in Traces button -->
-            <q-btn
-              class="view-logs-btn o2-primary-button tw:py-[0.25rem]! tw:px-[0.25rem]!"
-              dense
-              unelevated
-              no-caps
+            <OButton
+              variant="ghost-primary"
               size="sm"
               data-test="service-graph-side-panel-view-in-traces-btn"
               @click="viewInTraces"
             >
-              <q-icon name="search" size="0.8rem" class="tw:pr-[0.12rem]" />
+              <template #icon-left>
+                <q-icon name="search" size="0.8rem" />
+              </template>
               View Traces
-            </q-btn>
+            </OButton>
           </div>
           <div class="charts-wrapper tw:py-0! tw:min-h-[10.875rem] tw:w-full">
             <div class="charts-container tw:w-full">
@@ -179,22 +168,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-end tw:border-b tw:border-b-[var(--o2-border-color)] tw:mx-[0.5rem] tw:mb-[0.375rem]"
             data-test="service-graph-node-panel-tabs-row"
           >
-            <q-tabs
+            <OTabs
               v-model="activeTab"
               dense
-              inline-label
-              outside-arrows
               align="left"
               class="text-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
               data-test="service-graph-node-panel-tabs"
             >
-              <q-tab
+              <OTab
                 name="operations"
                 label="Operations"
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-operations"
               />
-              <q-tab
+              <OTab
                 v-for="cfg in activeResourceTabConfigs"
                 :key="cfg.id"
                 :name="cfg.id"
@@ -202,71 +189,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="text-transform: capitalize"
                 :data-test="`service-graph-node-panel-tab-${cfg.id}`"
               />
-              <q-tab
+              <OTab
                 name="metrics"
                 label="Metrics"
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-metrics"
               />
-            </q-tabs>
+            </OTabs>
 
             <!-- Resource tabs dropdown — shows/hides individual OTEL resource tabs -->
-            <q-btn
+            <ODropdown
               v-if="availableResourceTabConfigs.length > 0"
-              flat
-              dense
-              icon="tune"
-              size="1.1rem"
-              data-test="service-graph-node-panel-workload-fields-btn"
+              side="bottom"
+              align="end"
             >
-              <q-tooltip>{{ t("common.resources") }}</q-tooltip>
-              <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
-                <q-list
-                  dense
-                  class="tw:min-w-[12rem]!"
-                  data-test="service-graph-node-panel-workload-fields-menu"
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  data-test="service-graph-node-panel-workload-fields-btn"
                 >
-                  <template v-for="env in detectedEnvironments" :key="env.key">
-                    <q-item-label
-                      header
-                      class="tw:text-xs tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide"
-                    >
-                      {{ env.label }}
-                    </q-item-label>
-                    <q-item
-                      v-for="cfg in availableResourceTabConfigs.filter(
-                        (c) => c.environment === env.key,
-                      )"
-                      :key="cfg.id"
-                      tag="label"
-                      clickable
-                      :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                      class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
-                    >
-                      <q-item-section side class="tw:pr-[0rem]!">
-                        <q-checkbox
-                          v-model="selectedWorkloadFields"
-                          :val="cfg.id"
-                          size="xs"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="tw:text-xs">
-                          {{ cfg.label }}
-                          <q-tooltip>
-                            {{ cfg.groupField }}
-                          </q-tooltip>
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </template>
-                </q-list>
-              </q-menu>
-            </q-btn>
+                  <q-icon name="tune" size="1.1rem" />
+                  <q-tooltip>{{ t("common.resources") }}</q-tooltip>
+                </OButton>
+              </template>
+              <q-list
+                dense
+                class="tw:min-w-[12rem]!"
+                data-test="service-graph-node-panel-workload-fields-menu"
+              >
+                <template v-for="env in detectedEnvironments" :key="env.key">
+                  <q-item-label
+                    header
+                    class="tw:text-xs tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide"
+                  >
+                    {{ env.label }}
+                  </q-item-label>
+                  <q-item
+                    v-for="cfg in availableResourceTabConfigs.filter(
+                      (c) => c.environment === env.key,
+                    )"
+                    :key="cfg.id"
+                    tag="label"
+                    clickable
+                    :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
+                    class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
+                  >
+                    <q-item-section side class="tw:pr-[0rem]!">
+                      <q-checkbox
+                        v-model="selectedWorkloadFields"
+                        :val="cfg.id"
+                        size="xs"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label class="tw:text-xs">
+                        {{ cfg.label }}
+                        <q-tooltip>
+                          {{ cfg.groupField }}
+                        </q-tooltip>
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-list>
+            </ODropdown>
           </div>
-          <q-tab-panels v-model="activeTab" animated>
+          <OTabPanels v-model="activeTab" animated>
             <!-- Operations Tab -->
-            <q-tab-panel
+            <OTabPanel
               name="operations"
               class="tw:p-0! panel-section tw:mb-0!"
               data-test="service-graph-side-panel-recent-operations"
@@ -296,7 +287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <TenstackTable
                     :columns="operationsTableColumns"
-                    :rows="operationsTableRows"
+                    :rows="sortedOperationsTableRows"
+                    :sort-by="sortBy"
+                    :sort-order="sortOrder"
                     :loading="false"
                     :default-columns="false"
                     :enable-column-reorder="false"
@@ -305,9 +298,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
                     :row-height="28"
+                    @sort-change="handleSortChange"
                     @click:data-row="
                       (row: any) =>
-                        navigateToTraces({ operationName: row._name })
+                        navigateToTraces({ operationName: row.operation })
                     "
                   >
                     <template #cell-errors="{ item }">
@@ -323,59 +317,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-p99="{ item }">
                       <span
                         :class="
-                          item.p99 !== 'N/A'
+                          item.p99 > 0
                             ? 'tw:text-[var(--o2-latency-p99)]'
                             : ''
                         "
-                        >{{ item.p99 }}</span
+                        >{{ formatOperationLatency(item.p99) }}</span
                       >
                     </template>
                     <template #cell-p95="{ item }">
                       <span
                         :class="
-                          item.p95 !== 'N/A'
+                          item.p95 > 0
                             ? 'tw:text-[var(--o2-latency-p95)]'
                             : ''
                         "
-                        >{{ item.p95 }}</span
+                        >{{ formatOperationLatency(item.p95) }}</span
                       >
                     </template>
                     <template #cell-p75="{ item }">
                       <span
                         :class="
-                          item.p75 !== 'N/A'
+                          item.p75 > 0
                             ? 'tw:text-[var(--o2-latency-p75)]'
                             : ''
                         "
-                        >{{ item.p75 }}</span
+                        >{{ formatOperationLatency(item.p75) }}</span
                       >
                     </template>
                     <template #cell-actions="{ row, column, active }">
-                      <q-btn
+                      <OButton
                         v-if="active"
-                        flat
-                        dense
-                        icon="search"
-                        size="xs"
-                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
+                        variant="ghost"
+                        size="icon"
+                        class="tw:ml-1 tw:absolute! tw:right-2!"
                         data-test="service-graph-side-panel-view-traces-btn"
                         @click.stop="
                           navigateToTraces({
-                            operationName: row._name,
+                            operationName: row.operation,
                             errorsOnly: column.id === 'errors',
-                            minDurationMicros:
-                              column.id === 'p99'
-                                ? row._p99
-                                : column.id === 'p95'
-                                  ? row._p95
-                                  : column.id === 'p75'
-                                    ? row._p75
-                                    : undefined,
+                            minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined
                           })
                         "
                       >
+                        <q-icon name="search" size="0.8rem" />
                         <q-tooltip>View in Traces</q-tooltip>
-                      </q-btn>
+                      </OButton>
                     </template>
                     <template #empty>
                       <div
@@ -388,11 +374,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </TenstackTable>
                 </div>
               </template>
-            </q-tab-panel>
+            </OTabPanel>
 
             <!-- Nodes Tab -->
             <!-- Dynamic OTEL resource tabs (Pods, Nodes, Hosts, Containers, Functions, ECS Tasks…) -->
-            <q-tab-panel
+            <OTabPanel
               v-for="cfg in activeResourceTabConfigs"
               :key="cfg.id"
               :name="cfg.id"
@@ -422,7 +408,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <TenstackTable
                     :columns="buildEntityTableColumns(cfg.colId, cfg.colLabel)"
-                    :rows="buildResourceTableRows(cfg)"
+                    :rows="sortResourceRows(buildResourceTableRows(cfg))"
+                    :sort-by="sortBy"
+                    :sort-order="sortOrder"
                     :loading="false"
                     :default-columns="false"
                     :enable-column-reorder="false"
@@ -431,45 +419,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :enable-status-bar="false"
                     :enable-ai-context-button="false"
                     :row-height="28"
+                    @sort-change="handleSortChange"
                     @click:data-row="
                       (row: any) =>
                         navigateToTraces({
                           resourceFilter: {
                             field: cfg.groupField,
-                            value: row._name,
+                            value: row[cfg.colId],
                           },
                         })
                     "
                   >
                     <template #cell-actions="{ row, column, active }">
-                      <q-btn
+                      <OButton
                         v-if="active"
-                        flat
-                        dense
-                        icon="search"
-                        size="xs"
-                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
+                        variant="ghost"
+                        size="icon"
+                        class="tw:ml-1 tw:absolute! tw:right-2!"
                         :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                         @click.stop="
                           navigateToTraces({
                             resourceFilter: {
                               field: cfg.groupField,
-                              value: row._name,
+                              value: row[cfg.colId],
                             },
                             errorsOnly: column.id === 'errors',
-                            minDurationMicros:
-                              column.id === 'p99'
-                                ? row._p99
-                                : column.id === 'p95'
-                                  ? row._p95
-                                  : column.id === 'p75'
-                                    ? row._p75
-                                    : undefined,
+                            minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined
                           })
                         "
                       >
+                        <q-icon name="search" size="0.8rem" />
                         <q-tooltip>View in Traces</q-tooltip>
-                      </q-btn>
+                      </OButton>
                     </template>
                     <template #cell-errors="{ item }">
                       <span
@@ -484,31 +465,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-p99="{ item }">
                       <span
                         :class="
-                          item.p99 !== 'N/A'
+                          item.p99 > 0
                             ? 'tw:text-[var(--o2-latency-p99)]'
                             : ''
                         "
-                        >{{ item.p99 }}</span
+                        >{{ formatOperationLatency(item.p99) }}</span
                       >
                     </template>
                     <template #cell-p95="{ item }">
                       <span
                         :class="
-                          item.p95 !== 'N/A'
+                          item.p95 > 0
                             ? 'tw:text-[var(--o2-latency-p95)]'
                             : ''
                         "
-                        >{{ item.p95 }}</span
+                        >{{ formatOperationLatency(item.p95) }}</span
                       >
                     </template>
                     <template #cell-p75="{ item }">
                       <span
                         :class="
-                          item.p75 !== 'N/A'
+                          item.p75 > 0
                             ? 'tw:text-[var(--o2-latency-p75)]'
                             : ''
                         "
-                        >{{ item.p75 }}</span
+                        >{{ formatOperationLatency(item.p75) }}</span
                       >
                     </template>
                     <template #empty>
@@ -522,10 +503,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </TenstackTable>
                 </div>
               </template>
-            </q-tab-panel>
+            </OTabPanel>
 
             <!-- Metrics Tab -->
-            <q-tab-panel
+            <OTabPanel
               name="metrics"
               class="tw:p-0! panel-section tw:mb-0! tw:h-full!"
               data-test="service-graph-side-panel-metrics"
@@ -549,16 +530,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-metrics-error"
               >
                 <span>{{ metricsCorrelationError }}</span>
-                <q-btn
-                  flat
-                  dense
-                  no-caps
+                <OButton
+                  variant="ghost-primary"
                   size="sm"
-                  label="Retry"
-                  color="primary"
                   data-test="service-graph-side-panel-metrics-retry-btn"
                   @click="fetchMetricsCorrelation(true)"
-                />
+                  >Retry</OButton
+                >
               </div>
 
               <!-- Metrics dashboard -->
@@ -593,8 +571,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 No metrics available for this service.
               </div>
-            </q-tab-panel>
-          </q-tab-panels>
+            </OTabPanel>
+          </OTabPanels>
         </template>
       </div>
     </div>
@@ -617,6 +595,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import {
   defineComponent,
   computed,
@@ -744,6 +729,13 @@ const envLabel = (envKey: string): string =>
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
+    OButton,
+    ODropdown,
+    ODropdownItem,
     TelemetryCorrelationDashboard,
     TenstackTable,
     RenderDashboardCharts,
@@ -855,8 +847,8 @@ export default defineComponent({
         panel.layout.h = 10;
 
         let query = panel.queries[0].query
-          .replace("[STREAM_NAME]", `"${streamName}"`)
-          .replace("[WHERE_CLAUSE]", whereClause);
+          .replace("[STREAM_NAME]", () => `"${streamName}"`)
+          .replace("[WHERE_CLAUSE]", () => whereClause);
 
         // Use count(*) instead of approx_distinct(trace_id)
         query = query
@@ -1435,6 +1427,50 @@ export default defineComponent({
       });
     };
 
+    // ── Sorting state ──────────────────────────────────────────────────────
+    const sortBy = ref<string>("");
+    const sortOrder = ref<"asc" | "desc">("");
+
+    function handleSortChange(field: string, order: "asc" | "desc") {
+      sortBy.value = field;
+      sortOrder.value = order;
+    }
+
+    const compareRows = (a: any, b: any, field: string): number => {
+      if (field === "p99" || field === "p95" || field === "p75") {
+        return (a[field] ?? 0) - (b[field] ?? 0);
+      }
+      // For requests, sort by raw _requests value
+      if (field === "requests") {
+        return (a.requests ?? 0) - (b.requests ?? 0);
+      }
+      const va = a[field];
+      const vb = b[field];
+      if (typeof va === "number" && typeof vb === "number") {
+        return va - vb;
+      }
+      return String(va ?? "").localeCompare(String(vb ?? ""));
+    };
+
+    const sortedOperationsTableRows = computed(() => {
+      const rows = operationsTableRows.value;
+      if (!sortBy.value) return rows;
+      const order = sortOrder.value;
+      return [...rows].sort((a, b) => {
+        const result = compareRows(a, b, sortBy.value);
+        return order === "desc" ? -result : result;
+      });
+    });
+
+    const sortResourceRows = (rows: any[]) => {
+      if (!sortBy.value) return rows;
+      const order = sortOrder.value;
+      return [...rows].sort((a, b) => {
+        const result = compareRows(a, b, sortBy.value);
+        return order === "desc" ? -result : result;
+      });
+    };
+
     // Generic helper: builds table columns with a dynamic first (entity) column
     const buildEntityTableColumns = (
       entityId: string,
@@ -1445,41 +1481,48 @@ export default defineComponent({
         accessorKey: entityId,
         header: entityHeader,
         size: 220,
-        meta: { slot: false },
+        enableSorting: true,
+        meta: { slot: false, sortable: true },
       },
       {
         id: "requests",
-        accessorKey: "requests",
+        accessorFn: (row: any) => formatNumber(row.requests),
         header: "Requests",
         size: 100,
+        enableSorting: true,
+        meta: { sortable: true },
       },
       {
         id: "errors",
         accessorKey: "errors",
         header: "Errors",
         size: 80,
-        meta: { slot: true },
+        enableSorting: true,
+        meta: { slot: true, sortable: true },
       },
       {
         id: "p99",
         accessorKey: "p99",
         header: "P99",
         size: 80,
-        meta: { slot: true },
+        enableSorting: true,
+        meta: { slot: true, sortable: true },
       },
       {
         id: "p95",
         accessorKey: "p95",
         header: "P95",
         size: 80,
-        meta: { slot: true },
+        enableSorting: true,
+        meta: { slot: true, sortable: true },
       },
       {
         id: "p75",
         accessorKey: "p75",
         header: "P75",
         size: 80,
-        meta: { slot: true },
+        enableSorting: true,
+        meta: { slot: true, sortable: true },
       },
     ];
 
@@ -1492,16 +1535,12 @@ export default defineComponent({
     const operationsTableRows = computed(() =>
       recentOperations.value.map((op) => ({
         operation: op.name,
-        requests: formatNumber(op.requestCount),
+        requests: op.requestCount,
         errors: op.errorCount,
-        p99: formatOperationLatency(op.p99Latency),
-        p95: formatOperationLatency(op.p95Latency),
-        p75: formatOperationLatency(op.p75Latency),
-        p50: formatOperationLatency(op.p50Latency),
-        _name: op.name,
-        _p99: op.p99Latency,
-        _p95: op.p95Latency,
-        _p75: op.p75Latency,
+        p99: op.p99Latency,
+        p95: op.p95Latency,
+        p75: op.p75Latency,
+        p50: op.p50Latency,
       })),
     );
 
@@ -1798,16 +1837,12 @@ export default defineComponent({
     const buildResourceTableRows = (config: ResourceTabConfig) =>
       (resourceTabData.value[config.id] || []).map((row) => ({
         [config.colId]: row.name,
-        requests: formatNumber(row.requestCount),
+        requests: row.requestCount,
         errors: row.errorCount,
-        p99: formatOperationLatency(row.p99Latency),
-        p95: formatOperationLatency(row.p95Latency),
-        p75: formatOperationLatency(row.p75Latency),
-        p50: formatOperationLatency(row.p50Latency),
-        _name: row.name,
-        _p99: row.p99Latency,
-        _p95: row.p95Latency,
-        _p75: row.p75Latency,
+        p99: row.p99Latency,
+        p95: row.p95Latency,
+        p75: row.p75Latency,
+        p50: row.p50Latency,
       }));
 
     // Lazy-fetch resource tab data / metrics when their tab is activated
@@ -2014,6 +2049,10 @@ export default defineComponent({
       return "status-critical";
     };
 
+    const isDurationColumn = (column: string) => {
+     return ['p99','p95','p75'].includes(column);
+    }
+
     return {
       t,
       serviceMetrics,
@@ -2067,6 +2106,13 @@ export default defineComponent({
       metricsCorrelationLoaded,
       fetchMetricsCorrelation,
       metricGroupResources,
+      sortedOperationsTableRows,
+      sortBy,
+      sortOrder,
+      handleSortChange,
+      sortResourceRows,
+      formatOperationLatency,
+      isDurationColumn
     };
   },
 });
@@ -2205,12 +2251,6 @@ export default defineComponent({
       filter: brightness(1.1);
       box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
     }
-  }
-
-  .close-btn {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
   }
 }
 

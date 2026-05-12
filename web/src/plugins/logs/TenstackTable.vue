@@ -17,7 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="parentRef"
-    class="container tw:rounded-none! tw:overflow-x-auto tw:relative table-container"
+    :class="[
+      'container tw:rounded-none! tw:overflow-x-auto tw:relative',
+      !props.scrollEl ? 'table-container' : '',
+    ]"
   >
     <table
       v-if="table"
@@ -162,7 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs" name="warning" class="q-mr-xs" />
+              <q-icon size="xs"
+name="warning"
+class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -184,15 +189,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-amber-300'
               "
             >
-              <q-btn
-                :icon="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'"
-                dense
-                size="xs"
-                flat
-                class="q-mr-xs"
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                class="q-mr-xs log-row-expand-btn"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
-              ></q-btn
+                ><q-icon :name="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'" size="14px" /></OButton
               ><b>
                 <q-icon name="warning" size="15px"></q-icon>
                 {{ t("search.functionErrorLabel") }}</b
@@ -328,20 +331,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
               >
-                <q-btn
+                <OButton
                   v-if="cellIndex == 0"
-                  :icon="
-                    expandedRowIndices.has(virtualRow.index)
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
+                  variant="ghost"
+                  size="icon-xs"
+                  class="q-mr-xs log-row-expand-btn"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
-                ></q-btn>
+                  ><q-icon
+                    :name="
+                      expandedRowIndices.has(virtualRow.index)
+                        ? 'expand_more'
+                        : 'chevron_right'
+                    "
+                    size="14px"
+                /></OButton>
 
                 <template
                   v-if="activeCellActionId === `${cell.id}_${cell.column.id}`"
@@ -383,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     cell.column.columnDef.id ===
                     store.state.zoConfig.timestamp_column
                   "
-                  class="tw:absolute tw:top-[14px] tw:left-[18px] tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
+                  class="tw:absolute tw:right-0 tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 tw:-translate-x-1/2 ai-btn"
                   @send-to-ai-chat="
                     sendToAiChat(JSON.stringify(cell.row.original), true)
                   "
@@ -427,6 +431,7 @@ import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface StreamField {
   name: string;
@@ -499,6 +504,15 @@ const props = defineProps({
   hideViewRelatedButton: {
     type: Boolean,
     default: false,
+  },
+  scrollEl: {
+    type: Object as PropType<HTMLElement | null>,
+    default: null,
+  },
+  /** Pixels of content above the virtual list within the shared scroll container (e.g. histogram height). */
+  scrollMargin: {
+    type: Number,
+    default: 0,
   },
 });
 
@@ -784,7 +798,9 @@ const expandedRowHeights = ref<{ [key: number]: number }>({});
 const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
-    getScrollElement: () => parentRef.value,
+    getScrollElement: () =>
+      (props.scrollEl as HTMLElement | null) ?? parentRef.value,
+    scrollMargin: props.scrollMargin,
     estimateSize: (index: number) => {
       // Check if this is an expanded row (odd indices after expansion)
       const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
@@ -815,7 +831,8 @@ const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
-const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+// +22 adds bottom padding so the last virtual row isn't clipped by the container
+const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 22);
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {
@@ -1035,7 +1052,11 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
+const sendToAiChat = (
+  value: any,
+  isEntireRow: boolean = false,
+  append: boolean = true,
+) => {
   if (isEntireRow) {
     //here we will get the original value of the row
     //and we need to filter the row if props.columns have any filtered cols that user applied
@@ -1090,6 +1111,15 @@ defineExpose({
 </style>
 <style scoped lang="scss">
 @import "@/styles/logs/tenstack-table.scss";
+
+// Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat
+.log-row-expand-btn {
+  height: 24px !important;
+  width: 24px !important;
+  min-height: 24px !important;
+  min-width: 24px !important;
+  padding: 0 !important;
+}
 
 // Add explicit hover styles for log rows
 .table-row-hover {

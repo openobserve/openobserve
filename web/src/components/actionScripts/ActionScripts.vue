@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,34 +18,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="action-scripts-list-page">
-    <div v-if="!showAddActionScriptDialog" class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+    <div
+      v-if="!showAddActionScriptDialog"
+      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+    >
       <div class="card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]">
-          <div class="tw:font-[600] tw:text-[20px]" data-test="alerts-list-title">
-                  {{ t("actions.header") }}
-                </div>
-                <div class="tw:full-width tw:flex tw:items-center tw:justify-end">
-                  <q-input
-                    v-model="filterQuery"
-                    borderless
-                    dense
-                    class="q-ml-auto no-border o2-search-input"
-                    :placeholder="t('actions.search')"
-                    data-test="action-list-search-input"
-                  >
-                    <template #prepend>
-                      <q-icon class="o2-search-input-icon" name="search" />
-                    </template>
-                  </q-input>
-                <q-btn
-                  data-test="action-list-add-btn"
-                  class="q-ml-sm o2-primary-button tw:h-[36px]"
-                  flat
-                  no-caps
-                  :label="t(`actions.add`)"
-                  @click="showAddUpdateFn({})"
-                />
-                </div>
+        <div
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]"
+        >
+          <div
+            class="tw:font-[600] tw:text-[20px]"
+            data-test="alerts-list-title"
+          >
+            {{ t("actions.header") }}
+          </div>
+          <div
+            class="tw:full-width tw:flex tw:items-center tw:justify-end tw:gap-3"
+          >
+            <q-input
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input"
+              :placeholder="t('actions.search')"
+              data-test="action-list-search-input"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+            <OButton
+              data-test="action-list-add-btn"
+              variant="primary"
+              size="sm"
+              @click="showAddUpdateFn({})"
+              >{{ t("actions.add") }}</OButton
+            >
+          </div>
         </div>
       </div>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
@@ -57,17 +66,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :pagination="pagination"
-            style="width: 100%;"
-            :style="{ height: hasVisibleRows ? 'calc(100vh - var(--navbar-height) - 77px)' : '' }"
+            style="width: 100%"
+            :style="{
+              height: hasVisibleRows
+                ? 'calc(100vh - var(--navbar-height) - 77px)'
+                : '',
+            }"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
             selection="multiple"
             v-model:selected="selectedActionScripts"
-            >
+          >
             <template #no-data>
               <NoData />
             </template>
             <template v-slot:body-selection="scope">
-              <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+              <q-checkbox
+                v-model="scope.selected"
+                size="sm"
+                class="o2-table-checkbox"
+              />
             </template>
             <template v-slot:body-cell-actions="props">
               <q-td :props="props">
@@ -86,30 +103,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="secondary"
                   />
                 </div>
-                <q-btn
+                <OButton
                   :data-test="`alert-list-${props.row.name}-update-alert`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="edit"
+                  variant="ghost"
+                  size="icon-circle-sm"
                   :title="t('alerts.edit')"
                   @click="showAddUpdateFn(props)"
-                >
-              </q-btn>
-                <q-btn
+                  ><q-icon name="edit" size="16px"
+                /></OButton>
+                <OButton
                   :data-test="`alert-list-${props.row.name}-delete-alert`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  :icon="outlinedDelete"
-                  flat
+                  variant="ghost"
+                  size="icon-circle-sm"
                   :title="t('alerts.delete')"
                   @click="showDeleteDialogFn(props)"
-                >
-              </q-btn>
+                  ><q-icon :name="outlinedDelete" size="16px"
+                /></OButton>
               </q-td>
             </template>
 
@@ -123,63 +132,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md">
-                    {{ resultTotal }} {{ t('actions.header') }}
+                  <div
+                    class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md"
+                  >
+                    {{ resultTotal }} {{ t("actions.header") }}
                   </div>
-                  <q-btn
+                  <OButton
                     v-if="selectedActionScripts.length > 0"
                     data-test="action-scripts-bulk-delete-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    no-caps
-                    dense
+                    variant="secondary"
+                    size="sm"
                     @click="openBulkDeleteDialog"
+                    ><q-icon name="delete" size="16px" /><span class="tw:ml-1.5"
+                      >Delete</span
+                    ></OButton
                   >
-                    <q-icon name="delete" size="16px" />
-                    <span class="tw:ml-2">Delete</span>
-                  </q-btn>
                 </div>
                 <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                />
               </div>
             </template>
 
             <template v-slot:header="props">
-                <q-tr :props="props">
-                  <!-- Adding this block to render the select-all checkbox -->
-                  <q-th v-if="columns.length > 0" auto-width>
-                    <q-checkbox
-                      v-model="props.selected"
-                      size="sm"
-                      :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                      class="o2-table-checkbox"
-                    />
-                  </q-th>
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th v-if="columns.length > 0" auto-width>
+                  <q-checkbox
+                    v-model="props.selected"
+                    size="sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
+                    "
+                    class="o2-table-checkbox"
+                  />
+                </q-th>
 
-                  <!-- Rendering the rest of the columns -->
-                  <!-- here we can add the classes class so that the head will be sticky -->
-                  <q-th
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                    :class="col.classes"
-                    :style="col.style"
-                  >
-                    {{ col.label }}
-                  </q-th>
-                </q-tr>
-              </template>
+                <!-- Rendering the rest of the columns -->
+                <!-- here we can add the classes class so that the head will be sticky -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
           </q-table>
         </div>
       </div>
@@ -260,26 +271,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hide-selected
                 :input-debounce="400"
               />
-              <div class="flex justify-center q-mt-lg">
-                <q-btn
+              <div class="tw:flex tw:gap-2 tw:justify-center q-mt-lg">
+                <OButton
                   data-test="clone-action-cancel-btn"
-                  v-close-popup="true"
-                  class="q-mb-md text-bold"
-                  :label="t('alerts.cancel')"
-                  text-color="light-text"
-                  padding="sm md"
-                  no-caps
-                />
-                <q-btn
+                  variant="outline"
+                  size="sm-action"
+                  @click="showForm = false"
+                  >{{ t("alerts.cancel") }}</OButton
+                >
+                <OButton
                   data-test="clone-action-submit-btn"
-                  :label="t('alerts.save')"
-                  class="q-mb-md text-bold no-border q-ml-md"
-                  color="secondary"
-                  padding="sm xl"
+                  variant="primary"
+                  size="sm-action"
                   type="submit"
-                  :disable="isSubmitting"
-                  no-caps
-                />
+                  :disabled="isSubmitting"
+                  >{{ t("alerts.save") }}</OButton
+                >
               </div>
             </q-form>
           </q-card-section>
@@ -329,6 +336,7 @@ import {
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -354,6 +362,7 @@ export default defineComponent({
     ),
     NoData,
     ConfirmDialog,
+    OButton,
   },
   emits: [
     "updated:fields",
@@ -468,7 +477,7 @@ export default defineComponent({
         align: "center",
         sortable: false,
         classes: "actions-column",
-        style: "width: 100px"
+        style: "width: 100px",
       },
     ]);
     const activeTab: any = ref("alerts");
@@ -581,7 +590,7 @@ export default defineComponent({
     const addAlert = () => {
       track("Button Click", {
         button: "Add Action Scripts",
-        page: "Action Scripts"
+        page: "Action Scripts",
       });
       showAddActionScriptDialog.value = true;
     };
@@ -709,7 +718,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           {
             ids: selectedActionScripts.value.map((script: any) => script.id),
-          }
+          },
         );
 
         const { successful = [], unsuccessful = [], err } = response.data || {};
@@ -745,7 +754,10 @@ export default defineComponent({
         if (error.response?.status != 403 || error?.status != 403) {
           $q.notify({
             type: "negative",
-            message: error.response?.data?.message || error?.message || "Error while deleting action scripts",
+            message:
+              error.response?.data?.message ||
+              error?.message ||
+              "Error while deleting action scripts",
             timeout: 2000,
           });
         }
@@ -845,33 +857,37 @@ export default defineComponent({
     // };
 
     const filterData = (rows: any, terms: any) => {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) ||
-            (rows[i]["owner"] != null &&
-              rows[i]["owner"].toLowerCase().includes(terms)) ||
-            (rows[i]["description"] != null &&
-              rows[i]["description"].toString().toLowerCase().includes(terms))
-          ) {
-            filtered.push(rows[i]);
-          }
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (
+          rows[i]["name"].toLowerCase().includes(terms) ||
+          (rows[i]["owner"] != null &&
+            rows[i]["owner"].toLowerCase().includes(terms)) ||
+          (rows[i]["description"] != null &&
+            rows[i]["description"].toString().toLowerCase().includes(terms))
+        ) {
+          filtered.push(rows[i]);
         }
-        return filtered;
-      };
+      }
+      return filtered;
+    };
 
-      const visibleRows = computed(() => {
-      if (!filterQuery.value) return actionsScriptRows.value || []
-      return filterData(actionsScriptRows.value || [], filterQuery.value)
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return actionsScriptRows.value || [];
+      return filterData(actionsScriptRows.value || [], filterQuery.value);
     });
 
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     return {
       t,
@@ -937,18 +953,18 @@ export default defineComponent({
 
 <style lang="scss">
 .alerts-tabs {
-  .q-tabs {
+  .o-tabs {
     &--vertical {
       margin: 1.5rem 1rem 0 0;
 
-      .q-tab {
+      .o-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
 
         &__content.tab_content {
-          .q-tab {
+          .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
               font-weight: 600;

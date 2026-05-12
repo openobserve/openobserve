@@ -26,7 +26,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ModelPricing::Table)
-                    .add_column(
+                    .add_column_if_not_exists(
                         ColumnDef::new(ModelPricing::Source)
                             .string_len(20)
                             .not_null()
@@ -41,7 +41,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ModelPricing::Table)
-                    .add_column(
+                    .add_column_if_not_exists(
                         ColumnDef::new(ModelPricing::Provider)
                             .string_len(100)
                             .null(),
@@ -55,7 +55,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ModelPricing::Table)
-                    .add_column(
+                    .add_column_if_not_exists(
                         ColumnDef::new(ModelPricing::Description)
                             .string_len(1024)
                             .null(),
@@ -107,4 +107,19 @@ enum ModelPricing {
     Source,
     Provider,
     Description,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20260415_000002_add_source_to_model_pricing"
+        );
+    }
 }

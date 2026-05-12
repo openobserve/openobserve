@@ -78,6 +78,18 @@ mod tests {
     }
 
     #[test]
+    fn test_clamp_value_none_input() {
+        let result = clamp(Value::None, 0.0, 10.0).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_clamp_invalid_input_returns_err() {
+        let result = clamp(Value::Float(5.0), 0.0, 10.0);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_clamp_function() {
         let eval_ts = 1000;
         let matrix = create_matrix(eval_ts, vec![5.0, 15.0, 25.0]);

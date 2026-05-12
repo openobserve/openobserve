@@ -35,13 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
+          <OButton
             v-close-popup="true"
-            round
-            flat
-            icon="cancel"
+            variant="ghost"
+            size="icon-circle"
             data-test="dashboard-tab-cancel"
-          />
+          >
+            <template #icon-left><q-icon name="cancel" /></template>
+          </OButton>
         </div>
       </div>
     </q-card-section>
@@ -53,33 +54,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Name*"
           class="q-py-md showLabelOnTop"
           stack-label
-          borderless hide-bottom-space
+          borderless
+          hide-bottom-space
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
           data-test="dashboard-add-tab-name"
         />
 
-        <div class="flex justify-start">
-          <q-btn
+        <div class="flex justify-start tw:gap-2">
+          <OButton
             v-close-popup="true"
-            :label="t('dashboard.cancel')"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
+            variant="outline"
+            size="sm-action"
             data-test="dashboard-add-cancel"
-          />
-          <q-btn
-            :disable="tabData.name.trim() === ''"
+            >{{ t("dashboard.cancel") }}</OButton
+          >
+          <OButton
+            :disabled="tabData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
-            :label="t('dashboard.save')"
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            borderless
+            variant="primary"
+            size="sm-action"
             type="submit"
             data-test="dashboard-add-tab-submit"
-          />
+            >{{ t("dashboard.save") }}</OButton
+          >
         </div>
       </q-form>
     </q-card-section>
@@ -95,6 +94,7 @@ import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const defaultValue = () => {
   return {
@@ -105,6 +105,7 @@ const defaultValue = () => {
 
 export default defineComponent({
   name: "AddTab",
+  components: { OButton },
   props: {
     tabId: {
       validator: (value) => {
@@ -149,14 +150,14 @@ export default defineComponent({
         dashboardData.value = await getDashboard(
           store,
           props.dashboardId,
-          props.folderId ?? route.query.folder ?? "default"
+          props.folderId ?? route.query.folder ?? "default",
         );
         tabData.value = JSON.parse(
           JSON.stringify(
             dashboardData?.value?.tabs?.find(
-              (tab: any) => tab.tabId === props.tabId
-            )
-          )
+              (tab: any) => tab.tabId === props.tabId,
+            ),
+          ),
         );
       }
     };
@@ -177,7 +178,7 @@ export default defineComponent({
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
               tabData.value.tabId,
-              tabData.value
+              tabData.value,
             );
 
             // emit refresh to rerender
@@ -193,7 +194,7 @@ export default defineComponent({
               store,
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
-              tabData.value
+              tabData.value,
             );
 
             // emit refresh to rerender
@@ -213,7 +214,7 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab")
+                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
             );
           } else {
             showErrorNotification(
@@ -221,7 +222,7 @@ export default defineComponent({
                 (props.editMode ? "Failed to update tab" : "Failed to add tab"),
               {
                 timeout: 2000,
-              }
+              },
             );
           }
         } finally {

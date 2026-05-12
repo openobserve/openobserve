@@ -201,3 +201,71 @@ pub fn apply_combined_filter(
             .build()?,
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use arrow::datatypes::{DataType, Field, Schema};
+
+    use super::*;
+
+    fn make_exec() -> Arc<dyn ExecutionPlan> {
+        let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
+        Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema))
+    }
+
+    #[test]
+    fn test_apply_combined_filter_both_none_returns_input() {
+        let exec = make_exec();
+        let schema = exec.schema();
+        let schema_ref: arrow_schema::Schema = schema.as_ref().clone();
+        let result = apply_combined_filter(None, None, &schema_ref, &[], exec.clone(), None);
+        assert!(result.is_ok());
+        // should return the same plan (EmptyExec) since no filters
+        let plan = result.unwrap();
+        assert_eq!(plan.name(), "EmptyExec");
+    }
+
+    #[test]
+    fn test_apply_projection_empty_diff_rules_returns_input() {
+        use hashbrown::HashMap;
+
+        let exec = make_exec();
+        let schema = exec.schema();
+        let diff_rules: HashMap<String, DataType> = HashMap::new();
+        let result = apply_projection(&schema, &diff_rules, None, exec.clone());
+        assert!(result.is_ok());
+        let plan = result.unwrap();
+        assert_eq!(plan.name(), "EmptyExec");
+    }
+
+    #[test]
+    fn test_apply_combined_filter_timestamp_only_wraps_filter() {
+        use arrow_schema::{Field, Schema};
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("col", DataType::Utf8, false),
+        ]));
+        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
+            schema.clone(),
+        )) as Arc<dyn ExecutionPlan>;
+        let schema_ref: arrow_schema::Schema = schema.as_ref().clone();
+        let result = apply_combined_filter(None, Some((1000, 2000)), &schema_ref, &[], exec, None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().name(), "FilterExec");
+    }
+
+    #[test]
+    fn test_apply_projection_with_diff_rules_produces_projection() {
+        use arrow_schema::{Field, Schema};
+        use hashbrown::HashMap;
+        let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
+        let exec = Arc::new(datafusion::physical_plan::empty::EmptyExec::new(
+            schema.clone(),
+        )) as Arc<dyn ExecutionPlan>;
+        let mut diff_rules: HashMap<String, DataType> = HashMap::new();
+        diff_rules.insert("col".to_string(), DataType::LargeUtf8);
+        let result = apply_projection(&schema, &diff_rules, None, exec);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().name(), "ProjectionExec");
+    }
+}

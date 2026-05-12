@@ -123,7 +123,11 @@
     "create": "Oluştur",
     "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
     "resources": "Kaynaklar",
-    "updated_at": "Güncellendi:"
+    "updated_at": "Güncellendi:",
+    "error": "Hata",
+    "db": "Veritabanı",
+    "discardChanges": "Değişiklikleri iptal et",
+    "unsavedChanges": "Kaydedilmemiş değişiklikler"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -387,7 +391,11 @@
     "liveModeTooltip": "Filtre/zaman değişikliklerinde sorguyu otomatik çalıştırın",
     "turnOnLiveMode": "Canlı modu açın",
     "turnOffLiveMode": "Canlı modu kapat",
-    "autoRunEnabled": "Otomatik çalıştırma etkin"
+    "autoRunEnabled": "Otomatik çalıştırma etkin",
+    "selectStreamFirst": "Önce bir yayın seçin",
+    "traces": "İzleri",
+    "switchToLogs": "Günlüklere geri dönmek için tıklayın",
+    "patternNoValuesAvailable": "Mevcut değer yok"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -976,7 +984,8 @@
     "fieldName": "Alan Adı",
     "fieldRequired": "Alan zorunludur!",
     "dataType": "Veri Türü",
-    "dataTypeRequired": "Veri Türü gereklidir!"
+    "dataTypeRequired": "Veri Türü gereklidir!",
+    "udsFieldAlreadyInSchema": "Seçili bir veya daha fazla alan zaten tanımlanmış şemanın bir parçasıdır"
   },
   "function": {
     "header": "Fonksiyonlar",
@@ -1121,7 +1130,8 @@
     "nginx": "Nginx",
     "apache": "Apaçi",
     "iis": "IIS",
-    "pubsub": "Pub/Alt Günlükleri"
+    "pubsub": "Pub/Alt Günlükleri",
+    "aiLabel": "Yapay Zeka Entegrasyonları"
   },
   "dashboard": {
     "selectField": "Tarla",
@@ -2237,6 +2247,8 @@
     "importedFromAnomalyPattern": "Anormal günlük düzeninden önceden doldurulmuş uyarı - aciliyet ayarlarını gözden geçirin",
     "additional_settings": "Ek Ayarlar",
     "alertNamePlaceholder": "Uyarı adı",
+    "nameRequired": "Uyarı adı gereklidir.",
+    "nameNoSpecialChars": "Uyarı adı ':', '#', '?', '&', '%', tırnak işaretleri veya boşluk içeremez. Bunun yerine alt çizgi (_) kullanın.",
     "anomalyNamePlaceholder": "Anomali adı",
     "folder": "Klasör",
     "selectStreamTypeFirst": "Önce bir akış türü seçin",
@@ -2283,7 +2295,8 @@
       "addNewDestination": "Yeni Hedef Ekle",
       "destinationRequired": "En az bir varış noktası gereklidir!",
       "disabledNotificationsInfo": "Anomali algılama çalışmaya devam edecek ve sonuçları _anomaliler akışına yazacaktır. Anormallikler tespit edildiğinde uyarı almak için bildirimleri etkinleştirin."
-    }
+    },
+    "anomalyName": "Anomali Adı"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2894,7 +2907,52 @@
       "multiStepAgent": "Çok adımlı Ajan"
     },
     "noLogsAvailableForService": "Bu hizmet için günlük yok",
-    "spansTruncatedWarning": "{total} açıklığın {count} gösterilmesi — izleme eksik olabilir. Zaman aralığını daraltın veya süre sınırını artırmak için yöneticinizle iletişime geçin."
+    "spansTruncatedWarning": "{total} açıklığın {count} gösterilmesi — izleme eksik olabilir. Zaman aralığını daraltın veya süre sınırını artırmak için yöneticinizle iletişime geçin.",
+    "servicesCatalog": {
+      "tabLabel": "Hizmet Kataloğu",
+      "title": "Hizmet Kataloğu",
+      "filterPlaceholder": "Hizmet adına göre filtrele...",
+      "noServicesFound": "Seçilen zaman aralığında hiçbir hizmet bulunamadı.",
+      "loading": "Hizmetler yükleniyor...",
+      "columns": {
+        "serviceName": "Hizmet",
+        "status": "Durum",
+        "requests": "İstekler",
+        "errorRate": "Hata Oranı",
+        "errors": "Hatalar",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Ortalama Gecikme",
+        "lastSeen": "Son Görülen",
+        "operations": "Operasyonlar"
+      },
+      "status": {
+        "healthy": "Sağlıklı",
+        "warning": "Uyarı",
+        "degraded": "Bozulmuş"
+      },
+      "viewTraces": "İzleri Görüntüle",
+      "exportCsv": "CSV'yi dışa aktarma",
+      "justNow": "Hemen şimdi",
+      "minutesAgo": "{n} m önce",
+      "hoursAgo": "{n} saat önce",
+      "daysAgo": "{n} d önce"
+    },
+    "noErrorPresent": "Bu aralıkta hata yok",
+    "httpStatusCode": "HTTP Durum Kodu",
+    "grpcStatusCode": "gRPC Durum Kodu",
+    "dbResponseStatusCode": "DB Yanıt Durum Kodu",
+    "processExitCode": "İşlem Çıkış Kodu",
+    "exceptionsWithCount": "İstisnalar ({count})",
+    "typeLabel": "Türü:",
+    "messageLabel": "Mesaj:",
+    "escapedLabel": "Kaçıldı:",
+    "stacktraceLabel": "Yığın izleme:",
+    "copyStacktrace": "Stacktrace'i kopyala",
+    "noStacktraceAvailable": "Yığın izleme mevcut değil",
+    "stacktraceCopied": "Stacktrace panoya kopyalandı",
+    "stacktraceCopyFailed": "Stacktrace kopyalanamadı"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -3296,7 +3354,9 @@
     "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı.",
     "errorRetrievingTraces": "İzler alınırken hata oluştu.",
     "serviceGroupProtected": "Hizmet grubu kaldırılamaz. Yalnızca eşlenen alanları değiştirebilirsiniz.",
-    "noDataFound": "Veri Bulunamadı"
+    "noDataFound": "Veri Bulunamadı",
+    "isWorkloadType": "Hizmet tanımlayıcısı",
+    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

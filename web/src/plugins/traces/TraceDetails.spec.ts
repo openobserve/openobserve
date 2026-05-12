@@ -29,10 +29,13 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
+// Shared spy — hoisted so the same instance is returned on every useNotifications() call
+const mockShowErrorNotification = vi.fn();
+
 // Mock useNotifications composable
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
-    showErrorNotification: vi.fn(),
+    showErrorNotification: mockShowErrorNotification,
   }),
 }));
 
@@ -157,12 +160,18 @@ describe("TraceDetails", () => {
               "leftWidth",
               "searchQuery",
               "spanList",
+              "selectedSpanId",
+              "hoveredSpanId",
+              "isSidebarOpen",
+              "scrollContainer",
             ],
             emits: [
               "toggle-collapse",
               "select-span",
               "update-current-index",
               "search-result",
+              "hover-span",
+              "unhover-span",
             ],
             methods: {
               nextMatch: vi.fn(),
@@ -1800,6 +1809,150 @@ describe("TraceDetails", () => {
     });
   });
 
+  describe("Bug fix: invalid span_id in URL query param", () => {
+    // Helper that builds a full mount with a custom route query so we can
+    // control which span_id (if any) arrives via the URL.
+    function mountWithSpanQuery(spanId: string | undefined) {
+      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+        value: {
+          query: {
+            trace_id: "test-trace-id",
+            from: "1752490492843",
+            to: "1752490493164",
+            stream: "test-stream",
+            org_identifier: "default",
+            ...(spanId !== undefined ? { span_id: spanId } : {}),
+          },
+          name: "traceDetails",
+        },
+      } as any);
+
+      return mount(TraceDetails, {
+        attachTo: "#app",
+        props: { traceId: "test-trace-id" },
+        global: {
+          plugins: [i18n, router],
+          provide: { store },
+          stubs: {
+            "q-resize-observer": true,
+            "chart-renderer": {
+              template: '<div data-test="chart-renderer">Chart</div>',
+              props: ["data", "id"],
+              emits: ["updated:chart"],
+            },
+            "trace-tree": {
+              template: '<div data-test="trace-tree">Trace Tree</div>',
+              props: [
+                "collapseMapping",
+                "spans",
+                "baseTracePosition",
+                "spanDimensions",
+                "spanMap",
+                "leftWidth",
+                "searchQuery",
+                "spanList",
+              ],
+              emits: [
+                "toggle-collapse",
+                "select-span",
+                "update-current-index",
+                "search-result",
+              ],
+            },
+            "trace-header": {
+              template: '<div data-test="trace-header">Trace Header</div>',
+              props: ["baseTracePosition", "splitterWidth"],
+              emits: ["resize-start"],
+            },
+            "trace-details-sidebar": {
+              template: '<div data-test="trace-details-sidebar">Sidebar</div>',
+              props: ["span", "baseTracePosition", "searchQuery"],
+              emits: ["view-logs", "close", "open-trace"],
+            },
+          },
+        },
+      });
+    }
+
+    beforeEach(() => {
+      mockShowErrorNotification.mockClear();
+
+      // Register the search API handler that returns real trace spans
+      globalThis.server.use(
+        http.post(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+          async ({ request }) => {
+            const body = (await request.json()) as any;
+            if (body.query?.sql?.includes("_rumdata")) {
+              return HttpResponse.json({
+                took: 0,
+                hits: [],
+                total: 0,
+                from: 0,
+                size: 0,
+                scan_size: 0,
+              });
+            }
+            return HttpResponse.json(tracesMockData.tracesDetails.traceSpans);
+          },
+        ),
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("should show error notification and close sidebar when span_id in URL does not exist in trace", async () => {
+      // The mock trace data contains spans with IDs: "6b080023171f5767",
+      // "d427ced59acf399b", "bf6bde74cdcc245f".  Use a completely different id.
+      const missingSpanId = "nonexistent-span-000000";
+      const localWrapper = mountWithSpanQuery(missingSpanId);
+      await flushPromises();
+
+      // showErrorNotification must have been called with the missing span id
+      expect(mockShowErrorNotification).toHaveBeenCalledWith(
+        expect.stringContaining(missingSpanId),
+      );
+
+      // State must be cleaned up
+      expect(localWrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(
+        false,
+      );
+      expect(localWrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(
+        "",
+      );
+
+      // Sidebar must not be rendered because showSpanDetails is false
+      expect(
+        localWrapper.find('[data-test="trace-details-sidebar"]').exists(),
+      ).toBe(false);
+
+      localWrapper.unmount();
+    });
+
+    it("should open sidebar and scroll when span_id in URL matches a span in the trace", async () => {
+      // "6b080023171f5767" is the root span in the mock trace data
+      const validSpanId =
+        tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const localWrapper = mountWithSpanQuery(validSpanId);
+      await flushPromises();
+
+      // No error must have been shown
+      expect(mockShowErrorNotification).not.toHaveBeenCalled();
+
+      // Sidebar state must reflect the selected span
+      expect(localWrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(
+        true,
+      );
+      expect(localWrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(
+        validSpanId,
+      );
+
+      localWrapper.unmount();
+    });
+  });
+
   describe("Priority 3: Search Navigation", () => {
     let mockTraceTreeRef: any;
 
@@ -2029,6 +2182,91 @@ describe("TraceDetails", () => {
 
         expect(wrapper.vm.searchResults).toBe(25);
       });
+    });
+  });
+
+  describe("Sidebar active tab", () => {
+    it("should initialize sidebarActiveTab to 'attributes'", () => {
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    it("should set sidebarActiveTab to 'preview' when first selected span is an LLM span", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      // Mark the span as LLM by setting gen_ai_system on the span in spanMap
+      wrapper.vm.spanMap[spanId].gen_ai_system = "openai";
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("preview");
+    });
+
+    it("should keep sidebarActiveTab as 'attributes' when first selected span is not an LLM span", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+  });
+
+  describe("effectiveSpanId", () => {
+    it("should return hoveredSpanId when hovering over a span", () => {
+      wrapper.vm.hoveredSpanId = "hovered-span-1";
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId =
+        "selected-span-1";
+
+      expect(wrapper.vm.effectiveSpanId).toBe("hovered-span-1");
+    });
+
+    it("should return selectedSpanId when not hovering", () => {
+      wrapper.vm.hoveredSpanId = "";
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId =
+        "selected-span-1";
+
+      expect(wrapper.vm.effectiveSpanId).toBe("selected-span-1");
+    });
+  });
+
+  describe("Hover span handlers", () => {
+    it("should set hoveredSpanId when onHoverSpan is called", () => {
+      wrapper.vm.onHoverSpan("hovered-span-42");
+      expect(wrapper.vm.hoveredSpanId).toBe("hovered-span-42");
+    });
+
+    it("should clear hoveredSpanId when onUnhoverSpan is called", () => {
+      wrapper.vm.hoveredSpanId = "hovered-span-42";
+      wrapper.vm.onUnhoverSpan();
+      expect(wrapper.vm.hoveredSpanId).toBe("");
+    });
+
+    it("should clear hoveredSpanId when closeSidebar is called", () => {
+      wrapper.vm.hoveredSpanId = "hovered-span-99";
+      wrapper.vm.closeSidebar();
+      expect(wrapper.vm.hoveredSpanId).toBe("");
+    });
+
+    it("should clear hoveredSpanId when updateSelectedSpan is called", () => {
+      wrapper.vm.hoveredSpanId = "hovered-span-77";
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      wrapper.vm.updateSelectedSpan(spanId);
+      expect(wrapper.vm.hoveredSpanId).toBe("");
+    });
+  });
+
+  describe("TraceTree hover integration", () => {
+    it("should pass hoveredSpanId prop to TraceTree child component", async () => {
+      wrapper.vm.hoveredSpanId = "hovered-span-from-parent";
+      await wrapper.vm.$nextTick();
+
+      const traceTree = wrapper.findComponent(
+        '[data-test="trace-details-tree"]',
+      );
+      expect(traceTree.exists()).toBe(true);
+      expect(traceTree.props("hoveredSpanId")).toBe(
+        "hovered-span-from-parent",
+      );
     });
   });
 });

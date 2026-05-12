@@ -661,6 +661,55 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_check_schema_for_defined_schema_fields_logs() {
+        let schema = Schema::new(vec![] as Vec<Field>);
+        let input = vec!["level".to_string(), "message".to_string()];
+        let result = check_schema_for_defined_schema_fields(StreamType::Logs, &schema, input);
+        assert!(result.contains("level"));
+        assert!(result.contains("message"));
+    }
+
+    #[test]
+    fn test_check_schema_for_defined_schema_fields_metrics_adds_labels() {
+        let schema = Schema::new(vec![] as Vec<Field>);
+        let input = vec!["custom_field".to_string()];
+        let result =
+            check_schema_for_defined_schema_fields(StreamType::Metrics, &schema, input.clone());
+        // Metrics should include the special labels
+        assert!(result.contains(NAME_LABEL));
+        assert!(result.contains(HASH_LABEL));
+        assert!(result.contains(VALUE_LABEL));
+        assert!(result.contains("custom_field"));
+        assert!(result.contains("trace_id"));
+    }
+
+    #[test]
+    fn test_check_schema_for_defined_schema_fields_traces_adds_trace_fields() {
+        let schema = Schema::new(vec![] as Vec<Field>);
+        let input = vec!["my_field".to_string()];
+        let result = check_schema_for_defined_schema_fields(StreamType::Traces, &schema, input);
+        assert!(result.contains("trace_id"));
+        assert!(result.contains("span_id"));
+        assert!(result.contains("service_name"));
+        assert!(result.contains("duration"));
+        assert!(result.contains("my_field"));
+    }
+
+    #[test]
+    fn test_check_schema_for_defined_schema_fields_traces_includes_gen_ai_fields() {
+        let schema = Schema::new(vec![
+            Field::new("gen_ai_prompt", DataType::Utf8, true),
+            Field::new("llm_model", DataType::Utf8, true),
+            Field::new("other_field", DataType::Utf8, true),
+        ]);
+        let result = check_schema_for_defined_schema_fields(StreamType::Traces, &schema, vec![]);
+        assert!(result.contains("gen_ai_prompt"));
+        assert!(result.contains("llm_model"));
+        // "other_field" has no gen_ai_ or llm_ prefix → not auto-included
+        assert!(!result.contains("other_field"));
+    }
+
     #[tokio::test]
     async fn test_check_for_schema() {
         let stream_name = "Sample";

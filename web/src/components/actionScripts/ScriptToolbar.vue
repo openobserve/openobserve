@@ -68,53 +68,43 @@
         </div>
       </q-form>
     </div>
-    <div class="add-script-actions flex justify-center">
-      <q-btn
+    <div class="add-script-actions tw:flex tw:items-center tw:gap-2">
+      <OButton
         data-test="add-script-fullscreen-btn"
         v-close-popup="true"
-        class="text-bold tw:border-primary add-script-fullscreen-btn"
-        :label="t('common.fullscreen')"
-        :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
-        padding="sm"
-        no-caps
-        icon="fullscreen"
+        variant="outline"
+        size="sm"
         @click="handleFullScreen"
-      />
-      <q-btn
+        ><q-icon name="fullscreen" size="18px" class="tw:mr-1" />{{
+          t("common.fullscreen")
+        }}</OButton
+      >
+      <OButton
         data-test="add-script-save-btn"
-        :label="t('actions.save')"
-        class="text-bold no-border tw:ml-[12px] add-script-save-btn"
-        color="secondary"
-        padding="sm md"
+        variant="primary"
+        size="sm-action"
         type="submit"
-        no-caps
         @click="onSave"
-      />
-      <q-btn
+        >{{ t("actions.save") }}</OButton
+      >
+      <OButton
         data-test="add-script-cancel-btn"
-        class="cancel-btn text-bold tw:ml-[12px] tw:border-3 tw:border-red-600 add-script-cancel-btn"
-        :label="t('common.cancel')"
-        text-color="negative"
-        padding="sm md"
-        no-caps
+        variant="outline-destructive"
+        size="sm-action"
         @click="emit('cancel')"
-      />
+        >{{ t("common.cancel") }}</OButton
+      >
     </div>
   </div>
 </template>
 <script setup lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  computed,
-  watch,
-} from "vue";
+import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const { t } = useI18n();
 
@@ -181,21 +171,8 @@ defineExpose({ addScriptForm });
   }
 
   .add-script-actions {
-    :deep(.q-btn) {
-      padding-top: 4px !important;
-      padding-bottom: 4px !important;
-      font-size: 13px;
-    }
-    :deep(.q-btn .q-icon) {
-      margin-right: 2px;
-    }
-
     :deep(.block) {
       font-weight: lighter;
-    }
-
-    :deep(.cancel-btn)::before {
-      border: 1px solid var(--q-negative) !important;
     }
   }
 }

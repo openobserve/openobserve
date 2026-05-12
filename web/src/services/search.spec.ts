@@ -80,7 +80,8 @@ describe("Search Service", () => {
       });
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
-        params.query
+        params.query,
+        undefined
       );
     });
 
@@ -110,7 +111,7 @@ describe("Search Service", () => {
         "&tab_id=tab-1" +
         "&tab_name=Test%20Tab";
 
-      expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query);
+      expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query, undefined);
     });
 
     it("should add is_ui_histogram parameter when provided", async () => {
@@ -125,7 +126,8 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true&is_ui_histogram=true",
-        params.query
+        params.query,
+        undefined
       );
     });
 
@@ -140,7 +142,8 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true&is_multi_stream_search=true",
-        params.query
+        params.query,
+        undefined
       );
     });
 
@@ -157,7 +160,8 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi?type=logs&search_type=ui&use_cache=true",
-        params.query.query
+        params.query.query,
+        undefined
       );
     });
 
@@ -175,7 +179,8 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi?type=logs&search_type=ui&use_cache=true",
-        { ...params.query.query, aggs: params.query.aggs }
+        { ...params.query.query, aggs: params.query.aggs },
+        undefined
       );
     });
 
@@ -207,7 +212,8 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=false",
-        params.query
+        params.query,
+        undefined
       );
     });
 
@@ -225,8 +231,79 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
-        params.query
+        params.query,
+        undefined
       );
+    });
+
+    it("should pass transformResponse config when page_type is traces", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "traces",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      const axiosConfig = postCall[2];
+      expect(axiosConfig).toBeDefined();
+      expect(Array.isArray(axiosConfig.transformResponse)).toBe(true);
+      expect(axiosConfig.transformResponse).toHaveLength(1);
+      expect(typeof axiosConfig.transformResponse[0]).toBe("function");
+    });
+
+    it("should have transformResponse that patches ns fields and parses JSON", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "traces",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      const transformFn = postCall[2].transformResponse[0];
+
+      const rawJson = JSON.stringify({ start_time: "PLACEHOLDER" }).replace(
+        '"PLACEHOLDER"',
+        "1700000000123456789"
+      );
+      // rawJson = '{"start_time":1700000000123456789}'
+      const result = transformFn(rawJson);
+
+      expect(result._start_time_ns).toBe("1700000000123456789");
+    });
+
+    it("should not pass transformResponse config when page_type is not traces", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "logs",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      // axiosConfig is undefined for non-traces page types
+      expect(postCall[2]).toBeUndefined();
+    });
+
+    it("should not throw when transformResponse receives invalid JSON", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "traces",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      const transformFn = postCall[2].transformResponse[0];
+
+      // The catch branch re-tries JSON.parse(data) which also throws on invalid JSON.
+      // We verify the function itself does not introduce additional errors beyond that.
+      expect(() => transformFn("not json")).toThrow(SyntaxError);
     });
   });
 

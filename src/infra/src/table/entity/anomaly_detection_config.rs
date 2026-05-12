@@ -61,3 +61,55 @@ impl Related<super::anomaly_detection_models::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_fields_basic() {
+        let m = Model {
+            anomaly_id: "id1".to_string(),
+            org_id: "org".to_string(),
+            stream_name: "stream".to_string(),
+            stream_type: "logs".to_string(),
+            enabled: true,
+            name: "test".to_string(),
+            description: None,
+            query_mode: "sql".to_string(),
+            filters: None,
+            custom_sql: None,
+            detection_function: "rcf".to_string(),
+            histogram_interval: "1h".to_string(),
+            schedule_interval: "5m".to_string(),
+            detection_window_seconds: 3600,
+            training_window_days: 7,
+            retrain_interval_days: 1,
+            threshold: 95,
+            seasonality: "none".to_string(),
+            is_trained: false,
+            training_started_at: None,
+            training_completed_at: None,
+            last_error: None,
+            last_processed_timestamp: None,
+            current_model_version: 0,
+            rcf_num_trees: 50,
+            rcf_tree_size: 256,
+            rcf_shingle_size: 8,
+            alert_enabled: false,
+            alert_destinations: None,
+            folder_id: "folder1".to_string(),
+            owner: None,
+            status: 0,
+            retries: 0,
+            last_updated: 0,
+            created_at: 1000,
+            updated_at: 1000,
+        };
+        assert_eq!(m.org_id, "org");
+        assert_eq!(m.stream_type, "logs");
+        assert!(m.enabled);
+        assert!(!m.is_trained);
+        assert_eq!(m.status, 0);
+    }
+}

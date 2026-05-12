@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed } from "vue";
+import { reactive, computed, nextTick } from "vue";
 import {
   b64EncodeStandard,
   b64EncodeUnicode,
@@ -172,14 +172,7 @@ const searchObj = reactive(Object.assign({}, defaultObject));
 
 /** Default ordered column ID lists used when no localStorage entry exists. */
 export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
-  spans: [
-    "service_name",
-    "operation_name",
-    "duration",
-    "span_status",
-    "status_code",
-    "method",
-  ],
+  spans: ["service_name", "operation_name", "duration", "span_status"],
   traces: [
     "service_name",
     "operation_name",
@@ -350,8 +343,8 @@ const useTraces = () => {
 
     return {
       stream: searchObj.data.traceDetails.selectedLogStreams.join(","),
-      from: span.startTimeMs * 1000 - 60000000,
-      to: span.endTimeMs * 1000 + 60000000,
+      from: Math.floor(span.start_time / 1000) - 60000000,
+      to: Math.ceil(span.end_time / 1000) + 60000000,
       refresh: 0,
       query,
       orgIdentifier: store.state.selectedOrganization.identifier,
@@ -359,7 +352,9 @@ const useTraces = () => {
   };
 
   // Function to navigate to logs with the provided query details
-  const navigateToLogs = (queryDetails: any) => {
+  const navigateToLogs = async (queryDetails: any) => {
+    store.dispatch("logs/setIsInitialized", false);
+    await nextTick();
     router.push({
       path: "/logs",
       query: {
@@ -425,6 +420,14 @@ const useTraces = () => {
     });
   };
 
+  const getOrSetServiceColor = (serviceName: string): string => {
+    if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
+      const colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+      searchObj.meta.serviceColors[serviceName] = getSpanColorHex(colorIndex);
+    }
+    return searchObj.meta.serviceColors[serviceName];
+  };
+
   const formatTracesMetaData = (traces: any[]): any[] => {
     if (!traces.length) return [];
 
@@ -442,11 +445,11 @@ const useTraces = () => {
         duration: trace.duration || 0,
         services: {} as Record<string, { count: number; duration: number }>,
         zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-        llm_usage_details_input: trace.llm_usage_tokens_input,
-        llm_usage_details_output: trace.llm_usage_tokens_output,
-        llm_usage_details_total: trace.llm_usage_tokens_total,
-        llm_cost_details_total: trace.llm_usage_cost_total,
-        llm_input: trace.llm_input || {},
+        gen_ai_usage_input_tokens: trace.gen_ai_usage_input_tokens,
+        gen_ai_usage_output_tokens: trace.gen_ai_usage_output_tokens,
+        gen_ai_usage_total_tokens: trace.gen_ai_usage_total_tokens,
+        gen_ai_usage_cost: trace.gen_ai_usage_cost,
+        gen_ai_input_messages: trace.gen_ai_input_messages,
       };
 
       // Build per-trace service span count and duration map
@@ -481,6 +484,7 @@ const useTraces = () => {
     tracesShareURL,
     formatTracesMetaData,
     setServiceColors,
+    getOrSetServiceColor,
   };
 };
 

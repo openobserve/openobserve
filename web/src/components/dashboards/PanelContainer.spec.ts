@@ -502,15 +502,15 @@ describe("PanelContainer", () => {
   describe("Context Menu", () => {
     it("should show dropdown menu in non-view-only mode", () => {
       wrapper = createWrapper({ viewOnly: false });
-      
-      const dropdown = wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]');
+
+      const dropdown = wrapper.findComponent({ name: 'ODropdown' });
       expect(dropdown.exists()).toBe(true);
     });
 
     it("should hide dropdown menu in view-only mode", () => {
       wrapper = createWrapper({ viewOnly: true });
-      
-      const dropdown = wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]');
+
+      const dropdown = wrapper.findComponent({ name: 'ODropdown' });
       expect(dropdown.exists()).toBe(false);
     });
   });
@@ -1436,13 +1436,13 @@ describe("PanelContainer", () => {
     it("should hide dropdown menu when simplifiedPanelView is true", () => {
       wrapper = createWrapper({ simplifiedPanelView: true });
 
-      expect(wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: 'ODropdown' }).exists()).toBe(false);
     });
 
     it("should show dropdown menu when simplifiedPanelView is false", () => {
       wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
 
-      expect(wrapper.find('[data-test="dashboard-edit-panel-Test Panel-dropdown"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: 'ODropdown' }).exists()).toBe(true);
     });
 
     it("should show direct delete button when simplifiedPanelView is true and not viewOnly", () => {

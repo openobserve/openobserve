@@ -19,7 +19,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column logs-index-menu tw:p-[0.375rem]! tw:h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <div style="max-width: 100%; overflow: hidden">
+    <div
+      class="tw:flex tw:items-center tw:gap-1"
+      style="max-width: 100%; overflow: hidden"
+    >
+      <OButton
+        v-if="
+          searchObj.data.stream.streamType &&
+          searchObj.data.stream.streamType !== 'logs'
+        "
+        data-test="log-search-index-list-stream-type-badge"
+        variant="ghost"
+        size="icon-sm"
+        class="stream-type-badge tw:shrink-0"
+        @click="onStreamTypeChange('logs')"
+      >
+        <q-icon :name="streamTypeIcon" size="16px" />
+        <q-tooltip anchor="bottom middle" self="top middle">
+          {{ streamTypeLabel }} — {{ t("search.switchToLogs") }}
+        </q-tooltip>
+      </OButton>
       <q-select
         ref="streamSelect"
         data-test="log-search-index-list-select-stream"
@@ -35,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         multiple
         emit-value
         map-options
+        class="tw:flex-1 tw:min-w-0"
         @filter="filterStreamFn"
         @update:model-value="handleMultiStreamSelection"
       >
@@ -54,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item>
         </template>
         <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-          <q-item style="cursor: pointer">
+          <q-item v-bind="itemProps" style="cursor: pointer">
             <q-item-section @click="handleSingleStreamSelect(opt)">
               <q-item-label>{{ opt.label }}</q-item-label>
             </q-item-section>
@@ -83,7 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none q-pt-md"
       >
-        <q-icon name="info" color="primary" size="xs" />
+        <q-icon name="info" color="primary"
+size="xs" />
         {{ t("search.noFieldFoundInStream") }}
       </div>
     </div>
@@ -116,7 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :active-exclude-field-values="activeExcludeFilterValues"
         :expanded-fields="expandedFields"
         :selected-streams-count="searchObj.data.stream.selectedStream.length"
-        :default-values-count="store.state.zoConfig?.query_values_default_num || 10"
+        :default-values-count="
+          store.state.zoConfig?.query_values_default_num || 10
+        "
         :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
         :use-user-defined-schemas="searchObj.meta.useUserDefinedSchemas"
         :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
@@ -180,6 +203,10 @@ import {
   outlinedAdd,
   outlinedVisibility,
   outlinedVisibilityOff,
+  outlinedSearch,
+  outlinedBarChart,
+  outlinedAccountTree,
+  outlinedTableView,
 } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -193,10 +220,13 @@ import {
   removeFieldFromWhereAST,
 } from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
+import { applyCollapseFilter } from "@/utils/fieldCategories";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
+import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 
 interface Filter {
@@ -212,6 +242,7 @@ export default defineComponent({
     FieldList: defineAsyncComponent(
       () => import("@/plugins/logs/components/FieldList.vue"),
     ),
+    OButton,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
@@ -270,7 +301,8 @@ export default defineComponent({
       extractValueQuery,
     } = useLogs();
 
-    const { filterHitsColumns, extractFields } = useStreamFields();
+    const { filterHitsColumns, extractFields, getStreamList } =
+      useStreamFields();
 
     const { searchObj, streamSchemaFieldsIndexMapping } = searchState();
 
@@ -339,16 +371,27 @@ export default defineComponent({
     const lastFieldFetchPayloads = ref<Record<string, any[]>>({});
     // Caches the original (no-keyword) values so clearing the search box
     // restores them instantly without a new API call.
-    const cachedFieldValues = ref<Record<string, { key: string; count: number }[]>>({});
+    const cachedFieldValues = ref<
+      Record<string, { key: string; count: number }[]>
+    >({});
     // Caches the per-stream values alongside cachedFieldValues so "load more"
     // appends correctly after a search is cleared.
-    const cachedStreamFieldValues = ref<Record<string, Record<string, { values: { key: string; count: number }[] }>>>({});
+    const cachedStreamFieldValues = ref<
+      Record<
+        string,
+        Record<string, { values: { key: string; count: number }[] }>
+      >
+    >({});
     // Tracks the cumulative size requested per field (grows on "load more").
     const fieldValuesCurrentSize = ref<Record<string, number>>({});
     // Stores finalized values from previous pages (immutable during streaming).
-    const fieldValuesFinalizedValues = ref<Record<string, { key: string; count: number }[]>>({});
+    const fieldValuesFinalizedValues = ref<
+      Record<string, { key: string; count: number }[]>
+    >({});
     // Stores the pinned time range from the first request per field.
-    const fieldValuesTimeRange = ref<Record<string, { start_time: number; end_time: number }>>({});
+    const fieldValuesTimeRange = ref<
+      Record<string, { start_time: number; end_time: number }>
+    >({});
     // Tracks the active keyword search term per field so "load more" re-applies it.
     const fieldSearchKeywords = ref<Record<string, string>>({});
 
@@ -367,9 +410,36 @@ export default defineComponent({
     });
 
     const streamTypes = [
-      { label: t("search.logs"), value: "logs" },
-      { label: t("search.enrichmentTables"), value: "enrichment_tables" },
+      { label: t("search.logs"), value: "logs", icon: outlinedSearch },
+      { label: t("search.traces"), value: "traces", icon: outlinedAccountTree },
+      { label: t("search.metrics"), value: "metrics", icon: outlinedBarChart },
+      {
+        label: t("search.enrichmentTables"),
+        value: "enrichment_tables",
+        icon: outlinedTableView,
+      },
     ];
+
+    const streamTypeIcon = computed(() => {
+      const current = searchObj.data.stream.streamType;
+      return (
+        streamTypes.find((t) => t.value === current)?.icon ?? outlinedSearch
+      );
+    });
+
+    const streamTypeLabel = computed(() => {
+      const current = searchObj.data.stream.streamType;
+      return streamTypes.find((t) => t.value === current)?.label ?? "";
+    });
+
+    const onStreamTypeChange = async (newType: string) => {
+      searchObj.data.stream.streamType = newType;
+      searchObj.data.stream.selectedStream = [];
+      searchObj.data.stream.selectedStreamFields = [];
+      saveLogsStreamType(store.state.selectedOrganization.identifier, newType);
+      saveLogsStream(store.state.selectedOrganization.identifier, []);
+      await getStreamList(true);
+    };
 
     const showUserDefinedSchemaToggle = computed(() => {
       return (
@@ -507,7 +577,7 @@ export default defineComponent({
       () => streamList.value,
       () => {
         if (streamOptions.value.length === 0) {
-          streamOptions.value = streamList.value;
+          streamOptions.value = [...streamList.value];
         }
       },
       {
@@ -627,13 +697,24 @@ export default defineComponent({
       setDefaultFieldTab();
     });
 
+    // Reset to page 1 whenever the field search term changes so the user
+    // always sees results from the beginning of the filtered list.
+    watch(
+      () => searchObj.data.stream.filterField,
+      () => { pagination.value = { ...pagination.value, page: 1 }; },
+    );
+
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
-        streamOptions.value = streamList.value;
         const needle = val.toLowerCase();
-        streamOptions.value = streamOptions.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
-        );
+        const source = streamList.value || [];
+        if (!needle) {
+          streamOptions.value = [...source];
+        } else {
+          streamOptions.value = source.filter(
+            (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
+          );
+        }
       });
     };
 
@@ -659,22 +740,41 @@ export default defineComponent({
     }
 
     const filterFieldFn = (rows: any, terms: any) => {
-      var filtered = [];
-      var includedFields: any = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) &&
-            includedFields.indexOf(rows[i]["name"]) == -1
-          ) {
-            filtered.push(rows[i]);
-            includedFields.push(rows[i]["name"]);
+      if (!terms) return rows;
+
+      const term = terms.toLowerCase();
+
+      // Build a label-row lookup from the current rows so we can re-inject
+      // the correct group header for each matched field.
+      const labelByGroup: Record<string, any> = {};
+      for (const row of rows) {
+        if (row.label && row.group) labelByGroup[row.group] = row;
+      }
+
+      const seen = new Set<string>();
+      const seenGroups = new Set<string>();
+      const filtered: any[] = [];
+
+      for (const row of rows) {
+        // Never include label rows directly — they'll be re-injected below
+        if (row.label) continue;
+
+        if (row.name.toLowerCase().includes(term) && !seen.has(row.name)) {
+          seen.add(row.name);
+
+          // Inject the group label row once, the first time a field from that group matches
+          const group = row.group;
+          if (group && labelByGroup[group] && !seenGroups.has(group)) {
+            seenGroups.add(group);
+            filtered.push(labelByGroup[group]);
           }
+
+          filtered.push(row);
         }
       }
+
       if (!filtered.length) {
-        return [{ name: "no-fields-found", label: "No matching fields found" }];
+        return [{ name: "No matching fields found", label: true, group: "__none__" }];
       }
       return filtered;
     };
@@ -685,8 +785,7 @@ export default defineComponent({
           /^([^=!<>\s()"]+)(\s*(?:!=|=)\s*.*)$/,
         );
         if (fieldAndOperator) {
-          searchObj.data.stream.addToFilter =
-            `${quoteSqlIdentifierIfNeeded(fieldAndOperator[1])}${fieldAndOperator[2]}`;
+          searchObj.data.stream.addToFilter = `${quoteSqlIdentifierIfNeeded(fieldAndOperator[1])}${fieldAndOperator[2]}`;
           return;
         }
       }
@@ -814,9 +913,13 @@ export default defineComponent({
         lastFieldFetchPayloads.value[name] = [];
         delete cachedFieldValues.value[name];
         delete cachedStreamFieldValues.value[name];
-        fieldValuesCurrentSize.value[name] = store.state.zoConfig?.query_values_default_num || 10;
+        fieldValuesCurrentSize.value[name] =
+          store.state.zoConfig?.query_values_default_num || 10;
         fieldValuesFinalizedValues.value[name] = [];
-        fieldValuesTimeRange.value[name] = { start_time: startISOTimestamp, end_time: endISOTimestamp };
+        fieldValuesTimeRange.value[name] = {
+          start_time: startISOTimestamp,
+          end_time: endISOTimestamp,
+        };
         delete fieldSearchKeywords.value[name];
         let query_context = "";
         let query = searchObj.data.query;
@@ -941,7 +1044,10 @@ export default defineComponent({
 
             // Build SQL with the expanded field's own filter condition removed so
             // field value counts are not constrained by that filter.
-            const rawSQL = query_context.replace("[INDEX_NAME]", selectedStream);
+            const rawSQL = query_context.replace(
+              "[INDEX_NAME]",
+              selectedStream,
+            );
             let sqlForValues = rawSQL;
             try {
               const parsedForValues = fnParsedSQL(rawSQL);
@@ -1085,7 +1191,12 @@ export default defineComponent({
         fetchValuesWithWebsocket({
           ...payload,
           size: newSize,
-          ...(pinnedTime ? { start_time: pinnedTime.start_time, end_time: pinnedTime.end_time } : {}),
+          ...(pinnedTime
+            ? {
+                start_time: pinnedTime.start_time,
+                end_time: pinnedTime.end_time,
+              }
+            : {}),
           ...(keyword ? { keyword } : {}),
         });
       }
@@ -1093,7 +1204,8 @@ export default defineComponent({
 
     const searchFieldValues = (fieldName: string, searchTerm: string) => {
       // Reset pagination whenever the search term changes.
-      fieldValuesCurrentSize.value[fieldName] = store.state.zoConfig?.query_values_default_num || 10;
+      fieldValuesCurrentSize.value[fieldName] =
+        store.state.zoConfig?.query_values_default_num || 10;
       delete fieldValuesFinalizedValues.value[fieldName];
       // Track the active keyword so "load more" can re-apply it.
       fieldSearchKeywords.value[fieldName] = searchTerm;
@@ -1405,6 +1517,8 @@ export default defineComponent({
     const toggleFieldGroup = (group: string) => {
       searchObj.data.stream.expandGroupRows[group] =
         !searchObj.data.stream.expandGroupRows[group];
+      // Reset to page 1 so Quasar recalculates page count from the new row total
+      pagination.value = { ...pagination.value, page: 1 };
     };
 
     const hasUserDefinedSchemas = () => {
@@ -1436,8 +1550,14 @@ export default defineComponent({
 
       // Pre-allocate the stream slot on fresh loads (skip on "load more"
       // so existing per-stream values survive until replaced by new data).
-      const isLoadMore = (fieldValuesFinalizedValues.value[fieldName]?.length || 0) > 0;
-      if (!isLoadMore && fieldName && streamName && streamFieldValues.value[fieldName])
+      const isLoadMore =
+        (fieldValuesFinalizedValues.value[fieldName]?.length || 0) > 0;
+      if (
+        !isLoadMore &&
+        fieldName &&
+        streamName &&
+        streamFieldValues.value[fieldName]
+      )
         streamFieldValues.value[fieldName][streamName] = { values: [] };
 
       const wsPayload = {
@@ -1617,7 +1737,8 @@ export default defineComponent({
 
           // Merge with finalized values from previous pages.
           const finalized = fieldValuesFinalizedValues.value[fieldName] || [];
-          const currentSize = fieldValuesCurrentSize.value[fieldName] || pageSize;
+          const currentSize =
+            fieldValuesCurrentSize.value[fieldName] || pageSize;
 
           if (finalized.length > 0) {
             const finalizedKeys = new Set(finalized.map((v) => v.key));
@@ -1789,6 +1910,9 @@ export default defineComponent({
       addSearchTerm,
       fieldValues,
       streamTypes,
+      streamTypeIcon,
+      streamTypeLabel,
+      onStreamTypeChange,
       outlinedAdd,
       outlinedVisibilityOff,
       outlinedVisibility,
@@ -1805,47 +1929,15 @@ export default defineComponent({
       fieldListRef,
       toggleFieldGroup,
       streamFieldsRows: computed(() => {
-        let expandKeys = Object.keys(
-          searchObj.data.stream.expandGroupRows,
-        ).reverse();
+        const source = showOnlyInterestingFields.value
+          ? searchObj.data.stream.selectedInterestingStreamFields
+          : searchObj.data.stream.selectedStreamFields;
 
-        const expandGroupRowsFieldCount = showOnlyInterestingFields.value
-          ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount
-          : searchObj.data.stream.expandGroupRowsFieldCount;
+        if (!source?.length) return source;
 
-        let startIndex = 0;
-        // Iterate over the keys in reverse order
-        let selectedStreamFields = cloneDeep(
-          showOnlyInterestingFields.value
-            ? searchObj.data.stream.selectedInterestingStreamFields
-            : searchObj.data.stream.selectedStreamFields,
-        );
-        let count = 0;
-        for (let key of expandKeys) {
-          if (
-            searchObj.data.stream.expandGroupRows[key] == false &&
-            selectedStreamFields != undefined &&
-            selectedStreamFields?.length > 0
-          ) {
-            startIndex =
-              selectedStreamFields.length - expandGroupRowsFieldCount[key];
-            if (startIndex > 0) {
-              // console.log("startIndex", startIndex);
-              // console.log("count", count);
-              // console.log("selectedStreamFields", selectedStreamFields.length);
-              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key]);
-              // console.log("========");
-              selectedStreamFields.splice(
-                startIndex - count,
-                expandGroupRowsFieldCount[key],
-              );
-            }
-          } else {
-            count += expandGroupRowsFieldCount[key];
-          }
-          count++;
-        }
-        return selectedStreamFields;
+        const expandGroupRows = searchObj.data.stream.expandGroupRows;
+
+        return applyCollapseFilter(source, expandGroupRows, searchObj.data.stream.filterField ?? "");
       }),
       formatLargeNumber,
       sortedStreamFields,
@@ -1888,6 +1980,14 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.stream-type-badge {
+  height: 32px;
+  width: 32px;
+  border: 1px solid var(--o2-border);
+  border-radius: 4px;
+  padding: 0;
+}
+
 .indexlist-search-input {
   height: 36px;
   .q-field__control {

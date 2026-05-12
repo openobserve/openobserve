@@ -478,4 +478,80 @@ mod tests {
         // Should return default interval of 1 hour (3600 seconds)
         assert_eq!(histogram_interval_visitor.interval, Some(3600));
     }
+
+    #[test]
+    fn test_histogram_interval_visitor_numeric_interval_sets_error() {
+        // Numeric interval (like 123) is invalid — visitor must set an error
+        let sql = "SELECT histogram(_timestamp, 123) FROM logs";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut visitor = HistogramIntervalVisitor::new(None);
+        let _ = statement.visit(&mut visitor);
+        assert!(visitor.is_histogram);
+        assert!(
+            visitor.error.is_some(),
+            "expected error for numeric interval"
+        );
+        assert!(
+            visitor
+                .error
+                .unwrap()
+                .contains("Invalid histogram interval")
+        );
+    }
+
+    #[test]
+    fn test_generate_histogram_interval_none_time_range() {
+        // None time_range → default "1 hour"
+        let result = generate_histogram_interval(None);
+        assert_eq!(result, "1 hour");
+    }
+
+    #[test]
+    fn test_generate_histogram_interval_duration_tiers() {
+        let hour = 3600 * 1_000_000_i64;
+        let minute = 60 * 1_000_000_i64;
+        // > 24*60h → "1 day"
+        assert_eq!(
+            generate_histogram_interval(Some((0, 24 * 61 * hour))),
+            "1 day"
+        );
+        // > 24*30h but <= 24*60h → "12 hour"
+        assert_eq!(
+            generate_histogram_interval(Some((0, 24 * 31 * hour))),
+            "12 hour"
+        );
+        // > 24*28h but <= 24*30h → "6 hour"
+        assert_eq!(
+            generate_histogram_interval(Some((0, 24 * 29 * hour))),
+            "6 hour"
+        );
+        // duration < 15 min → falls through all checks → "10 second"
+        assert_eq!(
+            generate_histogram_interval(Some((0, 10 * minute))),
+            "10 second"
+        );
+        // duration >= 30 min → "15 second"
+        assert_eq!(
+            generate_histogram_interval(Some((0, 31 * minute))),
+            "15 second"
+        );
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_abbreviations() {
+        // Test single-letter and short abbreviations
+        assert_eq!(convert_histogram_interval_to_seconds("1s").unwrap(), 1);
+        assert_eq!(convert_histogram_interval_to_seconds("5secs").unwrap(), 5);
+        assert_eq!(convert_histogram_interval_to_seconds("2sec").unwrap(), 2);
+        assert_eq!(convert_histogram_interval_to_seconds("3m").unwrap(), 180);
+        assert_eq!(convert_histogram_interval_to_seconds("4mins").unwrap(), 240);
+        assert_eq!(convert_histogram_interval_to_seconds("6min").unwrap(), 360);
+        assert_eq!(convert_histogram_interval_to_seconds("1h").unwrap(), 3600);
+        assert_eq!(convert_histogram_interval_to_seconds("2hrs").unwrap(), 7200);
+        assert_eq!(convert_histogram_interval_to_seconds("3hr").unwrap(), 10800);
+        assert_eq!(convert_histogram_interval_to_seconds("1d").unwrap(), 86400);
+    }
 }

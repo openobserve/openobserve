@@ -25,31 +25,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:px-3 tw:py-2 tw:min-w-0 tw:w-full tw:box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
       <div v-if="shouldShowTabs" class="tw:mb-2 tw:flex tw:items-center tw:justify-between">
-        <div class="query-mode-tabs" data-test="step2-query-tabs">
-          <button
+        <OToggleGroup
+          :model-value="localTab"
+          @update:model-value="updateTab($event as string)"
+          data-test="step2-query-tabs"
+        >
+          <OToggleGroupItem
             v-for="tab in tabOptions"
             :key="tab.value"
-            type="button"
-            class="query-mode-tab"
-            :class="{ active: localTab === tab.value }"
-            @click="updateTab(tab.value)"
+            :value="tab.value"
+            :data-test="`query-mode-${tab.value}`"
+            size="sm"
           >
+            <template #icon-left>
+              <Wrench v-if="tab.value === 'custom'" class="tw:size-3.5 tw:shrink-0" />
+              <Database v-else-if="tab.value === 'sql'" class="tw:size-3.5 tw:shrink-0" />
+              <ChartLine v-else-if="tab.value === 'promql'" class="tw:size-3.5 tw:shrink-0" />
+            </template>
             {{ tab.label }}
-          </button>
-        </div>
+          </OToggleGroupItem>
+        </OToggleGroup>
 
         <!-- Open Full Editor (SQL/PromQL tabs) -->
-        <q-btn
+        <OButton
           v-if="localTab !== 'custom'"
           data-test="step2-view-editor-btn"
+          variant="outline"
           size="sm"
-          flat
-          no-caps
-          class="o2-secondary-button"
           @click="viewSqlEditor = true"
         >
         {{ t('alerts.queryConfig.openFullEditor') }}
-      </q-btn>
+      </OButton>
       </div>
 
       <!-- Custom Query Builder -->
@@ -203,28 +209,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="onLogGroupByChange"
                       />
-                      <q-btn
-                        icon="close"
-                        size="xs"
-                        flat
-                        round
-                        dense
+                      <OButton
+                        variant="ghost"
+                        size="icon-circle-sm"
                         class="tw:text-gray-400 hover:tw:text-red-500"
                         @click="deleteLogGroupByColumn(index)"
-                      />
+                      >
+                        <q-icon name="close" />
+                      </OButton>
                     </div>
                   </template>
-                  <q-btn
-                    icon="add"
-                    size="xs"
-                    flat
-                    round
-                    dense
-                    color="primary"
+                  <OButton
+                    variant="ghost-primary"
+                    size="icon-circle-sm"
                     @click="addLogGroupByColumn"
                   >
+                    <q-icon name="add" />
                     <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
 
@@ -409,28 +411,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="emitAggregationUpdate"
                       />
-                      <q-btn
-                        icon="close"
-                        size="xs"
-                        flat
-                        round
-                        dense
+                      <OButton
+                        variant="ghost"
+                        size="icon-circle-sm"
                         class="tw:text-gray-400 hover:tw:text-red-500"
                         @click="deleteGroupByColumn(index)"
-                      />
+                      >
+                        <q-icon name="close" />
+                      </OButton>
                     </div>
                   </template>
-                  <q-btn
-                    icon="add"
-                    size="xs"
-                    flat
-                    round
-                    dense
-                    color="primary"
+                  <OButton
+                    variant="ghost-primary"
+                    size="icon-circle-sm"
                     @click="addGroupByColumn"
                   >
+                    <q-icon name="add" />
                     <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
 
@@ -947,6 +945,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense borderless hide-bottom-space
                     no-error-icon
                     class="alert-v3-select"
+                    data-test="alert-threshold-operator-select"
                     style="min-width: 70px; max-width: 120px;"
                     :rules="[(val: any) => !!val || 'Field is required!']"
                     @update:model-value="emitPromqlConditionUpdate"
@@ -957,6 +956,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense borderless hide-bottom-space
                     no-error-icon
                     class="alert-v3-input"
+                    data-test="alert-threshold-value-input"
                     style="min-width: 60px; max-width: 120px;"
                     debounce="300"
                     :rules="[(val: any) => (val !== undefined && val !== null && val !== '') || 'Field is required!']"
@@ -1045,6 +1045,10 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { Wrench, Database, ChartLine } from "lucide-vue-next";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -1061,6 +1065,12 @@ export default defineComponent({
     QueryEditorDialog,
     CustomConfirmDialog,
     UnifiedQueryEditor,
+    OButton,
+    OToggleGroup,
+    OToggleGroupItem,
+    Wrench,
+    Database,
+    ChartLine,
   },
   props: {
     tab: {
@@ -1326,10 +1336,17 @@ export default defineComponent({
 
     // Watch stream type changes to restore saved state or set new-alert defaults.
     // Fires when stream type prop changes (e.g. async load on edit, or user switching stream type).
-    watch(isEventBased, (eventBased) => {
+    watch(isEventBased, (eventBased, oldEventBased) => {
       if (eventBased) {
-        // Switched to logs/traces — restore saved function or default to total_events
-        if (props.isAggregationEnabled && props.inputData.aggregation?.function) {
+        // PromQL is only available for metrics — switch to builder when
+        // moving to logs/traces so the user isn't stuck on an invalid tab.
+        if (localTab.value === "promql") {
+          updateTab("custom");
+        }
+
+        // Switched to logs/traces — restore saved function or default to total_events.
+        // When coming from metrics the aggregation defaults don't apply to log fields.
+        if (props.isAggregationEnabled && props.inputData.aggregation?.function && oldEventBased !== false) {
           selectedFunction.value = props.inputData.aggregation.function;
           localIsAggregationEnabled.value = true;
         } else {
@@ -1642,15 +1659,28 @@ export default defineComponent({
       });
     };
 
+    // Helper to get numeric columns based on selected function
+    const getNumericColumns = (cols: any[]) => {
+      if (selectedFunction.value === 'count' || selectedFunction.value === 'total_events') {
+        return [...cols];
+      }
+      return cols.filter((column: any) => {
+        if (typeof column === "string") return false;
+        if (!column.type) return false;
+        return !/(?:utf8|string)/i.test(column.type);
+      });
+    };
+
     // Filtered columns for log measure column (unique count uses all fields, measure uses numeric)
-    const filteredLogMeasureColumns = ref([...props.columns]);
+    const filteredLogMeasureColumns = ref(getNumericColumns(props.columns));
     const filterLogMeasureColumns = (val: string, update: any) => {
       update(() => {
+        const numericCols = getNumericColumns(props.columns);
         if (val === "") {
-          filteredLogMeasureColumns.value = [...props.columns];
+          filteredLogMeasureColumns.value = numericCols;
         } else {
           const needle = val.toLowerCase();
-          filteredLogMeasureColumns.value = props.columns.filter((v: any) => {
+          filteredLogMeasureColumns.value = numericCols.filter((v: any) => {
             const label = typeof v === "string" ? v : v.label || v.value || "";
             return label.toLowerCase().indexOf(needle) > -1;
           });
@@ -2080,6 +2110,7 @@ export default defineComponent({
       (newCols) => {
         filteredFields.value = [...newCols];
         filteredNumericColumns.value = [...newCols];
+        filteredLogMeasureColumns.value = getNumericColumns(newCols);
 
         if (!isEventBased.value && props.inputData.aggregation?.having) {
           const currentCol = props.inputData.aggregation.having.column;
@@ -2195,6 +2226,7 @@ export default defineComponent({
 
     // When function switches to measure mode, reset threshold to >= 1 if group-by is empty
     watch(selectedFunction, (value) => {
+      filteredLogMeasureColumns.value = getNumericColumns(props.columns);
       if (value === 'total_events') return;
       const groupByEmpty = isEventBased.value
         ? !hasLogGroupByFields.value
@@ -2781,7 +2813,7 @@ export default defineComponent({
   }
 
   &.ai-btn-active {
-    background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   }
 }
 
@@ -2793,51 +2825,6 @@ export default defineComponent({
 .light-mode-chat-container {
   background-color: #ffffff;
   border-left: 1px solid #e5e7eb;
-}
-
-.query-mode-tabs {
-  display: flex;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 6px;
-  padding: 3px;
-
-  .query-mode-tab {
-    padding: 4px 12px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    color: rgba(0, 0, 0, 0.4);
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    line-height: 1.4;
-
-    &:hover { color: rgba(0, 0, 0, 0.7); }
-
-    &.active {
-      background: #fff;
-      color: #1a1a1a;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-    }
-  }
-}
-
-.dark-mode .query-mode-tabs {
-  background: rgba(255, 255, 255, 0.05);
-
-  .query-mode-tab {
-    color: rgba(255, 255, 255, 0.6);
-
-    &:hover { color: rgba(255, 255, 255, 0.85); }
-
-    &.active {
-      background: #374151;
-      color: #e4e7eb;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-    }
-  }
 }
 
 // Fixed label width for SQL/PromQL condition rows so inputs align

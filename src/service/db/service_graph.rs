@@ -47,3 +47,13 @@ pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::E
     };
     Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mk_key_returns_expected_path() {
+        assert_eq!(mk_key(), "/service_graph/node/offsets");
+    }
+}

@@ -355,3 +355,29 @@ pub async fn list_values(Path(org_id): Path<String>) -> Response {
 
     MetaHttpResponse::json(values)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stacktrace_request_deserialize_with_all_fields() {
+        let json = r#"{"service":"my-svc","env":"prod","version":"1.0.0","stacktrace":"Error\n  at foo.js:1:1"}"#;
+        let req: StacktraceRequest = serde_json::from_str(json).unwrap();
+        drop(req);
+    }
+
+    #[test]
+    fn test_stacktrace_request_deserialize_minimal() {
+        let json = r#"{"stacktrace":"Error at main.js:1:0"}"#;
+        let req: StacktraceRequest = serde_json::from_str(json).unwrap();
+        drop(req);
+    }
+
+    #[test]
+    fn test_stacktrace_request_deserialize_missing_required_stacktrace_fails() {
+        let json = r#"{"service":"svc","env":"prod"}"#;
+        let result: Result<StacktraceRequest, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+}

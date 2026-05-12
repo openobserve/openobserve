@@ -82,3 +82,40 @@ pub struct BulkDeleteResponse {
     pub unsuccessful: Vec<String>,
     pub err: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bulk_delete_response_default() {
+        let resp = BulkDeleteResponse::default();
+        assert!(resp.successful.is_empty());
+        assert!(resp.unsuccessful.is_empty());
+        assert!(resp.err.is_none());
+    }
+
+    #[test]
+    fn test_bulk_delete_request_roundtrip() {
+        let req = BulkDeleteRequest {
+            ids: vec!["id1".to_string(), "id2".to_string()],
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let deserialized: BulkDeleteRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.ids.len(), 2);
+        assert_eq!(deserialized.ids[0], "id1");
+    }
+
+    #[test]
+    fn test_bulk_delete_response_serializes() {
+        let resp = BulkDeleteResponse {
+            successful: vec!["ok1".to_string()],
+            unsuccessful: vec!["fail1".to_string()],
+            err: Some("some error".to_string()),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("ok1"));
+        assert!(json.contains("fail1"));
+        assert!(json.contains("some error"));
+    }
+}

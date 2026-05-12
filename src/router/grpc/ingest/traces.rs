@@ -87,3 +87,13 @@ impl TraceService for TraceServer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trace_server_default() {
+        let _server = TraceServer::default();
+    }
+}

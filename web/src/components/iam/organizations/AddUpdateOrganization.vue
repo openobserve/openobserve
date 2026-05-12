@@ -82,39 +82,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
 
-          <div class="flex justify-start tw:mt-6">
-            <q-btn
-              v-close-popup="true"
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('organization.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          <div class="flex justify-start tw:mt-6 tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
               @click="router.replace({ name: 'organizations' })"
               data-test="cancel-organizations-modal"
-            />
-            <q-btn
-              :disable="organizationData.name === '' && !proPlanRequired"
-              :label="t('organization.save')"
-              class="o2-primary-button no-border tw:h-[36px]"
+            >
+              {{ t('organization.cancel') }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
               type="submit"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              :disabled="organizationData.name === '' && !proPlanRequired"
               data-test="add-org"
-            />
+            >
+              {{ t('organization.save') }}
+            </OButton>
           </div>
 
           <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
-            <q-btn
-              class="q-mb-md text-bold no-border q-ml-md"
-              :label="t('organization.proceed_subscription')"
-              text-color="light-text"
-              padding="sm xl"
-              color="secondary"
-              no-caps
+            <OButton
+              variant="secondary"
+              size="md"
+              class="tw:mb-4 tw:ml-4"
               @click="completeSubscriptionProcess"
-            />
+            >
+              {{ t('organization.proceed_subscription') }}
+            </OButton>
           </div>
         </q-form>
       </div>
@@ -124,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -143,6 +140,7 @@ let callOrganization: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
+  components: { OButton },
   props: {
     modelValue: {
       type: Object,

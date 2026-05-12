@@ -91,3 +91,25 @@ impl<'n> TreeNodeVisitor<'n> for GroupByFieldVisitor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_visitor_has_no_fields() {
+        let visitor = GroupByFieldVisitor::new();
+        assert!(visitor.get_group_by_fields().is_empty());
+    }
+
+    #[test]
+    fn test_get_group_by_fields_returns_all_collected() {
+        let mut visitor = GroupByFieldVisitor::new();
+        visitor.group_by_fields.insert("host".to_string());
+        visitor.group_by_fields.insert("region".to_string());
+        let fields = visitor.get_group_by_fields();
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains(&"host".to_string()));
+        assert!(fields.contains(&"region".to_string()));
+    }
+}

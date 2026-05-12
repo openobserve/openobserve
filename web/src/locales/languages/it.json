@@ -123,7 +123,11 @@
     "create": "Crea",
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
-    "updated_at": "Aggiornato a"
+    "updated_at": "Aggiornato a",
+    "error": "Errore",
+    "db": "Banca dati",
+    "discardChanges": "Ignora le modifiche",
+    "unsavedChanges": "Modifiche non salvate"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -387,7 +391,11 @@
     "liveModeTooltip": "Interrogazione automatica sulle modifiche al filtro/orario",
     "turnOnLiveMode": "Attiva la modalità Live",
     "turnOffLiveMode": "Disattiva la modalità Live",
-    "autoRunEnabled": "Esecuzione automatica abilitata"
+    "autoRunEnabled": "Esecuzione automatica abilitata",
+    "selectStreamFirst": "Seleziona prima uno stream",
+    "traces": "Tracce",
+    "switchToLogs": "clicca per tornare a Logs",
+    "patternNoValuesAvailable": "Nessun valore disponibile"
   },
   "menu": {
     "home": "Home",
@@ -976,7 +984,8 @@
     "fieldName": "Nome campo",
     "fieldRequired": "Il campo è obbligatorio!",
     "dataType": "Tipo di dati",
-    "dataTypeRequired": "Il tipo di dati è obbligatorio!"
+    "dataTypeRequired": "Il tipo di dati è obbligatorio!",
+    "udsFieldAlreadyInSchema": "Uno o più campi selezionati fanno già parte dello schema definito"
   },
   "function": {
     "header": "Funzioni",
@@ -1121,7 +1130,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Registri Pub/Sub"
+    "pubsub": "Registri Pub/Sub",
+    "aiLabel": "Integrazioni AI"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2237,6 +2247,8 @@
     "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza",
     "additional_settings": "Impostazioni aggiuntive",
     "alertNamePlaceholder": "Nome dell'avviso",
+    "nameRequired": "Il nome dell'avviso è obbligatorio.",
+    "nameNoSpecialChars": "Il nome dell'avviso non può contenere ':', '#', '?', '&', '%', virgolette o spazi. Usare invece i trattini bassi (_).",
     "anomalyNamePlaceholder": "Nome dell'anomalia",
     "folder": "Cartella",
     "selectStreamTypeFirst": "Seleziona prima un tipo di stream",
@@ -2283,7 +2295,8 @@
       "addNewDestination": "Aggiungi nuova destinazione",
       "destinationRequired": "È richiesta almeno una destinazione!",
       "disabledNotificationsInfo": "Il rilevamento delle anomalie verrà comunque eseguito e scriverà i risultati nel flusso _anomalies. Abilita le notifiche per ricevere avvisi quando vengono rilevate anomalie."
-    }
+    },
+    "anomalyName": "Nome dell'anomalia"
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2892,7 +2905,52 @@
       "multiStepAgent": "Agente in più fasi"
     },
     "noLogsAvailableForService": "Nessun registro disponibile per questo servizio",
-    "spansTruncatedWarning": "Mostra {count} di {total} intervalli: la traccia potrebbe essere incompleta. Restringi l'intervallo di tempo o contatta l'amministratore per aumentare il limite di intervallo."
+    "spansTruncatedWarning": "Mostra {count} di {total} intervalli: la traccia potrebbe essere incompleta. Restringi l'intervallo di tempo o contatta l'amministratore per aumentare il limite di intervallo.",
+    "servicesCatalog": {
+      "tabLabel": "Catalogo dei servizi",
+      "title": "Catalogo dei servizi",
+      "filterPlaceholder": "Filtra per nome del servizio...",
+      "noServicesFound": "Nessun servizio trovato nell'intervallo di tempo selezionato.",
+      "loading": "Caricamento dei servizi...",
+      "columns": {
+        "serviceName": "Servizio",
+        "status": "Status",
+        "requests": "Richieste",
+        "errorRate": "Tasso di errore",
+        "errors": "Errori",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Latenza media",
+        "lastSeen": "Visto l'ultima volta",
+        "operations": "Operazioni"
+      },
+      "status": {
+        "healthy": "Salutare",
+        "warning": "Avvertenza",
+        "degraded": "Degradato"
+      },
+      "viewTraces": "Visualizza tracce",
+      "exportCsv": "Esporta CSV",
+      "justNow": "Proprio ora",
+      "minutesAgo": "{n} m fa",
+      "hoursAgo": "{n} h fa",
+      "daysAgo": "{n} d fa"
+    },
+    "noErrorPresent": "Nessun errore presente per questo intervallo",
+    "httpStatusCode": "Codice di stato HTTP",
+    "grpcStatusCode": "Codice di stato gRPC",
+    "dbResponseStatusCode": "Codice di stato della risposta DB",
+    "processExitCode": "Codice di uscita del processo",
+    "exceptionsWithCount": "Eccezioni ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Messaggio:",
+    "escapedLabel": "Fuggito:",
+    "stacktraceLabel": "Trace dello stack:",
+    "copyStacktrace": "Copia stacktrace",
+    "noStacktraceAvailable": "Nessuno stacktrace disponibile",
+    "stacktraceCopied": "Stacktrace copiato negli appunti",
+    "stacktraceCopyFailed": "Copia dello stacktrace non riuscita"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3294,7 +3352,9 @@
     "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato.",
     "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce.",
     "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati.",
-    "noDataFound": "Nessun dato trovato"
+    "noDataFound": "Nessun dato trovato",
+    "isWorkloadType": "Identificatore del servizio",
+    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

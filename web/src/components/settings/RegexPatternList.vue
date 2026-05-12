@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
     <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -17,22 +17,20 @@
             <q-icon class="o2-search-input-icon"  name="search" />
           </template>
         </q-input>
-          <q-btn
-            class="o2-secondary-button q-ml-sm tw:h-[36px]"
-            no-caps
-            flat
-            :label="t(`regex_patterns.import`)"
+          <OButton
+            class="q-ml-sm"
+            variant="outline"
+            size="sm-action"
             @click="importRegexPattern"
             data-test="regex-pattern-list-import"
-          />
-          <q-btn
+          >{{ t(`regex_patterns.import`) }}</OButton>
+          <OButton
             data-test="regex-pattern-list-add-pattern-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
-            no-caps
-            flat
-            :label="t(`regex_patterns.create_pattern`)"
+            class="q-ml-sm"
+            variant="primary"
+            size="sm-action"
             @click="createRegexPattern"
-          />
+          >{{ t(`regex_patterns.create_pattern`) }}</OButton>
     </div>
         <q-table
           v-if="!showImportRegexPatternDialog"
@@ -104,42 +102,33 @@
             </template>
             <template v-else>
               <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
-                <q-btn
+                <OButton
                   :data-test="`regex-pattern-list-${props.row.id}-export-regex-pattern`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="download"
+                  variant="ghost"
+                  size="icon-xs-sq"
                   title="Export Regex Pattern"
                   @click.stop="exportRegexPattern(props.row)"
                 >
-                </q-btn>
-                <q-btn
+                  <template #icon-left><Download class="tw:size-3.5 tw:shrink-0" /></template>
+                </OButton>
+                <OButton
                   :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="edit"
+                  variant="ghost"
+                  size="icon-xs-sq"
                   :title="t('regex_patterns.edit')"
                   @click.stop="editRegexPattern(props.row)"
                 >
-                </q-btn>
-                <q-btn
+                  <template #icon-left><Pencil class="tw:size-3.5 tw:shrink-0" /></template>
+                </OButton>
+                <OButton
                   :data-test="`regex-pattern-list-${props.row.id}-delete-regex-pattern`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :icon="outlinedDelete"
+                  variant="ghost-destructive"
+                  size="icon-xs-sq"
                   :title="t('regex_patterns.delete')"
                   @click.stop="confirmDeleteRegexPattern(props.row)"
                 >
-                </q-btn>
+                  <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
+                </OButton>
               </div>
             </template>
           </q-td>
@@ -151,22 +140,16 @@
             <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
               {{ resultTotal }} {{ t('regex_patterns.bottom_header') }}
             </div>
-            <q-btn
+            <OButton
               v-if="selectedPatterns.length > 0"
               data-test="regex-pattern-list-delete-patterns-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              no-caps
-              dense
+              variant="outline"
+              size="sm-action"
               @click="openBulkDeleteDialog"
             >
-              <q-icon name="delete" size="16px" />
-              <span class="tw:ml-2">Delete</span>
-            </q-btn>
+              <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
+              Delete
+            </OButton>
             <QTablePagination
               :scope="scope"
               :position="'bottom'"
@@ -205,6 +188,7 @@
   </template>
 
 <script lang="ts">
+
     import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue"; 
     import type { Ref } from "vue";
     import { useI18n } from "vue-i18n";
@@ -221,6 +205,8 @@
     import config from "@/aws-exports";
     import NoData from "@/components/shared/grid/NoData.vue";
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+    import OButton from "@/lib/core/Button/OButton.vue";
+    import { Pencil, Trash2, Download } from "lucide-vue-next";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -231,6 +217,10 @@
             AddRegexPattern,
             ImportRegexPattern,
             NoData,
+            OButton,
+            Pencil,
+            Trash2,
+            Download,
         },
     setup() {
 

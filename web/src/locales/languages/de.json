@@ -123,7 +123,11 @@
     "version": "Version",
     "create": "Erstellen",
     "resources": "Ressourcen",
-    "updated_at": "Aktualisiert am"
+    "updated_at": "Aktualisiert am",
+    "error": "Fehler",
+    "db": "Datenbank",
+    "discardChanges": "Änderungen verwerfen",
+    "unsavedChanges": "Ungespeicherte Änderungen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -387,7 +391,11 @@
     "liveModeTooltip": "Automatische Ausführung der Abfrage bei Filter-/Zeitänderungen",
     "turnOnLiveMode": "Aktiviere den Live-Modus",
     "turnOffLiveMode": "Schalten Sie den Live-Modus aus",
-    "autoRunEnabled": "Automatischer Lauf aktiviert"
+    "autoRunEnabled": "Automatischer Lauf aktiviert",
+    "selectStreamFirst": "Wähle zuerst einen Stream",
+    "traces": "Spuren",
+    "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln",
+    "patternNoValuesAvailable": "Keine Werte verfügbar"
   },
   "menu": {
     "home": "Startseite",
@@ -976,7 +984,8 @@
     "fieldName": "Feldname",
     "fieldRequired": "Feld ist erforderlich!",
     "dataType": "Datentyp",
-    "dataTypeRequired": "Datentyp ist erforderlich!"
+    "dataTypeRequired": "Datentyp ist erforderlich!",
+    "udsFieldAlreadyInSchema": "Ein oder mehrere ausgewählte Felder sind bereits Teil des definierten Schemas"
   },
   "function": {
     "header": "Funktionen",
@@ -1121,7 +1130,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Pub/Sub-Protokolle"
+    "pubsub": "Pub/Sub-Protokolle",
+    "aiLabel": "KI-Integrationen"
   },
   "dashboard": {
     "selectField": "Feld",
@@ -2237,6 +2247,8 @@
     "editJson": "Alert-JSON bearbeiten",
     "additional_settings": "Zusätzliche Einstellungen",
     "alertNamePlaceholder": "Name der Warnung",
+    "nameRequired": "Alert-Name ist erforderlich.",
+    "nameNoSpecialChars": "Alert-Name darf keine ':', '#', '?', '&', '%', Anführungszeichen oder Leerzeichen enthalten. Verwenden Sie stattdessen Unterstriche (_).",
     "anomalyNamePlaceholder": "Name der Anomalie",
     "folder": "Mappe",
     "selectStreamTypeFirst": "Wählen Sie zuerst einen Stream-Typ",
@@ -2283,7 +2295,8 @@
       "addNewDestination": "Neues Ziel hinzufügen",
       "destinationRequired": "Es ist mindestens ein Ziel erforderlich!",
       "disabledNotificationsInfo": "Die Anomalieerkennung wird weiterhin ausgeführt und die Ergebnisse werden in den _anomalies-Stream geschrieben. Aktivieren Sie Benachrichtigungen, um Benachrichtigungen zu erhalten, wenn Anomalien erkannt werden."
-    }
+    },
+    "anomalyName": "Name der Anomalie"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2881,7 +2894,52 @@
       "multiStepAgent": "Mehrstufiger Agent"
     },
     "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar",
-    "spansTruncatedWarning": "Es werden {count} der {total} Spannweiten angezeigt — die Spur ist möglicherweise unvollständig. Grenzen Sie den Zeitraum ein oder wenden Sie sich an Ihren Administrator, um das Zeitlimit zu erhöhen."
+    "spansTruncatedWarning": "Es werden {count} der {total} Spannweiten angezeigt — die Spur ist möglicherweise unvollständig. Grenzen Sie den Zeitraum ein oder wenden Sie sich an Ihren Administrator, um das Zeitlimit zu erhöhen.",
+    "servicesCatalog": {
+      "tabLabel": "Servicekatalog",
+      "title": "Servicekatalog",
+      "filterPlaceholder": "Nach Dienstnamen filtern...",
+      "noServicesFound": "Im ausgewählten Zeitraum wurden keine Dienste gefunden.",
+      "loading": "Dienste werden geladen...",
+      "columns": {
+        "serviceName": "Bedienung",
+        "status": "Status",
+        "requests": "Anfragen",
+        "errorRate": "Fehlerrate",
+        "errors": "Fehler",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Durchschnittliche Latenz",
+        "lastSeen": "Zuletzt gesehen",
+        "operations": "Operationen"
+      },
+      "status": {
+        "healthy": "Gesund",
+        "warning": "Warnung",
+        "degraded": "Degradiert"
+      },
+      "viewTraces": "Spuren ansehen",
+      "exportCsv": "CSV exportieren",
+      "justNow": "Gerade eben",
+      "minutesAgo": "vor {n} m",
+      "hoursAgo": "vor {n} h",
+      "daysAgo": "vor {n} d"
+    },
+    "noErrorPresent": "Für diese Spanne ist kein Fehler vorhanden",
+    "httpStatusCode": "HTTP-Statuscode",
+    "grpcStatusCode": "gRPC-Statuscode",
+    "dbResponseStatusCode": "DB-Antwortstatuscode",
+    "processExitCode": "Exit-Code verarbeiten",
+    "exceptionsWithCount": "Ausnahmen ({count})",
+    "typeLabel": "Typ:",
+    "messageLabel": "Nachricht:",
+    "escapedLabel": "Entkommen:",
+    "stacktraceLabel": "Stacktrace:",
+    "copyStacktrace": "Stacktrace kopieren",
+    "noStacktraceAvailable": "Kein Stacktrace verfügbar",
+    "stacktraceCopied": "Stacktrace wurde in die Zwischenablage kopiert",
+    "stacktraceCopyFailed": "Stacktrace konnte nicht kopiert werden"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3283,7 +3341,9 @@
     "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden.",
     "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten.",
     "serviceGroupProtected": "Die Dienstgruppe kann nicht entfernt werden. Sie können nur die zugewiesenen Felder ändern.",
-    "noDataFound": "Keine Daten gefunden"
+    "noDataFound": "Keine Daten gefunden",
+    "isWorkloadType": "Dienstkennzeichnung",
+    "isWorkloadTypeTooltip": "Wenn diese Gruppe aktiviert ist, wird sie verwendet, um einen Dienst eindeutig zu identifizieren (z. B. Cluster, Namespace, Deployment). Deaktiviert für Gruppen, die Operationen über einen Dienst beschreiben, z. B. eine HTTP-Methode oder einen Datenbanknamen."
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

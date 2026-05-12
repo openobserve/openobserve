@@ -64,3 +64,18 @@ enum ServiceStreams {
     Table,
     AllDimensions,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20260318_000005_add_all_dimensions_to_service_streams"
+        );
+    }
+}

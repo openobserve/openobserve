@@ -345,7 +345,7 @@
   }
 
   .download-logs-btn {
-    height: 1rem; // 30px
+    height: 1.875rem; // 30px
     border-radius: 0.375rem; // 6px
     transition: all 0.2s ease;
 
@@ -1191,13 +1191,11 @@
   overflow: auto !important;
 
   &--with-histogram {
-    height: calc(100% - 8.7rem) !important; // 128px
-    max-height: calc(100% - 8.7rem) !important;
+    min-height: calc(100% - 6.25rem) !important; // 6.25rem ( 100px ) histogram height
   }
 
   &--without-histogram {
-    height: calc(100% - 2.5rem) !important; // 40px (32px pagination header + 8px spacing)
-    max-height: calc(100% - 2.5rem) !important;
+    min-height: 100% !important;
   }
 
   // Ensure consistent scrollbar styling

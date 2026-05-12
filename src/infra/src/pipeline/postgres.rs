@@ -367,3 +367,20 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         Ok(pipeline)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_postgres_pipeline_table_new() {
+        let t = PostgresPipelineTable::new();
+        drop(t);
+    }
+
+    #[test]
+    fn test_postgres_pipeline_table_default() {
+        let t = PostgresPipelineTable::default();
+        drop(t);
+    }
+}

@@ -125,7 +125,8 @@ describe("SearchBar (logstream/explore)", () => {
     it("should render download logs button", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      expect(wrapper.find(".download-logs-btn").exists()).toBe(true);
+      // OButton replaces q-btn; download button is identified by its title attribute
+      expect(wrapper.find('button[data-o2-btn]').exists()).toBe(true);
     });
 
     it("should render run query button", async () => {
@@ -180,8 +181,11 @@ describe("SearchBar (logstream/explore)", () => {
       });
       await flushPromises();
 
-      const downloadBtn = wrapper.find(".download-logs-btn");
-      expect(downloadBtn.attributes("disabled")).toBeDefined();
+      // OButton renders as native <button data-o2-btn> with native disabled attribute
+      const allBtns = wrapper.findAll('button[data-o2-btn]');
+      const downloadBtn = allBtns.find(btn => btn.attributes('title') === 'Export logs');
+      expect(downloadBtn).toBeDefined();
+      expect(downloadBtn!.attributes("disabled")).toBeDefined();
     });
 
     it("should enable download button when hits exist", async () => {
@@ -191,7 +195,6 @@ describe("SearchBar (logstream/explore)", () => {
       });
       await flushPromises();
 
-      const downloadBtn = wrapper.find(".download-logs-btn");
       // When hits exist, the disabled prop condition is false
       // (hasOwnProperty('hits') && !hits.length) = (true && false) = false
       expect(wrapper.exists()).toBe(true);

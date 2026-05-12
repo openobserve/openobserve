@@ -118,6 +118,9 @@ const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
 // Field schema index mapping
 const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
 
+// Incremented each time extractFields() starts; guards against applying stale schema responses
+const schemaRequestToken = ref(0);
+
 /**
  * Reactive state management for logs functionality
  * Contains all reactive state variables used across logs components
@@ -450,6 +453,7 @@ export const searchState = () => {
     histogramResults,
     searchPartitionMap,
     resetSearchError,
+    schemaRequestToken,
   };
 };
 

@@ -19,20 +19,18 @@
             {{ computedLabel }}
           </span>
           <!-- Toggle AND/OR button -->
-          <q-btn
+          <OButton
             data-test="alert-conditions-toggle-operator-btn"
-            flat
-            dense
-            round
-            size="sm"
-            icon="restart_alt"
+            variant="ghost"
+            size="icon-circle-sm"
             class="tw:h-[26px] tw:flex-shrink-0 operator-toggle-btn"
             @click="toggleOperator"
           >
+            <q-icon name="restart_alt" />
             <q-tooltip>
               Toggle between and/or
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </template>
       </div>
         <div
@@ -119,6 +117,7 @@
   </template>
   
   <script setup lang="ts">
+  import OButton from '@/lib/core/Button/OButton.vue';
   const props = defineProps({
         condition: {
         type: Object,

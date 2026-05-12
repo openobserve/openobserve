@@ -276,14 +276,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <div class="tw:flex tw:flex-col tw:divide-y tw:divide-[var(--o2-border-color)]">
                 <!-- System Prompt (Expandable) -->
                 <q-expansion-item
-                  v-if="parseMessages(record.llm_input).system"
+                  v-if="parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).system"
                   icon="settings"
                   :label="$t('traces.evaluations.systemPrompt')"
                   header-class="tw:text-xs tw:font-medium"
                 >
                   <div class="tw:p-4 tw:bg-[var(--o2-code-bg)]">
                     <LLMContentRenderer
-                      :content="JSON.stringify([{ role: 'system', content: parseMessages(record.llm_input).system }])"
+                      :content="JSON.stringify([{ role: 'system', content: parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).system }])"
                       :contentType="'input'"
                       :viewMode="'formatted'"
                     />
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
                 <!-- User Messages -->
                 <q-expansion-item
-                  v-if="parseMessages(record.llm_input).user.length > 0"
+                  v-if="parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).user.length > 0"
                   icon="person"
                   :label="$t('traces.evaluations.userMessages')"
                   default-opened
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 >
                   <div class="tw:p-4 tw:bg-[var(--o2-code-bg)]">
                     <LLMContentRenderer
-                      :content="JSON.stringify(parseMessages(record.llm_input).user)"
+                      :content="JSON.stringify(parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).user)"
                       :contentType="'input'"
                       :viewMode="'formatted'"
                     />
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
                 <!-- Assistant Response -->
                 <q-expansion-item
-                  v-if="record.llm_output"
+                  v-if="record.gen_ai_output_messages"
                   icon="smart_toy"
                   :label="$t('traces.evaluations.assistantResponse')"
                   default-opened
@@ -750,7 +750,7 @@ export default defineComponent({
     };
 
     const getHighlightedResponse = (record: any): string => {
-      let content = record.llm_output || "N/A";
+      let content = record.gen_ai_output_messages || "N/A";
       if (content === "N/A") return content;
 
       // 1. Try to get ungrounded numbers from metadata
@@ -834,12 +834,36 @@ export default defineComponent({
 
     const parseMessages = (
       input: any,
+      systemInstructions: any,
     ): { system: string | null; user: any[] } => {
       try {
         let messages = [];
         let system = null;
 
-        // Parse input into array
+        // Check gen_ai_system_instructions first (OTEL spec: separate attribute)
+        if (systemInstructions) {
+          let parsedSystem;
+          try {
+            if (typeof systemInstructions === "string") {
+              parsedSystem = JSON.parse(systemInstructions);
+            } else {
+              parsedSystem = systemInstructions;
+            }
+            if (Array.isArray(parsedSystem)) {
+              // OTEL system instructions format: [{"type": "text", "content": "..."}]
+              system = parsedSystem
+                .filter((p: any) => p.type === "text" && p.content)
+                .map((p: any) => p.content)
+                .join("\n") || null;
+            }
+          } catch {
+            system = typeof systemInstructions === "string"
+              ? systemInstructions
+              : null;
+          }
+        }
+
+        // Parse input into array for user/assistant messages
         if (Array.isArray(input)) {
           messages = input;
         } else if (typeof input === "string") {

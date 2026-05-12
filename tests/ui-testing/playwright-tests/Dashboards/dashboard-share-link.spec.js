@@ -505,7 +505,7 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Click on the newly created tab
     const tabButton = page
-      .locator(".q-tabs .q-tab")
+      .locator("[role='tablist'] [role='tab']")
       .filter({ hasText: newTabName });
     await tabButton.waitFor({ state: "visible", timeout: 15000 });
     await tabButton.click();

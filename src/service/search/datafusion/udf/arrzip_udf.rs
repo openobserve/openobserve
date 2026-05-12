@@ -109,6 +109,7 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::{Array, StringArray};
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -120,6 +121,51 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_arr_zip_impl_direct_valid() {
+        let f1 = StringArray::from(vec![r#"["a","b","c"]"#]);
+        let f2 = StringArray::from(vec![r#"[1,2,3]"#]);
+        let delim = StringArray::from(vec![":"]);
+        let args = [
+            ColumnarValue::Array(Arc::new(f1)),
+            ColumnarValue::Array(Arc::new(f2)),
+            ColumnarValue::Array(Arc::new(delim)),
+        ];
+        let result = arr_zip_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert!(!out.is_null(0));
+            let v = out.value(0);
+            assert!(v.contains("a:1") && v.contains("b:2") && v.contains("c:3"));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
+    #[test]
+    fn test_arr_zip_impl_wrong_arg_count_errors() {
+        assert!(arr_zip_impl(&[]).is_err());
+    }
+
+    #[test]
+    fn test_arr_zip_impl_invalid_json_returns_null() {
+        let f1 = StringArray::from(vec!["not-json"]);
+        let f2 = StringArray::from(vec![r#"[1,2]"#]);
+        let delim = StringArray::from(vec![","]);
+        let args = [
+            ColumnarValue::Array(Arc::new(f1)),
+            ColumnarValue::Array(Arc::new(f2)),
+            ColumnarValue::Array(Arc::new(delim)),
+        ];
+        let result = arr_zip_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            let out = out.as_any().downcast_ref::<StringArray>().unwrap();
+            assert!(out.is_null(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
 
     // Helper function to run a single test case
     async fn run_single_test(

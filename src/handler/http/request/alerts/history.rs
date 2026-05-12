@@ -1174,4 +1174,76 @@ mod tests {
         assert_eq!(deserialized.size, 10);
         assert_eq!(deserialized.hits.len(), 1);
     }
+
+    #[test]
+    fn test_alert_history_entry_dedup_fields_absent_when_none() {
+        let entry = AlertHistoryEntry {
+            timestamp: 0,
+            alert_name: "a".to_string(),
+            org: "o".to_string(),
+            status: "ok".to_string(),
+            is_realtime: false,
+            is_silenced: false,
+            start_time: 0,
+            end_time: 0,
+            retries: 0,
+            error: None,
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: None,
+            query_took: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
+            anomaly_count: None,
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("dedup_enabled"));
+        assert!(!obj.contains_key("dedup_suppressed"));
+        assert!(!obj.contains_key("dedup_count"));
+        assert!(!obj.contains_key("grouped"));
+        assert!(!obj.contains_key("group_size"));
+        assert!(!obj.contains_key("anomaly_count"));
+    }
+
+    #[test]
+    fn test_alert_history_entry_dedup_fields_present_when_some() {
+        let entry = AlertHistoryEntry {
+            timestamp: 0,
+            alert_name: "a".to_string(),
+            org: "o".to_string(),
+            status: "ok".to_string(),
+            is_realtime: false,
+            is_silenced: false,
+            start_time: 0,
+            end_time: 0,
+            retries: 0,
+            error: None,
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: None,
+            query_took: None,
+            dedup_enabled: Some(true),
+            dedup_suppressed: Some(false),
+            dedup_count: Some(5),
+            grouped: Some(true),
+            group_size: Some(3),
+            anomaly_count: Some(2),
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("dedup_enabled"));
+        assert!(obj.contains_key("dedup_suppressed"));
+        assert!(obj.contains_key("dedup_count"));
+        assert!(obj.contains_key("grouped"));
+        assert!(obj.contains_key("group_size"));
+        assert!(obj.contains_key("anomaly_count"));
+    }
 }

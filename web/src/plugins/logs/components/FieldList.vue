@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="props.row.name === 'no-fields-found'"
         class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
       >
-        <q-icon name="info" color="primary"
-size="xs" />
+        <q-icon name="info" color="primary" size="xs" />
         <span class="tw:pl-[0.375rem]">No matching fields found.</span>
       </q-tr>
 
@@ -66,16 +65,20 @@ size="xs" />
                 : expandGroupRowsFieldCount[props.row.group]
             }})
           </div>
-          <q-btn
+          <OButton
             v-if="expandGroupRowsFieldCount[props.row.group] > 0"
-            :icon="
-              expandGroupRows[props.row.group] ? 'expand_more' : 'chevron_right'
-            "
-            dense
-            size="xs"
-            flat
-            class="q-pa-none"
-          ></q-btn>
+            variant="ghost"
+            size="icon-xs-sq"
+          >
+            <q-icon
+              :name="
+                expandGroupRows[props.row.group]
+                  ? 'expand_more'
+                  : 'chevron_right'
+              "
+              size="14px"
+            />
+          </OButton>
         </q-td>
       </q-tr>
 
@@ -180,13 +183,11 @@ size="xs" />
           class="indexlist-search-input tw:mb-[0.25rem]"
         >
           <template #prepend>
-            <q-icon name="search" size="1.25rem"
-class="o2-search-input-icon" />
+            <q-icon name="search" size="1.25rem" class="o2-search-input-icon" />
           </template>
         </q-input>
         <q-tr v-if="loadingStream == true">
-          <q-td colspan="100%" class="text-bold"
-style="opacity: 0.7">
+          <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
             <div class="text-subtitle2 text-weight-bold">
               <q-spinner-hourglass size="1.25rem" />
               {{ t("confirmDialog.loading") }}
@@ -226,6 +227,7 @@ import { useI18n } from "vue-i18n";
 import FieldRow from "./FieldRow.vue";
 import FieldExpansion from "./FieldExpansion.vue";
 import FieldListPagination from "./FieldListPagination.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const { t } = useI18n();
 

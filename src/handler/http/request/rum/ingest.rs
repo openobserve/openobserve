@@ -312,3 +312,90 @@ pub async fn sessionreplay(
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rum_stream_constants() {
+        assert_eq!(RUM_LOG_STREAM, "_rumlog");
+        assert_eq!(RUM_SESSION_REPLAY_STREAM, "_sessionreplay");
+        assert_eq!(RUM_DATA_STREAM, "_rumdata");
+    }
+
+    #[test]
+    fn test_event_default_values() {
+        let e = Event::default();
+        assert_eq!(e.raw_segment_size, 0);
+        assert_eq!(e.compressed_segment_size, 0);
+        assert_eq!(e.start, 0);
+        assert_eq!(e.end, 0);
+        assert!(e.creation_reason.is_empty());
+        assert_eq!(e.records_count, 0);
+        assert!(!e.has_full_snapshot);
+        assert_eq!(e.index_in_view, 0);
+        assert!(e.source.is_empty());
+    }
+
+    #[test]
+    fn test_application_session_view_defaults() {
+        let app = Application::default();
+        let sess = Session::default();
+        let view = View::default();
+        assert!(app.id.is_empty());
+        assert!(sess.id.is_empty());
+        assert!(view.id.is_empty());
+    }
+
+    #[test]
+    fn test_event_serde_roundtrip() {
+        let e = Event {
+            raw_segment_size: 100,
+            compressed_segment_size: 50,
+            start: 1000,
+            end: 2000,
+            creation_reason: "end".to_string(),
+            records_count: 5,
+            has_full_snapshot: true,
+            index_in_view: 3,
+            source: "browser".to_string(),
+            application: Application {
+                id: "app-1".to_string(),
+            },
+            session: Session {
+                id: "sess-1".to_string(),
+            },
+            view: View {
+                id: "view-1".to_string(),
+            },
+        };
+        let json = serde_json::to_string(&e).unwrap();
+        let back: Event = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.raw_segment_size, 100);
+        assert_eq!(back.compressed_segment_size, 50);
+        assert_eq!(back.records_count, 5);
+        assert!(back.has_full_snapshot);
+        assert_eq!(back.application.id, "app-1");
+        assert_eq!(back.session.id, "sess-1");
+        assert_eq!(back.view.id, "view-1");
+    }
+
+    #[test]
+    fn test_segment_event_serde_construction() {
+        let e = Event::default();
+        let s = SegmentEventSerde {
+            segment: "abc".to_string(),
+            event: e.clone(),
+        };
+        assert_eq!(s.segment, "abc");
+        assert_eq!(s.event, e);
+    }
+
+    #[test]
+    fn test_event_equality() {
+        let e1 = Event::default();
+        let e2 = Event::default();
+        assert_eq!(e1, e2);
+    }
+}

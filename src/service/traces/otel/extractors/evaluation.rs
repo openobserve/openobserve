@@ -356,4 +356,98 @@ mod tests {
             EvaluatorType::Deterministic
         );
     }
+
+    #[test]
+    fn test_evaluator_type_as_str() {
+        assert_eq!(EvaluatorType::Human.as_str(), "human");
+        assert_eq!(EvaluatorType::Model.as_str(), "model");
+        assert_eq!(EvaluatorType::Deterministic.as_str(), "deterministic");
+    }
+
+    #[test]
+    fn test_has_any_false_when_only_duration_ms_set() {
+        // duration_ms is not included in has_any()
+        let extractor = EvaluationExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("llm.evaluation.duration_ms".to_string(), json::json!(42.0));
+        let eval = extractor.extract(&attrs);
+        assert!(!eval.has_any());
+        assert_eq!(eval.scores.duration_ms, Some(42.0));
+    }
+
+    #[test]
+    fn test_extract_string_non_string_returns_json_string() {
+        // extract_string falls back to v.to_string() for non-string values
+        let extractor = EvaluationExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "llm.evaluation.commentary".to_string(),
+            json::json!({"detail": "ok"}),
+        );
+        let eval = extractor.extract(&attrs);
+        let commentary = eval.commentary.unwrap();
+        assert!(commentary.contains("detail"));
+    }
+
+    #[test]
+    fn test_extract_commentary_from_underscore_format() {
+        let extractor = EvaluationExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "llm_evaluation_commentary".to_string(),
+            json::json!("Looks good"),
+        );
+        let eval = extractor.extract(&attrs);
+        assert_eq!(eval.commentary, Some("Looks good".to_string()));
+    }
+
+    #[test]
+    fn test_extract_evaluator_from_underscore_format() {
+        let extractor = EvaluationExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("llm.evaluation.quality_score".to_string(), json::json!(0.9));
+        attrs.insert("llm_evaluator_name".to_string(), json::json!("my-eval"));
+        attrs.insert("llm_evaluator_version".to_string(), json::json!("2.0"));
+        attrs.insert("llm_evaluator_type".to_string(), json::json!("llm"));
+        let eval = extractor.extract(&attrs);
+        assert_eq!(eval.evaluator.name, Some("my-eval".to_string()));
+        assert_eq!(eval.evaluator.version, Some("2.0".to_string()));
+        assert_eq!(eval.evaluator.evaluator_type, EvaluatorType::Model);
+    }
+
+    #[test]
+    fn test_has_any_true_when_quality_score_set() {
+        let scores = EvaluationScores {
+            quality_score: Some(0.9),
+            relevance: None,
+            completeness: None,
+            tool_effectiveness: None,
+            groundedness: None,
+            safety: None,
+            duration_ms: None,
+        };
+        assert!(scores.has_any());
+    }
+
+    #[test]
+    fn test_evaluation_has_any_delegates_to_scores() {
+        let eval = Evaluation {
+            scores: EvaluationScores {
+                quality_score: Some(0.8),
+                relevance: None,
+                completeness: None,
+                tool_effectiveness: None,
+                groundedness: None,
+                safety: None,
+                duration_ms: None,
+            },
+            commentary: None,
+            evaluator: EvaluatorInfo {
+                name: None,
+                version: None,
+                evaluator_type: EvaluatorType::Deterministic,
+            },
+        };
+        assert!(eval.has_any());
+    }
 }

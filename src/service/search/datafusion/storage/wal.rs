@@ -123,3 +123,50 @@ impl ObjectStore for FS {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use object_store::path::Path;
+
+    use super::*;
+
+    #[test]
+    fn test_name_returns_wal() {
+        assert_eq!(FS::name(), "Wal");
+    }
+
+    #[test]
+    fn test_display_formats_wal() {
+        let fs = FS::new();
+        assert_eq!(format!("{fs}"), "Wal");
+    }
+
+    #[tokio::test]
+    async fn test_put_opts_returns_not_implemented() {
+        let fs = FS::new();
+        let path = Path::from("test/file.parquet");
+        let result = fs
+            .put_opts(&path, PutPayload::default(), PutOptions::default())
+            .await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_list_with_delimiter_returns_not_implemented() {
+        let fs = FS::new();
+        let result = fs.list_with_delimiter(None).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_copy_opts_returns_not_implemented() {
+        let fs = FS::new();
+        let from = Path::from("src/file.parquet");
+        let to = Path::from("dst/file.parquet");
+        let result = fs.copy_opts(&from, &to, CopyOptions::default()).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::NotImplemented { .. }));
+    }
+}

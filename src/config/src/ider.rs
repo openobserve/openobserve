@@ -674,6 +674,51 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_file_name() {
+        let name1 = generate_file_name();
+        let name2 = generate_file_name();
+        assert_ne!(name1, name2);
+        // last 4 chars are hex digits
+        assert_eq!(name1.len(), name1.len());
+        let suffix = &name1[name1.len() - 4..];
+        assert!(suffix.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_snowflake_generator_generate_method() {
+        let mut snowflake = SnowflakeIdGenerator::new(0);
+        let id1 = snowflake.generate();
+        let id2 = snowflake.generate();
+        assert_ne!(id1, id2);
+        assert!(id1 > 0);
+    }
+
+    #[test]
+    fn test_snowflake_generator_lazy_generate() {
+        let mut snowflake = SnowflakeIdGenerator::new(0);
+        let id1 = snowflake.lazy_generate();
+        let id2 = snowflake.lazy_generate();
+        assert_ne!(id1, id2);
+        assert!(id1 > 0);
+    }
+
+    #[test]
+    fn test_snowflake_generator_mem_size() {
+        use crate::stats::MemorySize;
+        let snowflake = SnowflakeIdGenerator::new(1);
+        assert_eq!(
+            snowflake.mem_size(),
+            std::mem::size_of::<SnowflakeIdGenerator>()
+        );
+    }
+
+    #[test]
+    fn test_get_time_millis_is_positive() {
+        let t = get_time_millis(std::time::UNIX_EPOCH);
+        assert!(t > 0);
+    }
+
+    #[test]
     fn test_concurrent_id_generation() {
         use std::{
             sync::{

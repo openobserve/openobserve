@@ -61,6 +61,9 @@ export const useSearchConnection = () => {
     if (type === "search") {
       searchObj.data.lastSearchTraceId = traceId;
     }
+    if (type === "histogram") {
+      searchObj.data.lastHistogramTraceId = traceId;
+    }
 
     const payload: {
       queryReq: SearchRequestPayload;

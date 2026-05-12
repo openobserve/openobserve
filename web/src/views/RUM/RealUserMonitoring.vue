@@ -34,13 +34,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
       <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem]">
-        <AppTabs
-          :show="showTabs"
-          :tabs="tabs"
-          class="card-container"
-          v-model:active-tab="activeTab"
-          @update:active-tab="changeTab"
-        />
+        <div class="card-container tw:px-4 tw:pt-2">
+          <OTabs v-model="activeTab" align="left" dense @change="changeTab">
+            <OTab
+              v-for="tab in tabs"
+              :key="tab.value"
+              :name="tab.value"
+              :label="tab.label"
+            />
+          </OTabs>
+        </div>
       </div>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
@@ -81,16 +84,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div></div>
             </div>
           </div>
-          <q-btn
-            class="o2-primary-button tw:h-[36px]"
-            flat
-            no-caps
+          <OButton
+            variant="primary"
+            size="sm-action"
             :title="t('rum.getStartedTitle')"
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
             <q-icon name="arrow_forward" size="1.25rem" class="q-ml-xs" />
-          </q-btn>
+          </OButton>
         </div>
       </div>
     </template>
@@ -117,7 +119,9 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import useRum from "@/composables/rum/useRum";
 import useStreams from "@/composables/useStreams";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const route = useRoute();
 const router = useRouter();

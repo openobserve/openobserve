@@ -58,27 +58,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
 
-        <div class="flex justify-start tw:mt-6">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        <div class="flex justify-start tw:mt-6 tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="emits('cancel:hideform')"
             data-test="add-alert-cancel-btn"
-          />
-          <q-btn
-            :disable="!name || !isValidRoleName"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('alerts.save')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          >
+            {{ t('alerts.cancel') }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :disabled="!name || !isValidRoleName"
             @click="saveRole"
             data-test="add-alert-submit-btn"
-          />
+          >
+            {{ t('alerts.save') }}
+          </OButton>
         </div>
       </div>
     </q-card-section>
@@ -87,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { createRole, updateRole } from "@/services/iam";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";

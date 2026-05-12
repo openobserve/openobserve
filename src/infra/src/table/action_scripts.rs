@@ -222,3 +222,64 @@ pub async fn clear() -> Result<(), errors::Error> {
 pub async fn is_empty() -> Result<bool, errors::Error> {
     Ok(len().await? == 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::actions::action::ExecutionDetailsType;
+    use svix_ksuid::KsuidLike;
+
+    use super::*;
+    use crate::table::entity::action_scripts::Model;
+
+    fn make_model(id: &str, execution_details: &str, status: &str) -> Model {
+        Model {
+            id: id.to_string(),
+            name: "my-action".to_string(),
+            file_path: "/zip/file.zip".to_string(),
+            file_name: "file.zip".to_string(),
+            org_id: "myorg".to_string(),
+            created_by: "admin".to_string(),
+            origin_cluster_url: String::new(),
+            env: serde_json::json!({"KEY": "value"}),
+            execution_details: execution_details.to_string(),
+            cron_expr: None,
+            created_at: 1_000_000_000_000,
+            last_modified_at: 2_000_000_000_000,
+            last_executed_at: None,
+            last_successful_at: None,
+            description: Some("test action".to_string()),
+            status: status.to_string(),
+            service_account: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_try_from_model_valid() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let action = Action::try_from(make_model(&id, "once", "ready")).unwrap();
+        assert_eq!(action.name, "my-action");
+        assert_eq!(action.org_id, "myorg");
+        assert_eq!(action.execution_details, ExecutionDetailsType::Once);
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_ksuid() {
+        let result = Action::try_from(make_model("not-a-ksuid", "once", "ready"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_repeat_execution_details() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let action = Action::try_from(make_model(&id, "repeat", "running")).unwrap();
+        assert_eq!(action.execution_details, ExecutionDetailsType::Repeat);
+    }
+
+    #[test]
+    fn test_try_from_model_optional_fields_none() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let action = Action::try_from(make_model(&id, "service", "ready")).unwrap();
+        assert!(action.last_executed_at.is_none());
+        assert!(action.cron_expr.is_none());
+    }
+}

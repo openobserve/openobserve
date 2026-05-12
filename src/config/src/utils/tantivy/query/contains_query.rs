@@ -370,4 +370,94 @@ mod test {
             .unwrap();
         assert!(top_docs.is_empty(), "Expected ZERO document");
     }
+
+    mod automaton_tests {
+        use tantivy_fst::Automaton;
+
+        use super::super::{ContainsAutomaton, ContainsState};
+
+        #[test]
+        fn test_automaton_start_is_searching_pos_zero() {
+            let auto = ContainsAutomaton::new("hello", false);
+            assert_eq!(auto.start(), ContainsState::Searching { pos: 0 });
+        }
+
+        #[test]
+        fn test_automaton_is_match_found_true_searching_false() {
+            let auto = ContainsAutomaton::new("hi", false);
+            assert!(auto.is_match(&ContainsState::Found));
+            assert!(!auto.is_match(&ContainsState::Searching { pos: 0 }));
+            assert!(!auto.is_match(&ContainsState::Searching { pos: 1 }));
+        }
+
+        #[test]
+        fn test_automaton_can_match_always_true() {
+            let auto = ContainsAutomaton::new("hi", false);
+            assert!(auto.can_match(&ContainsState::Found));
+            assert!(auto.can_match(&ContainsState::Searching { pos: 0 }));
+        }
+
+        #[test]
+        fn test_automaton_accept_found_stays_found() {
+            let auto = ContainsAutomaton::new("ab", false);
+            let state = auto.accept(&ContainsState::Found, b'x');
+            assert_eq!(state, ContainsState::Found);
+        }
+
+        #[test]
+        fn test_automaton_accept_matches_single_char_keyword() {
+            let auto = ContainsAutomaton::new("a", false);
+            let state = auto.accept(&ContainsState::Searching { pos: 0 }, b'a');
+            assert_eq!(state, ContainsState::Found);
+        }
+
+        #[test]
+        fn test_automaton_accept_case_insensitive_uppercase() {
+            let auto = ContainsAutomaton::new("hello", false);
+            // 'H' lowercased = 'h', should match keyword[0]
+            let state = auto.accept(&ContainsState::Searching { pos: 0 }, b'H');
+            assert_eq!(state, ContainsState::Searching { pos: 1 });
+        }
+
+        #[test]
+        fn test_automaton_accept_case_sensitive_uppercase_no_match() {
+            let auto = ContainsAutomaton::new("hello", true);
+            // 'H' != 'h' in case-sensitive mode
+            let state = auto.accept(&ContainsState::Searching { pos: 0 }, b'H');
+            assert_eq!(state, ContainsState::Searching { pos: 0 });
+        }
+
+        #[test]
+        fn test_automaton_accept_mid_keyword_mismatch_restarts() {
+            // keyword = "ab", state = Searching { pos: 1 }, byte = 'x'
+            // pos > 0, byte != 'a', so restart to pos: 0
+            let auto = ContainsAutomaton::new("ab", false);
+            let state = auto.accept(&ContainsState::Searching { pos: 1 }, b'x');
+            assert_eq!(state, ContainsState::Searching { pos: 0 });
+        }
+
+        #[test]
+        fn test_automaton_accept_mid_keyword_mismatch_restarts_at_first() {
+            // keyword = "ab", state = Searching { pos: 1 }, byte = 'a'
+            // pos > 0, byte == keyword[0] = 'a', so go to pos: 1
+            let auto = ContainsAutomaton::new("ab", false);
+            let state = auto.accept(&ContainsState::Searching { pos: 1 }, b'a');
+            assert_eq!(state, ContainsState::Searching { pos: 1 });
+        }
+
+        #[test]
+        fn test_automaton_full_match_sequence() {
+            // Feed "xab" into automaton for keyword "ab"
+            let auto = ContainsAutomaton::new("ab", false);
+            let s0 = auto.start();
+            assert_eq!(s0, ContainsState::Searching { pos: 0 });
+            let s1 = auto.accept(&s0, b'x');
+            assert_eq!(s1, ContainsState::Searching { pos: 0 });
+            let s2 = auto.accept(&s1, b'a');
+            assert_eq!(s2, ContainsState::Searching { pos: 1 });
+            let s3 = auto.accept(&s2, b'b');
+            assert_eq!(s3, ContainsState::Found);
+            assert!(auto.is_match(&s3));
+        }
+    }
 }

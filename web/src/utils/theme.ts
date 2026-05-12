@@ -56,6 +56,38 @@ export const mixColors = (color1: string, color2: string, percentage: number): s
 };
 
 /**
+ * Generate a full primary color palette from a single base hex color.
+ * The base color is treated as the 600 shade; lighter shades are mixed
+ * towards white, darker shades towards black.
+ */
+const generatePrimaryPalette = (baseHex: string): Record<string, string> => {
+  return {
+    '50':  mixColors(baseHex, '#ffffff', 5),
+    '100': mixColors(baseHex, '#ffffff', 15),
+    '200': mixColors(baseHex, '#ffffff', 30),
+    '300': mixColors(baseHex, '#ffffff', 50),
+    '400': mixColors(baseHex, '#ffffff', 70),
+    '500': mixColors(baseHex, '#ffffff', 85),
+    '600': baseHex,
+    '700': mixColors(baseHex, '#000000', 80),
+    '800': mixColors(baseHex, '#000000', 60),
+    '900': mixColors(baseHex, '#000000', 40),
+  };
+};
+
+/**
+ * Sync the O2 component-library design tokens (--color-primary-*)
+ * with the current custom theme color so all O2 components pick it up.
+ */
+const syncO2LibraryTokens = (themeColor: string): void => {
+  const palette = generatePrimaryPalette(themeColor);
+  const root = document.documentElement;
+  for (const [shade, hex] of Object.entries(palette)) {
+    root.style.setProperty(`--color-primary-${shade}`, hex);
+  }
+};
+
+/**
  * Apply theme colors directly to CSS variables
  * @param themeColor - Hex color code for the theme
  * @param mode - Theme mode ("light" or "dark")
@@ -63,6 +95,12 @@ export const mixColors = (color1: string, color2: string, percentage: number): s
  */
 export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault: boolean = false) => {
   const isDarkMode = mode === "dark";
+
+  // Toggle .dark class on <html> for the O2 component library (Tailwind dark variant)
+  document.documentElement.classList.toggle('dark', isDarkMode);
+
+  // Sync O2 library tokens with the custom theme color
+  syncO2LibraryTokens(themeColor);
 
   if (isDarkMode) {
     // Apply dark mode theme color

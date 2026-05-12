@@ -433,24 +433,32 @@ test.describe("Scheduled Alert Features", () => {
         await viewEditorBtn.click();
         await page.waitForTimeout(1000);
 
-        const sqlEditor = page.locator(pm.alertsPage.locators.sqlEditorDialog).locator('.inputarea');
-        await page.locator(pm.alertsPage.locators.viewLineLocator).first().click();
-        await sqlEditor.fill(`SELECT COUNT(*) as cnt FROM "${STREAM_NAME}"`);
+        // Click monaco-editor with force to bypass q-portal overlay
+        const monacoEditor = page.locator(pm.alertsPage.locators.sqlEditorDialog).locator('.monaco-editor').last();
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        await monacoEditor.click({ force: true });
+        await page.waitForTimeout(500);
+        await page.keyboard.type(`SELECT COUNT(*) as cnt FROM "${STREAM_NAME}"`);
 
         // Run query
         await page.locator(pm.alertsPage.locators.runQueryButton).click();
         await page.waitForTimeout(3000);
 
-        // Close editor
+        // Close editor — force-click bypasses q-portal overlay
         try {
             const closeButton = page.locator(pm.alertsPage.locators.alertBackButton).first();
-            if (await closeButton.isVisible({ timeout: 3000 })) {
-                await closeButton.click();
-            }
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
             await page.keyboard.press('Escape');
+            await page.waitForTimeout(500);
         }
         await page.waitForTimeout(1500);
+        // Cleanup: remove any q-portal elements that intercept clicks
+        await page.evaluate(() => {
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+        }).catch(e => testLogger.warn('Failed to remove q-portals', { error: e.message }));
+        await page.waitForTimeout(500);
 
         testLogger.info('=== PHASE 3: Verify preview chart is visible ===');
 
@@ -476,37 +484,141 @@ test.describe("Scheduled Alert Features", () => {
 
     // ========================================================================
     // TEST 5: P2 - "Would Trigger" indicator displays for scheduled alerts
+    //
+    // KEY INSIGHT: PreviewAlert.handleChartDataUpdate() has a guard at its top
+    // that returns early if `props.formData.trigger_condition` is null/undefined
+    // (PreviewAlert.vue ~line 653). This means the evaluation status is NEVER
+    // computed unless trigger_condition is already populated when chart data
+    // arrives from PanelSchemaRenderer.
+    //
+    // Therefore the order of operations is CRITICAL:
+    //   WRONG: Run query first, then set threshold
+    //          → chart data arrives when trigger_condition is null
+    //          → handleChartDataUpdate returns early → no evaluation
+    //   CORRECT: Set threshold first, then run query
+    //            → trigger_condition is populated before chart data arrives
+    //            → handleChartDataUpdate evaluates → indicator appears
+    //
+    // Approach:
+    // 1. Open scheduled alert wizard (stays in "Alert Rules" tab, Custom/Builder mode)
+    // 2. Set threshold operator (>=) and value (1) in the "Alert if row" FIRST
+    // 3. Switch to SQL tab, enter query, and run it
+    // 4. Close SQL editor dialog, clean up q-portals
+    // 5. Check for evaluation status indicator
     // ========================================================================
     test("Would Trigger indicator displays for scheduled alerts", {
         tag: ['@alertScheduled', '@preview', '@edgeCase', '@P2', '@all', '@alerts']
     }, async ({ page }) => {
-        testLogger.info('=== PHASE 1: Open existing scheduled alert for editing ===');
+        testLogger.info('=== PHASE 1: Open fresh scheduled alert wizard ===');
 
         await pm.alertsPage.navigateToFolder(FOLDER_NAME);
         await page.waitForTimeout(1000);
 
-        // Edit the API-created alert
-        await pm.alertsPage.clickAlertUpdateButton(API_ALERT_NAME);
-        await page.waitForTimeout(2000);
+        // Use setupScheduledAlertWizardToStep2 to create a fresh scheduled alert wizard
+        // (no destination needed since we won't save — just evaluating the preview)
+        await pm.alertsPage.setupScheduledAlertWizardToStep2(STREAM_NAME, 'auto_eval_test_' + RUN_ID);
 
-        testLogger.info('=== PHASE 2: Check for evaluation status indicator ===');
+        testLogger.info('=== PHASE 2: Set trigger condition threshold FIRST ===');
 
-        // The "Would Trigger" indicator should be visible for scheduled alerts
-        // It's in the AlertWizardRightColumn persistent panel
-        // Wait for the preview to potentially load and evaluate
+        // Set trigger_condition BEFORE running any query so that when chart data
+        // arrives, handleChartDataUpdate can evaluate instead of returning early.
+        // The "Alert if" row is auto-rendered in v3 for scheduled alerts.
+        const alertIfRow = page.locator('.alert-condition-row').filter({ hasText: 'Alert if' }).first();
+        const rowVisible = await alertIfRow.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (rowVisible) {
+            // Set threshold operator (2nd .alert-v3-select — 1st is the function dropdown)
+            const thresholdOperator = alertIfRow.locator('.alert-v3-select').nth(1);
+            if (await thresholdOperator.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await thresholdOperator.click();
+                await page.waitForTimeout(500);
+                await page.locator('.q-menu:visible').getByText('>=', { exact: true }).click();
+                await page.waitForTimeout(300);
+                testLogger.info('Set threshold operator to >=');
+            }
+
+            // Set threshold value
+            const thresholdInput = alertIfRow.locator('input[type="number"]').first();
+            if (await thresholdInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await thresholdInput.fill('1');
+                await page.waitForTimeout(500);
+                testLogger.info('Set threshold value to 1');
+            }
+        } else {
+            testLogger.info('Alert if row not found, trying fallback');
+            const fallbackRow = page.locator('.alert-condition-row').first();
+            if (await fallbackRow.isVisible({ timeout: 3000 }).catch(() => false)) {
+                const fallbackInput = fallbackRow.locator('input[type="number"]').first();
+                if (await fallbackInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await fallbackInput.fill('1');
+                    await page.waitForTimeout(500);
+                    testLogger.info('Set threshold via fallback');
+                }
+            }
+        }
+
+        testLogger.info('=== PHASE 3: Switch to SQL tab, enter query, and run ===');
+
+        // Click SQL tab
+        const sqlTab = page.locator(pm.alertsPage.locators.tabSql);
+        await sqlTab.waitFor({ state: 'visible', timeout: 10000 });
+        await sqlTab.click();
+        await page.waitForTimeout(1000);
+
+        // Open SQL editor
+        const viewEditorBtn = page.locator(pm.alertsPage.locators.viewEditorButton);
+        await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await viewEditorBtn.click();
+        await page.waitForTimeout(1000);
+
+        // Type query in monaco editor (force-click to bypass any overlays)
+        const monacoEditor = page.locator(pm.alertsPage.locators.sqlEditorDialog).locator('.monaco-editor').last();
+        await monacoEditor.waitFor({ state: 'visible', timeout: 30000 });
+        await monacoEditor.click({ force: true });
+        await page.waitForTimeout(500);
+        await page.keyboard.type(`SELECT COUNT(*) as cnt FROM "${STREAM_NAME}"`);
+
+        // Run query — this triggers PanelSchemaRenderer which emits
+        // @result-metadata-update, calling handleChartDataUpdate.
+        // Since trigger_condition is already set (Phase 2),
+        // handleChartDataUpdate will evaluate and call evaluateAndSetStatus().
+        await page.locator(pm.alertsPage.locators.runQueryButton).click();
+        await page.waitForTimeout(3000);
+
+        // Close editor — force-click bypasses q-portal overlay
+        try {
+            const closeButton = page.locator(pm.alertsPage.locators.alertBackButton).first();
+            await closeButton.click({ force: true, timeout: 10000 });
+        } catch (error) {
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(500);
+        }
+        await page.waitForTimeout(1500);
+
+        // Remove any residual q-portal elements that intercept clicks
+        await page.evaluate(() => {
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+        }).catch(e => testLogger.warn('Failed to remove q-portals', { error: e.message }));
+        await page.waitForTimeout(500);
+
+        testLogger.info('=== PHASE 4: Check for evaluation status indicator ===');
+
+        // Wait for handleChartDataUpdate to process and set evaluationStatus
+        await page.waitForTimeout(3000);
+
         await pm.alertsPage.expectEvaluationStatusIndicatorVisible();
 
         const statusText = await pm.alertsPage.getEvaluationStatusText();
         testLogger.info('Evaluation status indicator visible', { text: statusText });
 
-        // Should contain either "WOULD TRIGGER" or "WOULD NOT TRIGGER"
-        const hasExpectedText = statusText.includes('WOULD TRIGGER') || statusText.includes('WOULD NOT TRIGGER');
+        // Should contain either "Would Trigger" or "Would Not Trigger" (case-insensitive)
+        const hasExpectedText = /would trigger/i.test(statusText) || /would not trigger/i.test(statusText);
         expect(hasExpectedText).toBe(true);
         testLogger.info('Status indicator has expected text');
 
-        testLogger.info('=== PHASE 3: Verify indicator hidden for real-time context ===');
+        testLogger.info('=== PHASE 5: Clean up - go back ===');
 
-        // Go back
         await pm.alertsPage.clickBackButton();
         await page.waitForTimeout(1000);
 
@@ -516,41 +628,60 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 6: P2 - Aggregation toggle off clears configuration
     // ========================================================================
-    test("Aggregation toggle off clears group-by fields", {
+    test("Aggregation function dropdown enables/disables group-by fields", {
         tag: ['@alertScheduled', '@aggregation', '@edgeCase', '@P2', '@all', '@alerts']
     }, async ({ page }) => {
-        testLogger.info('=== PHASE 1: Open alert wizard and navigate to Step 2 ===');
+        testLogger.info('=== PHASE 1: Open alert wizard (v3 flat UI) ===');
 
         await pm.alertsPage.navigateToFolder(FOLDER_NAME);
         await page.waitForTimeout(1000);
 
         await pm.alertsPage.setupScheduledAlertWizardToStep2(STREAM_NAME, 'auto_agg_toggle_' + RUN_ID);
 
-        testLogger.info('=== PHASE 2: Toggle aggregation ON ===');
+        testLogger.info('=== PHASE 2: Enable aggregation via function dropdown ===');
 
-        // Find and click the aggregation toggle
-        // The aggregation toggle is the only q-toggle in the step-query-config section
-        const aggregationToggle = pm.alertsPage.getAggregationToggle();
-        await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
-        await aggregationToggle.click();
-        await page.waitForTimeout(1000);
+        // In v3, aggregation is controlled by the function dropdown in the "Alert if" row
+        // Default is "total events" (no aggregation). Select "count" to enable aggregation.
+        // The "Alert if" condition row is auto-created in v3, so no "Add Condition" click needed.
+        await pm.alertsPage.enableAggregation();
+        await page.waitForTimeout(500);
 
-        // Verify group-by section appeared
+        // Verify group-by section appeared (v-if="selectedFunction !== 'total_events'")
         const groupByLabel = pm.alertsPage.getGroupByLabel().first();
         await expect(groupByLabel).toBeVisible({ timeout: 5000 });
         testLogger.info('Aggregation ON: Group By section visible');
 
-        // Verify aggregation threshold section appeared (i18n: "Alert If Any Groups *")
+        // Add a group-by field so that "Having groups" section appears
+        // (v-if="selectedFunction !== 'total_events' && hasLogGroupByFields")
+        const groupBySection = page.locator('.alert-condition-row').filter({ hasText: 'Group by' }).first();
+        await groupBySection.waitFor({ state: 'visible', timeout: 5000 });
+        const addGroupByBtn = groupBySection.locator('button').last();
+        await addGroupByBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await addGroupByBtn.click();
+        await page.waitForTimeout(800);
+        // Select first available group-by field
+        const groupBySelect = groupBySection.locator('.q-select').first();
+        await groupBySelect.waitFor({ state: 'visible', timeout: 5000 });
+        await groupBySelect.click();
+        await page.waitForTimeout(500);
+        const groupByMenu = page.locator('.q-menu:visible');
+        await expect(groupByMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        await groupByMenu.locator('.q-item').first().click();
+        await page.waitForTimeout(500);
+        testLogger.info('Added group-by field');
+
+        // Verify aggregation threshold section appeared (i18n: "alerts.queryConfig.havingGroups" = "Having groups")
         const aggThresholdLabel = pm.alertsPage.getAggregationThresholdLabel().first();
         await expect(aggThresholdLabel).toBeVisible({ timeout: 5000 });
         testLogger.info('Aggregation ON: Threshold section visible');
 
-        testLogger.info('=== PHASE 3: Toggle aggregation OFF ===');
+        testLogger.info('=== PHASE 3: Disable aggregation via function dropdown ===');
 
-        await aggregationToggle.click();
-        await page.waitForTimeout(1000);
+        // Select "total events" from the function dropdown to disable aggregation
+        await pm.alertsPage.disableAggregation();
+        await page.waitForTimeout(500);
 
-        // Verify group-by section disappeared
+        // Verify group-by section disappeared (hidden when function === 'total_events')
         await expect(groupByLabel).not.toBeVisible({ timeout: 5000 });
         testLogger.info('Aggregation OFF: Group By section hidden');
 
@@ -562,7 +693,7 @@ test.describe("Scheduled Alert Features", () => {
         await pm.alertsPage.clickBackButton();
         await page.waitForTimeout(1000);
 
-        testLogger.info('=== Aggregation toggle test COMPLETE ===');
+        testLogger.info('=== Aggregation function dropdown test COMPLETE ===');
     });
 
     // Bug #10899 test moved to RegressionSet/alerts-regression.spec.js to avoid duplication

@@ -25,9 +25,10 @@ test.describe("Trace Query Editor testcases", () => {
     await pm.tracesPage.navigateToTraces();
 
     // Select the default stream as data is ingested for it only
-    if (await pm.tracesPage.isStreamSelectVisible()) {
-      await pm.tracesPage.selectTraceStream('default');
-    }
+    await pm.tracesPage.isStreamSelectVisible()
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForTimeout(2000);
+
 
     testLogger.info('Test setup completed for trace query editor');
   });

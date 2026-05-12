@@ -475,4 +475,32 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_simple_topn_visitor_initial_state() {
+        let fields = HashSet::from(["service".to_string()]);
+        let visitor = SimpleTopnVisitor::new(fields.clone());
+        assert!(visitor.simple_topn.is_none());
+        assert!(visitor.secondary_sort_column.is_none());
+        assert_eq!(visitor.index_fields, fields);
+    }
+
+    #[test]
+    fn test_simple_topn_visitor_empty_index_fields() {
+        let fields: HashSet<String> = HashSet::new();
+        let visitor = SimpleTopnVisitor::new(fields.clone());
+        assert!(visitor.simple_topn.is_none());
+        assert!(visitor.secondary_sort_column.is_none());
+        assert!(visitor.index_fields.is_empty());
+    }
+
+    #[test]
+    fn test_simple_topn_visitor_multiple_index_fields() {
+        let fields = HashSet::from(["service".to_string(), "host".to_string(), "pod".to_string()]);
+        let visitor = SimpleTopnVisitor::new(fields.clone());
+        assert_eq!(visitor.index_fields.len(), 3);
+        assert!(visitor.index_fields.contains("service"));
+        assert!(visitor.index_fields.contains("host"));
+        assert!(visitor.index_fields.contains("pod"));
+    }
 }

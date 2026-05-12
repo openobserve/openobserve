@@ -1826,6 +1826,376 @@ mod test {
         assert_eq!(active_array.value(2), true);
     }
 
+    // ── concat_batches ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_concat_batches_empty_batches_list() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int64, false),
+            Field::new("b", DataType::Utf8, true),
+        ]));
+        let result = concat_batches(schema.clone(), vec![]).unwrap();
+        assert_eq!(result.num_rows(), 0);
+        assert_eq!(result.schema(), schema);
+    }
+
+    #[test]
+    fn test_concat_batches_empty_schema_sums_rows() {
+        let schema = Arc::new(Schema::empty());
+        let b1 = RecordBatch::try_new_with_options(schema.clone(), vec![], &{
+            let mut opts = RecordBatchOptions::default();
+            opts.row_count = Some(3);
+            opts
+        })
+        .unwrap();
+        let b2 = RecordBatch::try_new_with_options(schema.clone(), vec![], &{
+            let mut opts = RecordBatchOptions::default();
+            opts.row_count = Some(2);
+            opts
+        })
+        .unwrap();
+        let result = concat_batches(schema.clone(), vec![b1, b2]).unwrap();
+        assert_eq!(result.num_rows(), 5);
+    }
+
+    #[test]
+    fn test_concat_batches_multiple_batches() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int64, false)]));
+        let make = |vals: Vec<i64>| {
+            RecordBatch::try_new(
+                schema.clone(),
+                vec![Arc::new(Int64Array::from(vals)) as ArrayRef],
+            )
+            .unwrap()
+        };
+        let result =
+            concat_batches(schema.clone(), vec![make(vec![1, 2]), make(vec![3, 4, 5])]).unwrap();
+        assert_eq!(result.num_rows(), 5);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 1);
+        assert_eq!(col.value(4), 5);
+    }
+
+    // ── RecordBatchExt::size ────────────────────────────────────────────────
+
+    #[test]
+    fn test_record_batch_size_is_nonzero() {
+        let schema = Arc::new(Schema::new(vec![Field::new("x", DataType::Int64, false)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int64Array::from(vec![1_i64, 2, 3])) as ArrayRef],
+        )
+        .unwrap();
+        assert!(batch.size() > 0);
+    }
+
+    // ── sort_record_batch_by_column additional branches ────────────────────
+
+    #[test]
+    fn test_sort_record_batch_by_column_uint64() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::UInt64, false)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(UInt64Array::from(vec![30_u64, 10, 20])) as ArrayRef],
+        )
+        .unwrap();
+        let sorted = sort_record_batch_by_column(batch, "v", false, None).unwrap();
+        let col = sorted
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 10);
+        assert_eq!(col.value(1), 20);
+        assert_eq!(col.value(2), 30);
+    }
+
+    // ── format_recordbatch_by_schema additional type-conversion paths ──────
+
+    #[test]
+    fn test_format_recordbatch_empty_rows_returns_empty_with_target_schema() {
+        let target_schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            src_schema.clone(),
+            vec![Arc::new(StringArray::from(vec![] as Vec<&str>)) as ArrayRef],
+        )
+        .unwrap();
+        let result = format_recordbatch_by_schema(target_schema.clone(), batch);
+        assert_eq!(result.num_rows(), 0);
+        assert_eq!(result.schema(), target_schema);
+    }
+
+    #[test]
+    fn test_format_recordbatch_missing_column_becomes_null() {
+        // Target schema has an extra column not present in source → null array
+        let target_schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, true),
+            Field::new("missing", DataType::Int64, true),
+        ]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            src_schema.clone(),
+            vec![Arc::new(StringArray::from(vec!["x"])) as ArrayRef],
+        )
+        .unwrap();
+        let result = format_recordbatch_by_schema(target_schema.clone(), batch);
+        assert_eq!(result.num_rows(), 1);
+        // "missing" column should be all-null
+        let missing_col = result.column_by_name("missing").unwrap();
+        assert_eq!(missing_col.null_count(), 1);
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8view_to_utf8() {
+        use arrow::array::StringViewArray;
+        let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
+        let arr: ArrayRef = Arc::new(StringViewArray::from(vec!["hello", "world"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "hello");
+        assert_eq!(col.value(1), "world");
+    }
+
+    #[test]
+    fn test_format_recordbatch_large_utf8_to_utf8() {
+        use arrow::array::LargeStringArray;
+        let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new(
+            "s",
+            DataType::LargeUtf8,
+            true,
+        )]));
+        let arr: ArrayRef = Arc::new(LargeStringArray::from(vec!["alpha", "beta"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "alpha");
+    }
+
+    #[test]
+    fn test_format_recordbatch_int64_to_utf8() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Utf8, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let arr: ArrayRef = Arc::new(Int64Array::from(vec![42_i64, -7]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "42");
+        assert_eq!(col.value(1), "-7");
+    }
+
+    #[test]
+    fn test_format_recordbatch_uint64_to_utf8() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Utf8, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::UInt64, true)]));
+        let arr: ArrayRef = Arc::new(UInt64Array::from(vec![100_u64, 200]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "100");
+    }
+
+    #[test]
+    fn test_format_recordbatch_float64_to_utf8() {
+        let target = Arc::new(Schema::new(vec![Field::new("f", DataType::Utf8, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Float64, true)]));
+        let arr: ArrayRef = Arc::new(Float64Array::from(vec![3.14_f64]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "3.14");
+    }
+
+    #[test]
+    fn test_format_recordbatch_bool_to_utf8() {
+        let target = Arc::new(Schema::new(vec![Field::new("b", DataType::Utf8, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let arr: ArrayRef = Arc::new(BooleanArray::from(vec![true, false]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "true");
+        assert_eq!(col.value(1), "false");
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8_to_int64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Utf8, true)]));
+        let arr: ArrayRef = Arc::new(StringArray::from(vec!["123", "456"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 123);
+        assert_eq!(col.value(1), 456);
+    }
+
+    #[test]
+    fn test_format_recordbatch_float64_to_int64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Float64, true)]));
+        let arr: ArrayRef = Arc::new(Float64Array::from(vec![9.9_f64, 2.1]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 9);
+        assert_eq!(col.value(1), 2);
+    }
+
+    #[test]
+    fn test_format_recordbatch_bool_to_int64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Boolean, true)]));
+        let arr: ArrayRef = Arc::new(BooleanArray::from(vec![true, false]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 1);
+        assert_eq!(col.value(1), 0);
+    }
+
+    #[test]
+    fn test_format_recordbatch_int64_to_uint64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::UInt64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let arr: ArrayRef = Arc::new(Int64Array::from(vec![5_i64, 10]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 5_u64);
+        assert_eq!(col.value(1), 10_u64);
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8_to_float64() {
+        let target = Arc::new(Schema::new(vec![Field::new("f", DataType::Float64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Utf8, true)]));
+        let arr: ArrayRef = Arc::new(StringArray::from(vec!["1.5", "2.5"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        assert!((col.value(0) - 1.5).abs() < f64::EPSILON);
+        assert!((col.value(1) - 2.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_format_recordbatch_bool_to_float64() {
+        let target = Arc::new(Schema::new(vec![Field::new("f", DataType::Float64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Boolean, true)]));
+        let arr: ArrayRef = Arc::new(BooleanArray::from(vec![true, false]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        assert!((col.value(0) - 1.0).abs() < f64::EPSILON);
+        assert!((col.value(1) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8_to_boolean() {
+        let target = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Utf8, true)]));
+        let arr: ArrayRef = Arc::new(StringArray::from(vec!["true", "false"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(col.value(0));
+        assert!(!col.value(1));
+    }
+
+    #[test]
+    fn test_format_recordbatch_int64_to_boolean() {
+        let target = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Int64, true)]));
+        let arr: ArrayRef = Arc::new(Int64Array::from(vec![1_i64, 0, -5]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(col.value(0)); // 1 > 0
+        assert!(!col.value(1)); // 0 == 0
+        assert!(!col.value(2)); // -5 not > 0
+    }
+
+    #[test]
+    fn test_format_recordbatch_float64_to_boolean() {
+        let target = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Float64, true)]));
+        let arr: ArrayRef = Arc::new(Float64Array::from(vec![1.0_f64, 0.0]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(col.value(0));
+        assert!(!col.value(1));
+    }
+
+    // ── convert_json_to_record_batch comprehensive branches ────────────────
+
     // Test case for convert_json_to_record_batch that contains utf8view
     #[tokio::test]
     async fn test_convert_json_to_record_batch_with_utf8view() {
@@ -1887,5 +2257,1023 @@ mod test {
         assert_eq!(city_array.value(0), "New York");
         assert_eq!(city_array.value(1), "London");
         assert!(city_array.is_null(2)); // Charlie's city should be null
+    }
+
+    // ── convert_json_to_record_batch additional branches ──────────────────
+
+    #[test]
+    fn test_convert_json_to_record_batch_empty_data() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+        let result = convert_json_to_record_batch(&schema, &[]).unwrap();
+        assert_eq!(result.num_rows(), 0);
+        assert_eq!(result.schema(), schema);
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_non_object_error() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+        let data = vec![Arc::new(serde_json::json!([1, 2, 3]))];
+        let result = convert_json_to_record_batch(&schema, &data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_large_utf8() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "msg",
+            DataType::LargeUtf8,
+            true,
+        )]));
+        let data = vec![
+            Arc::new(serde_json::json!({"msg": "hello"})),
+            Arc::new(serde_json::json!({"msg": 42})),
+            Arc::new(serde_json::json!({"msg": true})),
+            Arc::new(serde_json::json!({"msg": null})),
+            Arc::new(serde_json::json!({"msg": [1, 2]})), // array → ""
+        ];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        use arrow::array::LargeStringArray;
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<LargeStringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "hello");
+        assert_eq!(col.value(1), "42");
+        assert_eq!(col.value(2), "true");
+        assert!(col.is_null(3));
+        assert_eq!(col.value(4), "");
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_uint64() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::UInt64, true)]));
+        let data = vec![
+            Arc::new(serde_json::json!({"v": 100})),
+            Arc::new(serde_json::json!({"v": "200"})),
+            Arc::new(serde_json::json!({"v": true})),
+            Arc::new(serde_json::json!({"v": false})),
+            Arc::new(serde_json::json!({"v": null})),
+            Arc::new(serde_json::json!({"v": []})), // other → 0
+        ];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 100);
+        assert_eq!(col.value(1), 200);
+        assert_eq!(col.value(2), 1);
+        assert_eq!(col.value(3), 0);
+        assert!(col.is_null(4));
+        assert_eq!(col.value(5), 0);
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_float64() {
+        let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Float64, true)]));
+        let data = vec![
+            Arc::new(serde_json::json!({"f": 3.14})),
+            Arc::new(serde_json::json!({"f": "2.71"})),
+            Arc::new(serde_json::json!({"f": true})),
+            Arc::new(serde_json::json!({"f": false})),
+            Arc::new(serde_json::json!({"f": null})),
+            Arc::new(serde_json::json!({"f": {}})), // other → 0.0
+        ];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        assert!((col.value(0) - 3.14).abs() < 1e-10);
+        assert!((col.value(1) - 2.71).abs() < 1e-10);
+        assert!((col.value(2) - 1.0).abs() < f64::EPSILON);
+        assert!((col.value(3) - 0.0).abs() < f64::EPSILON);
+        assert!(col.is_null(4));
+        assert!((col.value(5) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_boolean() {
+        let schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let data = vec![
+            Arc::new(serde_json::json!({"b": true})),
+            Arc::new(serde_json::json!({"b": false})),
+            Arc::new(serde_json::json!({"b": 1})), // number > 0 → true
+            Arc::new(serde_json::json!({"b": 0})), // number == 0 → false
+            Arc::new(serde_json::json!({"b": "true"})),
+            Arc::new(serde_json::json!({"b": "false"})),
+            Arc::new(serde_json::json!({"b": null})),
+            Arc::new(serde_json::json!({"b": []})), // other → false
+        ];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(col.value(0));
+        assert!(!col.value(1));
+        assert!(col.value(2));
+        assert!(!col.value(3));
+        assert!(col.value(4));
+        assert!(!col.value(5));
+        assert!(col.is_null(6));
+        assert!(!col.value(7));
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_binary_ok() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "data",
+            DataType::Binary,
+            true,
+        )]));
+        // "deadbeef" is a valid hex string
+        let data = vec![Arc::new(serde_json::json!({"data": "deadbeef"}))];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        use arrow::array::BinaryArray;
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<BinaryArray>()
+            .unwrap();
+        assert_eq!(col.value(0), &[0xde, 0xad, 0xbe, 0xef]);
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_binary_non_hex_error() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "data",
+            DataType::Binary,
+            true,
+        )]));
+        // "xyz" is not valid hex
+        let data = vec![Arc::new(serde_json::json!({"data": "xyz"}))];
+        let result = convert_json_to_record_batch(&schema, &data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_binary_non_string_error() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "data",
+            DataType::Binary,
+            true,
+        )]));
+        // number value for a Binary field → error
+        let data = vec![Arc::new(serde_json::json!({"data": 123}))];
+        let result = convert_json_to_record_batch(&schema, &data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_null_type() {
+        let schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Null, true)]));
+        let data = vec![
+            Arc::new(serde_json::json!({"n": null})),
+            Arc::new(serde_json::json!({"n": "ignored"})),
+        ];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        assert_eq!(batch.num_rows(), 2);
+        // NullArray always has len == num_rows and data type Null
+        assert_eq!(batch.column(0).len(), 2);
+        assert_eq!(batch.column(0).data_type(), &DataType::Null);
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_utf8_number_u64_path() {
+        // Use a large u64 that doesn't fit in i64 to exercise the u64 path in Utf8 formatting
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Utf8, true)]));
+        // serde_json represents 18446744073709551615 as u64
+        let data = vec![Arc::new(serde_json::json!({"v": 18446744073709551615_u64}))];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "18446744073709551615");
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_missing_fields_become_null() {
+        // Schema has multiple fields; records only have some fields → null for missing ones
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, true),
+            Field::new("b", DataType::Int64, true),
+            Field::new("c", DataType::Float64, true),
+            Field::new("d", DataType::Boolean, true),
+            Field::new("e", DataType::UInt64, true),
+        ]));
+        let data = vec![Arc::new(serde_json::json!({"a": "hello"}))];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        assert_eq!(batch.num_rows(), 1);
+        // all columns except "a" should be null
+        assert!(
+            !batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            batch
+                .column(2)
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            batch
+                .column(3)
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            batch
+                .column(4)
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .unwrap()
+                .is_null(0)
+        );
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_int64_number_float_path() {
+        // Float value that has no i64/u64 representation exercises the f64 fallback
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int64, true)]));
+        let data = vec![Arc::new(serde_json::json!({"v": 3.9}))];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 3);
+    }
+
+    #[test]
+    fn test_convert_json_to_record_batch_uint64_negative_i64_path() {
+        // Negative i64 exercises the as_i64() path for UInt64
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::UInt64, true)]));
+        let data = vec![Arc::new(serde_json::json!({"v": -1_i64}))];
+        let batch = convert_json_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        // -1i64 as u64 = u64::MAX
+        assert_eq!(col.value(0), u64::MAX);
+    }
+
+    // ── convert_vrl_to_record_batch additional branches ───────────────────
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_utf8view() {
+        let schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
+        let data = vec![
+            vrl::value::Value::Object(
+                [("s".into(), vrl::value::Value::from("hello"))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("s".into(), vrl::value::Value::Integer(99))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("s".into(), vrl::value::Value::Boolean(true))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [(
+                    "s".into(),
+                    vrl::value::Value::Float(vrl::prelude::NotNan::new(1.5).unwrap()),
+                )]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("s".into(), vrl::value::Value::Null)]
+                    .into_iter()
+                    .collect(),
+            ),
+        ];
+        let batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringViewArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "hello");
+        assert_eq!(col.value(1), "99");
+        assert_eq!(col.value(2), "true");
+        assert_eq!(col.value(3), "1.5");
+        assert!(col.is_null(4));
+    }
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_large_utf8() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "s",
+            DataType::LargeUtf8,
+            true,
+        )]));
+        use arrow::array::LargeStringArray;
+        let data = vec![
+            vrl::value::Value::Object(
+                [("s".into(), vrl::value::Value::from("world"))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("s".into(), vrl::value::Value::Integer(7))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("s".into(), vrl::value::Value::Boolean(false))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("s".into(), vrl::value::Value::Null)]
+                    .into_iter()
+                    .collect(),
+            ),
+        ];
+        let batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<LargeStringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "world");
+        assert_eq!(col.value(1), "7");
+        assert_eq!(col.value(2), "false");
+        assert!(col.is_null(3));
+    }
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_uint64() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::UInt64, true)]));
+        let data = vec![
+            vrl::value::Value::Object(
+                [("v".into(), vrl::value::Value::Integer(42))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [(
+                    "v".into(),
+                    vrl::value::Value::Float(vrl::prelude::NotNan::new(9.0).unwrap()),
+                )]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("v".into(), vrl::value::Value::Boolean(true))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("v".into(), vrl::value::Value::Null)]
+                    .into_iter()
+                    .collect(),
+            ),
+        ];
+        let batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 42);
+        assert_eq!(col.value(1), 9);
+        assert_eq!(col.value(2), 1);
+        assert!(col.is_null(3));
+    }
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_int64_from_bytes() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int64, true)]));
+        let data = vec![
+            vrl::value::Value::Object(
+                [("v".into(), vrl::value::Value::Bytes(b"123".to_vec().into()))]
+                    .into_iter()
+                    .collect(),
+            ),
+            // invalid → 0
+            vrl::value::Value::Object(
+                [(
+                    "v".into(),
+                    vrl::value::Value::Bytes(b"notanumber".to_vec().into()),
+                )]
+                .into_iter()
+                .collect(),
+            ),
+            // fallback other (array/object) → 0
+            vrl::value::Value::Object(
+                [("v".into(), vrl::value::Value::Array(vec![]))]
+                    .into_iter()
+                    .collect(),
+            ),
+        ];
+        let batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 123);
+        assert_eq!(col.value(1), 0);
+        assert_eq!(col.value(2), 0);
+    }
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_float64_from_bytes() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Float64, true)]));
+        let data = vec![
+            vrl::value::Value::Object(
+                [(
+                    "v".into(),
+                    vrl::value::Value::Bytes(b"3.14".to_vec().into()),
+                )]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("v".into(), vrl::value::Value::Boolean(false))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("v".into(), vrl::value::Value::Array(vec![]))]
+                    .into_iter()
+                    .collect(),
+            ),
+        ];
+        let batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        assert!((col.value(0) - 3.14).abs() < 1e-10);
+        assert!((col.value(1) - 0.0).abs() < f64::EPSILON);
+        assert!((col.value(2) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_boolean_from_bytes_and_float() {
+        let schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let data = vec![
+            vrl::value::Value::Object(
+                [("b".into(), vrl::value::Value::Integer(1))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("b".into(), vrl::value::Value::Integer(0))]
+                    .into_iter()
+                    .collect(),
+            ),
+            vrl::value::Value::Object(
+                [(
+                    "b".into(),
+                    vrl::value::Value::Float(vrl::prelude::NotNan::new(2.5).unwrap()),
+                )]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [(
+                    "b".into(),
+                    vrl::value::Value::Bytes(b"true".to_vec().into()),
+                )]
+                .into_iter()
+                .collect(),
+            ),
+            vrl::value::Value::Object(
+                [("b".into(), vrl::value::Value::Array(vec![]))]
+                    .into_iter()
+                    .collect(),
+            ),
+        ];
+        let batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+        let col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(col.value(0)); // 1 > 0
+        assert!(!col.value(1)); // 0 not > 0
+        assert!(col.value(2)); // 2.5 > 0
+        assert!(col.value(3)); // "true" parses as true
+        assert!(!col.value(4)); // other → false
+    }
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_null_type() {
+        let schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Null, true)]));
+        let data = vec![vrl::value::Value::Object(
+            [("n".into(), vrl::value::Value::Integer(5))]
+                .into_iter()
+                .collect(),
+        )];
+        let batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+        assert_eq!(batch.num_rows(), 1);
+        // NullArray: len matches num_rows and data type is Null
+        assert_eq!(batch.column(0).len(), 1);
+        assert_eq!(batch.column(0).data_type(), &DataType::Null);
+    }
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_missing_keys_null_fill() {
+        // Schema has Utf8View, LargeUtf8, UInt64, Binary, Null fields.
+        // Record only provides "a" → all others get null-filled via fill-null path.
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, true),
+            Field::new("b", DataType::Utf8View, true),
+            Field::new("c", DataType::LargeUtf8, true),
+            Field::new("d", DataType::UInt64, true),
+            Field::new("e", DataType::Boolean, true),
+            Field::new("f", DataType::Binary, true),
+            Field::new("g", DataType::Null, true),
+        ]));
+        let data = vec![vrl::value::Value::Object(
+            [("a".into(), vrl::value::Value::from("x"))]
+                .into_iter()
+                .collect(),
+        )];
+        let batch = convert_vrl_to_record_batch(&schema, &data).unwrap();
+        assert_eq!(batch.num_rows(), 1);
+        // "a" is present
+        let a = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(a.value(0), "x");
+        // all others null
+        assert!(
+            batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<StringViewArray>()
+                .unwrap()
+                .is_null(0)
+        );
+        use arrow::array::LargeStringArray;
+        assert!(
+            batch
+                .column(2)
+                .as_any()
+                .downcast_ref::<LargeStringArray>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            batch
+                .column(3)
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            batch
+                .column(4)
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .unwrap()
+                .is_null(0)
+        );
+        use arrow::array::BinaryArray;
+        assert!(
+            batch
+                .column(5)
+                .as_any()
+                .downcast_ref::<BinaryArray>()
+                .unwrap()
+                .is_null(0)
+        );
+        // NullArray column: len matches and data type is Null
+        assert_eq!(batch.column(6).data_type(), &DataType::Null);
+        assert_eq!(batch.column(6).len(), 1);
+    }
+
+    #[test]
+    fn test_convert_vrl_to_record_batch_unsupported_type_error() {
+        // DataType::Date32 is not handled → should return Err
+        let schema = Arc::new(Schema::new(vec![Field::new("d", DataType::Date32, true)]));
+        let data = vec![vrl::value::Value::Object(
+            [("d".into(), vrl::value::Value::Integer(1))]
+                .into_iter()
+                .collect(),
+        )];
+        let result = convert_vrl_to_record_batch(&schema, &data);
+        assert!(result.is_err());
+    }
+
+    // ── format_recordbatch_by_schema additional paths ────────────────────
+
+    #[test]
+    fn test_format_recordbatch_utf8_to_utf8view() {
+        let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
+        let arr: ArrayRef = Arc::new(StringArray::from(vec!["abc", "def"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringViewArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "abc");
+        assert_eq!(col.value(1), "def");
+    }
+
+    #[test]
+    fn test_format_recordbatch_large_utf8_to_utf8view() {
+        use arrow::array::LargeStringArray;
+        let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new(
+            "s",
+            DataType::LargeUtf8,
+            true,
+        )]));
+        let arr: ArrayRef = Arc::new(LargeStringArray::from(vec!["foo", "bar"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringViewArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "foo");
+    }
+
+    #[test]
+    fn test_format_recordbatch_int64_to_utf8view() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Utf8View, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let arr: ArrayRef = Arc::new(Int64Array::from(vec![100_i64]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringViewArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "100");
+    }
+
+    #[test]
+    fn test_format_recordbatch_bool_to_utf8view() {
+        let target = Arc::new(Schema::new(vec![Field::new("b", DataType::Utf8View, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let arr: ArrayRef = Arc::new(BooleanArray::from(vec![true, false]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringViewArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "true");
+        assert_eq!(col.value(1), "false");
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8_to_large_utf8() {
+        use arrow::array::LargeStringArray;
+        let target = Arc::new(Schema::new(vec![Field::new(
+            "s",
+            DataType::LargeUtf8,
+            true,
+        )]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
+        let arr: ArrayRef = Arc::new(StringArray::from(vec!["test"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<LargeStringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "test");
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8view_to_large_utf8() {
+        use arrow::array::LargeStringArray;
+        let target = Arc::new(Schema::new(vec![Field::new(
+            "s",
+            DataType::LargeUtf8,
+            true,
+        )]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8View, true)]));
+        let arr: ArrayRef = Arc::new(StringViewArray::from(vec!["view_val"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<LargeStringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "view_val");
+    }
+
+    #[test]
+    fn test_format_recordbatch_int64_to_large_utf8() {
+        use arrow::array::LargeStringArray;
+        let target = Arc::new(Schema::new(vec![Field::new(
+            "n",
+            DataType::LargeUtf8,
+            true,
+        )]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let arr: ArrayRef = Arc::new(Int64Array::from(vec![-55_i64]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<LargeStringArray>()
+            .unwrap();
+        assert_eq!(col.value(0), "-55");
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8view_to_int64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Utf8View, true)]));
+        let arr: ArrayRef = Arc::new(StringViewArray::from(vec!["789"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 789);
+    }
+
+    #[test]
+    fn test_format_recordbatch_large_utf8_to_int64() {
+        use arrow::array::LargeStringArray;
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new(
+            "n",
+            DataType::LargeUtf8,
+            true,
+        )]));
+        let arr: ArrayRef = Arc::new(LargeStringArray::from(vec!["321"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 321);
+    }
+
+    #[test]
+    fn test_format_recordbatch_uint64_to_int64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::Int64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::UInt64, true)]));
+        let arr: ArrayRef = Arc::new(UInt64Array::from(vec![999_u64]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 999);
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8view_to_uint64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::UInt64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Utf8View, true)]));
+        let arr: ArrayRef = Arc::new(StringViewArray::from(vec!["42"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 42);
+    }
+
+    #[test]
+    fn test_format_recordbatch_float64_to_uint64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::UInt64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Float64, true)]));
+        let arr: ArrayRef = Arc::new(Float64Array::from(vec![7.8_f64]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 7);
+    }
+
+    #[test]
+    fn test_format_recordbatch_bool_to_uint64() {
+        let target = Arc::new(Schema::new(vec![Field::new("n", DataType::UInt64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("n", DataType::Boolean, true)]));
+        let arr: ArrayRef = Arc::new(BooleanArray::from(vec![true, false]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(col.value(0), 1);
+        assert_eq!(col.value(1), 0);
+    }
+
+    #[test]
+    fn test_format_recordbatch_int64_to_float64() {
+        let target = Arc::new(Schema::new(vec![Field::new("f", DataType::Float64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Int64, true)]));
+        let arr: ArrayRef = Arc::new(Int64Array::from(vec![5_i64, -3]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        assert!((col.value(0) - 5.0).abs() < f64::EPSILON);
+        assert!((col.value(1) - (-3.0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_format_recordbatch_uint64_to_float64() {
+        let target = Arc::new(Schema::new(vec![Field::new("f", DataType::Float64, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("f", DataType::UInt64, true)]));
+        let arr: ArrayRef = Arc::new(UInt64Array::from(vec![8_u64]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        assert!((col.value(0) - 8.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_format_recordbatch_utf8view_to_boolean() {
+        let target = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("b", DataType::Utf8View, true)]));
+        let arr: ArrayRef = Arc::new(StringViewArray::from(vec!["true", "false"]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(col.value(0));
+        assert!(!col.value(1));
+    }
+
+    #[test]
+    fn test_format_recordbatch_uint64_to_boolean() {
+        let target = Arc::new(Schema::new(vec![Field::new("b", DataType::Boolean, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("b", DataType::UInt64, true)]));
+        let arr: ArrayRef = Arc::new(UInt64Array::from(vec![5_u64, 0]));
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        assert!(col.value(0));
+        assert!(!col.value(1));
+    }
+
+    #[test]
+    fn test_format_recordbatch_null_source_to_utf8() {
+        // Source column is Null type → Null arm fills builder with nulls
+        let target = Arc::new(Schema::new(vec![Field::new("s", DataType::Utf8, true)]));
+        let src_schema = Arc::new(Schema::new(vec![Field::new("s", DataType::Null, true)]));
+        let arr: ArrayRef = arrow::array::new_null_array(&DataType::Null, 2);
+        let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
+        let result = format_recordbatch_by_schema(target, batch);
+        let col = result
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(col.null_count(), 2);
+    }
+
+    // ── merge_record_batches basic coverage ──────────────────────────────
+
+    #[test]
+    fn test_merge_record_batches_basic() {
+        use crate::TIMESTAMP_COL_NAME;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("val", DataType::Utf8, true),
+        ]));
+        let make_batch = |ts: Vec<i64>, vals: Vec<&str>| {
+            RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(ts)) as ArrayRef,
+                    Arc::new(StringArray::from(vals)) as ArrayRef,
+                ],
+            )
+            .unwrap()
+        };
+        let b1 = make_batch(vec![200, 100], vec!["b", "a"]);
+        let b2 = make_batch(vec![400, 300], vec!["d", "c"]);
+        let (out_schema, merged) =
+            merge_record_batches("test_job", 0, schema.clone(), vec![b1, b2]).unwrap();
+        // Should be sorted descending by _timestamp
+        assert_eq!(merged.num_rows(), 4);
+        let ts_col = merged
+            .column_by_name(TIMESTAMP_COL_NAME)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(ts_col.value(0), 400);
+        assert_eq!(ts_col.value(3), 100);
+        assert_eq!(out_schema, merged.schema());
+    }
+
+    // ── format_recordbatch_by_schema fast paths ──────────────────────────
+
+    #[test]
+    fn test_format_recordbatch_empty_target_schema_returns_batch_unchanged() {
+        // schema.fields().is_empty() → return batch immediately
+        let target_schema = Arc::new(Schema::empty());
+        let src_schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            src_schema.clone(),
+            vec![Arc::new(StringArray::from(vec!["x"])) as ArrayRef],
+        )
+        .unwrap();
+        let result = format_recordbatch_by_schema(target_schema, batch.clone());
+        assert_eq!(result.num_rows(), batch.num_rows());
+        assert_eq!(result.schema(), batch.schema());
+    }
+
+    #[test]
+    fn test_format_recordbatch_identical_schemas_returns_batch_unchanged() {
+        // schema.fields() == batch.schema().fields() → return batch immediately
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, true),
+            Field::new("b", DataType::Int64, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["hello"])) as ArrayRef,
+                Arc::new(Int64Array::from(vec![42_i64])) as ArrayRef,
+            ],
+        )
+        .unwrap();
+        let result = format_recordbatch_by_schema(schema.clone(), batch.clone());
+        assert_eq!(result.schema(), batch.schema());
+        assert_eq!(result.num_rows(), 1);
+        let col = result.column_by_name("a").unwrap();
+        assert_eq!(
+            col.as_any().downcast_ref::<StringArray>().unwrap().value(0),
+            "hello"
+        );
     }
 }

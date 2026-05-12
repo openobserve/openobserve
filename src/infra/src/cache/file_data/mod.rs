@@ -517,4 +517,105 @@ mod tests {
         let time = get_file_time(file);
         assert_eq!(time, Some(2025040802));
     }
+
+    #[test]
+    fn test_cache_type_equality_and_copy() {
+        let a = CacheType::Disk;
+        let b = a;
+        assert_eq!(a, b);
+        assert_ne!(CacheType::Disk, CacheType::Memory);
+        assert_ne!(CacheType::Memory, CacheType::None);
+        assert_ne!(CacheType::Disk, CacheType::None);
+    }
+
+    #[test]
+    fn test_cache_strategy_unknown_defaults_to_lru() {
+        let mut lru = CacheStrategy::new("lru");
+        let mut unknown = CacheStrategy::new("something_unknown");
+        let key = "files/default/logs/b/2025/04/08/06/1.parquet";
+        lru.insert(key.to_string(), 10);
+        unknown.insert(key.to_string(), 10);
+        assert!(lru.contains_key(key));
+        assert!(unknown.contains_key(key));
+        assert_eq!(lru.len(), unknown.len());
+    }
+
+    #[test]
+    fn test_cache_strategy_is_empty_and_len() {
+        let mut cache = CacheStrategy::new("fifo");
+        assert!(cache.is_empty());
+        assert_eq!(cache.len(), 0);
+        cache.insert(
+            "files/default/logs/b/2025/04/08/06/x.parquet".to_string(),
+            1,
+        );
+        assert!(!cache.is_empty());
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_cache_strategy_lru_is_empty_and_len() {
+        let mut cache = CacheStrategy::new("lru");
+        assert!(cache.is_empty());
+        assert_eq!(cache.len(), 0);
+        cache.insert(
+            "files/default/logs/b/2025/04/08/06/x.parquet".to_string(),
+            5,
+        );
+        assert!(!cache.is_empty());
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_cache_strategy_remove_key_lru() {
+        let mut cache = CacheStrategy::new("lru");
+        let key = "files/default/logs/b/2025/04/08/06/k.parquet";
+        cache.insert(key.to_string(), 42);
+        assert!(cache.contains_key(key));
+        let removed = cache.remove_key(key);
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().1, 42);
+        assert!(!cache.contains_key(key));
+    }
+
+    #[test]
+    fn test_cache_strategy_remove_key_fifo_empty() {
+        let mut cache = CacheStrategy::new("fifo");
+        let removed = cache.remove_key("nonexistent");
+        assert!(removed.is_none());
+    }
+
+    #[test]
+    fn test_cache_strategy_remove_key_fifo_missing_key() {
+        let mut cache = CacheStrategy::new("fifo");
+        cache.insert(
+            "files/default/logs/b/2025/04/08/06/a.parquet".to_string(),
+            1,
+        );
+        let removed = cache.remove_key("files/default/logs/b/2025/04/08/06/b.parquet");
+        assert!(removed.is_none());
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_cache_strategy_remove_on_empty_returns_none() {
+        let mut lru = CacheStrategy::new("lru");
+        assert!(lru.remove().is_none());
+        let mut fifo = CacheStrategy::new("fifo");
+        assert!(fifo.remove().is_none());
+        let mut time_lru = CacheStrategy::new("time_lru");
+        assert!(time_lru.remove().is_none());
+    }
+
+    #[test]
+    fn test_get_file_time_unknown_prefix_returns_none() {
+        let file = "unknown/default/logs/b/2025/04/08/06/1.parquet";
+        assert_eq!(get_file_time(file), None);
+    }
+
+    #[test]
+    fn test_get_file_time_too_short_path_returns_none() {
+        let file = "files/a/b/c";
+        assert_eq!(get_file_time(file), None);
+    }
 }

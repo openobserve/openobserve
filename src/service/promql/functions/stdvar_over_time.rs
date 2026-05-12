@@ -46,3 +46,46 @@ impl RangeFunc for StdvarOverTimeFunc {
         std_variance(&sample_values)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_samples(values: &[f64]) -> Vec<Sample> {
+        values
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| Sample {
+                timestamp: i as i64 * 1_000_000,
+                value: v,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_stdvar_over_time_name() {
+        assert_eq!(StdvarOverTimeFunc::new().name(), "stdvar_over_time");
+    }
+
+    #[test]
+    fn test_stdvar_over_time_empty() {
+        let func = StdvarOverTimeFunc::new();
+        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
+    }
+
+    #[test]
+    fn test_stdvar_over_time_constant() {
+        let func = StdvarOverTimeFunc::new();
+        let samples = make_samples(&[5.0, 5.0, 5.0]);
+        assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(0.0));
+    }
+
+    #[test]
+    fn test_stdvar_over_time_non_trivial() {
+        let func = StdvarOverTimeFunc::new();
+        // [1,2,3]: mean=2, variance=(1+0+1)/3 = 2/3
+        let samples = make_samples(&[1.0, 2.0, 3.0]);
+        let result = func.exec(&samples, 0, &Duration::from_secs(1)).unwrap();
+        assert!((result - 2.0 / 3.0).abs() < 1e-10);
+    }
+}

@@ -93,3 +93,25 @@ pub fn reload_config(path: &PathBuf) -> Result<(), anyhow::Error> {
     log::info!("Config file and config reloaded successfully");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn test_run_returns_none_when_no_config_path() {
+        // Default test env has no config file path set
+        let result = run();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_reload_config_nonexistent_path_succeeds() {
+        // refresh_config doesn't use the path argument directly — it reads env vars
+        let path = PathBuf::from("/nonexistent/path/config.yaml");
+        // This may succeed or fail depending on environment; just ensure no panic
+        let _ = reload_config(&path);
+    }
+}

@@ -34,8 +34,9 @@
             </div>
             </div>
             <div class="col-auto">
-            <q-btn v-close-popup="true" round
-    flat icon="cancel" />
+            <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+              <X :size="14" />
+            </OButton>
             </div>
         </div>
         </q-card-section>
@@ -183,6 +184,8 @@
     outlinedDelete,
     } from "@quasar/extras/material-icons-outlined";
     import DateTime from "@/components/DateTime.vue";
+    import OButton from "@/lib/core/Button/OButton.vue";
+    import { X } from "lucide-vue-next";
     const defaultStreamData = {
         name: '',
         schema: [],
@@ -197,7 +200,7 @@
     export default defineComponent({
     name: "SchemaEnrichment",
     props: {
-        // eslint-disable-next-line vue/require-default-prop
+         
         selectedEnrichmentTable: {
         type: String,
         default: '',
@@ -208,6 +211,8 @@
         StreamFieldsInputs,
         AppTabs,
         QTablePagination,
+        OButton,
+        X,
     },
     setup({ selectedEnrichmentTable }) {
         const { t } = useI18n();

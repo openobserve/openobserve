@@ -65,8 +65,6 @@ pub async fn do_partitioned_search(
     stream_name: &str,
     is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
-    let start_timer = Instant::now();
-
     // limit the search by max_query_range
     let mut range_error = String::new();
     if max_query_range > 0
@@ -152,6 +150,7 @@ pub async fn do_partitioned_search(
         } else {
             format!("{trace_id}-{idx}")
         };
+        let start_timer = Instant::now();
         let mut search_res = do_search(
             &trace_id,
             org_id,
@@ -191,7 +190,7 @@ pub async fn do_partitioned_search(
 
         search_res = order_search_results(search_res, fallback_order_by_col.clone());
 
-        // set took
+        // set took for this partition only (not cumulative)
         search_res.set_took(start_timer.elapsed().as_millis() as usize);
 
         // check range error

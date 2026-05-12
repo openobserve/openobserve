@@ -497,16 +497,16 @@ export const usePagination = () => {
     });
   };
 
-  const processPostPaginationData = () => {
+  const processPostPaginationData = async () => {
     updateFieldValues();
 
     //extract fields from query response
-    extractFields();
+    await extractFields();
 
     //update grid columns
     updateGridColumns();
 
-    filterHitsColumns();
+    await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 

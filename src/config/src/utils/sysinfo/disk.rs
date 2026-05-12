@@ -31,3 +31,35 @@ pub fn get_disk_usage() -> Vec<DiskUsage> {
     disks.sort_by(|a, b| b.mount_point.cmp(&a.mount_point));
     disks
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_disk_usage_returns_vec() {
+        let disks = get_disk_usage();
+        assert!(!disks.is_empty(), "should have at least one disk");
+    }
+
+    #[test]
+    fn test_disk_usage_available_leq_total() {
+        for disk in get_disk_usage() {
+            assert!(
+                disk.available_space <= disk.total_space,
+                "available should not exceed total"
+            );
+        }
+    }
+
+    #[test]
+    fn test_disk_usage_sorted_descending() {
+        let disks = get_disk_usage();
+        for i in 1..disks.len() {
+            assert!(
+                disks[i - 1].mount_point >= disks[i].mount_point,
+                "disks should be sorted descending by mount point"
+            );
+        }
+    }
+}

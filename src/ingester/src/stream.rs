@@ -94,3 +94,20 @@ impl MemorySize for Stream {
         std::mem::size_of::<Stream>() + self.partitions.mem_size()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stream_new_has_empty_partitions() {
+        let s = Stream::new();
+        assert!(s.partitions.is_empty());
+    }
+
+    #[test]
+    fn test_stream_mem_size_empty() {
+        let s = Stream::new();
+        assert!(s.mem_size() >= std::mem::size_of::<Stream>());
+    }
+}

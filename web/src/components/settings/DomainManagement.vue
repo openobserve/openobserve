@@ -58,26 +58,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-select>
         </div>
         <div class="col-auto">
-          <q-btn
-            :label="t('common.save')"
-            color="primary"
-            class="text-bold text-capitalize no-border"
-            unelevated
+          <OButton
+            variant="primary"
+            size="sm-action"
             @click="saveClaimParserFunction"
             :loading="savingClaimParser"
-            :disable="!hasClaimParserChanged"
-          />
+            :disabled="!hasClaimParserChanged"
+          >{{ t('common.save') }}</OButton>
         </div>
         <div class="col-auto">
-          <q-btn
-            flat
-            round
-            dense
-            icon="help_outline"
+          <OButton
+            variant="ghost-muted"
+            size="icon-xs-sq"
             @click="showVrlInfo = true"
           >
+            <template #icon-left><q-icon name="help_outline" /></template>
             <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </div>
 
@@ -96,13 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("settings.claimParserFunctionInfoTitle") }}
             </div>
             <div class="col-auto">
-              <q-btn
-                flat
-                round
-                dense
-                icon="close"
+              <OButton
+                variant="ghost"
+                size="icon"
                 @click="showVrlInfo = false"
-              />
+              >
+                <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
+              </OButton>
             </div>
           </div>
 
@@ -126,16 +123,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="row items-center q-mb-sm">
                 <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
                 <div class="col-auto">
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    icon="refresh"
+                  <OButton
+                    variant="ghost-muted"
+                    size="icon-xs-sq"
                     @click="loadRecentErrors"
                     :loading="loadingErrors"
                   >
+                    <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
                     <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
 
@@ -165,15 +161,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Show More Button -->
                 <div class="q-mt-sm text-center">
-                  <q-btn
-                    flat
-                    dense
-                    color="primary"
-                    :label="t('common.showMore')"
-                    icon-right="open_in_new"
+                  <OButton
+                    variant="ghost-primary"
                     size="sm"
                     @click="viewAllErrors"
-                  />
+                  >
+                    {{ t('common.showMore') }}
+                    <template #icon-right><ExternalLink class="tw:size-3.5 tw:shrink-0" /></template>
+                  </OButton>
                 </div>
               </div>
             </div>
@@ -215,14 +210,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="col-auto q-my-none">
-          <q-btn
-            :label="t('settings.addDomain')"
-            color="primary"
-            class="text-bold text-capitalize no-border"
+          <OButton
+            variant="primary"
+            size="sm-action"
             @click="addDomain"
             :disabled="!newDomain || !isValidDomain(newDomain)"
-            unelevated
-          />
+          >{{ t('settings.addDomain') }}</OButton>
         </div>
       </div>
 
@@ -238,17 +231,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="domain && domain.name"
           class="domain-card q-mb-xs"
         >
-        <div class="domain-header row items-center justify-between q-px-md q-py-sm">
+          <div class="domain-header row items-center justify-between q-px-md q-py-sm">
           <div class="text-body1 text-bold">{{ domain.name }}</div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            color="negative"
+          <OButton
+            variant="ghost-destructive"
+            size="icon-xs-sq"
             @click="removeDomain(index)"
             :title="t('common.delete')"
-          />
+          >
+            <template #icon-left><X class="tw:size-3.5 tw:shrink-0" /></template>
+          </OButton>
         </div>
 
         <div class="q-pa-md">
@@ -298,15 +290,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="col-auto q-my-none">
-                <q-btn
-                  :label="t('settings.addEmail')"
-                  color="secondary"
-                  class="text-bold text-capitalize no-border"
+                <OButton
+                  variant="primary"
+                  size="sm-action"
                   @click="addEmail(domain)"
                   :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
-                  unelevated
-                  dense
-                />
+                >{{ t('settings.addEmail') }}</OButton>
               </div>
             </div>
 
@@ -318,16 +307,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="email-item row items-center justify-between q-pa-sm q-mb-xs"
               >
                 <div class="text-body2">{{ email }}</div>
-                <q-btn
-                  icon="close"
-                  flat
-                  round
-                  dense
-                  size="sm"
-                  color="negative"
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-xs-sq"
                   @click="removeEmail(domain, emailIndex)"
                   :title="t('common.delete')"
-                />
+                >
+                  <template #icon-left><X class="tw:size-3.5 tw:shrink-0" /></template>
+                </OButton>
               </div>
             </div>
           </div>
@@ -340,19 +327,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Action Buttons -->
-    <div class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
-      <q-btn
-        :label="t('common.cancel')"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
+    <div class="tw:flex tw:justify-end tw:gap-2 q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
+      <OButton
+        variant="outline"
+        size="sm-action"
         @click="resetForm"
-      />
-      <q-btn
-        :label="t('settings.saveChanges')"
-        class="o2-primary-button no-border tw:h-[36px] q-mr-md"
-        unelevated
+      >{{ t('common.cancel') }}</OButton>
+      <OButton
+        variant="primary"
+        size="sm-action"
         @click="saveChanges"
         :loading="saving"
-      />
+      >{{ t('settings.saveChanges') }}</OButton>
     </div>
   </div>
 </template>
@@ -362,6 +348,8 @@ import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
 import { add, formatDistanceToNow } from "date-fns";

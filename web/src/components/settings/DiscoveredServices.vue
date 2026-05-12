@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full discovered-services" :class="{ 'ds-dark': store.state.theme === 'dark' }">
+  <div
+    class="tw:w-full discovered-services"
+    :class="{ 'ds-dark': store.state.theme === 'dark' }"
+  >
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
       <q-spinner-hourglass color="primary" size="1.875rem" />
@@ -23,57 +26,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="tw:text-center tw:py-8">
-      <q-icon name="error_outline" size="3rem" color="negative" class="tw:mb-4" />
+      <q-icon
+        name="error_outline"
+        size="3rem"
+        color="negative"
+        class="tw:mb-4"
+      />
       <div class="text-body1 text-negative">{{ error }}</div>
-      <q-btn
+      <OButton
         data-test="retry-discovered-services-btn"
-        flat no-caps dense
-        icon="refresh"
+        variant="outline"
+        size="sm-action"
         @click="loadServices"
-      >{{ t('settings.correlation.retry') }}</q-btn>
+      >
+        <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
+        {{ t("settings.correlation.retry") }}
+      </OButton>
     </div>
 
     <!-- Empty State -->
     <div v-else-if="services.length === 0" class="tw:text-center tw:py-8">
       <q-icon name="search_off" size="3rem" color="grey-5" class="tw:mb-4" />
-      <div class="text-body1">{{ t("settings.correlation.noServicesYet") }}</div>
+      <div class="text-body1">
+        {{ t("settings.correlation.noServicesYet") }}
+      </div>
       <div class="text-body2 text-grey-6 tw:mt-2">
         {{ t("settings.correlation.noServicesDescription") }}
       </div>
-      <q-btn
+      <OButton
         data-test="refresh-discovered-services-btn"
-        flat no-caps dense
-        icon="refresh"
-        @click="loadServices(true)"
+        variant="outline"
+        size="sm-action"
         :loading="refreshing"
         class="tw:mt-3"
-      >{{ t('common.refresh') }}</q-btn>
+        @click="loadServices(true)"
+      >
+        <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
+        {{ t("common.refresh") }}
+      </OButton>
     </div>
 
     <!-- Services List -->
     <div v-else>
       <!-- Info banner -->
-      <div class="info-banner tw:mb-3 tw:rounded-lg tw:flex tw:items-center tw:gap-3">
-        <q-icon name="info" size="1.25rem" class="tw:shrink-0 info-banner-icon" />
+      <div
+        class="info-banner tw:mb-3 tw:rounded-lg tw:flex tw:items-center tw:gap-3"
+      >
+        <q-icon
+          name="info"
+          size="1.25rem"
+          class="tw:shrink-0 info-banner-icon"
+        />
         <div class="tw:text-sm tw:leading-relaxed info-banner-text">
           {{ t("settings.correlation.discoveredServicesDescription") }}
           <a
             class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle"
             @click.prevent="$emit('navigate-to-configuration')"
-          >{{ t('settings.correlation.goToConfiguration') }}</a>
-          <span>{{ t('settings.correlation.configureServicesHint') }}</span>
+            >{{ t("settings.correlation.goToConfiguration") }}</a
+          >
+          <span>{{ t("settings.correlation.configureServicesHint") }}</span>
         </div>
       </div>
 
       <!-- Header with title -->
       <div class="card-container tw:mb-[0.625rem]">
-        <div class="services-header-bar tw:flex tw:justify-between tw:items-center tw:w-full">
-          <div class="q-table__title tw:font-[600]" data-test="services-list-title">
+        <div
+          class="services-header-bar tw:flex tw:justify-between tw:items-center tw:w-full"
+        >
+          <div
+            class="q-table__title tw:font-[600]"
+            data-test="services-list-title"
+          >
             {{ t("settings.correlation.discoveredServicesTitle") }}
           </div>
           <!-- Filter bar -->
           <div class="tw:flex tw:items-center tw:gap-2">
-            <span class="tw:text-md tw:text-grey-6">{{ t('settings.correlation.filterBy') }}</span>
+            <span class="tw:text-md tw:text-grey-6">{{
+              t("settings.correlation.filterBy")
+            }}</span>
             <q-select
               v-model="filterKey"
               :options="filteredKeyOptions"
@@ -111,7 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="o2-search-input filter-select"
                 @filter="filterValueFn"
               />
-              <q-tooltip v-if="!filterKey">{{ t('settings.correlation.selectFieldFirst') }}</q-tooltip>
+              <q-tooltip v-if="!filterKey">{{
+                t("settings.correlation.selectFieldFirst")
+              }}</q-tooltip>
             </span>
             <q-input
               v-model="searchQuery"
@@ -126,24 +158,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-            <q-btn
+            <OButton
               data-test="reset-discovered-services-btn"
-              round
-              class="o2-secondary-button"
+              variant="outline"
+              size="sm-action"
               :loading="resetting"
               @click="confirmResetServices"
             >
-              {{ t('settings.correlation.resetServices') }}
-              <q-tooltip>{{ t("settings.correlation.resetServicesTooltip") }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              flat
-              round
+              {{ t("settings.correlation.resetServices") }}
+              <q-tooltip>{{
+                t("settings.correlation.resetServicesTooltip")
+              }}</q-tooltip>
+            </OButton>
+            <OButton
+              variant="outline"
+              size="sm-action"
               :loading="refreshing"
               @click="loadServices(true)"
               data-test="refresh-discovered-services-btn"
-              class="o2-secondary-button refresh-btn"
-            >{{ t('common.refresh') }}</q-btn>
+            >
+              {{ t("common.refresh") }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -152,7 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full">
         <div class="tw:h-[calc(100vh-21.25rem)]">
           <q-table
-            :pagination="{ rowsPerPage: 0, sortBy: sortBy, descending: sortDescending }"
+            :pagination="{
+              rowsPerPage: 0,
+              sortBy: sortBy,
+              descending: sortDescending,
+            }"
             :rows="refreshing ? [] : paginatedGroups"
             :columns="columns"
             :loading="refreshing"
@@ -161,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @request="onTableRequest"
             :class="[
               'o2-quasar-table o2-row-md o2-quasar-table-header-sticky services-table',
-              filteredGroups.length > 0 ? 'services-table-full-height' : ''
+              filteredGroups.length > 0 ? 'services-table-full-height' : '',
             ]"
             data-test="services-list-table"
           >
@@ -185,30 +224,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-td key="service_name" :props="props">
                   <div class="tw:flex tw:items-center tw:gap-2">
                     <q-icon
-                      :name="expandedGroups.has(props.row.service_name) ? 'expand_more' : 'chevron_right'"
+                      :name="
+                        expandedGroups.has(props.row.service_name)
+                          ? 'expand_more'
+                          : 'chevron_right'
+                      "
                       size="1.25rem"
                       class="tw:text-gray-400"
                     />
-                    <span class="tw:font-semibold">{{ props.row.service_name }}</span>
+                    <span class="tw:font-semibold">{{
+                      props.row.service_name
+                    }}</span>
                     <span class="instance-count-badge">
                       {{ props.row.instances.length }}
-                      {{ props.row.instances.length === 1 ? t('settings.correlation.instanceSingular') : t('settings.correlation.instancePlural') }}
+                      {{
+                        props.row.instances.length === 1
+                          ? t("settings.correlation.instanceSingular")
+                          : t("settings.correlation.instancePlural")
+                      }}
                     </span>
                   </div>
                 </q-td>
                 <q-td key="telemetry" :props="props">
                   <div class="instance-telemetry-grid">
-                    <span v-if="props.row.totalLogs > 0" class="telemetry-badge telemetry-logs">{{ t('settings.correlation.logs') }}</span>
+                    <span
+                      v-if="props.row.totalLogs > 0"
+                      class="telemetry-badge telemetry-logs"
+                      >{{ t("settings.correlation.logs") }}</span
+                    >
                     <span v-else class="telemetry-slot-empty"></span>
-                    <span v-if="props.row.totalTraces > 0" class="telemetry-badge telemetry-traces">{{ t('settings.correlation.traces') }}</span>
+                    <span
+                      v-if="props.row.totalTraces > 0"
+                      class="telemetry-badge telemetry-traces"
+                      >{{ t("settings.correlation.traces") }}</span
+                    >
                     <span v-else class="telemetry-slot-empty"></span>
-                    <span v-if="props.row.totalMetrics > 0" class="telemetry-badge telemetry-metrics">{{ t('settings.correlation.metrics') }}</span>
+                    <span
+                      v-if="props.row.totalMetrics > 0"
+                      class="telemetry-badge telemetry-metrics"
+                      >{{ t("settings.correlation.metrics") }}</span
+                    >
                     <span v-else class="telemetry-slot-empty"></span>
                   </div>
                 </q-td>
                 <q-td key="last_seen" :props="props" class="td-last-seen">
-                  <span class="tw:text-sm last-seen-text"
-                  >{{ formatRelativeTime(props.row.lastSeen) }}</span>
+                  <span class="tw:text-sm last-seen-text">{{
+                    formatRelativeTime(props.row.lastSeen)
+                  }}</span>
                 </q-td>
               </q-tr>
 
@@ -223,39 +285,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Service name cell: set_id badge + dimension badges -->
                   <q-td key="service_name" :props="props">
-                    <div class="tw:pl-7 tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+                    <div
+                      class="tw:pl-7 tw:flex tw:items-center tw:gap-2 tw:flex-wrap"
+                    >
                       <span class="set-id-badge">{{ instance.set_id }}</span>
                       <span
-                        v-for="[key, value] in Object.entries(instance.disambiguation).sort(([a], [b]) => a.localeCompare(b))"
+                        v-for="[key, value] in Object.entries(
+                          instance.disambiguation,
+                        ).sort(([a], [b]) => a.localeCompare(b))"
                         :key="`${key}=${value}`"
                         class="dimension-badge"
                         :class="getDimensionColorClass(key)"
                       >
-                        <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+                        <span class="tw:font-medium">{{ key }}</span
+                        >=<span>{{ value }}</span>
                       </span>
-                      <span v-if="Object.keys(instance.disambiguation).length === 0" class="tw:text-xs tw:italic no-dimensions-text"
-                      >{{ t('settings.correlation.noDimensions') }}</span>
+                      <span
+                        v-if="Object.keys(instance.disambiguation).length === 0"
+                        class="tw:text-xs tw:italic no-dimensions-text"
+                        >{{ t("settings.correlation.noDimensions") }}</span
+                      >
                     </div>
                   </q-td>
 
                   <!-- Telemetry cell: fixed slots so Logs/Traces/Metrics align vertically across instances -->
-                  <q-td key="telemetry" :props="props" class="td-telemetry-instance">
+                  <q-td
+                    key="telemetry"
+                    :props="props"
+                    class="td-telemetry-instance"
+                  >
                     <div class="instance-telemetry-grid">
-                      <span v-if="instance.logs_streams.length > 0" class="telemetry-badge telemetry-sm telemetry-logs">
-                        <q-tooltip class="tw:text-xs">{{ instance.logs_streams.join(', ') }}</q-tooltip>
-                        {{ t('settings.correlation.logsWithCount', { count: instance.logs_streams.length }) }}
+                      <span
+                        v-if="instance.logs_streams.length > 0"
+                        class="telemetry-badge telemetry-sm telemetry-logs"
+                      >
+                        <q-tooltip class="tw:text-xs">{{
+                          instance.logs_streams.join(", ")
+                        }}</q-tooltip>
+                        {{
+                          t("settings.correlation.logsWithCount", {
+                            count: instance.logs_streams.length,
+                          })
+                        }}
                       </span>
                       <span v-else class="telemetry-slot-empty"></span>
 
-                      <span v-if="instance.traces_streams.length > 0" class="telemetry-badge telemetry-sm telemetry-traces">
-                        <q-tooltip class="tw:text-xs">{{ instance.traces_streams.join(', ') }}</q-tooltip>
-                        {{ t('settings.correlation.tracesWithCount', { count: instance.traces_streams.length }) }}
+                      <span
+                        v-if="instance.traces_streams.length > 0"
+                        class="telemetry-badge telemetry-sm telemetry-traces"
+                      >
+                        <q-tooltip class="tw:text-xs">{{
+                          instance.traces_streams.join(", ")
+                        }}</q-tooltip>
+                        {{
+                          t("settings.correlation.tracesWithCount", {
+                            count: instance.traces_streams.length,
+                          })
+                        }}
                       </span>
                       <span v-else class="telemetry-slot-empty"></span>
 
-                      <span v-if="instance.metrics_streams.length > 0" class="telemetry-badge telemetry-sm telemetry-metrics">
-                        <q-tooltip class="tw:text-xs">{{ instance.metrics_streams.join(', ') }}</q-tooltip>
-                        {{ t('settings.correlation.metricsWithCount', { count: instance.metrics_streams.length }) }}
+                      <span
+                        v-if="instance.metrics_streams.length > 0"
+                        class="telemetry-badge telemetry-sm telemetry-metrics"
+                      >
+                        <q-tooltip class="tw:text-xs">{{
+                          instance.metrics_streams.join(", ")
+                        }}</q-tooltip>
+                        {{
+                          t("settings.correlation.metricsWithCount", {
+                            count: instance.metrics_streams.length,
+                          })
+                        }}
                       </span>
                       <span v-else class="telemetry-slot-empty"></span>
                     </div>
@@ -263,8 +364,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Last seen cell: right-aligned to match group header -->
                   <q-td key="last_seen" :props="props" class="td-last-seen">
-                    <span class="tw:text-xs last-seen-text"
-                    >{{ formatRelativeTime(instance.last_seen) }}</span>
+                    <span class="tw:text-xs last-seen-text">{{
+                      formatRelativeTime(instance.last_seen)
+                    }}</span>
                   </q-td>
                 </q-tr>
               </template>
@@ -272,12 +374,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Pagination footer -->
             <template v-slot:bottom>
-              <div class="bottom-btn tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[2.25rem]">
+              <div
+                class="bottom-btn tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[2.25rem]"
+              >
                 <div class="o2-table-footer-title tw:w-[15.625rem] tw:mr-md">
-                  {{ filteredGroups.length === 1
-                    ? t('settings.correlation.serviceCountSingular', { count: filteredGroups.length })
-                    : t('settings.correlation.serviceCountPlural', { count: filteredGroups.length }) }}
-                  {{ t('settings.correlation.instancesCount', { count: totalInstances }) }}
+                  {{
+                    filteredGroups.length === 1
+                      ? t("settings.correlation.serviceCountSingular", {
+                          count: filteredGroups.length,
+                        })
+                      : t("settings.correlation.serviceCountPlural", {
+                          count: filteredGroups.length,
+                        })
+                  }}
+                  {{
+                    t("settings.correlation.instancesCount", {
+                      count: totalInstances,
+                    })
+                  }}
                 </div>
                 <QTablePagination
                   :scope="paginationScope"
@@ -299,25 +413,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       position="right"
       full-height
       maximized
-      @update:model-value="(val: boolean) => { if (!val) selectedService = null }"
+      @update:model-value="
+        (val: boolean) => {
+          if (!val) selectedService = null;
+        }
+      "
     >
       <q-card class="service-side-panel" data-test="service-side-panel">
-
         <!-- Header -->
         <div class="panel-header">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:flex-1 tw:min-w-0">
-            <span class="panel-service-name">{{ selectedService?.service_name }}</span>
+          <div
+            class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:flex-1 tw:min-w-0"
+          >
+            <span class="panel-service-name">{{
+              selectedService?.service_name
+            }}</span>
             <span class="set-id-badge">{{ selectedService?.set_id }}</span>
           </div>
-          <q-btn v-close-popup flat round dense icon="close" size="sm" class="tw:shrink-0" />
+          <span class="tw:shrink-0">
+            <OButton variant="ghost" size="icon" v-close-popup>
+              <q-icon name="close" size="14px" />
+            </OButton>
+          </span>
         </div>
 
         <!-- Default set warning banner -->
-        <div v-if="selectedService?.set_id === 'default'" class="panel-warning-banner">
-          <q-icon name="info_outline" size="1rem" class="tw:shrink-0 tw:mt-0.5" />
+        <div
+          v-if="selectedService?.set_id === 'default'"
+          class="panel-warning-banner"
+        >
+          <q-icon
+            name="info_outline"
+            size="1rem"
+            class="tw:shrink-0 tw:mt-0.5"
+          />
           <div class="tw:text-xs tw:leading-relaxed">
-            <span class="tw:font-semibold">{{ t('settings.correlation.defaultSetWarningTitle') }}</span>
-            {{ t('settings.correlation.defaultSetWarningBody') }}
+            <span class="tw:font-semibold">{{
+              t("settings.correlation.defaultSetWarningTitle")
+            }}</span>
+            {{ t("settings.correlation.defaultSetWarningBody") }}
           </div>
         </div>
 
@@ -325,76 +459,137 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Scrollable body -->
         <div class="panel-body">
-
           <!-- Instance Identity -->
           <div class="panel-block">
-            <div class="panel-block-label">{{ t('settings.correlation.instanceIdentity') }}</div>
-            <div v-if="selectedService && Object.keys(selectedService.disambiguation).length > 0" class="tw:flex tw:flex-wrap tw:gap-1.5">
+            <div class="panel-block-label">
+              {{ t("settings.correlation.instanceIdentity") }}
+            </div>
+            <div
+              v-if="
+                selectedService &&
+                Object.keys(selectedService.disambiguation).length > 0
+              "
+              class="tw:flex tw:flex-wrap tw:gap-1.5"
+            >
               <span
-                v-for="[key, value] in Object.entries(selectedService.disambiguation).sort(([a], [b]) => a.localeCompare(b))"
+                v-for="[key, value] in Object.entries(
+                  selectedService.disambiguation,
+                ).sort(([a], [b]) => a.localeCompare(b))"
                 :key="`${key}=${value}`"
                 class="dimension-badge"
                 :class="getDimensionColorClass(key)"
               >
-                <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+                <span class="tw:font-medium">{{ key }}</span
+                >=<span>{{ value }}</span>
               </span>
             </div>
-            <div v-else class="panel-empty-text">{{ t('settings.correlation.noDimensionsCatchAll') }}</div>
+            <div v-else class="panel-empty-text">
+              {{ t("settings.correlation.noDimensionsCatchAll") }}
+            </div>
           </div>
 
           <!-- Stream Sources -->
           <div class="panel-block">
-            <div class="panel-block-label">{{ t('settings.correlation.streamSources') }}</div>
+            <div class="panel-block-label">
+              {{ t("settings.correlation.streamSources") }}
+            </div>
             <div class="tw:flex tw:flex-col tw:gap-3">
-
               <!-- Logs -->
-              <div v-if="selectedService && selectedService.logs_streams.length > 0">
+              <div
+                v-if="
+                  selectedService && selectedService.logs_streams.length > 0
+                "
+              >
                 <div class="panel-signal-row">
-                  <span class="telemetry-badge telemetry-logs panel-signal-type">{{ t('settings.correlation.logs') }}</span>
+                  <span
+                    class="telemetry-badge telemetry-logs panel-signal-type"
+                    >{{ t("settings.correlation.logs") }}</span
+                  >
                   <div class="tw:flex tw:flex-wrap tw:gap-1.5">
-                    <span v-for="stream in selectedService.logs_streams" :key="stream" class="stream-name-badge">{{ stream }}</span>
+                    <span
+                      v-for="stream in selectedService.logs_streams"
+                      :key="stream"
+                      class="stream-name-badge"
+                      >{{ stream }}</span
+                    >
                   </div>
                 </div>
               </div>
 
               <!-- Traces -->
-              <div v-if="selectedService && selectedService.traces_streams.length > 0">
+              <div
+                v-if="
+                  selectedService && selectedService.traces_streams.length > 0
+                "
+              >
                 <div class="panel-signal-row">
-                  <span class="telemetry-badge telemetry-traces panel-signal-type">{{ t('settings.correlation.traces') }}</span>
+                  <span
+                    class="telemetry-badge telemetry-traces panel-signal-type"
+                    >{{ t("settings.correlation.traces") }}</span
+                  >
                   <div class="tw:flex tw:flex-wrap tw:gap-1.5">
-                    <span v-for="stream in selectedService.traces_streams" :key="stream" class="stream-name-badge">{{ stream }}</span>
+                    <span
+                      v-for="stream in selectedService.traces_streams"
+                      :key="stream"
+                      class="stream-name-badge"
+                      >{{ stream }}</span
+                    >
                   </div>
                 </div>
               </div>
 
               <!-- Metrics -->
-              <div v-if="selectedService && selectedService.metrics_streams.length > 0">
+              <div
+                v-if="
+                  selectedService && selectedService.metrics_streams.length > 0
+                "
+              >
                 <div class="panel-signal-row">
-                  <span class="telemetry-badge telemetry-metrics panel-signal-type">{{ t('settings.correlation.metrics') }}</span>
+                  <span
+                    class="telemetry-badge telemetry-metrics panel-signal-type"
+                    >{{ t("settings.correlation.metrics") }}</span
+                  >
                   <div class="tw:flex tw:flex-wrap tw:gap-1.5">
-                    <span v-for="stream in selectedService.metrics_streams" :key="stream" class="stream-name-badge">{{ stream }}</span>
+                    <span
+                      v-for="stream in selectedService.metrics_streams"
+                      :key="stream"
+                      class="stream-name-badge"
+                      >{{ stream }}</span
+                    >
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
 
           <!-- Field Name Mapping -->
-          <div v-if="selectedService && Object.keys(selectedService.field_name_mapping ?? {}).length > 0" class="panel-block">
-            <div class="panel-block-label">{{ t('settings.correlation.fieldNameMapping') }}</div>
+          <div
+            v-if="
+              selectedService &&
+              Object.keys(selectedService.field_name_mapping ?? {}).length > 0
+            "
+            class="panel-block"
+          >
+            <div class="panel-block-label">
+              {{ t("settings.correlation.fieldNameMapping") }}
+            </div>
             <div class="panel-mapping-grid">
               <template
-                v-for="[raw, mapped] in Object.entries(selectedService.field_name_mapping ?? {}).sort(([a], [b]) => a.localeCompare(b))"
+                v-for="[raw, mapped] in Object.entries(
+                  selectedService.field_name_mapping ?? {},
+                ).sort(([a], [b]) => a.localeCompare(b))"
                 :key="raw"
               >
                 <span class="mapping-key">{{ raw }}</span>
-                <q-icon name="arrow_forward" size="0.75rem" class="tw:text-gray-400 tw:justify-self-center" />
+                <q-icon
+                  name="arrow_forward"
+                  size="0.75rem"
+                  class="tw:text-gray-400 tw:justify-self-center"
+                />
                 <span class="mapping-val">{{ mapped }}</span>
               </template>
             </div>
           </div>
-
         </div>
       </q-card>
     </q-dialog>
@@ -416,6 +611,8 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { RefreshCw } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
@@ -471,17 +668,19 @@ watch([filterKey, filterValue, searchQuery], () => {
 
 // Label override for internal field keys shown in the filter dropdown
 const KEY_DISPLAY_LABELS: Record<string, string> = {
-  set_id: t('settings.correlation.workload'),
+  set_id: t("settings.correlation.workload"),
 };
 
 // All unique dimension keys + set_id across all services, as { label, value } objects
 const allKeys = computed((): { label: string; value: string }[] => {
   const keys = new Set<string>();
-  keys.add('set_id');
+  keys.add("set_id");
   for (const s of services.value) {
     for (const k of Object.keys(s.disambiguation)) keys.add(k);
   }
-  return [...keys].sort().map(k => ({ label: KEY_DISPLAY_LABELS[k] ?? k, value: k }));
+  return [...keys]
+    .sort()
+    .map((k) => ({ label: KEY_DISPLAY_LABELS[k] ?? k, value: k }));
 });
 
 // Values for the currently selected key
@@ -489,7 +688,7 @@ const allValues = computed((): string[] => {
   if (!filterKey.value) return [];
   const vals = new Set<string>();
   for (const s of services.value) {
-    if (filterKey.value === 'set_id') {
+    if (filterKey.value === "set_id") {
       vals.add(s.set_id);
     } else {
       const v = s.disambiguation[filterKey.value];
@@ -507,7 +706,7 @@ function filterKeyFn(val: string, update: (fn: () => void) => void) {
   update(() => {
     const needle = val.toLowerCase();
     filteredKeyOptions.value = needle
-      ? allKeys.value.filter(k => k.label.toLowerCase().includes(needle))
+      ? allKeys.value.filter((k) => k.label.toLowerCase().includes(needle))
       : allKeys.value;
   });
 }
@@ -516,7 +715,7 @@ function filterValueFn(val: string, update: (fn: () => void) => void) {
   update(() => {
     const needle = val.toLowerCase();
     filteredValueOptions.value = needle
-      ? allValues.value.filter(v => v.toLowerCase().includes(needle))
+      ? allValues.value.filter((v) => v.toLowerCase().includes(needle))
       : allValues.value;
   });
 }
@@ -530,7 +729,7 @@ const pagination = ref({
   rowsPerPage: 20,
 });
 
-const sortBy = ref<string>('last_seen');
+const sortBy = ref<string>("last_seen");
 const sortDescending = ref<boolean>(true);
 
 const perPageOptions: any = [
@@ -591,65 +790,78 @@ const serviceGroups = computed((): ServiceGroup[] => {
     groupMap[s.service_name].push(s);
   }
 
-  return Object.entries(groupMap).map(([name, instances]) => {
-    const allDimKeys = new Set<string>();
-    for (const inst of instances) {
-      for (const k of Object.keys(inst.disambiguation)) allDimKeys.add(k);
-    }
-
-    const shared: [string, string][] = [];
-    const varying: string[] = [];
-    for (const key of allDimKeys) {
-      const values = new Set(instances.map(i => i.disambiguation[key]).filter(Boolean));
-      if (values.size === 1) {
-        shared.push([key, [...values][0]]);
-      } else {
-        varying.push(key);
+  return Object.entries(groupMap)
+    .map(([name, instances]) => {
+      const allDimKeys = new Set<string>();
+      for (const inst of instances) {
+        for (const k of Object.keys(inst.disambiguation)) allDimKeys.add(k);
       }
-    }
 
-    const allLogs = new Set<string>();
-    const allTraces = new Set<string>();
-    const allMetrics = new Set<string>();
-    let latestSeen = 0;
-    for (const inst of instances) {
-      inst.logs_streams.forEach(s => allLogs.add(s));
-      inst.traces_streams.forEach(s => allTraces.add(s));
-      inst.metrics_streams.forEach(s => allMetrics.add(s));
-      if (inst.last_seen > latestSeen) latestSeen = inst.last_seen;
-    }
+      const shared: [string, string][] = [];
+      const varying: string[] = [];
+      for (const key of allDimKeys) {
+        const values = new Set(
+          instances.map((i) => i.disambiguation[key]).filter(Boolean),
+        );
+        if (values.size === 1) {
+          shared.push([key, [...values][0]]);
+        } else {
+          varying.push(key);
+        }
+      }
 
-    const correlationScore = (allLogs.size > 0 ? 1 : 0) + (allTraces.size > 0 ? 1 : 0) + (allMetrics.size > 0 ? 1 : 0);
+      const allLogs = new Set<string>();
+      const allTraces = new Set<string>();
+      const allMetrics = new Set<string>();
+      let latestSeen = 0;
+      for (const inst of instances) {
+        inst.logs_streams.forEach((s) => allLogs.add(s));
+        inst.traces_streams.forEach((s) => allTraces.add(s));
+        inst.metrics_streams.forEach((s) => allMetrics.add(s));
+        if (inst.last_seen > latestSeen) latestSeen = inst.last_seen;
+      }
 
-    // Sort instances: highest correlation first, default set_id always last
-    const sortedInstances = [...instances].sort((a, b) => {
-      const aIsDefault = a.set_id === 'default' ? 1 : 0;
-      const bIsDefault = b.set_id === 'default' ? 1 : 0;
-      if (aIsDefault !== bIsDefault) return aIsDefault - bIsDefault;
-      const scoreA = (a.logs_streams.length > 0 ? 1 : 0) + (a.traces_streams.length > 0 ? 1 : 0) + (a.metrics_streams.length > 0 ? 1 : 0);
-      const scoreB = (b.logs_streams.length > 0 ? 1 : 0) + (b.traces_streams.length > 0 ? 1 : 0) + (b.metrics_streams.length > 0 ? 1 : 0);
-      return scoreB - scoreA;
-    });
+      const correlationScore =
+        (allLogs.size > 0 ? 1 : 0) +
+        (allTraces.size > 0 ? 1 : 0) +
+        (allMetrics.size > 0 ? 1 : 0);
 
-    return {
-      service_name: name,
-      instances: sortedInstances,
-      sharedDimensions: shared.sort(([a], [b]) => a.localeCompare(b)),
-      varyingKeys: varying.sort(),
-      totalLogs: allLogs.size,
-      totalTraces: allTraces.size,
-      totalMetrics: allMetrics.size,
-      correlationScore,
-      lastSeen: latestSeen,
-    };
-  }).sort((a, b) => b.lastSeen - a.lastSeen);
+      // Sort instances: highest correlation first, default set_id always last
+      const sortedInstances = [...instances].sort((a, b) => {
+        const aIsDefault = a.set_id === "default" ? 1 : 0;
+        const bIsDefault = b.set_id === "default" ? 1 : 0;
+        if (aIsDefault !== bIsDefault) return aIsDefault - bIsDefault;
+        const scoreA =
+          (a.logs_streams.length > 0 ? 1 : 0) +
+          (a.traces_streams.length > 0 ? 1 : 0) +
+          (a.metrics_streams.length > 0 ? 1 : 0);
+        const scoreB =
+          (b.logs_streams.length > 0 ? 1 : 0) +
+          (b.traces_streams.length > 0 ? 1 : 0) +
+          (b.metrics_streams.length > 0 ? 1 : 0);
+        return scoreB - scoreA;
+      });
+
+      return {
+        service_name: name,
+        instances: sortedInstances,
+        sharedDimensions: shared.sort(([a], [b]) => a.localeCompare(b)),
+        varyingKeys: varying.sort(),
+        totalLogs: allLogs.size,
+        totalTraces: allTraces.size,
+        totalMetrics: allMetrics.size,
+        correlationScore,
+        lastSeen: latestSeen,
+      };
+    })
+    .sort((a, b) => b.lastSeen - a.lastSeen);
 });
 
 /** Filter instances within a group based on active key/value filter */
 function filterInstances(instances: ServiceRecord[]): ServiceRecord[] {
   if (!filterKey.value || !filterValue.value) return instances;
-  return instances.filter(inst => {
-    if (filterKey.value === 'set_id') return inst.set_id === filterValue.value;
+  return instances.filter((inst) => {
+    if (filterKey.value === "set_id") return inst.set_id === filterValue.value;
     const v = inst.disambiguation[filterKey.value!];
     return v === filterValue.value;
   });
@@ -661,24 +873,34 @@ const filteredGroups = computed((): ServiceGroup[] => {
   // Filter by dimension key+value (including set_id)
   if (filterKey.value && filterValue.value) {
     groups = groups
-      .map(g => ({ ...g, instances: filterInstances(g.instances) }))
-      .filter(g => g.instances.length > 0);
+      .map((g) => ({ ...g, instances: filterInstances(g.instances) }))
+      .filter((g) => g.instances.length > 0);
   }
 
   // Filter by search query
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
-    groups = groups.filter(g =>
-      g.service_name.toLowerCase().includes(query) ||
-      g.instances.some(inst =>
-        inst.set_id.toLowerCase().includes(query) ||
-        Object.entries(inst.disambiguation).some(([k, v]) =>
-          k.toLowerCase().includes(query) || v.toLowerCase().includes(query)
-        ) ||
-        inst.logs_streams.some(stream => stream.toLowerCase().includes(query)) ||
-        inst.traces_streams.some(stream => stream.toLowerCase().includes(query)) ||
-        inst.metrics_streams.some(stream => stream.toLowerCase().includes(query))
-      )
+    groups = groups.filter(
+      (g) =>
+        g.service_name.toLowerCase().includes(query) ||
+        g.instances.some(
+          (inst) =>
+            inst.set_id.toLowerCase().includes(query) ||
+            Object.entries(inst.disambiguation).some(
+              ([k, v]) =>
+                k.toLowerCase().includes(query) ||
+                v.toLowerCase().includes(query),
+            ) ||
+            inst.logs_streams.some((stream) =>
+              stream.toLowerCase().includes(query),
+            ) ||
+            inst.traces_streams.some((stream) =>
+              stream.toLowerCase().includes(query),
+            ) ||
+            inst.metrics_streams.some((stream) =>
+              stream.toLowerCase().includes(query),
+            ),
+        ),
     );
   }
 
@@ -686,14 +908,14 @@ const filteredGroups = computed((): ServiceGroup[] => {
   if (sortBy.value) {
     groups = [...groups].sort((a, b) => {
       let aVal: any, bVal: any;
-      if (sortBy.value === 'last_seen') {
+      if (sortBy.value === "last_seen") {
         aVal = a.lastSeen || 0;
         bVal = b.lastSeen || 0;
       } else {
         aVal = (a as any)[sortBy.value];
         bVal = (b as any)[sortBy.value];
       }
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
+      if (typeof aVal === "string" && typeof bVal === "string") {
         const result = aVal.localeCompare(bVal);
         return sortDescending.value ? -result : result;
       }
@@ -706,12 +928,15 @@ const filteredGroups = computed((): ServiceGroup[] => {
 });
 
 const totalInstances = computed(() =>
-  filteredGroups.value.reduce((sum, g) => sum + g.instances.length, 0)
+  filteredGroups.value.reduce((sum, g) => sum + g.instances.length, 0),
 );
 
 const paginatedGroups = computed(() => {
   const start = (pagination.value.page - 1) * pagination.value.rowsPerPage;
-  return filteredGroups.value.slice(start, start + pagination.value.rowsPerPage);
+  return filteredGroups.value.slice(
+    start,
+    start + pagination.value.rowsPerPage,
+  );
 });
 
 const paginationScope = computed(() => ({
@@ -720,17 +945,29 @@ const paginationScope = computed(() => ({
     rowsPerPage: pagination.value.rowsPerPage,
     rowsNumber: filteredGroups.value.length,
   },
-  pagesNumber: Math.ceil(filteredGroups.value.length / pagination.value.rowsPerPage),
+  pagesNumber: Math.ceil(
+    filteredGroups.value.length / pagination.value.rowsPerPage,
+  ),
   isFirstPage: pagination.value.page === 1,
-  isLastPage: pagination.value.page >= Math.ceil(filteredGroups.value.length / pagination.value.rowsPerPage),
-  firstPage: () => { pagination.value.page = 1; },
-  prevPage: () => { if (pagination.value.page > 1) pagination.value.page--; },
+  isLastPage:
+    pagination.value.page >=
+    Math.ceil(filteredGroups.value.length / pagination.value.rowsPerPage),
+  firstPage: () => {
+    pagination.value.page = 1;
+  },
+  prevPage: () => {
+    if (pagination.value.page > 1) pagination.value.page--;
+  },
   nextPage: () => {
-    const maxPage = Math.ceil(filteredGroups.value.length / pagination.value.rowsPerPage);
+    const maxPage = Math.ceil(
+      filteredGroups.value.length / pagination.value.rowsPerPage,
+    );
     if (pagination.value.page < maxPage) pagination.value.page++;
   },
   lastPage: () => {
-    pagination.value.page = Math.ceil(filteredGroups.value.length / pagination.value.rowsPerPage);
+    pagination.value.page = Math.ceil(
+      filteredGroups.value.length / pagination.value.rowsPerPage,
+    );
   },
 }));
 
@@ -746,24 +983,24 @@ const toggleGroup = (serviceName: string) => {
 
 const getDimensionColorClass = (key: string): string => {
   const colorMap: Record<string, string> = {
-    'k8s-deployment': 'badge-blue',
-    'k8s-namespace': 'badge-orange',
-    'k8s-cluster': 'badge-indigo',
-    'deployment': 'badge-blue',
-    'namespace': 'badge-orange',
-    'cluster': 'badge-indigo',
-    'env': 'badge-green',
-    'environment': 'badge-green',
-    'host': 'badge-purple',
-    'hostname': 'badge-purple',
-    'service': 'badge-cyan',
-    'service_name': 'badge-cyan',
-    'region': 'badge-pink',
-    'zone': 'badge-pink',
-    'pod': 'badge-teal',
-    'container': 'badge-red',
-    'app': 'badge-yellow',
-    'application': 'badge-yellow',
+    "k8s-deployment": "badge-blue",
+    "k8s-namespace": "badge-orange",
+    "k8s-cluster": "badge-indigo",
+    deployment: "badge-blue",
+    namespace: "badge-orange",
+    cluster: "badge-indigo",
+    env: "badge-green",
+    environment: "badge-green",
+    host: "badge-purple",
+    hostname: "badge-purple",
+    service: "badge-cyan",
+    service_name: "badge-cyan",
+    region: "badge-pink",
+    zone: "badge-pink",
+    pod: "badge-teal",
+    container: "badge-red",
+    app: "badge-yellow",
+    application: "badge-yellow",
   };
 
   if (colorMap[key]) return colorMap[key];
@@ -773,10 +1010,10 @@ const getDimensionColorClass = (key: string): string => {
     if (lowerKey.includes(pattern)) return className;
   }
 
-  const classes = ['badge-gray', 'badge-amber', 'badge-violet', 'badge-rose'];
+  const classes = ["badge-gray", "badge-amber", "badge-violet", "badge-rose"];
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
-    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash = (hash << 5) - hash + key.charCodeAt(i);
     hash = hash & hash;
   }
   return classes[Math.abs(hash) % classes.length];
@@ -847,7 +1084,9 @@ const doResetServices = async () => {
 
     q.notify({
       type: "positive",
-      message: t("settings.correlation.resetServicesSuccess", { count: deleted_count }),
+      message: t("settings.correlation.resetServicesSuccess", {
+        count: deleted_count,
+      }),
       caption: note,
       timeout: 5000,
     });
@@ -863,7 +1102,6 @@ const doResetServices = async () => {
     resetting.value = false;
   }
 };
-
 
 onMounted(() => {
   loadServices();
@@ -1070,47 +1308,124 @@ onMounted(() => {
   font-size: 0.75rem;
 }
 
-.telemetry-logs { border: 1px solid #1d4ed8; }
-.telemetry-traces { border: 1px solid #c2410c; }
-.telemetry-metrics { border: 1px solid #065f46; }
-.telemetry-inactive { border: 1px solid #9ca3af; color: #9ca3af; }
+.telemetry-logs {
+  border: 1px solid #1d4ed8;
+}
+.telemetry-traces {
+  border: 1px solid #c2410c;
+}
+.telemetry-metrics {
+  border: 1px solid #065f46;
+}
+.telemetry-inactive {
+  border: 1px solid #9ca3af;
+  color: #9ca3af;
+}
 
 /* Dimension color palette — border only */
-.badge-blue { border: 1px solid #1d4ed8; }
-.badge-green { border: 1px solid #065f46; }
-.badge-yellow { border: 1px solid #92400e; }
-.badge-pink { border: 1px solid #9f1239; }
-.badge-purple { border: 1px solid #7c3aed; }
-.badge-orange { border: 1px solid #c2410c; }
-.badge-cyan { border: 1px solid #0e7490; }
-.badge-indigo { border: 1px solid #4f46e5; }
-.badge-teal { border: 1px solid #0f766e; }
-.badge-red { border: 1px solid #dc2626; }
-.badge-gray { border: 1px solid #4b5563; }
-.badge-amber { border: 1px solid #d97706; }
-.badge-violet { border: 1px solid #7c3aed; }
-.badge-rose { border: 1px solid #e11d48; }
+.badge-blue {
+  border: 1px solid #1d4ed8;
+}
+.badge-green {
+  border: 1px solid #065f46;
+}
+.badge-yellow {
+  border: 1px solid #92400e;
+}
+.badge-pink {
+  border: 1px solid #9f1239;
+}
+.badge-purple {
+  border: 1px solid #7c3aed;
+}
+.badge-orange {
+  border: 1px solid #c2410c;
+}
+.badge-cyan {
+  border: 1px solid #0e7490;
+}
+.badge-indigo {
+  border: 1px solid #4f46e5;
+}
+.badge-teal {
+  border: 1px solid #0f766e;
+}
+.badge-red {
+  border: 1px solid #dc2626;
+}
+.badge-gray {
+  border: 1px solid #4b5563;
+}
+.badge-amber {
+  border: 1px solid #d97706;
+}
+.badge-violet {
+  border: 1px solid #7c3aed;
+}
+.badge-rose {
+  border: 1px solid #e11d48;
+}
 
 /* Dark mode */
-.ds-dark .badge-more { background: #4b5563; color: #d1d5db; }
-.ds-dark .telemetry-logs { border-color: #93c5fd; }
-.ds-dark .telemetry-traces { border-color: #fdba74; }
-.ds-dark .telemetry-metrics { border-color: #6ee7b7; }
-.ds-dark .telemetry-inactive { border-color: #6b7280; color: #6b7280; }
-.ds-dark .badge-blue { border-color: #93c5fd; }
-.ds-dark .badge-green { border-color: #6ee7b7; }
-.ds-dark .badge-yellow { border-color: #fcd34d; }
-.ds-dark .badge-pink { border-color: #f9a8d4; }
-.ds-dark .badge-purple { border-color: #c4b5fd; }
-.ds-dark .badge-orange { border-color: #fdba74; }
-.ds-dark .badge-cyan { border-color: #67e8f9; }
-.ds-dark .badge-indigo { border-color: #a5b4fc; }
-.ds-dark .badge-teal { border-color: #5eead4; }
-.ds-dark .badge-red { border-color: #fca5a5; }
-.ds-dark .badge-gray { border-color: #d1d5db; }
-.ds-dark .badge-amber { border-color: #fbbf24; }
-.ds-dark .badge-violet { border-color: #c4b5fd; }
-.ds-dark .badge-rose { border-color: #fda4af; }
+.ds-dark .badge-more {
+  background: #4b5563;
+  color: #d1d5db;
+}
+.ds-dark .telemetry-logs {
+  border-color: #93c5fd;
+}
+.ds-dark .telemetry-traces {
+  border-color: #fdba74;
+}
+.ds-dark .telemetry-metrics {
+  border-color: #6ee7b7;
+}
+.ds-dark .telemetry-inactive {
+  border-color: #6b7280;
+  color: #6b7280;
+}
+.ds-dark .badge-blue {
+  border-color: #93c5fd;
+}
+.ds-dark .badge-green {
+  border-color: #6ee7b7;
+}
+.ds-dark .badge-yellow {
+  border-color: #fcd34d;
+}
+.ds-dark .badge-pink {
+  border-color: #f9a8d4;
+}
+.ds-dark .badge-purple {
+  border-color: #c4b5fd;
+}
+.ds-dark .badge-orange {
+  border-color: #fdba74;
+}
+.ds-dark .badge-cyan {
+  border-color: #67e8f9;
+}
+.ds-dark .badge-indigo {
+  border-color: #a5b4fc;
+}
+.ds-dark .badge-teal {
+  border-color: #5eead4;
+}
+.ds-dark .badge-red {
+  border-color: #fca5a5;
+}
+.ds-dark .badge-gray {
+  border-color: #d1d5db;
+}
+.ds-dark .badge-amber {
+  border-color: #fbbf24;
+}
+.ds-dark .badge-violet {
+  border-color: #c4b5fd;
+}
+.ds-dark .badge-rose {
+  border-color: #fda4af;
+}
 
 /* Side panel */
 .service-side-panel {
@@ -1219,7 +1534,9 @@ onMounted(() => {
   font-family: monospace;
   cursor: pointer;
   border: none;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .stream-nav-logs {
@@ -1336,7 +1653,10 @@ onMounted(() => {
 /* Instance telemetry — fixed columns wide enough for "Logs (99)" / "Traces (99)" / "Metrics (99)" */
 .instance-telemetry-grid {
   display: inline-grid;
-  grid-template-columns: minmax(4rem, auto) minmax(5rem, auto) minmax(5.75rem, auto);
+  grid-template-columns: minmax(4rem, auto) minmax(5rem, auto) minmax(
+      5.75rem,
+      auto
+    );
   gap: 0.25rem;
   align-items: center;
   justify-items: start;
@@ -1352,8 +1672,5 @@ onMounted(() => {
   padding-right: 1.5rem !important;
 }
 
-.refresh-btn {
-  min-height: 2.25rem;
-  height: 2.25rem;
-}
+
 </style>

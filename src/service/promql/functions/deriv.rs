@@ -65,6 +65,26 @@ mod tests {
     }
 
     #[test]
+    fn test_deriv_value_none_input() {
+        let result = deriv_test_helper(Value::None).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_deriv_invalid_input_returns_err() {
+        let result = deriv_test_helper(Value::Float(1.0));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deriv_exec_fewer_than_two_samples_returns_none() {
+        let func = DerivFunc::new();
+        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
+        let one = vec![Sample::new(1000, 5.0)];
+        assert!(func.exec(&one, 0, &Duration::ZERO).is_none());
+    }
+
+    #[test]
     fn test_deriv_function() {
         // Create a range value with linear trend
         let samples = vec![

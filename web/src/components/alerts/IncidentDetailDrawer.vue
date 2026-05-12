@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -119,20 +119,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Save/Cancel buttons when editing -->
       <div v-if="incidentDetails && isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
-         <q-btn
-          no-caps
+        <OButton
+          variant="outline"
+          size="sm-action"
           @click="cancelTitleEdit"
-          class="o2-secondary-button"
-        >
-          <span>{{ t('alerts.cancel') }}</span>
-        </q-btn>
-        <q-btn
-          no-caps
+        >{{ t('alerts.cancel') }}</OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
           @click="saveTitleEdit"
-          class="o2-primary-button"
-        >
-          <span>{{ t('alerts.save') }}</span>
-        </q-btn>
+        >{{ t('alerts.save') }}</OButton>
       </div>
 
       <!-- Vertical Separator -->
@@ -146,51 +142,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Action buttons at extreme right of header -->
       <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:gap-2 tw:items-center">
-        <q-btn
+        <OButton
           v-if="incidentDetails.status === 'open'"
-          no-caps
-          unelevated
+          variant="outline"
+          size="sm"
+          :loading="updating"
           @click="acknowledgeIncident"
-          :loading="updating"
-          class="o2-secondary-button"
-        >
-          <span>{{ t("alerts.incidents.acknowledge") }}</span>
-          <q-tooltip :delay="500">{{ t("alerts.incidents.markAsAcknowledgedTooltip") }}</q-tooltip>
-        </q-btn>
-        <q-btn
+        >{{ t("alerts.incidents.acknowledge") }}<q-tooltip :delay="500">{{ t("alerts.incidents.markAsAcknowledgedTooltip") }}</q-tooltip></OButton>
+        <OButton
           v-if="incidentDetails.status !== 'resolved'"
-          no-caps
-          unelevated
+          variant="outline"
+          size="sm"
+          :loading="updating"
           @click="resolveIncident"
-          :loading="updating"
-          class="o2-secondary-button"
-        >
-          <span>{{ t("alerts.incidents.resolve") }}</span>
-          <q-tooltip :delay="500">{{ t("alerts.incidents.markAsResolvedTooltip") }}</q-tooltip>
-        </q-btn>
-        <q-btn
+        >{{ t("alerts.incidents.resolve") }}<q-tooltip :delay="500">{{ t("alerts.incidents.markAsResolvedTooltip") }}</q-tooltip></OButton>
+        <OButton
           v-if="incidentDetails.status === 'resolved'"
-          no-caps
-          unelevated
-          @click="reopenIncident"
+          variant="outline"
+          size="sm"
           :loading="updating"
-          class="o2-secondary-button"
-        >
-          <q-icon name="refresh" size="16px" class="tw:mr-1" />
-          <span>{{ t("alerts.incidents.reopen") }}</span>
-          <q-tooltip :delay="500">{{ t("alerts.incidents.reopenIncidentTooltip") }}</q-tooltip>
-        </q-btn>
+          @click="reopenIncident"
+        ><q-icon name="refresh" size="16px" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<q-tooltip :delay="500">{{ t("alerts.incidents.reopenIncidentTooltip") }}</q-tooltip></OButton>
 
         <!-- Edit Title Button -->
-        <q-btn
-          no-caps
-          flat
+        <OButton
+          variant="outline"
+          size="sm"
           @click="startTitleEdit"
-          class="o2-secondary-button"
-        >
-          <span>{{ t("alerts.edit") }}</span>
-          <q-tooltip :delay="500">{{ t("alerts.incidents.editIncidentTitleTooltip") }}</q-tooltip>
-        </q-btn>
+        >{{ t("alerts.edit") }}<q-tooltip :delay="500">{{ t("alerts.incidents.editIncidentTitleTooltip") }}</q-tooltip></OButton>
       </div>
     </div>
 
@@ -198,35 +177,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:flex-col tw:overflow-hidden" style="height: calc(100vh - 130px);">
       <!-- Tabs (moved to top level) -->
       <div class="tw:flex-shrink-0 tw:px-4 tw:pt-3">
-        <q-tabs
+        <OTabs
           v-model="activeTab"
-          inline-label
           dense
-          no-caps
           align="left"
           class="tw:flex-1"
           mobile-arrows
-          outside-arrows
           :breakpoint="0"
         >
-          <q-tab
+          <OTab
             name="overview"
             label="Overview"
+            data-test="incident-overview-tab"
           />
-          <q-tab
+          <OTab
             name="activity"
             label="Activity"
+            data-test="incident-activity-tab"
           />
-          <q-tab
+          <OTab
             name="incidentAnalysis"
             :label="t('alerts.incidents.incidentAnalysis')"
+            data-test="incident-analysis-tab"
           />
-          <q-tab
+          <OTab
             name="serviceGraph"
             label="Alert Graph"
+            data-test="incident-alert-graph-tab"
           />
-          <q-tab
+          <OTab
             name="alertTriggers"
+            data-test="incident-alert-triggers-tab"
           >
             <template #default>
               <div class="tw:flex tw:items-center tw:gap-1.5">
@@ -234,22 +215,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tw:text-sm tw:opacity-70">({{ triggers.length }})</span>
               </div>
             </template>
-          </q-tab>
+          </OTab>
 
           <!-- Telemetry tabs always inline -->
-          <q-tab
+          <OTab
             name="logs"
             :label="t('common.logs')"
+            data-test="incident-logs-tab"
           />
-          <q-tab
+          <OTab
             name="metrics"
             :label="t('search.metrics')"
+            data-test="incident-metrics-tab"
           />
-          <q-tab
+          <OTab
             name="traces"
             :label="t('menu.traces')"
+            data-test="incident-traces-tab"
           />
-        </q-tabs>
+        </OTabs>
       </div>
 
       <!-- Tab Content Container -->
@@ -484,17 +468,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Show Full Activity Button -->
                   <div class="tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:p-2 tw:flex tw:justify-end">
-                    <q-btn
-                      flat
-                      dense
-                      no-caps
+                    <OButton
+                      variant="ghost-primary"
                       size="sm"
-                      color="primary"
                       @click="activeTab = 'activity'"
                       data-test="incident-timeline-show-full-activity"
-                    >
-                      <span class="tw:text-xs">Show Full Activity</span>
-                    </q-btn>
+                    ><span class="tw:text-xs">Show Full Activity</span></OButton>
                   </div>
                 </div>
                 <!-- Incident Details (66.67% width) -->
@@ -1057,16 +1036,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
-            <q-btn
+            <OButton
               v-if="correlationError && !correlationError.includes('disambiguation fields')"
-              color="primary"
-              outline
+              variant="outline"
               size="md"
               @click="refreshCorrelation"
-              icon="refresh"
-              label="Retry"
               class="q-mt-md"
-            />
+            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - CorrelatedLogsTable -->
@@ -1111,16 +1087,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
-            <q-btn
+            <OButton
               v-if="correlationError && !correlationError.includes('disambiguation fields')"
-              color="primary"
-              outline
+              variant="outline"
               size="md"
               @click="refreshCorrelation"
-              icon="refresh"
-              label="Retry"
               class="q-mt-md"
-            />
+            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1145,17 +1118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Refresh Button (shown when traces data is loaded) -->
           <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="tw-px-4 tw-py-2 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-between">
             <span class="tw-text-xs tw-text-gray-500">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="refresh"
-              color="primary"
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              :disabled="correlationLoading"
               @click="refreshCorrelation"
-              :disable="correlationLoading"
-            >
-              <q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip>
-            </q-btn>
+            ><q-icon name="refresh" size="16px" /><q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip></OButton>
           </div>
 
           <!-- Loading State -->
@@ -1177,16 +1145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-body2 text-grey-7 q-mt-sm" style="max-width: 500px; text-align: center;">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
-            <q-btn
+            <OButton
               v-if="correlationError && !correlationError.includes('disambiguation fields')"
-              color="primary"
-              outline
+              variant="outline"
               size="md"
               @click="refreshCorrelation"
-              icon="refresh"
-              label="Retry"
               class="q-mt-md"
-            />
+            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1219,6 +1184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -1246,10 +1213,13 @@ import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
+    OTabs,
+    OTab,
     TelemetryCorrelationDashboard,
     CorrelatedLogsTable,
     IncidentServiceGraph,
@@ -1258,6 +1228,7 @@ export default defineComponent({
     IncidentRCAAnalysis,
     IncidentTimeline,
     CustomChartRenderer,
+    OButton,
   },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
@@ -3104,7 +3075,7 @@ body.body--dark .ai-chat-panel::-webkit-scrollbar-thumb {
 
 /* AI Button Styles */
 .ai-btn-active {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
 }
 
 .ai-hover-btn {

@@ -452,3 +452,41 @@ pub async fn list_reports<C: ConnectionTrait>(
     let reports = queries::ListReportsQueryResult::get(conn, params).await?;
     Ok(reports)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_report_not_found_display() {
+        assert_eq!(Error::ReportNotFound.to_string(), "Report not found.");
+    }
+
+    #[test]
+    fn test_error_dashboard_not_found_display() {
+        assert_eq!(Error::DashboardNotFound.to_string(), "Dashboard not found.");
+    }
+
+    #[test]
+    fn test_error_report_folder_not_found_display() {
+        assert_eq!(
+            Error::ReportFolderNotFound.to_string(),
+            "Report folder not found."
+        );
+    }
+
+    #[test]
+    fn test_error_negative_frequency_interval_display() {
+        assert_eq!(
+            Error::NegativeFrequencyInterval.to_string(),
+            "Frequency interval cannot be negative."
+        );
+    }
+
+    #[test]
+    fn test_error_from_serde_json_error() {
+        let json_err = serde_json::from_str::<serde_json::Value>("invalid json {{").unwrap_err();
+        let err: Error = json_err.into();
+        assert!(matches!(err, Error::Json(_)));
+    }
+}

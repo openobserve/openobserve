@@ -1303,7 +1303,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       const anyDropdown = panelContainer.locator('[data-test*="dropdown"]').first();
       await anyDropdown.click();
     }
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    // PanelContainer uses ODropdown (Reka UI), not Quasar q-menu — wait for
+    // the edit menu item directly instead of waiting for a .q-menu element.
 
     // Click Edit Panel menu item
     const editMenuItem = page.locator('[data-test="dashboard-edit-panel"]');
@@ -1323,10 +1324,12 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     }
 
     // Verify builder mode is active (PromQL + Builder tabs)
+    // OToggleGroupItem uses data-state="on" (Reka UI) rather than a "selected" CSS class
     const builderBtn = page.locator('[data-test="dashboard-builder-query-type"]');
     if (await builderBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       const classes = await builderBtn.getAttribute('class') || '';
-      expect(classes).toContain('selected');
+      const dataState = await builderBtn.getAttribute('data-state') || '';
+      expect(classes.includes('selected') || dataState === 'on').toBe(true);
       testLogger.info('Builder mode active in panel editor');
     }
 
@@ -1390,7 +1393,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       await discardBtn.click();
       await page.waitForTimeout(1000);
       // Handle confirmation dialog if appears
-      const confirmBtn = page.locator('.q-dialog .q-btn:has-text("OK"), .q-dialog .q-btn:has-text("Confirm"), [data-test="confirm-button"]').first();
+      const confirmBtn = page.locator('button:has-text("OK"), button:has-text("Confirm"), [data-test="confirm-button"]').first();
       if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await confirmBtn.click();
         await page.waitForTimeout(1000);

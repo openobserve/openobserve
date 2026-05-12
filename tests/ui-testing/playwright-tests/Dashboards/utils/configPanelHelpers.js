@@ -247,7 +247,7 @@ export async function setupMetricPanelWithConfig(page, pm, dashboardName, panelN
  * @param {string} [options.panelName]
  * @param {string} [options.query]    - PromQL query string
  */
-async function buildPromQLPanel(page, pm, dashboardName, {
+export async function buildPromQLPanel(page, pm, dashboardName, {
   chartType,
   panelName = "Test Panel",
   query = "zo_node_memory_usage",
@@ -273,7 +273,9 @@ async function buildPromQLPanel(page, pm, dashboardName, {
   const monacoEditor = queryEditor.getByRole('code');
   await monacoEditor.click({ clickCount: 3 });
   await page.keyboard.press('Backspace');
-  await page.keyboard.type(query, { delay: 50 });
+  // Use insertText (paste-like) to avoid Monaco autocomplete interfering with
+  // character-by-character typing, which can truncate/mangle the query
+  await page.keyboard.insertText(query);
   await page.keyboard.press('Escape'); // dismiss any autocomplete
   // Wait for Monaco debounce to sync editor content to Vue data model
   await page.waitForTimeout(3000);
@@ -318,8 +320,10 @@ export async function setupPromQLDonutPanelWithConfig(page, pm, dashboardName, p
  * PromQL table panel — config sidebar opened and ready.
  * Used for PromQL table mode, column visibility, sticky columns tests.
  */
-export async function setupPromQLTablePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
-  await buildPromQLPanel(page, pm, dashboardName, { chartType: "table", panelName });
+export async function setupPromQLTablePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel", query) {
+  const opts = { chartType: "table", panelName };
+  if (query) opts.query = query;
+  await buildPromQLPanel(page, pm, dashboardName, opts);
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL table panel with config ready", { dashboardName, panelName });
 }

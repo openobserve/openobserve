@@ -181,7 +181,7 @@ export const useSearchAround = () => {
           is_multistream: searchObj.data.stream.selectedStream.length > 1,
           traceparent,
         })
-        .then((res: { data: SearchAroundResponse }) => {
+        .then(async (res: { data: SearchAroundResponse }) => {
           searchObj.loading = false;
           searchObj.data.histogram.chartParams.title = "";
           if (res.data.from > 0) {
@@ -193,12 +193,12 @@ export const useSearchAround = () => {
             searchObj.data.queryResults = res.data;
           }
           //extract fields from query response
-          extractFields();
+          await extractFields();
           generateHistogramSkeleton();
           generateHistogramData();
           //update grid columns
           updateGridColumns();
-          filterHitsColumns();
+          await filterHitsColumns();
 
           if (searchObj.meta.showHistogram) {
             searchObj.meta.showHistogram = false;

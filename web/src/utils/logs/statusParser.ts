@@ -44,18 +44,18 @@ export interface StatusInfo {
 
 /**
  * Color mapping for different log levels
- * Uses Tailwind CSS color palette for consistent theming
+ * Keys must stay aligned with SEMANTIC_COLORS_LIGHT / SEMANTIC_COLORS_DARK in convertLogData.ts.
  */
 export const STATUS_COLORS = {
-  emergency: '#E53935', // aligned with convertLogData fatal
-  alert: '#ea580c',    // no convertLogData equivalent — unchanged
-  critical: '#F4511E', // aligned with convertLogData critical
-  error: '#EF5350',    // aligned with convertLogData error
-  warning: '#FB8C00',  // aligned with convertLogData warn
-  notice: '#16a34a',   // no convertLogData equivalent — unchanged
-  info: '#1E88E5',     // aligned with convertLogData info
-  debug: '#00ACC1',    // aligned with convertLogData debug
-  ok: '#43A047',       // aligned with convertLogData success
+  emergency: '#E53935', // aligned with convertLogData fatal/emergency
+  alert:     '#ea580c',
+  critical:  '#F4511E', // aligned with convertLogData critical
+  error:     '#EF5350', // aligned with convertLogData error
+  warning:   '#FB8C00', // aligned with convertLogData warn/warning
+  notice:    '#16a34a',
+  info:      '#1E88E5', // aligned with convertLogData info
+  debug:     '#00ACC1', // aligned with convertLogData debug
+  ok:        '#43A047', // aligned with convertLogData success/ok
 } as const;
 
 /**
@@ -79,9 +79,36 @@ export const STATUS_COLORS_DARK: Partial<Record<keyof typeof STATUS_COLORS, stri
 const STATUS_FIELDS = ['severity', 'level', 'log_level', 'syslog.severity', 'status'] as const;
 
 /**
+ * Regex to find a standalone log-level keyword in a template or log message string.
+ * Matches common syslog / OTEL levels at word boundaries (e.g. "INFO", "ERROR").
+ */
+const TEMPLATE_LEVEL_RE = /\b(emergency|emerg|fatal|alert|critical|crit|error|err|warning|warn|notice|info|information|debug|trace|verbose|ok|success)\b/i;
+
+/**
+ * Extract status color from a pattern template or example log message string.
+ *
+ * Searches the text for a recognised log-level keyword and delegates to
+ * `extractStatusFromLog` so the existing colour logic stays in one place.
+ *
+ * @param text - Pattern template or example log message string
+ * @param isDark - Whether dark-mode colours should be used
+ * @returns StatusInfo with level, color, and priority (defaults to info)
+ */
+export function extractStatusFromTemplate(text: string, isDark = false): StatusInfo {
+  if (!text || typeof text !== 'string') {
+    return extractStatusFromLog(null, isDark);
+  }
+  const match = text.match(TEMPLATE_LEVEL_RE);
+  if (match) {
+    return extractStatusFromLog({ level: match[1] }, isDark);
+  }
+  return extractStatusFromLog(null, isDark);
+}
+
+/**
  * Extracts status information from a log entry object
  * Searches through common status field names and parses the value
- * 
+ *
  * @param logEntry - The log entry object to analyze
  * @returns StatusInfo with level, color, and priority
  */

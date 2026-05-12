@@ -125,27 +125,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end q-px-lg q-py-lg full-width tw:bg-[var(--q-card-background)]"
+            class="flex justify-end tw:gap-2 q-px-lg q-py-lg full-width tw:bg-[var(--q-card-background)]"
           >
-            <q-btn
+            <OButton
               v-close-popup
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('alerts.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              variant="outline"
+              size="sm-action"
               @click="$emit('cancel:hideform')"
               data-test="add-template-cancel-btn"
-            />
-            <q-btn
-              class="o2-primary-button no-border tw:h-[36px]"
-              :label="t('alerts.save')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            >{{ t('alerts.cancel') }}</OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
               @click="saveTemplate"
               data-test="add-template-submit-btn"
-            />
+            >{{ t('alerts.save') }}</OButton>
           </div>
         </div>
       </template>
@@ -221,10 +215,12 @@ import { useI18n } from "vue-i18n";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { copyToClipboard, useQuasar } from "quasar";
+import OButton from '@/lib/core/Button/OButton.vue';
 import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Webhook, Mail } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
 import {
   validateTemplateBody,
@@ -287,11 +283,13 @@ const tabs = computed(() => [
     label: "Web Hook",
     value: "http",
     style: {},
+    icon: Webhook,
   },
   {
     label: "Email",
     value: "email",
     style: {},
+    icon: Mail,
   },
 ]);
 

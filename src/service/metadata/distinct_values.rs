@@ -377,3 +377,41 @@ impl Metadata for DistinctValues {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+
+    use super::*;
+
+    fn make_item() -> DvItem {
+        DvItem {
+            stream_type: StreamType::Logs,
+            stream_name: "mystream".to_string(),
+            value: Map::new(),
+        }
+    }
+
+    #[test]
+    fn test_dv_event_new_sets_org_and_count() {
+        let item = make_item();
+        let ev = DvEvent::new("myorg", item.clone(), 5);
+        assert_eq!(ev.org_id, "myorg");
+        assert_eq!(ev.count, 5);
+        assert_eq!(ev.item.stream_name, "mystream");
+    }
+
+    #[test]
+    fn test_dv_event_shutdown_has_empty_org() {
+        let ev = DvEvent::shutdown();
+        assert!(ev.org_id.is_empty());
+        assert_eq!(ev.count, 0);
+    }
+
+    #[test]
+    fn test_dv_item_default_is_logs_type() {
+        let item = DvItem::default();
+        assert_eq!(item.stream_type, StreamType::Logs);
+        assert!(item.stream_name.is_empty());
+    }
+}

@@ -68,6 +68,56 @@ impl NewMemTable {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow::datatypes::{DataType, Field, Schema};
+    use hashbrown::HashMap;
+
+    use super::*;
+
+    fn make_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("message", DataType::Utf8, true),
+        ]))
+    }
+
+    #[test]
+    fn test_try_new_single_empty_partition_succeeds() {
+        let schema = make_schema();
+        // MemTable requires at least one partition (may be empty)
+        let result = NewMemTable::try_new(
+            schema,
+            vec![vec![]],
+            HashMap::new(),
+            false,
+            None,
+            vec![],
+            (0, i64::MAX),
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_try_new_with_rules() {
+        let schema = make_schema();
+        let mut rules = HashMap::new();
+        rules.insert("message".to_string(), DataType::Utf8);
+        let result = NewMemTable::try_new(
+            schema,
+            vec![vec![]],
+            rules,
+            true,
+            None,
+            vec!["message".to_string()],
+            (0, 1000),
+        );
+        assert!(result.is_ok());
+    }
+}
+
 #[async_trait]
 impl TableProvider for NewMemTable {
     fn as_any(&self) -> &dyn Any {

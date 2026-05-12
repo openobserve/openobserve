@@ -39,3 +39,48 @@ fn format_location(location: &Path) -> (String, Path) {
     }
     (account.to_string(), path.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_location_no_separators() {
+        let loc = Path::from("files/org/logs/test.parquet");
+        let (account, path) = format_location(&loc);
+        assert!(account.is_empty());
+        assert_eq!(path.to_string(), "files/org/logs/test.parquet");
+    }
+
+    #[test]
+    fn test_format_location_with_trace_separator() {
+        let loc = Path::from("trace123/$$/files/org/logs/test.parquet");
+        let (account, path) = format_location(&loc);
+        assert!(account.is_empty());
+        assert_eq!(path.to_string(), "files/org/logs/test.parquet");
+    }
+
+    #[test]
+    fn test_format_location_with_account() {
+        let loc = Path::from("myaccount/::/files/org/logs/test.parquet");
+        let (account, path) = format_location(&loc);
+        assert_eq!(account, "myaccount");
+        assert_eq!(path.to_string(), "files/org/logs/test.parquet");
+    }
+
+    #[test]
+    fn test_format_location_empty_account_prefix() {
+        let loc = Path::from("::/files/org/logs/test.parquet");
+        let (account, path) = format_location(&loc);
+        assert!(account.is_empty());
+        assert_eq!(path.to_string(), "files/org/logs/test.parquet");
+    }
+
+    #[test]
+    fn test_format_location_with_both_separators() {
+        let loc = Path::from("trace/$$/myaccount/::/files/test.parquet");
+        let (account, path) = format_location(&loc);
+        assert_eq!(account, "myaccount");
+        assert_eq!(path.to_string(), "files/test.parquet");
+    }
+}

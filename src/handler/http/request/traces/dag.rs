@@ -179,7 +179,7 @@ pub async fn get_trace_dag(
     // Query all spans for this trace_id
     let query_sql = format!(
         "SELECT span_id, trace_id, service_name, operation_name, span_status, \
-         reference_parent_span_id, start_time, end_time, llm_observation_type \
+         reference_parent_span_id, start_time, end_time, gen_ai_operation_name \
          FROM {stream_name} \
          WHERE trace_id = '{trace_id}'"
     );
@@ -302,8 +302,8 @@ pub async fn get_trace_dag(
                 .to_string(),
             start_time: item.get("start_time").and_then(|v| v.as_i64()).unwrap_or(0),
             end_time: item.get("end_time").and_then(|v| v.as_i64()).unwrap_or(0),
-            llm_observation_type: item
-                .get("llm_observation_type")
+            gen_ai_operation_name: item
+                .get("gen_ai_operation_name")
                 .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string()),
@@ -360,11 +360,60 @@ struct SpanNode {
     span_status: String,
     start_time: i64,
     end_time: i64,
-    llm_observation_type: Option<String>,
+    gen_ai_operation_name: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct SpanEdge {
     from: String,
     to: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_span_node_serializes() {
+        let node = SpanNode {
+            span_id: "span1".to_string(),
+            parent_span_id: None,
+            service_name: "svc".to_string(),
+            operation_name: "GET /api".to_string(),
+            span_status: "OK".to_string(),
+            start_time: 100,
+            end_time: 200,
+            gen_ai_operation_name: None,
+        };
+        let json = serde_json::to_string(&node).unwrap();
+        assert!(json.contains("span1"));
+        assert!(json.contains("svc"));
+    }
+
+    #[test]
+    fn test_span_node_with_parent_serializes() {
+        let node = SpanNode {
+            span_id: "child".to_string(),
+            parent_span_id: Some("parent".to_string()),
+            service_name: "svc".to_string(),
+            operation_name: "op".to_string(),
+            span_status: "OK".to_string(),
+            start_time: 0,
+            end_time: 1,
+            gen_ai_operation_name: None,
+        };
+        let json = serde_json::to_string(&node).unwrap();
+        assert!(json.contains("parent"));
+    }
+
+    #[test]
+    fn test_span_edge_serializes() {
+        let edge = SpanEdge {
+            from: "a".to_string(),
+            to: "b".to_string(),
+        };
+        let json = serde_json::to_string(&edge).unwrap();
+        assert!(json.contains("\"from\":\"a\""));
+        assert!(json.contains("\"to\":\"b\""));
+    }
 }

@@ -95,23 +95,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Billing is handled through your Azure account
         </div>
       </div>
+      <!-- External contract - billed offline, no Stripe portal to open -->
+      <div
+        v-else-if="subscriptionType === 'external-contract'"
+        class="full-width text-center"
+      >
+        <q-chip
+          color="grey-3"
+          text-color="grey-8"
+          icon="description"
+          label="Managed via contract"
+          class="q-px-md q-py-sm"
+        />
+        <div class="text-caption text-grey-7 q-mt-sm">
+          Billing is handled through your contract — contact your account manager for changes
+        </div>
+      </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
-      <q-btn
+      <OButton
         v-else-if="planType == planName"
-        :label="btnCancelSubscription"
-        text-color="black"
-        class="full-width bg-grey-4 text-bold text-capitalize text-subtitle1"
-        flat
+        variant="outline"
+        size="sm-action"
+        block
         @click="cancelSubscription"
-      />
-      <q-btn
+      >
+        {{ btnCancelSubscription }}
+      </OButton>
+      <OButton
         v-else
-        :label="btnSubscribe"
-        text-color="white"
-        class="full-width bg-primary text-bold text-capitalize text-subtitle1"
-        flat
+        variant="primary"
+        size="sm-action"
+        block
         @click="onSubscribe"
-      />
+      >
+        {{ btnSubscribe }}
+      </OButton>
     </div>
   </q-card>
 </template>
@@ -119,10 +137,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 export default defineComponent({
   name: "proPlan",
-  props: ["planType", "billingProvider", "features", "pricingError"],
+  components: { OButton },
+  props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const planName = "pay-as-you-go";

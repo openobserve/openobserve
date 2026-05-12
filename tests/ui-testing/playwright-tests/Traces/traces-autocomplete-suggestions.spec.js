@@ -206,9 +206,9 @@ test.describe("Traces Autocomplete Value Suggestions", () => {
         await pm.tracesPage.navigateToTraces();
 
         // Select the default stream if visible
-        if (await pm.tracesPage.isStreamSelectVisible()) {
-            await pm.tracesPage.selectTraceStream('default');
-        }
+        await pm.tracesPage.isStreamSelectVisible()
+        await pm.tracesPage.selectTraceStream('default');
+        await page.waitForTimeout(2000);
 
         testLogger.info('Traces test setup completed');
     });

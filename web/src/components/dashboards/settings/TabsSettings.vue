@@ -21,20 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="column full-height" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
-        <q-btn
-          class="text-bold no-border q-ml-md o2-primary-button"
-          no-caps
-          no-outline
-          rounded
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          :label="t(`dashboard.newTab`)"
+        <OButton
+          variant="primary"
+          size="sm"
           @click.stop="addNewItem"
           data-test="dashboard-tab-settings-add-tab"
-        />
+          >{{ t("dashboard.newTab") }}</OButton
+        >
       </template>
     </DashboardHeader>
     <div class="table-header flex justify-between text-bold">
@@ -84,53 +77,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="edit-input"
                 data-test="dashboard-tab-settings-tab-name-edit"
               />
-              <q-btn
-                icon="check"
-                unelevated
-                size="sm"
-                round
-                flat
+              <OButton
+                variant="ghost"
+                size="icon"
                 :title="t('dashboard.save')"
                 @click.stop="saveEdit"
-                :disable="!editTabObj.data.name.trim()"
+                :disabled="!editTabObj.data.name.trim()"
                 data-test="dashboard-tab-settings-tab-name-edit-save"
-              ></q-btn>
-              <q-btn
-                icon="close"
-                unelevated
-                size="sm"
-                round
-                flat
+              >
+                <template #icon-left><q-icon name="check" /></template>
+              </OButton>
+              <OButton
+                variant="ghost"
+                size="icon"
                 :title="t('dashboard.cancel')"
                 @click.stop="cancelEdit"
                 data-test="dashboard-tab-settings-tab-name-edit-cancel"
-              ></q-btn>
+              >
+                <template #icon-left><q-icon name="close" /></template>
+              </OButton>
             </div>
             <div class="actions">
-              <q-btn
-                icon="edit"
-                padding="4px"
-                unelevated
-                size="sm"
-                round
-                flat
+              <OButton
+                variant="ghost"
+                size="icon"
                 :disabled="tab.tabId === editTabId"
                 :title="t('dashboard.edit')"
                 @click.stop="editItem(tab.tabId)"
                 data-test="dashboard-tab-settings-tab-edit-btn"
-              />
-              <q-btn
+              >
+                <template #icon-left><q-icon name="edit" /></template>
+              </OButton>
+              <OButton
                 v-if="currentDashboardData.data.tabs.length !== 1"
-                :icon="outlinedDelete"
+                variant="ghost"
+                size="icon"
                 :title="t('dashboard.delete')"
-                padding="4px"
-                unelevated
-                size="sm"
-                round
-                flat
                 @click.stop="deleteItem(tab.tabId)"
                 data-test="dashboard-tab-settings-tab-delete-btn"
-              />
+              >
+                <template #icon-left
+                  ><q-icon :name="outlinedDelete"
+                /></template>
+              </OButton>
             </div>
           </div>
         </div>
@@ -178,6 +167,7 @@ import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import { updateDashboard } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -186,6 +176,7 @@ export default defineComponent({
     DashboardHeader,
     AddTab,
     TabsDeletePopUp,
+    OButton,
   },
   emits: ["refresh"],
   setup(props, { emit }) {

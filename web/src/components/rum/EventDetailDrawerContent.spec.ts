@@ -161,6 +161,46 @@ function mountComponent(options: any = {}) {
             '<div data-test="frustration-badge">Frustration Badge</div>',
           props: ["frustrationTypes"],
         },
+        // OTabs stub — Reka UI-based, forward data-test via v-bind="$attrs"
+        OTabs: {
+          name: "OTabs",
+          template: '<div class="o-tabs-stub" v-bind="$attrs"><slot /></div>',
+          props: ["modelValue", "dense", "align"],
+          emits: ["update:modelValue"],
+        },
+        OTab: {
+          name: "OTab",
+          template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+          props: ["name", "label", "style"],
+        },
+        // OTabPanels: provide reactive context via setup()
+        OTabPanels: {
+          name: "OTabPanels",
+          template: '<div class="o-tab-panels-stub"><slot /></div>',
+          props: ["modelValue", "animated", "keepAlive", "grow"],
+          emits: ["update:modelValue"],
+          setup(props: any) {
+            const { computed, provide } = require("vue");
+            const ctx = computed(() => ({ modelValue: props.modelValue }));
+            provide("tabPanelsCtx", ctx);
+            return {};
+          },
+        },
+        OTabPanel: {
+          name: "OTabPanel",
+          // v-bind="$attrs" forwards data-test; renders only when active
+          template: '<div v-if="isActive" v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
+          props: ["name", "padding", "layout", "stretch"],
+          setup(props: any) {
+            const { inject, computed } = require("vue");
+            const ctx = inject("tabPanelsCtx", { value: { modelValue: null } });
+            const isActive = computed(() => {
+              const mv = ctx?.value?.modelValue ?? ctx?.modelValue ?? null;
+              return mv === props.name;
+            });
+            return { isActive };
+          },
+        },
         ...options.stubs,
       },
     },

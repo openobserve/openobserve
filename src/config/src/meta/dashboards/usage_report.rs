@@ -24,3 +24,57 @@ pub struct DashboardInfo {
     pub tab_id: String,
     pub tab_name: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dashboard_info_serialize_deserialize() {
+        let info = DashboardInfo {
+            run_id: "run1".to_string(),
+            panel_id: "panel1".to_string(),
+            panel_name: "My Panel".to_string(),
+            tab_id: "tab1".to_string(),
+            tab_name: "Tab 1".to_string(),
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let back: DashboardInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(info, back);
+    }
+
+    #[test]
+    fn test_dashboard_info_equality() {
+        let a = DashboardInfo {
+            run_id: "r".to_string(),
+            panel_id: "p".to_string(),
+            panel_name: "n".to_string(),
+            tab_id: "t".to_string(),
+            tab_name: "tn".to_string(),
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
+        let c = DashboardInfo {
+            run_id: "different".to_string(),
+            ..b
+        };
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn test_dashboard_info_all_fields_in_json() {
+        let info = DashboardInfo {
+            run_id: "r1".to_string(),
+            panel_id: "p1".to_string(),
+            panel_name: "Panel".to_string(),
+            tab_id: "t1".to_string(),
+            tab_name: "Tab".to_string(),
+        };
+        let val = serde_json::to_value(&info).unwrap();
+        assert_eq!(val["run_id"], "r1");
+        assert_eq!(val["panel_id"], "p1");
+        assert_eq!(val["panel_name"], "Panel");
+        assert_eq!(val["tab_id"], "t1");
+        assert_eq!(val["tab_name"], "Tab");
+    }
+}

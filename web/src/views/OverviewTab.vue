@@ -56,9 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ov-row-title">{{ item.title }}</div>
             <div class="ov-row-desc">{{ item.description }}</div>
           </div>
-          <button class="ov-investigate-btn" @click="goToAlert(item)">
-            {{ t('overview.investigate') }}
-          </button>
+          <span class="ov-investigate-wrap">
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              @click="goToAlert(item)"
+            >
+              {{ t("overview.investigate") }}
+            </OButton>
+          </span>
         </div>
       </div>
     </section>
@@ -104,9 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-if="inc.assigned_to"> · {{ inc.assigned_to }}</span>
             </div>
           </div>
-          <button class="ov-investigate-btn" @click="goToIncident(inc)">
-            {{ t('overview.investigate') }}
-          </button>
+          <span class="ov-investigate-wrap">
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              @click="goToIncident(inc)"
+            >
+              {{ t("overview.investigate") }}
+            </OButton>
+          </span>
         </div>
       </div>
     </section>
@@ -124,16 +136,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="ov-svc-header">
             <span class="ov-svc-name">{{ svc.label }}</span>
-            <button
-              class="ov-svc-info-btn"
-              :title="t('overview.viewLatencyCharts')"
-              @click="openServicePanel(svc, $event)"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                <path d="M12 16v-4m0-4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </button>
+            <span class="ov-svc-info-wrap">
+              <OButton
+                variant="ghost-muted"
+                size="icon"
+                :title="t('overview.viewLatencyCharts')"
+                @click="openServicePanel(svc, $event)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                  <path d="M12 16v-4m0-4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </OButton>
+            </span>
           </div>
           <div class="ov-svc-flags">
             <span v-if="svc.errorFlag" class="ov-svc-flag ov-flag-error" :title="t('overview.elevatedErrorRate')">
@@ -222,7 +237,8 @@ import incidentsService from "@/services/incidents";
 import serviceGraphService from "@/services/service_graph";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 
 const { t } = useI18n();
@@ -280,12 +296,15 @@ const onDateChange = (value: any) => {
     dateTimeType.value = "absolute";
     absoluteTime.value = { startTime: value.startTime, endTime: value.endTime };
   }
-  localStorage.setItem(LS_TIME_KEY, JSON.stringify({
-    type: dateTimeType.value,
-    relative: relativeTime.value,
-    absolute: absoluteTime.value,
-    timeRange: timeRange.value,
-  }));
+  localStorage.setItem(
+    LS_TIME_KEY,
+    JSON.stringify({
+      type: dateTimeType.value,
+      relative: relativeTime.value,
+      absolute: absoluteTime.value,
+      timeRange: timeRange.value,
+    }),
+  );
   loadAll();
 };
 
@@ -299,7 +318,9 @@ const recentEvents = ref<any[]>([]);
 
 // Service graph raw data + panel state
 const graphData = ref<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] });
-const graphStream = ref(localStorage.getItem("serviceGraph_streamFilter") || "");
+const graphStream = ref(
+  localStorage.getItem("serviceGraph_streamFilter") || "",
+);
 const selectedService = ref<any>(null);
 const servicePanelVisible = ref(false);
 
@@ -319,19 +340,27 @@ const loadAll = async () => {
   lastFetched.value = new Date();
 };
 
-
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async () => {
   try {
     // Get all anomaly configs for this org
     const listRes = await anomalyService.list(orgId.value);
     const configs: any[] = listRes.data ?? [];
-    if (!configs.length) { anomalies.value = []; return; }
+    if (!configs.length) {
+      anomalies.value = [];
+      return;
+    }
 
     // Fetch history for each config in parallel, cap per-config at 20 hits
     const limitPerConfig = Math.min(20, Math.ceil(500 / configs.length));
     const results = await Promise.allSettled(
-      configs.map((c) => anomalyService.getHistory(orgId.value, c.id ?? c.anomaly_id, limitPerConfig))
+      configs.map((c) =>
+        anomalyService.getHistory(
+          orgId.value,
+          c.id ?? c.anomaly_id,
+          limitPerConfig,
+        ),
+      ),
     );
 
     const found: any[] = [];
@@ -342,7 +371,12 @@ const loadAnomalies = async () => {
       hits.forEach((h) => {
         // Only include hits within the selected time window (history API doesn't filter by time)
         const tsMs = h.timestamp ? Math.floor(h.timestamp / 1000) : 0;
-        if (tsMs && (tsMs < timeRange.value.startTime / 1000 || tsMs > timeRange.value.endTime / 1000)) return;
+        if (
+          tsMs &&
+          (tsMs < timeRange.value.startTime / 1000 ||
+            tsMs > timeRange.value.endTime / 1000)
+        )
+          return;
         if ((h.anomaly_count ?? 0) > 0) {
           found.push({
             id: h.id ?? `anm-${cfg.id}-${tsMs}`,
@@ -420,10 +454,9 @@ const loadHistoryAndSplit = async () => {
         }
       });
 
-    recentEvents.value = [
-      ...firingHits,
-      ...Array.from(failedMap.values()),
-    ].sort((a, b) => (b.rawTs ?? 0) - (a.rawTs ?? 0)).slice(0, 15);
+    recentEvents.value = [...firingHits, ...Array.from(failedMap.values())]
+      .sort((a, b) => (b.rawTs ?? 0) - (a.rawTs ?? 0))
+      .slice(0, 15);
   } catch {
     recentEvents.value = [];
   }
@@ -496,7 +529,6 @@ const loadServiceGraph = async () => {
   }
 };
 
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const formatStatus = (status: string) => {
   if (!status) return "Event";
@@ -506,7 +538,10 @@ const formatStatus = (status: string) => {
     failed: "Failed",
     anomaly: "Anomaly",
   };
-  return map[status.toLowerCase()] ?? status.charAt(0).toUpperCase() + status.slice(1);
+  return (
+    map[status.toLowerCase()] ??
+    status.charAt(0).toUpperCase() + status.slice(1)
+  );
 };
 
 const relativeTime_ = (tsMicros: number): string => {
@@ -524,24 +559,34 @@ const formatReqRate = (reqs: number) => {
   return String(reqs);
 };
 
-
 const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
-  Object.keys(dims).sort().map((k) => [k, dims[k]]);
+  Object.keys(dims)
+    .sort()
+    .map((k) => [k, dims[k]]);
 
 // Shorten verbose k8s-style keys for display: "k8s-namespace" → "namespace"
 const shortDimKey = (key: string): string =>
   key.replace(/^k8s-/, "").replace(/^kubernetes[_-]/, "");
 
 const DIM_COLOR_MAP: Record<string, string> = {
-  deployment: "badge-blue",   "k8s-deployment": "badge-blue",
-  namespace:  "badge-orange", "k8s-namespace":  "badge-orange",
-  env:        "badge-green",  environment:      "badge-green",
-  host:       "badge-purple", hostname:         "badge-purple",
-  service:    "badge-cyan",   service_name:     "badge-cyan",
-  region:     "badge-pink",   zone:             "badge-pink",
-  cluster:    "badge-indigo", "k8s-cluster":    "badge-indigo",
-  pod:        "badge-teal",   container:        "badge-red",
-  app:        "badge-yellow", application:      "badge-yellow",
+  deployment: "badge-blue",
+  "k8s-deployment": "badge-blue",
+  namespace: "badge-orange",
+  "k8s-namespace": "badge-orange",
+  env: "badge-green",
+  environment: "badge-green",
+  host: "badge-purple",
+  hostname: "badge-purple",
+  service: "badge-cyan",
+  service_name: "badge-cyan",
+  region: "badge-pink",
+  zone: "badge-pink",
+  cluster: "badge-indigo",
+  "k8s-cluster": "badge-indigo",
+  pod: "badge-teal",
+  container: "badge-red",
+  app: "badge-yellow",
+  application: "badge-yellow",
 };
 
 const dimColorClass = (key: string): string => {
@@ -622,7 +667,9 @@ onMounted(loadAll);
 
 watch(
   () => store.state.selectedOrganization?.identifier,
-  (val, old) => { if (val && val !== old) loadAll(); }
+  (val, old) => {
+    if (val && val !== old) loadAll();
+  },
 );
 
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
@@ -670,7 +717,6 @@ watch(isIncidentsEnabled, (enabled) => {
   gap: 0.5rem;
 }
 
-
 /* ── Section ── */
 .ov-section {
   margin-bottom: 1.25rem;
@@ -708,17 +754,23 @@ watch(isIncidentsEnabled, (enabled) => {
 
   &.ov-row-critical {
     border-left: 0.1875em solid #ef4444;
-    .ov-row-icon { color: #ef4444; }
+    .ov-row-icon {
+      color: #ef4444;
+    }
   }
 
   &.ov-row-warning {
     border-left: 0.1875em solid #f59e0b;
-    .ov-row-icon { color: #f59e0b; }
+    .ov-row-icon {
+      color: #f59e0b;
+    }
   }
 
   &.ov-row-info {
     border-left: 0.1875em solid #3b82f6;
-    .ov-row-icon { color: #3b82f6; }
+    .ov-row-icon {
+      color: #3b82f6;
+    }
   }
 }
 
@@ -753,22 +805,9 @@ watch(isIncidentsEnabled, (enabled) => {
   text-overflow: ellipsis;
 }
 
-.ov-investigate-btn {
+.ov-investigate-wrap {
   flex-shrink: 0;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--o2-primary-color);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
   white-space: nowrap;
-  transition: background 0.15s;
-
-  &:hover {
-    background: var(--o2-hover-accent);
-  }
 }
 
 /* ── Dimension badges — exact match to IncidentList.vue ── */
@@ -792,32 +831,80 @@ watch(isIncidentsEnabled, (enabled) => {
   }
 }
 
-.badge-blue    { border: 0.0625em solid #1d4ed8; }
-.badge-green   { border: 0.0625em solid #065f46; }
-.badge-yellow  { border: 0.0625em solid #92400e; }
-.badge-pink    { border: 0.0625em solid #9f1239; }
-.badge-purple  { border: 0.0625em solid #7c3aed; }
-.badge-orange  { border: 0.0625em solid #c2410c; }
-.badge-cyan    { border: 0.0625em solid #0e7490; }
-.badge-indigo  { border: 0.0625em solid #4f46e5; }
-.badge-teal    { border: 0.0625em solid #0f766e; }
-.badge-red     { border: 0.0625em solid #dc2626; }
-.badge-gray    { border: 0.0625em solid #4b5563; }
-.badge-amber   { border: 0.0625em solid #d97706; }
+.badge-blue {
+  border: 0.0625em solid #1d4ed8;
+}
+.badge-green {
+  border: 0.0625em solid #065f46;
+}
+.badge-yellow {
+  border: 0.0625em solid #92400e;
+}
+.badge-pink {
+  border: 0.0625em solid #9f1239;
+}
+.badge-purple {
+  border: 0.0625em solid #7c3aed;
+}
+.badge-orange {
+  border: 0.0625em solid #c2410c;
+}
+.badge-cyan {
+  border: 0.0625em solid #0e7490;
+}
+.badge-indigo {
+  border: 0.0625em solid #4f46e5;
+}
+.badge-teal {
+  border: 0.0625em solid #0f766e;
+}
+.badge-red {
+  border: 0.0625em solid #dc2626;
+}
+.badge-gray {
+  border: 0.0625em solid #4b5563;
+}
+.badge-amber {
+  border: 0.0625em solid #d97706;
+}
 
 body.body--dark {
-  .badge-blue    { border-color: #93c5fd; }
-  .badge-green   { border-color: #6ee7b7; }
-  .badge-yellow  { border-color: #fcd34d; }
-  .badge-pink    { border-color: #f9a8d4; }
-  .badge-purple  { border-color: #c4b5fd; }
-  .badge-orange  { border-color: #fdba74; }
-  .badge-cyan    { border-color: #67e8f9; }
-  .badge-indigo  { border-color: #a5b4fc; }
-  .badge-teal    { border-color: #5eead4; }
-  .badge-red     { border-color: #fca5a5; }
-  .badge-gray    { border-color: #9ca3af; }
-  .badge-amber   { border-color: #fcd34d; }
+  .badge-blue {
+    border-color: #93c5fd;
+  }
+  .badge-green {
+    border-color: #6ee7b7;
+  }
+  .badge-yellow {
+    border-color: #fcd34d;
+  }
+  .badge-pink {
+    border-color: #f9a8d4;
+  }
+  .badge-purple {
+    border-color: #c4b5fd;
+  }
+  .badge-orange {
+    border-color: #fdba74;
+  }
+  .badge-cyan {
+    border-color: #67e8f9;
+  }
+  .badge-indigo {
+    border-color: #a5b4fc;
+  }
+  .badge-teal {
+    border-color: #5eead4;
+  }
+  .badge-red {
+    border-color: #fca5a5;
+  }
+  .badge-gray {
+    border-color: #9ca3af;
+  }
+  .badge-amber {
+    border-color: #fcd34d;
+  }
 
   .ov-flag-error {
     background: #401a1a;
@@ -830,9 +917,18 @@ body.body--dark {
     border-color: rgba(245, 158, 11, 0.35);
   }
 
-  .ov-badge-firing { background: #401a1a; color: #fca5a5; }
-  .ov-badge-error  { background: #401f10; color: #fdba74; }
-  .ov-badge-failed { background: #401a1a; color: #f9cbcb; }
+  .ov-badge-firing {
+    background: #401a1a;
+    color: #fca5a5;
+  }
+  .ov-badge-error {
+    background: #401f10;
+    color: #fdba74;
+  }
+  .ov-badge-failed {
+    background: #401a1a;
+    color: #f9cbcb;
+  }
 
   .ov-fail-count {
     color: #f9cbcb;
@@ -850,19 +946,50 @@ body.body--dark {
   border-radius: 0.2rem;
   letter-spacing: 0.04em;
 
-  &.ov-sev-p1 { background: #fef2f2; color: #b91c1c; border: 0.0625em solid #fca5a5; }
-  &.ov-sev-p2 { background: #fff7ed; color: #c2410c; border: 0.0625em solid #fdba74; }
-  &.ov-sev-p3 { background: #fefce8; color: #a16207; border: 0.0625em solid #fde047; }
-  &.ov-sev-p4 { background: #f0f9ff; color: #0369a1; border: 0.0625em solid #7dd3fc; }
+  &.ov-sev-p1 {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 0.0625em solid #fca5a5;
+  }
+  &.ov-sev-p2 {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 0.0625em solid #fdba74;
+  }
+  &.ov-sev-p3 {
+    background: #fefce8;
+    color: #a16207;
+    border: 0.0625em solid #fde047;
+  }
+  &.ov-sev-p4 {
+    background: #f0f9ff;
+    color: #0369a1;
+    border: 0.0625em solid #7dd3fc;
+  }
 }
 
 /* Dark mode severity badges */
 :root.body--dark {
-  .ov-sev-p1 { background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3); }
-  .ov-sev-p2 { background: rgba(249,115,22,0.15); color: #fdba74; border-color: rgba(249,115,22,0.3); }
-  .ov-sev-p3 { background: rgba(234,179,8,0.15); color: #fde047; border-color: rgba(234,179,8,0.3); }
-  .ov-sev-p4 { background: rgba(59,130,246,0.15); color: #7dd3fc; border-color: rgba(59,130,246,0.3); }
-
+  .ov-sev-p1 {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+  .ov-sev-p2 {
+    background: rgba(249, 115, 22, 0.15);
+    color: #fdba74;
+    border-color: rgba(249, 115, 22, 0.3);
+  }
+  .ov-sev-p3 {
+    background: rgba(234, 179, 8, 0.15);
+    color: #fde047;
+    border-color: rgba(234, 179, 8, 0.3);
+  }
+  .ov-sev-p4 {
+    background: rgba(59, 130, 246, 0.15);
+    color: #7dd3fc;
+    border-color: rgba(59, 130, 246, 0.3);
+  }
 }
 
 /* ── Services grid ── */
@@ -879,12 +1006,20 @@ body.body--dark {
   background: var(--o2-card-bg-solid);
   transition: background 0.15s;
 
-  &.ov-svc-degraded { border-left: 0.1875em solid #ef4444; }
-  &.ov-svc-warn     { border-left: 0.1875em solid #f59e0b; }
-  &.ov-svc-healthy  { border-left: 0.1875em solid #22c55e; }
+  &.ov-svc-degraded {
+    border-left: 0.1875em solid #ef4444;
+  }
+  &.ov-svc-warn {
+    border-left: 0.1875em solid #f59e0b;
+  }
+  &.ov-svc-healthy {
+    border-left: 0.1875em solid #22c55e;
+  }
 
   cursor: pointer;
-  &:hover { background: var(--o2-hover-gray); }
+  &:hover {
+    background: var(--o2-hover-gray);
+  }
 }
 
 .ov-svc-header {
@@ -905,26 +1040,11 @@ body.body--dark {
   white-space: nowrap;
 }
 
-.ov-svc-info-btn {
+.ov-svc-info-wrap {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  width: 1.25em;
-  height: 1.25em;
-  padding: 0;
-  border: none;
-  border-radius: 0.25em;
-  background: transparent;
-  color: var(--o2-text-muted);
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
   margin-left: 0.25rem;
-
-  &:hover {
-    color: var(--o2-primary-color);
-    background: var(--o2-hover-gray);
-  }
 }
 
 .ov-svc-flags {
@@ -994,8 +1114,12 @@ body.body--dark {
   font-size: 0.8125rem;
   transition: background 0.15s;
 
-  &:last-child { border-bottom: none; }
-  &:hover { background: var(--o2-hover-gray); }
+  &:last-child {
+    border-bottom: none;
+  }
+  &:hover {
+    background: var(--o2-hover-gray);
+  }
 }
 
 .ov-event-type-badge {
@@ -1006,9 +1130,19 @@ body.body--dark {
   border-radius: 0.2rem;
   letter-spacing: 0.03em;
 
-  &.ov-badge-firing { background: rgba(239,68,68,0.12);  color: #ef4444; }
-  &.ov-badge-error  { background: rgba(249,115,22,0.12); color: #c2410c; }
-  &.ov-badge-failed { background: rgba(239,68,68,0.18);  color: #b91c1c; font-weight: 700; }
+  &.ov-badge-firing {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+  }
+  &.ov-badge-error {
+    background: rgba(249, 115, 22, 0.12);
+    color: #c2410c;
+  }
+  &.ov-badge-failed {
+    background: rgba(239, 68, 68, 0.18);
+    color: #b91c1c;
+    font-weight: 700;
+  }
 }
 
 .ov-event-service {
@@ -1059,7 +1193,9 @@ body.body--dark {
   color: var(--o2-text-muted);
 }
 
-.ov-empty-icon { opacity: 0.4; }
+.ov-empty-icon {
+  opacity: 0.4;
+}
 
 .ov-empty-title {
   font-size: 1rem;
@@ -1095,13 +1231,21 @@ body.body--dark {
 }
 
 @keyframes skeleton-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* ── Scrollbar ── */
-.overview-tab::-webkit-scrollbar { width: 0.375em; }
-.overview-tab::-webkit-scrollbar-track { background: transparent; }
+.overview-tab::-webkit-scrollbar {
+  width: 0.375em;
+}
+.overview-tab::-webkit-scrollbar-track {
+  background: transparent;
+}
 .overview-tab::-webkit-scrollbar-thumb {
   background: var(--o2-border-color);
   border-radius: 0.1875em;

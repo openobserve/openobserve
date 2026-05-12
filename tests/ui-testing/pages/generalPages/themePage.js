@@ -8,11 +8,11 @@ export class ThemePage {
         this.predefinedThemesMenuItem = '[data-test="menu-link-predefined-themes-item"]';
         this.predefinedThemesDialog = '.predefined-theme-card';
         this.resetThemeBtn = 'button:has-text("Reset")';
-        this.closeDialogBtn = '.predefined-theme-card .q-btn--round.q-btn--flat';
+        this.closeDialogBtn = '[data-test="predefined-themes-close-btn"]';
 
         // Light/Dark Mode Tabs in Predefined Themes
-        this.lightModeTab = '.q-tab:has-text("Light Mode")';
-        this.darkModeTab = '.q-tab:has-text("Dark Mode")';
+        this.lightModeTab = '[role="tab"]:has-text("Light Mode")';
+        this.darkModeTab = '[role="tab"]:has-text("Dark Mode")';
 
         // Theme Cards
         this.themeCard = '.theme-card-compact';
@@ -24,7 +24,7 @@ export class ThemePage {
         this.customColorPreview = '.theme-card-compact:has-text("Custom Color") .color-preview-small.clickable';
         this.colorPickerDialog = '.q-color-picker, .q-color';
         // The color picker Close button is the rectangle-styled button, not the round X button
-        this.colorPickerClose = '.q-dialog .q-btn--rectangle:has-text("Close")';
+        this.colorPickerClose = '[data-test="color-picker-close-btn"]';
 
         // General Settings - Theme Management
         this.settingsMenuItem = '[data-test="menu-link-\\/settings-item"]';
@@ -37,7 +37,10 @@ export class ThemePage {
         // User Profile Menu (contains predefined themes link)
         this.profileMenuBtn = '[data-test="header-my-account-profile-icon"]';
 
-        // Body class for theme detection
+        // Theme Switcher
+        this.themeToggleBtn = '[data-test="navbar-theme-toggle-btn"]';
+
+        // Body class for theme detection (Quasar dark plugin adds 'body--dark')
         this.bodyDarkClass = 'body--dark';
 
         // Notification
@@ -75,11 +78,8 @@ export class ThemePage {
         // Get current theme state before toggle
         const wasDark = await this.isDarkMode();
 
-        // Find and click the theme switcher button in header
-        const themeSwitcher = this.page.locator('button.q-btn--rounded.q-btn--flat').filter({
-            has: this.page.locator('.q-icon.header-icon')
-        }).first();
-        await themeSwitcher.click();
+        // Click the theme switcher button using its data-test selector
+        await this.page.locator(this.themeToggleBtn).click();
 
         // Wait for theme to actually change by polling body class
         const bodyDarkClass = this.bodyDarkClass;
@@ -89,7 +89,7 @@ export class ThemePage {
                 return isDark !== expectedDark;
             },
             [bodyDarkClass, wasDark],
-            { timeout: 5000 }
+            { timeout: 10000 }
         );
     }
 
@@ -121,14 +121,14 @@ export class ThemePage {
         const tab = this.page.locator(this.lightModeTab);
         await tab.click();
         // Wait for tab to become active
-        await expect(tab).toHaveClass(/q-tab--active/, { timeout: 3000 });
+        await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
     }
 
     async selectDarkModeTab() {
         const tab = this.page.locator(this.darkModeTab);
         await tab.click();
         // Wait for tab to become active
-        await expect(tab).toHaveClass(/q-tab--active/, { timeout: 3000 });
+        await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
     }
 
     async getThemeCards() {
