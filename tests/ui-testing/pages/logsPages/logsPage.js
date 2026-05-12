@@ -6536,7 +6536,7 @@ export class LogsPage {
      */
     async getWildcardChipText(index = 0) {
         const text = await this.page.locator(this.wildcardChip).nth(index).textContent().catch(() => '');
-        return text;
+        return text.trim();
     }
 
     /**
