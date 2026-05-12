@@ -1037,23 +1037,27 @@ GROUP BY stream;
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if let Some(stream_type) = stream_type
-            && let Some(stream_name) = stream_name
-        {
-            format!(
-                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';",
-            )
-        } else {
-            format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
-        };
+        // SECURITY: bind parameters via sqlx to prevent SQL injection when
+        // org_id / stream_type / stream_name contain quotes or SQL metacharacters.
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["get_stream_stats", "stream_stats"])
             .inc();
         let start = std::time::Instant::now();
-        let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let ret = if let Some(stream_type) = stream_type
+            && let Some(stream_name) = stream_name
+        {
+            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE stream = $1;")
+                .bind(&stream_key)
+                .fetch_all(&pool)
+                .await?
+        } else {
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE org = $1;")
+                .bind(org_id)
+                .fetch_all(&pool)
+                .await?
+        };
         let mut stats: HashMap<String, StreamStats> = HashMap::with_capacity(ret.len() / 2);
         for r in ret {
             match stats.get_mut(&r.stream) {
