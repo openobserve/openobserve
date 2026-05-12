@@ -47,6 +47,7 @@ if (import.meta.env.DEV && !form) {
         :searchable="props.searchable"
         :search-debounce="props.searchDebounce"
         :hide-selected="props.hideSelected"
+        :select-all="props.selectAll"
         :creatable="props.creatable"
         :label-key="props.labelKey"
         :value-key="props.valueKey"
