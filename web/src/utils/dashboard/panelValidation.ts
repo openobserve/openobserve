@@ -23,11 +23,15 @@ export const findFirstValidMappedValue = (
         isMatch = +v?.from <= +value && +v?.to >= +value;
       }
     } else if (v?.type == "regex") {
-      isMatch = new RegExp(v?.pattern ?? "").test(value);
+      try {
+        isMatch = new RegExp(v?.pattern ?? "").test(value);
+      } catch {
+        // invalid regex pattern, skip
+      }
     }
 
     // If a match is found, check if the required field (color or text) is valid
-    if (isMatch && v[fieldToCheck]) {
+    if (isMatch && v[fieldToCheck] != null) {
       return true;
     }
 

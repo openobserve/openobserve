@@ -249,6 +249,9 @@ export default defineComponent({
       editedValueMapping.value.push({
         type: "value",
         value: "",
+        pattern: "",
+        from: "",
+        to: "",
         text: "",
         color: null,
       });
