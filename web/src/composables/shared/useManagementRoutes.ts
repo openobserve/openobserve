@@ -98,6 +98,7 @@ const useManagementRoutes = () => {
             create: {
               labelKey: "commandPalette.newDestination",
               keywords: ["new destination", "add notification destination", "create webhook", "new alert destination"],
+              query: { action: "create" },
             },
           },
           component: AlertsDestinationList,
@@ -119,6 +120,7 @@ const useManagementRoutes = () => {
             create: {
               labelKey: "commandPalette.newTemplate",
               keywords: ["new template", "add template", "create notification template", "new alert template"],
+              query: { action: "create" },
             },
           },
           component: TemplateList,
@@ -175,6 +177,7 @@ const useManagementRoutes = () => {
             create: {
               labelKey: "commandPalette.newCipherKey",
               keywords: ["new cipher key", "add cipher key", "create encryption key"],
+              query: { action: "create" },
             },
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -221,6 +224,7 @@ const useManagementRoutes = () => {
             create: {
               labelKey: "commandPalette.newPipelineDestination",
               keywords: ["new pipeline destination", "add pipeline destination", "create pipeline output"],
+              query: { action: "create" },
             },
           },
           component: () =>
@@ -300,6 +304,7 @@ const useManagementRoutes = () => {
             create: {
               labelKey: "commandPalette.newPattern",
               keywords: ["new pattern", "add regex pattern", "create pattern", "new regex", "add SDR pattern"],
+              query: { action: "create" },
             },
           },
           beforeEnter(to: any, from: any, next: any) {

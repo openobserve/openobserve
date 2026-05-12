@@ -29,6 +29,7 @@ export interface PaletteItem {
   keywords: string[];
   type: "page" | "entity" | "command" | "ai_action" | "create";
   prompt?: string;
+  query?: Record<string, string>;
 }
 
 export interface SlashCommand {
@@ -160,7 +161,7 @@ const useCommandPalette = () => {
 
     for (const route of routes) {
       const createMeta = route.meta?.create as
-        | { label?: string; labelKey?: string; icon?: string; keywords?: string[] }
+        | { label?: string; labelKey?: string; icon?: string; keywords?: string[]; query?: Record<string, string> }
         | undefined;
       if (!createMeta) continue;
 
@@ -186,6 +187,7 @@ const useCommandPalette = () => {
         section: "Create",
         keywords,
         type: "create" as const,
+        query: createMeta.query,
       });
     }
 
@@ -460,8 +462,21 @@ const useCommandPalette = () => {
       return;
     }
 
-    // Page or entity navigation — uses shared AutoNavigation
     store.dispatch("commandPalette/close");
+
+    // Create items: fire global event + set sessionStorage + navigate
+    // Global event: handled immediately if component is already mounted (same-page)
+    // sessionStorage: picked up by onPageReady after data loads (cross-page)
+    if (item.type === "create") {
+      sessionStorage.setItem("o2_create_action", item.name);
+      window.dispatchEvent(
+        new CustomEvent("o2:create-action", { detail: { name: item.name } }),
+      );
+      router.push(item.path);
+      return;
+    }
+
+    // Page / entity navigation — uses shared AutoNavigation
     navigate({ path: item.path });
   }
 
