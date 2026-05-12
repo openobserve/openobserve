@@ -153,12 +153,14 @@ import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import useCreateAction from "@/composables/useCreateAction";
 
 const { t } = useI18n();
 
 const { track } = useReo();
 
 const showAddGroup = ref(false);
+const { onPageReady } = useCreateAction(showAddGroup);
 
 const rows: any = ref([]);
 
@@ -206,7 +208,7 @@ const columns: any = [
 const { rolesState } = usePermissions();
 
 onBeforeMount(() => {
-  setupRoles();
+  setupRoles().then(() => onPageReady());
 });
 
 const filterQuery = ref("");

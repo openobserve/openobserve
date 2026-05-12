@@ -3701,5 +3701,32 @@
     "clearAll": "Alles löschen",
     "clearAllTitle": "Alle Chats löschen",
     "clearAllMessage": "Dadurch wird der gesamte Chatverlauf dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "commandPalette": {
+    "placeholder": "Suchen Sie nach Seiten, Entitäten oder geben Sie /ai ein, um Hilfe zu erhalten...",
+    "noResults": "Keine Ergebnisse für „{query}“ gefunden",
+    "searching": "Entitäten werden gesucht...",
+    "recents": "Aktuelle",
+    "pages": "Seiten",
+    "entities": "Entitäten",
+    "commands": "Befehle",
+    "aiActions": "KI-Aktionen",
+    "create": "Erstellen",
+    "newDashboard": "Neues Dashboard",
+    "newStream": "Neuer Stream",
+    "newAlert": "Neue Warnung",
+    "newPipeline": "Neue Pipeline",
+    "newFunction": "Neue Funktion",
+    "newEnrichmentTable": "Neue Anreicherungstabelle",
+    "newEvaluationTemplate": "Neue Bewertungsvorlage",
+    "newServiceAccount": "Neues Servicekonto",
+    "newOrganization": "Neue Organisation",
+    "newUserGroup": "Neue Benutzergruppe",
+    "newRole": "Neue Rolle",
+    "newDestination": "Neues Reiseziel",
+    "newPipelineDestination": "Neues Pipeline-Ziel",
+    "newTemplate": "Neue Vorlage",
+    "newCipherKey": "Neuer Chiffrenschlüssel",
+    "newPattern": "Neues Muster"
   }
 }

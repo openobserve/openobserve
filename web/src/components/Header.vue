@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -145,28 +145,41 @@ size="xs" class="warning" />{{
       <OButton
         variant="secondary"
         size="sm"
+        style="display: inline; padding: 5px 10px"
         class="q-ma-xs"
         @click="router.replace('/billings/plans')"
+        >Upgrade to PRO Plan</OButton
       >
-        Upgrade to PRO Plan
-      </OButton>
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
     <div class="header-menu">
       <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
       <OButton
-        variant="primary"
-        size="xs"
-        class="q-mx-xs"
-        data-test="upgrade-to-enterprise-btn"
+        variant="ghost"
+        size="sm"
+        class="upgrade-enterprise-btn q-px-sm q-mx-xs"
         @click="openEnterpriseDialog"
+        data-test="upgrade-to-enterprise-btn"
       >
-        <template #icon-left>
-          <q-icon name="card_giftcard" size="16px" />
-        </template>
-        {{ enterpriseButtonText }}
+        <div class="row items-center no-wrap">
+          <q-icon name="card_giftcard"
+size="16px" class="q-mr-xs" />
+          <span class="text-weight-medium">{{ enterpriseButtonText }}</span>
+        </div>
       </OButton>
+
+      <!-- COMMAND PALETTE SEARCH BUTTON -->
+      <button
+        class="cmd-palette-btn q-mx-xs"
+        data-test="header-command-palette-btn"
+        @click="openCommandPalette"
+        :aria-label="`Search pages (${isMac ? '⌘' : 'Ctrl'}K)`"
+      >
+        <q-icon name="search" class="cmd-palette-btn__icon" />
+        <span class="cmd-palette-btn__text">Search…</span>
+        <kbd class="cmd-palette-btn__kbd">{{ isMac ? "⌘" : "Ctrl" }}K</kbd>
+      </button>
 
       <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
       <OButton
@@ -175,15 +188,18 @@ size="xs" class="warning" />{{
           store.state.zoConfig.ingestion_quota_used >= 85
         "
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-sm"
+        :ripple="false"
         data-test="ingestion-quota-warning-icon"
       >
-        <q-icon
-          name="warning"
-          size="24px"
-          class="header-icon"
-          :style="{ color: ingestionQuotaColor }"
-        />
+        <div class="row items-center no-wrap">
+          <q-icon
+            name="warning"
+            size="24px"
+            class="header-icon"
+            :style="{ color: ingestionQuotaColor }"
+          ></q-icon>
+        </div>
         <q-tooltip anchor="top middle" self="bottom middle">
           Warning: {{ ingestionQuotaPercentage }}% of ingestion limit used
         </q-tooltip>
@@ -192,24 +208,28 @@ size="xs" class="warning" />{{
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
       <OButton
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-        variant="ghost"
-        size="icon-circle-sm"
+        :ripple="false"
         @click="toggleAIChat"
         data-test="menu-link-ai-item"
-        class="ai-hover-btn"
+        variant="ghost"
+        size="sm"
+        class="o2-button ai-hover-btn q-px-sm q-py-sm"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+        style="border-radius: 100%"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
       >
-        <img :src="getBtnLogo" class="header-icon ai-icon" />
+        <div class="row items-center no-wrap tw:gap-2">
+          <img :src="getBtnLogo" class="header-icon ai-icon" />
+        </div>
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
       <div data-test="navbar-organizations-select" class="q-mx-sm row">
         <OButton
+          style="max-width: 250px"
           variant="ghost"
           size="sm"
-          style="max-width: 250px"
           class="tw:text-ellipsis tw:overflow-hidden"
         >
           <div class="row items-center no-wrap full-width">
@@ -334,22 +354,31 @@ size="xs" class="warning" />{{
       <!-- SLACK COMMUNITY LINK -->
       <OButton
         variant="ghost"
-        size="icon-circle-sm"
-        data-test="menu-link-slack-item"
+        size="icon-sm"
+        :ripple="false"
         @click="openSlack"
+        data-test="menu-link-slack-item"
       >
-        <component :is="slackIcon" size="20px" class="header-icon" />
+        <div class="row items-center no-wrap">
+          <q-icon
+            ><component :is="slackIcon" size="32px"
+class="header-icon"
+          /></q-icon>
+        </div>
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.slack") }}
         </q-tooltip>
       </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
-      <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
-        <q-icon name="help_outline" size="20px" class="header-icon" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          {{ t("menu.help") }}
-        </q-tooltip>
+      <OButton variant="ghost"
+size="icon-sm" :ripple="false" data-test="menu-link-help-item">
+        <div class="row items-center no-wrap">
+          <q-icon name="help_outline" class="header-icon"></q-icon>
+          <q-tooltip anchor="top middle" self="bottom middle">
+            {{ t("menu.help") }}
+          </q-tooltip>
+        </div>
 
         <q-menu
           fit
@@ -407,12 +436,15 @@ size="xs" class="warning" />{{
 
       <!-- SETTINGS BUTTON -->
       <OButton
-        variant="ghost"
-        size="icon-circle-sm"
         data-test="menu-link-settings-item"
+        variant="ghost"
+        size="icon-sm"
+        :ripple="false"
         @click="router.push({ name: 'settings' })"
       >
-        <q-icon :name="outlinedSettings" size="20px" class="header-icon" />
+        <div class="row items-center no-wrap">
+          <q-icon :name="outlinedSettings" class="header-icon"></q-icon>
+        </div>
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.settings") }}
         </q-tooltip>
@@ -421,25 +453,27 @@ size="xs" class="warning" />{{
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
       <OButton
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-sm"
+        :ripple="false"
         data-test="header-my-account-profile-icon"
       >
-        <q-icon
-          :name="user.picture ? user.picture : 'person'"
-          size="20px"
-          class="header-icon"
-        />
-        <q-tooltip
-          anchor="top middle"
-          self="bottom middle"
-          class="header-user-tooltip"
-        >
-          {{
-            user.given_name
-              ? user.given_name + " " + user.family_name
-              : user.email
-          }}</q-tooltip
-        >
+        <div class="row items-center no-wrap">
+          <q-icon
+            :name="user.picture ? user.picture : 'person'"
+            class="header-icon"
+          ></q-icon>
+          <q-tooltip
+            anchor="top middle"
+            self="bottom middle"
+            class="header-user-tooltip"
+          >
+            {{
+              user.given_name
+                ? user.given_name + " " + user.family_name
+                : user.email
+            }}</q-tooltip
+          >
+        </div>
 
         <q-menu
           fit
@@ -581,21 +615,20 @@ name="exit_to_app" class="padding-none" />
 </template>
 
 <script lang="ts">
-
 import { defineComponent, PropType, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "HeaderComponent",
   components: {
+    OButton,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
-    OButton,
   },
   props: {
     // Store instance
@@ -785,6 +818,15 @@ export default defineComponent({
       showEnterpriseDialog.value = true;
     };
 
+    // Detect macOS for correct shortcut label
+     
+    const isMac = computed(() => /mac/i.test(navigator.platform));
+
+    // Open command palette
+    const openCommandPalette = () => {
+      props.store.dispatch("commandPalette/open");
+    };
+
     return {
       t,
       outlinedSettings,
@@ -807,12 +849,101 @@ export default defineComponent({
       handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
+      isMac,
+      openCommandPalette,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
+.upgrade-enterprise-btn {
+  background: var(--q-primary) !important;
+  color: white !important;
+  border-radius: 4px !important;
+  padding: 0 10px !important;
+  transition: all 0.2s ease !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  font-size: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  vertical-align: middle !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+
+  &:hover {
+    opacity: 0.85;
+    filter: brightness(0.9);
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .q-icon {
+    color: white !important;
+    font-size: 14px !important;
+    margin-right: 4px;
+  }
+
+  span {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 28px;
+    display: inline-block;
+  }
+}
+
+.cmd-palette-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.875rem;
+  padding: 0 0.625rem;
+  background: var(--o2-muted-background);
+  border: 1px solid var(--o2-border);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  color: var(--o2-text-muted);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  align-self: center;
+  vertical-align: middle;
+
+  &:hover {
+    background: var(--o2-hover-accent);
+    border-color: var(--o2-primary-color);
+    color: var(--o2-text-primary);
+  }
+
+  &__icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  &__text {
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+
+  &__kbd {
+    font-size: 0.6875rem;
+    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--o2-border);
+    border-radius: 0.25rem;
+    background: var(--o2-card-background);
+    font-family: inherit;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+}
+
 :deep(.header-user-tooltip) {
   width: auto;
   max-width: none;

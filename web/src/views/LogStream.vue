@@ -414,6 +414,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { ScrollText, BarChart2, GitFork, Info } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
+import useCreateAction from "@/composables/useCreateAction";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -573,6 +574,10 @@ export default defineComponent({
       },
     });
 
+    const { onPageReady } = useCreateAction(
+      () => { addStreamDialog.value.show = true; },
+    );
+
     let deleteStreamName = "";
     let deleteStreamType = "";
 
@@ -679,6 +684,7 @@ export default defineComponent({
               }
             });
             loadingState.value = false;
+            onPageReady();
 
             addNewStreams(selectedStreamType.value, res.list);
 

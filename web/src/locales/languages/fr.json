@@ -3701,5 +3701,32 @@
     "clearAll": "Tout effacer",
     "clearAllTitle": "Effacer tous les chats",
     "clearAllMessage": "Cela supprimera définitivement tout l'historique des discussions. Cette action ne peut pas être annulée."
+  },
+  "commandPalette": {
+    "placeholder": "Recherchez des pages, des entités ou tapez /ai pour obtenir de l'aide...",
+    "noResults": "Aucun résultat pour « {query} »",
+    "searching": "Rechercher des entités...",
+    "recents": "Récents",
+    "pages": "Des pages",
+    "entities": "Entités",
+    "commands": "Commandes",
+    "aiActions": "Actions liées à l'IA",
+    "create": "Créez",
+    "newDashboard": "Nouveau tableau de bord",
+    "newStream": "Nouveau stream",
+    "newAlert": "Nouvelle alerte",
+    "newPipeline": "Nouveau gazoduc",
+    "newFunction": "Nouvelle fonction",
+    "newEnrichmentTable": "Nouveau tableau d'enrichissement",
+    "newEvaluationTemplate": "Nouveau modèle d'évaluation",
+    "newServiceAccount": "Nouveau compte de service",
+    "newOrganization": "Nouvelle organisation",
+    "newUserGroup": "Nouveau groupe d'utilisateurs",
+    "newRole": "Nouveau rôle",
+    "newDestination": "Nouvelle destination",
+    "newPipelineDestination": "Nouvelle destination du pipeline",
+    "newTemplate": "Nouveau modèle",
+    "newCipherKey": "Nouvelle clé de chiffrement",
+    "newPattern": "Nouveau motif"
   }
 }

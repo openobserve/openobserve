@@ -271,6 +271,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
+import useCreateAction from "@/composables/useCreateAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { Pencil, Trash2 } from "lucide-vue-next";
 
@@ -299,6 +300,7 @@ export default defineComponent({
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
+    const { onPageReady } = useCreateAction(showAddJSTransformDialog);
     const qTable: any = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
@@ -355,7 +357,7 @@ export default defineComponent({
         message: "Please wait while loading functions...",
       });
 
-      jsTransformService
+      return jsTransformService
         .list(
           1,
           100000,
@@ -410,7 +412,7 @@ export default defineComponent({
     };
 
     if (jsTransforms.value == "" || jsTransforms.value == undefined) {
-      getJSTransforms();
+      getJSTransforms().then(() => onPageReady());
     }
 
     interface OptionType {

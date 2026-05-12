@@ -361,6 +361,7 @@ import { outlinedDelete,outlinedVisibility } from "@quasar/extras/material-icons
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
+import useCreateAction from "@/composables/useCreateAction";
 import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
@@ -382,6 +383,7 @@ export default defineComponent({
     const qTable: any = ref(null);
     const isUpdated = ref(false);
     const showAddUserDialog = ref(false);
+    const { onPageReady } = useCreateAction(showAddUserDialog);
     const { serviceAccountsState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
@@ -399,7 +401,7 @@ export default defineComponent({
     const confirmBulkDelete = ref(false);
 
     onBeforeMount(()=>{
-      getServiceAccountsUsers();
+      getServiceAccountsUsers().then(() => onPageReady());
     })
 
     const columns: any = ref<QTableProps["columns"]>([

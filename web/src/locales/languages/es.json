@@ -3699,5 +3699,32 @@
     "clearAll": "Borrar todo",
     "clearAllTitle": "Borrar todos los chats",
     "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer."
+  },
+  "commandPalette": {
+    "placeholder": "Busca páginas, entidades o escribe /ai para obtener ayuda...",
+    "noResults": "No se han encontrado resultados para «{query}»",
+    "searching": "Buscando entidades...",
+    "recents": "Recientes",
+    "pages": "Páginas",
+    "entities": "Entidades",
+    "commands": "Comandos",
+    "aiActions": "Acciones de IA",
+    "create": "Crear",
+    "newDashboard": "Nuevo panel",
+    "newStream": "Nueva transmisión",
+    "newAlert": "Nueva alerta",
+    "newPipeline": "Nuevo oleoducto",
+    "newFunction": "Nueva función",
+    "newEnrichmentTable": "Nueva tabla de enriquecimiento",
+    "newEvaluationTemplate": "Nueva plantilla de evaluación",
+    "newServiceAccount": "Nueva cuenta de servicio",
+    "newOrganization": "Nueva organización",
+    "newUserGroup": "Nuevo grupo de usuarios",
+    "newRole": "Nuevo rol",
+    "newDestination": "Nuevo destino",
+    "newPipelineDestination": "Nuevo destino de gasoducto",
+    "newTemplate": "Nueva plantilla",
+    "newCipherKey": "Nueva clave de cifrado",
+    "newPattern": "Nuevo patrón"
   }
 }

@@ -94,6 +94,10 @@ const mockRouter = {
 
 vi.mock("vue-router", () => ({
   useRouter: () => mockRouter,
+  useRoute: () => ({
+    query: {},
+    params: {},
+  }),
 }));
 
 // Mock child components

@@ -635,6 +635,7 @@ import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
+import useCreateAction from "@/composables/useCreateAction";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -697,6 +698,8 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
+
+    const { onPageReady } = useCreateAction(showAddDashboardDialog);
 
     // Listen for AI assistant dashboard mutations to auto-refresh the list
     const { on: onDashboardEvent, off: offDashboardEvent } =
@@ -852,13 +855,16 @@ export default defineComponent({
         } finally {
           dismiss();
           searchAcrossFolders.value = false;
-          router.push({
+          await router.push({
             path: "/dashboards",
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
           });
+          if (activeFolderId.value) {
+            onPageReady();
+          }
         }
       },
       { deep: true },

@@ -47,6 +47,23 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
+// Mock vue-router for Composition API (useRoute / useRouter)
+vi.mock("vue-router", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useRoute: () => ({
+      query: {},
+      params: {},
+      name: "serviceAccounts",
+    }),
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+    }),
+  };
+});
+
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";

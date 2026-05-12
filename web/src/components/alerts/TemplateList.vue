@@ -228,6 +228,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import useCreateAction from "@/composables/useCreateAction";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -264,6 +265,7 @@ const columns: any = ref<QTableProps["columns"]>([
   },
 ]);
 const showTemplateEditor = ref(false);
+const { onPageReady } = useCreateAction(showTemplateEditor);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
 const perPageOptions: any = [
@@ -297,7 +299,7 @@ onActivated(() => {
   if (!templates.value.length) updateRoute();
 });
 onMounted(() => {
-  getTemplates();
+  getTemplates().then(() => onPageReady());
 });
 
 watch(
@@ -316,7 +318,7 @@ const getTemplates = () => {
     message: "Please wait while loading templates...",
   });
 
-  templateService
+  return templateService
     .list({
       org_identifier: store.state.selectedOrganization.identifier,
     })

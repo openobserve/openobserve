@@ -3712,5 +3712,32 @@
     "clearAll": "Alles wissen",
     "clearAllTitle": "Alle chats wissen",
     "clearAllMessage": "Hiermee wordt alle chatgeschiedenis definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt."
+  },
+  "commandPalette": {
+    "placeholder": "Zoek naar pagina's, entiteiten of typ /ai voor hulp...",
+    "noResults": "Geen resultaten gevonden voor „{query}”",
+    "searching": "Entiteiten zoeken...",
+    "recents": "Recent",
+    "pages": "Paginas",
+    "entities": "Entiteiten",
+    "commands": "Commando's",
+    "aiActions": "AI-acties",
+    "create": "Creëren",
+    "newDashboard": "Nieuw dashboard",
+    "newStream": "Nieuwe stream",
+    "newAlert": "Nieuwe waarschuwing",
+    "newPipeline": "Nieuwe pijplijn",
+    "newFunction": "Nieuwe functie",
+    "newEnrichmentTable": "Nieuwe verrijkingstabel",
+    "newEvaluationTemplate": "Nieuw evaluatiesjabloon",
+    "newServiceAccount": "Nieuw serviceaccount",
+    "newOrganization": "Nieuwe organisatie",
+    "newUserGroup": "Nieuwe gebruikersgroep",
+    "newRole": "Nieuwe rol",
+    "newDestination": "Nieuwe bestemming",
+    "newPipelineDestination": "Nieuwe bestemming voor pijpleidingen",
+    "newTemplate": "Nieuw sjabloon",
+    "newCipherKey": "Nieuwe coderingssleutel",
+    "newPattern": "Nieuw patroon"
   }
 }

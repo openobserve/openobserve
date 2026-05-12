@@ -3712,5 +3712,32 @@
     "clearAll": "Tümünü temizle",
     "clearAllTitle": "Tüm sohbetleri temizle",
     "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz."
+  },
+  "commandPalette": {
+    "placeholder": "Sayfaları, varlıkları arayın veya yardım için /ai yazın...",
+    "noResults": "“{query}” için sonuç bulunamadı",
+    "searching": "Varlıklar aranıyor...",
+    "recents": "Recent",
+    "pages": "Sayfalar",
+    "entities": "Varlıklar",
+    "commands": "Komutlar",
+    "aiActions": "Yapay Zeka Eylemleri",
+    "create": "Oluştur",
+    "newDashboard": "Yeni Kontrol Paneli",
+    "newStream": "Yeni Akış",
+    "newAlert": "Yeni Uyarı",
+    "newPipeline": "Yeni Boru Hattı",
+    "newFunction": "Yeni Fonksiyon",
+    "newEnrichmentTable": "Yeni Zenginleştirme Tablosu",
+    "newEvaluationTemplate": "Yeni Değerlendirme Şablonu",
+    "newServiceAccount": "Yeni Hizmet Hesabı",
+    "newOrganization": "Yeni Organizasyon",
+    "newUserGroup": "Yeni Kullanıcı Grubu",
+    "newRole": "Yeni Rol",
+    "newDestination": "Yeni Hedef",
+    "newPipelineDestination": "Yeni Boru Hattı Hedefi",
+    "newTemplate": "Yeni Şablon",
+    "newCipherKey": "Yeni Şifre Anahtarı",
+    "newPattern": "Yeni Desen"
   }
 }

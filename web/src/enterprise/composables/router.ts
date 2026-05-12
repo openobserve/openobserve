@@ -19,8 +19,7 @@ import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue"
 import Usage from "@/enterprise/components/billings/usage.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
-import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
-import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
+import EvalTemplateManager from "@/enterprise/components/EvalTemplateManager.vue";
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
@@ -85,27 +84,19 @@ const useEnvRoutes = () => {
     {
       path: "eval-templates",
       name: "evalTemplates",
-      component: EvalTemplateList,
+      component: EvalTemplateManager,
       meta: {
         title: "Evaluation Templates",
-        keepAlive: false,
-      },
-    },
-    {
-      path: "eval-templates/add",
-      name: "evalTemplatesAdd",
-      component: EvalTemplateEditor,
-      meta: {
-        title: "Create Evaluation Template",
-        keepAlive: false,
-      },
-    },
-    {
-      path: "eval-templates/:id/edit",
-      name: "evalTemplatesEdit",
-      component: EvalTemplateEditor,
-      meta: {
-        title: "Edit Evaluation Template",
+        titleKey: "pipeline.evalTemplates",
+        searchable: true,
+        icon: "rule",
+        section: "Management",
+        keywords: [
+          "eval templates",
+          "pipeline evaluation",
+          "LLM evaluation",
+          "pipeline templates",
+        ],
         keepAlive: false,
       },
     },

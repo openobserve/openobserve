@@ -153,8 +153,10 @@ import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import useCreateAction from "@/composables/useCreateAction";
 
 const showAddGroup = ref(false);
+const { onPageReady } = useCreateAction(showAddGroup);
 
 const { t } = useI18n();
 
@@ -210,7 +212,7 @@ const columns: any = [
 const groups = ref([]);
 
 onBeforeMount(() => {
-  setupGroups();
+  setupGroups().then(() => onPageReady());
 });
 
 const updateTable = () => {

@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="col"
         v-show="isLoading"
-        :style="{ width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%' }"
+        :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
         :key="store.state.selectedOrganization?.identifier"
       >
         <q-page-container v-if="isLoading">
@@ -93,12 +93,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
       <div
-        v-show="store.state.isAiChatEnabled && isLoading"
         class="col-auto"
-        :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
-        :style="store.state.isAiChatExpanded
-          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: calc(var(--navbar-height) + 8px);'
-          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: calc(var(--navbar-height) + 8px); padding-right: 0.625rem;'"
+        v-show="store.state.isAiChatEnabled && isLoading"
+        style="
+          width: 25%;
+          max-width: 100%;
+          min-width: 75px;
+          z-index: 10;
+          padding-top: 44px;
+          padding-right: 0.625rem;
+        "
+        :class="
+          store.state.theme == 'dark'
+            ? 'dark-mode-chat-container'
+            : 'light-mode-chat-container'
+        "
       >
         <O2AIChat
           :header-height="42.5"
@@ -106,7 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
           :appendMode="aiChatAppendMode"
-          :aiChatPayload="aiChatPayload"
         />
       </div>
     </div>
@@ -116,6 +124,7 @@ maximized full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
     <PredefinedThemes />
+    <GlobalCommandPalette />
   </q-layout>
 </template>
 
@@ -158,6 +167,7 @@ import {
   KeepAlive,
   computed,
   onMounted,
+  onBeforeUnmount,
   watch,
   markRaw,
   nextTick,
@@ -207,6 +217,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
+import GlobalCommandPalette from "@/components/GlobalCommandPalette.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -246,6 +257,7 @@ export default defineComponent({
     PredefinedThemes,
     O2AIChat,
     GetStarted,
+    GlobalCommandPalette,
   },
   methods: {
     navigateToDocs() {
@@ -324,8 +336,6 @@ export default defineComponent({
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
-    const aiChatAutoSend = ref(false);
-    const aiChatPayload = ref<{ text: string; autoSend: boolean; id: number } | null>(null);
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
 
@@ -380,7 +390,7 @@ export default defineComponent({
     let slackURL = "https://short.openobserve.ai/community";
     if (
       config.isEnterprise == "true" &&
-      store.state.zoConfig.custom_slack_url
+      store.state.zoConfig.custom_slack_url != ""
     ) {
       slackURL = store.state.zoConfig.custom_slack_url;
     }
@@ -543,7 +553,39 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const handleCommandPaletteShortcut = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        store.dispatch("commandPalette/open");
+      }
+    };
+
+    const handleAiPrompt = (e: CustomEvent) => {
+      const prompt = e.detail?.prompt;
+      if (!prompt) return;
+
+      const isHomePage =
+        router.currentRoute.value.name === "home" ||
+        router.currentRoute.value.path === "/";
+
+      if (isHomePage) {
+        // Switch to AI tab on home page and send prompt
+        window.dispatchEvent(
+          new CustomEvent("o2:home-switch-tab", { detail: { tab: "ai" } }),
+        );
+        // Small delay to ensure tab switch and component mount
+        nextTick(() => {
+          sendToAiChat(prompt, false);
+        });
+      } else {
+        // Open AI sidebar and send prompt
+        sendToAiChat(prompt, false);
+      }
+    };
+
     onMounted(async () => {
+      window.addEventListener("keydown", handleCommandPaletteShortcut);
+      window.addEventListener("o2:ai-prompt", handleAiPrompt as EventListener);
       filterMenus();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
@@ -565,6 +607,11 @@ export default defineComponent({
           setRumUser();
         }
       }
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener("keydown", handleCommandPaletteShortcut);
+      window.removeEventListener("o2:ai-prompt", handleAiPrompt as EventListener);
     });
 
     const updateIncidentsMenu = () => {
@@ -1073,11 +1120,6 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
-      // On the home page, switch to the AI tab instead of opening the side panel
-      if (router.currentRoute.value.name === "home") {
-        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
-        return;
-      }
       const isEnabled = !store.state.isAiChatEnabled;
       store.dispatch("setIsAiChatEnabled", isEnabled);
       window.dispatchEvent(new Event("resize"));
@@ -1085,7 +1127,6 @@ export default defineComponent({
 
     const closeChat = () => {
       store.dispatch("setIsAiChatEnabled", false);
-      store.dispatch("setIsAiChatExpanded", false);
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -1105,30 +1146,22 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
+    const sendToAiChat = (value: any, append: boolean = true) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
 
-      // Support object payload { query, autoSend } from OverviewTab
-      let text = value;
-      let shouldAutoSend = autoSend;
-      if (value && typeof value === "object" && "query" in value) {
-        text = value.query;
-        shouldAutoSend = value.autoSend ?? false;
-      }
-
+      // Set the append mode
       aiChatAppendMode.value = append;
 
-      // Deliver text + autoSend atomically in a single object so O2AIChat
-      // watcher always sees both values together — no timing race.
-      aiChatPayload.value = { text, autoSend: shouldAutoSend, id: Date.now() };
-
-      // Keep legacy aiChatInputContext in sync for other callers
+      // Always clear and set to trigger the watcher in O2AIChat
       aiChatInputContext.value = "";
       nextTick(() => {
-        aiChatInputContext.value = text;
-        nextTick(() => { aiChatInputContext.value = ""; });
+        aiChatInputContext.value = value;
+        // Clear it after another tick so it doesn't accumulate in parent
+        nextTick(() => {
+          aiChatInputContext.value = "";
+        });
       });
     };
 
@@ -1603,11 +1636,7 @@ export default defineComponent({
 }
 
 .header-menu {
-  display: flex;
-  align-items: center;
-
-  .q-btn,
-  [data-o2-btn] {
+  .q-btn {
     transition: transform 0.2s ease;
 
     &:hover {
@@ -1623,8 +1652,7 @@ export default defineComponent({
   }
 
   // Skip bounce for org selector (inside div)
-  [data-test="navbar-organizations-select"] .q-btn,
-  [data-test="navbar-organizations-select"] [data-o2-btn] {
+  [data-test="navbar-organizations-select"] .q-btn {
     &:hover {
       transform: none;
     }
@@ -1657,12 +1685,11 @@ body.ai-chat-open {
 .light-mode-chat-container {
 }
 
-
 .ai-btn-active {
   background: linear-gradient(
     135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
+    rgba(139, 92, 246, 0.35) 0%,
+    rgba(236, 72, 153, 0.35) 100%
   ) !important;
 
   .header-icon {
@@ -1675,8 +1702,8 @@ body.ai-chat-open {
 .ai-hover-btn {
   background: linear-gradient(
     135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
+    rgba(139, 92, 246, 0.3) 0%,
+    rgba(236, 72, 153, 0.4) 100%
   ) !important;
   transition:
     background 0.3s ease,

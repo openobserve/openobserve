@@ -82,9 +82,18 @@ const mockRouter = {
   }
 };
 
-vi.mock('vue-router', () => ({
-  useRouter: () => mockRouter
-}));
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useRouter: () => mockRouter,
+    useRoute: () => ({
+      query: {},
+      params: {},
+      name: 'enrichmentTables',
+    }),
+  };
+});
 
 installQuasar({
   plugins: [Dialog, Notify],

@@ -3701,5 +3701,32 @@
     "clearAll": "Limpar tudo",
     "clearAllTitle": "Limpar todos os bate-papos",
     "clearAllMessage": "Isso excluirá permanentemente todo o histórico de bate-papo. Essa ação não pode ser desfeita."
+  },
+  "commandPalette": {
+    "placeholder": "Pesquise páginas, entidades ou digite /ai para obter ajuda...",
+    "noResults": "Nenhum resultado encontrado para “{query}”",
+    "searching": "Pesquisando entidades...",
+    "recents": "Recentes",
+    "pages": "Páginas",
+    "entities": "Entidades",
+    "commands": "Comandos",
+    "aiActions": "Ações de IA",
+    "create": "Criar",
+    "newDashboard": "Novo painel",
+    "newStream": "Novo stream",
+    "newAlert": "Novo alerta",
+    "newPipeline": "Novo gasoduto",
+    "newFunction": "Nova função",
+    "newEnrichmentTable": "Nova tabela de enriquecimento",
+    "newEvaluationTemplate": "Novo modelo de avaliação",
+    "newServiceAccount": "Nova conta de serviço",
+    "newOrganization": "Nova organização",
+    "newUserGroup": "Novo grupo de usuários",
+    "newRole": "Novo papel",
+    "newDestination": "Novo destino",
+    "newPipelineDestination": "Novo destino do gasoduto",
+    "newTemplate": "Novo modelo",
+    "newCipherKey": "Nova chave cifrada",
+    "newPattern": "Novo padrão"
   }
 }

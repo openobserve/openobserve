@@ -3712,5 +3712,32 @@
     "clearAll": "모두 지우기",
     "clearAllTitle": "모든 채팅 지우기",
     "clearAllMessage": "이렇게 하면 모든 채팅 기록이 영구적으로 삭제됩니다.이 작업은 취소할 수 없습니다."
+  },
+  "commandPalette": {
+    "placeholder": "페이지, 엔티티를 검색하거나 /ai를 입력하여 도움을 받으세요...",
+    "noResults": "“{query}”에 대한 결과를 찾을 수 없습니다.",
+    "searching": "엔티티 검색 중...",
+    "recents": "최근",
+    "pages": "페이지",
+    "entities": "엔티티",
+    "commands": "커맨드",
+    "aiActions": "AI 액션",
+    "create": "작성",
+    "newDashboard": "새 대시보드",
+    "newStream": "새 스트림",
+    "newAlert": "새 알림",
+    "newPipeline": "새 파이프라인",
+    "newFunction": "새 함수",
+    "newEnrichmentTable": "새로운 강화 표",
+    "newEvaluationTemplate": "새 평가 템플릿",
+    "newServiceAccount": "새 서비스 계정",
+    "newOrganization": "새 조직",
+    "newUserGroup": "새 사용자 그룹",
+    "newRole": "새 역할",
+    "newDestination": "새 목적지",
+    "newPipelineDestination": "새 파이프라인 목적지",
+    "newTemplate": "새 템플릿",
+    "newCipherKey": "새 암호 키",
+    "newPattern": "새 패턴"
   }
 }
