@@ -915,7 +915,6 @@ pub async fn search_partition(
         #[cfg(feature = "enterprise")]
         streaming_id: None,
         is_histogram_eligible,
-        is_non_ts_order_by: false,
         non_ts_order_by_cols: vec![],
     };
 
@@ -1042,7 +1041,6 @@ pub async fn search_partition(
         is_histogram,
     );
 
-    resp.is_non_ts_order_by = is_non_ts_order_by;
     resp.non_ts_order_by_cols = sql
         .order_by
         .iter()

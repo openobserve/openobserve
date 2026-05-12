@@ -107,8 +107,8 @@ pub async fn do_partitioned_search(
         );
     }
 
-    let is_non_ts_order_by = partition_resp.is_non_ts_order_by;
     let non_ts_order_by_cols = partition_resp.non_ts_order_by_cols.clone();
+    let is_non_ts_order_by = !non_ts_order_by_cols.is_empty();
     let original_from = req.query.from as usize;
     let original_size = if req.query.size > 0 {
         req.query.size as usize
