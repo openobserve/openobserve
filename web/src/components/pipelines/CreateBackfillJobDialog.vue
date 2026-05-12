@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="expand-toggle-btn-wrapper"
               >
                 <template #icon-left><ChevronsUpDown class="tw:size-3.5 tw:shrink-0" /></template>
-              </OButton>              />
+              </OButton>
             </div>
             <div v-show="showAdvanced" class="section-content">
               <div class="tw:space-y-4">
