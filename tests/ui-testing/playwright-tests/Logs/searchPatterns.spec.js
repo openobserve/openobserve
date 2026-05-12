@@ -660,9 +660,12 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         for (let i = 0; i < Math.min(cardCount, 5); i++) {
             const patternText = await pm.logsPage.getPatternCardTemplateText(i);
-            const hasWildcards = patternText.includes('<:') ||
-                               patternText.includes('<*>') ||
-                               patternText.includes('[<:');
+
+            // Check for wildcard chip DOM elements (rendered as .wildcard-chip)
+            // textContent returns short labels like "str"/"num" rather than the
+            // raw template format like "<:STR>"/"<:NUM>"
+            const chipCount = await pm.logsPage.getPatternCardWildcardChipCount(i);
+            const hasWildcards = chipCount > 0;
 
             if (hasWildcards) {
                 patternsWithWildcards++;
@@ -705,8 +708,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Find wildcard chips - they have class 'wildcard-chip' in PatternCard.vue
         // Tooltips only appear when tok.sampleValues.length > 0 (see PatternCard.vue:48)
-        const wildcardChips = page.locator('.wildcard-chip');
-        const chipCount = await wildcardChips.count();
+        const chipCount = await pm.logsPage.getWildcardChipCount();
         testLogger.info(`Found ${chipCount} wildcard chips on page`);
 
         // ASSERTION: Must have wildcard chips to test
@@ -719,27 +721,24 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         const chipsToTry = Math.min(chipCount, 5);
 
         for (let i = 0; i < chipsToTry && !tooltipFound; i++) {
-            const chip = wildcardChips.nth(i);
-            const isVisible = await chip.isVisible().catch(() => false);
-
+            const isVisible = await pm.logsPage.isWildcardChipVisible(i);
             if (!isVisible) continue;
 
-            const chipText = await chip.textContent().catch(() => '');
+            const chipText = await pm.logsPage.getWildcardChipText(i);
             testLogger.info(`Trying chip ${i}: ${chipText}`);
 
             // Hover over the chip
-            await chip.hover();
+            await pm.logsPage.hoverWildcardChip(i);
 
             // Wait for Quasar tooltip (delay is 300ms + render time)
             await page.waitForTimeout(500);
 
             // Check if tooltip appeared
-            const tooltip = page.locator('.q-tooltip');
-            const tooltipVisible = await tooltip.isVisible().catch(() => false);
+            const tooltipVisible = await pm.logsPage.isTooltipVisible(1000);
 
             if (tooltipVisible) {
                 tooltipFound = true;
-                tooltipContent = await tooltip.innerText().catch(() => '');
+                tooltipContent = await pm.logsPage.getTooltipText(1000) || '';
                 testLogger.info(`✅ Tooltip found on chip ${i}: ${tooltipContent.substring(0, 100)}`);
 
                 // ASSERTION: Tooltip content must not be empty
@@ -765,11 +764,12 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             testLogger.info('This is data-dependent: tooltips only appear when sampleValues are populated');
 
             // ASSERTION: At minimum, chips must render with proper text
-            // Wildcard formats: <*> for variables, <:NAME> for named tokens (e.g., <:TIMESTAMP>)
-            const firstChipText = await wildcardChips.first().textContent().catch(() => '');
+            // wildcardLabel() maps <:STR>→"str", <:NUM>→"num", <*>→"<*>" etc.
+            // chips display short labels, not raw angle-bracket tokens
+            const firstChipText = await pm.logsPage.getWildcardChipText(0);
             expect(firstChipText.length).toBeGreaterThan(0);
-            // Match any wildcard format: <*>, <:WORD>, or angle brackets with content
-            expect(firstChipText).toMatch(/<[*:]|<\*>|<:[A-Z]/);
+            // Match wildcard chip labels: <*> literal or short type label (str, num, ip, ts, etc.)
+            expect(firstChipText).toMatch(/^[a-z0-9]+$|^<\*>$/);
             testLogger.info('✅ Wildcard chips render correctly (no sampleValues in data for tooltips)');
         }
 
@@ -795,15 +795,12 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         const anomalyBadgeInfo = [];
 
         for (let i = 0; i < Math.min(cardCount, 10); i++) {
-            const badgeSelector = `[data-test="pattern-card-${i}-anomaly-badge"]`;
-            const badge = page.locator(badgeSelector);
-            // Use timeout to handle badges that render with slight delay
-            const isVisible = await badge.isVisible({ timeout: 500 }).catch(() => false);
+            const isVisible = await pm.logsPage.isPatternAnomaly(i);
 
             if (isVisible) {
                 patternsWithAnomalyBadge++;
-                const badgeText = await badge.textContent().catch(() => '');
-                anomalyBadgeInfo.push({ index: i, text: badgeText.trim() });
+                const badgeText = await pm.logsPage.getPatternAnomalyBadgeText(i);
+                anomalyBadgeInfo.push({ index: i, text: badgeText });
             }
         }
 
