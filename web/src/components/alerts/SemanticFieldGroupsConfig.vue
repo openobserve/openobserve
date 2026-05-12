@@ -146,7 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Import Dialog -->
-    <ODrawer data-test="semantic-field-groups-config-import-drawer" v-model:open="showImportDrawer" size="lg">
+    <ODrawer
+      data-test="semantic-field-groups-config-import-drawer"
+      v-model:open="showImportDrawer"
+      size="xl"
+      title="Import Semantic Groups"
+      sub-title="Upload JSON file to import semantic field groups"
+    >
       <ImportSemanticGroupsDrawer
         :current-groups="localGroups"
         :org-id="store.state.selectedOrganization.identifier"

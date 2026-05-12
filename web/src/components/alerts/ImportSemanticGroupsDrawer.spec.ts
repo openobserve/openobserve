@@ -102,11 +102,6 @@ describe("ImportSemanticGroupsDrawer - rendering", () => {
     expect(w.exists()).toBe(true);
   });
 
-  it("renders the close button", async () => {
-    const w = await mountComp();
-    expect(w.find('[data-test="import-drawer-close-btn"]').exists()).toBe(true);
-  });
-
   it("renders the file input", async () => {
     const w = await mountComp();
     expect(w.find('[data-test="semantic-groups-import-file-drawer"]').exists()).toBe(true);
@@ -135,9 +130,10 @@ describe("ImportSemanticGroupsDrawer - rendering", () => {
 });
 
 describe("ImportSemanticGroupsDrawer - close & cancel", () => {
-  it("clicking close button emits close", async () => {
+  it("clicking close button (handleClose) emits close", async () => {
     const w = await mountComp();
-    await w.find('[data-test="import-drawer-close-btn"]').trigger("click");
+    (w.vm as any).handleClose();
+    await w.vm.$nextTick();
     expect(w.emitted("close")).toBeTruthy();
   });
 
