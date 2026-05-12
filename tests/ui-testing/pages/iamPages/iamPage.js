@@ -126,14 +126,14 @@ export class IamPage {
 
 
     async verifySuccessMessage(expectedMessage) {
-        // Wait for alert to appear and verify the message
-        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
-        
-        // Find the alert that contains the expected message (instead of just checking the first one)
-        const specificAlert = this.page.getByRole('alert').filter({ hasText: expectedMessage });
-        
-        // Verify the specific alert with our expected message is visible
-        await expect(specificAlert).toBeVisible({ timeout: 5000 });
+        // Match both Quasar notification toasts (.q-notification__message) and
+        // q-input form validation messages ([role="alert"] inside q-field__bottom).
+        // getByRole('alert') alone can miss notifications when accessibility tree
+        // resolution races against Quasar's notify queue / dialog portals.
+        const specificAlert = this.page
+            .locator('.q-notification__message, [role="alert"]')
+            .filter({ hasText: expectedMessage });
+        await expect(specificAlert.first()).toBeVisible({ timeout: 15000 });
     }
 
     async validateServiceAccountToken() {
@@ -181,9 +181,9 @@ export class IamPage {
 
     async reloadServiceAccountPage(emailName) {
         await this.page.reload();
-        // Wait for the page to fully load including any system accounts
-        await this.page.waitForLoadState('networkidle');
-        // Allow time for service accounts table to populate
+        // Avoid waitForLoadState('networkidle') — deployed envs continuously poll
+        // RUM/analytics so the network never idles. Use a known element instead.
+        await this.page.waitForSelector('[data-test="iam-service-accounts-tab"]', { timeout: 10000 });
         await this.page.waitForTimeout(1000);
     }
 
