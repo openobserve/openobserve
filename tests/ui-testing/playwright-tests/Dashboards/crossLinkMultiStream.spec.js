@@ -445,6 +445,17 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.dashboardPanelActions.applyDashboardBtn();
         await page.waitForTimeout(5000);
 
+        // Track result_schema cross-link responses so we can wait for the dashboard
+        // view to finish loading them after save (avoids race condition on CI).
+        const crossLinkResponses = [];
+        const crossLinkResponseHandler = (response) => {
+            if (response.url().includes('result_schema') && response.url().includes('cross_linking=true')) {
+                crossLinkResponses.push(Date.now());
+            }
+        };
+        page.on('response', crossLinkResponseHandler);
+        const crossLinkCountBeforeSave = crossLinkResponses.length;
+
         // Save the panel
         await pm.dashboardPanelActions.savePanel();
         await page.waitForTimeout(3000);
@@ -462,6 +473,17 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
             return Array.from(cells).some(cell => cell.offsetParent !== null && cell.textContent.trim());
         }, { timeout: 15000 });
         testLogger.info('Table panel has data rows');
+
+        // Wait for the dashboard view's result_schema cross-link API call to complete.
+        // This prevents the race condition on CI where the async fetch hasn't returned
+        // by the time the test clicks a table cell and checks the drilldown menu.
+        const crossLinkDeadline = Date.now() + 20000;
+        while (crossLinkResponses.length <= crossLinkCountBeforeSave && Date.now() < crossLinkDeadline) {
+            await page.waitForTimeout(300);
+        }
+        page.off('response', crossLinkResponseHandler);
+        testLogger.info('Cross-link API loaded', { responseCount: crossLinkResponses.length });
+        await page.waitForTimeout(500);
 
         // Step 4: Intercept window.open
         await page.evaluate(() => {
