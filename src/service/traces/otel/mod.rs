@@ -363,7 +363,7 @@ mod tests {
 
         // Verify embedding enrichment
         assert_eq!(
-            span_attrs
+            span_attributes
                 .get(GenAiAttributes::OPERATION_NAME)
                 .and_then(|v| v.as_str()),
             Some("embeddings")
