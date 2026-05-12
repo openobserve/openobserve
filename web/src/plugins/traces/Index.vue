@@ -25,17 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-splitter
         :class="[
           'traces-horizontal-splitter full-height',
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'hide-splitter-separator'
             : '',
         ]"
         v-model="splitterModel"
         :disable="
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
         "
         horizontal
         :before-class="
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights'
+          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'tw:max-h-[3.54rem]!'
             : ''
         "
@@ -103,6 +103,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <LLMInsightsDashboard
               ref="llmInsightsRef"
+              :streamName="selectedStreamName"
+              :startTime="insightsTimeRange.startTime"
+              :endTime="insightsTimeRange.endTime"
+              class="tw:h-full"
+            />
+          </div>
+
+          <!-- Sessions Tab Content -->
+          <div
+            v-if="activeTab === 'sessions'"
+            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+          >
+            <SessionsList
+              ref="sessionsListRef"
               :streamName="selectedStreamName"
               :startTime="insightsTimeRange.startTime"
               :endTime="insightsTimeRange.endTime"
@@ -379,6 +393,9 @@ const ServicesCatalog = defineAsyncComponent(
 const LLMInsightsDashboard = defineAsyncComponent(
   () => import("./LLMInsightsDashboard.vue"),
 );
+const SessionsList = defineAsyncComponent(
+  () => import("./SessionsList.vue"),
+);
 
 const store = useStore();
 const activeTab = computed(() => {
@@ -386,6 +403,7 @@ const activeTab = computed(() => {
   if (searchObj.meta.searchMode === "services-catalog")
     return "services-catalog";
   if (searchObj.meta.searchMode === "llm-insights") return "llm-insights";
+  if (searchObj.meta.searchMode === "sessions") return "sessions";
   return "search";
 });
 const router = useRouter();
@@ -422,6 +440,7 @@ const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const llmInsightsRef = ref<any>(null);
+const sessionsListRef = ref<any>(null);
 const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
@@ -1656,8 +1675,8 @@ function restoreUrlQueryParams() {
   if (
     tab !== undefined &&
     (
-      ["service-graph", "traces", "spans", "llm-insights", "services-catalog"] as const
-    ).includes(tab as "service-graph" | "traces" | "spans" | "llm-insights" | "services-catalog")
+      ["service-graph", "traces", "spans", "llm-insights", "services-catalog", "sessions"] as const
+    ).includes(tab as "service-graph" | "traces" | "spans" | "llm-insights" | "services-catalog" | "sessions")
   ) {
     if (tab === "service-graph" && config.isEnterprise !== "true") return;
     searchObj.meta.searchMode = tab as TraceSearchMode;
@@ -1753,14 +1772,14 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
+// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog / Sessions / LLM Insights)
 const onSearchModeChange = (
-  mode: "traces" | "spans" | "llm-insights" | "service-graph" | "services-catalog",
+  mode: "traces" | "spans" | "llm-insights" | "service-graph" | "services-catalog" | "sessions",
 ) => {
   searchObj.meta.searchMode = mode;
   // Refresh the datetime snapshot on every tab-enter so the dashboard's
   // first onMounted has the up-to-date window for relative ranges.
-  if (mode === "llm-insights") {
+  if (mode === "llm-insights" || mode === "sessions") {
     recomputeInsightsTimeRange();
     return;
   }
@@ -1946,6 +1965,15 @@ const searchData = () => {
     return;
   }
 
+  if (activeTab.value === "sessions") {
+    recomputeInsightsTimeRange();
+    sessionsListRef.value?.refresh?.(
+      insightsTimeRange.value.startTime,
+      insightsTimeRange.value.endTime,
+    );
+    return;
+  }
+
   if (
     !(
       searchObj.data.stream.streamLists.length &&
@@ -2119,6 +2147,7 @@ const debouncedAutoRunOnDatetime = debounce(() => {
   // `on:date-change` emit (re-writes `searchObj.data.datetime`, which
   // would otherwise trigger a second `searchData` 500ms after mount).
   if (activeTab.value === "llm-insights") return;
+  if (activeTab.value === "sessions") return;
 
   // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
   // Only auto-run here for relative time to avoid double-triggering.
