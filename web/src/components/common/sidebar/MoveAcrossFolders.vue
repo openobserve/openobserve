@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`${type}-folder-move-form`"
         >
           <q-input
-            v-model="store.state.organizationData.foldersByType[type].find((item: any) => item.folderId === activeFolderId).name"
+            :model-value="store.state.organizationData.foldersByType?.[type]?.find((item: any) => item.folderId === activeFolderId)?.name ?? ''"
             :label="t('dashboard.currentFolderLabel')"
             color="input-border"
             bg-color="input-bg"
@@ -100,9 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const moveFolderForm: any = ref(null);
       //dropdown selected folder
       const selectedFolder = ref({
-        label: store.state.organizationData.foldersByType[props.type].find(
-          (item: any) => item.folderId === props.activeFolderId
-        ).name,
+        label:
+          store.state.organizationData.foldersByType?.[props.type]?.find(
+            (item: any) => item.folderId === props.activeFolderId,
+          )?.name ?? "",
         value: props.activeFolderId,
       });
       const { t } = useI18n();
