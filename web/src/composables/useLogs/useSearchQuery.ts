@@ -30,6 +30,40 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 
+// Walk the WHERE clause AST and replace column references whose name matches
+// a key in the fieldMapping (original field → stream-specific field).
+const replaceColumnRefsInWhere = (
+  node: any,
+  fieldMapping: Record<string, string>,
+): void => {
+  if (!node) return;
+
+  if (node.type === "column_ref") {
+    const col = node.column;
+    const colName: string | null =
+      typeof col === "string"
+        ? col.replace(/^"|"$/g, "")
+        : col?.expr?.value != null
+          ? String(col.expr.value)
+          : null;
+    if (colName !== null && fieldMapping[colName] && fieldMapping[colName] !== colName) {
+      const newName = fieldMapping[colName];
+      if (typeof col === "string") {
+        node.column = `"${newName}"`;
+      } else if (col?.expr) {
+        col.expr.value = newName;
+      }
+    }
+    return;
+  }
+
+  // Recurse into binary expressions (WHERE conditions) and other containers
+  replaceColumnRefsInWhere(node.left, fieldMapping);
+  replaceColumnRefsInWhere(node.right, fieldMapping);
+  replaceColumnRefsInWhere(node.args, fieldMapping);
+  if (node.expr) replaceColumnRefsInWhere(node.expr, fieldMapping);
+};
+
 export const useSearchQuery = () => {
   const store = useStore();
   const router = useRouter();
@@ -557,6 +591,7 @@ export const useSearchQuery = () => {
     const preSQLQuery = req.query.sql;
     req.query.sql = [];
 
+
     streams
       .join(",")
       .split(",")
@@ -567,16 +602,29 @@ export const useSearchQuery = () => {
         // for any filter fields (reverse semantic group mapping), swap them in.
         if (multiStreamFieldMapping?.has(item)) {
           const mapping = multiStreamFieldMapping.get(item)!;
-          for (const [originalField, streamField] of Object.entries(mapping)) {
-            if (originalField === streamField) continue;
-            // Quote-aware replacement: match the field name when it appears
-            // as a standalone identifier (optionally quoted) in the SQL.
-            const escaped = originalField.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            const regex = new RegExp(
-              `(?<![\\w])"?"?${escaped}"?"?(?![\\w])`,
-              "g",
+
+          // Build a parsable SQL by temporarily replacing template placeholders
+          const hasFieldListPlaceholder =
+            finalQuery.includes("[FIELD_LIST]");
+          if (hasFieldListPlaceholder) {
+            finalQuery = finalQuery.replace(
+              "[FIELD_LIST]",
+              "__field_list_placeholder__",
             );
-            finalQuery = finalQuery.replace(regex, `"${streamField}"`);
+          }
+
+          const parsed = fnParsedSQL(finalQuery);
+          if (parsed?.where) {
+            replaceColumnRefsInWhere(parsed.where, mapping);
+            finalQuery = fnUnparsedSQL(parsed);
+
+            finalQuery = finalQuery.replace(/`/g, '"');
+            
+            if (hasFieldListPlaceholder) {
+              finalQuery = finalQuery
+                .replace(/"__field_list_placeholder__"/g, "[FIELD_LIST]")
+                .replace(/__field_list_placeholder__/g, "[FIELD_LIST]");
+            }
           }
         }
 
