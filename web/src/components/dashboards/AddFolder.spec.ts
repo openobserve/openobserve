@@ -158,8 +158,7 @@ describe("AddFolder", () => {
     await wrapper.vm.$nextTick();
 
     const saveButton = wrapper.find('[data-test="dashboard-folder-add-save"]');
-    const qBtn = saveButton.findComponent({ name: "QBtn" });
-    expect(qBtn.props("disable")).toBe(true);
+    expect((saveButton.element as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("should enable save button when name is provided", async () => {

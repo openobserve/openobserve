@@ -53,6 +53,13 @@ const qBtnStub = {
   emits: ["click"],
 };
 
+const oBtnStub = {
+  template:
+    "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot></slot></button>",
+  props: ["variant", "size"],
+  emits: ["click"],
+};
+
 function mountNoPanel(props: Record<string, unknown> = {}) {
   return mount(NoPanel, {
     global: {
@@ -60,6 +67,7 @@ function mountNoPanel(props: Record<string, unknown> = {}) {
       stubs: {
         "q-img": qImgStub,
         "q-btn": qBtnStub,
+        OButton: oBtnStub,
       },
     },
     props,
@@ -145,7 +153,7 @@ describe("NoPanel", () => {
       const btn = wrapper.find(
         '[data-test="dashboard-if-no-panel-add-panel-btn"]',
       );
-      expect(btn.text()).toBe("Add Panel");
+      expect(btn.text()).toContain("Add Panel");
     });
   });
 

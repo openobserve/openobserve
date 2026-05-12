@@ -123,7 +123,11 @@
     "create": "Crea",
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
-    "updated_at": "Aggiornato a"
+    "updated_at": "Aggiornato a",
+    "error": "Errore",
+    "db": "Banca dati",
+    "discardChanges": "Ignora le modifiche",
+    "unsavedChanges": "Modifiche non salvate"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -390,7 +394,8 @@
     "autoRunEnabled": "Esecuzione automatica abilitata",
     "selectStreamFirst": "Seleziona prima uno stream",
     "traces": "Tracce",
-    "switchToLogs": "clicca per tornare a Logs"
+    "switchToLogs": "clicca per tornare a Logs",
+    "patternNoValuesAvailable": "Nessun valore disponibile"
   },
   "menu": {
     "home": "Home",
@@ -2235,6 +2240,8 @@
     "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza",
     "additional_settings": "Impostazioni aggiuntive",
     "alertNamePlaceholder": "Nome dell'avviso",
+    "nameRequired": "Il nome dell'avviso è obbligatorio.",
+    "nameNoSpecialChars": "Il nome dell'avviso non può contenere ':', '#', '?', '&', '%', virgolette o spazi. Usare invece i trattini bassi (_).",
     "anomalyNamePlaceholder": "Nome dell'anomalia",
     "folder": "Cartella",
     "selectStreamTypeFirst": "Seleziona prima un tipo di stream",
@@ -2281,7 +2288,8 @@
       "addNewDestination": "Aggiungi nuova destinazione",
       "destinationRequired": "È richiesta almeno una destinazione!",
       "disabledNotificationsInfo": "Il rilevamento delle anomalie verrà comunque eseguito e scriverà i risultati nel flusso _anomalies. Abilita le notifiche per ricevere avvisi quando vengono rilevate anomalie."
-    }
+    },
+    "anomalyName": "Nome dell'anomalia"
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2921,7 +2929,21 @@
       "minutesAgo": "{n} m fa",
       "hoursAgo": "{n} h fa",
       "daysAgo": "{n} d fa"
-    }
+    },
+    "noErrorPresent": "Nessun errore presente per questo intervallo",
+    "httpStatusCode": "Codice di stato HTTP",
+    "grpcStatusCode": "Codice di stato gRPC",
+    "dbResponseStatusCode": "Codice di stato della risposta DB",
+    "processExitCode": "Codice di uscita del processo",
+    "exceptionsWithCount": "Eccezioni ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Messaggio:",
+    "escapedLabel": "Fuggito:",
+    "stacktraceLabel": "Trace dello stack:",
+    "copyStacktrace": "Copia stacktrace",
+    "noStacktraceAvailable": "Nessuno stacktrace disponibile",
+    "stacktraceCopied": "Stacktrace copiato negli appunti",
+    "stacktraceCopyFailed": "Copia dello stacktrace non riuscita"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3323,7 +3345,9 @@
     "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato.",
     "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce.",
     "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati.",
-    "noDataFound": "Nessun dato trovato"
+    "noDataFound": "Nessun dato trovato",
+    "isWorkloadType": "Identificatore del servizio",
+    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

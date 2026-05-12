@@ -28,57 +28,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
+          <OButton
             v-close-popup="true"
-            round
-            flat
-            icon="cancel"
+            variant="ghost"
+            size="icon-sm"
             data-test="close-dialog"
-          />
+          ><q-icon name="cancel" size="16px" /></OButton>
         </div>
       </div>
     </q-card-section>
     <q-separator />
     <!-- Single Tab Row -->
-    <div class="row justify-between q-pt-sm">
-      <div class="col-10">
-        <q-tabs v-model="tab" shrink align="left">
-          <q-tab
+    <div class="row justify-between q-pt-sm items-center">
+      <div class="col tw:flex tw:items-center tw:gap-2">
+        <OTabs v-model="tab" align="left">
+          <OTab
             data-test="log-detail-json-tab"
             name="json"
             :label="t('common.json')"
           />
-          <q-tab
+          <OTab
             data-test="log-detail-table-tab"
             name="table"
             :label="t('common.table')"
           />
           <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
-          <q-tab
+          <OTab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-logs"
             :label="t('correlation.correlatedLogs')"
           />
-          <q-tab
+          <OTab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-metrics"
             :label="t('correlation.correlatedMetrics')"
           />
-          <q-tab
+          <OTab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-traces"
             :label="t('correlation.correlatedTraces')"
           />
-          <!-- o2 ai context add button in the detail table -->
-          <O2AIContextAddBtn
-            class="tw:px-2 tw:py-2"
-            @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
-             />
-        </q-tabs>
+        </OTabs>
+        <!-- o2 ai context add button outside OTabs for proper alignment -->
+        <O2AIContextAddBtn
+          @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
+        />
       </div>
       <div
         v-show="tab === 'table'"
-        class="col-2 flex justify-end align-center q-pr-md"
+        class="col-auto flex justify-end align-center q-pr-md"
       >
         <q-toggle
           data-test="log-detail-wrap-values-toggle-btn"
@@ -99,14 +97,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
 
-    <q-tab-panels
+    <div :class="['tab-panels-container', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
+    <OTabPanels
       data-test="log-detail-tab-container"
-      :class="['tab-panels-container', tab.startsWith('correlated-') ? 'full-height-panels' : '']"
       v-model="tab"
       animated
       keep-alive
+      grow
     >
-      <q-tab-panel name="json" class="q-pa-none">
+      <OTabPanel name="json">
         <q-card-section
           data-test="log-detail-json-content"
           class="q-pa-none q-mb-lg q-pt-sm"
@@ -127,8 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @show-correlation="showCorrelation"
           />
         </q-card-section>
-      </q-tab-panel>
-      <q-tab-panel name="table" class="q-pa-none">
+      </OTabPanel>
+      <OTabPanel name="table">
         <q-card-section
           class="tw:p-[0.675rem] q-mb-lg"
           data-test="log-detail-table-content"
@@ -168,146 +167,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="!shouldWrapValues ? 'ellipsis' : ''"
               >
                 <div class="tw:flex tw:items-start tw:gap-2">
-                  <q-btn-dropdown
-                    :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
-                    size="6px"
-                    outlined
-                    filled
-                    dense
-                    class="pointer"
-                    name="'img:' + getImageURL('images/common/add_icon.svg')"
-                  >
-                    <q-list data-test="field-list-modal" class="logs-table-list">
-                      <q-item
-                        clickable
-                        v-close-popup="true"
-                        v-if="
-                          searchObj.data.stream.selectedStreamFields.some(
-                            (item: any) =>
-                              item.name === props.row.field ? item.isSchemaField : '',
-                          )
-                        "
+                  <ODropdown v-model:open="tableDropdownOpenMap[props.row.field]" side="bottom" align="start">
+                    <template #trigger>
+                      <OButton
+                        :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
+                        size="icon-xs"
+                        variant="ghost"
+                        class="log-json-field-dropdown-btn"
+                        aria-label="Add icon"
                       >
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-include-field-btn"
-                            @click="
-                              toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')
-                            "
-                            ><q-btn
-                              title="Add to search query"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <EqualIcon></EqualIcon>
-                              </q-icon> </q-btn
-                            >{{ t("common.includeSearchTerm") }}</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-
-                      <q-item
-                        clickable
-                        v-close-popup="true"
-                        v-if="
-                          searchObj.data.stream.selectedStreamFields.some(
-                            (item: any) =>
-                              item.name === props.row.field ? item.isSchemaField : '',
-                          )
-                        "
+                        <q-icon :name="tableDropdownOpenMap[props.row.field] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+                      </OButton>
+                    </template>
+                    <ODropdownItem
+                      v-if="
+                        searchObj.data.stream.selectedStreamFields.some(
+                          (item: any) =>
+                            item.name === props.row.field ? item.isSchemaField : '',
+                        )
+                      "
+                      data-test="log-details-include-field-btn"
+                      @select="toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')"
+                    >
+                      <template #icon-left><EqualIcon class="tw:size-4" /></template>
+                      {{ t("common.includeSearchTerm") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      v-if="
+                        searchObj.data.stream.selectedStreamFields.some(
+                          (item: any) =>
+                            item.name === props.row.field ? item.isSchemaField : '',
+                        )
+                      "
+                      data-test="log-details-exclude-field-btn"
+                      @select="toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')"
+                    >
+                      <template #icon-left><NotEqualIcon class="tw:size-4" /></template>
+                      {{ t("common.excludeSearchTerm") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      v-if="!searchObj.data.stream.selectedFields.includes(props.row.field.toString())"
+                      data-test="log-details-include-field-btn"
+                      @select="addFieldToTable(props.row.field.toString())"
+                    >
+                      <template #icon-left><q-icon name="visibility" size="16px" /></template>
+                      {{ t("common.addFieldToTable") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      v-else
+                      data-test="log-details-include-field-btn"
+                      @select="addFieldToTable(props.row.field.toString())"
+                    >
+                      <template #icon-left><q-icon name="visibility_off" size="16px" /></template>
+                      {{ t("common.removeFieldFromTable") }}
+                    </ODropdownItem>
+                    <!-- Cross-link options -->
+                    <template v-if="getCrossLinksForField(props.row.field).length > 0">
+                      <ODropdownSeparator />
+                      <ODropdownItem
+                        v-for="crossLink in getCrossLinksForField(props.row.field)"
+                        :key="crossLink.name"
+                        :data-test="`log-details-cross-link-${crossLink.name}`"
+                        @select.stop="openCrossLink(crossLink.resolvedUrl)"
                       >
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-exclude-field-btn"
-                            @click="
-                              toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')
-                            "
-                            ><q-btn
-                              title="Add to search query"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <NotEqualIcon></NotEqualIcon>
-                              </q-icon> </q-btn
-                            >{{ t("common.excludeSearchTerm") }}</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-
-                      <q-item
-                        v-if="
-                          !searchObj.data.stream.selectedFields.includes(
-                            props.row.field.toString(),
-                          )
-                        "
-                        clickable
-                        v-close-popup="true"
-                      >
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-include-field-btn"
-                            @click="addFieldToTable(props.row.field.toString())"
-                            ><q-btn
-                              title="Add to table"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon
-                                color="currentColor"
-                                name="visibility" /></q-btn
-                            >{{ t("common.addFieldToTable") }}</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <q-item v-else clickable v-close-popup="true">
-                        <q-item-section>
-                          <q-item-label
-                            data-test="log-details-include-field-btn"
-                            @click="addFieldToTable(props.row.field.toString())"
-                            ><q-btn
-                              title="Remove from table "
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon
-                                color="currentColor"
-                                name="visibility_off" /></q-btn
-                            >{{
-                              t("common.removeFieldFromTable")
-                            }}</q-item-label
-                          >
-                        </q-item-section>
-                      </q-item>
-                      <!-- Cross-link options -->
-                      <template v-if="getCrossLinksForField(props.row.field).length > 0">
-                        <q-separator class="q-my-xs" />
-                        <q-item
-                          v-for="crossLink in getCrossLinksForField(props.row.field)"
-                          :key="crossLink.name"
-                          clickable
-                          v-close-popup
-                          @click.stop="openCrossLink(crossLink.resolvedUrl)"
-                        >
-                          <q-item-section>
-                            <q-item-label>
-                              <q-btn
-                                icon="open_in_new"
-                                size="6px"
-                                round
-                                class="q-mr-sm pointer"
-                              />{{ crossLink.name }}
-                            </q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-list>
-                  </q-btn-dropdown>
+                        <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
+                        {{ crossLink.name }}
+                      </ODropdownItem>
+                    </template>
+                  </ODropdown>
                   <pre
                     :data-test="`log-detail-${props.row.field}-value`"
                     class="table-pre tw:flex-1"
@@ -333,10 +260,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-table>
         </q-card-section>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Correlated Logs Tab Panel (Custom Component) -->
-      <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
+      <OTabPanel name="correlated-logs" stretch>
         <CorrelatedLogsTable
           v-if="correlationProps"
           :service-name="correlationProps.serviceName"
@@ -378,10 +305,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Correlated Metrics Tab Panel -->
-      <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
+      <OTabPanel name="correlated-metrics" stretch>
         <TelemetryCorrelationDashboard
           v-if="correlationProps"
           mode="embedded-tabs"
@@ -408,10 +335,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Correlated Traces Tab Panel -->
-      <q-tab-panel name="correlated-traces" class="q-pa-none full-height">
+      <OTabPanel name="correlated-traces" stretch>
         <TelemetryCorrelationDashboard
           v-if="correlationProps"
           mode="embedded-tabs"
@@ -438,23 +365,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
-      </q-tab-panel>
-    </q-tab-panels>
+      </OTabPanel>
+    </OTabPanels>
+    </div>
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <q-separator v-if="tab === 'json' || tab === 'table'" />
     <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
-          <q-btn
+          <OButton
             data-test="log-detail-previous-detail-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            no-caps
+            variant="outline"
+            size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-            icon="navigate_before"
-            :label="t('common.previous')"
-          />
+          ><q-icon name="navigate_before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
         </div>
         <div
           v-show="
@@ -476,27 +402,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-select>
           </div>
           <div class="">
-            <q-btn
+            <OButton
               data-test="logs-detail-table-search-around-btn"
-              class="o2-secondary-button tw:h-[36px]"
-              text-color="light-text"
-              no-caps
-              flat
-              :label="t('common.searchAround')"
+              variant="outline"
+              size="sm-action"
               @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
-            />
+            >{{ t('common.searchAround') }}</OButton>
           </div>
         </div>
         <div class="col-1 items-end" style="display: contents;">
-          <q-btn
+          <OButton
             data-test="log-detail-next-detail-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            text-color="light-text"
+            variant="outline"
+            size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-            icon-right="navigate_next"
-            :label="t('common.next')"
-          />
+          >{{ t('common.next') }}<q-icon name="navigate_next" size="14px" class="tw:ml-1" /></OButton>
         </div>
       </div>
     </q-card-section>
@@ -504,7 +425,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -519,6 +444,10 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
@@ -531,7 +460,8 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable },
+  components: {
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -611,6 +541,7 @@ export default defineComponent({
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
+    const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
@@ -890,6 +821,7 @@ export default defineComponent({
       selectedRelativeValue,
       recordSizeOptions,
       getImageURL,
+      tableDropdownOpenMap,
       shouldWrapValues,
       toggleWrapLogDetails,
       copyContentToClipboard,
@@ -922,6 +854,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 @import "@/styles/logs/detail-table.scss";
+@import "@/styles/logs/json-preview.scss";
 
 // Make correlation tab panels use full remaining height (no footer space)
 .full-height-panels {
@@ -930,7 +863,7 @@ export default defineComponent({
   flex-direction: column;
   overflow: hidden;
 
-  :deep(.q-tab-panel) {
+  :deep(.o-tab-panel) {
     flex: 1;
     display: flex;
     flex-direction: column;

@@ -28,16 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center q-table__title q-mr-md">
         <span>{{ t("dashboard.columnOrder") }}</span>
       </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        outline
+      <OButton
+        variant="ghost"
+        size="icon"
         @click.stop="cancelEdit"
         data-test="dashboard-column-order-cancel"
-      />
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
     </div>
 
     <!-- Content -->
@@ -72,69 +70,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="column-order-row"
           :data-test="`column-order-row-${index}`"
         >
-            <!-- Drag handle -->
-            <div class="drag-handle">
-              <q-icon
-                name="drag_indicator"
-                color="grey-6"
-                size="20px"
-                :data-test="`column-order-drag-handle-${index}`"
-              />
-            </div>
-
-            <!-- Column number -->
-            <div class="column-number">{{ index + 1 }}.</div>
-
-            <!-- Column name -->
-            <div class="column-name">{{ column }}</div>
-
-            <!-- Actions -->
-            <div class="column-actions">
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_upward"
-                :disable="index === 0"
-                @click="moveColumnUp(index)"
-                :data-test="`column-order-move-up-${index}`"
-              >
-                <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_downward"
-                :disable="index === editColumnOrder.length - 1"
-                @click="moveColumnDown(index)"
-                :data-test="`column-order-move-down-${index}`"
-              >
-                <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
-              </q-btn>
-            </div>
+          <!-- Drag handle -->
+          <div class="drag-handle">
+            <q-icon
+              name="drag_indicator"
+              color="grey-6"
+              size="20px"
+              :data-test="`column-order-drag-handle-${index}`"
+            />
           </div>
+
+          <!-- Column number -->
+          <div class="column-number">{{ index + 1 }}.</div>
+
+          <!-- Column name -->
+          <div class="column-name">{{ column }}</div>
+
+          <!-- Actions -->
+          <div class="column-actions">
+            <OButton
+              variant="ghost"
+              size="icon"
+              :disabled="index === 0"
+              @click="moveColumnUp(index)"
+              :data-test="`column-order-move-up-${index}`"
+            >
+              <template #icon-left><q-icon name="arrow_upward" /></template>
+              <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
+              :disabled="index === editColumnOrder.length - 1"
+              @click="moveColumnDown(index)"
+              :data-test="`column-order-move-down-${index}`"
+            >
+              <template #icon-left><q-icon name="arrow_downward" /></template>
+              <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
+            </OButton>
+          </div>
+        </div>
       </draggable>
     </div>
 
     <!-- Footer -->
-    <div class="sticky-footer q-pa-md">
-      <q-btn
-        :label="t('common.cancel')"
-        outline
-        no-caps
+    <div class="sticky-footer q-pa-md tw:flex tw:gap-2">
+      <OButton
+        variant="outline"
+        size="sm-action"
         @click.stop="cancelEdit"
         data-test="dashboard-column-order-cancel-btn"
-      />
-      <q-btn
-        :label="t('common.save')"
-        color="primary"
-        no-caps
+        >{{ t("common.cancel") }}</OButton
+      >
+      <OButton
+        variant="primary"
+        size="sm-action"
         @click.stop="saveEdit"
         data-test="dashboard-column-order-save-btn"
-      />
+        >{{ t("common.save") }}</OButton
+      >
     </div>
   </q-card>
 </template>
@@ -143,11 +137,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext } from "vue-draggable-next";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ColumnOrderPopUp",
   components: {
     draggable: VueDraggableNext as any,
+    OButton,
   },
   props: {
     columnOrder: {
@@ -176,12 +172,12 @@ export default defineComponent({
       if (props.columnOrder && props.columnOrder.length > 0) {
         // Filter the column order to only include columns that are in availableColumns
         const filtered = props.columnOrder.filter((col) =>
-          props.availableColumns.includes(col)
+          props.availableColumns.includes(col),
         );
 
         // Find columns in availableColumns that are not in columnOrder
         const remaining = props.availableColumns.filter(
-          (col) => !filtered.includes(col)
+          (col) => !filtered.includes(col),
         );
 
         // Combine: ordered columns first, then remaining in their natural order
@@ -202,7 +198,7 @@ export default defineComponent({
       () => {
         initializeColumnOrder();
       },
-      { deep: true }
+      { deep: true },
     );
 
     const moveColumnUp = (index: number) => {

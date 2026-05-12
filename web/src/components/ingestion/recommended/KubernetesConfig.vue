@@ -1,4 +1,4 @@
-<!-- eslint-disable no-useless-escape -->
+﻿<!-- eslint-disable no-useless-escape -->
 <template>
   <div class="q-pa-md kubernetes-config-section tw:pb-lg">
     <!-- Quick Install Section -->
@@ -28,12 +28,12 @@
           </div>
 
           <div v-if="config.isCloud != 'true'" class="tw:mb-3">
-            <q-tabs v-model="installType" dense no-caps>
-              <q-tab name="external" label="External Endpoint" />
-              <q-tab name="internal" label="Internal Endpoint">
+            <OTabs v-model="installType" dense>
+              <OTab name="external" label="External Endpoint" />
+              <OTab name="internal" label="Internal Endpoint">
                 <q-tooltip>Use this if OpenObserve is in the same cluster</q-tooltip>
-              </q-tab>
-            </q-tabs>
+              </OTab>
+            </OTabs>
           </div>
 
           <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
@@ -97,13 +97,13 @@
           <ContentCopy class="q-mt-sm" :content="collectorCmd" />
         </div>
         <div v-else>
-          <q-tabs v-model="tab" horizontalalign="left" no-caps>
-            <q-tab
+          <OTabs v-model="tab" horizontalalign="left">
+            <OTab
               data-test="kubernetes-default-tab"
               name="external"
               :label="t('ingestion.external')"
             />
-            <q-tab
+            <OTab
               data-test="kubernetes-this-tab"
               name="internal"
               :label="t('ingestion.internal')"
@@ -111,10 +111,10 @@
               <q-tooltip>
                 {{ t("ingestion.internalLabel") }}
               </q-tooltip>
-            </q-tab>
-          </q-tabs>
+            </OTab>
+          </OTabs>
           <q-separator />
-          <q-tab-panels
+          <OTabPanels
             v-model="tab"
             animated
             swipeable
@@ -122,18 +122,18 @@
             transition-prev="jump-up"
             transition-next="jump-up"
           >
-            <q-tab-panel name="internal" data-test="kubernetes-tab-panels-this">
+            <OTabPanel name="internal" data-test="kubernetes-tab-panels-this">
               <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
               <pre>
 Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local
 Make changes accordingly to the above URL.
               </pre>
-            </q-tab-panel>
+            </OTabPanel>
 
-            <q-tab-panel name="external" data-test="kubernetes-tab-panels-default">
+            <OTabPanel name="external" data-test="kubernetes-tab-panels-default">
               <ContentCopy class="q-mt-sm" :content="collectorCmd" />
-            </q-tab-panel>
-          </q-tab-panels>
+            </OTabPanel>
+          </OTabPanels>
         </div>
       </div>
     </q-expansion-item>
@@ -202,6 +202,10 @@ Make changes accordingly to the above URL.
 </template>
 
 <script setup lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";

@@ -52,11 +52,27 @@ describe("AutoRefreshInterval", () => {
             template: '<button @click="$emit(\'click\')" :disabled="disable"><slot /></button>',
             props: ['disable', 'disabled']
           },
+          OButton: {
+            template: '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="$emit(\'click\')"><slot /><slot name="label" /></button>',
+            props: ['variant', 'size', 'disabled', 'loading', 'active', 'block'],
+            emits: ['click'],
+          },
+          ODropdown: {
+            template: '<div class="o-dropdown"><slot name="trigger" /><slot /></div>',
+            props: ['open', 'side', 'align', 'sideOffset', 'modal'],
+            emits: ['update:open'],
+          },
+          ODropdownSeparator: {
+            template: '<hr />',
+          },
           'q-separator': {
             template: '<div class="q-separator"></div>'
           },
           'q-tooltip': {
             template: '<div class="q-tooltip"><slot /></div>'
+          },
+          'q-menu': {
+            template: '<div class="q-menu"><slot /></div>'
           }
         }
       },

@@ -971,19 +971,12 @@ export class StreamsPage {
      * Note: In OpenObserve streams table, you need to click the schema icon (list_alt) to view details
      */
     async clickStream(streamName) {
-        const streamRow = this.page.locator('tr').filter({ hasText: streamName }).first();
-        // Find the schema button (list_alt icon) in the actions column
-        const schemaButton = streamRow.locator('button:has(.q-icon), [role="button"]').filter({ has: this.page.locator('.material-icons:text("list_alt"), .q-icon:text("list_alt")') }).first();
-
-        // If schema button not found, try alternative selectors
-        const schemaButtonAlt = streamRow.locator('button[title*="Schema"], button[title*="schema"], button .material-icons').nth(1);
+        const streamRow = this.page.locator('[data-test="log-stream-table"] tbody tr').filter({ hasText: streamName }).first();
+        const schemaButton = streamRow.locator('[data-test="log-stream-schema-btn"]');
 
         if (await schemaButton.isVisible().catch(() => false)) {
             await schemaButton.click();
             testLogger.info(`Clicked schema button for stream: ${streamName}`);
-        } else if (await schemaButtonAlt.isVisible().catch(() => false)) {
-            await schemaButtonAlt.click();
-            testLogger.info(`Clicked schema button (alt) for stream: ${streamName}`);
         } else {
             // Fallback: click on the row itself, which may expand it
             await streamRow.click();
@@ -998,9 +991,7 @@ export class StreamsPage {
      * The schema opens in a right-side dialog with SchemaIndex component
      */
     async expectStreamDetailsVisible() {
-        // The schema dialog opens on the right side with maximized prop
-        // Try multiple selectors: the dialog itself, the schema table, or the drawer
-        const detailsPanel = this.page.locator('.q-dialog--maximized, [data-test="schema-log-stream-field-mapping-table"], .schema-container').first();
+        const detailsPanel = this.page.locator('[data-test="schema-title-text"]');
         await expect(detailsPanel).toBeVisible({ timeout: 15000 });
         testLogger.info('Stream schema/details dialog is visible');
     }

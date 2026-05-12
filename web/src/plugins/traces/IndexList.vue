@@ -73,13 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-[calc(100%-1.25rem)] ellipsis">
                 {{ props.row.name }} ({{ groupFieldCount[props.row.group] ?? 0 }})
               </div>
-              <q-btn
-                :icon="expandGroupRows[props.row.group] !== false ? 'expand_more' : 'chevron_right'"
-                dense
-                size="xs"
-                flat
-                class="q-pa-none"
-              />
+              <OButton
+                variant="ghost"
+                size="icon-xs-sq"
+              >
+                <q-icon :name="expandGroupRows[props.row.group] !== false ? 'expand_more' : 'chevron_right'" />
+              </OButton>
             </q-td>
           </q-tr>
           <!-- Field row -->
@@ -163,12 +162,14 @@ import { getImageURL } from "../../utils/zincutils";
 import { applyCollapseFilter } from "@/utils/fieldCategories";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: {
     BasicValuesFilter,
     FieldRow,
+    OButton,
   },
   emits: ["update:changeStream", "update:selectedFields"],
   props: {

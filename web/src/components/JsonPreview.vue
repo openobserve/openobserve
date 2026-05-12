@@ -1,44 +1,50 @@
 <template>
   <div class="tw:relative">
-    <q-btn
+    <OButton
       v-if="showCopyButton"
-      dense
-      size="sm"
-      no-caps
-      class="tw:absolute! tw:top-0! tw:right-0 tw:z-10 q-px-sm tw:py-[0.35rem]! tw:bg-[var(--o2-tag-grey-2)]!"
+      variant="secondary"
+      size="icon-sm"
+      class="tw:absolute! tw:top-0! tw:right-0 tw:z-10"
       :class="copyButtonClass"
-      icon="content_copy"
       @click="copyToClipboard"
     >
+      <q-icon name="content_copy" />
       <q-tooltip>{{ t("common.copyToClipboard") }}</q-tooltip>
-    </q-btn>
+    </OButton>
     <div class="q-pb-xs flex justify-start items-center q-px-md copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
       <slot name="toolbar" />
     </div>
     {
     <div
-      class="log_json_content"
+      class="log_json_content tw:flex"
       v-for="(key, index) in Object.keys(value)"
       :key="key"
     >
       <!-- Field dropdown slot: render the button only when the slot is provided -->
-      <q-btn-dropdown
+      <ODropdown
         v-if="hasFieldDropdownSlot"
-        data-test="json-preview-field-dropdown-btn"
-        size="0.5rem"
-        flat
-        outlined
-        filled
-        dense
-        class="q-ml-sm pointer tw:px-0!"
-        :name="'img:' + getImageURL('images/common/add_icon.svg')"
-        aria-label="Add icon"
+        v-model:open="dropdownOpenMap[key]"
+        side="bottom"
+        align="start"
       >
-        <q-list class="logs-table-list">
-          <slot name="field-dropdown" :field="key" :value="value[key]" />
-        </q-list>
-      </q-btn-dropdown>
+        <template #trigger>
+          <OButton
+            data-test="json-preview-field-dropdown-btn"
+            size="xs"
+            variant="ghost"
+            class="q-ml-sm log-json-field-dropdown-btn"
+            aria-label="Add icon"
+          >
+            <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+          </OButton>
+        </template>
+        <div class="logs-table-list tw:min-w-[180px]">
+          <slot name="field-dropdown"
+:field="key"
+:value="value[key]" />
+        </div>
+      </ODropdown>
 
       <span
         class="tw:pl-[0.625rem]"
@@ -66,19 +72,23 @@
 </template>
 
 <script lang="ts">
-import { computed, useSlots } from "vue";
+import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard as quasarCopyToClipboard, useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default {
   name: "JsonPreview",
   components: {
     LogsHighLighting,
     ChunkedContent,
+    OButton,
+    ODropdown,
   },
   props: {
     value: {
@@ -107,6 +117,7 @@ export default {
     const slots = useSlots();
 
     const hasFieldDropdownSlot = computed(() => !!slots["field-dropdown"]);
+    const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
     const copyToClipboard = () => {
       quasarCopyToClipboard(JSON.stringify(props.value, null, 2));
@@ -138,6 +149,7 @@ export default {
       copyToClipboard,
       getContentSize,
       getImageURL,
+      dropdownOpenMap,
     };
   },
 };

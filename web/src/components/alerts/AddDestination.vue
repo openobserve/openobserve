@@ -15,59 +15,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
- <q-page class="q-pa-none o2-custom-bg" style="height: calc(100vh - 48px); min-height: inherit; display: flex; flex-direction: column;" >
-      <div class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]" style="flex-shrink: 0;">
-        <div class="flex items-center tw:h-[60px]">
-          <div
-            no-caps
-            padding="xs"
-            outline
-            icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
-            title="Go Back"
-            @click="$emit('cancel:hideform')"
-          >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+  <q-page
+    class="q-pa-none o2-custom-bg"
+    style="
+      height: calc(100vh - 48px);
+      min-height: inherit;
+      display: flex;
+      flex-direction: column;
+    "
+  >
+    <div
+      class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
+      style="flex-shrink: 0"
+    >
+      <div class="flex items-center tw:h-[60px]">
+        <div
+          no-caps
+          padding="xs"
+          outline
+          icon="arrow_back_ios_new"
+          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          title="Go Back"
+          @click="$emit('cancel:hideform')"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+        <div class="col" data-test="add-destination-title">
+          <div v-if="destination" class="text-h6">
+            {{ t("alert_destinations.updateTitle") }}
           </div>
-          <div class="col" data-test="add-destination-title">
-            <div v-if="destination" class="text-h6">
-              {{ t("alert_destinations.updateTitle") }}
-            </div>
-            <div v-else class="text-h6">
-              {{ t("alert_destinations.addTitle") }}
-            </div>
+          <div v-else class="text-h6">
+            {{ t("alert_destinations.addTitle") }}
           </div>
         </div>
       </div>
-      <div class="card-container tw:py-2" style="flex: 1; overflow-y: auto; overflow-x: hidden;">
-        <div>
-       <div class="row q-col-gutter-sm q-px-md q-mt-sm q-mb-xs">
-        <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
-        <div v-if="isAlerts && !destination" class="col-12 q-pb-md">
-          <div class="text-subtitle2 q-mb-sm">{{ t('alert_destinations.destination_type') }}</div>
-          <PrebuiltDestinationSelector
-            v-model="formData.destination_type"
-            :search-query="destinationSearchQuery"
-            data-test="prebuilt-destination-selector"
-            @select="selectDestinationType"
-            @update:search-query="destinationSearchQuery = $event"
-          />
-        </div>
+    </div>
+    <div
+      class="card-container tw:py-2"
+      style="flex: 1; overflow-y: auto; overflow-x: hidden"
+    >
+      <div>
+        <div class="row q-col-gutter-sm q-px-md q-mt-sm q-mb-xs">
+          <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
+          <div v-if="isAlerts && !destination" class="col-12 q-pb-md">
+            <div class="text-subtitle2 q-mb-sm">
+              {{ t("alert_destinations.destination_type") }}
+            </div>
+            <PrebuiltDestinationSelector
+              v-model="formData.destination_type"
+              :search-query="destinationSearchQuery"
+              data-test="prebuilt-destination-selector"
+              @select="selectDestinationType"
+              @update:search-query="destinationSearchQuery = $event"
+            />
+          </div>
 
-        <!-- Destination Type and Name Display for Edit Mode -->
-        <div v-if="isAlerts && destination && formData.destination_type" class="col-12 q-pb-md">
-          <div class="row q-col-gutter-md">
-            <!-- Destination Type (Read-only) -->
-            <div class="col-6">
-              <div class="text-subtitle2 q-mb-xs">{{ t('alert_destinations.destination_type') }}</div>
-              <div class="flex items-center q-pa-sm el-border el-border-radius" data-test="destination-type-readonly">
-                <q-icon :name="getDestinationTypeIcon(formData.destination_type)" size="20px" class="q-mr-sm" />
-                <span class="text-body2">{{ getDestinationTypeName(formData.destination_type) }}</span>
-                <q-chip size="sm" color="grey-3" text-color="grey-8" class="q-ml-sm">{{ t('alert_destinations.readonly') }}</q-chip>
+          <!-- Destination Type and Name Display for Edit Mode -->
+          <div
+            v-if="isAlerts && destination && formData.destination_type"
+            class="col-12 q-pb-md"
+          >
+            <div class="row q-col-gutter-md">
+              <!-- Destination Type (Read-only) -->
+              <div class="col-6">
+                <div class="text-subtitle2 q-mb-xs">
+                  {{ t("alert_destinations.destination_type") }}
+                </div>
+                <div
+                  class="flex items-center q-pa-sm el-border el-border-radius"
+                  data-test="destination-type-readonly"
+                >
+                  <q-icon
+                    :name="getDestinationTypeIcon(formData.destination_type)"
+                    size="20px"
+                    class="q-mr-sm"
+                  />
+                  <span class="text-body2">{{
+                    getDestinationTypeName(formData.destination_type)
+                  }}</span>
+                  <q-chip
+                    size="sm"
+                    color="grey-3"
+                    text-color="grey-8"
+                    class="q-ml-sm"
+                    >{{ t("alert_destinations.readonly") }}</q-chip
+                  >
+                </div>
+              </div>
+              <!-- Destination Name (Read-only) -->
+              <div class="col-6">
+                <q-input
+                  data-test="add-destination-name-input"
+                  v-model="formData.name"
+                  :label="t('alerts.name') + ' *'"
+                  class="showLabelOnTop"
+                  stack-label
+                  borderless
+                  dense
+                  readonly
+                  disable
+                  :rules="[
+                    (val: any) =>
+                      !!val
+                        ? isValidResourceName(val) ||
+                          `Characters like :, ?, /, #, and spaces are not allowed.`
+                        : t('common.nameRequired'),
+                  ]"
+                  tabindex="0"
+                  hide-bottom-space
+                />
               </div>
             </div>
-            <!-- Destination Name (Read-only) -->
-            <div class="col-6">
+          </div>
+
+          <!-- Prebuilt Destination Form (for alerts only) -->
+          <!-- Show for: create mode with destination_type selected OR edit mode for prebuilt destinations -->
+          <div
+            v-if="
+              isAlerts &&
+              (isPrebuiltDestination ||
+                (isUpdatingDestination &&
+                  formData.destination_type !== 'custom'))
+            "
+            class="col-12"
+          >
+            <!-- Name Field for Create Mode -->
+            <div v-if="!destination" class="col-12 q-pb-md">
               <q-input
                 data-test="add-destination-name-input"
                 v-model="formData.name"
@@ -76,8 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 stack-label
                 borderless
                 dense
-                readonly
-                disable
                 :rules="[
                   (val: any) =>
                     !!val
@@ -89,14 +160,146 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hide-bottom-space
               />
             </div>
-          </div>
-        </div>
 
-        <!-- Prebuilt Destination Form (for alerts only) -->
-        <!-- Show for: create mode with destination_type selected OR edit mode for prebuilt destinations -->
-        <div v-if="isAlerts && (isPrebuiltDestination || (isUpdatingDestination && formData.destination_type !== 'custom'))" class="col-12">
-          <!-- Name Field for Create Mode -->
-          <div v-if="!destination" class="col-12 q-pb-md">
+            <PrebuiltDestinationForm
+              v-if="
+                formData.destination_type &&
+                formData.destination_type !== 'custom'
+              "
+              :key="`${formData.destination_type}-${isUpdatingDestination}`"
+              v-model="prebuiltCredentials"
+              :destination-type="formData.destination_type"
+              :hide-actions="true"
+              data-test="prebuilt-form"
+            />
+            <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
+              <q-spinner color="primary" size="40px" />
+              <div class="q-mt-sm text-grey-7">Loading destination data...</div>
+            </div>
+
+            <!-- Additional Settings for Prebuilt Destinations -->
+            <div class="col-12 q-mt-md">
+              <div class="text-bold q-py-xs">
+                {{ t("alert_destinations.additional_settings") }}
+              </div>
+
+              <!-- Custom Headers (hidden for email destinations) -->
+              <div v-if="formData.destination_type !== 'email'" class="q-py-sm">
+                <div class="text-subtitle2 q-pb-xs">
+                  {{ t("alert_destinations.custom_headers") }}
+                </div>
+                <div
+                  v-for="(header, index) in apiHeaders"
+                  :key="header.uuid"
+                  class="row q-col-gutter-sm q-pb-sm"
+                >
+                  <div class="col-5 q-ml-none">
+                    <q-input
+                      :data-test="`add-destination-header-${header['key']}-key-input`"
+                      v-model="header.key"
+                      stack-label
+                      borderless
+                      hide-bottom-space
+                      :placeholder="t('alert_destinations.api_header')"
+                      dense
+                      tabindex="0"
+                    />
+                  </div>
+                  <div class="col-5 q-ml-none">
+                    <q-input
+                      :data-test="`add-destination-header-${header['key']}-value-input`"
+                      v-model="header.value"
+                      :placeholder="t('alert_destinations.api_header_value')"
+                      stack-label
+                      borderless
+                      hide-bottom-space
+                      dense
+                      tabindex="0"
+                    />
+                  </div>
+                  <div class="col-2 q-ml-none">
+                    <OButton
+                      :data-test="`add-destination-header-${header['key']}-delete-btn`"
+                      class="q-ml-xs"
+                      variant="ghost"
+                      size="icon-circle-sm"
+                      :title="t('alert_templates.edit')"
+                      @click="deleteApiHeader(header)"
+                    >
+                      <q-icon name="delete" />
+                    </OButton>
+                    <OButton
+                      data-test="add-destination-add-header-btn"
+                      v-if="index === apiHeaders.length - 1"
+                      class="q-ml-xs"
+                      variant="ghost"
+                      size="icon-circle-sm"
+                      :title="t('alert_templates.edit')"
+                      @click="addApiHeader()"
+                    >
+                      <q-icon name="add" />
+                    </OButton>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Skip TLS Verify Toggle -->
+              <div class="q-py-sm">
+                <q-toggle
+                  data-test="add-destination-skip-tls-verify-toggle"
+                  class="o2-toggle-button-lg"
+                  size="lg"
+                  v-model="formData.skip_tls_verify"
+                  :label="t('alert_destinations.skip_tls_verify')"
+                />
+              </div>
+            </div>
+
+            <!-- Test Result Display -->
+            <DestinationTestResult
+              v-if="lastTestResult"
+              :result="lastTestResult"
+              :is-loading="isTestInProgress"
+              data-test="prebuilt-test-result"
+              @retry="handleTestDestination"
+            />
+          </div>
+
+          <!-- Tabs for non-alert destinations OR custom alert destinations -->
+          <div
+            v-if="
+              !isAlerts || (isAlerts && formData.destination_type === 'custom')
+            "
+            class="col-12 q-pb-md"
+          >
+            <div class="app-tabs-container tw:h-[36px] q-mr-sm tw:w-fit">
+              <app-tabs
+                data-test="add-destination-tabs"
+                :tabs="tabs"
+                class="tabs-selection-container"
+                v-model:active-tab="formData.type"
+              />
+            </div>
+          </div>
+          <div
+            v-if="formData.type === 'email' && !getFormattedTemplates.length"
+            class="flex items-center col-12 q-mb-md"
+          >
+            <div class="text-subtitle2 q-mr-sm">
+              It looks like you haven't created any Email Templates yet.
+            </div>
+            <OButton variant="outline" size="sm" @click="createEmailTemplate"
+              >Create Email Template</OButton
+            >
+          </div>
+          <!-- Name field for custom destinations or pipelines (not prebuilt) -->
+          <div
+            v-if="
+              !isAlerts || (isAlerts && formData.destination_type === 'custom')
+            "
+            class="q-py-xs"
+            :class="{ 'col-6': isAlerts, 'col-12': !isAlerts }"
+          >
             <q-input
               data-test="add-destination-name-input"
               v-model="formData.name"
@@ -116,31 +319,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               hide-bottom-space
             />
           </div>
-
-          <PrebuiltDestinationForm
-            v-if="formData.destination_type && formData.destination_type !== 'custom'"
-            :key="`${formData.destination_type}-${isUpdatingDestination}`"
-            v-model="prebuiltCredentials"
-            :destination-type="formData.destination_type"
-            :hide-actions="true"
-            data-test="prebuilt-form"
-          />
-          <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
-            <q-spinner color="primary" size="40px" />
-            <div class="q-mt-sm text-grey-7">Loading destination data...</div>
+          <!-- Template field only for custom alert destinations -->
+          <div
+            v-if="isAlerts && formData.destination_type === 'custom'"
+            class="col-6 row q-py-xs"
+          >
+            <div class="col-12">
+              <q-select
+                data-test="add-destination-template-select"
+                v-model="formData.template"
+                :label="t('alert_destinations.template') + ' *'"
+                :options="getFormattedTemplates"
+                class="showLabelOnTop no-case"
+                stack-label
+                borderless
+                hide-bottom-space
+                dense
+                tabindex="0"
+                :rules="[(val: any) => !!val || 'Template is required!']"
+              >
+              </q-select>
+            </div>
           </div>
 
-          <!-- Additional Settings for Prebuilt Destinations -->
-          <div class="col-12 q-mt-md">
-            <div class="text-bold q-py-xs">
-              {{ t('alert_destinations.additional_settings') }}
+          <template
+            v-if="
+              (isAlerts &&
+                formData.destination_type === 'custom' &&
+                formData.type === 'http') ||
+              (!isAlerts && formData.type === 'http')
+            "
+          >
+            <div class="col-6 q-py-xs">
+              <q-input
+                data-test="add-destination-url-input"
+                v-model="formData.url"
+                :label="t('alert_destinations.url') + ' *'"
+                class="showLabelOnTop"
+                stack-label
+                borderless
+                hide-bottom-space
+                dense
+                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                tabindex="0"
+              />
             </div>
-
-            <!-- Custom Headers (hidden for email destinations) -->
-            <div v-if="formData.destination_type !== 'email'" class="q-py-sm">
-              <div class="text-subtitle2 q-pb-xs">
-                {{ t('alert_destinations.custom_headers') }}
-              </div>
+            <div
+              class="q-py-xs destination-method-select"
+              :class="{ 'col-3': !isAlerts, 'col-6': isAlerts }"
+            >
+              <q-select
+                data-test="add-destination-method-select"
+                v-model="formData.method"
+                :label="t('alert_destinations.method') + ' *'"
+                :options="apiMethods"
+                class="showLabelOnTop"
+                stack-label
+                dense
+                borderless
+                hide-bottom-space
+                :popup-content-style="{ textTransform: 'uppercase' }"
+                :rules="[(val: any) => !!val || 'Field is required!']"
+                tabindex="0"
+              />
+            </div>
+            <div
+              v-if="!isAlerts"
+              class="col-3 q-py-xs destination-method-select"
+            >
+              <q-select
+                data-test="add-destination-output-format-select"
+                v-model="formData.output_format"
+                :label="t('alert_destinations.output_format') + ' *'"
+                :options="outputFormats"
+                class="showLabelOnTop"
+                stack-label
+                borderless
+                hide-bottom-space
+                :popup-content-style="{ textTransform: 'uppercase' }"
+                dense
+                :rules="[(val: any) => !!val || 'Field is required!']"
+                tabindex="0"
+              />
+            </div>
+            <div class="col-12 q-py-sm">
+              <div class="text-bold q-py-xs">Headers</div>
               <div
                 v-for="(header, index) in apiHeaders"
                 :key="header.uuid"
@@ -167,41 +430,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     borderless
                     hide-bottom-space
                     dense
+                    isUpdatingDestination
                     tabindex="0"
                   />
                 </div>
                 <div class="col-2 q-ml-none">
-                  <q-btn
+                  <OButton
                     :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                    icon="delete"
-                    class="q-ml-xs iconHoverBtn"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
+                    class="q-ml-xs"
+                    variant="ghost"
+                    size="icon-circle-sm"
                     :title="t('alert_templates.edit')"
                     @click="deleteApiHeader(header)"
-                  />
-                  <q-btn
+                  >
+                    <q-icon name="delete" />
+                  </OButton>
+                  <OButton
                     data-test="add-destination-add-header-btn"
                     v-if="index === apiHeaders.length - 1"
-                    icon="add"
-                    class="q-ml-xs iconHoverBtn"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
+                    class="q-ml-xs"
+                    variant="ghost"
+                    size="icon-circle-sm"
                     :title="t('alert_templates.edit')"
                     @click="addApiHeader()"
-                  />
+                  >
+                    <q-icon name="add" />
+                  </OButton>
                 </div>
               </div>
             </div>
-
-            <!-- Skip TLS Verify Toggle -->
-            <div class="q-py-sm">
+            <div class="col-12 q-py-sm">
               <q-toggle
                 data-test="add-destination-skip-tls-verify-toggle"
                 class="o2-toggle-button-lg"
@@ -210,307 +468,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('alert_destinations.skip_tls_verify')"
               />
             </div>
-          </div>
-
-          <!-- Test Result Display -->
-          <DestinationTestResult
-            v-if="lastTestResult"
-            :result="lastTestResult"
-            :is-loading="isTestInProgress"
-            data-test="prebuilt-test-result"
-            @retry="handleTestDestination"
-          />
-        </div>
-
-        <!-- Tabs for non-alert destinations OR custom alert destinations -->
-        <div v-if="!isAlerts || (isAlerts && formData.destination_type === 'custom')" class="col-12 q-pb-md">
-         <div class="app-tabs-container tw:h-[36px] q-mr-sm tw:w-fit">
-          <app-tabs
-            data-test="add-destination-tabs"
-            :tabs="tabs"
-            class="tabs-selection-container"
-            v-model:active-tab="formData.type"
-          />
-          </div>
-        </div>
-        <div
-          v-if="formData.type === 'email' && !getFormattedTemplates.length"
-          class="flex items-center col-12 q-mb-md"
-        >
-          <div class="text-subtitle2 q-mr-sm">
-            It looks like you haven't created any Email Templates yet.
-          </div>
-          <q-btn
-            label="Create Email Template"
-            size="sm"
-            no-caps
-            class="o2-secondary-button"
-            style="border-radius: 4px; font-size: 12px"
-            @click="createEmailTemplate"
-          />
-        </div>
-        <!-- Name field for custom destinations or pipelines (not prebuilt) -->
-        <div
-          v-if="!isAlerts || (isAlerts && formData.destination_type === 'custom')"
-          class="q-py-xs"
-          :class="{ 'col-6': isAlerts, 'col-12': !isAlerts }"
-        >
-          <q-input
-            data-test="add-destination-name-input"
-            v-model="formData.name"
-            :label="t('alerts.name') + ' *'"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            :rules="[
-              (val: any) =>
-                !!val
-                  ? isValidResourceName(val) ||
-                    `Characters like :, ?, /, #, and spaces are not allowed.`
-                  : t('common.nameRequired'),
-            ]"
-            tabindex="0"
-            hide-bottom-space
-          />
-        </div>
-        <!-- Template field only for custom alert destinations -->
-        <div v-if="isAlerts && formData.destination_type === 'custom'" class="col-6 row q-py-xs">
-          <div class="col-12">
-            <q-select
-              data-test="add-destination-template-select"
-              v-model="formData.template"
-              :label="t('alert_destinations.template') + ' *'"
-              :options="getFormattedTemplates"
-              class="showLabelOnTop no-case"
-              stack-label
-              borderless
-              hide-bottom-space
-              dense
-              tabindex="0"
-              :rules="[(val: any) => !!val || 'Template is required!']"
-            >
-            </q-select>
-          </div>
-        </div>
-
-        <template
-          v-if="((isAlerts && formData.destination_type === 'custom' && formData.type === 'http') || (!isAlerts && formData.type === 'http'))"
-        >
-          <div class="col-6 q-py-xs">
-            <q-input
-              data-test="add-destination-url-input"
-              v-model="formData.url"
-              :label="t('alert_destinations.url') + ' *'"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              hide-bottom-space
-              dense
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-              tabindex="0"
-            />
-          </div>
-          <div  class=" q-py-xs destination-method-select"
-          :class="{ 'col-3': !isAlerts, 'col-6': isAlerts }"
+          </template>
+          <template
+            v-if="
+              formData.type === 'email' &&
+              (!isAlerts || formData.destination_type === 'custom')
+            "
           >
-            <q-select
-              data-test="add-destination-method-select"
-              v-model="formData.method"
-              :label="t('alert_destinations.method') + ' *'"
-              :options="apiMethods"
-              class="showLabelOnTop"
-              stack-label
-                            dense
-
-              borderless
-              hide-bottom-space
-              :popup-content-style="{ textTransform: 'uppercase' }"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              tabindex="0"
-            />
-            
-          </div>
-          <div v-if="!isAlerts" class="col-3 q-py-xs destination-method-select">
-            <q-select
-              data-test="add-destination-output-format-select"
-              v-model="formData.output_format"
-              :label="t('alert_destinations.output_format') + ' *'"
-              :options="outputFormats"
+            <q-input
+              v-model="formData.emails"
+              :label="t('reports.recipients') + ' *'"
               class="showLabelOnTop"
               stack-label
               borderless
-              hide-bottom-space
-              :popup-content-style="{ textTransform: 'uppercase' }"
               dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :rules="[
+                (val: any) =>
+                  /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
+                    val,
+                  ) || 'Add valid emails!',
+              ]"
               tabindex="0"
+              style="width: 100%"
+              :placeholder="t('user.inviteByEmail')"
             />
-            
-          </div>
-          <div class="col-12 q-py-sm">
-            <div class="text-bold q-py-xs">
-              Headers
-            </div>
-            <div
-              v-for="(header, index) in apiHeaders"
-              :key="header.uuid"
-              class="row q-col-gutter-sm q-pb-sm"
-            >
-              <div class="col-5 q-ml-none">
-                <q-input
-                  :data-test="`add-destination-header-${header['key']}-key-input`"
-                  v-model="header.key"
-                  stack-label
-                  borderless
-                  hide-bottom-space
-                  :placeholder="t('alert_destinations.api_header')"
-                  dense
-                  tabindex="0"
-                />
-              </div>
-              <div class="col-5 q-ml-none">
-                <q-input
-                  :data-test="`add-destination-header-${header['key']}-value-input`"
-                  v-model="header.value"
-                  :placeholder="t('alert_destinations.api_header_value')"
-                  stack-label
-                  borderless
-                  hide-bottom-space
-                  dense
-                  isUpdatingDestination
-                  tabindex="0"
-                />
-              </div>
-              <div class="col-2 q-ml-none">
-                <q-btn
-                  :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                  icon="delete"
-                  class="q-ml-xs iconHoverBtn"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('alert_templates.edit')"
-                  @click="deleteApiHeader(header)"
-                />
-                <q-btn
-                  data-test="add-destination-add-header-btn"
-                  v-if="index === apiHeaders.length - 1"
-                  icon="add"
-                  class="q-ml-xs iconHoverBtn"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('alert_templates.edit')"
-                  @click="addApiHeader()"
-                />
-              </div>
-            </div>
-          </div>
-          <div class="col-12 q-py-sm">
-              <q-toggle
-                data-test="add-destination-skip-tls-verify-toggle"
-                class="o2-toggle-button-lg"
-                size="lg"
-                v-model="formData.skip_tls_verify"
-                :label="t('alert_destinations.skip_tls_verify')"
+          </template>
+
+          <template
+            v-if="
+              formData.type === 'action' &&
+              (!isAlerts || formData.destination_type === 'custom')
+            "
+          >
+            <div class="col-6 q-py-xs action-select">
+              <q-select
+                data-test="add-destination-action-select"
+                v-model="formData.action_id"
+                :label="t('alert_destinations.action') + ' *'"
+                :options="filteredActions"
+                class="showLabelOnTop no-case"
+                map-options
+                emit-value
+                stack-label
+                borderless
+                dense
+                use-input
+                :loading="isLoadingActions"
+                :rules="[(val: any) => !!val || 'Field is required!']"
+                tabindex="0"
+                @filter="filterActions"
               />
-          </div>
-        </template>
-        <template v-if="formData.type === 'email' && (!isAlerts || formData.destination_type === 'custom')">
-          <q-input
-            v-model="formData.emails"
-            :label="t('reports.recipients') + ' *'"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            :rules="[
-              (val: any) =>
-                /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
-                  val,
-                ) || 'Add valid emails!',
-            ]"
-            tabindex="0"
-            style="width: 100%"
-            :placeholder="t('user.inviteByEmail')"
-          />
-        </template>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div class="flex justify-between q-px-lg q-py-lg full-width">
+        <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
+        <div
+          v-if="
+            isAlerts &&
+            (isPrebuiltDestination ||
+              (isUpdatingDestination && formData.destination_type !== 'custom'))
+          "
+          class="flex items-center tw:gap-2"
+        >
+          <OButton
+            data-test="destination-preview-button"
+            variant="outline"
+            size="sm"
+            @click="showPreview"
+          >
+            <template #icon-left><q-icon name="preview" /></template>
+            {{ t("alert_destinations.preview") }}
+          </OButton>
+          <OButton
+            data-test="destination-test-button"
+            :loading="isTestInProgress"
+            variant="outline"
+            size="sm"
+            @click="handleTestDestination"
+          >
+            <template #icon-left><q-icon name="send" /></template>
+            {{ t("alert_destinations.test") }}
+          </OButton>
+        </div>
+        <div v-else></div>
 
-        <template v-if="formData.type === 'action' && (!isAlerts || formData.destination_type === 'custom')">
-          <div class="col-6 q-py-xs action-select">
-            <q-select
-              data-test="add-destination-action-select"
-              v-model="formData.action_id"
-              :label="t('alert_destinations.action') + ' *'"
-              :options="filteredActions"
-              class="showLabelOnTop no-case"
-              map-options
-              emit-value
-              stack-label
-              borderless
-              dense
-              use-input
-              :loading="isLoadingActions"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              tabindex="0"
-              @filter="filterActions"
-            />
-          </div>
-        </template>
+        <!-- Right side: Cancel and Save buttons -->
+        <div class="flex items-center tw:gap-2">
+          <OButton
+            data-test="add-destination-cancel-btn"
+            v-close-popup="true"
+            variant="outline"
+            size="sm-action"
+            @click="$emit('cancel:hideform')"
+            >{{ t("alerts.cancel") }}</OButton
+          >
+          <OButton
+            data-test="add-destination-submit-btn"
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            @click="saveDestination"
+            >{{ t("alerts.save") }}</OButton
+          >
+        </div>
       </div>
-    </div>
-    <div class="flex justify-between q-px-lg q-py-lg full-width">
-      <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
-      <div v-if="isAlerts && (isPrebuiltDestination || (isUpdatingDestination && formData.destination_type !== 'custom'))" class="flex items-center tw:gap-2">
-        <q-btn
-          data-test="destination-preview-button"
-          :label="t('alert_destinations.preview')"
-          icon="preview"
-          outline
-          no-caps
-          class="tw:h-[36px] tw:mr-2"
-          @click="showPreview"
-        />
-        <q-btn
-          data-test="destination-test-button"
-          :loading="isTestInProgress"
-          :label="t('alert_destinations.test')"
-          icon="send"
-          outline
-          no-caps
-          class="tw:h-[36px]"
-          @click="handleTestDestination"
-        />
-      </div>
-      <div v-else></div>
-
-      <!-- Right side: Cancel and Save buttons -->
-      <div class="flex items-center tw:gap-2">
-        <q-btn
-          data-test="add-destination-cancel-btn"
-          v-close-popup="true"
-          class="o2-secondary-button tw:h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
-          @click="$emit('cancel:hideform')"
-        />
-        <q-btn
-          data-test="add-destination-submit-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('alerts.save')"
-          type="submit"
-          no-caps
-          flat
-          @click="saveDestination"
-        />
-      </div>
-    </div>
     </div>
 
     <!-- Destination Preview Modal -->
@@ -536,6 +599,7 @@ import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type {
   Template,
   DestinationData,
@@ -545,6 +609,7 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Webhook, Mail, Zap } from "lucide-vue-next";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -612,14 +677,14 @@ const {
   generatePreview,
   isTestInProgress,
   lastTestResult,
-  detectPrebuiltType
+  detectPrebuiltType,
 } = usePrebuiltDestinations();
 
 // Prebuilt destinations state
 const prebuiltCredentials = ref<Record<string, any>>({});
-const destinationSearchQuery = ref('');
+const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
-const previewContent = ref('');
+const previewContent = ref("");
 
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
@@ -636,90 +701,33 @@ const apiHeaders: Ref<
 
 const tabs = computed(() => {
   // In edit mode for custom destinations, only show the tab for the current type
-  if (isUpdatingDestination.value && formData.value.destination_type === 'custom') {
+  if (
+    isUpdatingDestination.value &&
+    formData.value.destination_type === "custom"
+  ) {
     const currentType = formData.value.type;
 
     // Only return the tab matching the current destination type
     if (currentType === "http") {
-      return [{
-        label: t("alerts.webhook"),
-        value: "http",
-        style: {
-          width: "fit-content",
-          padding: "4px 14px",
-          background: "#5960B2",
-          border: "none !important",
-          color: "#ffffff !important",
-        },
-      }];
+      return [{ label: t("alerts.webhook"), value: "http", icon: Webhook }];
     } else if (currentType === "email") {
-      return [{
-        label: t("alerts.email"),
-        value: "email",
-        style: {
-          width: "fit-content",
-          padding: "4px 14px",
-          background: "#5960B2",
-          border: "none !important",
-          color: "#ffffff !important",
-        },
-      }];
+      return [{ label: t("alerts.email"), value: "email", icon: Mail }];
     } else if (currentType === "action") {
-      return [{
-        label: t("alerts.action"),
-        value: "action",
-        style: {
-          width: "fit-content",
-          padding: "4px 14px",
-          background: "#5960B2",
-          border: "none !important",
-          color: "#ffffff !important",
-        },
-      }];
+      return [{ label: t("alerts.action"), value: "action", icon: Zap }];
     }
   }
 
   // In create mode, show all tabs
-  let tabs = [
-    {
-      label: t("alerts.webhook"),
-      value: "http",
-      style: {
-        width: "fit-content",
-        padding: "4px 14px",
-        background: formData.value.type === "http" ? "#5960B2" : "",
-        border: "none !important",
-        color: formData.value.type === "http" ? "#ffffff !important" : "",
-      },
-    },
-    {
-      label: t("alerts.email"),
-      value: "email",
-      style: {
-        width: "fit-content",
-        padding: "4px 14px",
-        background: formData.value.type === "email" ? "#5960B2" : "",
-        border: "none !important",
-        color: formData.value.type === "email" ? "#ffffff !important" : "",
-      },
-    },
+  const tabs = [
+    { label: t("alerts.webhook"), value: "http", icon: Webhook },
+    { label: t("alerts.email"), value: "email", icon: Mail },
   ];
 
   if (
     (config.isEnterprise == "true" || config.isCloud == "true") &&
     store.state.zoConfig.actions_enabled
   ) {
-    tabs.push({
-      label: t("alerts.action"),
-      value: "action",
-      style: {
-        width: "fit-content",
-        padding: "4px 14px",
-        background: formData.value.type === "action" ? "#5960B2" : "",
-        border: "none !important",
-        color: formData.value.type === "action" ? "#ffffff !important" : "",
-      },
-    });
+    tabs.push({ label: t("alerts.action"), value: "action", icon: Zap });
   }
 
   return tabs;
@@ -729,21 +737,21 @@ const tabs = computed(() => {
 const destinationTypes = computed(() => {
   if (!props.isAlerts) return [];
 
-  const prebuiltTypes = availableTypes.value.map(type => ({
+  const prebuiltTypes = availableTypes.value.map((type) => ({
     value: type.id,
     label: type.name,
     image: `/src/assets/images/destinations/${type.icon}.png`,
     icon: type.icon,
-    description: type.description
+    description: type.description,
   }));
 
   // Add custom option
   prebuiltTypes.push({
-    value: 'custom',
-    label: 'Custom',
+    value: "custom",
+    label: "Custom",
     image: null,
-    icon: 'webhook',
-    description: 'Create custom webhook destination'
+    icon: "webhook",
+    description: "Create custom webhook destination",
   });
 
   return prebuiltTypes;
@@ -751,27 +759,30 @@ const destinationTypes = computed(() => {
 
 // Check if current destination type is prebuilt
 const isPrebuiltDestination = computed(() => {
-  return formData.value.destination_type && formData.value.destination_type !== 'custom';
+  return (
+    formData.value.destination_type &&
+    formData.value.destination_type !== "custom"
+  );
 });
 
 // Helper methods for displaying destination type in edit mode
 const getDestinationTypeName = (typeId: string) => {
-  const type = availableTypes.value.find(t => t.id === typeId);
+  const type = availableTypes.value.find((t) => t.id === typeId);
   return type ? type.name : typeId;
 };
 
 const getDestinationTypeIcon = (typeId: string) => {
   const iconMap: Record<string, string> = {
-    slack: 'chat',
-    discord: 'forum',
-    msteams: 'groups',
-    email: 'email',
-    pagerduty: 'warning',
-    opsgenie: 'notifications_active',
-    servicenow: 'support_agent',
-    custom: 'settings'
+    slack: "chat",
+    discord: "forum",
+    msteams: "groups",
+    email: "email",
+    pagerduty: "warning",
+    opsgenie: "notifications_active",
+    servicenow: "support_agent",
+    custom: "settings",
   };
-  return iconMap[typeId] || 'webhook';
+  return iconMap[typeId] || "webhook";
 };
 
 onActivated(() => setupDestinationData());
@@ -789,7 +800,7 @@ watch(
       setupDestinationData();
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 const setupDestinationData = () => {
@@ -811,48 +822,63 @@ const setupDestinationData = () => {
     let parsedMetadata: any = null;
     if (props.destination.metadata) {
       try {
-        parsedMetadata = typeof props.destination.metadata === 'string'
-          ? JSON.parse(props.destination.metadata)
-          : props.destination.metadata;
+        parsedMetadata =
+          typeof props.destination.metadata === "string"
+            ? JSON.parse(props.destination.metadata)
+            : props.destination.metadata;
       } catch (e) {
-        console.error('Failed to parse destination metadata:', e);
+        console.error("Failed to parse destination metadata:", e);
       }
     }
 
     // Priority 1: Check metadata.prebuilt_type (most reliable for prebuilt destinations)
-    if (parsedMetadata?.prebuilt_type && isPrebuiltType(parsedMetadata.prebuilt_type)) {
+    if (
+      parsedMetadata?.prebuilt_type &&
+      isPrebuiltType(parsedMetadata.prebuilt_type)
+    ) {
       formData.value.destination_type = parsedMetadata.prebuilt_type;
     }
     // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
     // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
-    else if (props.destination.template?.startsWith('system-prebuilt-')) {
-      const templateType = props.destination.template.replace('system-prebuilt-', '');
+    else if (props.destination.template?.startsWith("system-prebuilt-")) {
+      const templateType = props.destination.template.replace(
+        "system-prebuilt-",
+        "",
+      );
       // Only treat as prebuilt if structure matches the type
-      if (templateType === 'email' && props.destination.type === 'email' && props.destination.emails) {
-        formData.value.destination_type = 'email';
-      } else if (props.destination.type === 'http' && props.destination.url) {
+      if (
+        templateType === "email" &&
+        props.destination.type === "email" &&
+        props.destination.emails
+      ) {
+        formData.value.destination_type = "email";
+      } else if (props.destination.type === "http" && props.destination.url) {
         // Check if URL matches known prebuilt patterns
         const detectedType = detectPrebuiltType(props.destination);
         if (detectedType) {
           formData.value.destination_type = detectedType;
         } else {
           // Has system template but URL doesn't match prebuilt patterns - it's custom
-          formData.value.destination_type = 'custom';
+          formData.value.destination_type = "custom";
         }
       } else {
-        formData.value.destination_type = 'custom';
+        formData.value.destination_type = "custom";
       }
     }
     // Priority 3: Check if template starts with 'prebuilt_' (user templates)
-    else if (props.destination.template?.startsWith('prebuilt_')) {
-      const extractedType = props.destination.template.replace('prebuilt_', '');
-      formData.value.destination_type = isPrebuiltType(extractedType) ? extractedType : 'custom';
+    else if (props.destination.template?.startsWith("prebuilt_")) {
+      const extractedType = props.destination.template.replace("prebuilt_", "");
+      formData.value.destination_type = isPrebuiltType(extractedType)
+        ? extractedType
+        : "custom";
     }
     // Priority 4: Check if template includes 'prebuilt' (legacy format)
-    else if (props.destination.template?.includes('prebuilt')) {
-      const parts = props.destination.template.split('-');
+    else if (props.destination.template?.includes("prebuilt")) {
+      const parts = props.destination.template.split("-");
       const extractedType = parts[parts.length - 1];
-      formData.value.destination_type = isPrebuiltType(extractedType) ? extractedType : 'custom';
+      formData.value.destination_type = isPrebuiltType(extractedType)
+        ? extractedType
+        : "custom";
     }
     // Priority 5: Fallback to URL-based detection (for destinations created before metadata was added)
     else if (props.destination.url) {
@@ -860,16 +886,19 @@ const setupDestinationData = () => {
       if (detectedType) {
         formData.value.destination_type = detectedType;
       } else {
-        formData.value.destination_type = 'custom';
+        formData.value.destination_type = "custom";
       }
     }
     // Priority 6: No indicators - this is a custom destination
     else {
-      formData.value.destination_type = 'custom';
+      formData.value.destination_type = "custom";
     }
 
     // Continue with credential restoration if we have a destination_type
-    if (formData.value.destination_type && formData.value.destination_type !== 'custom') {
+    if (
+      formData.value.destination_type &&
+      formData.value.destination_type !== "custom"
+    ) {
       const typeId = formData.value.destination_type;
 
       // Restore prebuilt credentials from metadata and destination fields
@@ -878,19 +907,20 @@ const setupDestinationData = () => {
       // Step 1: Parse metadata and remove credential_ prefix
       if (props.destination.metadata) {
         try {
-          const metadata = typeof props.destination.metadata === 'string'
-            ? JSON.parse(props.destination.metadata)
-            : props.destination.metadata;
+          const metadata =
+            typeof props.destination.metadata === "string"
+              ? JSON.parse(props.destination.metadata)
+              : props.destination.metadata;
 
           // Extract credential fields (remove credential_ prefix)
           Object.entries(metadata).forEach(([key, value]) => {
-            if (key.startsWith('credential_')) {
-              const credentialKey = key.replace('credential_', '');
+            if (key.startsWith("credential_")) {
+              const credentialKey = key.replace("credential_", "");
               credentials[credentialKey] = value;
             }
           });
         } catch (e) {
-          console.error('Failed to parse destination metadata:', e);
+          console.error("Failed to parse destination metadata:", e);
         }
       }
 
@@ -901,27 +931,33 @@ const setupDestinationData = () => {
       }
 
       // For ServiceNow, instanceUrl is the base URL
-      if (typeId === 'servicenow' && props.destination.url) {
+      if (typeId === "servicenow" && props.destination.url) {
         credentials.instanceUrl = props.destination.url;
       }
 
       // For email destinations, recipients are in emails field
-      if (typeId === 'email' && props.destination.emails) {
+      if (typeId === "email" && props.destination.emails) {
         credentials.recipients = Array.isArray(props.destination.emails)
-          ? props.destination.emails.join(', ')
+          ? props.destination.emails.join(", ")
           : props.destination.emails;
       }
 
       // For PagerDuty, integrationKey is in headers (if present)
-      if (typeId === 'pagerduty' && props.destination.headers?.['X-Routing-Key']) {
-        credentials.integrationKey = props.destination.headers['X-Routing-Key'];
+      if (
+        typeId === "pagerduty" &&
+        props.destination.headers?.["X-Routing-Key"]
+      ) {
+        credentials.integrationKey = props.destination.headers["X-Routing-Key"];
       }
 
       // For Opsgenie, apiKey is in Authorization header
-      if (typeId === 'opsgenie' && props.destination.headers?.['Authorization']) {
-        const authHeader = props.destination.headers['Authorization'];
-        if (authHeader.startsWith('GenieKey ')) {
-          credentials.apiKey = authHeader.replace('GenieKey ', '');
+      if (
+        typeId === "opsgenie" &&
+        props.destination.headers?.["Authorization"]
+      ) {
+        const authHeader = props.destination.headers["Authorization"];
+        if (authHeader.startsWith("GenieKey ")) {
+          credentials.apiKey = authHeader.replace("GenieKey ", "");
         }
       }
 
@@ -934,9 +970,10 @@ const setupDestinationData = () => {
 
     if (Object.keys(formData.value?.headers || {}).length) {
       // Filter out system/prebuilt headers - only load custom headers into the UI
-      const systemHeaders = ['Content-Type', 'Authorization', 'X-Routing-Key'];
-      const customHeadersOnly = Object.entries(formData.value?.headers || {})
-        .filter(([key]) => !systemHeaders.includes(key));
+      const systemHeaders = ["Content-Type", "Authorization", "X-Routing-Key"];
+      const customHeadersOnly = Object.entries(
+        formData.value?.headers || {},
+      ).filter(([key]) => !systemHeaders.includes(key));
 
       if (customHeadersOnly.length > 0) {
         apiHeaders.value = [];
@@ -1010,14 +1047,14 @@ const selectDestinationType = (type: string) => {
   // Reset form data when switching types
   prebuiltCredentials.value = {};
 
-  if (type === 'custom') {
+  if (type === "custom") {
     // Switch to custom mode
-    formData.value.type = 'http';
-    formData.value.url = '';
-    formData.value.template = '';
+    formData.value.type = "http";
+    formData.value.url = "";
+    formData.value.template = "";
   } else {
     // Set up prebuilt type
-    formData.value.type = type === 'email' ? 'email' : 'http';
+    formData.value.type = type === "email" ? "email" : "http";
   }
 };
 
@@ -1026,9 +1063,12 @@ const handleTestDestination = async () => {
   if (!isPrebuiltDestination.value) return;
 
   try {
-    await testDestination(formData.value.destination_type, prebuiltCredentials.value);
+    await testDestination(
+      formData.value.destination_type,
+      prebuiltCredentials.value,
+    );
   } catch (error) {
-    console.error('Test failed:', error);
+    console.error("Test failed:", error);
   }
 };
 
@@ -1038,20 +1078,23 @@ const showPreview = async () => {
 
   try {
     // Clear previous content
-    previewContent.value = '';
+    previewContent.value = "";
 
     // Fetch and generate preview
-    const preview = await generatePreview(formData.value.destination_type, prebuiltCredentials.value);
+    const preview = await generatePreview(
+      formData.value.destination_type,
+      prebuiltCredentials.value,
+    );
     previewContent.value = preview;
 
     // Only show modal after content is ready
     showPreviewModal.value = true;
   } catch (error) {
-    console.error('Failed to generate preview:', error);
+    console.error("Failed to generate preview:", error);
     q.notify({
-      type: 'negative',
-      message: 'Failed to generate preview',
-      timeout: 2000
+      type: "negative",
+      message: "Failed to generate preview",
+      timeout: 2000,
     });
   }
 };
@@ -1077,7 +1120,7 @@ const saveDestination = async () => {
           formData.value.name, // potentially new name
           prebuiltCredentials.value,
           customHeaders, // custom headers
-          formData.value.skip_tls_verify || false // skipTlsVerify
+          formData.value.skip_tls_verify || false, // skipTlsVerify
         );
       } else {
         // Create new prebuilt destination
@@ -1086,7 +1129,7 @@ const saveDestination = async () => {
           formData.value.name,
           prebuiltCredentials.value,
           customHeaders, // custom headers
-          formData.value.skip_tls_verify || false // skipTlsVerify
+          formData.value.skip_tls_verify || false, // skipTlsVerify
         );
       }
 
@@ -1094,7 +1137,7 @@ const saveDestination = async () => {
       emit("cancel:hideform");
       return;
     } catch (error) {
-      console.error('Failed to save prebuilt destination:', error);
+      console.error("Failed to save prebuilt destination:", error);
       return;
     }
   }
@@ -1125,10 +1168,9 @@ const saveDestination = async () => {
     template: props.isAlerts ? formData.value.template : "",
     headers: headers,
     name: formData.value.name,
-    
   };
 
-  if(!props.isAlerts){
+  if (!props.isAlerts) {
     payload["output_format"] = formData.value.output_format;
   }
 
@@ -1176,7 +1218,7 @@ const saveDestination = async () => {
       });
     track("Button Click", {
       button: "Update Destination",
-      page: "Add Destination"
+      page: "Add Destination",
     });
   } else {
     destinationService
@@ -1206,7 +1248,7 @@ const saveDestination = async () => {
       });
     track("Button Click", {
       button: "Create Destination",
-      page: "Add Destination"
+      page: "Add Destination",
     });
   }
 };
@@ -1312,7 +1354,11 @@ const filterActions = (val: string, update: any) => {
 
   &.selected {
     border-color: var(--q-primary);
-    background: linear-gradient(135deg, var(--q-primary) 0%, color-mix(in srgb, var(--q-primary) 85%, black) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--q-primary) 0%,
+      color-mix(in srgb, var(--q-primary) 85%, black) 100%
+    );
     color: white;
     box-shadow: 0 4px 16px rgba(89, 96, 178, 0.3);
 

@@ -146,18 +146,20 @@ describe("ColorPaletteDropDown", () => {
             `,
             props: ["caption"],
           },
-          "q-btn-toggle": {
+          "OToggleGroup": {
             template: `
-              <div class="q-btn-toggle" 
-                   :model-value="modelValue" 
+              <div class="o-toggle-group"
+                   :model-value="modelValue"
                    data-test="series-by-toggle">
-                <button v-for="opt in options" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </button>
+                <slot />
               </div>
             `,
-            props: ["modelValue", "options", "push", "toggleColor", "size"],
-            emits: ["update:model-value"],
+            props: ["modelValue", "variant"],
+            emits: ["update:modelValue"],
+          },
+          "OToggleGroupItem": {
+            template: `<button :value="value"><slot /></button>`,
+            props: ["value", "size", "disabled"],
           },
         },
       },

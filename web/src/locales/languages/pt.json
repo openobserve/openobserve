@@ -123,7 +123,11 @@
     "version": "Versão",
     "create": "Criar",
     "resources": "Recursos",
-    "updated_at": "Atualizado em"
+    "updated_at": "Atualizado em",
+    "error": "Erro",
+    "db": "Banco de dados",
+    "discardChanges": "Descartar alterações",
+    "unsavedChanges": "Alterações não salvas"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -390,7 +394,8 @@
     "autoRunEnabled": "Execução automática ativada",
     "selectStreamFirst": "Selecione um stream primeiro",
     "traces": "Traços",
-    "switchToLogs": "clique para voltar para Logs"
+    "switchToLogs": "clique para voltar para Logs",
+    "patternNoValuesAvailable": "Não há valores disponíveis"
   },
   "menu": {
     "home": "Início",
@@ -2237,6 +2242,8 @@
     "editJson": "Editar alerta JSON",
     "additional_settings": "Configurações adicionais",
     "alertNamePlaceholder": "Nome do alerta",
+    "nameRequired": "O nome do alerta é obrigatório.",
+    "nameNoSpecialChars": "O nome do alerta não pode conter ':', '#', '?', '&', '%', aspas ou espaços. Use sublinhados (_) em vez disso.",
     "anomalyNamePlaceholder": "Nome da anomalia",
     "folder": "Pasta",
     "selectStreamTypeFirst": "Selecione primeiro um tipo de stream",
@@ -2283,7 +2290,8 @@
       "addNewDestination": "Adicionar novo destino",
       "destinationRequired": "É necessário pelo menos um destino!",
       "disabledNotificationsInfo": "A detecção de anomalias ainda será executada e gravará os resultados no fluxo _anomalies. Ative as notificações para receber alertas quando forem detectadas anomalias."
-    }
+    },
+    "anomalyName": "Nome da anomalia"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2912,7 +2920,21 @@
       "minutesAgo": "{n} m atrás",
       "hoursAgo": "{n} h atrás",
       "daysAgo": "{n} d atrás"
-    }
+    },
+    "noErrorPresent": "Nenhum erro presente neste período",
+    "httpStatusCode": "Código de status HTTP",
+    "grpcStatusCode": "Código de status gRPC",
+    "dbResponseStatusCode": "Código de status de resposta do banco de dados",
+    "processExitCode": "Código de saída do processo",
+    "exceptionsWithCount": "Exceções ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Mensagem:",
+    "escapedLabel": "Escapou:",
+    "stacktraceLabel": "Stacktrace:",
+    "copyStacktrace": "Copiar stacktrace",
+    "noStacktraceAvailable": "Nenhum stacktrace disponível",
+    "stacktraceCopied": "Stacktrace copiado para a área de transferência",
+    "stacktraceCopyFailed": "Falha ao copiar o stacktrace"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3314,7 +3336,9 @@
     "noMetricsDescription": "Nenhuma métrica encontrada para essa correlação no intervalo de tempo selecionado.",
     "errorRetrievingTraces": "Ocorreu um erro ao recuperar os traços.",
     "serviceGroupProtected": "O grupo de serviços não pode ser removido. Você só pode modificar os campos mapeados.",
-    "noDataFound": "Nenhum dado encontrado"
+    "noDataFound": "Nenhum dado encontrado",
+    "isWorkloadType": "Identificador de serviço",
+    "isWorkloadTypeTooltip": "Quando ativado, esse grupo é usado para identificar exclusivamente um serviço (por exemplo, cluster, namespace, implantação). Desative para grupos que descrevem operações por meio de um serviço, como método HTTP ou nome do banco de dados."
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

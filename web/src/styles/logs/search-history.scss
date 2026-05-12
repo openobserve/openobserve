@@ -42,6 +42,10 @@
   color: #f5a623;
   border: 1px solid #f5a623;
 }
+
+:deep(.date-time-button) {
+  height: 36px !important;
+}
 .expanded-sql {
   border-left: #7a54a2 3px solid;
 }

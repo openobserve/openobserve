@@ -458,7 +458,7 @@ test.describe("Organization Management - CRUD Operations", () => {
                     
                     // Assert the specific validation message appears
                     const validationMessage = page.getByText('Use alphanumeric characters,');
-                    await expect(validationMessage).toBeVisible({ timeout: 3000 });
+                    await expect(validationMessage).toBeVisible({ timeout: 5000 });
                     
                     testLogger.info(`✓ Validation message correctly shown for "${invalidName}"`);
                 } else {

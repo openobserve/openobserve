@@ -39,21 +39,10 @@ if (!process.env.INGESTION_URL || process.env.INGESTION_URL.includes('localhost'
   testLogger.info(`INGESTION_URL set to ZO_BASE_URL: ${process.env.ZO_BASE_URL}`);
 }
 
-// Override ORGNAME with the correct org identifier from cloud-config.json
-// (written by global-setup-alpha1.js after Dex login)
-const fs = require('fs');
-const cloudConfigFile = path.join(__dirname, 'playwright-tests/utils/auth/cloud-config.json');
-try {
-  if (fs.existsSync(cloudConfigFile)) {
-    const cloudConfig = JSON.parse(fs.readFileSync(cloudConfigFile, 'utf-8'));
-    if (cloudConfig.orgIdentifier) {
-      process.env.ORGNAME = cloudConfig.orgIdentifier;
-      testLogger.info(`ORGNAME overridden from cloud-config: ${cloudConfig.orgIdentifier}`);
-    }
-  }
-} catch (e) {
-  testLogger.debug('cloud-config.json not yet available (will be created by global setup)');
-}
+// ORGNAME comes from .env. global-setup-alpha1.js performs a UI org-switch
+// post-login so the Pinia store binds API calls to this org, and writes
+// cloud-config.json with the matching passcode for ingestion.
+testLogger.info(`ORGNAME from .env: ${process.env.ORGNAME}`);
 
 /**
  * Alpha1 Cloud Playwright Configuration

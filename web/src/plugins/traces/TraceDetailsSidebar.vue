@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -24,17 +24,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :title="span.operation_name"
         :style="{ width: 'calc(100% - 24px)' }"
-        class="q-pb-none ellipsis flex items-center"
+        class="q-pb-none tw:pl-[0.25rem] ellipsis flex items-center"
         data-test="trace-details-sidebar-header-operation-name"
       >
+        <!-- Status Code Badge -->
+        <span
+          v-if="hasSpanError"
+          class="tw:inline-flex tw:items-center"
+          data-test="trace-details-sidebar-header-toolbar-status-code"
+        >
+          <q-icon
+            name="error"
+            size="1rem"
+            class="q-mr-xs tw:text-[var(--o2-status-error-text)]!"
+          />
+        </span>
         <!-- Observation Type Badge (for LLM spans) -->
         <q-badge
           v-if="isLLMSpan"
           :label="
-            span.llm_observation_type?.charAt(0) +
-            span.llm_observation_type?.slice(1).toLowerCase()
+            span.gen_ai_operation_name?.charAt(0) +
+            span.gen_ai_operation_name?.slice(1).toLowerCase()
           "
-          :color="getObservationTypeColor(span.llm_observation_type)"
+          :color="getObservationTypeColor(span.gen_ai_operation_name)"
           class="q-mr-xs observation-type-badge"
           data-test="trace-details-sidebar-observation-badge"
         />
@@ -42,14 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="ellipsis">{{ span.operation_name }}</span>
       </div>
 
-      <q-btn
-        dense
-        icon="cancel"
-        class="align-right no-border q-pa-xs"
-        size="xs"
+      <OButton
+        variant="ghost"
+        size="icon"
         @click="closeSidebar"
         data-test="trace-details-sidebar-header-close-btn"
-      ></q-btn>
+      >
+        <q-icon name="cancel" size="14px" />
+      </OButton>
     </div>
     <div
       class="trace-details-toolbar-container"
@@ -92,7 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <q-icon name="schedule" size="12px" class="q-mr-xs" />
+            <q-icon name="schedule"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
           </q-chip>
@@ -106,7 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <q-icon name="speed" size="12px" class="q-mr-xs" />
+            <q-icon name="speed"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
           </q-chip>
@@ -119,9 +135,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <q-icon name="access_time" size="12px" class="q-mr-xs" />
+            <q-icon name="access_time"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
+          </q-chip>
+
+          <!-- Resend Count Badge -->
+          <q-chip
+            v-if="spanHttpResendCount"
+            dense
+            square
+            class="toolbar-chip resend-chip"
+            :title="`Request resent ${spanHttpResendCount} time(s)`"
+            data-test="trace-details-sidebar-header-toolbar-resend-count"
+          >
+            <q-icon name="replay"
+size="12px"
+class="q-mr-xs" />
+            <span class="chip-label">Resends</span>
+            <span class="chip-value">{{ spanHttpResendCount }}</span>
           </q-chip>
         </div>
 
@@ -136,7 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <q-icon name="tag" size="12px" class="q-mr-xs" />
+            <q-icon name="tag"
+size="12px"
+class="q-mr-xs" />
             <span class="chip-value">{{ span.span_id }}</span>
             <q-icon
               name="content_copy"
@@ -147,25 +183,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-chip>
 
           <!-- View Logs Button -->
-          <q-btn
-            v-if="parentMode === 'standalone'"
-            class="view-logs-btn o2-secondary-button"
-            dense
-            unelevated
-            no-caps
-            size="sm"
-            :title="t('traces.viewLogs')"
-            @click.stop="viewSpanLogs"
-            data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
-          >
-            View Logs
-          </q-btn>
+          <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
+            <OButton
+              variant="outline"
+             size="xs"
+                  class="tw:h-full tw:text-[0.75rem]!"
+:title="t('traces.viewLogs')"
+              @click.stop="viewSpanLogs"
+              data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+            >
+              View Logs
+            </OButton>
+          </span>
         </div>
       </div>
 
       <!-- Row 2: LLM Metrics (conditional) -->
       <div
-        v-if="isLLMSpan && llmMetrics && span.llm_model_name"
+        v-if="isLLMSpan && llmMetrics && span.gen_ai_response_model"
         class="flex items-center justify-between q-pa-xs llm-metrics-row"
         style="
           overflow-x: auto;
@@ -180,9 +215,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             square
             class="llm-chip model-chip"
             icon="psychology"
-            :title="span.llm_model_name"
+            :title="span.gen_ai_response_model"
           >
-            <span class="chip-value text-bold">{{ span.llm_model_name }}</span>
+            <span class="chip-value text-bold">{{ span.gen_ai_response_model }}</span>
           </q-chip>
 
           <!-- Token Usage Group -->
@@ -194,7 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <q-icon name="arrow_upward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_upward"
+size="10px"
+class="q-mr-xs" />
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </q-chip>
@@ -206,7 +243,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <q-icon name="arrow_downward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_downward"
+size="10px"
+class="q-mr-xs" />
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </q-chip>
@@ -229,733 +268,647 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center">
           <!-- Provider Badge -->
           <q-badge
-            v-if="span.llm_provider_name"
-            :label="span.llm_provider_name"
+            v-if="span.gen_ai_provider_name"
+            :label="span.gen_ai_provider_name"
             class="provider-badge"
           />
         </div>
       </div>
     </div>
 
-    <q-tabs
-      v-model="activeTab"
-      dense
-      inline-label
-      align="left"
-      class="text-bold q-mx-sm span_details_tabs"
-      data-test="trace-details-sidebar-tabs"
-    >
-      <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
-      <q-tab
-        v-if="isLLMSpan"
-        name="preview"
-        label="Preview"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-preview"
-      />
-
-      <q-tab
-        name="attributes"
-        :label="t('common.attributes')"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-attributes"
-      />
-      <q-tab
-        name="events"
-        :label="t('common.events')"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-events"
-      />
-      <q-tab
-        name="exceptions"
-        :label="t('common.exceptions')"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-exceptions"
-      />
-      <q-tab
-        name="links"
-        :label="t('common.links')"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-links"
-      />
-      <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
-      <q-tab
-        v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-        name="correlated-logs"
-        :label="t('correlation.correlatedLogs')"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-correlated-logs"
-      />
-      <q-tab
-        v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-        name="correlated-metrics"
-        :label="t('correlation.correlatedMetrics')"
-        style="text-transform: capitalize"
-        data-test="trace-details-sidebar-tabs-correlated-metrics"
-      />
-    </q-tabs>
-    <q-separator style="width: 100%" />
-    <q-tab-panels v-model="activeTab" class="span_details_tab-panels tw:grow">
-      <!-- LLM Preview Tab Panel -->
-      <q-tab-panel
-        v-if="isLLMSpan"
-        name="preview"
-        class="llm-preview-panel q-pa-md"
+    <div class="text-bold q-mx-sm span_details_tabs ">
+      <OTabs
+        v-model="activeTab"
+        dense
+        align="left"
+        data-test="trace-details-sidebar-tabs"
       >
-        <div class="llm-preview-container tw:overflow-x-auto tw:w-full">
-          <!-- Input and Output Side by Side -->
-          <div
-            class="flex io-container tw:w-full!"
-            :class="{ 'io-container-dark': isDarkMode }"
-            ref="ioContainerRef"
-          >
-            <!-- Input Section -->
-            <div class="col-6 io-section">
-              <div
-                class="section-label text-bold q-mb-xs flex items-center justify-between"
-              >
-                <div>Input</div>
-                <div class="flex items-center gap-xs">
-                  <q-btn
-                    outline
-                    class="q-px-sm q-ml-sm"
-                    size="sm"
-                    no-caps
-                    :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-                    :title="
-                      isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
-                    "
-                    @click="toggleFullscreen"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    icon="content_copy"
-                    title="Copy input"
-                    @click="copyContent(span.llm_input, 'input')"
-                    :disable="!hasContent(span.llm_input)"
-                  />
-                </div>
-              </div>
-              <div class="llm-content-box">
-                <div v-if="!hasContent(span.llm_input)" class="no-data-message">
-                  No data available
-                </div>
-                <LLMContentRenderer
-                  v-else
-                  :content="span.llm_input"
-                  :observation-type="span.llm_observation_type"
-                  content-type="input"
-                  :span="span"
-                  view-mode="formatted"
-                  :instance-id="`${span.span_id}-input`"
-                />
-              </div>
-            </div>
+        <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
+        <OTab
+          v-if="isLLMSpan"
+          name="preview"
+          label="Preview"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-preview"
+                    class="tw:font-normal!"
 
-            <!-- Output Section -->
-            <div class="col-6 io-section">
-              <div
-                class="section-label text-bold q-mb-xs flex items-center justify-between"
-              >
-                <div>Output</div>
-                <div class="flex items-center gap-xs">
-                  <q-btn
-                    outline
-                    class="q-px-sm q-ml-sm"
-                    size="sm"
-                    no-caps
-                    :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-                    :title="
-                      isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
-                    "
-                    @click="toggleFullscreen"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    icon="content_copy"
-                    title="Copy output"
-                    @click="copyContent(span.llm_output, 'output')"
-                    :disable="!hasContent(span.llm_output)"
-                  />
-                </div>
-              </div>
-              <div class="llm-content-box">
-                <div
-                  v-if="!hasContent(span.llm_output)"
-                  class="no-data-message"
-                >
-                  No data available
-                </div>
-                <LLMContentRenderer
-                  v-else
-                  :content="span.llm_output"
-                  :observation-type="span.llm_observation_type"
-                  content-type="output"
-                  :span="span"
-                  view-mode="formatted"
-                  :instance-id="`${span.span_id}-output`"
-                />
-              </div>
-            </div>
-          </div>
+        />
 
-          <!-- Model Parameters (collapsible) -->
-          <q-expansion-item
-            v-if="span.llm_model_parameters"
-            label="Model Parameters"
-            class="q-mt-md"
-          >
-            <pre class="model-params-json q-pa-sm">{{
-              formatModelParams(span.llm_model_parameters)
-            }}</pre>
-          </q-expansion-item>
-        </div>
-      </q-tab-panel>
+        <OTab
+          name="attributes"
+          :label="t('common.attributes')"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-attributes"
+          class="tw:font-normal!"
+        />
+        <OTab
+          name="error"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-error"
+                    class="tw:font-normal!"
 
-      <q-tab-panel
-        name="attributes"
-        class="q-pa-none tw:flex tw:flex-col tw:overflow-hidden"
-      >
-        <!-- View mode toggle toolbar -->
-        <div class="tw:flex tw:items-center tw:justify-start tw:pb-[0.3rem]">
-          <q-btn-toggle
-            v-model="attributesViewMode"
-            no-caps
-            toggle-color="primary"
-            text-color="primary"
-            bordered
-            class="tw:rounded!"
-            :options="[
-              {
-                value: 'json',
-                label: 'JSON',
-                attrs: {
-                  class:
-                    'tw:px-[0.5rem]! tw:py-[0.1rem]! tw:min-h-auto! tw:text-[0.7rem]! tw:tracking-[0.03rem]',
-                },
-              },
-              {
-                value: 'table',
-                label: 'Table',
-                attrs: {
-                  class:
-                    'tw:px-[0.5rem]! tw:min-h-auto! tw:py-[0.1rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]',
-                },
-              },
-            ]"
-          />
-        </div>
-        <!-- JSON View -->
-        <div
-          v-if="attributesViewMode === 'json'"
-          class="tw:grow tw:overflow-auto"
         >
-          <json-preview
-            :value="attributesForDisplay"
-            :highlight-query="searchQuery"
-            data-test="trace-details-sidebar-attributes-table"
-          >
-            <template #field-dropdown="{ field, value: fieldValue }">
-              <q-item
-                v-for="action in filterActions"
-                :key="action.operator"
-                clickable
-                v-close-popup
-                @click.stop="
-                  $emit('apply-filter-immediately', {
-                    field,
-                    value: getFilterValue(field, fieldValue),
-                    operator: action.operator,
-                  })
-                "
-              >
-                <q-item-section>
-                  <q-item-label>
-                    <q-btn
-                      size="0.375rem"
-                      round
-                      class="tw:mr-[0.25rem]! pointer"
+          {{ t('common.error') }}
+          <q-badge
+            v-if="hasExceptionEvents.length"
+            class="tw:font-normal! q-ml-xs tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]!"
+            :label="hasExceptionEvents.length"
+            data-test="trace-details-sidebar-tabs-error-count"
+          />
+        </OTab>
+        <OTab
+          v-if="hasDbSpan"
+          name="database"
+          :label="t('common.db')"
+          style="text-transform: capitalize"
+          class="tw:font-normal!"
+          data-test="trace-details-sidebar-tabs-database"
+        />
+        <OTab
+          name="events"
+          :label="t('common.events')"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-events"
+                    class="tw:font-normal!"
+
+        />
+        <OTab
+          name="links"
+          :label="t('common.links')"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-links"
+          class="tw:font-normal!"
+
+        />
+        <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+        <OTab
+          v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+          name="correlated-logs"
+          :label="t('correlation.correlatedLogs')"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-correlated-logs"
+          class="tw:font-normal!"
+
+        />
+        <OTab
+          v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+          name="correlated-metrics"
+          :label="t('correlation.correlatedMetrics')"
+          style="text-transform: capitalize"
+          data-test="trace-details-sidebar-tabs-correlated-metrics"
+          class="tw:font-normal!"
+        />
+      </OTabs>
+    </div>
+    <q-separator style="width: 100%" />
+    <div class="span_details_tab-panels  tw:p-2">
+      <OTabPanels v-model="activeTab"
+grow
+class="tw:h-full tw:overflow-y-auto">
+        <!-- LLM Preview Tab Panel -->
+        <OTabPanel
+          v-if="isLLMSpan"
+          name="preview"
+          class="llm-preview-panel q-pa-md"
+        >
+          <div class="llm-preview-container tw:overflow-x-auto tw:w-full">
+            <!-- Input and Output Side by Side -->
+            <div
+              class="flex io-container tw:w-full!"
+              :class="{ 'io-container-dark': isDarkMode }"
+              ref="ioContainerRef"
+            >
+              <!-- Input Section -->
+              <div class="col-6 io-section">
+                <div
+                  class="section-label text-bold q-mb-xs flex items-center justify-between"
+                >
+                  <div>Input</div>
+                  <div class="flex items-center gap-xs">
+                    <OButton
+                      variant="outline"
+                      size="icon"
+                      :title="
+                        isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+                      "
+                      @click="toggleFullscreen"
                     >
                       <q-icon
-                        color="currentColor"
-                        class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
-                      >
-                        <component :is="action.iconComponent" />
-                      </q-icon>
-                    </q-btn>
-                    <span class="tw:text-[0.85rem]!">{{
-                      $t("traces.applyAndSearch")
-                    }}</span>
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-          </json-preview>
-        </div>
-        <!-- Table View -->
-        <div
-          v-else
-          class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)]"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
-          data-test="trace-details-sidebar-attributes-tenstack-table"
-        >
-          <TenstackTable
-            :rows="attributesTableRows"
-            :columns="attributesTableColumns"
-            :enable-row-expand="false"
-            :enable-text-highlight="false"
-            :enable-status-bar="false"
-            :default-columns="false"
-            :enable-column-reorder="false"
-            :row-height="28"
-            :enable-ai-context-button="false"
-          >
-            <template #cell-value="{ item }">
-              <AttributeValueCell :field="item.field" :value="item.value">
-                <template #dropdown="{ field, value: fieldValue }">
-                  <q-item
-                    v-for="action in filterActions"
-                    :key="action.operator"
-                    clickable
-                    v-close-popup
-                    @click.stop="
-                      $emit('apply-filter-immediately', {
-                        field,
-                        value: getFilterValue(field, fieldValue),
-                        operator: action.operator,
-                      })
-                    "
+                        :name="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+                        size="14px"
+                      />
+                    </OButton>
+                    <OButton
+                      variant="ghost"
+                      size="icon"
+                      title="Copy input"
+                      @click="copyContent(span.gen_ai_input_messages, 'input')"
+                      :disabled="!hasContent(span.gen_ai_input_messages)"
+                    >
+                      <q-icon name="content_copy" size="14px" />
+                    </OButton>
+                  </div>
+                </div>
+                <div class="llm-content-box">
+                  <!-- System Instructions (when available) -->
+                  <div v-if="parsedSystemInstructions" class="tw:mb-3">
+                    <q-expansion-item
+                      icon="settings"
+                      label="System Instructions"
+                      header-class="tw:text-xs tw:font-medium"
+                    >
+                      <div class="tw:p-2 tw:bg-[var(--o2-code-bg)]">
+                        <LLMContentRenderer
+                          :content="JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])"
+                          :observation-type="span.gen_ai_operation_name"
+                          content-type="input"
+                          view-mode="formatted"
+                        />
+                      </div>
+                    </q-expansion-item>
+                  </div>
+                  <div
+                    v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
+                    class="no-data-message"
                   >
-                    <q-item-section>
-                      <q-item-label>
-                        <q-btn
-                          size="0.375rem"
-                          round
-                          class="tw:mr-[0.25rem]! pointer"
-                        >
+                    No data available
+                  </div>
+                  <LLMContentRenderer
+                    v-if="hasContent(span.gen_ai_input_messages)"
+                    :content="span.gen_ai_input_messages"
+                    :observation-type="span.gen_ai_operation_name"
+                    content-type="input"
+                    :span="span"
+                    view-mode="formatted"
+                    :instance-id="`${span.span_id}-input`"
+                  />
+                </div>
+              </div>
+
+              <!-- Output Section -->
+              <div class="col-6 io-section">
+                <div
+                  class="section-label text-bold q-mb-xs flex items-center justify-between"
+                >
+                  <div>Output</div>
+                  <div class="flex items-center gap-xs">
+                    <OButton
+                      variant="outline"
+                      size="icon"
+                      :title="
+                        isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+                      "
+                      @click="toggleFullscreen"
+                    >
+                      <q-icon
+                        :name="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+                        size="14px"
+                      />
+                    </OButton>
+                    <OButton
+                      variant="ghost"
+                      size="icon"
+                      title="Copy output"
+                      @click="copyContent(span.gen_ai_output_messages, 'output')"
+                      :disabled="!hasContent(span.gen_ai_output_messages)"
+                    >
+                      <q-icon name="content_copy" size="14px" />
+                    </OButton>
+                  </div>
+                </div>
+                <div class="llm-content-box">
+                  <div
+                    v-if="!hasContent(span.gen_ai_output_messages)"
+                    class="no-data-message"
+                  >
+                    No data available
+                  </div>
+                  <LLMContentRenderer
+                    v-else
+                    :content="span.gen_ai_output_messages"
+                    :observation-type="span.gen_ai_operation_name"
+                    content-type="output"
+                    :span="span"
+                    view-mode="formatted"
+                    :instance-id="`${span.span_id}-output`"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Model Parameters (collapsible) -->
+            <q-expansion-item
+              v-if="span.llm_request_parameters"
+              label="Model Parameters"
+              class="q-mt-md"
+            >
+              <pre class="model-params-json q-pa-sm">{{
+                formatModelParams(span.llm_request_parameters)
+              }}</pre>
+            </q-expansion-item>
+          </div>
+        </OTabPanel>
+
+        <OTabPanel
+          name="attributes"
+          class="q-pa-none tw:flex tw:flex-col tw:overflow-hidden"
+        >
+          <!-- View mode toggle toolbar -->
+          <div class="tw:flex tw:items-center tw:justify-start tw:pb-1.5! tw:h-fit!">
+            <OToggleGroup v-model="attributesViewMode" class="tw:rounded!">
+              <OToggleGroupItem value="json"
+size="xs"
+class="tw:h-5! tw:text-[0.75rem]!">
+                <template #icon-left
+                  ><Braces class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                JSON
+              </OToggleGroupItem>
+              <OToggleGroupItem value="table"
+size="xs"
+class="tw:h-5! tw:text-[0.75rem]!">
+                <template #icon-left
+                  ><Table2 class="tw:size-3.5 tw:shrink-0"
+                /></template>
+                Table
+              </OToggleGroupItem>
+            </OToggleGroup>
+          </div>
+          <!-- JSON View -->
+          <div
+            v-if="attributesViewMode === 'json'"
+            class="tw:grow tw:overflow-auto"
+          >
+            <json-preview
+              :value="attributesForDisplay"
+              :highlight-query="searchQuery"
+              data-test="trace-details-sidebar-attributes-table"
+            >
+              <template #field-dropdown="{ field, value: fieldValue }">
+                <q-item
+                  v-for="action in filterActions"
+                  :key="action.operator"
+                  clickable
+                  v-close-popup
+                  @click.stop="
+                    $emit('apply-filter-immediately', {
+                      field,
+                      value: getFilterValue(field, fieldValue),
+                      operator: action.operator,
+                    })
+                  "
+                >
+                  <q-item-section>
+                    <q-item-label>
+                      <span class="tw:mr-1 tw:inline-flex">
+                        <OButton variant="ghost" size="icon-xs-circle">
                           <q-icon
                             color="currentColor"
                             class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
                           >
                             <component :is="action.iconComponent" />
                           </q-icon>
-                        </q-btn>
-                        <span class="tw:text-[0.85rem]!">{{
-                          $t("traces.applyAndSearch")
-                        }}</span>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </AttributeValueCell>
-            </template>
-          </TenstackTable>
-        </div>
-      </q-tab-panel>
-      <q-tab-panel
-        name="events"
-        class="tw:p-0 tw:flex tw:flex-col tw:h-[30.6rem]!"
-      >
-        <template v-if="spanDetails.events.length">
-          <!-- Wrap toggle toolbar -->
-          <div class="tw:flex tw:items-center tw:gap-2 tw:pb-[0.325rem]">
-            <q-toggle
-              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:py-0!"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
-              v-model="eventsWrap"
-              label="Wrap"
-            />
+                        </OButton>
+                      </span>
+                      <span class="tw:text-[0.85rem]!">{{
+                        $t("traces.applyAndSearch")
+                      }}</span>
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+              </template>
+            </json-preview>
           </div>
-          <!-- TenstackTable for events -->
+          <!-- Table View -->
           <div
-            class="tw:flex-1 traces-events-table-container tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
+            v-else
+            class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="
-              isLLMSpan && llmMetrics && span.llm_model_name
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? 'tab-content-with-llm-metrics'
                 : 'tab-content-without-llm-metrics'
             "
-            data-test="trace-details-sidebar-events-table"
+            data-test="trace-details-sidebar-attributes-tenstack-table"
           >
             <TenstackTable
-              :rows="spanDetails.events"
-              :columns="eventsTableColumns"
-              :wrap="eventsWrap"
-              :enable-row-expand="true"
+              :rows="attributesTableRows"
+              :columns="attributesTableColumns"
+              :enable-row-expand="false"
               :enable-text-highlight="false"
               :enable-status-bar="false"
               :default-columns="false"
+              :enable-column-reorder="false"
               :row-height="28"
               :enable-ai-context-button="false"
-              :hide-view-related-button="true"
-              :hide-expand-field-options="true"
-              @copy="copyContentToClipboard"
-              @update:columnOrder="handleEventsColumnOrder"
-              @update:columnSizes="handleEventsColumnSizes"
             >
-              <template #expanded-row="{ row }">
-                <json-preview
-                  :value="row"
-                  class="tw:py-[0.375rem] tw:pl-[0.375rem]"
-                  copyButtonClass="tw:left-[0.25rem]! tw:w-fit! tw:sticky!"
-                  mode="expanded"
-                />
+              <template #cell-value="{ item }">
+                <AttributeValueCell :field="item.field" :value="item.value">
+                  <template #dropdown="{ field, value: fieldValue }">
+                    <q-item
+                      v-for="action in filterActions"
+                      :key="action.operator"
+                      clickable
+                      v-close-popup
+                      @click.stop="
+                        $emit('apply-filter-immediately', {
+                          field,
+                          value: getFilterValue(field, fieldValue),
+                          operator: action.operator,
+                        })
+                      "
+                    >
+                      <q-item-section>
+                        <q-item-label>
+                          <span class="tw:mr-1 tw:inline-flex">
+                            <OButton variant="ghost" size="icon-xs-circle">
+                              <q-icon
+                                color="currentColor"
+                                class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                              >
+                                <component :is="action.iconComponent" />
+                              </q-icon>
+                            </OButton>
+                          </span>
+                          <span class="tw:text-[0.85rem]!">{{
+                            $t("traces.applyAndSearch")
+                          }}</span>
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </template>
+                </AttributeValueCell>
               </template>
             </TenstackTable>
           </div>
-        </template>
-        <div
-          v-else
-          class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-dynamic-height"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
-          data-test="trace-details-sidebar-no-events"
+        </OTabPanel>
+        <OTabPanel
+          name="events"
+          class="tw:p-0 tw:flex tw:flex-col tw:h-[30.6rem]!"
         >
-          No events present for this span
-        </div>
-      </q-tab-panel>
-      <q-tab-panel name="exceptions">
-        <q-table
-          v-if="getExceptionEvents.length"
-          ref="qTable"
-          data-test="trace-details-sidebar-exceptions-table"
-          :rows="getExceptionEvents"
-          :columns="exceptionEventColumns"
-          row-key="name"
-          :rows-per-page-options="[0]"
-          class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
-          dense
-        >
-          <template v-slot:body="props">
-            <q-tr
-              :data-test="`trace-event-detail-${
-                props.row[store.state.zoConfig.timestamp_column]
-              }`"
-              :key="props.key"
-              @click="expandEvent(props.rowIndex)"
-              style="cursor: pointer"
-              class="pointer"
+          <template v-if="spanDetails.events.length">
+            <!-- Wrap toggle toolbar -->
+            <div class="tw:flex tw:items-center tw:gap-2 tw:pb-[0.325rem]">
+              <q-toggle
+                class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:py-0!"
+                size="xs"
+                flat
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-toggle-button-xs-dark'
+                    : 'o2-toggle-button-xs-light'
+                "
+                v-model="eventsWrap"
+                label="Wrap"
+              />
+            </div>
+            <!-- TenstackTable for events -->
+            <div
+              class="tw:flex-1 traces-events-table-container tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
+              :class="
+                isLLMSpan && llmMetrics && span.gen_ai_response_model
+                  ? 'tab-content-with-llm-metrics'
+                  : 'tab-content-without-llm-metrics'
+              "
+              data-test="trace-details-sidebar-events-table"
             >
-              <q-td
-                v-for="column in exceptionEventColumns"
-                :key="props.rowIndex + '-' + column.name"
-                class="field_list text-left"
-                style="cursor: pointer"
+              <TenstackTable
+                :rows="spanDetails.events"
+                :columns="eventsTableColumns"
+                :wrap="eventsWrap"
+                :enable-row-expand="true"
+                :enable-text-highlight="false"
+                :enable-status-bar="false"
+                :default-columns="false"
+                :row-height="28"
+                :enable-ai-context-button="false"
+                :hide-view-related-button="true"
+                :hide-expand-field-options="true"
+                @copy="copyContentToClipboard"
+                @update:columnOrder="handleEventsColumnOrder"
+                @update:columnSizes="handleEventsColumnSizes"
               >
-                <div class="flex row items-center no-wrap">
-                  <q-btn
-                    v-if="column.name === '@timestamp'"
-                    :icon="
-                      expandedEvents[props.rowIndex.toString()]
-                        ? 'expand_more'
-                        : 'chevron_right'
-                    "
-                    dense
-                    size="xs"
-                    flat
-                    class="q-mr-xs"
-                    @click.stop="expandEvent(props.rowIndex)"
-                    :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
-                  ></q-btn>
-                  <span
-                    v-if="column.name !== '@timestamp'"
-                    v-html="
-                      highlightTextMatch(column.prop(props.row), searchQuery)
-                    "
+                <template #expanded-row="{ row }">
+                  <json-preview
+                    :value="row"
+                    class="tw:py-[0.375rem] tw:pl-[0.375rem]"
+                    copyButtonClass="tw:left-[0.25rem]! tw:w-fit! tw:sticky!"
+                    mode="expanded"
                   />
-                  <span v-else> {{ column.prop(props.row) }}</span>
-                </div>
-              </q-td>
-            </q-tr>
-            <q-tr
-              v-if="expandedEvents[props.rowIndex.toString()]"
-              :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${props.rowIndex}`"
-            >
-              <q-td colspan="2" class="exception-details-container">
-                <div class="exception-content">
-                  <!-- Exception Type -->
-                  <div class="exception-field">
-                    <span class="exception-label">Type:</span>
-                    <span class="exception-type">{{
-                      props.row["exception.type"]
-                    }}</span>
-                  </div>
-
-                  <!-- Exception Message -->
-                  <div class="exception-field">
-                    <span class="exception-label">Message:</span>
-                    <div class="exception-message">
-                      {{
-                        formatExceptionMessage(props.row["exception.message"])
-                      }}
-                    </div>
-                  </div>
-
-                  <!-- Escaped -->
-                  <div class="exception-field">
-                    <span class="exception-label">Escaped:</span>
-                    <span class="exception-value">{{
-                      props.row["exception.escaped"]
-                    }}</span>
-                  </div>
-
-                  <!-- Stacktrace -->
-                  <div class="exception-field">
-                    <div class="stacktrace-header">
-                      <span class="exception-label">Stacktrace:</span>
-                      <q-btn
-                        v-if="
-                          props.row['exception.stacktrace'] &&
-                          props.row['exception.stacktrace'].trim()
-                        "
-                        flat
-                        dense
-                        size="xs"
-                        icon="content_copy"
-                        class="copy-btn"
-                        @click.stop="
-                          copyStackTrace(props.row['exception.stacktrace'])
-                        "
-                        title="Copy stacktrace"
-                      >
-                        <q-tooltip>Copy stacktrace</q-tooltip>
-                      </q-btn>
-                    </div>
-                    <div
-                      v-if="
-                        props.row['exception.stacktrace'] &&
-                        props.row['exception.stacktrace'].trim()
-                      "
-                      class="stacktrace-container"
-                    >
-                      <pre
-                        class="stacktrace-content"
-                        v-html="
-                          DOMPurify.sanitize(
-                            formatStackTrace(props.row['exception.stacktrace']),
-                          )
-                        "
-                      ></pre>
-                    </div>
-                    <div v-else class="stacktrace-empty">
-                      <q-icon name="info" size="16px" class="q-mr-xs" />
-                      <span>No stacktrace available</span>
-                    </div>
-                  </div>
-                </div>
-              </q-td>
-            </q-tr>
+                </template>
+              </TenstackTable>
+            </div>
           </template>
-        </q-table>
-        <div
-          v-else
-          class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
-          data-test="trace-details-sidebar-no-exceptions"
-        >
-          No exceptions present for this span
-        </div>
-      </q-tab-panel>
-
-      <q-tab-panel name="links">
-        <div v-if="spanLinks.length">
-          <q-virtual-scroll
-            type="table"
-            ref="searchTableRef"
-            style="max-height: 20rem"
-            :items="spanLinks"
-            class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-            data-test="trace-details-sidebar-links-table"
+          <div
+            v-else
+            class="full-width text-center tw:flex tw:items-center tw:justify-center q-pt-lg text-bold tab-content-dynamic-height"
+            :class="
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
+                ? 'tab-content-with-llm-metrics'
+                : 'tab-content-without-llm-metrics'
+            "
+            data-test="trace-details-sidebar-no-events"
           >
-            <template v-slot:before>
-              <thead
-                class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table"
-              >
-                <tr>
-                  <th
-                    v-for="(col, index) in linkColumns"
-                    :key="'result_' + index"
-                    class="table-header"
-                    :data-test="`trace-events-table-th-${col.label}`"
-                  >
-                    {{ col.label }}
-                  </th>
-                </tr>
-              </thead>
-            </template>
+            No events present for this span
+          </div>
+        </OTabPanel>
+        <OTabPanel name="error" class="tw:h-full">
+          <TraceErrorTab
+            :span="span"
+            :search-query="searchQuery"
+            :show-llm-metrics="
+              !!(isLLMSpan && llmMetrics && span.gen_ai_response_model)
+            "
+            data-test="trace-details-sidebar-no-exceptions"
+          />
+        </OTabPanel>
 
-            <template v-slot="{ item: row, index }">
-              <tr
-                :data-test="`trace-event-detail-link-${index}`"
-                :key="'expand_' + index"
-                @click="openReferenceTrace('span', row)"
-                style="cursor: pointer"
-                class="pointer"
-              >
-                <td
-                  v-for="column in linkColumns"
-                  :key="index + '-' + column.name"
-                  class="field_list"
-                  style="cursor: pointer"
+        <OTabPanel name="database" class="tw:p-0 tw:h-full">
+          <DbSpanDetails :span="span" />
+        </OTabPanel>
+
+        <OTabPanel name="links">
+          <div v-if="spanLinks.length">
+            <q-virtual-scroll
+              type="table"
+              ref="searchTableRef"
+              style="max-height: 20rem"
+              :items="spanLinks"
+              class="trace-detail-tab-table tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+              data-test="trace-details-sidebar-links-table"
+            >
+              <template v-slot:before>
+                <thead
+                  class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table"
                 >
-                  <div class="flex row items-center no-wrap">
-                    {{ column.prop(row) }}
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </q-virtual-scroll>
-        </div>
-        <div
-          v-else
-          class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
-          data-test="trace-details-sidebar-no-links"
-        >
-          No links present for this span
-        </div>
-      </q-tab-panel>
+                  <tr>
+                    <th
+                      v-for="(col, index) in linkColumns"
+                      :key="'result_' + index"
+                      class="table-header"
+                      :data-test="`trace-events-table-th-${col.label}`"
+                    >
+                      {{ col.label }}
+                    </th>
+                  </tr>
+                </thead>
+              </template>
 
-      <!-- Correlated Logs Tab Panel -->
-      <q-tab-panel
-        name="correlated-logs"
-        class="q-pa-none full-height traces-correlated-logs-container"
-      >
-        <CorrelatedLogsTable
-          v-if="correlationProps"
-          :service-name="correlationProps.serviceName"
-          :matched-dimensions="correlationProps.matchedDimensions"
-          :additional-dimensions="correlationProps.additionalDimensions"
-          :log-streams="correlationProps.logStreams"
-          :source-stream="correlationProps.sourceStream"
-          :source-type="correlationProps.sourceType"
-          :available-dimensions="correlationProps.availableDimensions"
-          :fts-fields="correlationProps.ftsFields"
-          :time-range="correlationProps.timeRange"
-          :hide-view-related-button="true"
-          :hide-search-term-actions="false"
-          :hide-dimension-filters="true"
-          :hide-reset-filters-button="true"
-        />
-        <!-- Loading/Empty state when no data -->
-        <div
-          v-else
-          class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
+              <template v-slot="{ item: row, index }">
+                <tr
+                  :data-test="`trace-event-detail-link-${index}`"
+                  :key="'expand_' + index"
+                  @click="openReferenceTrace('span', row)"
+                  style="cursor: pointer"
+                  class="pointer"
+                >
+                  <td
+                    v-for="column in linkColumns"
+                    :key="index + '-' + column.name"
+                    class="field_list"
+                    style="cursor: pointer"
+                  >
+                    <div class="flex row items-center no-wrap">
+                      {{ column.prop(row) }}
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </q-virtual-scroll>
+          </div>
+          <div
+            v-else
+            class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height"
+            :class="
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
+                ? 'tab-content-with-llm-metrics'
+                : 'tab-content-without-llm-metrics'
+            "
+            data-test="trace-details-sidebar-no-links"
+          >
+            No links present for this span
+          </div>
+        </OTabPanel>
+
+        <!-- Correlated Logs Tab Panel -->
+        <OTabPanel
+          name="correlated-logs"
+          class="q-pa-none full-height traces-correlated-logs-container"
         >
-          <div class="tw:text-center">
-            <q-spinner-hourglass
-              v-if="correlationLoading"
-              color="primary"
-              size="3rem"
-              class="tw:mb-4"
-            />
-            <div
-              v-else-if="correlationError"
-              class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
-            >
-              {{ correlationError }}
-            </div>
-            <div v-else class="tw:text-base tw:text-gray-500">
-              {{ t("correlation.clickToLoadLogs") }}
+          <CorrelatedLogsTable
+            v-if="correlationProps"
+            :service-name="correlationProps.serviceName"
+            :matched-dimensions="correlationProps.matchedDimensions"
+            :additional-dimensions="correlationProps.additionalDimensions"
+            :log-streams="correlationProps.logStreams"
+            :source-stream="correlationProps.sourceStream"
+            :source-type="correlationProps.sourceType"
+            :available-dimensions="correlationProps.availableDimensions"
+            :fts-fields="correlationProps.ftsFields"
+            :time-range="correlationProps.timeRange"
+            :hide-view-related-button="true"
+            :hide-search-term-actions="false"
+            :hide-dimension-filters="true"
+            :hide-reset-filters-button="true"
+          />
+          <!-- Loading/Empty state when no data -->
+          <div
+            v-else
+            class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
+            :class="
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
+                ? 'tab-content-with-llm-metrics'
+                : 'tab-content-without-llm-metrics'
+            "
+          >
+            <div class="tw:text-center">
+              <q-spinner-hourglass
+                v-if="correlationLoading"
+                color="primary"
+                size="3rem"
+                class="tw:mb-4"
+              />
+              <div
+                v-else-if="correlationError"
+                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+              >
+                {{ correlationError }}
+              </div>
+              <div v-else class="tw:text-base tw:text-gray-500">
+                {{ t("correlation.clickToLoadLogs") }}
+              </div>
             </div>
           </div>
-        </div>
-      </q-tab-panel>
+        </OTabPanel>
 
-      <!-- Correlated Metrics Tab Panel -->
-      <q-tab-panel
-        name="correlated-metrics"
-        class="q-pa-none full-height traces-correlated-metrics-container"
-      >
-        <TelemetryCorrelationDashboard
-          v-if="correlationProps"
-          mode="embedded-tabs"
-          external-active-tab="metrics"
-          :service-name="correlationProps.serviceName"
-          :matched-dimensions="correlationProps.matchedDimensions"
-          :additional-dimensions="correlationProps.additionalDimensions"
-          :metric-streams="correlationProps.metricStreams"
-          :log-streams="correlationProps.logStreams"
-          :trace-streams="correlationProps.traceStreams"
-          :source-stream="correlationProps.sourceStream"
-          :source-type="correlationProps.sourceType"
-          :available-dimensions="correlationProps.availableDimensions"
-          :fts-fields="correlationProps.ftsFields"
-          :time-range="correlationProps.timeRange"
-          :hide-dimension-filters="true"
-          :metric-group-definitions="metricGroupResources"
-          :panelHeight="12"
-          :panelWidth="96"
-          @close="activeTab = 'attributes'"
-        />
-        <!-- Loading/Empty state when no data -->
-        <div
-          v-else
-          class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
-          :class="
-            isLLMSpan && llmMetrics && span.llm_model_name
-              ? 'tab-content-with-llm-metrics'
-              : 'tab-content-without-llm-metrics'
-          "
+        <!-- Correlated Metrics Tab Panel -->
+        <OTabPanel
+          name="correlated-metrics"
+          class="q-pa-none full-height traces-correlated-metrics-container"
         >
-          <div class="tw:text-center">
-            <q-spinner-hourglass
-              v-if="correlationLoading"
-              color="primary"
-              size="3rem"
-              class="tw:mb-4"
-            />
-            <div
-              v-else-if="correlationError"
-              class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
-            >
-              {{ correlationError }}
-            </div>
-            <div v-else class="tw:text-base tw:text-gray-500">
-              {{ t("correlation.clickToLoadMetrics") }}
+          <TelemetryCorrelationDashboard
+            v-if="correlationProps"
+            mode="embedded-tabs"
+            external-active-tab="metrics"
+            :service-name="correlationProps.serviceName"
+            :matched-dimensions="correlationProps.matchedDimensions"
+            :additional-dimensions="correlationProps.additionalDimensions"
+            :metric-streams="correlationProps.metricStreams"
+            :log-streams="correlationProps.logStreams"
+            :trace-streams="correlationProps.traceStreams"
+            :source-stream="correlationProps.sourceStream"
+            :source-type="correlationProps.sourceType"
+            :available-dimensions="correlationProps.availableDimensions"
+            :fts-fields="correlationProps.ftsFields"
+            :time-range="correlationProps.timeRange"
+            :hide-dimension-filters="true"
+            :metric-group-definitions="metricGroupResources"
+            :panelHeight="12"
+            :panelWidth="96"
+            @close="activeTab = 'attributes'"
+          />
+          <!-- Loading/Empty state when no data -->
+          <div
+            v-else
+            class="tw:flex tw:items-center tw:justify-center tw:py-20 tab-content-dynamic-height"
+            :class="
+              isLLMSpan && llmMetrics && span.gen_ai_response_model
+                ? 'tab-content-with-llm-metrics'
+                : 'tab-content-without-llm-metrics'
+            "
+          >
+            <div class="tw:text-center">
+              <q-spinner-hourglass
+                v-if="correlationLoading"
+                color="primary"
+                size="3rem"
+                class="tw:mb-4"
+              />
+              <div
+                v-else-if="correlationError"
+                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+              >
+                {{ correlationError }}
+              </div>
+              <div v-else class="tw:text-base tw:text-gray-500">
+                {{ t("correlation.clickToLoadMetrics") }}
+              </div>
             </div>
           </div>
-        </div>
-      </q-tab-panel>
-    </q-tab-panels>
+        </OTabPanel>
+      </OTabPanels>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Braces, Table2 } from "lucide-vue-next";
 import { cloneDeep } from "lodash-es";
 import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
@@ -997,6 +950,9 @@ import { escapeHtml } from "@/utils/html";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
+import useTraceDetails from "@/composables/traces/useTraceDetails";
+import DbSpanDetails from "./DbSpanDetails.vue";
+import TraceErrorTab from "./components/TraceErrorTab.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1025,8 +981,21 @@ export default defineComponent({
       type: String,
       default: "standalone",
     },
+    activeTab: {
+      type: String,
+      default: "attributes",
+    },
   },
   components: {
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
+    OToggleGroup,
+    OToggleGroupItem,
+    OButton,
+    Braces,
+    Table2,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -1039,6 +1008,8 @@ export default defineComponent({
     NotEqualIcon,
     AttributeValueCell,
     DeployedCode,
+    DbSpanDetails,
+    TraceErrorTab
   },
   emits: [
     "close",
@@ -1049,12 +1020,39 @@ export default defineComponent({
     "add-filter",
     "apply-filter-immediately",
     "add-field-to-table",
+    "update:activeTab",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
-    const activeTab = ref(isLLMSpan.value ? "preview" : "attributes");
+
+    const spanDetails: any = ref({
+      attrs: {},
+      events: [],
+    });
+
+    const { hasSpanError, hasExceptionEvents } = useTraceDetails(
+      computed(() => props.span),
+    );
+
+    const spanHttpResendCount = computed(() => {
+      const attrs = props.span;
+      if (!attrs) return null;
+      const count = attrs["http_request_resend_count"] ?? null;
+      if (count === null || count === undefined) return null;
+      const num = parseInt(String(count), 10);
+      return !isNaN(num) && num > 0 ? num : null;
+    });
+
+    const activeTab = computed({
+      get: () => props.activeTab,
+      set: (value: string) => emit("update:activeTab", value),
+    });
+
+    const navigateToError = () => {
+      activeTab.value = "error";
+    };
     const tags: Ref<{ [key: string]: string }> = ref({});
 
     // Ref for fullscreen container (parent container with both Input and Output)
@@ -1068,10 +1066,7 @@ export default defineComponent({
     const closeSidebar = () => {
       emit("close");
     };
-    const spanDetails: any = ref({
-      attrs: {},
-      events: [],
-    });
+
     const pagination: any = ref({
       rowsPerPage: 0,
     });
@@ -1150,6 +1145,10 @@ export default defineComponent({
       store.state?.zoConfig?.timestamp_column || "_timestamp",
     ]);
 
+    const hasDbSpan = computed(() =>
+      Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),
+    );
+
     const filterActions = [
       { operator: "=" as const, iconComponent: EqualIcon },
       { operator: "!=" as const, iconComponent: NotEqualIcon },
@@ -1174,8 +1173,9 @@ export default defineComponent({
 
     const attributesForDisplay = computed(() => {
       const attrs = { ...spanDetails.value.attrs };
-      delete attrs.llm_input;
-      delete attrs.llm_output;
+      delete attrs.gen_ai_input_messages;
+      delete attrs.gen_ai_output_messages;
+      delete attrs.gen_ai_system_instructions;
       return attrs;
     });
 
@@ -1255,12 +1255,12 @@ export default defineComponent({
 
     const getTTFT = computed(() => {
       // Only calculate for LLM spans with completion_start_time
-      if (!props.span.llm_completion_start_time || !props.span.start_time) {
+      if (!props.span.gen_ai_completion_start_time || !props.span.start_time) {
         return null;
       }
       // completion_start_time is in microseconds
       // start_time is in nanoseconds, convert to microseconds
-      const completionStartTime = props.span.llm_completion_start_time;
+      const completionStartTime = props.span.gen_ai_completion_start_time;
       const spanStartTimeUs = props.span.start_time / 1000;
       const ttftUs = completionStartTime - spanStartTimeUs;
       return formatTimeWithSuffix(ttftUs);
@@ -1273,7 +1273,6 @@ export default defineComponent({
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");
 
-    const expandedEvents: any = ref({});
     const eventColumns = ref([
       {
         name: "@timestamp",
@@ -1398,29 +1397,6 @@ export default defineComponent({
       return cols;
     });
 
-    const exceptionEventColumns = ref([
-      {
-        name: "@timestamp",
-        field: "@timestamp",
-        prop: (row: any) =>
-          date.formatDate(
-            Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
-          ),
-        label: "Timestamp",
-        align: "left" as const,
-        sortable: true,
-      },
-      {
-        name: "type",
-        field: "exception.type",
-        prop: (row: any) => row["exception.type"],
-        label: "Type",
-        align: "left" as const,
-        sortable: true,
-      },
-    ]);
-
     const linkColumns = ref([
       {
         name: "traceId",
@@ -1437,18 +1413,6 @@ export default defineComponent({
         sortable: true,
       },
     ]);
-
-    const getExceptionEvents = computed(() => {
-      return spanDetails.value.events.filter(
-        (event: any) => event.name === "exception",
-      );
-    });
-
-    const expandEvent = (index: number) => {
-      if (expandedEvents.value[index.toString()])
-        delete expandedEvents.value[index.toString()];
-      else expandedEvents.value[index.toString()] = true;
-    };
 
     const getSpanKind = (id: number | string | null | undefined): string => {
       if (id === null || id === undefined || id === "") return "Unspecified";
@@ -1535,131 +1499,6 @@ export default defineComponent({
         immediate: true,
       },
     );
-    function formatStackTrace(trace: any) {
-      if (!trace) return "";
-
-      // Split the trace into lines
-      const lines = trace.split("\n");
-
-      // Process each line with syntax highlighting
-      const formattedLines = lines.map((line: string) => {
-        const trimmed = line.trim();
-
-        // Skip empty lines
-        if (!trimmed) return '<div class="stack-line stack-empty"></div>';
-
-        // Highlight file paths and line numbers (e.g., File "path", line 123, in function_name)
-        if (trimmed.startsWith("File ")) {
-          const fileMatch = line.match(
-            /(File\s+)"([^"]+)"(,\s+line\s+)(\d+)(,\s+in\s+)(.+)/,
-          );
-          if (fileMatch) {
-            return `<div class="stack-line stack-file">  ${escapeHtml(fileMatch[1])}<span class="stack-path">"${escapeHtml(fileMatch[2])}"</span>${escapeHtml(fileMatch[3])}<span class="stack-lineno">${escapeHtml(fileMatch[4])}</span>${escapeHtml(fileMatch[5])}<span class="stack-function">${escapeHtml(fileMatch[6])}</span></div>`;
-          }
-        }
-
-        // Highlight exception raises (e.g., raise ContextWindowExceededError)
-        if (trimmed.startsWith("raise ") || trimmed.includes("raise ")) {
-          // Escape the entire line first, then add highlighting spans
-          const highlighted = escapeHtml(line).replace(
-            /(raise\s+)(\w+)/,
-            '<span class="stack-keyword">$1</span><span class="stack-exception">$2</span>',
-          );
-          return `<div class="stack-line stack-raise">${highlighted}</div>`;
-        }
-
-        // Highlight traceback headers
-        if (trimmed.startsWith("Traceback ")) {
-          return `<div class="stack-line stack-traceback"><span class="stack-traceback-header">${escapeHtml(line)}</span></div>`;
-        }
-
-        // Highlight "During handling" messages
-        if (trimmed.startsWith("During handling of")) {
-          return `<div class="stack-line stack-during"><span class="stack-during-text">${escapeHtml(line)}</span></div>`;
-        }
-
-        // Highlight code lines (indented lines that aren't file paths)
-        if (line.startsWith("    ") && !trimmed.startsWith("File ")) {
-          // Escape the entire line first, then add highlighting spans
-          let highlighted = escapeHtml(line)
-            .replace(
-              /(return|await|async|yield|raise|for|if|else|try|except|finally|with|as|import|from)\s/g,
-              '<span class="stack-keyword">$1</span> ',
-            )
-            .replace(/(\w+\()/g, '<span class="stack-call">$1</span>')
-            .replace(/(\.\.\.)/g, '<span class="stack-ellipsis">$1</span>');
-          return `<div class="stack-line stack-code">${highlighted}</div>`;
-        }
-
-        // Highlight error types at the end of stack (e.g., httpx.HTTPStatusError: ...)
-        if (trimmed.match(/^\w+\.\w+Error:/)) {
-          const errorMatch = line.match(/^(\s*)(\w+(?:\.\w+)*Error:)(.+)/);
-          if (errorMatch) {
-            return `<div class="stack-line stack-error">${escapeHtml(errorMatch[1])}<span class="stack-exception">${escapeHtml(errorMatch[2])}</span><span class="stack-error-msg">${escapeHtml(errorMatch[3])}</span></div>`;
-          }
-        }
-
-        // Default line
-        return `<div class="stack-line">${escapeHtml(line)}</div>`;
-      });
-
-      return formattedLines.join("");
-    }
-
-    function formatExceptionMessage(message: any) {
-      if (!message) return "";
-
-      // Try to format as JSON if it looks like JSON
-      if (
-        typeof message === "string" &&
-        (message.includes("{") || message.includes("["))
-      ) {
-        try {
-          // Extract JSON parts and format them
-          const jsonMatch = message.match(/\{[^}]+\}/g);
-          if (jsonMatch) {
-            let formatted = message;
-            jsonMatch.forEach((json) => {
-              try {
-                const parsed = JSON.parse(json);
-                const pretty = JSON.stringify(parsed, null, 2);
-                formatted = formatted.replace(json, "\n" + pretty);
-              } catch {
-                // Keep original if can't parse
-              }
-            });
-            return formatted;
-          }
-        } catch {
-          // Keep original if parsing fails
-        }
-      }
-
-      return message;
-    }
-
-    function copyStackTrace(stacktrace: string) {
-      if (!stacktrace) return;
-
-      navigator.clipboard
-        .writeText(stacktrace)
-        .then(() => {
-          $q.notify({
-            message: "Stacktrace copied to clipboard",
-            color: "positive",
-            position: "top",
-            timeout: 2000,
-          });
-        })
-        .catch(() => {
-          $q.notify({
-            message: "Failed to copy stacktrace",
-            color: "negative",
-            position: "top",
-            timeout: 2000,
-          });
-        });
-    }
 
     const viewSpanLogs = () => {
       const queryDetails = buildQueryDetails(props.span);
@@ -2059,6 +1898,28 @@ export default defineComponent({
       return true;
     };
 
+    const parsedSystemInstructions = computed(() => {
+      const raw = props.span?.gen_ai_system_instructions;
+      if (!raw) return null;
+      try {
+        let parsed;
+        if (typeof raw === "string") {
+          parsed = JSON.parse(raw);
+        } else {
+          parsed = raw;
+        }
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((p: any) => p.type === "text" && p.content)
+            .map((p: any) => p.content)
+            .join("\n") || null;
+        }
+        return null;
+      } catch {
+        return typeof raw === "string" ? raw : null;
+      }
+    });
+
     // Toggle fullscreen for both Input and Output side by side
     const toggleFullscreen = () => {
       if (ioContainerRef.value) {
@@ -2144,8 +2005,6 @@ export default defineComponent({
       filterActions,
       closeSidebar,
       eventColumns,
-      expandedEvents,
-      expandEvent,
       eventsWrap,
       eventsTableColumns,
       handleEventsColumnOrder,
@@ -2154,11 +2013,10 @@ export default defineComponent({
       spanDetails,
       store,
       tags,
-      formatStackTrace,
-      formatExceptionMessage,
-      copyStackTrace,
-      getExceptionEvents,
-      exceptionEventColumns,
+      hasExceptionEvents,
+      hasSpanError,
+      spanHttpResendCount,
+      navigateToError,
       getDuration,
       getTTFT,
       viewSpanLogs,
@@ -2185,16 +2043,17 @@ export default defineComponent({
       config,
       // LLM
       isLLMSpan,
+      hasDbSpan,
       llmMetrics,
       copyContent,
       formatModelParams,
       getObservationTypeColor,
       hasContent,
+      parsedSystemInstructions,
       ioContainerRef,
       isFullscreen,
       toggleFullscreen,
       isDarkMode,
-      DOMPurify,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,
@@ -2825,11 +2684,20 @@ body.body--dark {
     overflow-x: hidden;
     background-color: var(--o2-code-bg);
 
-    // Enhance hover visibility for code/text content
+    // Enhance hover visibility for code/text content (exclude VueJsonPretty)
     ::v-deep {
       .plain-text-content {
         &:hover {
           background-color: rgba(0, 0, 0, 0.04) !important;
+        }
+      }
+
+      // Don't apply hover to VueJsonPretty elements
+      .vjs-tree {
+        * {
+          &:hover {
+            background-color: transparent !important;
+          }
         }
       }
     }
@@ -2888,6 +2756,15 @@ body.body--dark {
       .plain-text-content {
         &:hover {
           background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+      }
+
+      // Don't apply hover to VueJsonPretty elements in dark mode
+      .vjs-tree {
+        * {
+          &:hover {
+            background-color: transparent !important;
+          }
         }
       }
     }
@@ -3024,280 +2901,6 @@ body.body--dark {
     th {
       background-color: #424242 !important;
     }
-  }
-}
-
-// Exception Details Styling
-.exception-details-container {
-  padding: 0.75rem !important;
-  font-size: 12px;
-  font-family:
-    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
-  background-color: var(--o2-code-bg);
-}
-
-.exception-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.exception-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.exception-label {
-  font-weight: 700;
-  color: var(--o2-text-primary);
-  font-size: 13px;
-  margin-bottom: 0;
-}
-
-.exception-type {
-  color: #d32f2f;
-  font-weight: 600;
-  background: rgba(211, 47, 47, 0.1);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  display: inline-block;
-}
-
-.exception-message {
-  color: var(--o2-text-secondary);
-  background: rgba(0, 0, 0, 0.05);
-  padding: 0.5rem;
-  border-radius: 4px;
-  border-left: 3px solid #ff9800;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.5;
-}
-
-.exception-value {
-  color: var(--o2-text-secondary);
-}
-
-.stacktrace-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-
-  .copy-btn {
-    margin-left: auto;
-    color: var(--o2-text-secondary);
-    opacity: 0.7;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.stacktrace-container {
-  background: #f8f9fa;
-  border-radius: 4px;
-  border: 1px solid #dee2e6;
-  overflow: auto;
-  max-height: 600px;
-  padding: 0.75rem;
-}
-
-.stacktrace-content {
-  margin: 0;
-  padding: 0;
-  font-size: 11px;
-  line-height: 1.6;
-  color: #2c3e50;
-  font-family:
-    "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-
-  .stack-line {
-    padding: 2px 0;
-  }
-
-  .stack-empty {
-    height: 0.5em;
-  }
-
-  .stack-file {
-    color: #0066cc;
-    font-weight: 500;
-  }
-
-  .stack-path {
-    color: #d63384;
-  }
-
-  .stack-lineno {
-    color: #087990;
-    font-weight: 600;
-  }
-
-  .stack-function {
-    color: #6f42c1;
-  }
-
-  .stack-keyword {
-    color: #8250df;
-    font-weight: 600;
-  }
-
-  .stack-exception {
-    color: #d73a49;
-    font-weight: 600;
-  }
-
-  .stack-traceback {
-    color: #6c757d;
-    font-style: italic;
-  }
-
-  .stack-traceback-header {
-    color: #6c757d;
-    font-weight: 600;
-  }
-
-  .stack-during {
-    color: #6c757d;
-    margin: 0.5em 0;
-  }
-
-  .stack-during-text {
-    font-style: italic;
-  }
-
-  .stack-code {
-    color: #2c3e50;
-    padding-left: 2em;
-  }
-
-  .stack-call {
-    color: #0969da;
-  }
-
-  .stack-ellipsis {
-    color: #6c757d;
-  }
-
-  .stack-error {
-    margin-top: 0.5em;
-  }
-
-  .stack-error-msg {
-    color: #2c3e50;
-  }
-
-  .stack-raise {
-    color: #d73a49;
-  }
-}
-
-.stacktrace-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background: #f8f9fa;
-  border: 1px dashed #dee2e6;
-  border-radius: 4px;
-  color: #6c757d;
-  font-size: 12px;
-  font-style: italic;
-}
-
-// Dark Mode Adjustments
-body.body--dark {
-  .exception-details-container {
-    background-color: #1a1a1a;
-  }
-
-  .exception-type {
-    color: #ef5350;
-    background: rgba(239, 83, 80, 0.15);
-  }
-
-  .exception-message {
-    background: rgba(255, 255, 255, 0.05);
-    border-left-color: #ffb74d;
-    color: #e0e0e0;
-  }
-
-  .stacktrace-container {
-    background: #0d0d0d;
-    border-color: #2a2a2a;
-  }
-
-  .stacktrace-content {
-    color: #d4d4d4;
-
-    .stack-file {
-      color: #9cdcfe;
-    }
-
-    .stack-path {
-      color: #ce9178;
-    }
-
-    .stack-lineno {
-      color: #b5cea8;
-    }
-
-    .stack-function {
-      color: #dcdcaa;
-    }
-
-    .stack-keyword {
-      color: #c586c0;
-    }
-
-    .stack-exception {
-      color: #f48771;
-    }
-
-    .stack-traceback {
-      color: #808080;
-    }
-
-    .stack-traceback-header {
-      color: #808080;
-    }
-
-    .stack-during {
-      color: #808080;
-    }
-
-    .stack-code {
-      color: #d4d4d4;
-    }
-
-    .stack-call {
-      color: #4ec9b0;
-    }
-
-    .stack-ellipsis {
-      color: #808080;
-    }
-
-    .stack-error-msg {
-      color: #d4d4d4;
-    }
-
-    .stack-raise {
-      color: #f48771;
-    }
-  }
-
-  .stacktrace-empty {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: #4a5568;
-    color: #a0aec0;
   }
 }
 </style>

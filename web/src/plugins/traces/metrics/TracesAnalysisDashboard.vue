@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     position="right"
     full-height
     :maximized="true"
+    allow-focus-outside
     transition-show="slide-left"
     transition-hide="slide-right"
     @hide="onClose"
@@ -108,44 +109,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="tw:flex tw:items-center tw:gap-3">
           <!-- Refresh button (shown when percentile changes on duration tab) -->
-          <q-btn
+          <OButton
             v-if="showRefreshButton"
-            dense
-            no-caps
-            color="primary"
-            icon="refresh"
+            variant="primary"
+            size="icon-xs-sq"
             @click="refreshAfterPercentileChange"
             data-test="percentile-refresh-button"
-            class="tw:px-[0.5rem]!"
           >
+            <RefreshCw class="tw:size-3.5 tw:shrink-0" />
             <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
-          </q-btn>
+          </OButton>
 
-          <q-btn
-            flat
-            round
-            dense
-            size="sm"
-            :icon="outlinedClose"
+          <OButton
+            variant="ghost"
+            size="icon-xs-sq"
             @click="isOpen = false"
             data-test="analysis-dashboard-close"
-            class="traces-analysis-close-btn"
-          />
+          >
+            <X class="tw:size-3.5 tw:shrink-0" />
+          </OButton>
         </div>
       </q-card-section>
 
       <!-- Tabs (only shown if multiple analysis types available) -->
-      <q-tabs
+      <OTabs
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        inline-label
         class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-1)]! insights-dashboard-tabs"
-        active-color="primary"
-        indicator-color="primary"
         align="left"
       >
-        <q-tab
+        <OTab
           v-for="tab in availableTabs"
           :key="tab.name"
           :name="tab.name"
@@ -153,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :icon="tab.icon"
           class="tw:min-h-[3rem]"
         />
-      </q-tabs>
+      </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
       <q-card-section class="analysis-content tw:flex-1 tw:p-0">
@@ -255,9 +249,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SEPARATOR: Collapse/Expand Button -->
           <template #separator>
-            <q-btn
+            <OButton
               data-test="dimension-selector-collapse-btn"
-              :icon="showDimensionSelector ? 'chevron_left' : 'chevron_right'"
               :title="
                 showDimensionSelector
                   ? 'Collapse Dimensions'
@@ -268,12 +261,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'splitter-icon-expand'
                   : 'splitter-icon-collapse'
               "
-              color="primary"
-              size="sm"
-              dense
-              round
+              variant="sidebar-button"
+              size="sidebar-button"
               @click="toggleDimensionSelector"
-            />
+            >
+              <ChevronLeft v-if="showDimensionSelector" class="tw:size-3.5 tw:shrink-0" />
+              <ChevronRight v-else class="tw:size-3.5 tw:shrink-0" />
+            </OButton>
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -319,13 +313,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>
                   <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
-                  <q-btn
-                    outline
-                    color="primary"
-                    :label="t('latencyInsights.retryButton')"
+                  <OButton
+                    variant="outline"
+                    size="sm-action"
                     class="tw:mt-4"
                     @click="loadAnalysis"
-                  />
+                  >
+                    {{ t('latencyInsights.retryButton') }}
+                  </OButton>
                 </div>
 
                 <!-- Dashboard -->
@@ -353,6 +348,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OButton from "@/lib/core/Button/OButton.vue";
+import { RefreshCw, X, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -370,7 +369,6 @@ import {
   selectDimensionsFromData,
   selectTraceDimensions,
 } from "@/composables/useDimensionSelector";
-import { outlinedClose } from "@quasar/extras/material-icons-outlined";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1156,21 +1154,14 @@ watch(
     margin: 8px 0px;
   }
 
-  .traces-analysis-close-btn {
-    :deep(.q-icon) {
-      font-size: 1.2rem;
-      color: var(--o2-text-1);
-    }
-  }
-
   .insights-dashboard-tabs {
-    :deep(.q-tabs__content .q-icon) {
+    :deep(.o-tabs__content .q-icon) {
       font-size: 1.2rem;
       display: flex;
       align-items: center;
     }
 
-    :deep(.q-tab__label) {
+    :deep(.o-tab__label) {
       font-weight: bold;
       padding-left: 0.13rem;
     }

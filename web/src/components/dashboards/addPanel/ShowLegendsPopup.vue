@@ -33,27 +33,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="legend-count q-mr-md" style="font-size: 14px">
             {{ t("dashboard.totalLegends", { count: legends.length }) }}
           </span>
-          <q-btn
-            :icon="isAllCopied ? 'check' : 'content_copy'"
-            :label="isAllCopied ? 'Copied' : 'Copy all'"
-            class="q-px-sm q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-            no-caps
-            dense
+          <OButton
+            variant="outline"
             size="sm"
             @click.stop="copyAllLegends"
             data-test="dashboard-show-legends-copy-all"
-          />
-          <q-btn
-            icon="close"
-            class="q-ml-xs"
-            unelevated
-            size="sm"
-            round
-            flat
+          >
+            <template #icon-left
+              ><q-icon :name="isAllCopied ? 'check' : 'content_copy'"
+            /></template>
+            {{ isAllCopied ? "Copied" : "Copy all" }}
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon"
+            class="tw:ml-1"
             :title="t('common.close')"
             @click.stop="closePopup"
             data-test="dashboard-show-legends-close"
-          ></q-btn>
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
         </div>
       </div>
 
@@ -77,18 +77,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="legend-text">
                 {{ legend.name }}
               </div>
-              <q-btn
-                :icon="isLegendCopied(index) ? 'check' : 'content_copy'"
-                dense
-                size="xs"
-                no-caps
-                class="copy-btn q-ml-sm tw:font-normal"
+              <OButton
+                variant="ghost"
+                size="icon"
+                class="tw:ml-1"
+                data-test="dashboard-legend-copy-btn"
                 @click.stop="copyLegend(legend.name, index)"
               >
+                <template #icon-left
+                  ><q-icon
+                    :name="isLegendCopied(index) ? 'check' : 'content_copy'"
+                /></template>
                 <q-tooltip>{{
                   isLegendCopied(index) ? "Copied!" : "Copy legend"
                 }}</q-tooltip>
-              </q-btn>
+              </OButton>
             </div>
           </div>
         </div>
@@ -106,9 +109,11 @@ import {
   getSeriesColor,
   getColorPalette,
 } from "@/utils/dashboard/colorPalette";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ShowLegendsPopup",
+  components: { OButton },
   props: {
     panelData: {
       type: Object,
@@ -212,11 +217,7 @@ export default defineComponent({
 
       // For pie/donut charts, extract from series[0].data
       const firstSeries = series.find((s: any) => s != null);
-      if (
-        firstSeries &&
-        firstSeries.data &&
-        Array.isArray(firstSeries.data)
-      ) {
+      if (firstSeries && firstSeries.data && Array.isArray(firstSeries.data)) {
         const firstSeriesData = firstSeries.data;
         // Check if it's pie/donut format (data has name property)
         if (
@@ -250,24 +251,22 @@ export default defineComponent({
     };
 
     const copyLegend = (text: string, index: number) => {
-      copyToClipboard(text)
-        .then(() => {
-          copiedLegendIndices.value.add(index);
-          setTimeout(() => {
-            copiedLegendIndices.value.delete(index);
-          }, 3000);
-        });
+      copyToClipboard(text).then(() => {
+        copiedLegendIndices.value.add(index);
+        setTimeout(() => {
+          copiedLegendIndices.value.delete(index);
+        }, 3000);
+      });
     };
 
     const copyAllLegends = () => {
       const allLegendsText = legends.value.map((l: any) => l.name).join("\n");
-      copyToClipboard(allLegendsText)
-        .then(() => {
-          isAllCopied.value = true;
-          setTimeout(() => {
-            isAllCopied.value = false;
-          }, 3000);
-        });
+      copyToClipboard(allLegendsText).then(() => {
+        isAllCopied.value = true;
+        setTimeout(() => {
+          isAllCopied.value = false;
+        }, 3000);
+      });
     };
 
     return {
@@ -329,13 +328,13 @@ export default defineComponent({
       font-size: 12px;
     }
 
-    .copy-btn {
+    [data-test="dashboard-legend-copy-btn"] {
       opacity: 0;
       transition: opacity 0.2s ease-in-out;
       flex-shrink: 0;
     }
 
-    &:hover .copy-btn {
+    &:hover [data-test="dashboard-legend-copy-btn"] {
       opacity: 1;
     }
   }

@@ -404,16 +404,19 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
         let pool = CLIENT_RO.clone();
+        let cfg = get_config();
+        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let ret = sqlx::query_as::<_, super::FileRecord>(
                 r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
-    WHERE stream = $1 AND date >= $2 AND date <= $3;
+    WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#,
             )
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
+            .bind(max_size)
             .fetch_all(&pool)
             .await;
         Ok(ret?.iter().map(|r| r.into()).collect())
@@ -610,7 +613,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let sql = r#"
 SELECT date
     FROM file_list
-    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND records < $5
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND original_size <= $5
     GROUP BY date HAVING count(*) >= $6;
             "#;
 
@@ -619,7 +622,7 @@ SELECT date
             .bind(time_start)
             .bind(max_ts_upper_bound)
             .bind(time_end)
-            .bind(cfg.compact.old_data_min_records)
+            .bind(cfg.compact.max_file_size as i64 / 2)
             .bind(cfg.compact.old_data_min_files)
             .fetch_all(&pool)
             .await?;

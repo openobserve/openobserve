@@ -42,6 +42,7 @@ export interface FieldAlias {
   display: string;
   fields: string[];
   group?: string;
+  is_workload_type?: boolean;
 }
 
 export interface StreamInfo {
@@ -188,6 +189,12 @@ export interface IdentitySet {
 export interface ServiceIdentityConfig {
   sets: IdentitySet[];
   tracked_alias_ids: string[];
+  /**
+   * When true, correlation matches streams to services without requiring the
+   * `service` dimension. Streams sharing infrastructure attributes (e.g.
+   * k8s-namespace) correlate together even if some lack `service.name`.
+   */
+  service_optional?: boolean;
 }
 
 /**

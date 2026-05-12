@@ -23,16 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header bar -->
     <div class="card-container tw:mb-2 tw:shrink-0">
       <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[64px]">
-        <q-btn
+        <OButton
           data-test="eval-template-editor-back-btn"
-          no-caps
-          padding="xs"
-          outline
-          icon="arrow_back_ios_new"
-          size="sm"
-          class="el-border"
+          variant="outline"
+          size="icon-xs-sq"
           @click="cancel"
-        />
+        >
+          <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
+        </OButton>
         <span class="q-table__title tw:font-[600]" data-test="eval-template-editor-title">
           {{ isEdit ? t("evalTemplate.editTemplate") : t("evalTemplate.createTemplate") }}
         </span>
@@ -154,24 +152,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
     >
-      <q-btn
+      <OButton
         data-test="eval-template-editor-cancel-btn"
-        class="o2-secondary-button tw:h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        :label="t('common.cancel')"
-        no-caps
-        flat
+        variant="outline"
+        size="sm-action"
         @click="cancel"
-      />
-      <q-btn
+      >
+        {{ t('common.cancel') }}
+      </OButton>
+      <OButton
         data-test="eval-template-editor-save-btn"
-        class="o2-primary-button tw:h-[36px]"
-        :label="isEdit ? t('common.update') : t('common.save')"
-        no-caps
-        flat
+        variant="primary"
+        size="sm-action"
         :loading="saving"
         @click="saveTemplate"
-      />
+      >
+        {{ isEdit ? t('common.update') : t('common.save') }}
+      </OButton>
     </div>
   </div>
 </template>
@@ -183,6 +180,8 @@ import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { ChevronLeft } from 'lucide-vue-next';
 
 const { t } = useI18n();
 const q = useQuasar();

@@ -281,8 +281,8 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const firstMoveUpButton = wrapper.findComponent('[data-test="column-order-move-up-0"]');
-      expect(firstMoveUpButton.props("disable")).toBe(true);
+      const firstMoveUpButton = wrapper.find('[data-test="column-order-move-up-0"]');
+      expect((firstMoveUpButton.element as HTMLButtonElement).disabled).toBe(true);
     });
   });
 
@@ -333,8 +333,8 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      const lastMoveDownButton = wrapper.findComponent('[data-test="column-order-move-down-1"]');
-      expect(lastMoveDownButton.props("disable")).toBe(true);
+      const lastMoveDownButton = wrapper.find('[data-test="column-order-move-down-1"]');
+      expect((lastMoveDownButton.element as HTMLButtonElement).disabled).toBe(true);
     });
   });
 
@@ -590,12 +590,12 @@ describe("ColumnOrderPopUp", () => {
       expect(wrapper.vm.editColumnOrder).toEqual(["column1"]);
 
       // Move up button should be disabled
-      const moveUpBtn = wrapper.findComponent('[data-test="column-order-move-up-0"]');
-      expect(moveUpBtn.props("disable")).toBe(true);
+      const moveUpBtn = wrapper.find('[data-test="column-order-move-up-0"]');
+      expect((moveUpBtn.element as HTMLButtonElement).disabled).toBe(true);
 
       // Move down button should be disabled
-      const moveDownBtn = wrapper.findComponent('[data-test="column-order-move-down-0"]');
-      expect(moveDownBtn.props("disable")).toBe(true);
+      const moveDownBtn = wrapper.find('[data-test="column-order-move-down-0"]');
+      expect((moveDownBtn.element as HTMLButtonElement).disabled).toBe(true);
     });
 
     it("should handle columnOrder with duplicates gracefully", async () => {

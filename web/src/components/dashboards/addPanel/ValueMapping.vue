@@ -16,18 +16,18 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <q-btn
+    <OButton
+      variant="outline"
+      size="sm"
       @click="openValueMappingPopUp"
-      style="cursor: pointer; padding: 0px 5px"
-      :label="
-        dashboardPanelData.data.config.mappings.length
-          ? t('dashboard.editValueMapping')
-          : t('dashboard.addValueMapping')
-      "
-      no-caps
       data-test="dashboard-addpanel-config-value-mapping-add-btn"
-      class="el-border"
-    />
+    >
+      {{
+        dashboardPanelData.data.config.mappings.length
+          ? t("dashboard.editValueMapping")
+          : t("dashboard.addValueMapping")
+      }}
+    </OButton>
     <q-dialog v-model="showValueMappingPopUp">
       <ValueMappingPopUp
         :value-mapping="
@@ -48,10 +48,11 @@ import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
 import { onBeforeMount } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ValueMapping",
-  components: { ValueMappingPopUp },
+  components: { ValueMappingPopUp, OButton },
   props: [],
   setup() {
     const { t } = useI18n();

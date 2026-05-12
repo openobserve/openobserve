@@ -158,7 +158,7 @@ export class AlertTemplatesPage {
             'button[data-test*="add"]',
             'button:has(.q-icon):has-text("add")',
             '.q-toolbar button:has-text("Add")',
-            'button.q-btn:not(.q-btn--flat):not(.q-btn--outline)'
+            'button[data-o2-btn]:has-text("Add Template")'
         ];
 
         let addBtnClicked = false;

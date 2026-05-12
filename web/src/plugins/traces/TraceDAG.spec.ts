@@ -76,7 +76,7 @@ const defaultMockResponse = {
       span_status: "OK",
       start_time: 1000000,
       end_time: 1100000,
-      llm_observation_type: null,
+      gen_ai_operation_name: null,
     },
     {
       span_id: "span-2",
@@ -86,7 +86,7 @@ const defaultMockResponse = {
       span_status: "OK",
       start_time: 1010000,
       end_time: 1050000,
-      llm_observation_type: "generation",
+      gen_ai_operation_name: "generation",
     },
     {
       span_id: "span-3",
@@ -96,7 +96,7 @@ const defaultMockResponse = {
       span_status: "ERROR",
       start_time: 1060000,
       end_time: 1080000,
-      llm_observation_type: "tool",
+      gen_ai_operation_name: "tool",
     },
   ],
   edges: [

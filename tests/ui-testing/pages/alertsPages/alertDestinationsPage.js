@@ -163,7 +163,11 @@ export class AlertDestinationsPage {
         
         await this.page.locator(this.submitButton).click();
         await expect(this.page.getByText(this.successMessage)).toBeVisible();
-        
+
+        // Navigate back to the list so the dialog is fully closed before verifying
+        await this.navigateToDestinations();
+        await this.page.waitForTimeout(1000);
+
         // Verify the destination exists by checking all pages
         await this.verifyDestinationExists(destinationName);
     }
@@ -222,7 +226,7 @@ export class AlertDestinationsPage {
 
         while (!destinationFound && !isLastPage) {
             try {
-                await this.page.getByRole('cell', { name: destinationName }).waitFor({ timeout: 2000 });
+                await this.page.getByRole('cell', { name: destinationName }).waitFor({ timeout: 5000 });
                 destinationFound = true;
                 testLogger.info('Found destination via UI', { destinationName });
             } catch (error) {
@@ -637,6 +641,10 @@ export class AlertDestinationsPage {
         await this.page.locator(this.submitButton).click();
         await expect(this.page.getByText(this.successMessage)).toBeVisible();
 
+        // Navigate back to the list so the dialog is fully closed before verifying
+        await this.navigateToDestinations();
+        await this.page.waitForTimeout(2000);
+
         // Verify the destination exists
         await this.verifyDestinationExists(destinationName);
         testLogger.info('Created destination with headers', { destinationName, url, headerCount: Object.keys(headers).length });
@@ -661,7 +669,7 @@ export class AlertDestinationsPage {
             '[data-test*="destination-import"]',
             'button:has-text("Import")',
             '.q-table__control button:has-text("Import")',
-            'button.q-btn:not(.q-btn--flat)'
+            'button[data-o2-btn]:has-text("Import")'
         ];
 
         let importBtnClicked = false;

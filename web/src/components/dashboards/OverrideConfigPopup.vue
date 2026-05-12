@@ -7,16 +7,14 @@
       <div class="flex items-center q-table__title q-mr-md">
         <span>{{ t("dashboard.overrideConfigTitle") }}</span>
       </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        outline
+      <OButton
+        variant="ghost"
+        size="icon"
         :title="t('dashboard.cancel')"
         @click.stop="closePopup"
-      ></q-btn>
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
     </div>
 
     <div
@@ -38,7 +36,8 @@
         borderless
         dense
         class="tw:flex-1 o2-custom-select-dashboard"
-       hide-bottom-space/>
+        hide-bottom-space
+      />
       <div class="tw:flex items-center" style="width: 60%; gap: 10px">
         <q-select
           v-model="overrideConfig.config[0].type"
@@ -54,7 +53,8 @@
           dense
           class="o2-custom-select-dashboard"
           @update:model-value="onConfigTypeChange(index)"
-         hide-bottom-space/>
+          hide-bottom-space
+        />
 
         <div
           v-if="overrideConfig.config[0].type === 'unit'"
@@ -74,7 +74,8 @@
             borderless
             dense
             class="tw:flex-1 o2-custom-select-dashboard"
-           hide-bottom-space/>
+            hide-bottom-space
+          />
           <q-input
             v-if="overrideConfig.config[0].value.unit === 'custom'"
             v-model="overrideConfig.config[0].value.customUnit"
@@ -86,7 +87,9 @@
             label-slot
             data-test="dashboard-config-unit"
             style="width: 50%"
-           borderless hide-bottom-space/>
+            borderless
+            hide-bottom-space
+          />
         </div>
 
         <div
@@ -102,44 +105,56 @@
           />
         </div>
 
-        <q-btn
+        <OButton
+          variant="ghost"
+          size="icon"
           @click="removeOverrideConfig(index)"
-          icon="close"
-          class="delete-btn"
-          dense
-          flat
-          round
           :data-test="`dashboard-addpanel-config-unit-config-delete-btn-${index}`"
-        />
+        >
+          <template #icon-left><q-icon name="close" /></template>
+        </OButton>
       </div>
     </div>
-    <q-btn
+    <OButton
+      variant="outline"
+      size="sm"
+      class="tw:mt-3"
       @click="addOverrideConfig"
-      :label="t('dashboard.overrideConfigAddNew')"
-      no-caps
-      class="q-mt-md el-border"
-    />
+      >{{ t("dashboard.overrideConfigAddNew") }}</OButton
+    >
 
     <q-card-actions align="right">
-      <q-btn :label="t('dashboard.overrideConfigSave')" color="primary" @click="saveOverrides" />
+      <OButton variant="primary" size="sm-action" @click="saveOverrides">{{
+        t("dashboard.overrideConfigSave")
+      }}</OButton>
     </q-card-actions>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, PropType, onMounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  watch,
+  PropType,
+  onMounted,
+} from "vue";
 import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "OverrideConfigPopup",
+  components: { OButton },
   props: {
     columns: {
       type: Array as PropType<Array<{ label: string; alias: string }>>,
       required: true,
-      validator: (value: any[]) => value.every(item => 
-        typeof item.label === 'string' && 
-        typeof item.alias === 'string'
-      )
+      validator: (value: any[]) =>
+        value.every(
+          (item) =>
+            typeof item.label === "string" && typeof item.alias === "string",
+        ),
     },
     overrideConfig: {
       type: Object as PropType<{
@@ -152,7 +167,7 @@ export default defineComponent({
           }>;
         }>;
       }>,
-      required: true
+      required: true,
     },
   },
   emits: ["close", "save"],

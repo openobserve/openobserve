@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @click.stop
       >
-        <q-btn
+        <OButton
           v-if="
             showLegendsButton &&
             noData !== 'No Data' &&
@@ -205,19 +205,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'gauge',
             ].includes(panelSchema.type)
           "
-          color="primary"
-          icon="format_list_bulleted"
-          round
-          outline
-          size="sm"
+          variant="outline"
+          size="icon-circle"
           @click="$emit('show-legends')"
-          class="el-border"
         >
+          <template #icon-left><q-icon name="format_list_bulleted" /></template>
           <q-tooltip anchor="top middle" self="bottom right">
             Show Legends
           </q-tooltip>
-        </q-btn>
-        <q-btn
+        </OButton>
+        <OButton
           v-if="
             [
               'area',
@@ -233,26 +230,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             allowAnnotationsAdd &&
             !viewOnly
           "
-          color="primary"
-          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
-          round
-          outline
-          size="sm"
+          variant="outline"
+          size="icon-circle"
           @click="toggleAddAnnotationMode"
-          class="el-border"
         >
+          <template #icon-left
+            ><q-icon :name="isAddAnnotationMode ? 'cancel' : 'edit'"
+          /></template>
           <q-tooltip anchor="top middle" self="bottom right">
             {{
               isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
             }}
           </q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
       <div
         class="crosslink-drilldown-menu"
         :class="{
           'crosslink-drilldown-menu--dark': store.state.theme === 'dark',
         }"
+        data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
@@ -269,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             class="crosslink-drilldown-menu-item"
+            data-test="drilldown-menu-item"
             @click="openDrilldown(index)"
           >
             <q-icon
@@ -407,6 +405,7 @@ const CustomChartRenderer = defineAsyncComponent(() => {
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
 });
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -422,6 +421,7 @@ export default defineComponent({
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
+    OButton,
   },
   props: {
     selectedTimeObj: {
@@ -982,8 +982,7 @@ export default defineComponent({
                   const gridModel = chartInstance
                     ?.getModel()
                     ?.getComponent("grid");
-                  const freshRect =
-                    gridModel?.coordinateSystem?.getRect();
+                  const freshRect = gridModel?.coordinateSystem?.getRect();
                   if (freshRect) {
                     previousOptionsSnapshot._gridRect = {
                       x: freshRect.x,
@@ -1423,13 +1422,6 @@ export default defineComponent({
       ) {
         return "";
       }
-      // A rendered chart is already on screen — suppress "No Data" even if
-      // the raw data buffer is momentarily empty. This prevents a flicker on
-      // refresh where the executor resets state.data = [] before loading
-      // flips to true, transiently firing this computed with empty data.
-      if (panelData.value?.options?.series?.length > 0) {
-        return "";
-      }
       // Check if the queryType is 'promql'
       if (panelSchema.value?.queryType == "promql") {
         // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
@@ -1437,6 +1429,14 @@ export default defineComponent({
           filteredData.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
+      }
+
+      // A rendered chart is already on screen — suppress "No Data" even if
+      // the raw data buffer is momentarily empty. This prevents a flicker on
+      // refresh where the executor resets state.data = [] before loading
+      // flips to true, transiently firing this computed with empty data.
+      if (panelData.value?.options?.series?.length > 0) {
+        return "";
       }
       // The queryType is not 'promql'
       return data.value.length &&
@@ -1486,7 +1486,7 @@ export default defineComponent({
       showErrorNotification,
     });
 
-    const { downloadDataAsCSV, downloadDataAsJSON } = usePanelDownload({
+    const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
       filteredData,
@@ -1579,6 +1579,23 @@ export default defineComponent({
       showPopupsAndOverlays,
       downloadDataAsCSV,
       downloadDataAsJSON,
+      getPanelCsvData: (title: string) => {
+        const csv = getPanelCsvString();
+        if (!csv) return null;
+        return {
+          title: title ?? panelSchema.value?.title ?? "panel",
+          csv,
+        };
+      },
+      logDataAsJSON: (title: string) => {
+        const chartData =
+          panelSchema.value?.queryType === "promql"
+            ? filteredData.value
+            : data.value;
+        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.log(chartData);
+        console.groupEnd();
+      },
       loadingProgressPercentage,
       isPartialData,
       contextMenuVisible,

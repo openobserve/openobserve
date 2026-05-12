@@ -64,25 +64,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             dense
           />
-          <div class="flex justify-start tw:mt-6">
-            <q-btn
-              v-close-popup="true"
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('user.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          <div class="flex justify-start tw:mt-6 tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
               data-test="cancel-button"
               @click="$emit('cancel:hideform')"
-            />
-            <q-btn
-              :label="t('user.save')"
-              class="o2-primary-button no-border tw:h-[36px]"
+            >
+              {{ t('user.cancel') }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
               type="submit"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            />
+            >
+              {{ t('user.save') }}
+            </OButton>
           </div>
         </q-form>
       </div>
@@ -92,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onActivated } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -112,6 +110,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
+  components: { OButton },
   props: {
     modelValue: {
       type: Object,

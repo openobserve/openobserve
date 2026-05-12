@@ -38,7 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- only show if there are panels in the tab -->
       <div
-        v-if="dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.panels?.length"
+        v-if="
+          dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.panels
+            ?.length
+        "
         style="padding: 10px"
         data-test="dashboard-tab-delete-tab-panels-container"
       >
@@ -57,7 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="selectedTabToMovePanels"
                 :options="moveTabOptions"
                 data-test="dashboard-tab-delete-tab-panels-move-select"
-               borderless hide-bottom-space/>
+                borderless
+                hide-bottom-space
+              />
             </div>
           </div>
           <q-radio
@@ -71,28 +76,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-card-actions class="confirmActions">
-        <div class="button-container">
-          <q-btn
+        <div class="button-container tw:gap-2">
+          <OButton
             v-close-popup="true"
-            unelevated
-            no-caps
-            class="q-mr-sm"
+            variant="outline"
+            size="sm-action"
             @click="onCancel"
             data-test="cancel-button"
           >
             {{ t("confirmDialog.cancel") }}
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            unelevated
-            no-caps
-            class="no-border"
-            color="primary"
+            variant="primary"
+            size="sm-action"
             @click="onConfirm"
             data-test="confirm-button"
           >
             {{ t("confirmDialog.ok") }}
-          </q-btn>
+          </OButton>
         </div>
       </q-card-actions>
     </q-card>
@@ -103,9 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onMounted } from "vue";
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "TabsDeletePopUp",
+  components: { OButton },
   emits: ["update:ok", "update:cancel"],
   props: ["tabId", "dashboardData"],
   setup(props, { emit }) {

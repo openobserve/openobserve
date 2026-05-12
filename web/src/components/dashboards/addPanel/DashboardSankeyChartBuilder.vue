@@ -41,8 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'source', null)"
         data-test="dashboard-source-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
+          radius="sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -59,73 +60,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
         >
-          <div>
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              size="13px"
-              class="'cursor-grab q-my-xs'"
-            />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              color="primary"
-              dense
-              size="sm"
-              :label="sourceLabel"
-              class="q-pl-sm"
-              :data-test="`dashboard-source-item-${sourceLabel}`"
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            class="cursor-grab"
+            :data-test="`dashboard-source-item-${sourceLabel}-drag`"
+          >
+            <template #icon-left>
+              <q-icon name="drag_indicator" size="13px" />
+            </template>
+          </OButton>
+          <OButton
+            variant="primary"
+            size="chip-12"
+            :data-test="`dashboard-source-item-${sourceLabel}`"
+          >
+            {{ sourceLabel }}
+            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <q-menu
+              class="field-function-menu-popup"
+              :data-test="`dashboard-source-item-${sourceLabel}-menu`"
             >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-source-item-${sourceLabel}-menu`"
+              <div
+                style="padding: 3px 16px 16px 16px"
+                :style="{
+                  width:
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery ||
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.source.isDerived
+                      ? 'auto'
+                      : '771px',
+                }"
               >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.source.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <div>
-                    <div class="q-mr-xs q-mb-sm">
-                      <DynamicFunctionPopUp
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.source
-                        "
-                        :allowAggregation="false"
-                        :customQuery="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                        "
-                        :chartType="dashboardPanelData.data.type"
-                      />
-                    </div>
+                <div>
+                  <div class="q-mr-xs q-mb-sm">
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.source
+                      "
+                      :allowAggregation="false"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
                   </div>
                 </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-source-item-${sourceLabel}-remove`"
-              @click="removeSource()"
-              icon="close"
-            />
-          </div>
-        </q-btn-group>
+              </div>
+            </q-menu>
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            :data-test="`dashboard-source-item-${sourceLabel}-remove`"
+            @click="removeSource()"
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -164,8 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'target', null)"
         data-test="dashboard-target-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
+          radius="sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -182,73 +182,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
         >
-          <div>
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              size="13px"
-              class="'cursor-grab q-my-xs'"
-            />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="targetLabel"
-              :data-test="`dashboard-target-item-${targetLabel}`"
-              class="q-pl-sm"
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            class="cursor-grab"
+            :data-test="`dashboard-target-item-${targetLabel}-drag`"
+          >
+            <template #icon-left>
+              <q-icon name="drag_indicator" size="13px" />
+            </template>
+          </OButton>
+          <OButton
+            variant="primary"
+            size="chip-12"
+            :data-test="`dashboard-target-item-${targetLabel}`"
+          >
+            {{ targetLabel }}
+            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <q-menu
+              class="field-function-menu-popup"
+              :data-test="`dashboard-target-item-${targetLabel}-menu`"
             >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-target-item-${targetLabel}-menu`"
+              <div
+                style="padding: 3px 16px 16px 16px"
+                :style="{
+                  width:
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery ||
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.target.isDerived
+                      ? 'auto'
+                      : '771px',
+                }"
               >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.target.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <div>
-                    <div class="q-mr-xs q-mb-sm">
-                      <DynamicFunctionPopUp
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.target
-                        "
-                        :allowAggregation="false"
-                        :customQuery="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                        "
-                        :chartType="dashboardPanelData.data.type"
-                      />
-                    </div>
+                <div>
+                  <div class="q-mr-xs q-mb-sm">
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.target
+                      "
+                      :allowAggregation="false"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
                   </div>
                 </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-target-item-${targetLabel}-remove`"
-              @click="removeTarget()"
-              icon="close"
-            />
-          </div>
-        </q-btn-group>
+              </div>
+            </q-menu>
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            :data-test="`dashboard-target-item-${targetLabel}-remove`"
+            @click="removeTarget()"
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -287,8 +285,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'value', null)"
         data-test="dashboard-value-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
+          radius="sm"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -305,73 +304,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
         >
-          <div>
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              size="13px"
-              class="'cursor-grab q-my-xs'"
-            />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="valueLabel"
-              :data-test="`dashboard-value-item-${valueLabel}`"
-              class="q-pl-sm"
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            class="cursor-grab"
+            :data-test="`dashboard-value-item-${valueLabel}-drag`"
+          >
+            <template #icon-left>
+              <q-icon name="drag_indicator" size="13px" />
+            </template>
+          </OButton>
+          <OButton
+            variant="primary"
+            size="chip-12"
+            :data-test="`dashboard-value-item-${valueLabel}`"
+          >
+            {{ valueLabel }}
+            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <q-menu
+              class="field-function-menu-popup"
+              :data-test="`dashboard-value-item-${valueLabel}-menu`"
             >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-value-item-${valueLabel}-menu`"
+              <div
+                style="padding: 3px 16px 16px 16px"
+                :style="{
+                  width:
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].customQuery ||
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].fields.value.isDerived
+                      ? 'auto'
+                      : '771px',
+                }"
               >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.value.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <div>
-                    <div class="q-mr-xs q-mb-sm">
-                      <DynamicFunctionPopUp
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.value
-                        "
-                        :allowAggregation="true"
-                        :customQuery="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                        "
-                        :chartType="dashboardPanelData.data.type"
-                      />
-                    </div>
+                <div>
+                  <div class="q-mr-xs q-mb-sm">
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.value
+                      "
+                      :allowAggregation="true"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
                   </div>
                 </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-value-item-${valueLabel}-remove`"
-              @click="removeValue()"
-              icon="close"
-            />
-          </div>
-        </q-btn-group>
+              </div>
+            </q-menu>
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            :data-test="`dashboard-value-item-${valueLabel}-remove`"
+            @click="removeValue()"
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -416,10 +413,14 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
   components: {
+    OButtonGroup,
+    OButton,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,

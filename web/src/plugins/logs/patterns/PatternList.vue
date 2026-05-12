@@ -35,27 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
 
-        <!-- Occurrence Column Header -->
+        <!-- Count & Percentage Column Header -->
         <div
-          class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right"
+          class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right"
         >
           <span
             class="tw:font-bold"
             :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
           >
             {{ t("search.occurrenceColumnHeader") }}
-          </span>
-        </div>
-
-        <!-- Percentage Column Header -->
-        <div
-          class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-right"
-        >
-          <span
-            class="tw:font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
-          >
-            {{ t("search.percentageColumnHeader") }}
           </span>
         </div>
 
@@ -124,6 +112,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+
+    <!-- Wildcard hover popover (outside q-virtual-scroll to avoid DOM recycling conflicts) -->
+    <WildcardValuePopover
+      :visible="!!hoveredToken"
+      :token="hoveredToken?.token ?? ''"
+      :displayValues="hoveredToken?.displayValues ?? []"
+      :anchorEl="hoveredToken?.anchorEl ?? null"
+      @popoverEnter="onPopoverEnter"
+      @popoverLeave="onPopoverLeave"
+      @filter-value="(value, action) => $emit('filter-value', value, action)"
+    />
   </div>
 </template>
 
@@ -131,6 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
+import WildcardValuePopover from "./WildcardValuePopover.vue";
+import useWildcardHover from "./useWildcardHover";
 
 defineProps<{
   patterns: any[];
@@ -145,8 +146,15 @@ defineEmits<{
   (e: "open-details", pattern: any, index: number): void;
   (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
   (e: "create-alert", pattern: any): void;
+  (e: "filter-value", value: string, action: "include" | "exclude"): void;
 }>();
 
 const store = useStore();
 const { t } = useI18n();
+
+const {
+  hoveredToken,
+  onPopoverEnter,
+  onPopoverLeave,
+} = useWildcardHover();
 </script>

@@ -1352,7 +1352,7 @@ describe("TenstackTable", () => {
 
       const copyBtn = wrapper.find(".copy-btn");
       expect(copyBtn.exists()).toBe(true);
-      await copyBtn.trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
@@ -1376,7 +1376,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn").trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledOnce();
@@ -1405,7 +1405,7 @@ describe("TenstackTable", () => {
 
       const copyBtn = wrapper.find(".copy-btn");
       expect(copyBtn.exists()).toBe(true);
-      await copyBtn.trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
@@ -1423,7 +1423,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn").trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text");
@@ -1447,7 +1447,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn").trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
@@ -1503,7 +1503,7 @@ describe("TenstackTable", () => {
       // Two copy buttons: index 0 = "region" cell, index 1 = "ts" cell.
       const copyBtns = wrapper.findAll(".copy-btn");
       expect(copyBtns.length).toBeGreaterThanOrEqual(2);
-      await copyBtns[1].trigger("click");
+      await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
@@ -1536,7 +1536,7 @@ describe("TenstackTable", () => {
       await flushPromises();
 
       const copyBtns = wrapper.findAll(".copy-btn");
-      await copyBtns[1].trigger("click");
+      await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
       const copiedValue = mockCopyToClipboard.mock.calls[0][0] as string;
@@ -1580,7 +1580,7 @@ describe("TenstackTable", () => {
       // (region is index 0, ts right-aligned is index 1).
       const copyBtns = wrapper.findAll(".copy-btn");
       expect(copyBtns.length).toBeGreaterThanOrEqual(2);
-      await copyBtns[1].trigger("click");
+      await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);

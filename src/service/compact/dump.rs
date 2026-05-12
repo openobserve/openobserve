@@ -749,7 +749,7 @@ async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<Stre
 
     // Parse the parquet file to get FileRecord list
     let file_format = FileFormat::from_extension(file_key).unwrap_or(FileFormat::Parquet);
-    let (_, mut reader) = get_recordbatch_reader_from_bytes(file_format, &file_data)
+    let (_, mut reader) = get_recordbatch_reader_from_bytes(file_format, file_data)
         .await
         .map_err(|e| format!("failed to parse dump file as parquet: {e}"))?;
 

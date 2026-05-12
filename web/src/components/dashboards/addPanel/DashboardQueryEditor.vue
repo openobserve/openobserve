@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,52 +16,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
-    <q-bar
-      class="row sql-bar"
-      style="display: flex; justify-content: space-between; align-items: center"
+    <div
+      class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between"
+      :style="{
+        backgroundColor:
+          store.state.theme === 'dark'
+            ? 'transparent'
+            : 'var(--color-primary-100)',
+      }"
       @click.stop="onDropDownClick"
     >
       <div
-        style="display: flex; flex-direction: row; align-items: center"
-        :style="
-          promqlMode || dashboardPanelData.data.type == 'geomap'
-            ? 'flex: 1; min-width: 0'
-            : ''
-        "
+        class="tw:flex tw:flex-row tw:items-center tw:flex-1 tw:min-w-0"
         data-test="dashboard-query-data"
       >
-        <q-space
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-        />
         <span
           v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-          class="text-subtitle2 text-weight-bold"
+          class="text-subtitle2 text-weight-bold tw:ml-2"
           >{{ t("panel.sql") }}</span
         >
         <div
           v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
           style="max-width: 600px; overflow: hidden"
         >
-          <q-tabs
+          <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
-            narrow-indicator
             dense
-            inline-label
-            outside-arrows
             mobile-arrows
             @click.stop
             data-test="dashboard-panel-query-tab"
           >
-            <q-tab
-              no-caps
-              :ripple="false"
+            <OTab
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="'Query ' + (index + 1)"
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
+              <span>{{ "Query " + (index + 1) }}</span>
               <q-icon
                 v-if="promqlMode"
                 :name="
@@ -94,28 +86,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="cursor: pointer"
                 :data-test="`dashboard-panel-query-tab-remove-${index}`"
               />
-            </q-tab>
-          </q-tabs>
-          <!-- <div v-if="promqlMode" class="query-tabs-container">
-                    <div v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" class="query-tab" :class="{ 'active': index === activeTab }" @click="handleActiveTab(index)">
-                        <div class="tab-label">{{ 'Query ' + (index + 1) }}</div>
-                        <div v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)" @click.stop="removeTab(index)">
-                            <i class="material-icons">cancel</i>
-                        </div>
-                    </div>
-                </div> -->
+            </OTab>
+          </OTabs>
         </div>
-        <q-btn
+        <OButton
           v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
-          round
-          flat
+          variant="ghost"
+          size="icon"
           @click.stop="addTab"
-          icon="add"
-          style="margin-right: 10px"
-          data-test="`dashboard-panel-query-tab-add`"
-        ></q-btn>
+          data-test="dashboard-panel-query-tab-add"
+        >
+          <template #icon-left><q-icon name="add" /></template>
+        </OButton>
       </div>
-      <div style="display: flex; gap: 4px; flex-shrink: 0">
+      <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
         <q-toggle
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -133,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <QueryTypeSelector></QueryTypeSelector>
       </div>
-    </q-bar>
+    </div>
   </div>
   <div
     class="col"
@@ -250,15 +234,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-item>
                       </template>
                     </q-select>
-                    <q-btn
-                      no-caps
-                      padding="xs"
-                      class=""
-                      size="sm"
-                      flat
-                      icon="info_outline"
+                    <OButton
+                      variant="ghost"
+                      size="icon"
                       data-test="dashboard-addpanel-config-drilldown-info"
                     >
+                      <template #icon-left
+                        ><q-icon name="info_outline"
+                      /></template>
                       <q-tooltip
                         class="bg-grey-8"
                         anchor="bottom middle"
@@ -267,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("dashboard.vrlExtractionTooltip") }}
                       </q-tooltip>
-                    </q-btn>
+                    </OButton>
                   </div>
                 </div>
               </div>
@@ -283,6 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
 import {
   defineComponent,
@@ -308,13 +293,17 @@ import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
+    OTabs,
+    OTab,
     ConfirmDialog,
     QueryTypeSelector,
     UnifiedQueryEditor,
+    OButton,
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -539,13 +528,13 @@ export default defineComponent({
       ],
       ([streamFields, customFields, groupedFields, functions]) => {
         // Flatten schema fields from all selected streams (the Fields panel source).
-        const schemaFields = (groupedFields as any[] ?? []).flatMap(
+        const schemaFields = ((groupedFields as any[]) ?? []).flatMap(
           (group: any) => group.schema ?? [],
         );
         // Merge all sources; deduplicate by name so fields don't appear twice.
         const allFields = [
-          ...(streamFields as any[] ?? []),
-          ...(customFields as any[] ?? []),
+          ...((streamFields as any[]) ?? []),
+          ...((customFields as any[]) ?? []),
           ...schemaFields,
         ];
         const seen = new Set<string>();
@@ -554,7 +543,7 @@ export default defineComponent({
           seen.add(f.name);
           return true;
         });
-        sqlUpdateAllKeywords(uniqueFields, functions as any[] ?? []);
+        sqlUpdateAllKeywords(uniqueFields, (functions as any[]) ?? []);
       },
       { immediate: true },
     );
@@ -810,9 +799,7 @@ export default defineComponent({
 <!-- removed scope due to VRL background image issue-->
 <style lang="scss">
 .sql-bar {
-  height: 40px !important;
-  // overflow: hidden;
-  // cursor: pointer;
+  height: 40px;
 }
 
 .dashboard-query-remove-icon:hover {

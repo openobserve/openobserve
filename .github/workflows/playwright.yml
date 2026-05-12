@@ -74,7 +74,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-30
+      labels: ubicloud-standard-16
 
     steps:
       - name: Remove unused tools
@@ -108,12 +108,15 @@ jobs:
         with:
           node-version: 22
 
+      - name: Lint frontend code
+        run: cd web && npm ci && npm run lint:ci
+
       - name: Build binary and frontend
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           GIT_HASH_OVERRIDE: ${{ github.sha }}
         run: |
-          bash -c "cd web && npm ci && npm run build && cp -r ./dist /tmp/dist" &
+          bash -c "cd web && npm run build && cp -r ./dist /tmp/dist" &
           sed -i 's|folder = "web/dist/"|folder = "/tmp/dist/"|' src/handler/http/router/ui.rs
           cargo build --profile release-ci --target x86_64-unknown-linux-gnu
           wait
@@ -294,6 +297,7 @@ jobs:
             browser: "chrome"
             run_files:
               [
+                "service-catalog.spec.js",
                 "tracesSearch.spec.js",
                 "traceQueryEditor.spec.js",
                 "traceErrorFilter.spec.js",
@@ -303,21 +307,6 @@ jobs:
                 "traces-autocomplete-suggestions.spec.js",
               ]
 
-          - testfolder: "RegressionSet"
-            browser: "chrome"
-            run_files:
-              [
-                "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "logs-9754.spec.js",
-                "streams-regression.spec.js",
-                "enrichment-regression.spec.js",
-                "ui-regression.spec.js",
-                "pipeline-regression.spec.js",
-                # "alerts-regression.spec.js",
-                "metrics-regression.spec.js",
-                "traces-regression.spec.js",
-              ]
           - testfolder: "Metrics"
             browser: "chrome"
             run_files:
@@ -872,7 +861,7 @@ jobs:
           ls -lh playwright-results/report.json
 
       - name: Cache test failures to TestDino
-        if: always()
+        if: ${{ needs.ui_integration_tests.result == 'failure' }}
         env:
           TESTDINO_TOKEN: ${{ secrets.TESTDINO_API_TOKEN }}
         run: |
@@ -916,7 +905,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload to TestDino
-        if: ${{ (success() || failure()) && env.UPLOAD_TO_TESTDINO == 'true' }}
+        if: ${{ needs.ui_integration_tests.result == 'failure' && env.UPLOAD_TO_TESTDINO == 'true' }}
         run: |
           cd tests/ui-testing
 

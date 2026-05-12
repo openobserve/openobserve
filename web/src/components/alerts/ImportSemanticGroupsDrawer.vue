@@ -26,14 +26,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            flat
+          <OButton
             round
             dense
-            icon="close"
+            variant="ghost"
+            size="icon-circle-sm"
             @click="handleClose"
             data-test="import-drawer-close-btn"
-          />
+          >
+            <q-icon name="close" />
+          </OButton>
         </div>
       </div>
     </div>
@@ -100,32 +102,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Selection Actions -->
         <div class="selection-actions q-mb-md">
-          <q-btn-group flat>
-            <q-btn
-              flat
-              dense
-              label="Select All New"
+          <OButtonGroup>
+            <OButton
+              variant="ghost-primary"
+              size="xs"
               @click="selectAllAdditions"
-              color="positive"
-              size="sm"
-            />
-            <q-btn
-              flat
-              dense
-              label="Select All Modified"
+            >Select All New</OButton>
+            <OButton
+              variant="ghost-warning"
+              size="xs"
               @click="selectAllModifications"
-              color="warning"
-              size="sm"
-            />
-            <q-btn
-              flat
-              dense
-              label="Clear All"
+            >Select All Modified</OButton>
+            <OButton
+              variant="ghost-muted"
+              size="xs"
               @click="deselectAll"
-              color="grey-7"
-              size="sm"
-            />
-          </q-btn-group>
+            >Clear All</OButton>
+          </OButtonGroup>
         </div>
 
         <!-- Groups List -->
@@ -161,14 +154,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item-label>
                 </q-item-section>
                 <q-item-section side>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    icon="visibility"
-                    size="sm"
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
                     @click.stop="viewGroup(group)"
-                  />
+                  >
+                    <q-icon name="visibility" />
+                  </OButton>
                 </q-item-section>
               </q-item>
             </q-list>
@@ -208,14 +200,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item-label>
                 </q-item-section>
                 <q-item-section side>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    icon="compare"
-                    size="sm"
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
                     @click.stop="viewModification(mod)"
-                  />
+                  >
+                    <q-icon name="compare" />
+                  </OButton>
                 </q-item-section>
               </q-item>
             </q-list>
@@ -264,23 +255,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator class="q-mb-md" />
       <div class="row q-col-gutter-sm justify-end">
         <div class="col-auto">
-          <q-btn
-            flat
-            label="Cancel"
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="handleClose"
             data-test="import-drawer-cancel-btn"
-          />
+          >Cancel</OButton>
         </div>
         <div class="col-auto">
-          <q-btn
-            unelevated
-            color="primary"
-            label="Apply Changes"
+          <OButton
+            variant="primary"
+            size="sm-action"
             @click="handleApply"
-            :disable="!hasSelectedChanges"
+            :disabled="!hasSelectedChanges"
             :loading="isApplying"
             data-test="import-drawer-apply-btn"
-          />
+          >Apply Changes</OButton>
         </div>
       </div>
     </div>
@@ -312,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
+        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -374,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
+        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -382,6 +372,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
 import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
 

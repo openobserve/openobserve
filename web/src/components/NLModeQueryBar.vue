@@ -45,16 +45,14 @@
         <!-- Action Buttons (always present) -->
         <div class="tw:flex tw:gap-2 tw:ml-auto">
           <!-- Main Action Button: Run Query / Ask AI -->
-          <q-btn
+          <OButton
             :data-test="`${dataTestPrefix}-action-btn`"
-            dense
-            flat
-            no-caps
+            :variant="isAIMode ? 'ghost-primary' : 'ghost'"
+            size="sm"
             :title="isAIMode ? aiButtonTooltip : normalButtonTooltip"
             :class="buttonClasses"
-            :color="isAIMode ? 'primary' : undefined"
             :loading="loading"
-            :disable="disabled || (isAIMode && isGenerating)"
+            :disabled="disabled || (isAIMode && isGenerating)"
             @click="handleButtonClick"
           >
             <q-icon
@@ -63,45 +61,43 @@
               class="q-mr-xs"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
-          </q-btn>
+          </OButton>
 
           <!-- Dropdown (optional - for enterprise features) -->
           <template v-if="showDropdown">
             <q-separator class="tw:h-[29px] tw:w-[1px]" />
-            <q-btn-dropdown
-              flat
-              dense
-              class="tw:h-[29px] search-button-dropdown"
-              :class="dropdownClasses"
-            >
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  class="tw:h-[29px] search-button-dropdown"
+                  :class="dropdownClasses"
+                >
+                  <q-icon name="arrow_drop_down" size="18px" />
+                </OButton>
+              </template>
               <!-- Normal Mode: Refresh option -->
               <template v-if="!isAIMode">
-                <q-btn
-                  dense
-                  flat
-                  no-caps
-                  :title="t('search.refreshCacheAndRunQuery')"
-                  class="q-pa-sm tw:text-[12px]"
-                  v-close-popup
-                  @click="$emit('refresh')"
-                  :disable="disabled"
+                <ODropdownItem
+                  :disabled="disabled"
+                  @select="$emit('refresh')"
                 >
-                  <q-icon name="refresh" class="q-mr-xs" />
+                  <template #icon-left>
+                    <q-icon name="refresh" size="16px" />
+                  </template>
                   {{ t('search.refreshCacheAndRunQuery') }}
-                </q-btn>
+                </ODropdownItem>
               </template>
-
               <!-- AI Mode: Custom actions (slot) -->
               <template v-else>
                 <slot name="dropdown-actions">
-                  <q-list class="tw:min-w-[140px] tw:p-2">
-                    <q-item-label class="tw:text-xs tw:text-gray-500 tw:text-center">
-                      {{ t('nlMode.noAdditionalOptions') }}
-                    </q-item-label>
-                  </q-list>
+                  <div class="tw:min-w-[140px] tw:p-2 tw:text-xs tw:text-center tw:text-dropdown-item-text">
+                    {{ t('nlMode.noAdditionalOptions') }}
+                  </div>
                 </slot>
               </template>
-            </q-btn-dropdown>
+            </ODropdown>
           </template>
         </div>
       </div>
@@ -161,6 +157,9 @@ import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
+import OButton from '@/lib/core/Button/OButton.vue';
+import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
+import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
 import { getImageURL } from '@/utils/zincutils';
 import config from '@/aws-exports';
 

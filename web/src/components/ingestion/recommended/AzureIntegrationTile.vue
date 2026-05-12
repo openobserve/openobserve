@@ -15,30 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    class="azure-integration-tile"
-    flat
-    bordered
-  >
+  <q-card class="azure-integration-tile" flat bordered>
     <q-card-section class="tw:pb-2">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
         <div class="tile-name tw:font-semibold tw:text-base">
           {{ integration.displayName }}
         </div>
-        <q-btn
+        <OButton
           v-if="integration.documentationUrl"
-          flat
-          dense
-          round
-          size="sm"
-          icon="description"
-          color="primary"
+          variant="ghost"
+          size="icon-circle-sm"
           @click="handleDocumentation()"
           class="docs-btn"
           :data-test="`azure-${integration.id}-docs-btn`"
         >
+          <q-icon name="description" />
           <q-tooltip>View Documentation</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
         {{ integration.description }}
@@ -47,66 +40,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-card-actions class="tw:px-4 tw:pb-4 tw:flex tw:flex-row tw:gap-2">
       <!-- Deploy Button (ARM template) -->
-      <q-btn
+      <OButton
         v-if="integration.armTemplate"
-        color="primary"
-        label="Deploy"
+        variant="primary"
+        size="sm"
         @click="handleDeploy()"
-        unelevated
         class="tw:flex-1"
         :data-test="`azure-${integration.id}-deploy-btn`"
-      />
+        >Deploy</OButton
+      >
       <!-- Documentation Button (shown when no ARM template) -->
-      <q-btn
+      <OButton
         v-else-if="integration.documentationUrl"
-        color="primary"
-        label="Documentation"
+        variant="primary"
+        size="sm"
         @click="handleDocumentation()"
-        unelevated
         class="tw:flex-1"
         :data-test="`azure-${integration.id}-documentation-btn`"
-      />
+        >Documentation</OButton
+      >
       <!-- Docs icon button (shown alongside Deploy when both exist) -->
-      <q-btn
+      <OButton
         v-if="integration.armTemplate && integration.documentationUrl"
-        flat
-        dense
-        round
-        size="sm"
-        icon="description"
-        color="primary"
+        variant="ghost"
+        size="icon-circle-sm"
         @click="handleDocumentation()"
         :data-test="`azure-${integration.id}-docs-icon-btn`"
       >
+        <q-icon name="description" />
         <q-tooltip>View Documentation</q-tooltip>
-      </q-btn>
+      </OButton>
       <!-- Dashboard Button -->
-      <q-btn
-        outline
-        color="primary"
-        icon="dashboard"
-        label="Dashboard"
+      <OButton
+        variant="outline"
+        size="sm"
         @click="handleDashboard"
-        :disable="!integration.hasDashboard"
+        :disabled="!integration.hasDashboard"
         class="tw:flex-1"
         :data-test="`azure-${integration.id}-dashboard-btn`"
-      />
+      >
+        <template #icon-left><q-icon name="dashboard" /></template>
+        Dashboard
+      </OButton>
     </q-card-actions>
   </q-card>
 </template>
 
 <script lang="ts">
 import { defineComponent, type PropType } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import type { AzureIntegration } from "@/utils/azureIntegrations";
-import { generateAzureDashboardURL, generateARMTemplateURL } from "@/utils/azureIntegrations";
+import {
+  generateAzureDashboardURL,
+  generateARMTemplateURL,
+} from "@/utils/azureIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 
 export default defineComponent({
   name: "AzureIntegrationTile",
+  components: { OButton },
   props: {
     integration: {
       type: Object as PropType<AzureIntegration>,
@@ -129,7 +125,11 @@ export default defineComponent({
       if (!props.integration.armTemplate) return;
 
       if (!endpoint?.url) {
-        q.notify({ type: "negative", message: "Invalid ingestion endpoint. Please check configuration.", timeout: 3000 });
+        q.notify({
+          type: "negative",
+          message: "Invalid ingestion endpoint. Please check configuration.",
+          timeout: 3000,
+        });
         return;
       }
 
@@ -138,23 +138,35 @@ export default defineComponent({
       const passcode = store.state?.organizationData?.organizationPasscode;
 
       if (!organizationId || !email || !passcode) {
-        q.notify({ type: "negative", message: "Missing organization credentials. Please refresh the page.", timeout: 3000 });
+        q.notify({
+          type: "negative",
+          message: "Missing organization credentials. Please refresh the page.",
+          timeout: 3000,
+        });
         return;
       }
 
       const accessKey = btoa(`${email}:${passcode}`);
       const endpointUrl = `${endpoint.url}/azure/${organizationId}/default/_event_hub`;
 
-      const url = generateARMTemplateURL(props.integration, endpointUrl, accessKey);
+      const url = generateARMTemplateURL(
+        props.integration,
+        endpointUrl,
+        accessKey,
+      );
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      window.open(url, "_blank", "noopener,noreferrer");
 
       segment.track("Azure ARM Template Deploy Started", {
         service: props.integration.name,
         integration_id: props.integration.id,
       });
 
-      q.notify({ type: "info", message: `Opening Azure portal to deploy ${props.integration.displayName}`, timeout: 3000 });
+      q.notify({
+        type: "info",
+        message: `Opening Azure portal to deploy ${props.integration.displayName}`,
+        timeout: 3000,
+      });
     };
 
     const handleDashboard = () => {
@@ -172,7 +184,7 @@ export default defineComponent({
         const dashboardURL = generateAzureDashboardURL(
           props.integration,
           organizationId,
-          baseURL
+          baseURL,
         );
 
         // Track analytics
@@ -206,7 +218,11 @@ export default defineComponent({
       });
 
       // Open documentation in new tab
-      window.open(props.integration.documentationUrl, '_blank', 'noopener,noreferrer');
+      window.open(
+        props.integration.documentationUrl,
+        "_blank",
+        "noopener,noreferrer",
+      );
     };
 
     return {

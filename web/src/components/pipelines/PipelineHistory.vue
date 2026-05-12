@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -22,15 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-between full-width tw:h-[68px] tw:px-2 tw:py-3"
         >
           <div class="flex items-center">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              class="hideOnPrintMode el-border"
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              class="hideOnPrintMode"
               @click="goBack"
               data-test="alert-history-back-btn"
-            />
+            >
+              <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
+            </OButton>
             <div
               class="q-table__title tw:font-[600] q-ml-sm tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
@@ -38,8 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t(`pipeline.history`) }}
               <q-icon name="info" size="18px" color="grey-6">
                 <q-tooltip>
-                  History is only available for scheduled and manually triggered pipelines.
-                  Real-time pipelines do not generate history records.
+                  History is only available for scheduled and manually triggered
+                  pipelines. Real-time pipelines do not generate history
+                  records.
                 </q-tooltip>
               </q-icon>
             </div>
@@ -100,34 +101,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item>
               </template>
             </q-select>
-            <q-btn
-              icon="search"
-              flat
-              dense
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              class="q-mr-sm"
               @click="manualSearch"
               data-test="pipeline-history-manual-search-btn"
-              :disable="loading"
-              class="q-mr-sm download-logs-btn q-px-sm q-py-sm element-box-shadow el-border"
+              :disabled="loading"
             >
+              <template #icon-left><Search class="tw:size-3.5 tw:shrink-0" /></template>
               <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              icon="refresh"
-              flat
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
               @click="refreshData"
-              class="download-logs-btn q-px-sm q-py-sm element-box-shadow el-border"
               data-test="pipeline-history-refresh-btn"
               :loading="loading"
             >
+              <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
               <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
         </div>
       </div>
     </div>
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
-      <div class="pipeline-history-table card-container tw:h-[calc(100vh-127px)]">
+      <div
+        class="pipeline-history-table card-container tw:h-[calc(100vh-127px)]"
+      >
         <q-table
           data-test="pipeline-history-table"
           ref="qTable"
@@ -217,13 +219,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #body-cell-is_partial="props">
             <q-td :props="props">
               <q-icon
-                v-if="props.row.is_partial !== null && props.row.is_partial !== undefined"
+                v-if="
+                  props.row.is_partial !== null &&
+                  props.row.is_partial !== undefined
+                "
                 :name="props.row.is_partial ? 'warning' : 'check_circle'"
                 :color="props.row.is_partial ? 'warning' : 'positive'"
                 size="xs"
               >
                 <q-tooltip>
-                  {{ props.row.is_partial ? "Partial Results" : "Complete Results" }}
+                  {{
+                    props.row.is_partial
+                      ? "Partial Results"
+                      : "Complete Results"
+                  }}
                 </q-tooltip>
               </q-icon>
               <span v-else>-</span>
@@ -232,35 +241,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #body-cell-delay_in_secs="props">
             <q-td :props="props">
-              {{ props.row.delay_in_secs !== null && props.row.delay_in_secs !== undefined ? props.row.delay_in_secs + 's' : '-' }}
+              {{
+                props.row.delay_in_secs !== null &&
+                props.row.delay_in_secs !== undefined
+                  ? props.row.delay_in_secs + "s"
+                  : "-"
+              }}
             </q-td>
           </template>
 
           <template #body-cell-evaluation_took_in_secs="props">
             <q-td :props="props">
-              {{ props.row.evaluation_took_in_secs !== null && props.row.evaluation_took_in_secs !== undefined ? props.row.evaluation_took_in_secs.toFixed(2) + 's' : '-' }}
+              {{
+                props.row.evaluation_took_in_secs !== null &&
+                props.row.evaluation_took_in_secs !== undefined
+                  ? props.row.evaluation_took_in_secs.toFixed(2) + "s"
+                  : "-"
+              }}
             </q-td>
           </template>
 
           <template #body-cell-query_took="props">
             <q-td :props="props">
-              {{ props.row.query_took !== null && props.row.query_took !== undefined ? (props.row.query_took / 1000).toFixed(2) + 'ms' : '-' }}
+              {{
+                props.row.query_took !== null &&
+                props.row.query_took !== undefined
+                  ? (props.row.query_took / 1000).toFixed(2) + "ms"
+                  : "-"
+              }}
             </q-td>
           </template>
 
           <template #bottom="scope">
-                <div class="bottom-btn tw:h-[48px] tw:w-full tw:flex tw:items-center">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md">
-                      {{ pagination.rowsNumber }} {{ t('pipeline.header') }}
-                    </div>
-                    <QTablePagination
-                      :scope="scope"
-                      :position="'bottom'"
-                      :resultTotal="pagination.rowsNumber"
-                      :perPageOptions="rowsPerPageOptions"
-                      @update:changeRecordPerPage="changePagination"
-                    />
-                  </div>
+            <div
+              class="bottom-btn tw:h-[48px] tw:w-full tw:flex tw:items-center"
+            >
+              <div
+                class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md"
+              >
+                {{ pagination.rowsNumber }} {{ t("pipeline.header") }}
+              </div>
+              <QTablePagination
+                :scope="scope"
+                :position="'bottom'"
+                :resultTotal="pagination.rowsNumber"
+                :perPageOptions="rowsPerPageOptions"
+                @update:changeRecordPerPage="changePagination"
+              />
+            </div>
           </template>
         </q-table>
       </div>
@@ -275,7 +303,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-xs bg-primary text-white">
           <div class="text-h6">Pipeline Execution Details</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton variant="ghost" size="icon" v-close-popup>
+            <q-icon name="close" size="14px" />
+          </OButton>
         </q-card-section>
 
         <q-separator />
@@ -382,7 +412,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 selectedRow.query_took ||
                 selectedRow.retries > 0 ||
                 selectedRow.delay_in_secs ||
-                selectedRow.is_partial !== null && selectedRow.is_partial !== undefined
+                (selectedRow.is_partial !== null &&
+                  selectedRow.is_partial !== undefined)
               "
             >
               <q-separator class="q-my-sm" />
@@ -409,25 +440,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="text-body2">{{ selectedRow.retries }}</div>
                   </div>
                   <div v-if="selectedRow.delay_in_secs" class="col-4">
-                    <div class="text-caption text-grey-7 q-mb-xs">
-                      Delay
-                    </div>
+                    <div class="text-caption text-grey-7 q-mb-xs">Delay</div>
                     <div class="text-body2">
                       {{ selectedRow.delay_in_secs }}s
                     </div>
                   </div>
-                  <div v-if="selectedRow.is_partial !== null && selectedRow.is_partial !== undefined" class="col-4">
+                  <div
+                    v-if="
+                      selectedRow.is_partial !== null &&
+                      selectedRow.is_partial !== undefined
+                    "
+                    class="col-4"
+                  >
                     <div class="text-caption text-grey-7 q-mb-xs">
                       Result Status
                     </div>
                     <div class="text-body2">
                       <q-icon
-                        :name="selectedRow.is_partial ? 'warning' : 'check_circle'"
+                        :name="
+                          selectedRow.is_partial ? 'warning' : 'check_circle'
+                        "
                         :color="selectedRow.is_partial ? 'warning' : 'positive'"
                         size="xs"
                         class="q-mr-xs"
                       />
-                      {{ selectedRow.is_partial ? 'Partial' : 'Complete' }}
+                      {{ selectedRow.is_partial ? "Partial" : "Complete" }}
                     </div>
                   </div>
                 </div>
@@ -508,7 +545,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="right" class="q-pa-md">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="outline" size="sm-action" v-close-popup>
+            Close
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -516,26 +555,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error Dialog -->
     <q-dialog v-model="errorDialog">
       <q-card style="min-width: 500px">
-        <q-card-section class="pipeline-error-header row items-center q-pb-none">
+        <q-card-section
+          class="pipeline-error-header row items-center q-pb-none"
+        >
           <div class="tw:flex-1">
             <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
               <q-icon name="error" size="24px" class="error-icon" />
-              <span class="pipeline-name">{{ errorMessage.pipeline_name }}</span>
+              <span class="pipeline-name">{{
+                errorMessage.pipeline_name
+              }}</span>
             </div>
             <div class="error-timestamp">
               <span class="tw:ml-1">Last error:</span>
               <q-icon name="schedule" size="14px" class="tw:mr-1" />
-              {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
+              {{
+                errorMessage.last_error_timestamp &&
+                new Date(
+                  errorMessage.last_error_timestamp / 1000,
+                ).toLocaleString()
+              }}
             </div>
           </div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
+          <OButton
+            variant="ghost"
+            size="icon"
             @click="closeErrorDialog"
             class="close-btn"
-          />
+          >
+            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
+          </OButton>
         </q-card-section>
 
         <q-separator />
@@ -543,19 +591,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section>
           <div class="tw:mb-4">
             <div class="section-label tw:mb-2">Error Summary</div>
-              <div class="error-summary-box">
-                {{ errorMessage.error }}
-              </div>
+            <div class="error-summary-box">
+              {{ errorMessage.error }}
+            </div>
           </div>
         </q-card-section>
         <q-card-actions class="pipeline-error-actions">
-          <q-btn
-            flat
-            no-caps
-            label="Close"
-            class="o2-secondary-button tw:h-[36px]"
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="closeErrorDialog"
-          />
+          >Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -569,7 +615,9 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { ChevronLeft, Search, RefreshCw, X } from "lucide-vue-next";
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -792,7 +840,10 @@ const manualSearch = () => {
   // Update searchQuery from selectedPipeline when manually searching
   if (selectedPipeline.value && selectedPipeline.value.value) {
     searchQuery.value = selectedPipeline.value.value;
-  } else if (selectedPipeline.value && typeof selectedPipeline.value === 'string') {
+  } else if (
+    selectedPipeline.value &&
+    typeof selectedPipeline.value === "string"
+  ) {
     // Handle case where user typed a value without selecting from dropdown
     searchQuery.value = selectedPipeline.value;
   }
@@ -830,7 +881,6 @@ const fetchPipelineHistory = async () => {
       params.sort_order = pagination.value.descending ? "desc" : "asc";
     }
 
-
     const url = `/api/${org}/pipelines/history`;
     const response = await http().get(url, { params });
 
@@ -842,7 +892,10 @@ const fetchPipelineHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#": (index + 1) + (pagination.value.page - 1) * pagination.value.rowsPerPage,
+        "#":
+          index +
+          1 +
+          (pagination.value.page - 1) * pagination.value.rowsPerPage,
       }));
 
       // Update pagination total
@@ -965,11 +1018,12 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
-  router.push({ 
+  router.push({
     name: "pipelines",
     query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          }});
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
 };
 
 // Lifecycle
@@ -1115,7 +1169,7 @@ const changePagination = (val: { label: string; value: any }) => {
 .error-summary-box {
   padding: 16px;
   border-radius: 8px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;

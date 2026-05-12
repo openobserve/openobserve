@@ -488,7 +488,7 @@ export class HomePage {
 
         // The theme switcher is the button immediately before Slack button
         // Find all buttons in header-menu and get the one before Slack
-        const headerButtons = this.page.locator('.header-menu button, .header-menu .q-btn');
+        const headerButtons = this.page.locator('.header-menu button');
         const buttonCount = await headerButtons.count();
 
         // Find Slack button index and click the button before it

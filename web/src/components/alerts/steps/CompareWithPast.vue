@@ -56,18 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <span class="tw:inline-block">
-                <q-btn
-                  icon="delete_outline"
-                  class="iconHoverBtn q-ml-xs q-mr-sm"
-                  :class="store.state.theme === 'dark' ? 'icon-dark' : ''"
-                  padding="xs"
-                  unelevated
-                  size="16px"
-                  round
-                  flat
+                <OButton
+                  variant="ghost"
+                  size="icon-circle-sm"
                   disable
                   style="min-width: auto; opacity: 0.3; pointer-events: none;"
-                />
+                >
+                  <q-icon name="delete_outline" />
+                </OButton>
                 <q-tooltip
                   anchor="top middle"
                   self="bottom middle"
@@ -148,19 +144,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('alerts.compareWithPast.comparingText', { offset: getDisplayValue(picker.offSet) }) }}
             </div>
             <div>
-              <q-btn
+              <OButton
                 data-test="multi-time-range-alerts-delete-btn"
-                icon="delete_outline"
-                class="iconHoverBtn q-ml-xs q-mr-sm"
-                :class="store.state.theme === 'dark' ? 'icon-dark' : ''"
-                padding="xs"
-                unelevated
-                size="16px"
-                round
-                flat
+                variant="ghost"
+                size="icon-circle-sm"
                 @click="removeTimeShift(index)"
-                style="min-width: auto"
-              />
+              >
+                <q-icon name="delete_outline" />
+              </OButton>
             </div>
           </div>
         </div>
@@ -168,16 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Action Buttons Section -->
       <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 q-mt-sm">
-        <q-btn
+        <OButton
           data-test="multi-time-range-alerts-add-btn"
-          :label="t('alerts.compareWithPast.addComparisonWindow')"
-          size="md"
-          class="o2-secondary-button"
-          style="font-size: 14px;"
-          no-caps
+          variant="outline"
+          size="sm"
           :disable="isComparisonDisabled"
           @click="addTimeShift"
         >
+          {{ t('alerts.compareWithPast.addComparisonWindow') }}
           <q-tooltip
             v-if="isComparisonDisabled"
             anchor="top middle"
@@ -186,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ comparisonDisabledTooltip }}
           </q-tooltip>
-        </q-btn>
+        </OButton>
 
       </div>
       </div><!-- end tw:px-3 tw:py-2 -->
@@ -200,6 +189,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface TimeShiftPicker {
   offSet: string;
@@ -210,6 +200,7 @@ export default defineComponent({
   name: "Step4CompareWithPast",
   components: {
     CustomDateTimePicker,
+    OButton,
   },
   props: {
     multiTimeRange: {

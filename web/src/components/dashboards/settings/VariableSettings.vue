@@ -27,35 +27,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="column full-height">
       <DashboardHeader title="Variables">
         <template #right>
-          <div>
+          <div class="tw:flex tw:gap-2">
             <!-- show variables dependencies if variables exist -->
-            <q-btn
+            <OButton
               v-if="dashboardVariablesList.length > 0"
-              class="text-bold no-border q-ml-md o2-secondary-button tw:h-[36px]"
-              no-caps
-              no-outline
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              flat
-              label="Show Dependencies"
+              variant="outline"
+              size="sm"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
-            />
-            <q-btn
-              class="text-bold no-border q-ml-md o2-primary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              flat
-              :label="t(`dashboard.newVariable`)"
+              >Show Dependencies</OButton
+            >
+            <OButton
+              variant="primary"
+              size="sm"
               @click="addVariables"
               data-test="dashboard-add-variable-btn"
-            />
+              >{{ t("dashboard.newVariable") }}</OButton
+            >
           </div>
         </template>
       </DashboardHeader>
@@ -103,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <q-tooltip
                   v-if="variable.name.length > 30"
-                  style="word-wrap: break-word; white-space: normal;"
+                  style="word-wrap: break-word; white-space: normal"
                   class="variable-name-tooltip"
                 >
                   {{ variable.name }}
@@ -165,30 +153,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="item-actions">
-                <q-btn
-                  icon="edit"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
+                <OButton
+                  variant="ghost"
+                  size="icon"
                   :title="t('dashboard.edit')"
                   @click="editVariableFn(variable.name)"
                   :data-test="`dashboard-edit-variable-${variable.name}`"
-                />
-                <q-btn
-                  :icon="outlinedDelete"
+                >
+                  <template #icon-left><q-icon name="edit" /></template>
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon"
                   :title="t('dashboard.delete')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
                   @click.stop="
                     showDeleteDialogFn({ row: { name: variable.name } })
                   "
                   data-test="dashboard-delete-variable"
-                />
+                >
+                  <template #icon-left
+                    ><q-icon :name="outlinedDelete"
+                  /></template>
+                </OButton>
               </div>
             </div>
           </div>
@@ -207,7 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-toolbar>
               <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
-              <q-btn flat round dense icon="close" v-close-popup="true" />
+              <OButton variant="ghost" size="icon" v-close-popup="true">
+                <template #icon-left><q-icon name="close" /></template>
+              </OButton>
             </q-toolbar>
             <q-card-section style="width: 100%; height: calc(100% - 50px)">
               <VariablesDependenciesGraph
@@ -226,7 +214,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onActivated, reactive, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onActivated,
+  reactive,
+  nextTick,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
@@ -244,6 +239,7 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
 import { VueDraggableNext } from "vue-draggable-next";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -254,6 +250,7 @@ export default defineComponent({
     ConfirmDialog,
     DashboardHeader,
     VariablesDependenciesGraph,
+    OButton,
   },
   emits: ["save"],
   setup(props, { emit }) {

@@ -10,12 +10,14 @@ installQuasar();
 
 const mockReplace = vi.fn();
 const mockCurrentRoute = { value: { name: "ai-integrations" } };
+const mockRoute = { name: "ai-integrations" };
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     currentRoute: mockCurrentRoute,
     replace: mockReplace,
   }),
+  useRoute: () => mockRoute,
 }));
 
 vi.mock("quasar", async (importOriginal) => {

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -22,17 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-bold q-px-sm  q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
-            <q-btn
-              class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              no-caps
-              flat
+            <OButton
+              variant="outline"
+              size="icon"
               @click.stop="addFolder"
               data-test="dashboard-new-folder-btn"
               title="Add Folder"
             >
-            <q-icon name="add" size="xs" />
-          </q-btn>
+              <q-icon name="add" />
+            </OButton>
           </div>
         </div>
         <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
@@ -57,18 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
-        <q-tabs
-          indicator-color="transparent"
-          inline-label
-          vertical
+        <OTabs
+          orientation="vertical"
           v-model="activeFolderId"
           data-test="dashboards-folder-tabs"
       >
-          <q-tab
+          <OTab
           v-for="(tab, index) in filteredTabs"
           :key="tab.folderId"
           :name="tab.folderId"
-          content-class="tab_content full-width"
           class="test-class"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           >
@@ -77,16 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tab.name
               }}</span>
               <div class="hover-actions">
-              <q-btn
+              <OButton
                   v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
-                  dense
-                  flat
-                  no-caps
-                  icon="more_vert"
+                  variant="ghost"
+                  size="icon-circle-sm"
                   style="cursor: pointer; justify-self: end; height: 0.5rem"
-                  size="sm"
                   data-test="dashboard-more-icon"
               >
+                  <q-icon name="more_vert" />
                   <q-menu>
                   <q-list dense>
                       <q-item
@@ -117,12 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-item>
                   </q-list>
                   </q-menu>
-              </q-btn>
+              </OButton>
               </div>
           </div>
-          <q-separator />
-          </q-tab>
-      </q-tabs>
+          </OTab>
+      </OTabs>
       </div>
     </div>
       <q-dialog
@@ -153,6 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
   <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OButton from '@/lib/core/Button/OButton.vue';
   // @ts-nocheck
   import {
     computed,
@@ -214,6 +209,9 @@ export default defineComponent({
       ConfirmDialog,
       AddFolder,
       MoveDashboardToAnotherFolder,
+      OTabs,
+      OTab,
+      OButton,
     },
     props: {
       type: {
@@ -367,15 +365,13 @@ export default defineComponent({
 }
 
 .folders-tabs {
-  .q-tabs {
+  .o-tabs {
     height: auto !important;
     max-height: none !important;
   }
 
   .test-class {
     min-height: 1.5rem;
-    margin-bottom: 6px;
-    border-bottom: 1px lightgray dotted;
   }
   .folder-item {
     display: flex;
@@ -400,6 +396,10 @@ export default defineComponent({
     .hover-actions {
       display: none;
       align-items: center;
+      // No background change on hover — the button appears inside a folder item
+      // which already has its own hover/active state. Any fill here looks like
+      // a white or grey artifact over the item background.
+      --color-button-ghost-hover-bg: transparent;
 
       .q-btn {
         margin-left: 0.5rem;
@@ -407,18 +407,18 @@ export default defineComponent({
     }
   }
 
-  .q-tabs {
+  .o-tabs {
     &--vertical {
       margin: 5px;
 
-      .q-tab {
+      .o-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         text-transform: capitalize;
 
         &__content.tab_content {
-          .q-tab {
+          .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
               font-weight: 600;

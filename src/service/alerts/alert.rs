@@ -1826,7 +1826,8 @@ async fn process_dest_template(
     }
 
     for (key, value) in vars.iter() {
-        if resp.contains(&format!("{{{key}}}")) {
+        // Match both bare `{key}` and length-suffixed `{key:N}` forms.
+        if resp.contains(&format!("{{{key}}}")) || resp.contains(&format!("{{{key}:")) {
             let val = value.iter().cloned().collect::<Vec<_>>();
             process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")), is_email);
         }
@@ -1934,24 +1935,36 @@ fn extract_limit_with_prefix(tpl: &str, prefix: &str) -> Option<usize> {
 }
 
 fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue, is_email: bool) {
-    let pattern = "{".to_owned() + var_name + "}";
-    if tpl.contains(&pattern) {
-        *tpl = tpl.replace(&pattern, &var_val.to_string_with_length(0, is_email));
-        return;
-    }
-    let pattern = "{".to_owned() + var_name + ":";
-    if let Some(start) = tpl.find(&pattern) {
-        // find } start from position v
-        let p = start + pattern.len();
-        if let Some(end) = tpl[p..].find('}') {
-            let len = tpl[p..p + end].parse::<usize>().unwrap_or_default();
-            if len > 0 {
-                *tpl = tpl.replace(
-                    &tpl[start..p + end + 1],
-                    &var_val.to_string_with_length(len, is_email),
-                );
-            }
+    // 1) Handle every `{var:N}` occurrence first. We scan left-to-right and advance `cursor` past
+    //    each match so we don't loop forever on inputs that can't be parsed (e.g. `{var:abc}`) and
+    //    so multiple distinct lengths in the same template (`{msg:100}` and `{msg:200}`) are all
+    //    replaced.
+    let prefix = format!("{{{var_name}:");
+    let mut cursor = 0usize;
+    while let Some(rel_start) = tpl[cursor..].find(&prefix) {
+        let start = cursor + rel_start;
+        let num_start = start + prefix.len();
+        let Some(end_offset) = tpl[num_start..].find('}') else {
+            break;
+        };
+        let num_end = num_start + end_offset;
+        let full_end = num_end + 1; // include the closing `}`
+        let len = tpl[num_start..num_end].parse::<usize>().unwrap_or_default();
+        if len > 0 {
+            let replacement = var_val.to_string_with_length(len, is_email);
+            tpl.replace_range(start..full_end, &replacement);
+            cursor = start + replacement.len();
+        } else {
+            // Invalid/zero length — skip past this occurrence to avoid an
+            // infinite loop, but leave the original substring untouched.
+            cursor = full_end;
         }
+    }
+
+    // 2) Then handle every bare `{var}` occurrence.
+    let bare = format!("{{{var_name}}}");
+    if tpl.contains(&bare) {
+        *tpl = tpl.replace(&bare, &var_val.to_string_with_length(0, is_email));
     }
 }
 
@@ -3801,5 +3814,125 @@ mod tests {
         assert!(check_json_context(r#""fields": "{...items}"}"#, "items"));
         // should not match "rows"
         assert!(!check_json_context(r#""fields": "{...items}"}"#, "rows"));
+    }
+
+    // ── {var:N} length-suffix bug fixes (regression tests) ────────────────
+
+    /// Bug 2 (`process_variable_replace`): a template that contains *only*
+    /// `{var:N}` (no bare `{var}`) must still get truncated.
+    #[test]
+    fn test_process_variable_replace_only_length_form() {
+        let mut tpl = "stack: {exception_stacktrace:5}".to_string();
+        process_variable_replace(
+            &mut tpl,
+            "exception_stacktrace",
+            &VarValue::Str("NullPointerException at line 42"),
+            false,
+        );
+        assert_eq!(tpl, "stack: NullP");
+    }
+
+    /// Bug 2: when both `{var}` and `{var:N}` appear in the same template,
+    /// both forms must be replaced (the old code returned early after the
+    /// bare-form replacement, leaving `{var:N}` untouched).
+    #[test]
+    fn test_process_variable_replace_both_forms_same_template() {
+        let mut tpl = "full={msg} short={msg:5}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello world"), false);
+        assert_eq!(tpl, "full=hello world short=hello");
+    }
+
+    /// Two distinct length suffixes for the same variable in one template.
+    #[test]
+    fn test_process_variable_replace_multiple_length_specs() {
+        let mut tpl = "a={msg:3} b={msg:7}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("abcdefghij"), false);
+        assert_eq!(tpl, "a=abc b=abcdefg");
+    }
+
+    /// Multiple occurrences of the same `{var:N}` are all replaced.
+    #[test]
+    fn test_process_variable_replace_repeated_length_spec() {
+        let mut tpl = "x={msg:3} y={msg:3}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("abcdef"), false);
+        assert_eq!(tpl, "x=abc y=abc");
+    }
+
+    /// Malformed `{var:abc}` (non-numeric length) must not loop forever and
+    /// must leave the original substring untouched.
+    #[test]
+    fn test_process_variable_replace_invalid_length_is_skipped() {
+        let mut tpl = "bad={msg:abc} good={msg:5}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello world"), false);
+        assert_eq!(tpl, "bad={msg:abc} good=hello");
+    }
+
+    /// `{var:0}` is treated as no-op truncation (preserves prior behavior).
+    #[test]
+    fn test_process_variable_replace_zero_length_then_bare() {
+        let mut tpl = "z={msg:0} b={msg}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello"), false);
+        // {msg:0} is left as-is; {msg} is replaced.
+        assert_eq!(tpl, "z={msg:0} b=hello");
+    }
+
+    /// Bug 1 (`process_dest_template` guard): when the destination template
+    /// contains *only* `{field:N}` (no bare `{field}`), the row-derived value
+    /// must still be substituted with truncation. Mirrors the user's Lark
+    /// card template scenario.
+    #[tokio::test]
+    async fn test_process_dest_template_length_only_field() {
+        let dest_tpl = r#"{"text": "stacktrace: {exception_stacktrace:10}"}"#;
+        let rows_tpl_val = vec![Value::String(
+            "exception_stacktrace=NullPointerException at line 42".to_string(),
+        )];
+        let mut row = Map::new();
+        row.insert(
+            "exception_stacktrace".to_string(),
+            json!("NullPointerException at line 42"),
+        );
+        let rows = vec![row];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["text"], "stacktrace: NullPointe");
+    }
+
+    /// Bug 1 + Bug 2 combined: destination template containing both `{field}`
+    /// and `{field:N}` for the *same* variable. Both must be replaced.
+    #[tokio::test]
+    async fn test_process_dest_template_both_forms_same_field() {
+        let dest_tpl = r#"{"full": "{msg}", "short": "{msg:5}"}"#;
+        let rows_tpl_val = vec![Value::String("msg=hello world".to_string())];
+        let mut row = Map::new();
+        row.insert("msg".to_string(), json!("hello world"));
+        let rows = vec![row];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["full"], "hello world");
+        assert_eq!(parsed["short"], "hello");
     }
 }

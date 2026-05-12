@@ -19,21 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-[200px] tw:pl-[0.625rem] tw:pb-[0.625rem] tw:flex tw:flex-col">
       <div class="card-container tw:flex-1 el-border-radius">
         <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-100px)]">
-          <q-tabs
+          <OTabs
             v-model="selectedCategory"
-            vertical
-            inline-label
-            indicator-color="transparent"
-            class="ai-category-tabs"
+            orientation="vertical"
           >
-            <q-tab
+            <OTab
               v-for="cat in aiCategories"
               :key="cat.slug"
               :name="cat.slug"
               :label="cat.name"
               :data-test="`ai-integrations-category-${cat.slug}`"
             />
-          </q-tabs>
+          </OTabs>
         </div>
       </div>
     </div>
@@ -55,22 +52,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-150px)]">
-            <q-tabs
+            <OTabs
               v-model="selectedIntegration"
-              vertical
-              inline-label
-              indicator-color="transparent"
-              class="ai-integration-tabs"
+              orientation="vertical"
               @update:model-value="navigateToIntegration"
             >
-              <q-tab
+              <OTab
                 v-for="integration in filteredIntegrations"
                 :key="integration.slug"
                 :name="integration.routeName"
                 :label="integration.name"
                 :data-test="`ai-integrations-item-${integration.slug}`"
               />
-            </q-tabs>
+            </OTabs>
           </div>
         </div>
       </div>
@@ -92,15 +86,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
+import OTab from '@/lib/navigation/Tabs/OTab.vue';
 
 export default defineComponent({
   name: "AIIntegrationsPage",
+  components: { OTabs, OTab },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
 
     const selectedCategory = ref(aiCategories[0].slug);
     const selectedIntegration = ref(aiCategories[0].integrations[0].routeName);
@@ -164,6 +162,16 @@ export default defineComponent({
       }
     });
 
+    // Handle re-clicking the AI Integrations main tab while already on a child
+    // route. The route config redirect ("" → first integration) resolves to the
+    // same route the user is already on, so Vue Router cancels it as a duplicate
+    // navigation and the <router-view> can go blank.
+    watch(() => route.name, (newName) => {
+      if (newName === "ai-integrations") {
+        navigateToFirstIntegration(selectedCategory.value);
+      }
+    });
+
     return {
       t,
       store,
@@ -178,27 +186,4 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.ai-category-tabs {
-  height: auto !important;
-  overflow: visible !important;
-  :deep(.q-tab) {
-    min-height: 36px;
-  }
-  :deep(.q-tabs__content) {
-    overflow: visible !important;
-    height: auto !important;
-  }
-}
-.ai-integration-tabs {
-  height: auto !important;
-  overflow: visible !important;
-  :deep(.q-tab) {
-    min-height: 36px;
-  }
-  :deep(.q-tabs__content) {
-    overflow: visible !important;
-    height: auto !important;
-  }
-}
-</style>
+

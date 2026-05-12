@@ -13,13 +13,14 @@
             </div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               data-test="queryList-cancel"
-              round
-              flat
-              icon="cancel"
-            />
+              @click="$emit('close')"
+            >
+              <X class="tw:size-4" />
+            </OButton>
           </div>
         </div>
       </q-card-section>
@@ -50,15 +51,17 @@ import { useI18n } from "vue-i18n";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { X } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "QueryList",
-  components: {},
+  components: { OButton, X },
+  emits: ["save", "close"],
   props: {
     schemaData: Object,
     metaData: Object,
   },
-  emits: ["save"],
   setup(props: any) {
     const { t } = useI18n();
     const queryData = props.metaData?.queries || [];

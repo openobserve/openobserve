@@ -123,7 +123,11 @@
     "create": "Oluştur",
     "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
     "resources": "Kaynaklar",
-    "updated_at": "Güncellendi:"
+    "updated_at": "Güncellendi:",
+    "error": "Hata",
+    "db": "Veritabanı",
+    "discardChanges": "Değişiklikleri iptal et",
+    "unsavedChanges": "Kaydedilmemiş değişiklikler"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -390,7 +394,8 @@
     "autoRunEnabled": "Otomatik çalıştırma etkin",
     "selectStreamFirst": "Önce bir yayın seçin",
     "traces": "İzleri",
-    "switchToLogs": "Günlüklere geri dönmek için tıklayın"
+    "switchToLogs": "Günlüklere geri dönmek için tıklayın",
+    "patternNoValuesAvailable": "Mevcut değer yok"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -2235,6 +2240,8 @@
     "importedFromAnomalyPattern": "Anormal günlük düzeninden önceden doldurulmuş uyarı - aciliyet ayarlarını gözden geçirin",
     "additional_settings": "Ek Ayarlar",
     "alertNamePlaceholder": "Uyarı adı",
+    "nameRequired": "Uyarı adı gereklidir.",
+    "nameNoSpecialChars": "Uyarı adı ':', '#', '?', '&', '%', tırnak işaretleri veya boşluk içeremez. Bunun yerine alt çizgi (_) kullanın.",
     "anomalyNamePlaceholder": "Anomali adı",
     "folder": "Klasör",
     "selectStreamTypeFirst": "Önce bir akış türü seçin",
@@ -2281,7 +2288,8 @@
       "addNewDestination": "Yeni Hedef Ekle",
       "destinationRequired": "En az bir varış noktası gereklidir!",
       "disabledNotificationsInfo": "Anomali algılama çalışmaya devam edecek ve sonuçları _anomaliler akışına yazacaktır. Anormallikler tespit edildiğinde uyarı almak için bildirimleri etkinleştirin."
-    }
+    },
+    "anomalyName": "Anomali Adı"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2923,7 +2931,21 @@
       "minutesAgo": "{n} m önce",
       "hoursAgo": "{n} saat önce",
       "daysAgo": "{n} d önce"
-    }
+    },
+    "noErrorPresent": "Bu aralıkta hata yok",
+    "httpStatusCode": "HTTP Durum Kodu",
+    "grpcStatusCode": "gRPC Durum Kodu",
+    "dbResponseStatusCode": "DB Yanıt Durum Kodu",
+    "processExitCode": "İşlem Çıkış Kodu",
+    "exceptionsWithCount": "İstisnalar ({count})",
+    "typeLabel": "Türü:",
+    "messageLabel": "Mesaj:",
+    "escapedLabel": "Kaçıldı:",
+    "stacktraceLabel": "Yığın izleme:",
+    "copyStacktrace": "Stacktrace'i kopyala",
+    "noStacktraceAvailable": "Yığın izleme mevcut değil",
+    "stacktraceCopied": "Stacktrace panoya kopyalandı",
+    "stacktraceCopyFailed": "Stacktrace kopyalanamadı"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -3325,7 +3347,9 @@
     "noMetricsDescription": "Seçilen zaman aralığında bu korelasyon için hiçbir metrik bulunamadı.",
     "errorRetrievingTraces": "İzler alınırken hata oluştu.",
     "serviceGroupProtected": "Hizmet grubu kaldırılamaz. Yalnızca eşlenen alanları değiştirebilirsiniz.",
-    "noDataFound": "Veri Bulunamadı"
+    "noDataFound": "Veri Bulunamadı",
+    "isWorkloadType": "Hizmet tanımlayıcısı",
+    "isWorkloadTypeTooltip": "Etkinleştirildiğinde, bu grup bir hizmeti benzersiz bir şekilde tanımlamak için kullanılır (örn. küme, ad alanı, dağıtım). HTTP yöntemi veya veritabanı adı gibi bir hizmet üzerinden işlemleri tanımlayan gruplar için devre dışı bırakın."
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

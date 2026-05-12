@@ -105,19 +105,19 @@ pub(crate) async fn create_tantivy_index(
         return Ok(0);
     };
 
+    let buf = Bytes::from(puffin_bytes);
     let cfg = get_config();
     if cfg.cache_latest_files.enabled
         && cfg.cache_latest_files.cache_index
         && cfg.cache_latest_files.download_from_node
     {
-        infra::cache::file_data::disk::set(&idx_file_name, Bytes::from(puffin_bytes.clone()))
-            .await?;
+        infra::cache::file_data::disk::set(&idx_file_name, buf.clone()).await?;
         log::info!("file: {idx_file_name} file_data::disk::set success");
     }
 
     // the index file is stored in the same account as the parquet file
     let account = storage::get_account(parquet_file_name).unwrap_or_default();
-    match storage::put(&account, &idx_file_name, Bytes::from(puffin_bytes)).await {
+    match storage::put(&account, &idx_file_name, buf).await {
         Ok(_) => {
             log::info!(
                 "{caller} generated tantivy index file: {idx_file_name}, size {index_size}, took: {} ms",
@@ -416,7 +416,7 @@ mod tests {
         // Create stream from the buffer using the new API
         let bytes = bytes::Bytes::from(buffer);
         let (_schema, stream) =
-            config::utils::parquet::get_recordbatch_reader_from_bytes(FileFormat::Parquet, &bytes)
+            config::utils::parquet::get_recordbatch_reader_from_bytes(FileFormat::Parquet, bytes)
                 .await
                 .unwrap();
         stream

@@ -5,7 +5,9 @@ export default class DashboardImport {
     this.page = page;
 
     this.importButton = page.locator('[data-test="dashboard-import"]');
-    this.importButtonByRole = page.getByRole("button", { name: "Import" });
+    this.importButtonByRole = page.locator(
+      '[data-test="dashboard-import-submit-btn"]'
+    );
     this.inputFile = page.locator('input[type="file"]');
   }
   //Import dashboard button on dashboard page

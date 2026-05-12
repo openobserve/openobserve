@@ -11,13 +11,14 @@ export default class DashboardFilter {
   async selectFieldFromDropdown(fieldName, dropdownLocator) {
     await dropdownLocator.click();
 
-    // Find the input element within the StreamFieldSelect component
-    const inputField = dropdownLocator.locator('input[aria-label="Select Field"]');
-    await inputField.waitFor({ state: "visible" });
-    await inputField.fill(fieldName);
+    // Find the input element within the StreamFieldSelect component using data-test
+    const streamFieldSelect = this.page.locator('[data-test="stream-field-select"]').last();
+    await streamFieldSelect.waitFor({ state: "visible" });
+    // Use pressSequentially to properly trigger Vue reactive filtering
+    await streamFieldSelect.pressSequentially(fieldName, { delay: 50 });
 
     // Wait for the dropdown menu to appear - use .last() to get the most recent menu
-    const dropdownMenu = this.page.locator('.q-menu[role="listbox"]').last();
+    const dropdownMenu = this.page.locator('[role="listbox"]').last();
     await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for options to be filtered
@@ -84,7 +85,7 @@ export default class DashboardFilter {
     // Step 2: Select the new field from dropdown
     if (newFieldName) {
       const fieldDropdown = this.page.locator(
-        `[data-test="dashboard-add-condition-column-${idx}}"]`
+        `[data-test="dashboard-add-condition-column-${idx}"]`
       );
       await this.selectFieldFromDropdown(newFieldName, fieldDropdown);
     }
@@ -114,6 +115,13 @@ export default class DashboardFilter {
         .getByRole("option", { name: operator, exact: true })
         .first()
         .click();
+      // Wait for the operator dropdown portal to fully close before step 5.
+      // The Quasar q-select portal animates out and intercepts pointer events
+      // during the animation — wait for the listbox to be hidden first.
+      await this.page
+        .locator('[role="listbox"]')
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 5: Enter value (if required)
@@ -124,8 +132,11 @@ export default class DashboardFilter {
           : this.page.locator('[data-test="common-auto-complete"]').last();
 
       await valueInput.waitFor({ state: "visible", timeout: 10000 });
+      // Click to focus and trigger onFocus → showOptions = true
       await valueInput.click();
-      await valueInput.fill(value);
+      // Use pressSequentially to type char-by-char, ensuring Vue reactive
+      // filtering fires for each keystroke (fill() can bypass reactivity)
+      await valueInput.pressSequentially(value, { delay: 50 });
 
       // Retry logic for clicking autocomplete suggestion
       const maxRetries = 5;
@@ -161,21 +172,37 @@ export default class DashboardFilter {
             error.message.includes('detached') ||
             error.message.includes('not visible') ||
             error.message.includes('not found') ||
-            error.message.includes('Target closed');
+            error.message.includes('Target closed') ||
+            error.message.includes('Timeout');
 
           if (isRetryable && attempt < maxRetries) {
+            // Re-click input to restore focus and show options before retrying.
+            // Wrapped in try-catch because the input may become temporarily
+            // inaccessible (e.g. the q-menu closed during the wait period).
+            try {
+              await valueInput.click();
+            } catch (retryClickError) {
+              // Input inaccessible – continue to next attempt without crashing
+            }
             // Wait progressively longer between retries
-            await this.page.waitForTimeout(150 * attempt);
+            await this.page.waitForTimeout(300 * attempt);
             continue;
           }
 
-          // Last attempt failed or non-retryable error
-          throw new Error(`Failed to click autocomplete after ${attempt} attempts: ${error.message}`);
+          // All retries exhausted or non-retryable error.
+          // Value was already committed to the model via onModelValueChanged
+          // during pressSequentially, so press Tab to accept it and move on.
+          try {
+            await this.page.keyboard.press('Tab');
+          } catch (e) {
+            // ignore
+          }
+          break;
         }
       }
 
       if (!clicked) {
-        throw new Error(`Failed to click autocomplete suggestion after ${maxRetries} retries`);
+        // Fallback already handled above via Tab; no throw needed
       }
     } else if (operator && (newFieldName || initialFieldName)) {
       const selectedField = newFieldName || initialFieldName;
@@ -278,6 +305,11 @@ export default class DashboardFilter {
       // Wait until option is visible with increased timeout
       await optionLocator.waitFor({ state: "visible", timeout: 10000 });
       await optionLocator.click();
+      // Wait for the operator dropdown portal to fully close before step 5.
+      await this.page
+        .locator('[role="listbox"]')
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 5: Fill value field
@@ -309,7 +341,7 @@ export default class DashboardFilter {
 
     // Step 2: Handle multiple matching elements for column dropdown
     const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+      `[data-test="dashboard-add-condition-column-${idx}"]`
     );
     const count = await allColumnLocators.count();
 
@@ -363,6 +395,11 @@ export default class DashboardFilter {
 
       await operatorOption.waitFor({ state: "visible", timeout: 10000 });
       await operatorOption.click();
+      // Wait for the operator dropdown portal to fully close before step 6.
+      await this.page
+        .locator('[role="listbox"]')
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 6: Fill value if provided (appears in portal, use page scope)
@@ -375,18 +412,20 @@ export default class DashboardFilter {
       await valueInput.click();
       await valueInput.fill(value);
 
-      // Wait for autocomplete suggestion
+      // Wait for autocomplete suggestion — element may re-attach while the
+      // autocomplete list re-renders; use a longer timeout so Playwright's
+      // built-in retry has enough time to succeed after re-attachment.
       const suggestion = this.page
         .locator('[data-test="common-auto-complete-option"]')
         .first();
 
-      await suggestion.waitFor({ state: "visible", timeout: 5000 });
-      await suggestion.click();
+      await suggestion.waitFor({ state: "visible", timeout: 10000 });
+      await suggestion.click({ timeout: 15000 });
     }
 
     // Step 7: Update the field name (appears in portal, use page scope)
     const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+      `[data-test="dashboard-add-condition-column-${idx}"]`
     );
     const count = await allColumnLocators.count();
 

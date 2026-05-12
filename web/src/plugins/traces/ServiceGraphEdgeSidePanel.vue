@@ -34,16 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </h2>
         </div>
         <div class="panel-header-actions">
-          <q-btn
-            flat
-            dense
-            round
-            icon="cancel"
-            size="sm"
+          <OButton
+            variant="ghost"
+            size="icon"
             @click="handleClose"
             data-test="service-graph-edge-side-panel-close-btn"
-            class="close-btn"
-          />
+          >
+            <q-icon name="close" size="14px" />
+          </OButton>
         </div>
       </div>
 
@@ -159,29 +157,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="panel-section trend-section" data-test="service-graph-edge-side-panel-trend">
           <div class="section-header">
             <!-- R·E·D Tab switcher -->
-            <div class="chart-tabs" data-test="service-graph-edge-chart-tabs">
-              <button
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="switchTab($event as ChartTab)"
+              data-test="service-graph-edge-chart-tabs"
+              size="xs"
+            >
+              <OToggleGroupItem
                 v-for="tab in chartTabs"
                 :key="tab.key"
-                class="chart-tab"
-                :class="{ active: activeTab === tab.key }"
-                @click="switchTab(tab.key)"
+                :value="tab.key"
                 :data-test="`service-graph-edge-chart-tab-${tab.key}`"
               >
                 {{ tab.label }}
-              </button>
-            </div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              size="xs"
-              icon="refresh"
-              label="Refresh"
-              @click="loadTrend"
-              :loading="trendLoading"
-              class="refresh-trend-btn"
-            />
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <span class="tw:shrink-0">
+              <OButton
+                variant="ghost-muted"
+                size="xs"
+                @click="loadTrend"
+                :loading="trendLoading"
+              >
+                <template #icon-left>
+                  <q-icon name="refresh" size="12px" />
+                </template>
+                Refresh
+              </OButton>
+            </span>
           </div>
 
           <!-- Loading -->
@@ -230,11 +233,15 @@ import { useStore } from 'vuex';
 import { useQuasar } from 'quasar';
 import * as echarts from 'echarts';
 import serviceGraphService from '@/services/service_graph';
+import OButton from '@/lib/core/Button/OButton.vue';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
+  components: { OButton, OToggleGroup, OToggleGroupItem },
   props: {
     selectedEdge: {
       type: Object as PropType<{
@@ -703,7 +710,7 @@ export default defineComponent({
 
     watch(
       () => [props.selectedEdge?.from, props.selectedEdge?.to, props.visible] as const,
-      ([, , visible]) => {
+      ([ , visible]) => {
         if (visible && props.selectedEdge) {
           loadTrend();
         } else if (!visible) {
@@ -883,11 +890,6 @@ export default defineComponent({
     display: flex;
     align-items: center;
     flex-shrink: 0;
-
-    .close-btn {
-      width: 24px;
-      height: 24px;
-    }
   }
 }
 
@@ -949,60 +951,6 @@ export default defineComponent({
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
-}
-
-.refresh-trend-btn {
-  font-size: 11px;
-  color: #9ca3af;
-  flex-shrink: 0;
-}
-
-// ── RED tab switcher ───────────────────────────────────────────────────────
-.chart-tabs {
-  display: flex;
-  gap: 2px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  padding: 3px;
-
-  .chart-tab {
-    padding: 4px 12px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    line-height: 1.4;
-
-    &:hover {
-      color: rgba(255, 255, 255, 0.75);
-    }
-
-    &.active {
-      background: #374151;
-      color: #e4e7eb;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-    }
-  }
-}
-
-.body--light .chart-tabs {
-  background: rgba(0, 0, 0, 0.05);
-
-  .chart-tab {
-    color: rgba(0, 0, 0, 0.4);
-
-    &:hover { color: rgba(0, 0, 0, 0.7); }
-
-    &.active {
-      background: #ffffff;
-      color: #202124;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-    }
-  }
 }
 
 // ── Metric card ───────────────────────────────────────────────────────────
