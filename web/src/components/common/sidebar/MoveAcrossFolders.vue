@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer data-test="move-across-folders-dialog"
     :open="open"
-    size="lg"
+    :width="30"
     :title="`Move ${type.charAt(0).toUpperCase() + type.slice(1)} To Another Folder`"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit.execute()"
   >
       <q-card-section
-        class="q-w-md q-mx-lg"
+        class=""
         :data-test="`${type}-folder-move-body`"
       >
         <q-form
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('dashboard.currentFolderLabel')"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-md showLabelOnTop"
+            class="showLabelOnTop"
             stack-label
             outlined
             filled
@@ -167,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         selectedFolder,
         onSubmit,
         getModuleName,
+        emit,
       };
     },
   });
