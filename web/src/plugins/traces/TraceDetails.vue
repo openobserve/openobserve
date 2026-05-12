@@ -3016,7 +3016,6 @@ export default defineComponent({
       fetchEvalPipeline,
       fetchEvalData,
       formatLargeNumber,
-      config,
     };
   },
 });
