@@ -251,10 +251,10 @@ watch(isOpen, async (val) => {
 
 .palette-section-label {
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--o2-text-muted);
+  color: var(--o2-text-secondary);
   padding: 0.5rem 1rem 0.25rem;
 }
 

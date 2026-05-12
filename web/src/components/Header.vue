@@ -142,26 +142,22 @@ size="xs" class="warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
       </div>
-      <q-btn
-        color="secondary"
+      <OButton
+        variant="secondary"
         size="sm"
         style="display: inline; padding: 5px 10px"
-        rounded
-        borderless
-        dense
         class="q-ma-xs"
         @click="router.replace('/billings/plans')"
-        >Upgrade to PRO Plan</q-btn
+        >Upgrade to PRO Plan</OButton
       >
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
     <div class="header-menu">
       <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
-      <q-btn
-        no-caps
-        flat
-        dense
+      <OButton
+        variant="ghost"
+        size="sm"
         class="upgrade-enterprise-btn q-px-sm q-mx-xs"
         @click="openEnterpriseDialog"
         data-test="upgrade-to-enterprise-btn"
@@ -171,7 +167,7 @@ size="xs" class="warning" />{{
 size="16px" class="q-mr-xs" />
           <span class="text-weight-medium">{{ enterpriseButtonText }}</span>
         </div>
-      </q-btn>
+      </OButton>
 
       <!-- COMMAND PALETTE SEARCH BUTTON -->
       <button
@@ -186,14 +182,13 @@ size="16px" class="q-mr-xs" />
       </button>
 
       <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
-      <q-btn
+      <OButton
         v-if="
           config.isEnterprise == 'true' &&
           store.state.zoConfig.ingestion_quota_used >= 85
         "
-        round
-        flat
-        dense
+        variant="ghost"
+        size="icon-sm"
         :ripple="false"
         data-test="ingestion-quota-warning-icon"
       >
@@ -208,18 +203,16 @@ size="16px" class="q-mr-xs" />
         <q-tooltip anchor="top middle" self="bottom middle">
           Warning: {{ ingestionQuotaPercentage }}% of ingestion limit used
         </q-tooltip>
-      </q-btn>
+      </OButton>
 
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
-      <q-btn
+      <OButton
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
         :ripple="false"
         @click="toggleAIChat"
         data-test="menu-link-ai-item"
-        no-caps
-        :borderless="true"
-        flat
-        dense
+        variant="ghost"
+        size="sm"
         class="o2-button ai-hover-btn q-px-sm q-py-sm"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         style="border-radius: 100%"
@@ -229,15 +222,14 @@ size="16px" class="q-mr-xs" />
         <div class="row items-center no-wrap tw:gap-2">
           <img :src="getBtnLogo" class="header-icon ai-icon" />
         </div>
-      </q-btn>
+      </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
       <div data-test="navbar-organizations-select" class="q-mx-sm row">
-        <q-btn
+        <OButton
           style="max-width: 250px"
-          dense
-          no-caps
-          flat
+          variant="ghost"
+          size="sm"
           class="tw:text-ellipsis tw:overflow-hidden"
         >
           <div class="row items-center no-wrap full-width">
@@ -353,17 +345,16 @@ size="16px" class="q-mr-xs" />
               </q-item>
             </q-list>
           </q-menu>
-        </q-btn>
+        </OButton>
       </div>
 
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
 
       <!-- SLACK COMMUNITY LINK -->
-      <q-btn
-        round
-        flat
-        dense
+      <OButton
+        variant="ghost"
+        size="icon-sm"
         :ripple="false"
         @click="openSlack"
         data-test="menu-link-slack-item"
@@ -377,11 +368,11 @@ class="header-icon"
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.slack") }}
         </q-tooltip>
-      </q-btn>
+      </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
-      <q-btn round flat
-dense :ripple="false" data-test="menu-link-help-item">
+      <OButton variant="ghost"
+size="icon-sm" :ripple="false" data-test="menu-link-help-item">
         <div class="row items-center no-wrap">
           <q-icon name="help_outline" class="header-icon"></q-icon>
           <q-tooltip anchor="top middle" self="bottom middle">
@@ -441,14 +432,13 @@ dense :ripple="false" data-test="menu-link-help-item">
             </q-item>
           </q-list>
         </q-menu>
-      </q-btn>
+      </OButton>
 
       <!-- SETTINGS BUTTON -->
-      <q-btn
+      <OButton
         data-test="menu-link-settings-item"
-        round
-        flat
-        dense
+        variant="ghost"
+        size="icon-sm"
         :ripple="false"
         @click="router.push({ name: 'settings' })"
       >
@@ -458,13 +448,12 @@ dense :ripple="false" data-test="menu-link-help-item">
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.settings") }}
         </q-tooltip>
-      </q-btn>
+      </OButton>
 
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
-      <q-btn
-        round
-        flat
-        dense
+      <OButton
+        variant="ghost"
+        size="icon-sm"
         :ripple="false"
         data-test="header-my-account-profile-icon"
       >
@@ -617,7 +606,7 @@ name="exit_to_app" class="padding-none" />
             </q-item>
           </q-list>
         </q-menu>
-      </q-btn>
+      </OButton>
     </div>
 
     <!-- Enterprise Upgrade Dialog -->
@@ -632,10 +621,12 @@ import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "HeaderComponent",
   components: {
+    OButton,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
   },

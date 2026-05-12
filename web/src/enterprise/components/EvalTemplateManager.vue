@@ -11,21 +11,22 @@
             {{ t("evalTemplate.header") }}
           </h6>
           <div class="tw:flex tw:gap-2 tw:items-center">
-            <q-btn
-              flat
-              round
-              dense
-              icon="refresh"
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               :loading="loading"
               :title="t('common.refresh')"
               @click="loadTemplates"
-            />
-            <q-btn
-              color="primary"
-              :label="t('evalTemplate.newTemplate')"
-              icon="add"
+            >
+              <RefreshCw class="tw:size-4" />
+            </OButton>
+            <OButton
+              variant="primary"
               @click="startCreateForm"
-            />
+            >
+              <template #icon-left><Plus class="tw:size-4" /></template>
+              {{ t('evalTemplate.newTemplate') }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -52,25 +53,22 @@
 
           <template v-slot:body-cell-actions="props">
             <q-td :props="props" class="tw:text-center">
-              <q-btn
-                flat
-                round
-                dense
-                icon="edit"
-                size="sm"
+              <OButton
+                variant="ghost"
+                size="icon-sm"
                 @click="startEditForm(props.row)"
                 :title="t('common.edit')"
-              />
-              <q-btn
-                flat
-                round
-                dense
-                icon="delete"
-                size="sm"
-                color="negative"
+              >
+                <Pencil class="tw:size-4" />
+              </OButton>
+              <OButton
+                variant="ghost-destructive"
+                size="icon-sm"
                 @click="deleteTemplate(props.row)"
                 :title="t('common.delete')"
-              />
+              >
+                <Trash2 class="tw:size-4" />
+              </OButton>
             </q-td>
           </template>
 
@@ -98,13 +96,14 @@
             }}
           </h6>
           <div class="tw:flex tw:gap-2 tw:items-center">
-            <q-btn flat :label="t('common.cancel')" @click="cancelForm" />
-            <q-btn
-              color="primary"
-              :label="editingTemplate ? t('common.update') : t('common.create')"
+            <OButton variant="ghost" @click="cancelForm">{{ t('common.cancel') }}</OButton>
+            <OButton
+              variant="primary"
               @click="saveTemplate"
               :loading="saving"
-            />
+            >
+              {{ editingTemplate ? t('common.update') : t('common.create') }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -202,6 +201,8 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-vue-next";
 
 interface Template {
   id: string;

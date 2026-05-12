@@ -30,6 +30,7 @@ export interface PaletteItem {
   type: "page" | "entity" | "command" | "ai_action" | "create";
   prompt?: string;
   query?: Record<string, string>;
+  order?: number;
 }
 
 export interface SlashCommand {
@@ -161,7 +162,14 @@ const useCommandPalette = () => {
 
     for (const route of routes) {
       const createMeta = route.meta?.create as
-        | { label?: string; labelKey?: string; icon?: string; keywords?: string[]; query?: Record<string, string> }
+        | {
+            label?: string;
+            labelKey?: string;
+            icon?: string;
+            keywords?: string[];
+            query?: Record<string, string>;
+            order?: number;
+          }
         | undefined;
       if (!createMeta) continue;
 
@@ -188,8 +196,12 @@ const useCommandPalette = () => {
         keywords,
         type: "create" as const,
         query: createMeta.query,
+        order: createMeta.order ?? 999,
       });
     }
+
+    // Sort by order (lower = higher priority), then alphabetically by title
+    items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.title.localeCompare(b.title));
 
     return items;
   });
@@ -261,7 +273,7 @@ const useCommandPalette = () => {
   const visibleItems = computed<PaletteItem[]>(() => {
     const q = query.value.trim();
 
-    // Default view: create items + recents + top pages
+    // Default view: recents + create items + top pages
     if (!q) {
       const creates = createIndex.value;
       const recents = recentPages.value;
@@ -269,7 +281,7 @@ const useCommandPalette = () => {
       const topPages = pageIndex.value
         .filter((p) => !recentNames.has(p.name))
         .slice(0, Math.max(0, TOP_PAGES_COUNT - recents.length - creates.length));
-      return [...creates, ...recents, ...topPages].slice(0, TOP_PAGES_COUNT + creates.length);
+      return [...recents, ...creates, ...topPages].slice(0, TOP_PAGES_COUNT + creates.length);
     }
 
     // Slash command mode: show matching commands
@@ -294,7 +306,7 @@ const useCommandPalette = () => {
       return filteredCommands.value;
     }
 
-    // Normal search: pages + create items + entities (if any)
+    // Normal search: entities + pages + create items
     const pages = filteredPages.value;
     const creates = createIndex.value
       .map((item) => ({ item, score: scoreItem(item, q) }))
@@ -306,7 +318,7 @@ const useCommandPalette = () => {
         e.title.toLowerCase().includes(q.toLowerCase()) ||
         e.keywords.some((k) => k.toLowerCase().includes(q.toLowerCase())),
     );
-    return [...creates, ...pages, ...entities];
+    return [...entities, ...pages, ...creates];
   });
 
   const hasResults = computed(() => visibleItems.value.length > 0);
@@ -330,7 +342,7 @@ const useCommandPalette = () => {
 
     const q = query.value.trim();
     if (!q) {
-      // Default view: group create items + recents + top pages
+      // Default view: group recents + create items + top pages
       const groups: ResultGroup[] = [];
       const creates = items.filter((i) => i.type === "create");
       const recents = items.filter(
@@ -339,8 +351,8 @@ const useCommandPalette = () => {
       const pages = items.filter(
         (i) => i.type !== "create" && !recentPages.value.some((r) => r.name === i.name),
       );
-      if (creates.length) groups.push({ label: t("commandPalette.create"), items: creates });
       if (recents.length) groups.push({ label: "Recents", items: recents });
+      if (creates.length) groups.push({ label: t("commandPalette.create"), items: creates });
       if (pages.length) groups.push({ label: "Pages", items: pages });
       return groups;
     }
@@ -349,17 +361,30 @@ const useCommandPalette = () => {
       return [{ label: "Commands", items }];
     }
 
-    // Group by section
-    const map = new Map<string, PaletteItem[]>();
-    for (const item of items) {
-      const section = item.section || "Results";
-      if (!map.has(section)) map.set(section, []);
-      map.get(section)!.push(item);
+    // Group by section but ordered: entities → pages → creates
+    const entityItems = items.filter((i) => i.type === "entity");
+    const pageItems = items.filter((i) => i.type === "page");
+    const createItems = items.filter((i) => i.type === "create");
+    const groups: ResultGroup[] = [];
+    if (entityItems.length) {
+      groups.push({ label: entityItems[0].section || "Results", items: entityItems });
     }
-    return Array.from(map.entries()).map(([label, groupItems]) => ({
-      label,
-      items: groupItems,
-    }));
+    if (pageItems.length) {
+      // Group pages by their section
+      const pageMap = new Map<string, PaletteItem[]>();
+      for (const item of pageItems) {
+        const section = item.section || "Pages";
+        if (!pageMap.has(section)) pageMap.set(section, []);
+        pageMap.get(section)!.push(item);
+      }
+      for (const [label, sectionItems] of pageMap) {
+        groups.push({ label, items: sectionItems });
+      }
+    }
+    if (createItems.length) {
+      groups.push({ label: t("commandPalette.create"), items: createItems });
+    }
+    return groups;
   });
 
   // ─── Dynamic entity search (debounced) ─────────────────────────────────────

@@ -291,6 +291,7 @@ const useRoutes = () => {
           labelKey: "commandPalette.newStream",
           keywords: ["new stream", "add stream", "create stream"],
           query: { action: "create" },
+          order: 2,
         },
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -328,6 +329,7 @@ const useRoutes = () => {
           labelKey: "commandPalette.newDashboard",
           keywords: ["new dashboard", "add dashboard", "create dashboard"],
           query: { action: "create" },
+          order: 1,
         },
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -505,6 +507,7 @@ const useRoutes = () => {
                   labelKey: "commandPalette.newPipeline",
                   icon: "account_tree",
                   keywords: ["new pipeline", "add pipeline", "create stream pipeline"],
+                  order: 4,
                 },
               },
               beforeEnter(to: any, from: any, next: any) {
@@ -586,6 +589,7 @@ const useRoutes = () => {
           labelKey: "commandPalette.newAlert",
           icon: "notifications",
           keywords: ["new alert", "create alert", "add monitor", "new monitor"],
+          order: 3,
         },
       },
       beforeEnter(to: any, from: any, next: any) {
