@@ -85,6 +85,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "SecurityPage",
@@ -107,11 +108,7 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref(
-      router.currentRoute.value.name !== "security"
-        ? router.currentRoute.value.name as string
-        : "falco"
-    );
+    const ingestTabType = ref(resolveTab("security", router.currentRoute.value.name as string, "falco"));
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "security") {

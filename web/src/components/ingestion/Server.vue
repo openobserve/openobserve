@@ -85,6 +85,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "ServerPage",
@@ -107,11 +108,7 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref(
-      router.currentRoute.value.name !== "servers"
-        ? router.currentRoute.value.name as string
-        : "nginx"
-    );
+    const ingestTabType = ref(resolveTab("servers", router.currentRoute.value.name as string, "nginx"));
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "servers") {

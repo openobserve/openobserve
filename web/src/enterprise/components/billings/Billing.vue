@@ -135,6 +135,7 @@ import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { HardDrive, Database } from "lucide-vue-next";
 import BillingService from "@/services/billings";
@@ -148,11 +149,7 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const billingtab = ref(
-      router.currentRoute.value.name !== "billings"
-        ? router.currentRoute.value.name as string
-        : "usage"
-    );
+    const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "usage"));
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);

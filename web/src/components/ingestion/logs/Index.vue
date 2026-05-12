@@ -150,6 +150,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "IngestLogs",
@@ -167,11 +168,7 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
-    const ingestiontabs = ref(
-      router.currentRoute.value.name !== "ingestLogs"
-        ? router.currentRoute.value.name as string
-        : "curl"
-    );
+    const ingestiontabs = ref(resolveTab("ingestLogs", router.currentRoute.value.name as string, "curl"));
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier,
     );

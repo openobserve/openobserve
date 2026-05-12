@@ -51,6 +51,7 @@ import config from "@/aws-exports";
 import { useRouter } from "vue-router";
 import { nextTick } from "vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import { resolveTab } from "@/utils/routeTabMaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 
 const store = useStore();
@@ -58,11 +59,7 @@ const { t } = useI18n();
 
 const router = useRouter();
 
-const activeTab = ref(
-  router.currentRoute.value.name !== "iam"
-    ? router.currentRoute.value.name as string
-    : "users"
-);
+const activeTab = ref(resolveTab("iam", router.currentRoute.value.name as string, "users"));
 
 const iamRouteTabsRef: any = ref(null);
 

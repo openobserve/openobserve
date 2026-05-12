@@ -85,6 +85,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "DatabasePage",
@@ -107,11 +108,7 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref(
-      router.currentRoute.value.name !== "databases"
-        ? router.currentRoute.value.name as string
-        : "sqlserver"
-    );
+    const ingestTabType = ref(resolveTab("databases", router.currentRoute.value.name as string, "sqlserver"));
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "databases") {

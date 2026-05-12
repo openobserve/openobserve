@@ -115,12 +115,12 @@ export default defineComponent({
     ];
     const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel"];
     const rumRoutes = ["frontendMonitoring"];
-    const allLogRoutes = [
+    const logRoutes = [
       "curl", "fluentbit", "fluentd", "kinesisfirehose", "vector",
       "filebeat", "gcpLogs", "logstash", "syslogNg", "ingestLogsFromOtel",
     ];
     const tabs = ref(
-      allLogRoutes.includes(router.currentRoute.value.name as string)
+      logRoutes.includes(router.currentRoute.value.name as string)
         ? "ingestLogs"
         : metricRoutes.includes(router.currentRoute.value.name as string)
           ? "ingestMetrics"
@@ -130,23 +130,14 @@ export default defineComponent({
     );
 
     onBeforeMount(() => {
+      // Parent container routes: navigating to these redirects to their first child.
+      // Leaf child routes (tracesOTLP, ingestTracesFromOtel, logRoutes members, etc.)
+      // are intentionally excluded here — they just set the active tab below.
       const ingestRoutes = [
         "ingestLogs",
         "ingestTraces",
         "ingestMetrics",
         "rumMonitoring",
-      ];
-      const logRoutes = [
-        "curl",
-        "fluentbit",
-        "fluentd",
-        "kinesisfirehose",
-        "vector",
-        "filebeat",
-        "gcpLogs",
-        "logstash",
-        "syslogNg",
-        "ingestLogsFromOtel",
       ];
 
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
