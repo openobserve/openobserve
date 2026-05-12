@@ -58,13 +58,13 @@ pub async fn update_view(
     view_id: &str,
     view: &UpdateViewRequest,
 ) -> Result<View, Error> {
-    if let Some(existing_id) = view_exists_with_name(org_id, &view.view_name).await {
-        if existing_id != view_id {
-            return Err(Error::Message(format!(
-                "Saved view with name '{}' already exists in this organization",
-                view.view_name
-            )));
-        }
+    if let Some(existing_id) = view_exists_with_name(org_id, &view.view_name).await
+        && existing_id != view_id
+    {
+        return Err(Error::Message(format!(
+            "Saved view with name '{}' already exists in this organization",
+            view.view_name
+        )));
     }
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     let updated_view = match get_view(org_id, view_id).await {
