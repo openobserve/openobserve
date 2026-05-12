@@ -314,7 +314,11 @@ size="sm">
           <div class="tw:flex tw:items-center tw:space-x-2 tw:gap-[0.5rem] tw:pr-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
-              v-if="activeTab !== 'flame-graph' && activeTab !== 'map'"
+              v-if="
+                activeTab !== 'flame-graph' &&
+                activeTab !== 'map' &&
+                activeTab !== 'thread'
+              "
               class="unified-search-group tw:mr-0!"
             >
               <div class="log-stream-search-input">
