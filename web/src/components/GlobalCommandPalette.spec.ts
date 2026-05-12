@@ -21,6 +21,16 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
+vi.mock("vue-i18n", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    useI18n: () => ({
+      t: (key: string) => key,
+    }),
+  };
+});
+
 vi.mock("@/composables/useAutoNavigation", () => ({
   default: () => ({ navigate: vi.fn() }),
 }));
