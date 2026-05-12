@@ -18,11 +18,11 @@ import http from "./http";
 /** Single session row returned by the backend's session endpoint. */
 export interface SessionApiHit {
   session_id: string;
-  /** Earliest span `start_time` in the session (microseconds). */
+  /** Earliest span `start_time` in the session (nanoseconds). */
   start_time: number;
-  /** Latest span `end_time` in the session (microseconds). */
+  /** Latest span `end_time` in the session (nanoseconds). */
   end_time: number;
-  /** end_time - start_time (microseconds). */
+  /** end_time - start_time (nanoseconds). */
   duration: number;
   /** Distinct trace_ids in the session = number of conversation turns. */
   trace_count: number;
@@ -30,6 +30,8 @@ export interface SessionApiHit {
   gen_ai_usage_output_tokens: number;
   gen_ai_usage_total_tokens: number;
   gen_ai_usage_cost: number;
+  /** Number of error spans across all traces in this session. */
+  error_count: number;
 }
 
 export interface SessionApiResponse {

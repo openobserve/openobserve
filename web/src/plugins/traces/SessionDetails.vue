@@ -187,10 +187,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="kpi-label">Cost</div>
           <div class="kpi-value">${{ detail.cost.toFixed(2) }}</div>
         </div>
-        <div class="kpi-cell">
-          <div class="kpi-label">Avg Score</div>
-          <div class="kpi-value tw:text-[var(--o2-text-muted)]">—</div>
-        </div>
       </div>
 
       <!-- Conversation header -->
@@ -612,9 +608,13 @@ function openTrace(traceId: string) {
 }
 
 function openInTraceExplorer() {
+  // Lands on the Traces sub-tab (not Sessions) pre-filtered by this
+  // session's conversation id, so the user sees every trace that
+  // belongs to the session as rows in the trace explorer.
   router.push({
     name: "traces",
     query: {
+      tab: "traces",
       stream: streamName.value,
       query: `gen_ai_conversation_id = '${sessionId.value}'`,
       from: startTime.value,
@@ -697,7 +697,7 @@ onMounted(load);
 
 .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.5rem;
 
   @media (max-width: 900px) {

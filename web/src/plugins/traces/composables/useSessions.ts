@@ -69,23 +69,29 @@ export interface TurnDetail {
 /**
  * One row in the sessions list. Mirrors the
  * `GET /api/{org}/{stream}/traces/session` response shape, normalised
- * to the camelCase + (micros)/(nanos) suffix convention used elsewhere
- * in this composable's interfaces.
+ * to the camelCase + unit-suffixed convention used elsewhere here.
+ *
+ * Backend returns timestamps + duration in NANOSECONDS — we keep the
+ * nanos values on the row and the UI formats from there. (Same shape
+ * span data uses elsewhere in OO.)
  */
 export interface SessionRow {
   sessionId: string;
-  /** Earliest span start_time in the session (microseconds). */
-  firstSeenMicros: number;
-  /** Latest span end_time in the session (microseconds). */
-  lastSeenMicros: number;
+  /** Earliest span start_time in the session (nanoseconds). */
+  firstSeenNanos: number;
+  /** Latest span end_time in the session (nanoseconds). */
+  lastSeenNanos: number;
   /** Number of distinct trace_ids in the session = conversation turns. */
   turns: number;
-  /** Session duration in microseconds (end_time - start_time). */
-  durationMicros: number;
+  /** Session duration in nanoseconds (end_time - start_time). */
+  durationNanos: number;
   inputTokens: number;
   outputTokens: number;
   tokens: number;
   cost: number;
+  errorCount: number;
+  /** Derived from error_count: any error span → "error", else "ok". */
+  status: "ok" | "error";
 }
 
 /**
@@ -151,17 +157,22 @@ export function useSessions() {
         pageSize,
       });
       const body = res.data;
-      sessions.value = (body.hits || []).map((h) => ({
-        sessionId: h.session_id,
-        firstSeenMicros: Number(h.start_time) || 0,
-        lastSeenMicros: Number(h.end_time) || 0,
-        durationMicros: Number(h.duration) || 0,
-        turns: Number(h.trace_count) || 0,
-        inputTokens: Number(h.gen_ai_usage_input_tokens) || 0,
-        outputTokens: Number(h.gen_ai_usage_output_tokens) || 0,
-        tokens: Number(h.gen_ai_usage_total_tokens) || 0,
-        cost: Number(h.gen_ai_usage_cost) || 0,
-      }));
+      sessions.value = (body.hits || []).map((h) => {
+        const errorCount = Number(h.error_count) || 0;
+        return {
+          sessionId: h.session_id,
+          firstSeenNanos: Number(h.start_time) || 0,
+          lastSeenNanos: Number(h.end_time) || 0,
+          durationNanos: Number(h.duration) || 0,
+          turns: Number(h.trace_count) || 0,
+          inputTokens: Number(h.gen_ai_usage_input_tokens) || 0,
+          outputTokens: Number(h.gen_ai_usage_output_tokens) || 0,
+          tokens: Number(h.gen_ai_usage_total_tokens) || 0,
+          cost: Number(h.gen_ai_usage_cost) || 0,
+          errorCount,
+          status: errorCount > 0 ? "error" : "ok",
+        };
+      });
       total.value = Number(body.total) || 0;
       hasLoadedOnce.value = true;
     } catch (e: any) {

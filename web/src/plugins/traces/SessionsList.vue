@@ -131,6 +131,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
+    <!-- Empty state — query succeeded but no sessions in this window -->
+    <div
+      v-else-if="hasLoadedOnce && !loading && sessions.length === 0"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
+    >
+      <q-icon
+        name="forum"
+        size="3rem"
+        class="tw:mb-3 tw:opacity-40 tw:text-[var(--o2-text-muted)]"
+      />
+      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
+        No sessions found
+      </div>
+      <p
+        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:max-w-[30rem]"
+      >
+        No LLM sessions were recorded in this time range on
+        <code>{{ activeStream }}</code>. Try widening the time range or
+        switching to a different stream.
+      </p>
+    </div>
+
     <!-- Table -->
     <div
       v-else
@@ -151,9 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click:dataRow="handleRowClick"
       >
         <!-- Timestamp -->
-        <template #cell-firstSeenMicros="{ item }">
+        <template #cell-firstSeenNanos="{ item }">
           <span class="tw:font-mono tw:text-[0.75rem]">
-            {{ formatTimestamp(item.firstSeenMicros) }}
+            {{ formatTimestamp(item.firstSeenNanos) }}
           </span>
         </template>
 
@@ -171,11 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Duration -->
-        <template #cell-durationMicros="{ item }">
+        <template #cell-durationNanos="{ item }">
           <span class="tw:text-[0.75rem]">
-            {{ formatDuration(item.durationMicros) }}
+            {{ formatDuration(item.durationNanos) }}
             <q-tooltip
-              >{{ item.durationMicros.toLocaleString() }} µs</q-tooltip
+              >{{ item.durationNanos.toLocaleString() }} ns</q-tooltip
             >
           </span>
         </template>
@@ -191,6 +213,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Cost -->
         <template #cell-cost="{ item }">
           <span class="tw:text-[0.75rem]">${{ item.cost.toFixed(4) }}</span>
+        </template>
+
+        <!-- Status (derived from error_count) -->
+        <template #cell-status="{ item }">
+          <span
+            class="tw:rounded tw:px-[0.5rem] tw:py-[0.125rem] tw:inline-flex tw:items-center tw:gap-[0.25rem] tw:w-fit tw:text-[0.7rem] tw:font-semibold tw:capitalize"
+            :class="statusBadgeClass(item.status)"
+            :data-test="`sessions-list-status-${item.sessionId}`"
+          >
+            <span
+              class="tw:w-[6px] tw:h-[6px] tw:rounded-full"
+              :class="statusDotClass(item.status)"
+            />
+            {{ item.status }}
+          </span>
         </template>
 
         <!-- Initial loading -->
@@ -283,9 +320,9 @@ watch(totalPages, (n) => {
 
 const tableColumns = computed(() => [
   {
-    id: "firstSeenMicros",
+    id: "firstSeenNanos",
     header: "Timestamp",
-    accessorKey: "firstSeenMicros",
+    accessorKey: "firstSeenNanos",
     size: 170,
     enableSorting: false,
     meta: { slot: true, align: "left" },
@@ -307,9 +344,9 @@ const tableColumns = computed(() => [
     meta: { slot: true, align: "right" },
   },
   {
-    id: "durationMicros",
+    id: "durationNanos",
     header: "Duration",
-    accessorKey: "durationMicros",
+    accessorKey: "durationNanos",
     size: 120,
     enableSorting: false,
     meta: { slot: true, align: "right" },
@@ -330,11 +367,20 @@ const tableColumns = computed(() => [
     enableSorting: false,
     meta: { slot: true, align: "right" },
   },
+  {
+    id: "status",
+    header: "Status",
+    accessorKey: "status",
+    size: 100,
+    enableSorting: false,
+    meta: { slot: true, align: "left", disableCellAction: true },
+  },
 ]);
 
-function formatTimestamp(micros: number): string {
-  if (!micros) return "—";
-  return date.formatDate(Math.floor(micros / 1000), "YYYY-MM-DD HH:mm:ss");
+function formatTimestamp(nanos: number): string {
+  if (!nanos) return "—";
+  // Backend ships timestamps as nanoseconds — quasar's date wants ms.
+  return date.formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
 }
 
 function shortId(id: string): string {
@@ -343,9 +389,10 @@ function shortId(id: string): string {
   return `${id.slice(0, 8)}…${id.slice(-5)}`;
 }
 
-function formatDuration(micros: number): string {
-  if (!micros) return "—";
-  const d = splitDuration(micros);
+function formatDuration(nanos: number): string {
+  if (!nanos) return "—";
+  // splitDuration expects microseconds.
+  const d = splitDuration(nanos / 1000);
   return `${d.value}${d.unit}`;
 }
 
@@ -353,6 +400,24 @@ function formatTokens(n: number): string {
   if (!n) return "0";
   const t = splitNumberWithUnit(n);
   return `${t.value}${t.unit}`;
+}
+
+function statusBadgeClass(s: SessionRow["status"]): string {
+  switch (s) {
+    case "error":
+      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] tw:text-[var(--o2-service-health-critical)]";
+    default:
+      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy,#16a34a)_12%,transparent)] tw:text-[var(--o2-service-health-healthy,#16a34a)]";
+  }
+}
+
+function statusDotClass(s: SessionRow["status"]): string {
+  switch (s) {
+    case "error":
+      return "tw:bg-[var(--o2-service-health-critical)]";
+    default:
+      return "tw:bg-emerald-500";
+  }
 }
 
 async function loadTraceStreams() {
