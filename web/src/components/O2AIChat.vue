@@ -1,6 +1,6 @@
 <template>
   <div
-    class="chat-container"
+    class="chat-container tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-md"
     :class="[
       { 'chat-open': isOpen },
       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
@@ -8,7 +8,7 @@
   >
     <div
       v-if="isOpen"
-      class="chat-content-wrapper"
+      class="chat-content-wrapper tw:flex tw:flex-col tw:h-full tw:bg-transparent"
       :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
     >
       <div
