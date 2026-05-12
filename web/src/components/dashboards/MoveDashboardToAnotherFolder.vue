@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer data-test="move-dashboard-to-another-folder-dialog"
     :open="open"
-    size="lg"
+    :width="30"
     title="Move Dashboard"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
