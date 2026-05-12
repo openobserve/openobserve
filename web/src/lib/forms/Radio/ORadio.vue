@@ -18,6 +18,8 @@ import { computed, inject, watchEffect } from "vue";
 const props = withDefaults(defineProps<RadioProps>(), {
   size: "md",
   disabled: false,
+  value: undefined,
+  val: undefined,
 });
 
 defineSlots<RadioSlots>();
