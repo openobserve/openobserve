@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <span
               class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+              data-test="dashboard-view-folder-breadcrumb"
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }}
             </span>
