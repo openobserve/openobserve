@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               '/billings/usage?org_identifier=' +
               store.state.selectedOrganization.identifier +
               '&usage_date=' +
-              usageDate + 
+              usageDate +
               '&data_type=' +
               usageDataType
             "
@@ -207,14 +207,21 @@ export default defineComponent({
     onMounted(async () => {
       // Fetch billing info to determine provider type
       await fetchBillingInfo();
+
+      // Default to current cycle for paid Stripe users
+      if (
+        !router.currentRoute.value.query.usage_date &&
+        billingProvider.value === "stripe" &&
+        isPaidUser.value
+      ) {
+        usageDate.value = "1cycle";
+          selectUsageDate();
+      }
+
       if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
         billingtab.value = "plans";
         router.push({ path: "/billings/plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
       }
-      // else {
-      //   billingtab.value = router.currentRoute.value.name;
-      //   router.push({ path: "/billings/" + router.currentRoute.value.name });
-      // }
     });
 
     const headerBasedOnRoute = () => {
@@ -241,7 +248,7 @@ export default defineComponent({
           data_type: usageDataType.value
         }
       })
-      
+
     }
     const updateActiveTab = (value: any) => {
       usageDataType.value = value;
