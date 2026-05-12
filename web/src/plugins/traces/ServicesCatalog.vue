@@ -634,8 +634,8 @@ const statusCounts = computed(() => ({
 }));
 
 const filteredServices = computed(() => {
-  if (!filterText.value.trim()) return services.value;
-  const q = filterText.value.trim().toLowerCase();
+  if (!filterText?.value?.trim()) return services.value;
+  const q = filterText.value?.trim().toLowerCase();
   return services.value.filter((s) => s.service_name.toLowerCase().includes(q));
 });
 
