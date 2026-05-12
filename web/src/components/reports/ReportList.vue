@@ -336,22 +336,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Move to folder dialog -->
-    <ODrawer
+    <MoveAcrossFolders
       v-model:open="showMoveDialog"
-      size="lg"
-      :show-close="false"
-      @close="showMoveDialog = false"
+      :activeFolderId="activeFolderToMove"
+      :moduleId="reportIdsToMove"
+      type="reports"
+      @updated="onMoveUpdated"
       data-test="report-move-to-another-folder-dialog"
-    >
-      <MoveAcrossFolders
-        v-if="showMoveDialog"
-        :activeFolderId="activeFolderToMove"
-        :moduleId="reportIdsToMove"
-        type="reports"
-        @updated="onMoveUpdated"
-        @close="showMoveDialog = false"
-      />
-    </ODrawer>
+    />
   </div>
 </template>
 
@@ -379,7 +371,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { Pause, Play, Pencil, Trash2, FolderInput, CalendarClock, Database } from 'lucide-vue-next';
 
 const MoveAcrossFolders = defineAsyncComponent(

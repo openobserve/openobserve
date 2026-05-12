@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
     <ODrawer
       :open="open"
-      :width="30"
+      :width="20"
       :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
       secondary-button-label="Cancel"
       primary-button-label="Save"
