@@ -1351,12 +1351,13 @@ export default defineComponent({
       }
     };
 
-    // Check if any query has valid data for the given panel type.
+    // Check if any visible query has valid data for the given panel type.
+    // Uses filteredData / filteredPanelSchema so hidden queries are skipped.
     // Returns true as soon as one query passes the field-alias check.
     const handleNoData = (panelType: any) => {
-      return panelSchema.value.queries.some(
+      return filteredPanelSchema.value.queries.some(
         (query: any, queryIndex: number) => {
-          const queryData = data.value[queryIndex];
+          const queryData = filteredData.value[queryIndex];
           if (!queryData?.length) return false;
 
           const xAlias = query.fields.x.map((it: any) => it.alias || []);
@@ -1470,9 +1471,9 @@ export default defineComponent({
         return "";
       }
       // The queryType is not 'promql'
-      // Check if ANY query has data (not just the first one)
-      return data.value.length &&
-        data.value.some((queryData: any) => queryData?.length) &&
+      // Check if ANY visible query has data (skip hidden queries)
+      return filteredData.value.length &&
+        filteredData.value.some((queryData: any) => queryData?.length) &&
         handleNoData(panelSchema.value.type)
         ? ""
         : "No Data";
