@@ -656,6 +656,7 @@ import {
   onMounted,
   onUnmounted,
 } from "vue";
+import useCreateAction from "@/composables/useCreateAction";
 import { MarkerType } from "@vue-flow/core";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -737,6 +738,7 @@ onUnmounted(() => {
 });
 
 const showCreatePipeline = ref(false);
+const { onPageReady } = useCreateAction(showCreatePipeline);
 
 const expandedRow: any = ref([]); // Array to track expanded rows
 
@@ -1027,6 +1029,7 @@ const getColumnsForActiveTab = (tab: any) => {
 onMounted(async () => {
   await getPipelines(); // Ensure pipelines are fetched before updating
   updateActiveTab();
+  onPageReady();
 });
 
 const createPipeline = () => {

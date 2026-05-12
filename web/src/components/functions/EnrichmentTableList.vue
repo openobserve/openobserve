@@ -375,6 +375,7 @@ import {
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import useCreateAction from "@/composables/useCreateAction";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
@@ -410,6 +411,7 @@ export default defineComponent({
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
+    const { onPageReady } = useCreateAction(showAddJSTransformDialog);
     const qTable: any = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
@@ -490,7 +492,7 @@ export default defineComponent({
     const { getStreams, resetStreamType, getStream } = useStreams();
 
     onBeforeMount(() => {
-      getLookupTables();
+      getLookupTables().then(() => onPageReady());
     });
     //here we need to check if the action is there or not 
     //because if action is there user before refresh the page user was there in add / update page

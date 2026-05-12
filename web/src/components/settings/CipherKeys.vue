@@ -180,6 +180,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { Pencil, Trash2 } from 'lucide-vue-next';
+import useCreateAction from "@/composables/useCreateAction";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -199,6 +200,7 @@ export default defineComponent({
     const $q = useQuasar();
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
+    const { onPageReady } = useCreateAction(showAddDialog);
     const qTable: any = ref(null);
     const loading = ref(false);
     const filterQuery = ref("");
@@ -324,7 +326,7 @@ export default defineComponent({
         message: "Please wait while loading data...",
       });
 
-      CipherKeysService.list(store.state.selectedOrganization.identifier)
+      return CipherKeysService.list(store.state.selectedOrganization.identifier)
         .then((response) => {
           const data = [];
           const responseData = response.data.keys;
@@ -357,7 +359,7 @@ export default defineComponent({
         });
     };
 
-    getData();
+    getData().then(() => onPageReady());
 
     const hideAddDialog = async () => {
       showAddDialog.value = !showAddDialog.value;

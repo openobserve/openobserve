@@ -290,6 +290,7 @@ const useRoutes = () => {
         create: {
           labelKey: "commandPalette.newStream",
           keywords: ["new stream", "add stream", "create stream"],
+          query: { action: "create" },
         },
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -326,6 +327,7 @@ const useRoutes = () => {
         create: {
           labelKey: "commandPalette.newDashboard",
           keywords: ["new dashboard", "add dashboard", "create dashboard"],
+          query: { action: "create" },
         },
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -427,6 +429,7 @@ const useRoutes = () => {
             create: {
               labelKey: "commandPalette.newFunction",
               keywords: ["new function", "add function", "create VRL function"],
+              query: { action: "add" },
             },
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -452,6 +455,7 @@ const useRoutes = () => {
             create: {
               labelKey: "commandPalette.newEnrichmentTable",
               keywords: ["new enrichment", "add enrichment table", "create lookup table"],
+              query: { action: "create" },
             },
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -477,6 +481,7 @@ const useRoutes = () => {
             create: {
               labelKey: "commandPalette.newEvaluationTemplate",
               keywords: ["new evaluation template", "add eval template", "create evaluation template"],
+              query: { action: "create" },
             },
           },
           beforeEnter(to: any, from: any, next: any) {

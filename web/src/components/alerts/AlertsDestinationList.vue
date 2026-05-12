@@ -279,6 +279,7 @@ import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
+import useCreateAction from "@/composables/useCreateAction";
 import { useReo } from "@/services/reodotdev_analytics";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -367,6 +368,7 @@ export default defineComponent({
     const confirmBulkDelete = ref<boolean>(false);
     const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
+    const { onPageReady } = useCreateAction(showDestinationEditor);
     const showImportDestination = ref(false);
     const router = useRouter();
     const filterQuery = ref("");
@@ -388,7 +390,7 @@ export default defineComponent({
       if (!destinations.value.length) getDestinations();
     });
     onBeforeMount(() => {
-      getDestinations();
+      getDestinations().then(() => onPageReady());
       getTemplates();
       getActions();
     });
@@ -429,7 +431,7 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading destinations...",
       });
-      destinationService
+      return destinationService
         .list({
           page_num: 1,
           page_size: 100000,

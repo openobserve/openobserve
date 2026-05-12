@@ -207,6 +207,7 @@
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import OButton from "@/lib/core/Button/OButton.vue";
     import { Pencil, Trash2, Download } from "lucide-vue-next";
+import useCreateAction from "@/composables/useCreateAction";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -309,6 +310,8 @@
       isEdit: false,
     });
 
+    const { onPageReady } = useCreateAction(() => { showAddRegexPatternDialog.value.show = true; });
+
     onMounted(async () => {
       //if the regex patterns are not in the store, then we need to fetch them from the api
       //else we can use the regex patterns from the store
@@ -328,6 +331,7 @@
       if(router.currentRoute.value.query.action == 'import' && config.isEnterprise == 'true'){
         importRegexPattern();
       }
+      onPageReady();
     });
 
     const changePagination = (val: { label: string; value: any }) => { 

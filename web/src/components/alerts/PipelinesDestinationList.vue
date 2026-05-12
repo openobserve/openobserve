@@ -218,6 +218,7 @@ import type { Template } from "@/ts/interfaces/index";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
+import useCreateAction from "@/composables/useCreateAction";
 
 interface ConformDelete {
   visible: boolean;
@@ -312,6 +313,7 @@ export default defineComponent({
     const confirmBulkDelete = ref<boolean>(false);
     const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
+    const { onPageReady } = useCreateAction(showDestinationEditor);
     const router = useRouter();
     const filterQuery = ref("");
     const perPageOptions: any = [
@@ -332,7 +334,7 @@ export default defineComponent({
       if (!destinations.value.length) getDestinations();
     });
     onBeforeMount(() => {
-      getDestinations();
+      getDestinations().then(() => onPageReady());
       getTemplates();
     });
 
@@ -352,7 +354,7 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading destinations...",
       });
-      destinationService
+      return destinationService
         .list({
           page_num: 1,
           page_size: 100000,

@@ -90,6 +90,7 @@ const useEnterpriseRoutes = () => {
             create: {
               labelKey: "commandPalette.newServiceAccount",
               keywords: ["new service account", "add service account", "create API key", "create token"],
+              query: { action: "create" },
             },
           },
           component: ServiceAccountsList,
@@ -121,6 +122,7 @@ const useEnterpriseRoutes = () => {
             create: {
               labelKey: "commandPalette.newOrganization",
               keywords: ["new organization", "add organization", "create org", "create tenant"],
+              query: { action: "create" },
             },
           },
           component: Organizations,
@@ -205,6 +207,7 @@ const useEnterpriseRoutes = () => {
             create: {
               labelKey: "commandPalette.newUserGroup",
               keywords: ["new group", "add user group", "create group", "create RBAC group"],
+              query: { action: "create" },
             },
           },
           component: AppGroups,
@@ -240,6 +243,7 @@ const useEnterpriseRoutes = () => {
             create: {
               labelKey: "commandPalette.newRole",
               keywords: ["new role", "add role", "create role", "create RBAC role"],
+              query: { action: "create" },
             },
           },
           component: AppRoles,
