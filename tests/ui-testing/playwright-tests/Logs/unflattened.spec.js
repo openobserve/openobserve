@@ -168,6 +168,8 @@ test.describe("Unflattened testcases", () => {
         break;
       } catch (error) {
         testLogger.warn(`_o2_id not found on attempt ${attempt}, refreshing search`);
+        // Close the open log detail dialog before refreshing — it intercepts clicks
+        await pageManager.unflattenedPage.closeDialog.click();
         await applyQueryButton(page);
         // Re-expand log row
         await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
