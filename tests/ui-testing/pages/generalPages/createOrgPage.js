@@ -89,30 +89,30 @@ export class CreateOrgPage {
     }
 
     async clickSaveOrg() {
-        await this.page.locator('[data-test="add-org"]').click();
+        await this.page.locator('[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]').click();
     }
 
     async checkSaveEnabled() {
-        const saveButton = this.page.locator('[data-test="add-org"]');
-        
+        const saveButton = this.page.locator('[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]');
+
         // Check if the button is enabled
         const isEnabled = await saveButton.isEnabled();
-        
+
         if (!isEnabled) {
             console.error('The "Add Organization" button is not enabled.');
             return false; // Return false to indicate the button is not enabled
         }
-        
+
         return true; // Return true if the button is enabled
     }
-    
+
     async clickCancelButton() {
-        const cancelButton = this.page.locator('[data-test="cancel-organizations-modal"]');
-        
+        const cancelButton = this.page.locator('[data-test="add-update-organization-dialog"] [data-test="o-drawer-secondary-btn"]');
+
         // Check if the button is visible and enabled before clicking
         const isVisible = await cancelButton.isVisible();
         const isEnabled = await cancelButton.isEnabled();
-        
+
         if (isVisible && isEnabled) {
             await cancelButton.click();
         } else {
