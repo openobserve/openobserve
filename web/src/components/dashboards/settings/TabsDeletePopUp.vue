@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-radio
               v-model="action"
               val="move"
+              :disable="moveTabOptions.length === 0"
               data-test="dashboard-tab-delete-tab-panels-move"
             >
               Move panels to another tab
@@ -115,9 +116,9 @@ export default defineComponent({
         }
       });
 
-      // set action to move as default
-      action.value = "move";
-      // set selectedTabToMovePanels to [0]th value
+      // if there are no other tabs to move panels to, force delete action
+      action.value = newMoveTabOptions.length > 0 ? "move" : "delete";
+      // set selectedTabToMovePanels to [0]th value (may be undefined if no options)
       selectedTabToMovePanels.value = newMoveTabOptions[0];
 
       moveTabOptions.value = newMoveTabOptions;
