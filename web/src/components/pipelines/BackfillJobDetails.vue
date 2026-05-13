@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     v-model:open="show"
-    :width="55"
+    :width="40"
     title="Backfill Job Details"
     data-test="backfill-job-details-dialog"
   >
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-spinner color="primary" size="50px" />
     </div>
 
-    <div v-else-if="job" class="tw-space-y-6">
+    <div v-else-if="job" class="tw:space-y-2 tw:mx-6 tw:my-4">
           <!-- Status and Actions -->
           <div class="flex items-center justify-between">
             <q-badge
