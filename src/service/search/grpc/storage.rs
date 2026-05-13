@@ -842,10 +842,6 @@ async fn search_tantivy_index(
         need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
     }
     let ops = recording.ops();
-    log::info!(
-        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, open dir took: {} ms",
-        start.elapsed().as_millis()
-    );
     if !ops.is_empty() {
         let mut per_file: HashMap<PathBuf, (usize, usize)> = HashMap::new();
         for op in &ops {
@@ -856,29 +852,22 @@ async fn search_tantivy_index(
         let mut files: Vec<_> = per_file.iter().collect();
         files.sort_by_key(|(p, _)| p.to_owned());
         log::info!(
-            "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, before warmup fetched {} KB across {} ops / {} files",
+            "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, before warmup fetched {} KB across {} ops / {} files, took: {} ms",
             ops.iter().map(|o| o.num_bytes).sum::<usize>() / 1024,
             ops.len(),
             files.len(),
+            start.elapsed().as_millis()
         );
     }
 
     let start = std::time::Instant::now();
     warm_up_terms(
-        trace_id,
-        &ttv_file_name,
         &searcher,
         &warm_terms,
         need_all_term_fields,
         need_fast_field,
     )
     .await?;
-    log::info!(
-        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, warm up terms took: {} ms",
-        start.elapsed().as_millis()
-    );
-
-    // log what was read from the underlying directory during warmup
     let ops = recording.drain_ops();
     if !ops.is_empty() {
         let mut per_file: HashMap<PathBuf, (usize, usize)> = HashMap::new();
@@ -890,10 +879,11 @@ async fn search_tantivy_index(
         let mut files: Vec<_> = per_file.iter().collect();
         files.sort_by_key(|(p, _)| p.to_owned());
         log::info!(
-            "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, after warmup fetched {} KB across {} ops / {} files",
+            "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, after warmup fetched {} KB across {} ops / {} files, took: {} ms",
             ops.iter().map(|o| o.num_bytes).sum::<usize>() / 1024,
             ops.len(),
             files.len(),
+            start.elapsed().as_millis()
         );
     }
 
