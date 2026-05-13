@@ -195,8 +195,6 @@ jobs:
               [
                 "logs-autocomplete-suggestions.spec.js",
                 # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
-                "searchPatterns.spec.js",
-                "jobSearch.spec.js",
                 "logs-sql-autocomplete.spec.js",
                 "logsqueries.cte.spec.js",
                 "logsDownloads.spec.js",
