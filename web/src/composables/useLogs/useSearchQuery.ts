@@ -27,6 +27,42 @@ import {
 import config from "@/aws-exports";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
+
+// Walk the WHERE clause AST and replace column references whose name matches
+// a key in the fieldMapping (original field → stream-specific field).
+const replaceColumnRefsInWhere = (
+  node: any,
+  fieldMapping: Record<string, string>,
+): void => {
+  if (!node) return;
+
+  if (node.type === "column_ref") {
+    const col = node.column;
+    const colName: string | null =
+      typeof col === "string"
+        ? col.replace(/^"|"$/g, "")
+        : col?.expr?.value != null
+          ? String(col.expr.value)
+          : null;
+    if (colName !== null && fieldMapping[colName] && fieldMapping[colName] !== colName) {
+      const newName = fieldMapping[colName];
+      if (typeof col === "string") {
+        node.column = `"${newName}"`;
+      } else if (col?.expr) {
+        col.expr.value = newName;
+      }
+    }
+    return;
+  }
+
+  // Recurse into binary expressions (WHERE conditions) and other containers
+  replaceColumnRefsInWhere(node.left, fieldMapping);
+  replaceColumnRefsInWhere(node.right, fieldMapping);
+  replaceColumnRefsInWhere(node.args, fieldMapping);
+  if (node.expr) replaceColumnRefsInWhere(node.expr, fieldMapping);
+};
 
 export const useSearchQuery = () => {
   const store = useStore();
@@ -46,6 +82,13 @@ export const useSearchQuery = () => {
 
   const { searchObj, notificationMsg, initialQueryPayload, searchAggData } =
     searchState();
+
+  const { semanticGroups } = useServiceCorrelation();
+
+  // Per-stream field mapping for reverse semantic group resolution.
+  // Populated by validateFilterForMultiStream, consumed by handleMultiStream.
+  // Maps streamName -> { originalFilterField: streamSpecificEquivalentField }
+  let multiStreamFieldMapping: Map<string, Record<string, string>> | null = null;
 
   const getQueryReq = (isPagination: boolean): SearchRequestPayload | null => {
     searchObj.data.highlightQuery = "";
@@ -231,6 +274,7 @@ export const useSearchQuery = () => {
         searchObj.data.filterErrMsg = "";
         searchObj.data.missingStreamMessage = "";
         searchObj.data.stream.missingStreamMultiStreamFilter = [];
+        multiStreamFieldMapping = null;
       }
       const req: any = {
         query: {
@@ -546,11 +590,42 @@ export const useSearchQuery = () => {
     const preSQLQuery = req.query.sql;
     req.query.sql = [];
 
+
     streams
       .join(",")
       .split(",")
       .forEach((item: any) => {
         let finalQuery: string = preSQLQuery.replace("[INDEX_NAME]", item);
+
+        // Per-stream WHERE rewrite: if this stream has equivalent field names
+        // for any filter fields (reverse semantic group mapping), swap them in.
+        if (multiStreamFieldMapping?.has(item)) {
+          const mapping = multiStreamFieldMapping.get(item)!;
+
+          // Build a parsable SQL by temporarily replacing template placeholders
+          const hasFieldListPlaceholder =
+            finalQuery.includes("[FIELD_LIST]");
+          if (hasFieldListPlaceholder) {
+            finalQuery = finalQuery.replace(
+              "[FIELD_LIST]",
+              "__field_list_placeholder__",
+            );
+          }
+
+          const parsed = fnParsedSQL(finalQuery);
+          if (parsed?.where) {
+            replaceColumnRefsInWhere(parsed.where, mapping);
+            finalQuery = fnUnparsedSQL(parsed);
+
+            finalQuery = finalQuery.replace(/`/g, '"');
+            
+            if (hasFieldListPlaceholder) {
+              finalQuery = finalQuery
+                .replace(/"__field_list_placeholder__"/g, "[FIELD_LIST]")
+                .replace(/__field_list_placeholder__/g, "[FIELD_LIST]");
+            }
+          }
+        }
 
         const listOfFields: any = [];
         let streamField: any = {};
@@ -630,6 +705,11 @@ export const useSearchQuery = () => {
     searchObj.data.filterErrMsg = "";
     searchObj.data.missingStreamMessage = "";
     searchObj.data.stream.missingStreamMultiStreamFilter = [];
+    multiStreamFieldMapping = null;
+
+    // Build reverse field-to-group mapping from cached semantic groups.
+    // Cache is populated by extractFields() (useStreamFields.ts) before search runs.
+    const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups.value);
 
     for (const fieldObj of searchObj.data.stream.filteredField) {
       const fieldName = fieldObj.expr.value;
@@ -646,8 +726,6 @@ export const useSearchQuery = () => {
         if (!allStreamsEqual) {
           searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
         }
-      } else {
-        searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
       }
 
       const fieldStreams: any = searchObj.data.stream.selectedStreamFields
@@ -655,10 +733,53 @@ export const useSearchQuery = () => {
         .map((field: any) => field.streams)
         .flat();
 
-      searchObj.data.stream.missingStreamMultiStreamFilter =
+      let missingStreamsForField =
         searchObj.data.stream.selectedStream.filter(
           (stream: any) => !fieldStreams.includes(stream),
         );
+
+      // Try reverse mapping: for streams missing this field, check if they
+      // have an equivalent field from the same semantic group.
+      if (missingStreamsForField.length > 0) {
+        const fieldGroupId = fieldToGroupId.get(fieldName.toLowerCase());
+
+        if (fieldGroupId) {
+          const resolvedStreams: string[] = [];
+
+          for (const missingStream of missingStreamsForField) {
+            const equivalentField =
+              searchObj.data.stream.selectedStreamFields.find((sf: any) => {
+                if (!sf.streams?.includes(missingStream)) return false;
+                return fieldToGroupId.get(sf.name.toLowerCase()) === fieldGroupId;
+              });
+
+            if (equivalentField) {
+              if (!multiStreamFieldMapping) {
+                multiStreamFieldMapping = new Map();
+              }
+              if (!multiStreamFieldMapping.has(missingStream)) {
+                multiStreamFieldMapping.set(missingStream, {});
+              }
+              multiStreamFieldMapping.get(missingStream)![fieldName] =
+                equivalentField.name;
+              resolvedStreams.push(missingStream);
+            }
+          }
+
+          // Remove resolved streams from the missing list
+          missingStreamsForField = missingStreamsForField.filter(
+            (s: string) => !resolvedStreams.includes(s),
+          );
+        }
+
+        // Only show error if field doesn't exist in ANY stream (not even via equivalent)
+        if (filteredFields.length === 0 && missingStreamsForField.length === searchObj.data.stream.selectedStream.length) {
+          searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
+        }
+      }
+
+      searchObj.data.stream.missingStreamMultiStreamFilter =
+        missingStreamsForField;
 
       if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
         searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(

@@ -92,7 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <q-icon name="schedule" size="12px" class="q-mr-xs" />
+            <q-icon name="schedule" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
           </q-chip>
@@ -106,7 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <q-icon name="speed" size="12px" class="q-mr-xs" />
+            <q-icon name="speed" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
           </q-chip>
@@ -119,7 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <q-icon name="access_time" size="12px" class="q-mr-xs" />
+            <q-icon name="access_time" size="12px"
+class="q-mr-xs" />
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
           </q-chip>
@@ -136,7 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <q-icon name="tag" size="12px" class="q-mr-xs" />
+            <q-icon name="tag" size="12px"
+class="q-mr-xs" />
             <span class="chip-value">{{ span.span_id }}</span>
             <q-icon
               name="content_copy"
@@ -194,7 +198,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <q-icon name="arrow_upward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_upward" size="10px"
+class="q-mr-xs" />
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </q-chip>
@@ -206,7 +211,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <q-icon name="arrow_downward" size="10px" class="q-mr-xs" />
+              <q-icon name="arrow_downward" size="10px"
+class="q-mr-xs" />
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </q-chip>
@@ -759,7 +765,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ></pre>
                     </div>
                     <div v-else class="stacktrace-empty">
-                      <q-icon name="info" size="16px" class="q-mr-xs" />
+                      <q-icon name="info" size="16px"
+class="q-mr-xs" />
                       <span>No stacktrace available</span>
                     </div>
                   </div>
@@ -966,6 +973,7 @@ import {
   formatTimeWithSuffix,
   convertTimeFromNsToUs,
   getImageURL,
+  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -975,6 +983,7 @@ import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import {
@@ -997,6 +1006,10 @@ import { escapeHtml } from "@/utils/html";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
+import useTraceDetails from "@/composables/traces/useTraceDetails";
+import DbSpanDetails from "./DbSpanDetails.vue";
+import TraceErrorTab from "./components/TraceErrorTab.vue";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1661,9 +1674,60 @@ export default defineComponent({
         });
     }
 
+    const navigateToCorrelatedLogs = async () => {
+      const conditions = new Map<string, string>();
+      const usedGroups = new Set<string>();
+
+      const semanticGroups = await loadSemanticGroups();
+      const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
+
+      for (const streamInfo of correlationProps.value.logStreams) {
+        const filters = streamInfo.filters ?? {};
+        for (const [field, value] of Object.entries(filters)) {
+          if (!value || value === SELECT_ALL_VALUE || field.startsWith("_"))
+            continue;
+          const groupId = fieldToGroupId.get(field.toLowerCase()) ?? field;
+          if (usedGroups.has(groupId)) continue;
+          usedGroups.add(groupId);
+
+          const escapedValue = String(value).replace(/'/g, "''");
+          conditions.set(groupId, `${field} = '${escapedValue}'`);
+        }
+      }
+
+      const queryString = Array.from(conditions.values()).join(" and ");
+      const encodedQuery = b64EncodeUnicode(queryString);
+      const streamNames = correlationProps.value.logStreams
+        .map((s) => s.stream_name)
+        .join(",");
+
+      store.dispatch("logs/setIsInitialized", false);
+      await nextTick();
+
+      router.push({
+        path: "/logs",
+        query: {
+          stream: streamNames,
+          sql_mode: "false",
+          query: encodedQuery,
+          from: String(correlationProps.value.timeRange.startTime),
+          to: String(correlationProps.value.timeRange.endTime),
+          stream_type: "logs",
+          org_identifier: store.state.selectedOrganization.identifier,
+          type: "trace_explorer",
+          quick_mode: "false",
+          show_histogram: "true",
+        },
+      });
+    };
+
     const viewSpanLogs = () => {
-      const queryDetails = buildQueryDetails(props.span);
-      navigateToLogs(queryDetails);
+      if (config.isEnterprise === "true") {
+        navigateToCorrelatedLogs();
+      } else {
+        const queryDetails = buildQueryDetails(props.span);
+        navigateToLogs(queryDetails);
+      }
     };
 
     const getStartTime = computed(() => {
@@ -1749,7 +1813,8 @@ export default defineComponent({
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
     const correlationProps = ref<any>(null);
-    const { findRelatedTelemetry } = useServiceCorrelation();
+    const { findRelatedTelemetry, loadSemanticGroups } =
+      useServiceCorrelation();
 
     /**
      * Extract dimensions from span attributes for correlation

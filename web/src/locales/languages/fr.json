@@ -395,7 +395,8 @@
     "selectStreamFirst": "Sélectionnez d'abord un flux",
     "traces": "Des traces",
     "switchToLogs": "cliquez pour revenir à Logs",
-    "patternNoValuesAvailable": "Aucune valeur disponible"
+    "patternNoValuesAvailable": "Aucune valeur disponible",
+    "selectLogStream": "Sélectionnez le flux de journaux"
   },
   "menu": {
     "home": "Accueil",

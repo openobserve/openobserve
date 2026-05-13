@@ -14,14 +14,96 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { filterDimensionsForCorrelation } from './telemetryCorrelation';
-import type { ServiceIdentityConfig } from '@/services/service_streams';
+import {
+  filterDimensionsForCorrelation,
+  buildFieldToGroupIdMap,
+} from './telemetryCorrelation';
+import type { ServiceIdentityConfig, FieldAlias } from '@/services/service_streams';
 
 describe('telemetryCorrelation', () => {
   let consoleLogSpy: any;
 
   beforeEach(() => {
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  describe('buildFieldToGroupIdMap', () => {
+    it('should map each field to its group ID', () => {
+      const semanticGroups: FieldAlias[] = [
+        { id: 'deployment.environment', display: 'Environment', fields: ['deployment.environment'] },
+        { id: 'service.name', display: 'Service Name', fields: ['service.name', 'service_name'] },
+      ];
+
+      const result = buildFieldToGroupIdMap(semanticGroups);
+
+      expect(result.size).toBe(3);
+      expect(result.get('deployment.environment')).toBe('deployment.environment');
+      expect(result.get('service.name')).toBe('service.name');
+      expect(result.get('service_name')).toBe('service.name');
+    });
+
+    it('should apply definition-order priority when fields overlap across groups', () => {
+      const semanticGroups: FieldAlias[] = [
+        { id: 'group-a', display: 'Group A', fields: ['host.name'] },
+        { id: 'group-b', display: 'Group B', fields: ['host.name'] }, // same field in group-b
+      ];
+
+      const result = buildFieldToGroupIdMap(semanticGroups);
+
+      // The first group that contains the field wins
+      expect(result.get('host.name')).toBe('group-a');
+    });
+
+    it('should lowercase field names when using them as map keys', () => {
+      const semanticGroups: FieldAlias[] = [
+        { id: 'k8s.cluster.name', display: 'Cluster', fields: ['k8s.cluster.name', 'K8S_CLUSTER_NAME'] },
+      ];
+
+      const result = buildFieldToGroupIdMap(semanticGroups);
+
+      // Lowercase lookups should work regardless of the original field casing
+      expect(result.get('k8s.cluster.name')).toBe('k8s.cluster.name');
+      expect(result.get('k8s_cluster_name')).toBe('k8s.cluster.name');
+      // The function always lowercases fields before setting, so uppercase lookups should miss
+      expect(result.get('K8S_CLUSTER_NAME')).toBeUndefined();
+    });
+
+    it('should return an empty map for an empty groups array', () => {
+      const result = buildFieldToGroupIdMap([]);
+
+      expect(result.size).toBe(0);
+    });
+
+    it('should not add entries for groups with empty fields arrays', () => {
+      const semanticGroups: FieldAlias[] = [
+        { id: 'group-a', display: 'Group A', fields: [] },
+        { id: 'group-b', display: 'Group B', fields: ['valid.field'] },
+      ];
+
+      const result = buildFieldToGroupIdMap(semanticGroups);
+
+      expect(result.size).toBe(1);
+      expect(result.get('valid.field')).toBe('group-b');
+      // group-a with empty fields should produce no entries
+      expect(result.get('group-a')).toBeUndefined();
+    });
+
+    it('should map all fields from a single group to the same group ID', () => {
+      const semanticGroups: FieldAlias[] = [
+        {
+          id: 'k8s.namespace.name',
+          display: 'Namespace',
+          fields: ['k8s.namespace.name', 'namespace', 'k8s_namespace_name'],
+        },
+      ];
+
+      const result = buildFieldToGroupIdMap(semanticGroups);
+
+      expect(result.size).toBe(3);
+      expect(result.get('k8s.namespace.name')).toBe('k8s.namespace.name');
+      expect(result.get('namespace')).toBe('k8s.namespace.name');
+      expect(result.get('k8s_namespace_name')).toBe('k8s.namespace.name');
+    });
   });
 
   describe('filterDimensionsForCorrelation', () => {
