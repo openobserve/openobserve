@@ -1071,7 +1071,7 @@ export default defineComponent({
       rowsPerPage: 0,
     });
     const q = useQuasar();
-    const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();
+    const { buildQueryDetails, navigateToLogs, navigateToCorrelatedLogs, searchObj } = useTraces();
     const router = useRouter();
 
     // JSON syntax highlighting colors - using CSS variables for theme-aware colors
@@ -1501,8 +1501,12 @@ export default defineComponent({
     );
 
     const viewSpanLogs = () => {
-      const queryDetails = buildQueryDetails(props.span);
-      navigateToLogs(queryDetails);
+      if(config.isEnterprise === 'true'){
+        navigateToCorrelatedLogs(correlationProps.value)
+      } else {
+        const queryDetails = buildQueryDetails(props.span);
+        navigateToLogs(queryDetails);
+      }
     };
 
     const getStartTime = computed(() => {
@@ -1589,6 +1593,11 @@ export default defineComponent({
     const correlationError = ref<string | null>(null);
     const correlationProps = ref<any>(null);
     const { findRelatedTelemetry } = useServiceCorrelation();
+
+    // Write correlation data to shared searchObj for TraceDetails to use
+    watch(correlationProps, (newVal) => {
+      searchObj.data.traceDetails.correlationProps = newVal;
+    });
 
     /**
      * Extract dimensions from span attributes for correlation
@@ -1691,12 +1700,6 @@ export default defineComponent({
         const spanDimensions = extractSpanDimensions(props.span);
         // Merge span dimensions into context fields for semantic extraction
         Object.assign(context.fields, spanDimensions);
-
-        console.log("[TraceDetailsSidebar] Correlation context:", {
-          streamName: props.streamName,
-          serviceName: props.span.service_name,
-          dimensions: spanDimensions,
-        });
 
         // Find related telemetry
         const result = await findRelatedTelemetry(

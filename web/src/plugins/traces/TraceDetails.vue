@@ -568,6 +568,7 @@ size="14px"
                         @unhover-span="onUnhoverSpan"
                         @update-current-index="handleIndexUpdate"
                         @search-result="handleSearchResult"
+                        @view-correlated-logs="handleTreeViewCorrelatedLogs"
                       />
                     </div>
                   </div>
@@ -900,11 +901,11 @@ import {
   defineAsyncComponent,
   onBeforeMount,
   nextTick,
+  computed,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
-import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
@@ -944,6 +945,7 @@ import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import config from "@/aws-exports";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
@@ -1086,7 +1088,14 @@ export default defineComponent({
     const activeTab = ref("waterfall");
     const sidebarActiveTab = ref("attributes");
 
-    const { searchObj, getUrlQueryParams } = useTraces();
+    const {
+      searchObj,
+      getUrlQueryParams,
+      buildQueryDetails,
+      navigateToLogs,
+      navigateToCorrelatedLogs,
+    } = useTraces();
+
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -2584,7 +2593,9 @@ export default defineComponent({
       store.dispatch("logs/setIsInitialized", false);
 
       const stream: string =
-        searchObj.data.traceDetails.selectedLogStreams.join(",");
+        config.isEnterprise === "true"
+          ? logStreams.value.join(",")
+          : searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
         searchObj.data.traceDetails.selectedTrace?.trace_start_time - 60000000;
       const to =
@@ -2592,7 +2603,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
+        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${spanList.value[0]["trace_id"]}'`,
       );
 
       router.push({
@@ -2611,6 +2622,16 @@ export default defineComponent({
           quick_mode: "false",
         },
       });
+    };
+
+    const handleTreeViewCorrelatedLogs = (span: any) => {
+      const spanId = span.spanId || span.span_id;
+      updateSelectedSpan(spanId);
+
+      const correlationData = searchObj.data.traceDetails.correlationProps;
+      if (correlationData) {
+        navigateToCorrelatedLogs(correlationData);
+      }
     };
 
     const redirectToSessionReplay = () => {
@@ -2934,6 +2955,7 @@ export default defineComponent({
       outlinedInfo,
       outlinedPlayCircle,
       redirectToLogs,
+      handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
       hasRumSessionId,
       firstRumSessionData,
