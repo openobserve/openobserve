@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-stream-dialog"
+  <ODrawer
+    v-if="!isInPipeline"
+    data-test="add-stream-dialog"
     :open="open"
     size="md"
     :title="t('logStream.add')"
@@ -77,6 +79,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-form>
     </div>
   </ODrawer>
+
+  <!-- Inline form for pipeline usage (no drawer wrapper) -->
+  <div v-else class="q-px-md q-py-md add-stream-inputs">
+    <q-form ref="addStreamFormRef" @submit="saveStream">
+      <div data-test="add-stream-name-input">
+        <q-input
+          v-model="streamInputs.name"
+          :label="t('common.name') + ' *'"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+          tabindex="0"
+        />
+      </div>
+
+      <div data-test="add-stream-type-input">
+        <q-select
+          v-model="streamInputs.stream_type"
+          :options="filteredStreamTypes"
+          :label="t('alerts.streamType') + ' *'"
+          :popup-content-style="{ textTransform: 'capitalize' }"
+          class="showLabelOnTop no-case"
+          map-options
+          stack-label
+          emit-value
+          borderless
+          dense
+          :rules="[(val: any) => !!val || 'Field is required!']"
+        />
+      </div>
+
+      <div data-test="add-stream-data-retention-input">
+        <q-input
+          v-model="streamInputs.dataRetentionDays"
+          :label="t('logStream.dataRetention') + ' *'"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          type="number"
+          :rules="[(val: any) => val > 0 || 'Field is required!']"
+        />
+      </div>
+
+      <StreamFieldInputs
+        :fields="fields"
+        @add="addField"
+        @remove="removeField"
+      />
+
+      <div class="tw:flex tw:gap-2 q-mt-sm">
+        <OButton
+          data-test="add-stream-cancel-btn"
+          variant="outline"
+          size="sm-action"
+          @click="emits('close')"
+        >{{ t('logStream.cancel') }}</OButton>
+        <OButton
+          data-test="add-stream-save-btn"
+          variant="primary"
+          size="sm-action"
+          type="submit"
+        >{{ t('common.save') }}</OButton>
+      </div>
+    </q-form>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -91,6 +161,7 @@ import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
 import { X } from "lucide-vue-next";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
