@@ -2,7 +2,21 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { ColorProps, ColorEmits, ColorSlots } from "./OColor.types";
-import { computed, ref, useId } from "vue";
+import { computed, ref, watch, useId } from "vue";
+import {
+  PopoverRoot,
+  PopoverTrigger,
+  PopoverContent,
+  ColorAreaRoot,
+  ColorAreaArea,
+  ColorAreaThumb,
+  ColorSliderRoot,
+  ColorSliderTrack,
+  ColorSliderThumb,
+  parseColor,
+  colorToHex,
+} from "reka-ui";
+import type { Color } from "reka-ui";
 
 const props = withDefaults(defineProps<ColorProps>(), {
   size: "md",
@@ -12,12 +26,10 @@ const props = withDefaults(defineProps<ColorProps>(), {
 });
 
 const emit = defineEmits<ColorEmits>();
-
 defineSlots<ColorSlots>();
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
-const colorPickerId = computed(() => `${inputId.value}-picker`);
 const textInputRef = ref<HTMLInputElement | null>(null);
 
 const effectiveError = computed(
@@ -35,11 +47,63 @@ const swatchSize: Record<NonNullable<ColorProps["size"]>, string> = {
   md: "tw:size-6",
 };
 
-const swatchValue = computed(() => {
+// Canonical hex value for the swatch preview and Reka color bridge
+const swatchHex = computed(() => {
   const v = (props.modelValue ?? "").trim();
   if (/^#[0-9a-fA-F]{6}$/.test(v)) return v;
   return "#000000";
 });
+
+// Internal Reka color — kept in sync with modelValue
+const pickerColor = ref<string>(swatchHex.value);
+
+watch(
+  () => props.modelValue,
+  (v) => {
+    const hex = (v ?? "").trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(hex) && hex !== pickerColor.value) {
+      pickerColor.value = hex;
+    }
+  },
+);
+
+function toHex(value: string | Color): string {
+  if (typeof value === "string") {
+    // already a string — convert to #RRGGBB
+    try {
+      return colorToHex(parseColor(value));
+    } catch {
+      return swatchHex.value;
+    }
+  }
+  try {
+    return colorToHex(value);
+  } catch {
+    return swatchHex.value;
+  }
+}
+
+function handlePickerChange(value: string | Color) {
+  const hex = toHex(value);
+  pickerColor.value = hex;
+  emit("update:modelValue", hex);
+  emit("change", hex);
+}
+
+function handleText(event: Event) {
+  const val = (event.target as HTMLInputElement).value;
+  emit("update:modelValue", val);
+  if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+    pickerColor.value = val;
+    emit("change", val);
+  }
+}
+
+function handleClear() {
+  emit("update:modelValue", "");
+  emit("clear");
+  textInputRef.value?.focus();
+}
 
 const wrapperClasses = computed(() => [
   "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-colors tw:duration-150",
@@ -54,23 +118,6 @@ const wrapperClasses = computed(() => [
     : "",
   heightClasses[props.size ?? "md"],
 ]);
-
-function handleColorPicker(event: Event) {
-  const target = event.target as HTMLInputElement;
-  emit("update:modelValue", target.value);
-  emit("change", target.value);
-}
-
-function handleText(event: Event) {
-  const target = event.target as HTMLInputElement;
-  emit("update:modelValue", target.value);
-}
-
-function handleClear() {
-  emit("update:modelValue", "");
-  emit("clear");
-  textInputRef.value?.focus();
-}
 </script>
 
 <template>
@@ -84,42 +131,77 @@ function handleClear() {
     </label>
 
     <div :class="wrapperClasses">
-      <!--
-        Swatch — a <label> wrapping the hidden color input. The browser
-        dispatches a click to the input when the label is activated, which
-        opens the native picker anchored at the input's location. We nest
-        the input inside the label and position it absolutely at the
-        bottom-left of the swatch so the picker pops up directly below the
-        field. Position-relative on the label is the anchor.
-      -->
-      <label
-        :for="colorPickerId"
-        :aria-label="label ? `${label} swatch` : 'Pick color'"
-        class="tw:flex tw:items-center tw:ps-2 tw:pe-1 tw:shrink-0 tw:relative"
-        :class="disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer'"
-      >
-        <span
-          :class="[
-            'tw:rounded tw:border tw:border-datepicker-border tw:shadow-sm',
-            swatchSize[size ?? 'md'],
-          ]"
-          :style="{ background: swatchValue }"
-          aria-hidden="true"
-        />
-        <input
-          :id="colorPickerId"
-          type="color"
-          :value="swatchValue"
-          :disabled="disabled"
-          class="o2-color-picker-input"
-          tabindex="-1"
-          aria-hidden="true"
-          @input="handleColorPicker"
-          @change="handleColorPicker"
-        />
-      </label>
+      <!-- Swatch — opens the Reka color picker popover -->
+      <PopoverRoot>
+        <PopoverTrigger
+          type="button"
+          :disabled="disabled || readonly"
+          :aria-label="label ? `${label} — pick color` : 'Pick color'"
+          class="tw:flex tw:items-center tw:ps-2 tw:pe-1 tw:shrink-0 tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:rounded-s-md"
+          :class="disabled || readonly ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer'"
+        >
+          <span
+            :class="[
+              'tw:rounded tw:border tw:border-datepicker-border tw:shadow-sm',
+              swatchSize[size ?? 'md'],
+            ]"
+            :style="{ background: swatchHex }"
+            aria-hidden="true"
+          />
+        </PopoverTrigger>
 
-      <!-- Hex text input (always editable unless `readonly` is explicit) -->
+        <PopoverContent
+          :side-offset="6"
+          align="start"
+          class="tw:z-50 tw:rounded-lg tw:border tw:shadow-md tw:p-3 tw:flex tw:flex-col tw:gap-3 tw:bg-colorpicker-popup-bg tw:border-colorpicker-popup-border"
+          style="width: 220px"
+        >
+          <!-- Saturation / Brightness area -->
+          <!-- ColorAreaRoot passes gradient styles via scoped slot -->
+          <ColorAreaRoot
+            :model-value="pickerColor"
+            color-space="hsb"
+            x-channel="saturation"
+            y-channel="brightness"
+            class="tw:w-full tw:rounded tw:overflow-hidden tw:relative"
+            style="height: 140px"
+            @update:model-value="handlePickerChange"
+            v-slot="{ style: areaStyle }"
+          >
+            <ColorAreaArea class="tw:w-full tw:h-full" :style="areaStyle" />
+            <ColorAreaThumb
+              class="tw:size-4 tw:rounded-full tw:border-2 tw:border-colorpicker-thumb tw:shadow tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+            />
+          </ColorAreaRoot>
+
+          <!-- Hue slider — ColorSliderTrack applies its own gradient internally -->
+          <ColorSliderRoot
+            :model-value="pickerColor"
+            color-space="hsb"
+            channel="hue"
+            class="tw:relative tw:flex tw:items-center tw:w-full tw:h-4 tw:rounded"
+            @update:model-value="handlePickerChange"
+          >
+            <ColorSliderTrack class="tw:w-full tw:h-3 tw:rounded tw:overflow-hidden" />
+            <ColorSliderThumb
+              class="tw:size-4 tw:rounded-full tw:border-2 tw:border-colorpicker-thumb tw:shadow tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+            />
+          </ColorSliderRoot>
+
+          <!-- Hex input inside popup -->
+          <input
+            type="text"
+            :value="swatchHex"
+            maxlength="7"
+            placeholder="#000000"
+            :disabled="disabled"
+            class="tw:w-full tw:rounded tw:border tw:px-2 tw:py-1 tw:text-xs tw:font-mono tw:outline-none tw:text-datepicker-text tw:placeholder:text-datepicker-placeholder tw:bg-datepicker-bg tw:border-datepicker-border tw:focus:border-datepicker-focus-border"
+            @input="handleText"
+          />
+        </PopoverContent>
+      </PopoverRoot>
+
+      <!-- Hex text input (always visible) -->
       <input
         :id="inputId"
         ref="textInputRef"
@@ -182,25 +264,3 @@ function handleClear() {
     </div>
   </div>
 </template>
-
-<style scoped>
-/*
- Visually hide the native color input but keep it positioned at the
- bottom-left of its parent swatch <label> so the browser anchors the OS
- picker right below the swatch. Avoid `display:none` / `visibility:hidden`
- — both block the picker. `sr-only` (off-screen positioning) makes the
- picker open near 0,0 of the page, which is the bug we just fixed.
-*/
-.o2-color-picker-input {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-</style>

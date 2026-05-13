@@ -176,6 +176,29 @@
     --color-datepicker-disabled-bg: var(--color-surface-subtle);
     --color-datepicker-disabled-border: var(--color-border-default);
     --color-datepicker-error-border: var(--color-error-400);
+    --color-datepicker-segment-focus-bg: var(--color-primary-500);
+    --color-datepicker-segment-focus-text: var(--color-white);
+    /* DatePicker calendar popup */
+    --color-datepicker-popup-bg: var(--color-surface-overlay);
+    --color-datepicker-popup-border: var(--color-border-default);
+    --color-datepicker-day-hover-bg: var(--color-primary-900);
+    --color-datepicker-day-selected-bg: var(--color-primary-500);
+    --color-datepicker-day-today-border: var(--color-primary-400);
+    --color-datepicker-day-outside-text: var(--color-text-disabled);
+    --color-datepicker-nav-hover-bg: var(--color-primary-900);
+    --color-datepicker-day-range-bg: var(--color-primary-900);
+    --color-datepicker-day-range-text: var(--color-primary-200);
+    --color-datepicker-clock-face-bg: var(--color-surface-panel);
+    --color-datepicker-clock-header-bg: var(--color-primary-800);
+    --color-datepicker-clock-selected-bg: var(--color-primary-500);
+    --color-datepicker-clock-hover-bg: var(--color-primary-900);
+    --color-datepicker-relative-btn-bg: var(--color-surface-panel);
+    --color-datepicker-relative-btn-selected-bg: var(--color-primary-500);
+    --color-datepicker-relative-btn-hover-bg: var(--color-primary-900);
+
+    /* Color picker */
+    --color-colorpicker-popup-bg: var(--color-surface-overlay);
+    --color-colorpicker-popup-border: var(--color-border-default);
 
     /* Dialog */
     --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);

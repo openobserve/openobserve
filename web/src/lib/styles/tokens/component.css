@@ -291,6 +291,43 @@
   --color-datepicker-icon: var(--color-text-secondary);
   --color-datepicker-error-text: var(--color-error-600);
   --color-datepicker-error-border: var(--color-error-500);
+  --color-datepicker-segment-focus-bg: var(--color-primary-600);
+  --color-datepicker-segment-focus-text: var(--color-white);
+  /* DatePicker calendar popup */
+  --color-datepicker-popup-bg: var(--color-surface-overlay);
+  --color-datepicker-popup-border: var(--color-border-default);
+  --color-datepicker-day-text: var(--color-text-primary);
+  --color-datepicker-day-hover-bg: var(--color-primary-50);
+  --color-datepicker-day-selected-bg: var(--color-primary-600);
+  --color-datepicker-day-selected-text: var(--color-white);
+  --color-datepicker-day-today-border: var(--color-primary-400);
+  --color-datepicker-day-outside-text: var(--color-text-disabled);
+  --color-datepicker-day-disabled-text: var(--color-text-disabled);
+  --color-datepicker-nav-hover-bg: var(--color-primary-50);
+  --color-datepicker-heading-text: var(--color-text-primary);
+  --color-datepicker-weekday-text: var(--color-text-secondary);
+  --color-datepicker-day-range-bg: var(--color-primary-100);
+  --color-datepicker-day-range-text: var(--color-primary-700);
+  /* Analog clock face (OTime popup) */
+  --color-datepicker-clock-face-bg: var(--color-surface-subtle);
+  --color-datepicker-clock-header-bg: var(--color-primary-700);
+  --color-datepicker-clock-header-text: var(--color-white);
+  --color-datepicker-clock-hand: var(--color-primary-600);
+  --color-datepicker-clock-selected-bg: var(--color-primary-600);
+  --color-datepicker-clock-selected-text: var(--color-white);
+  --color-datepicker-clock-hover-bg: var(--color-primary-50);
+  /* DateTimeRange relative quick-select buttons */
+  --color-datepicker-relative-btn-bg: var(--color-surface-subtle);
+  --color-datepicker-relative-btn-text: var(--color-text-primary);
+  --color-datepicker-relative-btn-selected-bg: var(--color-primary-600);
+  --color-datepicker-relative-btn-selected-text: var(--color-white);
+  --color-datepicker-relative-btn-hover-bg: var(--color-primary-50);
+  --color-datepicker-relative-label: var(--color-text-secondary);
+
+  /* Color picker (OColor) */
+  --color-colorpicker-popup-bg: var(--color-surface-overlay);
+  --color-colorpicker-popup-border: var(--color-border-default);
+  --color-colorpicker-thumb: var(--color-white);
 
   /* Option Group (OOptionGroup) */
   --color-option-group-label: var(--color-text-primary);
@@ -615,6 +652,41 @@
   --color-datepicker-icon: var(--color-datepicker-icon);
   --color-datepicker-error-text: var(--color-datepicker-error-text);
   --color-datepicker-error-border: var(--color-datepicker-error-border);
+  --color-datepicker-segment-focus-bg: var(--color-datepicker-segment-focus-bg);
+  --color-datepicker-segment-focus-text: var(--color-datepicker-segment-focus-text);
+  /* DatePicker calendar popup */
+  --color-datepicker-popup-bg: var(--color-datepicker-popup-bg);
+  --color-datepicker-popup-border: var(--color-datepicker-popup-border);
+  --color-datepicker-day-text: var(--color-datepicker-day-text);
+  --color-datepicker-day-hover-bg: var(--color-datepicker-day-hover-bg);
+  --color-datepicker-day-selected-bg: var(--color-datepicker-day-selected-bg);
+  --color-datepicker-day-selected-text: var(--color-datepicker-day-selected-text);
+  --color-datepicker-day-today-border: var(--color-datepicker-day-today-border);
+  --color-datepicker-day-outside-text: var(--color-datepicker-day-outside-text);
+  --color-datepicker-day-disabled-text: var(--color-datepicker-day-disabled-text);
+  --color-datepicker-nav-hover-bg: var(--color-datepicker-nav-hover-bg);
+  --color-datepicker-heading-text: var(--color-datepicker-heading-text);
+  --color-datepicker-weekday-text: var(--color-datepicker-weekday-text);
+  --color-datepicker-day-range-bg: var(--color-datepicker-day-range-bg);
+  --color-datepicker-day-range-text: var(--color-datepicker-day-range-text);
+  --color-datepicker-clock-face-bg: var(--color-datepicker-clock-face-bg);
+  --color-datepicker-clock-header-bg: var(--color-datepicker-clock-header-bg);
+  --color-datepicker-clock-header-text: var(--color-datepicker-clock-header-text);
+  --color-datepicker-clock-hand: var(--color-datepicker-clock-hand);
+  --color-datepicker-clock-selected-bg: var(--color-datepicker-clock-selected-bg);
+  --color-datepicker-clock-selected-text: var(--color-datepicker-clock-selected-text);
+  --color-datepicker-clock-hover-bg: var(--color-datepicker-clock-hover-bg);
+  --color-datepicker-relative-btn-bg: var(--color-datepicker-relative-btn-bg);
+  --color-datepicker-relative-btn-text: var(--color-datepicker-relative-btn-text);
+  --color-datepicker-relative-btn-selected-bg: var(--color-datepicker-relative-btn-selected-bg);
+  --color-datepicker-relative-btn-selected-text: var(--color-datepicker-relative-btn-selected-text);
+  --color-datepicker-relative-btn-hover-bg: var(--color-datepicker-relative-btn-hover-bg);
+  --color-datepicker-relative-label: var(--color-datepicker-relative-label);
+
+  /* Color picker (OColor) */
+  --color-colorpicker-popup-bg: var(--color-colorpicker-popup-bg);
+  --color-colorpicker-popup-border: var(--color-colorpicker-popup-border);
+  --color-colorpicker-thumb: var(--color-colorpicker-thumb);
 
   /* Option Group (OOptionGroup) */
   --color-option-group-label: var(--color-option-group-label);
