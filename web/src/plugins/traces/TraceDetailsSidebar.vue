@@ -1074,7 +1074,7 @@ export default defineComponent({
       rowsPerPage: 0,
     });
     const q = useQuasar();
-    const { buildQueryDetails, navigateToLogs, searchObj } = useTraces();
+    const { buildQueryDetails, navigateToLogs, navigateToCorrelatedLogs, searchObj } = useTraces();
     const router = useRouter();
 
     // JSON syntax highlighting colors - using CSS variables for theme-aware colors
@@ -1503,54 +1503,9 @@ export default defineComponent({
       },
     );
 
-    const navigateToCorrelatedLogs = async () => {
-      const conditions = new Map<string, string>();
-      const usedGroups = new Set<string>();
-
-      const semanticGroups = await loadSemanticGroups();
-      const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
-
-      for (const streamInfo of correlationProps.value.logStreams) {
-        const filters = streamInfo.filters ?? {};
-        for (const [field, value] of Object.entries(filters)) {
-          if (!value || value === SELECT_ALL_VALUE || field.startsWith("_"))
-            continue;
-          const groupId = fieldToGroupId.get(field.toLowerCase()) ?? field;
-          if (usedGroups.has(groupId)) continue;
-          usedGroups.add(groupId);
-
-          const escapedValue = String(value).replace(/'/g, "''");
-          conditions.set(groupId, `${field} = '${escapedValue}'`);
-        }
-      }
-
-      const queryString = Array.from(conditions.values()).join(" and ");
-      const encodedQuery = b64EncodeUnicode(queryString);
-      const streamNames = correlationProps.value.logStreams.map((s) => s.stream_name).join(",");
-
-      store.dispatch("logs/setIsInitialized", false);
-      await nextTick();
-
-      router.push({
-        path: "/logs",
-        query: {
-          stream: streamNames,
-          sql_mode: "false",
-          query: encodedQuery,
-          from: String(correlationProps.value.timeRange.startTime),
-          to: String(correlationProps.value.timeRange.endTime),
-          stream_type: "logs",
-          org_identifier: store.state.selectedOrganization.identifier,
-          type: "trace_explorer",
-          quick_mode: "false",
-          show_histogram: "true",
-        },
-      });
-    }
-
     const viewSpanLogs = () => {
-      if(config.isEnterprise === 'true'){ 
-        navigateToCorrelatedLogs()
+      if(config.isEnterprise === 'true'){
+        navigateToCorrelatedLogs(correlationProps.value)
       } else {
         const queryDetails = buildQueryDetails(props.span);
         navigateToLogs(queryDetails);
@@ -1642,6 +1597,11 @@ export default defineComponent({
     const correlationError = ref<string | null>(null);
     const correlationProps = ref<any>(null);
     const { findRelatedTelemetry, loadSemanticGroups } = useServiceCorrelation();
+
+    // Write correlation data to shared searchObj for TraceDetails to use
+    watch(correlationProps, (newVal) => {
+      searchObj.data.traceDetails.correlationProps = newVal;
+    });
 
     /**
      * Extract dimensions from span attributes for correlation
@@ -1744,12 +1704,6 @@ export default defineComponent({
         const spanDimensions = extractSpanDimensions(props.span);
         // Merge span dimensions into context fields for semantic extraction
         Object.assign(context.fields, spanDimensions);
-
-        console.log("[TraceDetailsSidebar] Correlation context:", {
-          streamName: props.streamName,
-          serviceName: props.span.service_name,
-          dimensions: spanDimensions,
-        });
 
         // Find related telemetry
         const result = await findRelatedTelemetry(
