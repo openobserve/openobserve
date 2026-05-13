@@ -24,8 +24,181 @@
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
 import { calculateOptimalFontSize } from "./chartDimensionUtils";
-import { calculateGridPositions } from "./calculateGridForSubPlot";
+import {
+  calculateGridPositions,
+  getTrellisGrid,
+} from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+
+/**
+ * Re-applies trellis layout on merged multi-query data.
+ * Groups series by breakdown value (originalSeriesName) so that series from
+ * different queries sharing the same breakdown category share a subplot.
+ *
+ * Mirrors the logic in trellisConfig.ts → updateTrellisConfig(), including
+ * column-mode handling (vertical / custom / auto) and selective axis-label
+ * visibility (only first-column y-labels, only last-row x-labels).
+ */
+function reapplyTrellisLayout(
+  opts: any,
+  panelSchema: any,
+  chartPanelRef: any,
+  chartPanelStyle: any,
+) {
+  try {
+    const trellisConfig = panelSchema.config.trellis;
+    const isHorizontalChart =
+      panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
+
+    // Column logic — matches trellisConfig.ts
+    let customCols = -1;
+    if (
+      trellisConfig.layout === "custom" &&
+      trellisConfig.num_of_columns > 0
+    ) {
+      customCols = trellisConfig.num_of_columns;
+    }
+    if (trellisConfig.layout === "vertical") {
+      customCols = 1;
+    }
+
+    // Filter out annotation/markArea helper series
+    const realSeries = (opts.series || []).filter(
+      (s: any) => !(s.zlevel === 1 && s.markArea),
+    );
+    if (realSeries.length === 0) return;
+
+    // Group series by breakdown value so multiple queries sharing the same
+    // breakdown category land in the same subplot.
+    const groups = new Map<string, any[]>();
+    realSeries.forEach((series: any) => {
+      const key = series.originalSeriesName || series.name || "";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(series);
+    });
+
+    const numGrids = groups.size;
+    const gridData = getTrellisGrid(
+      chartPanelRef.value.offsetWidth,
+      chartPanelRef.value.offsetHeight,
+      numGrids,
+      0,
+      customCols,
+      panelSchema.config?.axis_width,
+    );
+
+    const gridNoOfCol = gridData.gridNoOfCol ?? 1;
+
+    // Deep-clone helper (axis objects have nested axisLabel / nameTextStyle)
+    const cloneObj = (o: any) => JSON.parse(JSON.stringify(o));
+
+    // Capture base axis templates
+    const baseXAxis = cloneObj(
+      Array.isArray(opts.xAxis) ? opts.xAxis[0] : opts.xAxis,
+    );
+    const baseYAxis = cloneObj(
+      Array.isArray(opts.yAxis) ? (opts.yAxis[0] ?? opts.yAxis) : opts.yAxis,
+    );
+
+    // Rebuild grid, axes, titles, series
+    opts.grid = gridData.gridArray;
+    opts.xAxis = [];
+    opts.yAxis = [];
+    opts.title = [];
+    opts.series = [];
+
+    let gridIdx = 0;
+    groups.forEach((seriesList: any[], groupName: string) => {
+      // Data series — all queries for this breakdown value share the subplot
+      seriesList.forEach((series: any) => {
+        opts.series.push({
+          ...series,
+          gridIndex: gridIdx,
+          xAxisIndex: gridIdx,
+          yAxisIndex: gridIdx,
+          zlevel: 2,
+        });
+      });
+
+      // Annotation placeholder
+      opts.series.push({
+        type: "line",
+        xAxisIndex: gridIdx,
+        yAxisIndex: gridIdx,
+        gridIndex: gridIdx,
+        data: [],
+        zlevel: 1,
+      });
+
+      // --- xAxis for this subplot ---
+      const xAxis = cloneObj(baseXAxis);
+      xAxis.gridIndex = gridIdx;
+      // Show x-axis labels only on the bottom row (or first column for h-charts)
+      const showXLabel = isHorizontalChart
+        ? gridIdx % gridNoOfCol === 0
+        : gridIdx >= numGrids - gridNoOfCol;
+      if (xAxis.axisLabel) xAxis.axisLabel.show = showXLabel;
+      if (xAxis.axisTick) xAxis.axisTick.length = showXLabel ? 5 : 0;
+      if (!showXLabel) {
+        xAxis.name = "";
+        xAxis.nameGap = 0;
+      }
+      opts.xAxis.push(xAxis);
+
+      // --- yAxis for this subplot ---
+      const yAxis = cloneObj(baseYAxis);
+      yAxis.gridIndex = gridIdx;
+      // Show y-axis labels only on the first column (or bottom row for h-charts)
+      const showYLabel = isHorizontalChart
+        ? gridIdx >= numGrids - gridNoOfCol
+        : gridIdx % gridNoOfCol === 0;
+      if (yAxis.axisLabel) {
+        yAxis.axisLabel.show = showYLabel;
+        yAxis.axisLabel.margin = showYLabel ? 5 : 0;
+      }
+      if (!showYLabel) {
+        yAxis.name = "";
+        yAxis.nameGap = 0;
+      }
+      opts.yAxis.push(yAxis);
+
+      // --- Title label above this subplot ---
+      if (gridData.gridArray[gridIdx]) {
+        opts.title.push({
+          text: groupName,
+          textStyle: {
+            fontSize: 12,
+            width:
+              parseFloat(gridData.gridArray[gridIdx].width) *
+                (chartPanelRef.value.offsetWidth / 100) -
+              8,
+            overflow: "truncate",
+            ellipsis: "...",
+          },
+          top:
+            parseFloat(gridData.gridArray[gridIdx].top) -
+            (20 / ((gridData.panelHeight as number) || 1)) * 100 +
+            "%",
+          left: gridData.gridArray[gridIdx].left,
+        });
+      }
+
+      gridIdx++;
+    });
+
+    // Update panel height to fit all subplots
+    if (gridData.panelHeight && chartPanelStyle) {
+      chartPanelStyle.height = gridData.panelHeight + "px";
+    }
+
+    // Hide legend — trellis uses per-subplot titles
+    if (opts.legend) {
+      opts.legend.show = false;
+    }
+  } catch (err: any) {
+    console.error("Trellis re-application on merged data failed:", err?.message);
+  }
+}
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -48,16 +221,24 @@ export const convertMultiSQLData = async (
 
   // C1: loop on all search query data with per-query schema
   const options: any = [];
+  const isMultiQuery = searchQueryData.length > 1;
+  const isTrellis = !!panelSchema.config?.trellis?.layout;
+
   for (let i = 0; i < searchQueryData.length; i++) {
     // Get the original query index from metadata (handling time-shifts gracefully)
     const panelQueryIndex = metadata?.queries?.[i]?.panelQueryIndex ?? i;
 
     // Create a per-query schema view: set queries[0] to the current query
-    // so contextBuilder.ts reads the correct query's fields
+    // so contextBuilder.ts reads the correct query's fields.
+    // When multi-query + trellis, disable trellis for individual conversions;
+    // it will be re-applied on the merged result to avoid grid/axis conflicts.
     if (!panelSchema.queries[panelQueryIndex]) continue;
     const querySchema = {
       ...panelSchema,
       queries: [panelSchema.queries[panelQueryIndex]],
+      ...(isMultiQuery && isTrellis
+        ? { config: { ...panelSchema.config, trellis: undefined } }
+        : {}),
     };
 
     options.push(
@@ -525,6 +706,19 @@ export const convertMultiSQLData = async (
       options[0].options.series,
       panelSchema?.config?.color?.colorBySeries,
       store.state.theme,
+    );
+  }
+
+  // When multi-query + trellis: per-query conversions had trellis stripped
+  // to avoid grid/axis index conflicts. Re-apply trellis on the merged
+  // result, grouping series by breakdown value (originalSeriesName) so
+  // series from different queries share the same subplot.
+  if (isMultiQuery && isTrellis && options[0]?.options && chartPanelRef?.value) {
+    reapplyTrellisLayout(
+      options[0].options,
+      panelSchema,
+      chartPanelRef,
+      chartPanelStyle,
     );
   }
 

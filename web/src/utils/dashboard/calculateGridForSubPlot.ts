@@ -131,8 +131,8 @@ export function getTrellisGrid(
   const cellWidth =
     (100 - (xSpacingBetween + rightPadding + leftPadding)) / numCols;
 
-  // Calculate cell height based on cell width
-  const cellHeightInPx = cellWidthInPx * 0.4;
+  // Calculate cell height based on cell width (preferred aspect ratio)
+  let cellHeightInPx = cellWidthInPx * 0.4;
 
   let totalChartHeight =
     cellHeightInPx * numRows +
@@ -140,7 +140,17 @@ export function getTrellisGrid(
     SPACING_CONFIG.padding.top +
     SPACING_CONFIG.padding.bottom;
 
-  totalChartHeight = Math.max(totalChartHeight, height);
+  // If the calculated height is smaller than the panel, expand cells to
+  // fill the available space instead of leaving blank area at the bottom.
+  if (totalChartHeight < height) {
+    totalChartHeight = height;
+    const availableForCells =
+      height -
+      SPACING_CONFIG.padding.top -
+      SPACING_CONFIG.padding.bottom -
+      SPACING_CONFIG.vertical * (numRows - 1);
+    cellHeightInPx = availableForCells / numRows;
+  }
 
   const topPadding = (SPACING_CONFIG.padding.top / totalChartHeight) * 100;
 
