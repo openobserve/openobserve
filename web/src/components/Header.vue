@@ -823,14 +823,14 @@ export default defineComponent({
   position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
-  min-width: 150px;
+  min-height: 2.5rem;
+  min-width: 9.375rem;
 }
 
 .openobserve-logo {
-  height: 32px;
+  height: 2rem;
   width: auto;
-  max-width: 150px;
+  max-width: 9.375rem;
   display: block;
   transition: opacity 0.2s ease;
 
@@ -844,7 +844,7 @@ export default defineComponent({
 
   .block {
     font-weight: 700;
-    color: #404040;
+    color: var(--o2-text-primary);
   }
 }
 </style>
