@@ -302,6 +302,142 @@ These `q-icon` usages are **inside Quasar component slots** (prepend/append of `
 
 ---
 
+## Phase 7 — `lucide-vue-next` Icons → `<OIcon>`
+
+> **Package**: `lucide-vue-next` v0.562.0 (see `web/package.json`)
+> **~90 unique icons across ~75 files.**
+> **Strategy**: Map each Lucide component to the nearest `material-symbols-light` symbol, add to `OIcon.icons.ts`, then replace `<LucideComponent />` usages with `<OIcon name="..." />` and remove the `lucide-vue-next` import line.
+
+> **Custom SVG icons** (`EqualIcon`, `NotEqualIcon`, `DynamicFilterIcon` in `components/icons/`) are **not** from lucide — they are hand-rolled SVGs used as slot children inside `<q-icon>` and `<OButton>`. Tracked separately.
+
+---
+
+### 7a — Unique Lucide icons (~90 total)
+
+| Lucide component | Suggested OIcon key | Registry | Notes |
+|---|---|---|---|
+| `Activity` | `activity` | ⚠️ | `components/functions/TestFunction.vue` |
+| `AlertCircle` | `error-outline` | ⚠️ map to existing | `components/pipelines/BackfillJobsList.vue` |
+| `AlignLeft` | `align-horizontal-left` | ⚠️ | `plugins/logs/JsonPreview.vue`, `plugins/traces/TraceDetails.vue` |
+| `ArrowDown` | `arrow-downward` | ⚠️ | `components/anomaly_detection/AnomalySummary.vue` |
+| `BarChart2` | `bar-chart` | ⚠️ | `components/functions/TestFunction.vue`, `views/LogStream.vue`, `components/pipeline/NodeForm/ScheduledPipeline.vue` |
+| `Bell` | `notifications` | ⚠️ | `components/alerts/AddAlert.vue`, `components/settings/CorrelationSettings.vue` |
+| `Bookmark` | `bookmark` | ⚠️ | `plugins/logs/SearchBar.vue` |
+| `Bot` | `smart-toy` | ⚠️ | `components/iam/groups/EditGroup.vue`, `components/iam/roles/EditRole.vue` |
+| `Braces` | `data-object` | ⚠️ | `components/alerts/steps/Advanced.vue`, `components/iam/roles/EditRole.vue`, `components/iam/quota/Quota.vue`, `plugins/traces/TraceDetailsSidebar.vue` |
+| `BrainCircuit` | — | 🔁 no equivalent | `components/anomaly_detection/AnomalyDetectionList.vue` — keep lucide or custom SVG |
+| `Building2` | `business` | ⚠️ | `components/settings/ModelPricingList.vue` |
+| `CalendarClock` | `schedule` | ⚠️ | `components/alerts/AlertList.vue`, `views/Dashboards/ScheduledDashboards.vue`, `components/reports/ReportList.vue` |
+| `ChartLine` | `show-chart` | ⚠️ | `components/alerts/steps/QueryConfig.vue`, `components/dashboards/addPanel/QueryTypeSelector.vue`, `plugins/logs/SearchBar.vue` |
+| `ChartNoAxesColumn` | `bar-chart` | ⚠️ | `plugins/logs/SearchBar.vue` |
+| `Check` | `check` | ✅ | `plugins/logs/SearchJobInspector.vue` |
+| `CheckSquare` | `check-box` | ⚠️ | `components/iam/roles/EditRole.vue` |
+| `ChevronDown` | `expand-more` | ⚠️ | `components/functions/AssociatedStreamFunction.vue`, `components/pipeline/PipelinesList.vue` |
+| `ChevronLeft` | `chevron-left` | ✅ | many files |
+| `ChevronRight` | `chevron-right` | ✅ | many files |
+| `ChevronsUpDown` | `unfold-more` | ⚠️ | `components/pipelines/CreateBackfillJobDialog.vue` |
+| `ChevronUp` | `expand-less` | ⚠️ Phase 2b | `components/functions/AssociatedStreamFunction.vue`, `components/pipeline/PipelinesList.vue` |
+| `ClipboardCheck` | `assignment-turned-in` | ⚠️ | `plugins/traces/TraceDetails.vue` |
+| `Clock` | `access-time` | ⚠️ | `components/iam/quota/Quota.vue` |
+| `Code2` | `code` | ✅ | `components/alerts/AlertHistoryDrawer.vue`, `components/pipeline/PipelineEditor.vue`, `plugins/logs/SearchHistory.vue`, `plugins/logs/SearchSchedulersList.vue`, `components/dashboards/addPanel/QueryTypeSelector.vue`, `components/pipeline/NodeForm/ScheduledPipeline.vue` |
+| `Copy` | `content-copy` | ✅ | `components/rum/EventDetailDrawerContent.vue`, `components/rum/correlation/TraceCorrelationCard.vue`, `plugins/logs/SearchJobInspector.vue` |
+| `Database` | `database` | ⚠️ | `components/alerts/steps/QueryConfig.vue`, `components/dashboards/addPanel/QueryTypeSelector.vue`, `views/Dashboards/ScheduledDashboards.vue`, `components/reports/ReportList.vue`, `enterprise/components/billings/Billing.vue`, `components/iam/roles/EditRole.vue` |
+| `Download` | `download` | ✅ | `components/settings/RegexPatternList.vue`, `components/functions/EnrichmentTableList.vue`, `components/logstream/explore/SearchBar.vue`, `components/rum/SearchBar.vue`, `enterprise/components/billings/invoiceTable.vue`, `components/pipeline/PipelinesList.vue` |
+| `Ellipsis` | `more-horiz` | ⚠️ | `plugins/logs/SearchBar.vue` |
+| `ExternalLink` | `open-in-new` | ✅ | `components/settings/DomainManagement.vue`, `plugins/correlation/TelemetryCorrelationDashboard.vue` |
+| `Eye` | `visibility` | ✅ | `components/pipelines/BackfillJobsList.vue`, `components/pipeline/PipelinesList.vue` |
+| `FileJson` | `description` | ⚠️ | `plugins/logs/JsonPreview.vue` |
+| `FileText` | `description` | ⚠️ | `components/functions/TestFunction.vue`, `views/LogStream.vue` |
+| `Flame` | — | 🔁 no equivalent | `plugins/traces/TraceDetails.vue` — keep lucide |
+| `FolderInput` | `drive-file-move` | ⚠️ Phase 2b | `components/reports/ReportList.vue` |
+| `Gauge` | `speed` | ⚠️ | `components/iam/quota/Quota.vue` |
+| `GitBranch` | — | 🔁 no close equivalent | `components/alerts/FilterGroup.vue`, `components/rum/EventDetailDrawerContent.vue`, `plugins/traces/SearchBar.vue`, `plugins/traces/TraceDetails.vue` — keep lucide or `fork-right` |
+| `GitFork` | `fork-right` | ⚠️ | `views/LogStream.vue` |
+| `GitMerge` | `merge` | ⚠️ | `components/alerts/FilterGroup.vue` |
+| `HardDrive` | `storage` | ⚠️ | `enterprise/components/billings/Billing.vue` |
+| `HelpCircle` | `help` | ⚠️ | `components/cross-linking/CrossLinkUserGuide.vue`, `plugins/logs/SyntaxGuide.vue`, `plugins/traces/SyntaxGuide.vue`, `plugins/metrics/SyntaxGuideMetrics.vue` |
+| `History` | `history` | ✅ | `components/alerts/AlertHistoryDrawer.vue` |
+| `Hourglass` | `hourglass-empty` | ⚠️ | `components/iam/quota/Quota.vue` |
+| `Info` | `info` | ✅ | `plugins/logs/SearchHistory.vue`, `plugins/logs/SearchSchedulersList.vue`, `views/LogStream.vue` |
+| `Infinity` | `all-inclusive` | ⚠️ | `plugins/correlation/DimensionFilterEditor.vue` |
+| `Layers` | `layers` | ⚠️ | `plugins/traces/SearchBar.vue`, `plugins/logs/SearchBar.vue` |
+| `LayoutList` | `format-list-bulleted` | ✅ | `components/alerts/AlertList.vue`, `components/logstream/schema.vue`, `components/settings/ModelPricingList.vue`, `components/iam/roles/EditRole.vue`, `components/functions/EnrichmentTableList.vue` |
+| `Link` | `link` | ✅ | `components/settings/ImportRegexPattern.vue`, `components/functions/EnrichmentTableList.vue`, `components/common/BaseImport.vue` |
+| `Link2` | `link` | ✅ | `components/settings/CorrelationSettings.vue` |
+| `List` | `format-list-bulleted` | ✅ | `components/functions/EnrichmentTableList.vue`, `components/rum/ResourceDetailDrawer.vue`, `components/queries/RunningQueriesList.vue` |
+| `Mail` | `mail` | ⚠️ | `components/alerts/AddTemplate.vue`, `components/alerts/AddDestination.vue` |
+| `Maximize` | `fullscreen` | ✅ | `components/functions/FunctionsToolbar.vue`, `plugins/logs/SearchBar.vue` |
+| `Maximize2` | `open-in-full` | ⚠️ | `components/pipeline/PipelineEditor.vue`, `components/pipeline/NodeForm/ScheduledPipeline.vue` |
+| `MessageSquare` | `chat` | ⚠️ | `plugins/traces/TraceDetails.vue` |
+| `Minimize` | `fullscreen-exit` | ⚠️ | `plugins/logs/SearchBar.vue` |
+| `Minimize2` | `close-fullscreen` | ⚠️ | `components/pipeline/PipelineEditor.vue`, `components/pipeline/NodeForm/ScheduledPipeline.vue` |
+| `MoreVertical` | `more-vert` | ✅ | `components/pipeline/PipelinesList.vue` |
+| `Navigation` | `navigation` | ⚠️ | `components/rum/PlayerEventsSidebar.vue` |
+| `Network` | `account-tree` | ⚠️ Phase 2b | `plugins/traces/SearchBar.vue`, `src/mixins/mainLayout.mixin.ts`, `src/enterprise/mixins/mainLayout.mixin.ts` |
+| `Pause` | `pause` | ⚠️ | `components/pipelines/BackfillJobsList.vue`, `components/anomaly_detection/AnomalyDetectionList.vue`, `components/reports/ReportList.vue`, `components/pipeline/PipelinesList.vue` |
+| `Pencil` | `edit` | ✅ | `components/settings/RegexPatternList.vue`, `components/settings/General.vue`, `components/settings/CipherKeys.vue`, `components/settings/AiToolsets.vue`, `components/functions/FunctionList.vue`, `components/functions/EnrichmentTableList.vue`, `components/anomaly_detection/AnomalyDetectionList.vue`, `components/pipelines/BackfillJobsList.vue`, `enterprise/components/EvalTemplateList.vue`, `components/cross-linking/CrossLinkManager.vue`, `components/reports/ReportList.vue`, `components/pipeline/PipelinesList.vue` |
+| `Play` | `play-arrow` | ✅ | `components/functions/FunctionsToolbar.vue`, `components/pipelines/BackfillJobsList.vue`, `components/anomaly_detection/AnomalyDetectionList.vue`, `components/reports/ReportList.vue`, `components/pipeline/PipelinesList.vue` |
+| `PlayCircle` | `play-circle` | ⚠️ | `components/rum/ResourceDetailDrawer.vue`, `components/rum/errorTracking/view/ErrorSessionReplay.vue` |
+| `Plus` | `add` | ✅ | `components/settings/ServiceIdentitySetup.vue`, `components/logstream/StreamFieldInputs.vue`, `components/logstream/schema.vue`, `components/logstream/AssociatedRegexPatterns.vue`, `plugins/metrics/MetricList.vue`, `components/pipeline/NodeForm/CreateDestinationForm.vue`, `components/pipeline/NodeForm/ScheduledPipeline.vue`, `components/cross-linking/CrossLinkManager.vue`, `components/cross-linking/CrossLinkDialog.vue` |
+| `RefreshCcw` | `refresh` | ✅ | `plugins/logs/SearchBar.vue` |
+| `RefreshCw` | `refresh` | ✅ | `components/settings/DomainManagement.vue`, `components/settings/DiscoveredServices.vue`, `components/logstream/LlmEvaluationSettings.vue`, `components/functions/AssociatedStreamFunction.vue`, `components/pipeline/NodeForm/LlmEvaluation.vue`, `components/pipelines/PipelineHistory.vue`, `components/pipelines/BackfillJobsList.vue`, `components/anomaly_detection/steps/AnomalyAlerting.vue`, `components/anomaly_detection/AnomalyDetectionList.vue`, `components/rum/correlation/TraceCorrelationCard.vue`, `plugins/correlation/TelemetryCorrelationDashboard.vue`, `plugins/traces/metrics/TracesAnalysisDashboard.vue` |
+| `RotateCcw` | `undo` | ⚠️ | `plugins/correlation/TimeRangeEditor.vue`, `plugins/correlation/DimensionFilterEditor.vue` |
+| `ScanSearch` | `manage-search` | ⚠️ | `components/settings/CorrelationSettings.vue`, `plugins/logs/SearchBar.vue` |
+| `ScrollText` | `article` | ✅ | `views/LogStream.vue` |
+| `Search` | `search` | ✅ | `components/functions/EnrichmentTableList.vue`, `components/pipelines/PipelineHistory.vue`, `views/LogStream.vue` |
+| `Server` | `dns` | ⚠️ | `components/settings/CorrelationSettings.vue` |
+| `Share` | `share` | ✅ | `plugins/logs/SearchBar.vue` |
+| `Share2` | `share` | ✅ | `plugins/traces/SearchBar.vue` |
+| `Shield` | `security` | ⚠️ | `components/alerts/AddAlert.vue`, `components/iam/groups/EditGroup.vue`, `components/iam/roles/EditRole.vue`, `components/iam/quota/Quota.vue` |
+| `SlidersHorizontal` | `tune` | ✅ | `components/alerts/AddAlert.vue` |
+| `Sliders` | `tune` | ✅ | `components/settings/ModelPricingList.vue` |
+| `Sparkles` | `auto-awesome` | ⚠️ | `plugins/traces/SearchBar.vue` |
+| `StopCircle` | `stop-circle` | ⚠️ | `components/anomaly_detection/AnomalyDetectionList.vue` |
+| `Table2` | `table-chart` | ⚠️ | `components/iam/roles/EditRole.vue`, `components/iam/quota/Quota.vue`, `plugins/traces/TraceDetailsSidebar.vue` |
+| `Tag` | `label` | ⚠️ | `components/rum/PlayerEventsSidebar.vue` |
+| `Timer` | `timer` | ⚠️ | `components/iam/quota/Quota.vue` |
+| `Trash2` | `delete` | ✅ | many files — see 7b |
+| `TrendingUp` | `trending-up` | ⚠️ | `components/alerts/AlertList.vue`, `components/alerts/AddAlert.vue` |
+| `Type` (as `TypeIcon`) | `title` | ⚠️ | `components/alerts/steps/Advanced.vue` |
+| `Upload` | `upload` | ⚠️ | `components/settings/ImportRegexPattern.vue`, `components/common/BaseImport.vue`, `components/rum/errorTracking/view/PrettyStackTrace.vue`, `components/functions/EnrichmentTableList.vue` |
+| `UserCheck` | `verified-user` | ⚠️ | `components/logstream/schema.vue` |
+| `Users` | `group` | ⚠️ | `components/iam/groups/EditGroup.vue`, `components/iam/roles/EditRole.vue` |
+| `Webhook` | `webhook` | ⚠️ | `components/alerts/AddTemplate.vue`, `components/alerts/AddDestination.vue` |
+| `Wrench` | `build` | ⚠️ | `components/alerts/steps/QueryConfig.vue`, `components/dashboards/addPanel/QueryTypeSelector.vue`, `plugins/logs/SearchBar.vue` |
+| `X` | `close` | ✅ | many files — see 7b |
+| `Zap` | `bolt` | ✅ | `components/alerts/AlertList.vue`, `components/alerts/AddDestination.vue` |
+
+> **Icons with no material-symbols-light equivalent** (keep `lucide-vue-next` or replace with custom SVG): `BrainCircuit`, `Flame`, `GitBranch`.
+
+---
+
+### 7b — Files by area
+
+| Area | Files with lucide imports |
+|---|---|
+| **Alerts** | `AlertList.vue`, `AddAlert.vue`, `AddTemplate.vue`, `AddDestination.vue`, `AlertHistoryDrawer.vue`, `FilterGroup.vue`, `steps/QueryConfig.vue`, `steps/Advanced.vue` |
+| **Settings** | `ServiceIdentitySetup.vue`, `RegexPatternList.vue`, `ModelPricingList.vue`, `ImportRegexPattern.vue`, `General.vue`, `DomainManagement.vue`, `DiscoveredServices.vue`, `CorrelationSettings.vue`, `CipherKeys.vue`, `AiToolsets.vue` |
+| **Logstream** | `StreamFieldInputs.vue`, `schema.vue`, `LlmEvaluationSettings.vue`, `explore/SearchBar.vue`, `AssociatedRegexPatterns.vue`, `AddStream.vue` |
+| **Functions** | `AssociatedStreamFunction.vue`, `EnrichmentSchema.vue`, `FunctionList.vue`, `EnrichmentTableList.vue`, `FunctionsToolbar.vue`, `TestFunction.vue` |
+| **Pipelines** | `pipeline/PipelinesList.vue`, `pipeline/PipelineEditor.vue`, `pipeline/NodeForm/CreateDestinationForm.vue`, `pipeline/NodeForm/LlmEvaluation.vue`, `pipeline/NodeForm/ScheduledPipeline.vue`, `pipelines/PipelineHistory.vue`, `pipelines/EditBackfillJobDialog.vue`, `pipelines/CreateBackfillJobDialog.vue`, `pipelines/BackfillJobsList.vue`, `pipelines/BackfillJobDetails.vue` |
+| **IAM** | `iam/groups/EditGroup.vue`, `iam/roles/EditRole.vue`, `iam/quota/Quota.vue` |
+| **RUM** | `rum/SearchBar.vue`, `rum/ResourceDetailDrawer.vue`, `rum/PlayerEventsSidebar.vue`, `rum/EventDetailDrawerContent.vue`, `rum/errorTracking/view/PrettyStackTrace.vue`, `rum/errorTracking/view/ErrorSessionReplay.vue`, `rum/correlation/TraceCorrelationCard.vue` |
+| **Queries** | `queries/SummaryList.vue`, `queries/RunningQueriesList.vue`, `queries/QueryList.vue` |
+| **Reports** | `reports/ReportList.vue` |
+| **Anomaly Detection** | `anomaly_detection/steps/AnomalyDetectionConfig.vue`, `anomaly_detection/steps/AnomalyAlerting.vue`, `anomaly_detection/AnomalySummary.vue`, `anomaly_detection/AnomalyDetectionList.vue` |
+| **Dashboards** | `dashboards/addPanel/QueryTypeSelector.vue`, `views/Dashboards/ScheduledDashboards.vue`, `views/Dashboards/ImportDashboard.vue` |
+| **Common** | `common/BaseImport.vue` |
+| **Cross-linking** | `cross-linking/CrossLinkUserGuide.vue`, `cross-linking/CrossLinkManager.vue`, `cross-linking/CrossLinkDialog.vue` |
+| **Logs plugin** | `plugins/logs/Index.vue`, `plugins/logs/SearchBar.vue`, `plugins/logs/SearchHistory.vue`, `plugins/logs/SearchJobInspector.vue`, `plugins/logs/SyntaxGuide.vue`, `plugins/logs/SearchSchedulersList.vue`, `plugins/logs/JsonPreview.vue` |
+| **Traces plugin** | `plugins/traces/Index.vue`, `plugins/traces/SearchBar.vue`, `plugins/traces/SyntaxGuide.vue`, `plugins/traces/TraceDetails.vue`, `plugins/traces/TraceDetailsSidebar.vue`, `plugins/traces/metrics/TracesAnalysisDashboard.vue` |
+| **Metrics plugin** | `plugins/metrics/SyntaxGuideMetrics.vue`, `plugins/metrics/MetricList.vue`, `plugins/metrics/AddToDashboard.vue` |
+| **Correlation plugin** | `plugins/correlation/TimeRangeEditor.vue`, `plugins/correlation/TelemetryCorrelationDashboard.vue`, `plugins/correlation/DimensionFilterEditor.vue` |
+| **Views** | `views/LogStream.vue` |
+| **Mixins** | `src/mixins/mainLayout.mixin.ts`, `src/enterprise/mixins/mainLayout.mixin.ts` |
+| **Enterprise** | `enterprise/components/EvalTemplateList.vue`, `enterprise/components/EvalTemplateEditor.vue`, `enterprise/components/billings/invoiceTable.vue`, `enterprise/components/billings/Billing.vue` |
+
+---
+
 ## Summary by Phase
 
 | Phase | Scope | Approx. files | Prerequisite | Status |
@@ -314,3 +450,4 @@ These `q-icon` usages are **inside Quasar component slots** (prepend/append of `
 | **Phase 4 (blocked)** | Migrate q-input prepend icons | ~10 files | OInput component built | 🔴 |
 | **Phase 5 (blocked)** | Migrate q-icon-wrapping-tooltip | ~5 files | OTooltip component built | 🔴 |
 | **Phase 6 (blocked)** | Migrate DateTime picker internal icons | ~3 files | ODatePicker component built | 🔴 |
+| **Phase 7** | Replace `lucide-vue-next` component usages with `<OIcon>` | ~75 files / ~90 icons | Registry mappings for each Lucide icon | 🔲 |
