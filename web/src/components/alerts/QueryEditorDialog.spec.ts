@@ -394,6 +394,8 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
         :data-show-close="String(!!showClose)"
       >
         <slot name="header" />
+        <slot name="header-left" />
+        <slot name="header-right" />
         <slot />
         <slot name="footer" />
         <button
