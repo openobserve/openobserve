@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none o2-custom-bg storage-settings-editor">
+  <q-page class="q-pa-none o2-custom-bg storage-settings-editor  ">
     <!-- Header -->
-    <div class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]">
+    <div class="row items-center no-wrap card-container  q-px-md tw:mb-[0.675rem]">
       <div class="flex items-center tw:h-[60px]">
         <div
           data-test="storage-settings-editor-back-btn"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Stepper -->
-    <div class="card-container tw:py-2 q-px-md tw:overflow-auto">
+    <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 q-px-md tw:overflow-auto">
     <div style="max-width: 720px;">
       <q-form ref="storageForm" @submit="submitStorage">
         <q-stepper
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="text-subtitle2 q-mb-sm" style="font-weight: 500">
-              select storage provider <span class="text-red">*</span>
+              Select Storage Provider <span class="text-red">*</span>
             </div>
             <div class="destination-type-grid">
               <div

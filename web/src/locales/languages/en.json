@@ -2756,7 +2756,7 @@
     "featureSecureDesc": "Fine grained access keys, your sensitive data stays in your infrastructure.",
     "goBack": "Go Back",
     "newStorageConfiguration": "New Storage Configuration",
-    "selectProviderDesc": "select a cloud storage provider to store this organization's data.",
+    "selectProviderDesc": "Select a cloud storage provider to store this organization's data.",
     "bucketNameRequired": "Bucket name is required",
     "accessKeyRequired": "Access key is required",
     "secretKeyRequired": "Secret key is required",
