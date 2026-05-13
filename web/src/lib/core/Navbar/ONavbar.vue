@@ -17,32 +17,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <nav
     v-show="visible"
+    v-bind="$attrs"
     role="navigation"
     aria-label="Main navigation"
     data-test="navbar-main-nav"
-    class="o2-sidebar o2-sidebar-left left-drawer tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:overflow-y-auto"
+    data-o2-navbar
+    class="navbar-links tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:overflow-y-auto"
     @keydown="handleKeydown"
   >
-    <div class="navbar-links" data-test="navbar-link-list">
-      <menu-link
-        v-for="(nav, index) in linksList"
-        :key="nav.title"
-        :link-name="nav.name"
-        :animation-index="index"
-        v-bind="{ ...nav, mini: miniMode }"
-        @mouseenter="emit('menu-hover', nav.link)"
-      />
-    </div>
+    <menu-link
+      v-for="(nav, index) in linksList"
+      :key="nav.title"
+      :link-name="nav.name"
+      :animation-index="index"
+      v-bind="{ ...nav, mini: miniMode }"
+      @mouseenter="emit('menu-hover', nav.link)"
+    />
   </nav>
 </template>
 
 <script setup lang="ts">
 /**
  * Left sidebar navigation bar. Renders a list of MenuLink items with keyboard
- * navigation (ArrowUp/ArrowDown) and Tab trapping to skip between header and content.
+ * navigation (ArrowUp/ArrowDown) and Tab trapping.
  */
-import MenuLink from "@/components/MenuLink.vue";
-import type { NavbarProps, NavbarEmits } from "./ONavbar.types";
+import type { NavbarProps, NavbarEmits, NavbarSlots } from "./ONavbar.types";
+
+defineOptions({ inheritAttrs: false });
 
 withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
@@ -50,6 +51,8 @@ withDefaults(defineProps<NavbarProps>(), {
 });
 
 const emit = defineEmits<NavbarEmits>();
+
+defineSlots<NavbarSlots>();
 
 const NAV_KEYS = ["ArrowDown", "ArrowUp", "Tab"] as const;
 
@@ -102,74 +105,3 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 </script>
-
-<style lang="scss">
-.navbar-links {
-  padding-top: 0.25rem;
-
-  .q-item {
-    margin: 0 0.156rem;
-    padding: 0.125rem;
-    border-radius: 0.313rem;
-    display: list-item;
-    text-align: center;
-    list-style: none;
-
-    &__section--avatar {
-      padding-right: 0;
-      min-width: 1.5rem;
-      display: list-item;
-      text-align: center;
-      list-style: none;
-    }
-
-    .q-icon {
-      height: 1.3rem;
-      width: 1.3rem;
-    }
-
-    .q-item__label {
-      padding-bottom: 0.25rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--o2-text-secondary);
-    }
-
-    &.q-router-link--active {
-      color: var(--o2-menu-color);
-
-      .q-icon img {
-        filter: brightness(100);
-      }
-
-      .q-item__label {
-        color: var(--o2-menu-color);
-      }
-
-      body.body--light & {
-        color: var(--o2-menu-color) !important;
-
-        .q-icon {
-          color: #19191e !important;
-        }
-
-        .q-item__label {
-          color: #19191e !important;
-        }
-      }
-
-      body.body--dark & {
-        color: var(--o2-menu-color) !important;
-
-        .q-icon {
-          color: #ffffff !important;
-        }
-
-        .q-item__label {
-          color: #ffffff !important;
-        }
-      }
-    }
-  }
-}
-</style>

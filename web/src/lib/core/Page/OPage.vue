@@ -3,8 +3,8 @@
 <script setup lang="ts">
 import type { PageProps, PageSlots } from "./OPage.types";
 /**
- * Page wrapper component. Renders a Primitive element with the .oo-page class and
- * rounded-md corners for consistent page-level styling across the application.
+ * Page wrapper component. Renders a Primitive element with rounded-md
+ * corners for consistent page-level styling across the application.
  */
 import { Primitive } from "reka-ui";
 
@@ -22,7 +22,7 @@ defineSlots<PageSlots>();
     :as="as"
     :as-child="asChild"
     v-bind="$attrs"
-    class="oo-page tw:rounded-md"
+    class="tw:rounded-md"
     data-o2-page
   >
     <slot />

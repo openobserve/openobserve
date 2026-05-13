@@ -15,7 +15,7 @@
 
 export interface NavItem {
   title: string;
-  icon: any;
+  icon: string;
   link: string;
   exact?: boolean;
   name: string;
