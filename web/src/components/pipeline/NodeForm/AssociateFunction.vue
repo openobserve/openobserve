@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.associateFunction')"
-    size="md"
-    :show-close="true"
+    :width="createNewFunction ? '97' : '30'"
     @keydown.stop
   >
     <div
