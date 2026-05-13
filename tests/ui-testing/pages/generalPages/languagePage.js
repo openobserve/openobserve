@@ -30,7 +30,7 @@ class LanguagePage {
     '.q-item__label', '.o-tab__label',
     '.q-field__label', '.q-card__section', '.q-toolbar__title',
     '[class*="menu"]', '[class*="nav"]', '[class*="sidebar"]',
-    '[data-test]', '.q-dialog', '.q-modal', '.q-drawer',
+    '[data-test]', '.q-dialog', '.q-modal', '[data-o2-navbar]',
     '[role="tab"]', '[role="tabpanel"]', '[role="dialog"]',
   ];
 

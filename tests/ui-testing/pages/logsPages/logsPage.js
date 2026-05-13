@@ -128,7 +128,7 @@ export class LogsPage {
         this.logsSearchBarSaveTransformBtn = '[data-test="logs-search-bar-save-transform-btn"]';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         this.qNotifyWarning = '#q-notify div';
-        this.qPageContainer = '.q-page-container';
+        this.qPageContainer = '[data-o2-page-container]';
         this.cmContent = '.view-lines';
         this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
@@ -907,7 +907,7 @@ export class LogsPage {
                     const b = document.querySelector(sel);
                     if (!b) return false;
                     return !b.hasAttribute('disabled')
-                        && !b.classList.contains('q-btn--loading')
+                        && b.getAttribute('aria-busy') !== 'true'
                         && !(b.textContent?.trim()?.includes('Cancel'));
                 },
                 this.queryButton,
@@ -1969,7 +1969,7 @@ export class LogsPage {
                     const b = document.querySelector(sel);
                     if (!b) return false;
                     return !b.hasAttribute('disabled')
-                        && !b.classList.contains('q-btn--loading')
+                        && b.getAttribute('aria-busy') !== 'true'
                         && !(b.textContent?.trim()?.includes('Cancel'));
                 },
                 this.queryButton,

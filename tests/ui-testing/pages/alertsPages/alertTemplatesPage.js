@@ -224,7 +224,7 @@ export class AlertTemplatesPage {
             // Strategy 2: data-test selector for template search
             () => this.page.locator('[data-test="alert-template-search-input"]'),
             // Strategy 3: input inside the templates section (look for search/filter input)
-            () => this.page.locator('.q-page-container .q-table__control input[type="text"], .q-page-container input.q-field__input[placeholder*="Search"], .q-page-container input[placeholder*="search"]').first()
+            () => this.page.locator('[data-o2-page-container] .q-table__control input[type="text"], [data-o2-page-container] input.q-field__input[placeholder*="Search"], [data-o2-page-container] input[placeholder*="search"]').first()
         ];
 
         for (const strategy of strategies) {
