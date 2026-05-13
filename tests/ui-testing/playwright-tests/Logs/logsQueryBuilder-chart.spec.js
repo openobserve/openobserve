@@ -53,7 +53,7 @@ async function setupQueryAndSwitchToBuild(pm, page, query) {
 // ============================================================================
 
 test.describe("Logs Query Builder - P0 Critical Tests", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -153,7 +153,7 @@ test.describe("Logs Query Builder - P0 Critical Tests", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder - Tab Navigation", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -252,7 +252,7 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -362,7 +362,7 @@ test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -523,7 +523,7 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder - Chart Auto-Selection", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {

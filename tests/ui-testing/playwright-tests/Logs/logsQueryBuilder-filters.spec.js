@@ -54,7 +54,7 @@ async function setupQueryAndSwitchToBuild(pm, page, query) {
 // ============================================================================
 
 test.describe("Logs Query Builder - Filter Operators", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {

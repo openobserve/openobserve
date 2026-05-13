@@ -54,7 +54,7 @@ async function setupQueryAndSwitchToBuild(pm, page, query) {
 // ============================================================================
 
 test.describe("Logs Query Builder - Builder Tab Improvement", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -184,7 +184,7 @@ test.describe("Logs Query Builder - Builder Tab Improvement", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder - Edge Cases", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -265,7 +265,7 @@ test.describe("Logs Query Builder - Edge Cases", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder - Query Mode Toggle", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -330,7 +330,7 @@ test.describe("Logs Query Builder - Query Mode Toggle", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -391,7 +391,7 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder - Search Bar Editor State", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -471,7 +471,7 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
 // ============================================================================
 
 test.describe("Logs Query Builder — Bare Field Select defaults (Case 3a)", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -558,7 +558,7 @@ test.describe("Logs Query Builder — Bare Field Select defaults (Case 3a)", () 
 // ============================================================================
 
 test.describe("Logs Query Builder — FieldList button visibility", () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
