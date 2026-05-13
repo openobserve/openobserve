@@ -703,7 +703,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("traces.traceFilters") }}
           </div>
           <q-btn icon="close"
-flat round dense v-close-popup />
+flat round
+dense v-close-popup />
         </q-card-section>
 
         <q-card-section class="tw:flex-1 tw:p-4 tw:flex tw:flex-col">
@@ -2682,6 +2683,7 @@ export default defineComponent({
     };
 
     return {
+      config,
       router,
       t,
       activeTab,
