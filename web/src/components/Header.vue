@@ -818,4 +818,33 @@ export default defineComponent({
   max-width: none;
   white-space: nowrap;
 }
+
+.logo-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  min-width: 150px;
+}
+
+.openobserve-logo {
+  height: 32px;
+  width: auto;
+  max-width: 150px;
+  display: block;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.headerMenu {
+  margin-right: 1rem;
+
+  .block {
+    font-weight: 700;
+    color: #404040;
+  }
+}
 </style>
