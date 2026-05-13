@@ -283,6 +283,13 @@ const mountGlobal = {
     QTooltip: true,
     QAvatar: true,
     ODialog: ODialogStub,
+    // Explicit stub so shallowMount tracks `open` as a declared prop.
+    ShowLegendsPopup: {
+      name: "ShowLegendsPopup",
+      props: ["open", "panelData"],
+      emits: ["update:open"],
+      template: '<div data-test="show-legends-popup-stub" :data-open="String(open)"></div>',
+    },
   },
 };
 
@@ -663,16 +670,14 @@ describe("PanelEditor.vue", () => {
   });
 
   describe("ODialog migration (legends popup)", () => {
-    // The legends popup uses ODialog with v-model:open + size="lg" + show-close=false.
-    // We need a truthy chartData so PanelSchemaRenderer renders (it emits show-legends).
+    // ShowLegendsPopup wraps ODialog internally. PanelEditor owns the v-model:open binding.
+    // We test at the ShowLegendsPopup level (it is auto-stubbed in shallowMount).
     beforeEach(() => {
       mockChartData.value = {};
       mockShowLegendsDialog.value = false;
     });
 
-    it("renders the legends ODialog with the correct forwarded props", () => {
-      // Open the legends dialog so the ODialog body renders (ODialogStub renders unconditionally,
-      // but we still want to verify the bound props match the migration contract).
+    it("renders the legends popup with open=true when showLegendsDialog is true", () => {
       mockShowLegendsDialog.value = true;
 
       wrapper = shallowMount(PanelEditor, {
@@ -680,33 +685,23 @@ describe("PanelEditor.vue", () => {
         global: mountGlobal,
       });
 
-      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
-      // The legends ODialog is always present in the template; find the lg-sized one.
-      const legendsDialog = dialogs.find(
-        (d: any) => d.attributes("data-size") === "lg",
-      );
-
-      expect(legendsDialog).toBeTruthy();
-      expect(legendsDialog!.attributes("data-show-close")).toBe("false");
-      expect(legendsDialog!.attributes("data-open")).toBe("true");
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(true);
     });
 
-    it("starts with the legends ODialog closed (data-open=false)", () => {
+    it("starts with the legends popup closed (open=false)", () => {
       wrapper = shallowMount(PanelEditor, {
         props: { pageType: "dashboard" },
         global: mountGlobal,
       });
 
-      const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
-      const legendsDialog = dialogs.find(
-        (d: any) => d.attributes("data-size") === "lg",
-      );
-
-      expect(legendsDialog).toBeTruthy();
-      expect(legendsDialog!.attributes("data-open")).toBe("false");
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(false);
     });
 
-    it("closes the legends dialog when ODialog emits update:open=false", async () => {
+    it("closes the legends dialog when ShowLegendsPopup emits update:open=false", async () => {
       mockShowLegendsDialog.value = true;
 
       wrapper = shallowMount(PanelEditor, {
@@ -714,15 +709,11 @@ describe("PanelEditor.vue", () => {
         global: mountGlobal,
       });
 
-      const legendsDialog = wrapper
-        .findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("size") === "lg");
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(true);
 
-      expect(legendsDialog).toBeTruthy();
-      expect(legendsDialog!.props("open")).toBe(true);
-
-      // Driving the close via the emit contract (v-model:open binding).
-      await legendsDialog!.vm.$emit("update:open", false);
+      await popup.vm.$emit("update:open", false);
       await nextTick();
 
       expect(mockShowLegendsDialog.value).toBe(false);
