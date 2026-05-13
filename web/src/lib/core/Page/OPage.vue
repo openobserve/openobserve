@@ -2,6 +2,10 @@
 
 <script setup lang="ts">
 import type { PageProps, PageSlots } from "./OPage.types";
+/**
+ * Page wrapper component. Renders a Primitive element with the .oo-page class and
+ * rounded-md corners for consistent page-level styling across the application.
+ */
 import { Primitive } from "reka-ui";
 
 defineOptions({ inheritAttrs: false });

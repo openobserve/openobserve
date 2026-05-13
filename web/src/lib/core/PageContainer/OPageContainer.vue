@@ -3,6 +3,10 @@
 <script setup lang="ts">
 import type { PageContainerProps, PageContainerSlots } from "./OPageContainer.types";
 import { Primitive } from "reka-ui";
+/**
+ * Page container component. Provides Quasar-compatible _q_pc_ injection for child
+ * Quasar components (q-page, q-dialog) to detect they are inside a page container.
+ */
 import { provide } from "vue";
 
 defineOptions({ inheritAttrs: false });

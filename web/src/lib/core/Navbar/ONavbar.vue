@@ -19,10 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-show="visible"
     role="navigation"
     aria-label="Main navigation"
+    data-test="navbar-main-nav"
     class="o2-sidebar o2-sidebar-left left-drawer tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:overflow-y-auto"
     @keydown="handleKeydown"
   >
-    <q-list class="leftNavList">
+    <q-list class="leftNavList" data-test="navbar-link-list">
       <menu-link
         v-for="(nav, index) in linksList"
         :key="nav.title"
@@ -36,6 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+/**
+ * Left sidebar navigation bar. Renders a list of MenuLink items with keyboard
+ * navigation (ArrowUp/ArrowDown) and Tab trapping to skip between header and content.
+ */
 import { QList } from "quasar";
 import MenuLink from "@/components/MenuLink.vue";
 import type { NavbarProps, NavbarEmits } from "./ONavbar.types";
