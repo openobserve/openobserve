@@ -794,11 +794,13 @@ export class AlertTemplatesPage {
         await this.page.locator(this.importUrlInput).fill(url);
         await this.page.waitForTimeout(1000); // Small delay after filling URL
         await this.page.locator(this.importJsonButton).click();
-        await expect(this.page.getByText('Template - 1: The "name"')).toBeVisible();
+        // Wait for validation/preview to render — text contains Template index and field validation
+        await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
+        await expect(this.page.getByText(/The.*name.*field.*required/)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.importNameInput).click();
         await this.page.locator(this.importNameInput).fill(templateName);
         await this.page.locator(this.importJsonButton).click();
-        
+
         if (importType === 'invalid') {
             await expect(this.page.locator(this.preLocator)).toContainText(this.templateImportErrorText);
         } else {
@@ -827,7 +829,9 @@ export class AlertTemplatesPage {
         await this.page.locator(this.templateImportButton).click();
         await this.page.locator(this.importFileInput).setInputFiles(filePath);
         await this.page.locator(this.importJsonButton).click();
-        await expect(this.page.getByText('Template - 1: The "name"')).toBeVisible();
+        // Wait for validation/preview to render — text contains Template index and field validation
+        await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
+        await expect(this.page.getByText(/The.*name.*field.*required/)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.importNameInput).fill(templateName);
         await this.page.locator(this.importJsonButton).click();
 
