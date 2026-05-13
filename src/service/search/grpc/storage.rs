@@ -727,6 +727,7 @@ async fn search_tantivy_index(
     idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
+    let start = std::time::Instant::now();
     let file_account = parquet_file.account.clone();
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
@@ -840,6 +841,10 @@ async fn search_tantivy_index(
     if !file_in_range {
         need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
     }
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, open dir took: {} ms",
+        start.elapsed().as_millis()
+    );
 
     let start = std::time::Instant::now();
     warm_up_terms(
@@ -875,6 +880,8 @@ async fn search_tantivy_index(
         );
     }
 
+    let start = std::time::Instant::now();
+    let ttv_file_name_clone = ttv_file_name.clone();
     // search the index
     let trace_id_clone = trace_id.to_string();
     let res = tokio::task::spawn_blocking(move || match idx_optimize_rule {
@@ -912,7 +919,12 @@ async fn search_tantivy_index(
         }
     })
     .await??;
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name_clone}, search index took: {} ms",
+        start.elapsed().as_millis()
+    );
 
+    let start = std::time::Instant::now();
     let key = parquet_file.key.to_string();
     let mut percent = 0.0;
     let result = match res {
@@ -958,6 +970,10 @@ async fn search_tantivy_index(
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name_clone}, process tantivy result took: {} ms",
+        start.elapsed().as_millis()
+    );
 
     // cache the result if the memory size is less than the limit
     if cfg.common.inverted_index_result_cache_enabled
