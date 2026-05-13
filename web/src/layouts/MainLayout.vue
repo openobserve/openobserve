@@ -1062,8 +1062,9 @@ export default defineComponent({
         store.dispatch("setIsAiChatEnabled", true);
         store.dispatch("setIsAiChatExpanded", false);
       } else if (!store.state.isAiChatExpanded) {
-        // Inline sidebar → Expanded overlay
-        store.dispatch("setIsAiChatExpanded", true);
+        // Inline sidebar → Close
+        store.dispatch("setIsAiChatEnabled", false);
+        store.dispatch("setIsAiChatExpanded", false);
       } else {
         // Expanded overlay → Back to inline sidebar
         store.dispatch("setIsAiChatExpanded", false);
