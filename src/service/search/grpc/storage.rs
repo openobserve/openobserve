@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, ops::Bound, sync::Arc};
+use std::{collections::HashSet, ops::Bound, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::{
@@ -65,6 +65,7 @@ use crate::service::{
         caching_directory::CachingDirectory,
         footer_cache::FooterCache,
         reader::{PuffinDirReader, warm_up_terms},
+        recording_directory::RecordingDirectory,
     },
 };
 
@@ -752,15 +753,15 @@ async fn search_tantivy_index(
     // open the tantivy index
     log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
 
-    let puffin_dir = Arc::new(
-        get_tantivy_directory(
-            trace_id,
-            &file_account,
-            &ttv_file_name,
-            parquet_file.meta.index_size,
-        )
-        .await?,
-    );
+    let puffin = get_tantivy_directory(
+        trace_id,
+        &file_account,
+        &ttv_file_name,
+        parquet_file.meta.index_size,
+    )
+    .await?;
+    let recording = Arc::new(RecordingDirectory::new(puffin));
+    let puffin_dir: Arc<dyn Directory> = recording.clone();
     let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
     let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
     let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
@@ -854,6 +855,25 @@ async fn search_tantivy_index(
         "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, warm up terms took: {} ms",
         start.elapsed().as_millis()
     );
+
+    // log what was read from the underlying directory during warmup
+    let ops = recording.drain_ops();
+    if !ops.is_empty() {
+        let mut per_file: HashMap<PathBuf, (usize, usize)> = HashMap::new();
+        for op in &ops {
+            let entry = per_file.entry(op.path.clone()).or_default();
+            entry.0 += 1;
+            entry.1 += op.num_bytes;
+        }
+        let mut files: Vec<_> = per_file.iter().collect();
+        files.sort_by_key(|(p, _)| p.to_owned());
+        log::info!(
+            "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, warmup fetched {} KB across {} ops / {} files",
+            ops.iter().map(|o| o.num_bytes).sum::<usize>() / 1024,
+            ops.len(),
+            files.len(),
+        );
+    }
 
     // search the index
     let trace_id_clone = trace_id.to_string();

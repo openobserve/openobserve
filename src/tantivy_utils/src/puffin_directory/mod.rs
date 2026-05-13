@@ -26,6 +26,7 @@ use writer::PuffinDirWriter;
 pub mod caching_directory;
 pub mod footer_cache;
 pub mod reader;
+pub mod recording_directory;
 pub mod writer;
 
 // We do not need all of the tantivy files, only specific ones:

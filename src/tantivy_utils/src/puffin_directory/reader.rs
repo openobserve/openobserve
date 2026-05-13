@@ -265,11 +265,7 @@ pub async fn warm_up_terms(
                 .await
                 .map_err(anyhow::Error::from)
         },
-        async {
-            try_join_all(warm_up_fast_fields_futures)
-                .await
-                .map_err(anyhow::Error::from)
-        },
+        async { try_join_all(warm_up_fast_fields_futures).await },
     )?;
     log::info!(
         "[trace_id {trace_id}] warm up terms: file_name: {file_name}, total duration: {:?}",
