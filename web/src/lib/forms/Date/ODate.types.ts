@@ -21,6 +21,8 @@ export interface DateProps {
   error?: boolean;
   /** Whether the user can clear the value */
   clearable?: boolean;
+  /** Apply immediately on date click (default true). Set false to show an Apply button. */
+  autoApply?: boolean;
   /** Prevents editing */
   readonly?: boolean;
   /** Prevents interaction */
