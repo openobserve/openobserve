@@ -77,7 +77,7 @@ pub fn get_azure(
                 .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
         )
         .with_container_name(&config.bucket_name)
-        .with_account(&config.access_key)
+        .with_account(&config.storage_account)
         .with_access_key(&config.secret_key);
     if !config.server_url.is_empty() {
         builder = builder.with_endpoint(config.server_url.clone());
@@ -156,9 +156,6 @@ pub fn _merge_gcp_credentials(existing: &str, new: &str) -> Result<String, anyho
 pub fn _merge_azure_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
     let mut existing: AzureCredentials = serde_json::from_str(existing)?;
     let new: AzureCredentials = serde_json::from_str(new)?;
-    if !new.access_key.is_empty() {
-        existing.access_key = new.access_key;
-    }
     if !new.secret_key.is_empty() {
         existing.secret_key = new.secret_key;
     }

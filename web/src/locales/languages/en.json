@@ -2760,6 +2760,7 @@
     "accessKeyRequired": "Access key is required",
     "secretKeyRequired": "Secret key is required",
     "serverURLRequired": "Server URL is required",
+    "storageAccountRequired": "Storage Account name is required",
     "regionRequired": "Region is required",
     "roleARNRequired": "Role ARN is required",
     "externalIdRequired": "External ID is required",

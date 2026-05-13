@@ -216,14 +216,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-input
                   data-test="storage-settings-access-key-input"
-                  v-model="formData.access_key"
-                  label="Access Key *"
+                  v-model="formData.storage_account"
+                  label="Storage Account Name *"
                   class="no-border showLabelOnTop"
                   borderless
                   dense
                   flat
                   stack-label
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.accessKeyRequired')]"
+                  :disable="isEditMode"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.storageAccountRequired')]"
                 />
                 <q-input
                   data-test="storage-settings-secret-key-input"
@@ -469,6 +470,7 @@ const formData = reactive({
   server_url: "",
   region: (store.state as any).zoConfig?.org_storage_region || "",
   access_key: "",
+  storage_account: "",
   secret_key: "",
   role_arn: "",
   external_id: "",
@@ -545,6 +547,7 @@ function resetFormData() {
   formData.server_url = "";
   formData.region = cloudRegion.value;
   formData.access_key = "";
+  formData.storage_account = "";
   formData.secret_key = "";
   formData.role_arn = "";
   formData.external_id = "";
@@ -563,7 +566,7 @@ function buildDataPayload() {
     case "AzureCredentials":
       data.bucket_name = formData.bucket_name;
       data.server_url = isCloud.value ? "" : formData.server_url;
-      data.access_key = formData.access_key;
+      data.storage_account = formData.storage_account;
       data.secret_key = formData.secret_key;
       break;
     case "GcpCredentials":
@@ -647,6 +650,7 @@ onMounted(async () => {
         formData.role_arn = "";
         // external id is something that is technically a credential, but not masked
         formData.external_id = parsed.external_id || "";
+        formData.storage_account = parsed.storage_account || "";
       }
     } catch {
       $q.notify({

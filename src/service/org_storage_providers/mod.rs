@@ -121,7 +121,6 @@ pub async fn get_redacted_config(
             }
             ProviderType::AzureCredentials => {
                 let mut creds: AzureCredentials = serde_json::from_str(&config.data)?;
-                creds.access_key = redact(&creds.access_key);
                 creds.secret_key = redact(&creds.secret_key);
                 config.data = serde_json::to_string(&creds).unwrap();
             }

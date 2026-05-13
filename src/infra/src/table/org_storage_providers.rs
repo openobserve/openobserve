@@ -69,7 +69,7 @@ pub struct GcpCredentials {
 pub struct AzureCredentials {
     pub bucket_name: String,
     pub server_url: String,
-    pub access_key: String,
+    pub storage_account: String,
     pub secret_key: String,
 }
 
