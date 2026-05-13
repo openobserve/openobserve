@@ -314,12 +314,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <QueryInspector v-model:open="showViewPanel" :metaData="metaData" :data="props.data" data-test="query-inspector-dialog" />
 
-    <ODialog data-test="panel-container-legends-dialog" v-model:open="showLegendsDialog" :show-close="false" size="lg">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </ODialog>
+    <ShowLegendsPopup
+      v-model:open="showLegendsDialog"
+      :panelData="currentPanelData"
+      data-test="panel-container-legends-dialog"
+    />
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
@@ -380,7 +379,6 @@ import {
 } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { isEqual } from "lodash-es";
@@ -443,7 +441,6 @@ export default defineComponent({
     RelativeTime,
     PanelErrorButtons,
     OButton,
-    ODialog,
     ODropdown,
     ODropdownItem,
     ShowLegendsPopup: defineAsyncComponent(() => {

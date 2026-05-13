@@ -646,12 +646,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Legends Dialog -->
-    <ODialog data-test="panel-editor-legends-dialog" v-model:open="showLegendsDialog" :show-close="false" size="lg">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </ODialog>
+    <ShowLegendsPopup
+      v-model:open="showLegendsDialog"
+      :panelData="currentPanelData"
+      data-test="panel-editor-legends-dialog"
+    />
   </div>
 </template>
 

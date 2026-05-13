@@ -383,9 +383,9 @@ describe("ViewPanel", () => {
           ShowLegendsPopup: {
             name: "ShowLegendsPopup",
             template:
-              '<div data-test="show-legends-popup"><button data-test="show-legends-popup-close" @click="$emit(\'close\')">close</button></div>',
-            props: ["panelData"],
-            emits: ["close"],
+              '<div data-test="show-legends-popup"><button data-test="show-legends-popup-close" @click="$emit(\'update:open\', false)">close</button></div>',
+            props: ["panelData", "open"],
+            emits: ["update:open"],
           },
         },
       },
@@ -1248,14 +1248,14 @@ describe("ViewPanel", () => {
       expect(popup.props("panelData")).toBeDefined();
     });
 
-    it("should close dialog when ShowLegendsPopup emits close", async () => {
+    it("should close dialog when ShowLegendsPopup emits update:open false", async () => {
       wrapper = createWrapper();
 
       wrapper.vm.showLegendsDialog = true;
       await wrapper.vm.$nextTick();
 
       const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
-      await popup.vm.$emit("close");
+      await popup.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showLegendsDialog).toBe(false);
