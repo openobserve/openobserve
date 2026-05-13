@@ -33,6 +33,14 @@ document.body.appendChild(node);
 const mockShowErrorNotification = vi.fn();
 
 // Mock useNotifications composable
+vi.mock("@/aws-exports", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    default: { ...((actual.default as object) || {}), isEnterprise: "false" },
+  };
+});
+
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showErrorNotification: mockShowErrorNotification,
