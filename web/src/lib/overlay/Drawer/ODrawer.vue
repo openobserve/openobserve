@@ -480,6 +480,7 @@ watch(internalOpen, (open) => {
             'tw:px-(--spacing-dialog-footer-px) tw:py-(--spacing-dialog-footer-py)',
             'tw:bg-dialog-footer-bg',
             'tw:border-t tw:border-dialog-footer-border',
+            'tw:border-b tw:border-dialog-footer-border',
           ]"
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
