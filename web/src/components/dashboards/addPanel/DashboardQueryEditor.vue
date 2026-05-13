@@ -706,10 +706,14 @@ export default defineComponent({
         // hide function editor
         splitterModel.value = 100;
 
-        // reset function query
+        // reset function query and clear VRL-derived fields
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].vrlFunctionQuery = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionFieldList = [];
+        dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       }
 
       // open query editor

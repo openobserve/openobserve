@@ -851,18 +851,21 @@ const xAxisChartTypes = new Set([
 const hasInconsistentXAlias = computed(() => {
   if (!xAxisChartTypes.has(dashboardPanelData.data.type)) return false;
 
+  // Only check builder-mode queries — custom SQL queries don't have
+  // functionName metadata, so including them causes false positives
+  // when the user writes SQL with the same timestamp field.
   const activeQueries = dashboardPanelData.data.queries.filter(
     (_: any, idx: number) =>
       !dashboardPanelData.layout.hiddenQueries.includes(idx),
   );
-  const queriesWithX = activeQueries.filter(
-    (q: any) => q.fields.x && q.fields.x.length > 0,
+  const builderQueries = activeQueries.filter(
+    (q: any) => !q.customQuery && q.fields.x && q.fields.x.length > 0,
   );
-  if (queriesWithX.length < 2) return false;
-  const hasHistogram = queriesWithX.some((q: any) =>
+  if (builderQueries.length < 2) return false;
+  const hasHistogram = builderQueries.some((q: any) =>
     q.fields.x.some((f: any) => f.functionName === "histogram"),
   );
-  const hasNonHistogram = queriesWithX.some((q: any) =>
+  const hasNonHistogram = builderQueries.some((q: any) =>
     q.fields.x.some((f: any) => f.functionName !== "histogram"),
   );
   return hasHistogram && hasNonHistogram;
