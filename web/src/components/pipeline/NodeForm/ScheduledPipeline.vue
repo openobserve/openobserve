@@ -712,7 +712,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                             <div
                               v-else
-                              class="tw:flex tw:items-center o2-input"
+                              class="tw:flex tw:items-center o2-input tw:gap-y-2"
                             >
                               <q-input
                                 data-test="scheduled-pipeline-cron-input-field"
@@ -792,7 +792,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                    <div class="flex items-center q-mr-sm q-mt-lg">
+                    <div class="flex items-center q-mr-sm tw:mt-8">
                       <div
                         data-test="scheduled-pipeline-period-title"
                         class="text-bold flex items-center q-pb-sm"

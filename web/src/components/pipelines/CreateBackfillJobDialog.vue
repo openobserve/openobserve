@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
 
-    <div class="tw:space-y-6">
+    <div class="tw:mx-6 tw:my-3 tw:space-y-3">
           <!-- Time Range Section -->
           <div>
             <div class="tw:flex tw:items-center tw:gap-4">
