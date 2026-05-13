@@ -29,10 +29,10 @@ describe("ONavbar", () => {
         stubs: {
           "menu-link": {
             template:
-              '<a class="q-item" :data-test="\'navbar-menu-link-\' + linkName" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
+              '<a class="q-item" :data-test="\'menu-link-\' + linkName + \'-item\'" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
             props: ["linkName", "mini", "animationIndex", "title", "icon", "link", "name", "exact", "display", "hide"],
             emits: ["menu-hover"],
-            inheritAttrs: false,
+            inheritAttrs: true,
           },
         },
       },
@@ -52,21 +52,21 @@ describe("ONavbar", () => {
 
     it("should render the correct number of menu links", () => {
       wrapper = mountNavbar();
-      const links = wrapper.findAll('[data-test^="navbar-menu-link-"]');
+      const links = wrapper.findAll('[data-test^="menu-link-"]');
       expect(links).toHaveLength(3);
     });
 
     it("should render menu links with correct link names", () => {
       wrapper = mountNavbar();
-      expect(wrapper.find('[data-test="navbar-menu-link-home"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="navbar-menu-link-logs"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="navbar-menu-link-settings"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-home-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-logs-item"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="menu-link-settings-item"]').exists()).toBe(true);
     });
 
     it("should pass mini prop to menu links", () => {
       wrapper = mountNavbar({ miniMode: true });
-      const link = wrapper.find('[data-test="navbar-menu-link-home"]');
-      expect(link.attributes("mini")).toBe("true");
+      const link = wrapper.findComponent('[data-test="menu-link-home-item"]');
+      expect(link.props("mini")).toBe(true);
     });
 
     it("should set role and aria-label for accessibility", () => {
@@ -78,108 +78,127 @@ describe("ONavbar", () => {
   });
 
   describe("keyboard navigation", () => {
+    // jsdom does not update document.activeElement on element.focus().
+    // Wire them together so the keyboard handler can read and set focus.
+    let activeEl: Element | null;
+    let focusSpy: ReturnType<typeof vi.spyOn>;
+    let activeElementSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      activeEl = document.body;
+      focusSpy = vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function () {
+        activeEl = this as unknown as Element;
+      });
+      activeElementSpy = vi.spyOn(document, "activeElement", "get").mockImplementation(() => activeEl as Element);
+    });
+
+    afterEach(() => {
+      focusSpy.mockRestore();
+      activeElementSpy.mockRestore();
+    });
+
     function createMenuLinkElements(count: number): HTMLElement[] {
       return Array.from({ length: count }, (_, i) => {
         const el = document.createElement("a");
-        el.setAttribute("data-test", `navbar-menu-link-${mockLinks[i]?.name ?? i}`);
+        el.href = "#";
+        el.setAttribute("data-test", `menu-link-${mockLinks[i]?.name ?? i}-item`);
         return el;
       });
     }
 
-    it("should move focus to next link on ArrowDown", () => {
+    function setupNavWithLinks(count: number) {
       wrapper = mountNavbar();
       const nav = wrapper.find('[data-test="navbar-main-nav"]').element;
-      const links = createMenuLinkElements(3);
+      // Clear stub-rendered elements so only test elements are in the nav
+      while (nav.firstChild) nav.removeChild(nav.firstChild);
+      const links = createMenuLinkElements(count);
       links.forEach((l) => nav.appendChild(l));
-      links[0].focus();
+      return { nav, links };
+    }
+
+    function setActiveElement(el: Element | null) {
+      activeEl = el;
+    }
+
+    function getActiveElement(): Element | null {
+      return activeEl;
+    }
+
+    it("should move focus to next link on ArrowDown", () => {
+      const { nav, links } = setupNavWithLinks(3);
+      setActiveElement(links[0]);
 
       const event = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true });
       nav.dispatchEvent(event);
 
-      // Focus should move to the second element
-      expect(document.activeElement).toBe(links[1]);
+      expect(getActiveElement()).toBe(links[1]);
     });
 
     it("should wrap to first link when ArrowDown on last link", () => {
-      wrapper = mountNavbar();
-      const nav = wrapper.find('[data-test="navbar-main-nav"]').element;
-      const links = createMenuLinkElements(3);
-      links.forEach((l) => nav.appendChild(l));
-      links[2].focus();
+      const { nav, links } = setupNavWithLinks(3);
+      setActiveElement(links[2]);
 
       const event = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true });
       nav.dispatchEvent(event);
 
-      expect(document.activeElement).toBe(links[0]);
+      expect(getActiveElement()).toBe(links[0]);
     });
 
     it("should move focus to previous link on ArrowUp", () => {
-      wrapper = mountNavbar();
-      const nav = wrapper.find('[data-test="navbar-main-nav"]').element;
-      const links = createMenuLinkElements(3);
-      links.forEach((l) => nav.appendChild(l));
-      links[1].focus();
+      const { nav, links } = setupNavWithLinks(3);
+      setActiveElement(links[1]);
 
       const event = new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true });
       nav.dispatchEvent(event);
 
-      expect(document.activeElement).toBe(links[0]);
+      expect(getActiveElement()).toBe(links[0]);
     });
 
     it("should wrap to last link when ArrowUp on first link", () => {
-      wrapper = mountNavbar();
-      const nav = wrapper.find('[data-test="navbar-main-nav"]').element;
-      const links = createMenuLinkElements(3);
-      links.forEach((l) => nav.appendChild(l));
-      links[0].focus();
+      const { nav, links } = setupNavWithLinks(3);
+      setActiveElement(links[0]);
 
       const event = new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true });
       nav.dispatchEvent(event);
 
-      expect(document.activeElement).toBe(links[2]);
+      expect(getActiveElement()).toBe(links[2]);
     });
 
     it("should focus first link on ArrowDown when no link is focused", () => {
-      wrapper = mountNavbar();
-      const nav = wrapper.find('[data-test="navbar-main-nav"]').element;
-      const links = createMenuLinkElements(3);
-      links.forEach((l) => nav.appendChild(l));
+      const { nav, links } = setupNavWithLinks(3);
+      setActiveElement(null);
 
       const event = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true });
       nav.dispatchEvent(event);
 
-      expect(document.activeElement).toBe(links[0]);
+      expect(getActiveElement()).toBe(links[0]);
     });
 
     it("should focus last link on ArrowUp when no link is focused", () => {
-      wrapper = mountNavbar();
-      const nav = wrapper.find('[data-test="navbar-main-nav"]').element;
-      const links = createMenuLinkElements(3);
-      links.forEach((l) => nav.appendChild(l));
+      const { nav, links } = setupNavWithLinks(3);
+      setActiveElement(null);
 
       const event = new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true });
       nav.dispatchEvent(event);
 
-      expect(document.activeElement).toBe(links[2]);
+      expect(getActiveElement()).toBe(links[2]);
     });
 
     it("should ignore unhandled keys", () => {
-      wrapper = mountNavbar();
-      const nav = wrapper.find('[data-test="navbar-main-nav"]').element;
-      const links = createMenuLinkElements(3);
-      links.forEach((l) => nav.appendChild(l));
-      links[0].focus();
+      const { nav, links } = setupNavWithLinks(3);
+      setActiveElement(links[0]);
 
       const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true });
       nav.dispatchEvent(event);
 
-      // Focus should remain unchanged
-      expect(document.activeElement).toBe(links[0]);
+      // Focus should remain unchanged — no focus() call made
+      expect(getActiveElement()).toBe(links[0]);
     });
 
     it("should handle keyboard nav when no menu links exist", () => {
       wrapper = mountNavbar();
       const nav = wrapper.find('[data-test="navbar-main-nav"]').element;
+      while (nav.firstChild) nav.removeChild(nav.firstChild);
 
       const event = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true });
       expect(() => nav.dispatchEvent(event)).not.toThrow();
@@ -189,7 +208,7 @@ describe("ONavbar", () => {
   describe("menu-hover emit", () => {
     it("should emit menu-hover when a menu link is hovered", async () => {
       wrapper = mountNavbar();
-      const link = wrapper.find('[data-test="navbar-menu-link-logs"]');
+      const link = wrapper.find('[data-test="menu-link-logs-item"]');
       await link.trigger("mouseenter");
       expect(wrapper.emitted("menu-hover")).toBeTruthy();
       expect(wrapper.emitted("menu-hover")![0]).toEqual(["/logs"]);
@@ -199,8 +218,8 @@ describe("ONavbar", () => {
   describe("props", () => {
     it("should default miniMode to false", () => {
       wrapper = mountNavbar();
-      const link = wrapper.find('[data-test="navbar-menu-link-home"]');
-      expect(link.attributes("mini")).toBe("false");
+      const link = wrapper.findComponent('[data-test="menu-link-home-item"]');
+      expect(link.props("mini")).toBe(false);
     });
 
     it("should default visible to true", () => {

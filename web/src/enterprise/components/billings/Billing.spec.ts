@@ -86,7 +86,7 @@ describe("Billing Component", () => {
           store,
         },
         stubs: {
-          'q-page': true,
+          'OPage': true,
           'q-separator': true,
           'q-splitter': {
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
@@ -192,7 +192,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
+            'OPage': true,
             'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
@@ -235,7 +235,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
+            'OPage': true,
             'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
@@ -492,7 +492,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
+            'OPage': true,
             'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
@@ -527,7 +527,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
+            'OPage': true,
             'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
@@ -562,7 +562,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-page': true,
+            'OPage': true,
             'q-separator': true,
             'q-splitter': {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'

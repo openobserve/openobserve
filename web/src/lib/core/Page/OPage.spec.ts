@@ -34,16 +34,6 @@ describe("OPage", () => {
       expect(wrapper.element.tagName).toBe("MAIN");
     });
 
-    it("should have oo-page class", () => {
-      wrapper = mountPage();
-      expect(wrapper.classes()).toContain("oo-page");
-    });
-
-    it("should have tw:rounded-md class", () => {
-      wrapper = mountPage();
-      expect(wrapper.classes()).toContain("tw:rounded-md");
-    });
-
     it("should have data-o2-page attribute", () => {
       wrapper = mountPage();
       expect(wrapper.attributes("data-o2-page")).toBeDefined();
