@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1
+# FE-only image: reuses a previously-built backend binary and ships
+# fresh `web/dist/` on disk. The binary picks up the new UI via
+# ZO_WEB_DIST_PATH instead of its compiled-in assets.
+
+FROM public.ecr.aws/debian/debian:trixie-slim AS runtime
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libatk1.0-0 libnss3 libglib2.0-0 ca-certificates curl \
+    htop iftop nload iptraf ncdu tcpdump sysstat procps lsof net-tools sqlite3 && \
+    update-ca-certificates
+COPY ./bin/openobserve /
+COPY ./openobserve/web/dist/ /web/
+ENV ZO_WEB_DIST_PATH=/web
+RUN ["/openobserve", "init-dir", "-p", "/data/"]
+CMD ["/openobserve"]

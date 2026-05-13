@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{path::PathBuf, sync::OnceLock};
+
 use axum::{
     Router,
     body::Body,
@@ -29,6 +31,38 @@ use rust_embed_for_web::{EmbedableFile, RustEmbed};
 #[folder = "web/dist/"]
 struct WebAssets;
 
+/// Optional override directory: when set, UI files are served from disk
+/// instead of the embedded assets. Enables FE-only image rebuilds in CI
+/// without recompiling the Rust binary. Resolved once at startup.
+fn web_dist_override() -> Option<&'static PathBuf> {
+    static OVERRIDE: OnceLock<Option<PathBuf>> = OnceLock::new();
+    OVERRIDE
+        .get_or_init(|| {
+            std::env::var("ZO_WEB_DIST_PATH")
+                .ok()
+                .filter(|p| !p.is_empty())
+                .map(PathBuf::from)
+        })
+        .as_ref()
+}
+
+/// Read a UI asset, preferring the disk override when configured. Returns
+/// embedded bytes as a fallback so a missing/partial mount can't take the
+/// UI offline.
+async fn read_asset(file_path: &str) -> Option<Vec<u8>> {
+    if let Some(root) = web_dist_override() {
+        // Reject traversal — the SPA allowlist below permits `assets/...`
+        // but does not, by itself, stop `assets/../../etc/passwd`.
+        if !file_path.split('/').any(|seg| seg == ".." || seg.is_empty()) {
+            let candidate = root.join(file_path);
+            if let Ok(bytes) = tokio::fs::read(&candidate).await {
+                return Some(bytes);
+            }
+        }
+    }
+    WebAssets::get(file_path).map(|content| content.data().to_vec())
+}
+
 /// Serve static files from embedded web assets
 pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {
     let mut file_path = path.as_str();
@@ -42,10 +76,9 @@ pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {
         file_path = "index.html";
     }
 
-    match WebAssets::get(file_path) {
-        Some(content) => {
+    match read_asset(file_path).await {
+        Some(data) => {
             let mime = mime_guess::from_path(file_path).first_or_octet_stream();
-            let data = content.data();
 
             // Vite emits content-hashed filenames under assets/ and monacoeditorwork/,
             // so those URLs are safe to cache forever. index.html must revalidate so
@@ -64,7 +97,7 @@ pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {
                 .header(header::CONTENT_TYPE, mime.as_ref())
                 .header(header::CACHE_CONTROL, cache_control)
                 .header("X-Content-Type-Options", "nosniff")
-                .body(Body::from(data.to_vec()))
+                .body(Body::from(data))
                 .unwrap()
         }
         None => Response::builder()
