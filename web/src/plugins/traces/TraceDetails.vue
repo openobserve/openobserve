@@ -279,8 +279,16 @@ size="sm">
                 /></template>
                 DAG
               </OToggleGroupItem>
+              <!--
+                Thread tab gated on:
+                  1. `VITE_SHOW_LLM_UI` env flag is NOT explicitly set
+                     to `"false"`. Unset / any other value keeps the
+                     feature visible.
+                  2. The trace actually has LLM spans worth rendering
+                     as a chat (`hasLLMSpans`).
+              -->
               <OToggleGroupItem
-                v-if="hasLLMSpans"
+                v-if="config.showLLMUI !== 'false' && hasLLMSpans"
                 value="thread"
                 size="sm"
                 data-test="trace-details-thread-tab"
@@ -306,7 +314,11 @@ size="sm">
           <div class="tw:flex tw:items-center tw:space-x-2 tw:gap-[0.5rem] tw:pr-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
-              v-if="activeTab !== 'flame-graph' && activeTab !== 'map'"
+              v-if="
+                activeTab !== 'flame-graph' &&
+                activeTab !== 'map' &&
+                activeTab !== 'thread'
+              "
               class="unified-search-group tw:mr-0!"
             >
               <div class="log-stream-search-input">
@@ -366,7 +378,7 @@ size="sm">
             </div>
             <!-- Log Stream Selector (if enabled) -->
             <div
-              v-if="showLogStreamSelector"
+              v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
               class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
             >
               <q-select
@@ -375,7 +387,7 @@ size="sm">
                 :label="
                   searchObj.data.traceDetails.selectedLogStreams.length
                     ? ''
-                    : t('search.selectIndex')
+                    : t('search.selectLogStream')
                 "
                 :options="filteredStreamOptions"
                 data-cy="stream-selection"
@@ -666,9 +678,15 @@ size="14px"
               />
             </div>
 
-            <!-- Thread View — chat-style projection of LLM turns -->
+            <!--
+              Thread View — chat-style projection of LLM turns.
+              Same `config.showLLMUI !== 'false'` gate as the tab
+              toggle above so a stale `activeTab="thread"` (e.g. from
+              a saved URL) can't render the body when the env flag
+              has explicitly disabled the feature.
+            -->
             <div
-              v-if="activeTab === 'thread'"
+              v-if="config.showLLMUI !== 'false' && activeTab === 'thread'"
               style="display: flex; flex: 1; min-height: 0"
               class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
             >
@@ -703,11 +721,13 @@ size="14px"
                   :stream-name="currentTraceStreamName"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
+                  :activeTab="sidebarActiveTab"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
+                  @update:activeTab="sidebarActiveTab = $event as string"
                 />
               </div>
             </div>
@@ -875,6 +895,7 @@ import {
   type Ref,
   type PropType,
   onMounted,
+  onUnmounted,
   watch,
   defineAsyncComponent,
   onBeforeMount,
@@ -889,6 +910,8 @@ import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
 import { useStore } from "vuex";
+import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
+import { contextRegistry } from "@/composables/contextProviders";
 import {
   formatTimeWithSuffix,
   getImageURL,
@@ -920,6 +943,7 @@ import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import config from "@/aws-exports";
 import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
@@ -1070,8 +1094,21 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const traceServiceMap: any = ref({});
     const { getStreams, getStream } = useStreams();
+
+    // AI copilot context provider for trace details page
+    const setupContextProvider = () => {
+      const provider = createTracesContextProvider(searchObj, store);
+      contextRegistry.register("traces", provider);
+      contextRegistry.setActive("traces");
+    };
+
+    const cleanupContextProvider = () => {
+      contextRegistry.unregister("traces");
+      contextRegistry.setActive("");
+    };
+
+    const traceServiceMap: any = ref({});
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -1555,7 +1592,7 @@ export default defineComponent({
               searchObj.data.traceDetails.selectedLogStreams.push(
                 logStreamFromQuery,
               );
-            } else if (logStreams.value.length > 0) {
+            } else if (logStreams.value.length === 1) {
               // Default: select the first available log stream
               searchObj.data.traceDetails.selectedLogStreams.push(
                 logStreams.value[0],
@@ -1610,6 +1647,7 @@ export default defineComponent({
     };
 
     onMounted(() => {
+      setupContextProvider();
       const params = router.currentRoute.value.query;
       if (params.span_id) {
         updateSelectedSpan(params.span_id as string);
@@ -1620,9 +1658,9 @@ export default defineComponent({
       // window.addEventListener("resize", updateHeight);
     });
 
-    // onBeforeUnmount(() => {
-    //   window.removeEventListener("resize", updateHeight);
-    // });
+    onUnmounted(() => {
+      cleanupContextProvider();
+    });
 
     // watch(
     //   () => spanList.value.length,
@@ -2851,6 +2889,10 @@ export default defineComponent({
     return {
       router,
       t,
+      // Exposed for the template `v-if` gating the LLM Observability
+      // surfaces (Thread tab toggle + ThreadView body) behind
+      // `config.showLLMUI`.
+      config,
       activeTab,
       sidebarActiveTab,
       traceTree,

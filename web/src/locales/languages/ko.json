@@ -395,7 +395,8 @@
     "selectStreamFirst": "먼저 스트림을 선택하세요",
     "traces": "트레이스",
     "switchToLogs": "로그로 다시 전환하려면 클릭",
-    "patternNoValuesAvailable": "사용할 수 있는 값 없음"
+    "patternNoValuesAvailable": "사용할 수 있는 값 없음",
+    "selectLogStream": "로그 스트림 선택"
   },
   "menu": {
     "home": "홈",

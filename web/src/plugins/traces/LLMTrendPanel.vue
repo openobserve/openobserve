@@ -21,12 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:flex tw:items-baseline tw:justify-between tw:mb-[0.25rem]">
       <div>
-        <div class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-1)]">
+        <!--
+          Use the *primary* text token so titles read clearly against
+          the card background in both light and dark modes. The numbered
+          `--o2-text-1` var is dimmer in dark mode and was nearly
+          invisible against the dark card bg.
+        -->
+        <div class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
           {{ panel.title }}
         </div>
         <div
           v-if="panel.subtitle"
-          class="tw:text-[0.7rem] tw:text-[var(--o2-text-3)] tw:mt-[0.1rem]"
+          class="tw:text-[0.7rem] tw:text-[var(--o2-text-muted)] tw:mt-[0.1rem]"
         >
           {{ panel.subtitle }}
         </div>
@@ -100,14 +106,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else-if="errorMsg"
-      class="llm-trend-empty tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-[var(--o2-text-3)]"
+      class="llm-trend-empty tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]"
       :class="panel.type === 'table' ? 'llm-trend-empty--table' : ''"
     >
       {{ errorMsg }}
     </div>
     <div
       v-else-if="!hasData"
-      class="llm-trend-empty tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-[var(--o2-text-3)]"
+      class="llm-trend-empty tw:flex tw:items-center tw:justify-center tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]"
       :class="panel.type === 'table' ? 'llm-trend-empty--table' : ''"
     >
       {{ panel.emptyStateText || "No data" }}
@@ -129,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <table class="tw:w-full tw:text-[0.75rem] tw:border-collapse">
         <thead>
-          <tr class="tw:bg-[var(--o2-bg-3)] tw:text-[0.7rem] tw:text-[var(--o2-text-3)]">
+          <tr class="tw:bg-[var(--o2-bg-3)] tw:text-[0.7rem] tw:text-[var(--o2-text-muted)]">
             <th
               v-for="col in panel.columns || []"
               :key="col.label || col.field"
@@ -153,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="col.align === 'right' ? 'tw:text-right!' : ''"
             >
               <template v-if="col.format === 'time'">
-                <span class="tw:text-[var(--o2-text-2)]">{{ formatTimeCell(row[col.field!]) }}</span>
+                <span class="tw:text-[var(--o2-text-secondary)]">{{ formatTimeCell(row[col.field!]) }}</span>
               </template>
               <template v-else-if="col.format === 'service-chip'">
                 <span class="service-chip">
@@ -162,12 +168,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
               <template v-else-if="col.format === 'error'">
-                <span class="tw:text-[#dc2626] tw:font-medium">
+                <span
+                  class="tw:text-[var(--o2-status-error-text)] tw:font-medium"
+                >
                   <span class="tw:mr-[0.25rem]">×</span>{{ row[col.field!] }}
                 </span>
               </template>
               <template v-else-if="col.format === 'cost'">
-                <span class="tw:text-[var(--o2-text-1)] tw:font-medium">
+                <span class="tw:text-[var(--o2-text-primary)] tw:font-medium">
                   {{ formatCostCell(row) }}
                 </span>
               </template>
@@ -181,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </a>
               </template>
               <template v-else>
-                <span class="tw:text-[var(--o2-text-2)]">{{ row[col.field!] }}</span>
+                <span class="tw:text-[var(--o2-text-secondary)]">{{ row[col.field!] }}</span>
               </template>
             </td>
           </tr>
@@ -194,7 +202,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import type { EChartsOption } from "echarts";
-import { useQuasar } from "quasar";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import { useStore } from "vuex";
@@ -226,7 +233,6 @@ const emit = defineEmits<{
   (e: "view-trace", traceId: string): void;
 }>();
 
-const $q = useQuasar();
 const store = useStore();
 const { executeQuery } = useLLMStreamQuery();
 
@@ -404,23 +410,26 @@ function buildStackedAreaOption(): EChartsOption {
       valueFormatter: (v: any) =>
         isCost ? `$${Number(v).toFixed(2)}` : Number(v).toLocaleString(),
     },
+    // Axis/legend colors and splitLine colors deliberately omitted —
+    // ChartRenderer initialises echarts with the theme name ("dark" /
+    // "light") so echarts' built-in theme paints these in a readable
+    // shade for whichever theme is active. Overriding with hex values
+    // here would defeat that adaptive behaviour.
     legend: {
       type: "scroll",
       bottom: 0,
       icon: "circle",
       itemWidth: 8,
       itemHeight: 8,
-      textStyle: { fontSize: 11, color: getTextColor() },
+      textStyle: { fontSize: 11 },
     },
     xAxis: {
       type: "category",
       data: xAxisData,
       axisLabel: {
         fontSize: 10,
-        color: getMutedColor(),
         formatter: (val: string) => formatTimeLabel(val),
       },
-      axisLine: { lineStyle: { color: getBorderColor() } },
       axisTick: { show: false },
       boundaryGap: false,
     },
@@ -428,11 +437,10 @@ function buildStackedAreaOption(): EChartsOption {
       type: "value",
       axisLabel: {
         fontSize: 10,
-        color: getMutedColor(),
         formatter: (v: number) =>
           isCost ? `$${formatCompact(v)}` : formatCompact(v),
       },
-      splitLine: { lineStyle: { color: getBorderColor(), type: "dashed" } },
+      splitLine: { lineStyle: { type: "dashed" } },
     },
     series,
   };
@@ -530,16 +538,15 @@ function buildHistogramThresholdOption(): EChartsOption {
         return `${formatLatencyMs(lo)} – ${formatLatencyMs(hi)} — ${count.toLocaleString()} calls`;
       },
     },
+    // Axis colors omitted — let echarts theme handle dark/light.
     xAxis: {
       type: "category",
       data: bucketLabels,
       axisLabel: {
         fontSize: 10,
-        color: getMutedColor(),
         interval: "auto",
         hideOverlap: true,
       },
-      axisLine: { lineStyle: { color: getBorderColor() } },
       axisTick: { show: false },
       splitLine: { show: false },
       boundaryGap: true,
@@ -548,10 +555,9 @@ function buildHistogramThresholdOption(): EChartsOption {
       type: "value",
       axisLabel: {
         fontSize: 10,
-        color: getMutedColor(),
         formatter: (v: number) => formatCompact(v),
       },
-      splitLine: { lineStyle: { color: getBorderColor(), type: "dashed" } },
+      splitLine: { lineStyle: { type: "dashed" } },
     },
     series: [
       {
@@ -592,23 +598,20 @@ function buildHorizontalBarOption(): EChartsOption {
       axisPointer: { type: "shadow" },
       valueFormatter: (v: any) => Number(v).toLocaleString(),
     },
+    // Axis colors omitted — let echarts theme handle dark/light.
     xAxis: {
       type: "value",
       axisLabel: {
         fontSize: 10,
-        color: getMutedColor(),
         formatter: (v: number) => formatCompact(v),
       },
-      splitLine: { lineStyle: { color: getBorderColor(), type: "dashed" } },
+      splitLine: { lineStyle: { type: "dashed" } },
     },
     yAxis: {
       type: "category",
       data: categories,
       inverse: true,
-      axisLabel: {
-        fontSize: 11,
-        color: getTextColor(),
-      },
+      axisLabel: { fontSize: 11 },
       axisTick: { show: false },
       axisLine: { show: false },
     },
@@ -622,7 +625,6 @@ function buildHorizontalBarOption(): EChartsOption {
           show: true,
           position: "right",
           fontSize: 11,
-          color: getTextColor(),
           formatter: (p: any) => formatCompact(Number(p.value)),
         },
       },
@@ -641,16 +643,6 @@ const chartOption = computed<EChartsOption>(() => {
   // navy background over our card. Card bg comes from .card-container.
   return { backgroundColor: "transparent", ...base };
 });
-
-function getTextColor(): string {
-  return $q.dark.isActive ? "#cbd5e1" : "#334155";
-}
-function getMutedColor(): string {
-  return $q.dark.isActive ? "#64748b" : "#94a3b8";
-}
-function getBorderColor(): string {
-  return $q.dark.isActive ? "#1e293b" : "#e2e8f0";
-}
 
 // ChartRenderer expects: { options, notMerge?, lazyUpdate?, extras? }
 // `extras.panelId` participates in the cross-chart hovered-series sync.
@@ -721,7 +713,7 @@ onUnmounted(() => {
       white-space: nowrap;
     }
     td {
-      color: var(--o2-text-1);
+      color: var(--o2-text-primary);
     }
     tbody tr:hover {
       background: var(--o2-bg-3);

@@ -395,7 +395,8 @@
     "selectStreamFirst": "先选择一个直播",
     "traces": "痕迹",
     "switchToLogs": "点击切换回日志",
-    "patternNoValuesAvailable": "没有可用值"
+    "patternNoValuesAvailable": "没有可用值",
+    "selectLogStream": "选择日志流"
   },
   "menu": {
     "home": "主页",

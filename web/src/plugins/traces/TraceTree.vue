@@ -501,6 +501,9 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
 
+    // As there are some UX issues, disabling it for now
+    const enableHoverSelection = false;
+
     // ── Virtualizer ──────────────────────────────────────────────────────────
     const rowVirtualizer = useVirtualizer(
       computed(() => ({
@@ -585,10 +588,10 @@ export default defineComponent({
       emit("selectSpan", spanId);
     };
     const onHoverSpan = (spanId: string) => {
-      emit("hoverSpan", spanId);
+      if(enableHoverSelection) emit("hoverSpan", spanId);
     };
     const onUnhoverSpan = () => {
-      emit("unhoverSpan");
+     if(enableHoverSelection) emit("unhoverSpan");
     };
 
     const viewSpanLogs = (span: any) => {

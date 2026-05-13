@@ -140,7 +140,15 @@ export default defineComponent({
 
     watch(selectedCategory, (newCategory) => {
       integrationFilter.value = "";
-      navigateToFirstIntegration(newCategory);
+      // Only navigate to first integration if the current route doesn't already
+      // belong to this category (avoids overriding route sync in onBeforeMount)
+      const cat = aiCategories.find((c) => c.slug === newCategory);
+      const alreadyInCategory = cat?.integrations.some(
+        (i) => i.routeName === (router.currentRoute.value.name as string),
+      );
+      if (!alreadyInCategory) {
+        navigateToFirstIntegration(newCategory);
+      }
     });
 
     onBeforeMount(() => {

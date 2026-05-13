@@ -19,7 +19,7 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
 }));
 
 import DbSpanDetails from "./DbSpanDetails.vue";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 installQuasar();

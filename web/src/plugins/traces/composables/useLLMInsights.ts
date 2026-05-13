@@ -129,6 +129,7 @@ export function useLLMInsights() {
     startTime: number,
     endTime: number,
     onData: (hits: any[]) => void,
+    size: number = 100,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const traceId = generateTraceContext().traceId;
@@ -143,7 +144,7 @@ export function useLLMInsights() {
               start_time: startTime,
               end_time: endTime,
               from: 0,
-              size: 100,
+              size,
             },
             ...(useBase64 ? { encoding: "base64" } : {}),
           },
@@ -260,6 +261,58 @@ export function useLLMInsights() {
     return "1 day";
   }
 
+  function intervalSeconds(interval: string): number {
+    switch (interval) {
+      case "10 seconds":
+        return 10;
+      case "1 minute":
+        return 60;
+      case "5 minutes":
+        return 300;
+      case "15 minutes":
+        return 900;
+      case "30 minutes":
+        return 1800;
+      case "1 hour":
+        return 3600;
+      case "6 hours":
+        return 21_600;
+      case "1 day":
+        return 86_400;
+      default:
+        return 60;
+    }
+  }
+
+  /**
+   * Build the full UTC-aligned bucket grid for the given window. The
+   * server's `histogram()` function aligns bucket starts to UTC interval
+   * boundaries and emits an ISO-like key ("2026-05-08T06:00:00") for
+   * each bucket *that has at least one matching row*. Sparse streams
+   * therefore produce 1 hit even across a 2-week window, and the
+   * sparkline would collapse to a single point.
+   *
+   * Pre-filling every bucket key with zeros guarantees a properly
+   * shaped time-series no matter how sparse the data is — the chart
+   * draws a flat line with peaks where real activity occurred, which is
+   * what users expect from a trend sparkline.
+   */
+  function buildBucketGrid(
+    startTimeMicros: number,
+    endTimeMicros: number,
+    intervalSecs: number,
+  ): string[] {
+    const stepMs = intervalSecs * 1000;
+    const startMs = Math.floor(startTimeMicros / 1000 / stepMs) * stepMs;
+    const endMs = Math.ceil(endTimeMicros / 1000 / stepMs) * stepMs;
+    const keys: string[] = [];
+    for (let t = startMs; t < endMs; t += stepMs) {
+      // Match server format "YYYY-MM-DDTHH:mm:ss" (UTC, no Z, no millis).
+      keys.push(new Date(t).toISOString().slice(0, 19));
+    }
+    return keys;
+  }
+
   /**
    * Internal — fetch the bucketed time-series powering the sparklines
    * under each KPI card. One SQL query produces all 5 series (cost,
@@ -286,6 +339,13 @@ export function useLLMInsights() {
     endTime: number,
   ): Promise<void> {
     const interval = bucketInterval(endTime - startTime);
+    // We need every bucket to render the sparkline — there is no
+    // pagination story here. Pass a generous size so the streaming
+    // endpoint never truncates the response. With the bucket ladder
+    // capping at "1 day", the most we can ever produce is ~bucket
+    // count for the largest window users pick (e.g. 1 year = 365
+    // rows). 10_000 leaves a wide safety margin.
+    const size = 10_000;
 
     const mainSql = `
       SELECT
@@ -301,45 +361,40 @@ export function useLLMInsights() {
       ORDER BY ts
     `;
 
-    const series: LLMSparklineSeries = {
-      cost: [],
-      tokens: [],
-      traces: [],
-      p95Micros: [],
-      errorRate: [],
-    };
-
-    const bucketOrder: string[] = [];
+    const intervalSecs = intervalSeconds(interval);
+    const bucketKeys = buildBucketGrid(startTime, endTime, intervalSecs);
     const bucketIndex = new Map<string, number>();
-    const ensureBucket = (ts: any): number => {
-      const key = String(ts);
-      let idx = bucketIndex.get(key);
-      if (idx === undefined) {
-        idx = bucketOrder.length;
-        bucketOrder.push(key);
-        bucketIndex.set(key, idx);
-        series.cost.push(0);
-        series.tokens.push(0);
-        series.traces.push(0);
-        series.p95Micros.push(0);
-        series.errorRate.push(0);
-      }
-      return idx;
+    bucketKeys.forEach((k, i) => bucketIndex.set(k, i));
+
+    const series: LLMSparklineSeries = {
+      cost: new Array(bucketKeys.length).fill(0),
+      tokens: new Array(bucketKeys.length).fill(0),
+      traces: new Array(bucketKeys.length).fill(0),
+      p95Micros: new Array(bucketKeys.length).fill(0),
+      errorRate: new Array(bucketKeys.length).fill(0),
     };
 
-    await executeQuery(mainSql, streamName, startTime, endTime, (hits) => {
-      for (const row of hits) {
-        const idx = ensureBucket(row.ts);
-        const requestCount = Number(row.request_count) || 0;
-        const errorCount = Number(row.error_count) || 0;
-        series.tokens[idx] = Number(row.total_tokens) || 0;
-        series.traces[idx] = Number(row.trace_count) || 0;
-        series.p95Micros[idx] = Number(row.p95_duration) || 0;
-        series.cost[idx] = Number(row.total_cost) || 0;
-        series.errorRate[idx] =
-          requestCount > 0 ? (errorCount / requestCount) * 100 : 0;
-      }
-    });
+    await executeQuery(
+      mainSql,
+      streamName,
+      startTime,
+      endTime,
+      (hits) => {
+        for (const row of hits) {
+          const idx = bucketIndex.get(String(row.ts));
+          if (idx === undefined) continue;
+          const requestCount = Number(row.request_count) || 0;
+          const errorCount = Number(row.error_count) || 0;
+          series.tokens[idx] = Number(row.total_tokens) || 0;
+          series.traces[idx] = Number(row.trace_count) || 0;
+          series.p95Micros[idx] = Number(row.p95_duration) || 0;
+          series.cost[idx] = Number(row.total_cost) || 0;
+          series.errorRate[idx] =
+            requestCount > 0 ? (errorCount / requestCount) * 100 : 0;
+        }
+      },
+      size,
+    );
 
     sparklines.value = series;
   }

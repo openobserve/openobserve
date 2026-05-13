@@ -307,7 +307,25 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const settingsTab = ref("general");
+    const routeToSettingsTab: Record<string, string> = {
+      general:               "general",
+      organization:          "organization",
+      nodes:                 "nodes",
+      queryManagement:       "queryManagement",
+      domainManagement:      "domain_management",
+      alertDestinations:     "alert_destinations",
+      pipelineDestinations:  "pipeline_destinations",
+      alertTemplates:        "templates",
+      modelPricing:          "model_pricing",
+      cipherKeys:            "cipher-keys",
+      license:               "license",
+      orgnizationManagement: "organization_management",
+      regexPatterns:         "regex_patterns",
+      correlationSettings:   "correlation_settings",
+    };
+    const settingsTab = ref(
+      routeToSettingsTab[router.currentRoute.value.name as string] ?? "general"
+    );
     const { isMetaOrg } = useIsMetaOrg();
     const splitterModel = ref(250);
     const storePreviousStoreModel  = ref(250);

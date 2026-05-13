@@ -395,7 +395,8 @@
     "selectStreamFirst": "Wähle zuerst einen Stream",
     "traces": "Spuren",
     "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln",
-    "patternNoValuesAvailable": "Keine Werte verfügbar"
+    "patternNoValuesAvailable": "Keine Werte verfügbar",
+    "selectLogStream": "Logs-Stream auswählen"
   },
   "menu": {
     "home": "Startseite",

@@ -281,6 +281,8 @@ export class LogsPage {
         this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
         this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
+        this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] .wildcard-chip`;
+        this.wildcardChip = '.wildcard-chip';
         // Pattern details dialog
         this.closePatternDialog = '[data-test="close-pattern-dialog"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
@@ -3854,8 +3856,8 @@ export class LogsPage {
         await this.page.waitForTimeout(1000);
     }
 
-    async expectFieldInTableHeader(fieldName) {
-        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible();
+    async expectFieldInTableHeader(fieldName, timeout = 10000) {
+        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible({ timeout });
     }
 
     async expectFieldNotInTableHeader(fieldName) {
@@ -6507,14 +6509,73 @@ export class LogsPage {
     }
 
     /**
+     * Get the count of wildcard chips in a specific pattern card template
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<number>} Number of wildcard chip elements
+     */
+    async getPatternCardWildcardChipCount(index = 0) {
+        const count = await this.page.locator(this.patternCardWildcardChips(index)).count().catch(() => 0);
+        testLogger.info(`Pattern ${index} wildcard chips: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get the total count of all wildcard chips across all visible pattern cards
+     * @returns {Promise<number>} Total number of .wildcard-chip elements on page
+     */
+    async getWildcardChipCount() {
+        const count = await this.page.locator(this.wildcardChip).count();
+        testLogger.info(`Total wildcard chips on page: ${count}`);
+        return count;
+    }
+
+    /**
+     * Get the text content of a wildcard chip at the given index
+     * @param {number} index - The chip index (0-based, page-global)
+     * @returns {Promise<string>} The chip's text label
+     */
+    async getWildcardChipText(index = 0) {
+        const text = await this.page.locator(this.wildcardChip).nth(index).textContent().catch(() => '');
+        return text.trim();
+    }
+
+    /**
+     * Hover over a wildcard chip at the given index to trigger its tooltip
+     * @param {number} index - The chip index (0-based, page-global)
+     */
+    async hoverWildcardChip(index = 0) {
+        await this.page.locator(this.wildcardChip).nth(index).hover();
+        testLogger.info(`Hovered over wildcard chip ${index}`);
+    }
+
+    /**
+     * Check if a specific wildcard chip is visible
+     * @param {number} index - The chip index (0-based, page-global)
+     * @returns {Promise<boolean>} True if the chip is visible
+     */
+    async isWildcardChipVisible(index = 0) {
+        return this.page.locator(this.wildcardChip).nth(index).isVisible().catch(() => false);
+    }
+
+    /**
      * Check if a pattern card has an anomaly badge
      * @param {number} index - The pattern card index (0-based)
      * @returns {Promise<boolean>} True if anomaly badge is visible
      */
     async isPatternAnomaly(index = 0) {
-        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible().catch(() => false);
+        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible({ timeout: 500 }).catch(() => false);
         testLogger.info(`Pattern ${index} is anomaly: ${isAnomaly}`);
         return isAnomaly;
+    }
+
+    /**
+     * Get the text content of a pattern card's anomaly badge
+     * @param {number} index - The pattern card index (0-based)
+     * @returns {Promise<string>} Badge text, or empty string if not visible
+     */
+    async getPatternAnomalyBadgeText(index = 0) {
+        const text = await this.page.locator(this.patternCardAnomalyBadge(index)).textContent().catch(() => '');
+        return text.trim();
     }
 
     /**

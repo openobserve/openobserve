@@ -395,7 +395,8 @@
     "selectStreamFirst": "最初にストリームを選択してください",
     "traces": "トレース",
     "switchToLogs": "クリックしてログに戻る",
-    "patternNoValuesAvailable": "使用可能な値はありません"
+    "patternNoValuesAvailable": "使用可能な値はありません",
+    "selectLogStream": "ログストリームを選択"
   },
   "menu": {
     "home": "ホーム",

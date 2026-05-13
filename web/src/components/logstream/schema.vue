@@ -1116,7 +1116,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SchemaIndex",
   props: {
-    // eslint-disable-next-line vue/require-default-prop
+     
     modelValue: {
       type: Object,
       default: () => defaultValue(),

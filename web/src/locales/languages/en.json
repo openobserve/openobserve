@@ -402,7 +402,8 @@
     "editor": "Editor",
     "addToDashboard": "Add To Dashboard",
     "selectStream": "Select Stream",
-    "pattern_summary": "Showing 1 to 50 out of {totalEvents} events & {patternsFound} patterns found in {logsAnalyzed} events in {totalTime} ms."
+    "pattern_summary": "Showing 1 to 50 out of {totalEvents} events & {patternsFound} patterns found in {logsAnalyzed} events in {totalTime} ms.",
+    "selectLogStream": "Select logs stream"
   },
   "menu": {
     "home": "Home",
@@ -3503,6 +3504,7 @@
       "errorDetails": "An error occurred while fetching log data. Please try again.",
       "noData": "No Logs Found",
       "noDataDetails": "No logs found matching the correlation filters. Try adjusting the filters or time range.",
+      "viewLogs": "View Logs",
       "resetFilters": "Reset Filters",
       "editFilters": "Edit Filters",
       "editTimeRange": "Edit Time Range",
@@ -3644,7 +3646,7 @@
     "resume_pipeline_title": "Resume Pipeline Ingestion",
     "tab_all": "All",
     "tab_scheduled": "Scheduled",
-    "tab_realtime": "Real-Time",
+    "tab_realtime": "Realtime",
     "stream_type": "Stream Type",
     "frequency": "Frequency",
     "period": "Period",
