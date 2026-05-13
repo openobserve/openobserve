@@ -11,18 +11,22 @@ describe("OColor", () => {
     wrapper?.unmount();
   });
 
-  it("renders a hex text input and a hidden color input", () => {
+  it("should render a hex text input", () => {
     wrapper = mount(OColor);
     expect(wrapper.find("input[type='text']").exists()).toBe(true);
-    expect(wrapper.find("input[type='color']").exists()).toBe(true);
   });
 
-  it("renders the label", () => {
+  it("should render a swatch trigger button", () => {
+    wrapper = mount(OColor);
+    expect(wrapper.find("button[aria-label*='color']").exists()).toBe(true);
+  });
+
+  it("should render the label", () => {
     wrapper = mount(OColor, { props: { label: "Brand color" } });
     expect(wrapper.text()).toContain("Brand color");
   });
 
-  it("emits update:modelValue when the hex text input is typed", async () => {
+  it("should emit update:modelValue when the hex text input changes", async () => {
     wrapper = mount(OColor);
     await wrapper.find("input[type='text']").setValue("#ff0000");
     const emitted = wrapper.emitted("update:modelValue");
@@ -30,71 +34,62 @@ describe("OColor", () => {
     expect(emitted![0][0]).toBe("#ff0000");
   });
 
-  it("emits update:modelValue when the color picker changes", async () => {
-    wrapper = mount(OColor);
-    await wrapper.find("input[type='color']").setValue("#00ff00");
-    const emitted = wrapper.emitted("update:modelValue");
-    expect(emitted).toBeTruthy();
-    expect(emitted![0][0]).toBe("#00ff00");
+  it("should not render a clear button when value is empty", () => {
+    wrapper = mount(OColor, { props: { clearable: true, modelValue: "" } });
+    expect(wrapper.find('[aria-label="Clear"]').exists()).toBe(false);
   });
 
-  it("falls back to #000000 swatch for invalid input", () => {
-    wrapper = mount(OColor, { props: { modelValue: "not-a-color" } });
-    const color = wrapper.find("input[type='color']").element as HTMLInputElement;
-    expect(color.value).toBe("#000000");
-  });
-
-  it("uses modelValue as swatch when valid", () => {
-    wrapper = mount(OColor, { props: { modelValue: "#abcdef" } });
-    const color = wrapper.find("input[type='color']").element as HTMLInputElement;
-    expect(color.value).toBe("#abcdef");
-  });
-
-  it("makes the hex input editable by default (typing is allowed)", () => {
-    wrapper = mount(OColor);
-    expect(
-      wrapper.find("input[type='text']").attributes("readonly"),
-    ).toBeUndefined();
-  });
-
-  it("makes the hex input read-only when readonly is true", () => {
+  it("should make the hex input read-only when readonly is true", () => {
     wrapper = mount(OColor, { props: { readonly: true } });
     expect(
       wrapper.find("input[type='text']").attributes("readonly"),
     ).toBeDefined();
   });
 
-  it("pairs the swatch label with the hidden color input via for=", () => {
-    wrapper = mount(OColor, { props: { label: "Brand" } });
-    const colorInput = wrapper.find("input[type='color']");
-    const colorId = colorInput.attributes("id");
-    expect(colorId).toBeDefined();
-    const swatchLabel = wrapper
-      .findAll("label")
-      .find((l) => l.attributes("for") === colorId);
-    expect(swatchLabel?.exists()).toBe(true);
+  it("should make the hex input editable by default", () => {
+    wrapper = mount(OColor);
+    expect(
+      wrapper.find("input[type='text']").attributes("readonly"),
+    ).toBeUndefined();
   });
 
-  it("disables the input", () => {
+  it("should disable the input when disabled is true", () => {
     wrapper = mount(OColor, { props: { disabled: true } });
     expect(
       wrapper.find("input[type='text']").attributes("disabled"),
     ).toBeDefined();
-    expect(
-      wrapper.find("input[type='color']").attributes("disabled"),
-    ).toBeDefined();
   });
 
-  it("renders the error message", () => {
+  it("should render the error message", () => {
     wrapper = mount(OColor, { props: { errorMessage: "Invalid color" } });
     expect(wrapper.text()).toContain("Invalid color");
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true);
   });
 
-  it("emits empty value when clear button pressed", async () => {
+  it("should render help text when no error", () => {
+    wrapper = mount(OColor, { props: { helpText: "Enter a hex code" } });
+    expect(wrapper.text()).toContain("Enter a hex code");
+  });
+
+  it("should emit empty string and 'clear' when clear button pressed", async () => {
     wrapper = mount(OColor, {
       props: { clearable: true, modelValue: "#abcdef" },
     });
     await wrapper.find('[aria-label="Clear"]').trigger("click");
     expect(wrapper.emitted("update:modelValue")![0][0]).toBe("");
+    expect(wrapper.emitted("clear")).toBeTruthy();
+  });
+
+  it("should accept a valid hex modelValue without error", () => {
+    expect(() => {
+      wrapper = mount(OColor, { props: { modelValue: "#3b82f6" } });
+    }).not.toThrow();
+    expect(wrapper.find("input[type='text']").exists()).toBe(true);
+  });
+
+  it("should reflect the modelValue in the hex input", () => {
+    wrapper = mount(OColor, { props: { modelValue: "#abcdef" } });
+    const input = wrapper.find("input[type='text']").element as HTMLInputElement;
+    expect(input.value).toBe("#abcdef");
   });
 });

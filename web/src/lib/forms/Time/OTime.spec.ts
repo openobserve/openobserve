@@ -11,64 +11,139 @@ describe("OTime", () => {
     wrapper?.unmount();
   });
 
-  it("renders a time input", () => {
-    wrapper = mount(OTime);
-    const input = wrapper.find("input");
-    expect(input.exists()).toBe(true);
-    expect(input.attributes("type")).toBe("time");
+  it("should render a time field group", () => {
+    wrapper = mount(OTime, { attachTo: document.body });
+    expect(wrapper.find('[role="group"]').exists()).toBe(true);
   });
 
-  it("renders the label", () => {
-    wrapper = mount(OTime, { props: { label: "Meeting time" } });
+  it("should render the label", () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
+      props: { label: "Meeting time" },
+    });
     expect(wrapper.text()).toContain("Meeting time");
   });
 
-  it("emits update:modelValue on change", async () => {
-    wrapper = mount(OTime);
-    const input = wrapper.find("input");
-    await input.setValue("14:30");
-    const emitted = wrapper.emitted("update:modelValue");
-    expect(emitted).toBeTruthy();
-    expect(emitted![0][0]).toBe("14:30");
-  });
-
-  it("uses step=60 by default", () => {
-    wrapper = mount(OTime);
-    expect(wrapper.find("input").attributes("step")).toBe("60");
-  });
-
-  it("uses step=1 when withSeconds is enabled", () => {
-    wrapper = mount(OTime, { props: { withSeconds: true } });
-    expect(wrapper.find("input").attributes("step")).toBe("1");
-  });
-
-  it("respects an explicit step prop", () => {
-    wrapper = mount(OTime, { props: { step: 300 } });
-    expect(wrapper.find("input").attributes("step")).toBe("300");
-  });
-
-  it("renders an error message", () => {
-    wrapper = mount(OTime, { props: { errorMessage: "Pick a time" } });
-    expect(wrapper.text()).toContain("Pick a time");
-  });
-
-  it("renders a clear button when clearable and value set", () => {
+  it("should render label slot content", () => {
     wrapper = mount(OTime, {
+      attachTo: document.body,
+      slots: { label: "Custom label" },
+    });
+    expect(wrapper.text()).toContain("Custom label");
+  });
+
+  it("should render an error message", () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
+      props: { errorMessage: "Pick a time" },
+    });
+    expect(wrapper.text()).toContain("Pick a time");
+    expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+  });
+
+  it("should set aria-invalid when errorMessage is provided", () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
+      props: { errorMessage: "Required" },
+    });
+    expect(wrapper.find('[role="group"]').attributes("aria-invalid")).toBe(
+      "true",
+    );
+  });
+
+  it("should render help text when no error", () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
+      props: { helpText: "HH:MM format" },
+    });
+    expect(wrapper.text()).toContain("HH:MM format");
+  });
+
+  it("should render a clear button when clearable and value set", () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
       props: { clearable: true, modelValue: "12:00" },
     });
     expect(wrapper.find('[aria-label="Clear"]').exists()).toBe(true);
   });
 
-  it("emits an empty value when cleared", async () => {
+  it("should not render clear button when modelValue is empty", () => {
     wrapper = mount(OTime, {
+      attachTo: document.body,
+      props: { clearable: true, modelValue: "" },
+    });
+    expect(wrapper.find('[aria-label="Clear"]').exists()).toBe(false);
+  });
+
+  it("should emit empty string and 'clear' when clear button pressed", async () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
       props: { clearable: true, modelValue: "12:00" },
     });
     await wrapper.find('[aria-label="Clear"]').trigger("click");
     expect(wrapper.emitted("update:modelValue")![0][0]).toBe("");
+    expect(wrapper.emitted("clear")).toBeTruthy();
   });
 
-  it("disables the input", () => {
-    wrapper = mount(OTime, { props: { disabled: true } });
-    expect(wrapper.find("input").attributes("disabled")).toBeDefined();
+  it("should apply disabled state to the field group", () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
+      props: { disabled: true },
+    });
+    const group = wrapper.find('[role="group"]');
+    expect(group.exists()).toBe(true);
+    expect(group.attributes("aria-disabled")).toBe("true");
+  });
+
+  it("should accept a valid modelValue without error", () => {
+    expect(() => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { modelValue: "14:30" },
+      });
+    }).not.toThrow();
+    expect(wrapper.find('[role="group"]').exists()).toBe(true);
+  });
+
+  it("should accept min and max props without error", () => {
+    expect(() => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { min: "08:00", max: "18:00" },
+      });
+    }).not.toThrow();
+  });
+
+  it("should display the current time value in the trigger", () => {
+    wrapper = mount(OTime, {
+      attachTo: document.body,
+      props: { modelValue: "09:30" },
+    });
+    expect(wrapper.find('[role="group"]').text()).toContain("09:30");
+  });
+
+  it("should render the clock face popup after opening", async () => {
+    wrapper = mount(OTime, { attachTo: document.body });
+    await wrapper.find('[role="group"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(document.body.querySelector('[data-test="otime-popup"]')).toBeTruthy();
+  });
+
+  it("should render the clock face SVG inside the popup", async () => {
+    wrapper = mount(OTime, { attachTo: document.body });
+    await wrapper.find('[role="group"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(
+      document.body.querySelector('[data-test="otime-clock-face"]'),
+    ).toBeTruthy();
+  });
+
+  it("should render a Close button in the popup", async () => {
+    wrapper = mount(OTime, { attachTo: document.body });
+    await wrapper.find('[role="group"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(
+      document.body.querySelector('[data-test="otime-close"]'),
+    ).toBeTruthy();
   });
 });

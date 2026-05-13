@@ -22,7 +22,7 @@ describe("OFormColor", () => {
       global: { components: { OFormColor } },
     });
     expect(wrapper.exists()).toBe(true);
-    expect(wrapper.find("input[type='color']").exists()).toBe(true);
+    expect(wrapper.find("input[type='text']").exists()).toBe(true);
   });
 
   it("propagates the default value", () => {
