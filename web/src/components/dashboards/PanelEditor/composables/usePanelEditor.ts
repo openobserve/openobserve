@@ -266,6 +266,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       variablesChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
     }
 
+    // chartData not yet initialized — don't show "not up to date" banner
+    if (!chartData.value) return false;
+
     // Compare chart data with panel data
     const configChanged = !isEqual(
       JSON.parse(JSON.stringify(chartData.value ?? {})),
@@ -753,6 +756,14 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       chartData.value = {};
     }
 
+    // Re-sync after watchers settle (e.g., VRL field list init adds
+    // properties reactively after the initial snapshot). Without this,
+    // isOutDated falsely shows "chart not up to date" on edit load.
+    setTimeout(() => {
+      chartData.value = JSON.parse(
+        JSON.stringify(dashboardPanelData.data),
+      );
+    }, 100);
   };
 
   // ============================================================================
