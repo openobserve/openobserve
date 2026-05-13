@@ -1171,23 +1171,24 @@ watch(
     }
   }
 
-  // Time range chips styling - matching chart colors
-  .time-range-chip {
-    font-size: 0.7rem;
-    line-height: 1.2;
-    transition: all 0.2s ease;
-
-    &.baseline-chip,
-    &.selected-chip {
-      background: color-mix(in srgb, var(--chip-color) 20%, transparent);
-      border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
-      color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
-      font-weight: 500;
-    }
-  }
-
   .q-card__section--vert {
     padding: 8px !important;
+  }
+}
+
+// Time range chips styling - matching chart colors
+// (lifted out: .analysis-dashboard-card wrapper no longer exists in template)
+.time-range-chip {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  transition: all 0.2s ease;
+
+  &.baseline-chip,
+  &.selected-chip {
+    background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+    border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
+    color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
+    font-weight: 500;
   }
 }
 
