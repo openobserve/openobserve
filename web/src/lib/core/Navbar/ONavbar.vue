@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-show="visible"
     role="navigation"
     aria-label="Main navigation"
-    class="oo_sidebar oo_left left-drawer tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:overflow-y-auto"
+    class="o2-sidebar o2-sidebar-left left-drawer tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:overflow-y-auto"
     @keydown="handleKeydown"
   >
     <q-list class="leftNavList">
@@ -85,10 +85,10 @@ function handleKeydown(event: KeyboardEvent) {
       event.preventDefault();
       const target = event.shiftKey
         ? document.querySelector<HTMLElement>(
-            '.oo_header a[href], .oo_header button, .oo_header [tabindex]:not([tabindex="-1"])',
+            '.o2-app-header a[href], .o2-app-header button, .o2-app-header [tabindex]:not([tabindex="-1"])',
           )
         : document.querySelector<HTMLElement>(
-            '.oo_content-scroll a[href]:not([tabindex="-1"]), .oo_content-scroll button:not([disabled]):not([tabindex="-1"]), .oo_content-scroll input:not([disabled]):not([tabindex="-1"]), .oo_content-scroll select:not([disabled]):not([tabindex="-1"]), .oo_content-scroll [tabindex]:not([tabindex="-1"])',
+            '.o2-content-scroll a[href]:not([tabindex="-1"]), .o2-content-scroll button:not([disabled]):not([tabindex="-1"]), .o2-content-scroll input:not([disabled]):not([tabindex="-1"]), .o2-content-scroll select:not([disabled]):not([tabindex="-1"]), .o2-content-scroll [tabindex]:not([tabindex="-1"])',
           );
       if (target) {
         target.focus();
@@ -102,15 +102,15 @@ function handleKeydown(event: KeyboardEvent) {
 <style lang="scss">
 .q-list {
   &.leftNavList {
-    padding: 4px 0px 0px 0px;
+    padding: 0.25rem 0 0 0;
 
     .q-item {
-      margin: 0px 5px;
+      margin: 0 0.313rem;
       display: list-item;
       text-align: center;
       list-style: none;
-      padding: 2px 2px;
-      border-radius: 5px;
+      padding: 0.125rem;
+      border-radius: 0.313rem;
 
       .q-icon {
         height: 1.3rem;
@@ -118,7 +118,7 @@ function handleKeydown(event: KeyboardEvent) {
       }
 
       .q-item__label {
-        padding-bottom: 4px;
+        padding-bottom: 0.25rem;
       }
 
       &.q-router-link--active {
@@ -160,7 +160,7 @@ function handleKeydown(event: KeyboardEvent) {
       }
 
       &__label {
-        font-size: 12px;
+        font-size: 0.75rem;
         font-weight: 600;
         color: var(--o2-text-secondary);
       }

@@ -2348,24 +2348,24 @@ body {
 // ============================================================================
 .warning-msg {
   background-color: var(--q-warning);
-  padding: 5px;
-  border-radius: 5px;
+  padding: 0.313rem;
+  border-radius: 0.313rem;
 }
 
 // ============================================================================
 // Global Quasar component overrides
 // ============================================================================
 .q-toolbar {
-  min-height: 40px;
+  min-height: 2.5rem;
 }
 
 .q-item {
-  min-height: 30px;
-  padding: 3px 8px;
+  min-height: 1.875rem;
+  padding: 0.188rem 0.5rem;
 }
 
-.oo_header .q-btn-dropdown__arrow {
-  margin-left: -4px;
+.o2-app-header .q-btn-dropdown__arrow {
+  margin-left: -0.25rem;
 }
 
 // ============================================================================
@@ -2373,11 +2373,11 @@ body {
 // ============================================================================
 .q-list {
   .flagIcon img {
-    border-radius: 3px;
+    border-radius: 0.188rem;
     object-fit: cover;
     display: block;
-    height: 16px;
-    width: 24px;
+    height: 1rem;
+    width: 1.5rem;
   }
 
   .q-item {
@@ -2419,13 +2419,13 @@ body {
 // AI Chat layout — body class applied by JS, must be unscoped
 // ============================================================================
 body.ai-chat-open {
-  .oo_app {
+  .o2-app-root {
     width: 75%;
     transition: width 0.3s ease;
   }
 }
 
-.oo_app {
+.o2-app-root {
   width: 100%;
   transition: width 0.3s ease;
 }
