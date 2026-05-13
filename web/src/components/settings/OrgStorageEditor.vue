@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none o2-custom-bg storage-settings-editor  ">
+  <div class="q-pa-none storage-settings-editor">
     <!-- Header -->
     <div class="row items-center no-wrap card-container  q-px-md tw:mb-[0.675rem]">
       <div class="flex items-center tw:h-[60px]">
@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="storage-settings-editor-back-btn"
           class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           :title="t('storage_settings.goBack')"
-          @click="goBack"
+          @click="emit('cancel')"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
-              @click="goBack"
+              @click="emit('cancel')"
             >
               {{ t("alerts.cancel") }}
             </OButton>
@@ -415,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
-              @click="goBack"
+              @click="emit('cancel')"
             >
               {{ t("alerts.cancel") }}
             </OButton>
@@ -437,24 +437,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-form>
     </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, reactive, watch } from "vue";
+
+defineOptions({ name: "OrgStorageEditor" });
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 
+const props = defineProps<{
+  action: "add" | "edit";
+}>();
+
+const emit = defineEmits<{
+  (e: "cancel"): void;
+  (e: "saved"): void;
+}>();
+
 const store = useStore();
 const { t } = useI18n();
-const router = useRouter();
-const route = useRoute();
 const $q = useQuasar();
 
 const step = ref(1);
@@ -462,7 +470,7 @@ const storageForm = ref(null);
 const selectedProvider = ref("");
 const existingConfig = ref<any>(null);
 
-const isEditMode = computed(() => route.query.edit === "true");
+const isEditMode = computed(() => props.action === "edit");
 const isCloud = computed(() => config.isCloud === "true");
 
 const formData = reactive({
@@ -533,15 +541,6 @@ function nextStep() {
 
 function prevStep() {
   if (step.value > 1) step.value--;
-}
-
-function goBack() {
-  router.push({
-    name: "storageSettings",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
 }
 
 function resetFormData() {
@@ -615,7 +614,7 @@ async function submitStorage() {
         message: "Storage config created successfully",
       });
     }
-    goBack();
+    emit("saved");
   } catch (err: any) {
     if (err.response?.status === 403) return;
     dismiss();

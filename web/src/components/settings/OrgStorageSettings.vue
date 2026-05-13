@@ -16,13 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="org-storage-settings ">
-    <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
-      >
-        <div class="q-table__title tw:font-[600]">
-          {{ t('storage_settings.title') }}
+      <template v-if="currentAction === 'list'">
+          <div
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
+        >
+          <div class="q-table__title tw:font-[600]">
+            {{ t('storage_settings.title') }}
+          </div>
         </div>
-      </div>
+   
     <!-- Loading state -->
     <div v-if="loading" class="flex justify-center items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
       <q-spinner color="primary" size="2em" />
@@ -255,6 +257,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
       </div>
     </div>
+    </template>
+    <OrgStorageEditor
+      v-else
+      :action="currentAction"
+      @cancel="currentAction = 'list'"
+      @saved="onEditorSaved"
+    />
   </div>
 </template>
 
@@ -262,15 +271,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OrgStorageEditor from "./OrgStorageEditor.vue";
 
 const store = useStore();
 const { t } = useI18n();
-const router = useRouter();
 
 const features = [
   {
@@ -287,6 +295,7 @@ const features = [
 
 const loading = ref(true);
 const existingConfig = ref<any>(null);
+const currentAction = ref<"list" | "add" | "edit">("list");
 
 
 const isCloud = computed(() => config.isCloud === "true");
@@ -384,22 +393,16 @@ async function fetchExistingConfig() {
 }
 
 function navigateToCreate() {
-  router.push({
-    name: "storageSettingsEditor",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
+  currentAction.value = "add";
 }
 
 function navigateToEdit() {
-  router.push({
-    name: "storageSettingsEditor",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-      edit: "true",
-    },
-  });
+  currentAction.value = "edit";
+}
+
+async function onEditorSaved() {
+  currentAction.value = "list";
+  await fetchExistingConfig();
 }
 
 onMounted(() => {

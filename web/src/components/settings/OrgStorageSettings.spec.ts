@@ -26,10 +26,9 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-const { mockGetStorage, mockNotify, mockRouterPush } = vi.hoisted(() => ({
+const { mockGetStorage, mockNotify } = vi.hoisted(() => ({
   mockGetStorage: vi.fn(),
   mockNotify: vi.fn(() => vi.fn()),
-  mockRouterPush: vi.fn(),
 }));
 
 vi.mock("quasar", async () => {
@@ -49,15 +48,6 @@ vi.mock("@/services/org_storage", () => ({
     update: vi.fn(),
     enable: vi.fn(),
   },
-}));
-
-vi.mock("vue-router", () => ({
-  useRouter: () => ({
-    push: mockRouterPush,
-  }),
-  useRoute: () => ({
-    query: {},
-  }),
 }));
 
 const mockStore = {
@@ -135,7 +125,7 @@ describe("OrgStorageSettings", () => {
     ).toBe(true);
   });
 
-  it("navigates to editor when configure is clicked", async () => {
+  it("shows editor when configure is clicked", async () => {
     const wrapper = createWrapper();
     await nextTick();
     await nextTick();
@@ -145,10 +135,9 @@ describe("OrgStorageSettings", () => {
       .trigger("click");
     await nextTick();
 
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "storageSettingsEditor",
-      query: { org_identifier: "test-org-123" },
-    });
+    const editor = wrapper.findComponent({ name: "OrgStorageEditor" });
+    expect(editor.exists()).toBe(true);
+    expect(editor.props("action")).toBe("add");
   });
 
   it("shows summary card when configured", async () => {
@@ -181,7 +170,7 @@ describe("OrgStorageSettings", () => {
     ).toBe(true);
   });
 
-  it("navigates to editor in edit mode when update is clicked", async () => {
+  it("shows editor in edit mode when update is clicked", async () => {
     mockGetStorage.mockResolvedValue({
       data: {
         provider: "AwsCredentials",
@@ -204,10 +193,9 @@ describe("OrgStorageSettings", () => {
       .trigger("click");
     await nextTick();
 
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: "storageSettingsEditor",
-      query: { org_identifier: "test-org-123", edit: "true" },
-    });
+    const editor = wrapper.findComponent({ name: "OrgStorageEditor" });
+    expect(editor.exists()).toBe(true);
+    expect(editor.props("action")).toBe("edit");
   });
 
   it("shows AwsRoleArn details in summary", async () => {
