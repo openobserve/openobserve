@@ -59,13 +59,35 @@ body {
 .header-menu {
   @extend .el-border-radius;
 
-  width: auto;
-  display: inline-flex;
+  display: flex;
+  align-items: center;
   background-color: var(--o2-header-menu-bg);
   position: relative;
 
   .q-btn .q-icon, .q-btn .q-spinner {
     font-size: 1.3rem;
+  }
+
+  .q-btn,
+  [data-o2-btn] {
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+    }
+
+    &.ai-hover-btn {
+      &:hover {
+        transform: none;
+      }
+    }
+  }
+
+  [data-test="navbar-organizations-select"] .q-btn,
+  [data-test="navbar-organizations-select"] [data-o2-btn] {
+    &:hover {
+      transform: none;
+    }
   }
 }
 
@@ -1635,19 +1657,119 @@ body {
   color: var(--o2-primary-btn-bg);
 }
 
-.organization-menu-o2 .org-table {
-  .q-table__bottom .q-btn{
-    @extend .el-border-radius;
-    @extend .el-border;
+.organization-menu-o2 {
+  // Disable hover for organization menu dropdown
+  .q-tr:hover,
+  tr:hover,
+  tbody tr:hover,
+  tbody .q-tr:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
 
-    margin-left: 0.625rem !important;
-    min-height: 10px !important;
-    min-width: 10px !important;
-    .q-icon{
-      font-size: 1.5rem;
+  td:hover,
+  .q-td:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  // Disable default q-item hover
+  .q-item:hover {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: inherit !important;
+  }
+
+  .org-table {
+    // Disable global table row hover
+    tbody .q-tr:hover {
+      background: transparent !important;
     }
 
-    color: var(--o2-text-primary);
+    td {
+      padding: 0 !important;
+      height: 32px !important;
+      min-height: 32px !important;
+    }
+
+    .q-table__top {
+      padding: 10px !important;
+
+      .q-field__control {
+        height: 40px;
+      }
+
+      input {
+        font-size: 14px;
+      }
+    }
+
+    .q-table__bottom {
+      padding: 8px 12px !important;
+      min-height: 40px;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+
+      .q-table__control {
+        display: flex !important;
+        align-items: center !important;
+      }
+
+      // Ensure pagination arrows are visible
+      .q-btn {
+        @extend .el-border-radius;
+        @extend .el-border;
+
+        display: inline-flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        margin-left: 0.625rem !important;
+        min-height: 10px !important;
+        min-width: 10px !important;
+
+        .q-icon {
+          font-size: 1.5rem;
+        }
+
+        color: var(--o2-text-primary);
+      }
+    }
+
+    // Table cell with no padding
+    .org-list-item-cell {
+      padding: 0 !important;
+      cursor: pointer;
+    }
+
+    // Individual org menu item
+    .org-menu-item {
+      padding: 6px 12px;
+      width: 100%;
+      display: block;
+      transition: background-color 0.2s ease;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+
+      // Enable hover only for individual org menu items
+      &:hover {
+        background-color: var(--o2-hover-accent) !important;
+        border-radius: 4px;
+      }
+
+      // Active/selected state
+      &--active {
+        color: var(--q-primary) !important;
+        font-weight: 500;
+        background: rgba(89, 96, 178, 0.08);
+
+        &:hover {
+          background: rgba(89, 96, 178, 0.12) !important;
+        }
+      }
+    }
   }
 }
 
@@ -2153,4 +2275,157 @@ body {
 
 .height-stretch{
   height: stretch;
+}
+
+// ============================================================================
+// Shared header icon opacity
+// ============================================================================
+.header-icon {
+  opacity: 0.7;
+}
+
+// ============================================================================
+// AI button styles (shared across Header, QueryEditor, AddRegexPattern, etc.)
+// ============================================================================
+.ai-btn-active {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+  }
+}
+
+.ai-btn-active:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+}
+
+.ai-hover-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.ai-hover-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+}
+
+.ai-icon {
+  transition: transform 0.6s ease;
+}
+
+.ai-hover-btn:hover .ai-icon {
+  transform: rotate(180deg);
+}
+
+// ============================================================================
+// Theme button active state
+// ============================================================================
+.theme-btn-active {
+  background: color-mix(
+    in srgb,
+    var(--o2-theme-color) 15%,
+    transparent 85%
+  ) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+    color: var(--o2-theme-color) !important;
+  }
+}
+
+// ============================================================================
+// Shared utility classes
+// ============================================================================
+.warning-msg {
+  background-color: var(--q-warning);
+  padding: 5px;
+  border-radius: 5px;
+}
+
+// ============================================================================
+// Global Quasar component overrides
+// ============================================================================
+.q-toolbar {
+  min-height: 40px;
+}
+
+.q-item {
+  min-height: 30px;
+  padding: 3px 8px;
+}
+
+.oo_header .q-btn-dropdown__arrow {
+  margin-left: -4px;
+}
+
+// ============================================================================
+// General q-list overrides (sidebar, language list, etc.)
+// ============================================================================
+.q-list {
+  .flagIcon img {
+    border-radius: 3px;
+    object-fit: cover;
+    display: block;
+    height: 16px;
+    width: 24px;
+  }
+
+  .q-item {
+    &__section {
+      &--avatar {
+        padding-right: 0px !important;
+        min-width: 1.5rem;
+        display: list-item;
+        text-align: center;
+        list-style: none;
+      }
+    }
+
+    &__label {
+      font-weight: 400;
+    }
+
+    &.activeLang {
+      &__label {
+        font-weight: 600;
+        color: $primary;
+      }
+    }
+  }
+}
+
+// ============================================================================
+// Global print overrides
+// ============================================================================
+@media print {
+  .tw\:h-full,
+  .tw\:h-\[calc\(100vh-105px\)\],
+  .tw\:overflow-y-auto {
+    overflow: visible !important;
+  }
+}
+
+// ============================================================================
+// AI Chat layout — body class applied by JS, must be unscoped
+// ============================================================================
+body.ai-chat-open {
+  .oo_app {
+    width: 75%;
+    transition: width 0.3s ease;
+  }
+}
+
+.oo_app {
+  width: 100%;
+  transition: width 0.3s ease;
 }
