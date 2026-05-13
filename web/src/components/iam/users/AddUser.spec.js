@@ -316,7 +316,7 @@ describe("AddUser Component", () => {
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
       expect(drawer.props("persistent")).toBe(true);
-      expect(drawer.props("size")).toBe("lg");
+      expect(drawer.props("width")).toBe(30);
     });
 
     it("reflects the open prop on the drawer when false", () => {

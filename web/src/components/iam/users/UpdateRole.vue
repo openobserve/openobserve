@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer data-test="update-role-dialog"
     :open="open"
-    size="lg"
+    :width="30"
     :title="t('user.editUser')"
     persistent
     @update:open="$emit('update:open', $event)"
