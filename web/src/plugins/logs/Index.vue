@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="toggleErrorDetails"
                             variant="outline"
                             size="sm-action"
+                            style="font-size: 0.875rem"
                             data-test="logs-page-result-error-details-btn"
                             >{{ t("search.histogramErrorBtnLabel") }}</OButton
                           >
