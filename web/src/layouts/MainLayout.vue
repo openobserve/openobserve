@@ -1161,7 +1161,7 @@ export default defineComponent({
       linksList,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen: false,
+      leftDrawerOpen: true,
       miniMode,
       user,
       zoBackendUrl,
