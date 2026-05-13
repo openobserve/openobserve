@@ -157,13 +157,28 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(1500);
 
     testLogger.info('Waiting for _o2_id field to appear in log details');
-    try {
-      await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 });
-      testLogger.info('Successfully found _o2_id field');
-      await pageManager.unflattenedPage.o2IdText.click();
-    } catch (error) {
-      testLogger.error('Failed to find _o2_id field in log details', { error: error.message });
-      throw error;
+    // Retry with query refresh if _o2_id not found (data may not be indexed yet)
+    let o2idFound = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 15000 });
+        testLogger.info(`Successfully found _o2_id field (attempt ${attempt})`);
+        await pageManager.unflattenedPage.o2IdText.click();
+        o2idFound = true;
+        break;
+      } catch (error) {
+        testLogger.warn(`_o2_id not found on attempt ${attempt}, refreshing search`);
+        await applyQueryButton(page);
+        // Re-expand log row
+        await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
+        await pageManager.unflattenedPage.logTableRowExpandMenu.click();
+        await pageManager.unflattenedPage.logSourceColumn.waitFor();
+        await pageManager.unflattenedPage.logSourceColumn.click();
+        await page.waitForTimeout(1500);
+      }
+    }
+    if (!o2idFound) {
+      throw new Error('Failed to find _o2_id field in log details after 3 attempts');
     }
 
     testLogger.info('Switching to unflattened tab');

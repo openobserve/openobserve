@@ -7023,7 +7023,7 @@ export class LogsPage {
                     return false;
                 },
                 { chartId, shouldBeSelected },
-                { timeout, polling: 'raf' }
+                { timeout, polling: 100 }
             );
             testLogger.info(
                 `Chart type "${chartId}" is ${shouldBeSelected ? '' : 'NOT '}selected (verified via bg-grey class)`
@@ -7329,7 +7329,14 @@ export class LogsPage {
     async getFilterConditionCount() {
         // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
         const filterItems = this.page.locator('[data-test^="dashboard-add-condition-label-"]');
-        const count = await filterItems.count();
+        // Retry for up to 5s to allow builder filter parsing to complete (CI may be slower)
+        const deadline = Date.now() + 5000;
+        let count = 0;
+        while (Date.now() < deadline) {
+            count = await filterItems.count();
+            if (count > 0) break;
+            await this.page.waitForTimeout(200);
+        }
         testLogger.info(`Filter has ${count} condition(s)`);
         return count;
     }
