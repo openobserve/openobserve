@@ -380,6 +380,8 @@ describe("ListOrganizations", () => {
     });
 
     it("should close dialog when AddUpdateOrganization emits update:open false", async () => {
+      await router.push('/organizations');
+      await flushPromises();
       wrapper.vm.showAddOrganizationDialog = true;
       await flushPromises();
       await wrapper.vm.$nextTick();
