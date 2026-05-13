@@ -7090,8 +7090,10 @@ export class LogsPage {
      */
     async searchFieldInBuilder(fieldName) {
         const input = this.page.locator(this.fieldListSearchInput).first();
-        await input.waitFor({ state: 'visible', timeout: 10000 });
-        await input.fill(fieldName);
+        // Quasar's q-field__native input resolves in the DOM but is considered hidden
+        // by Playwright's visibility algorithm — use force to interact directly.
+        await input.waitFor({ state: 'attached', timeout: 10000 });
+        await input.fill(fieldName, { force: true });
         await this.page.waitForTimeout(500);
         testLogger.info(`Searched for field: ${fieldName}`);
     }

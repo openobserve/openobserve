@@ -516,7 +516,7 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
     }, async ({ page }) => {
         testLogger.info('Verifying buttons in custom mode with search');
 
-        await setupQueryAndSwitchToBuild(pm, page, 'SELECT * FROM "e2e_automate"');
+        await setupQueryAndSwitchToBuild(pm, page, 'SELECT kubernetes_container_name, kubernetes_host FROM "e2e_automate"');
         await pm.logsPage.clickCustomQueryType();
 
         await pm.logsPage.searchFieldInBuilder('kubernetes');
