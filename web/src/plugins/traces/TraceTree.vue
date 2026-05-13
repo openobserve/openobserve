@@ -485,6 +485,7 @@ export default defineComponent({
     "selectSpan",
     "update-current-index",
     "search-result",
+    "view-correlated-logs",
   ],
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs } = useTraces();
@@ -577,6 +578,10 @@ export default defineComponent({
     };
 
     const viewSpanLogs = (span: any) => {
+      if (config.isEnterprise === "true") {
+        emit("view-correlated-logs", span);
+        return;
+      }
       const queryDetails = buildQueryDetails(span);
       navigateToLogs(queryDetails);
     };
