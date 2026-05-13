@@ -203,18 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AzureCredentials Fields -->
               <template v-if="selectedProvider === 'AzureCredentials'">
                 <q-input
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
-                />
-                <q-input
                   data-test="storage-settings-access-key-input"
                   v-model="formData.storage_account"
                   label="Storage Account Name *"
@@ -225,6 +213,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   stack-label
                   :disable="isEditMode"
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.storageAccountRequired')]"
+                />
+                <q-input
+                  data-test="storage-settings-bucket-name-input"
+                  v-model="formData.bucket_name"
+                  label="Bucket Name *"
+                  class="no-border showLabelOnTop"
+                  borderless
+                  dense
+                  flat
+                  stack-label
+                  :disable="isEditMode"
+                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
                 />
                 <q-input
                   data-test="storage-settings-secret-key-input"
@@ -509,12 +509,14 @@ const providerDefinitions = [
     icon: "cloud",
     image: getImageURL("images/org_storage/azure.png"),
   },
-  {
-    label: "GCP Credentials",
-    value: "GcpCredentials",
-    icon: "cloud",
-    image: getImageURL("images/org_storage/gcp.png"),
-  },
+  // for now we do not support gcp specifically, use the  aws route to use gcp
+  // keeping this for future use or remove later
+  // {
+  //   label: "GCP Credentials",
+  //   value: "GcpCredentials",
+  //   icon: "cloud",
+  //   image: getImageURL("images/org_storage/gcp.png"),
+  // },
   {
     label: "AWS Role ARN",
     value: "AwsRoleArn",

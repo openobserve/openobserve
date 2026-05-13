@@ -342,11 +342,11 @@ const providerDefinitions = [
     value: "AzureCredentials",
     image: getImageURL("images/org_storage/azure.png"),
   },
-  {
-    label: "GCP Credentials",
-    value: "GcpCredentials",
-    image: getImageURL("images/org_storage/gcp.png"),
-  },
+  // {
+  //   label: "GCP Credentials",
+  //   value: "GcpCredentials",
+  //   image: getImageURL("images/org_storage/gcp.png"),
+  // },
   {
     label: "AWS Role ARN",
     value: "AwsRoleArn",
