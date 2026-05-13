@@ -3746,6 +3746,7 @@
     "update": "Aktualisieren",
     "awsStsCloudInfo": "Dabei werden AWS sts verwendet, um Rollen zu übernehmen und Operationen durchzuführen. Sie müssen das Openobservate-AWS-Konto als vertrauenswürdigen Entitätstyp für diese Rolle in der AWS-Konsole hinzufügen. Bitte wenden Sie sich an das Openobserve-Team, um die Kontoinformationen zu erhalten oder weitere Hilfe bei der Einrichtung zu erhalten.",
     "awsStsSelfHostedInfo": "Dabei werden AWS sts verwendet, um Rollen zu übernehmen und Operationen durchzuführen. Stellen Sie sicher, dass Sie in der Installationsumgebung AWS-Anmeldeinformationen konfiguriert haben, die Zugriff auf diese Rolle haben.",
-    "externalIdRequired": "Externe ID ist erforderlich"
+    "externalIdRequired": "Externe ID ist erforderlich",
+    "storageAccountRequired": "Name des Speicherkontos ist erforderlich"
   }
 }

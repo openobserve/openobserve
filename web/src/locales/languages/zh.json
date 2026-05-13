@@ -3750,6 +3750,7 @@
     "update": "更新",
     "awsStsCloudInfo": "这使用 AWS sts 来代入角色并执行操作。您必须在 AWS 控制台中将 Openobserve AWS 账户添加为该角色的可信实体类型。请联系 Openobserve 团队获取账户信息或获取更多设置帮助。",
     "awsStsSelfHostedInfo": "这使用 AWS sts 来代入角色并执行操作。确保您在安装环境中配置了有权访问此角色的 aws 证书。",
-    "externalIdRequired": "外部 ID 为必填项"
+    "externalIdRequired": "外部 ID 为必填项",
+    "storageAccountRequired": "存储账户名称为必填项"
   }
 }

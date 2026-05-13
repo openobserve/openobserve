@@ -3757,6 +3757,7 @@
     "update": "업데이트",
     "awsStsCloudInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.OpenObserve AWS 계정을 AWS 콘솔에서 이 역할의 신뢰할 수 있는 개체 유형으로 추가해야 합니다.계정 정보를 얻거나 이 정보를 설정하는 데 도움이 더 필요하면 OpenObserve 팀에 문의하십시오.",
     "awsStsSelfHostedInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.설치 환경에서 이 역할에 액세스할 수 있는 AWS 자격 증명을 구성했는지 확인하십시오.",
-    "externalIdRequired": "외부 ID가 필요합니다."
+    "externalIdRequired": "외부 ID가 필요합니다.",
+    "storageAccountRequired": "스토리지 계정 이름이 필요합니다"
   }
 }

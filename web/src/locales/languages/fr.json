@@ -3746,6 +3746,7 @@
     "update": "Mettre à jour",
     "awsStsCloudInfo": "Cela utilise AWS sts pour assumer le rôle et effectuer des opérations. Vous devez ajouter le compte Openobserve AWS en tant que type d'entité de confiance pour ce rôle dans la console AWS. Veuillez contacter l'équipe d'Openobserve pour obtenir les informations du compte ou pour obtenir de l'aide supplémentaire pour le configurer.",
     "awsStsSelfHostedInfo": "Cela utilise AWS sts pour assumer le rôle et effectuer des opérations. Assurez-vous d'avoir configuré les informations d'identification AWS dans l'environnement d'installation qui ont accès à ce rôle.",
-    "externalIdRequired": "Un identifiant externe est requis"
+    "externalIdRequired": "Un identifiant externe est requis",
+    "storageAccountRequired": "Le nom du compte de stockage est obligatoire"
   }
 }

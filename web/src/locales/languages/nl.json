@@ -3757,6 +3757,7 @@
     "update": "Bijwerken",
     "awsStsCloudInfo": "Dit maakt gebruik van AWS sts om de rol op zich te nemen en operaties uit te voeren. U moet een Openobserve AWS-account toevoegen als vertrouwd entiteitstype voor deze rol in de AWS-console. Neem contact op met het Openobserve-team voor de accountinformatie of voor verdere hulp bij het instellen hiervan.",
     "awsStsSelfHostedInfo": "Dit maakt gebruik van AWS sts om de rol op zich te nemen en operaties uit te voeren. Zorg ervoor dat u aws-inloggegevens hebt geconfigureerd in de installatie-env die toegang hebben tot deze rol.",
-    "externalIdRequired": "Externe ID is vereist"
+    "externalIdRequired": "Externe ID is vereist",
+    "storageAccountRequired": "De naam van het opslagaccount is vereist"
   }
 }

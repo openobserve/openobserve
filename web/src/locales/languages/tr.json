@@ -3757,6 +3757,7 @@
     "update": "Güncelleme",
     "awsStsCloudInfo": "Bu, rol üstlenmek ve işlemleri gerçekleştirmek için AWS sts kullanır. AWS konsolunda bu rol için Openobserver AWS hesabını güvenilir varlık türü olarak eklemeniz gerekir. Hesap bilgilerini almak veya bunu ayarlamak için daha fazla yardım almak için lütfen Openobserver ekibiyle iletişime geçin.",
     "awsStsSelfHostedInfo": "Bu, rol üstlenmek ve işlemleri gerçekleştirmek için AWS sts kullanır. Kurulum ortamında bu role erişimi olan aws kimlik bilgilerini yapılandırdığınızdan emin olun.",
-    "externalIdRequired": "Harici kimlik gereklidir"
+    "externalIdRequired": "Harici kimlik gereklidir",
+    "storageAccountRequired": "Depolama Hesabı adı gereklidir"
   }
 }
