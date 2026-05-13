@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, useSlots, computed, inject, provide, nextTick, useAttrs } from "vue";
+import { ref, watch, watchEffect, useSlots, computed, inject, provide, nextTick, useAttrs } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 
@@ -237,6 +237,54 @@ function handleOpenAutoFocus(event: Event) {
     }
   });
 }
+
+// ── Focus-trap workaround for portaled elements ─────────────────────────────
+// reka-ui's modal DialogContent wraps content in a FocusScope that listens for
+// both `focusin` AND `focusout` on `document` (bubble phase) and pulls focus
+// back whenever it moves outside the DrawerContent DOM.  Quasar portals
+// (q-menu, q-select dropdown) are teleported to <body> and therefore sit
+// outside the FocusScope container.
+//
+// The `focusout` handler fires FIRST (when focus leaves the dialog) and checks
+// `relatedTarget` — if it's outside the container it immediately steals focus
+// back, so the `focusin` on the portal element never even gets a chance.
+//
+// Fix: while the drawer is open, intercept both events on `document.body` and
+// call `stopPropagation()` for events involving a known portal wrapper.  Since
+// body is below document in the DOM, this prevents the events from reaching
+// FocusScope's document-level handlers.
+watchEffect((cleanup) => {
+  if (!internalOpen.value) return;
+
+  function isPortalElement(el: Element | null): boolean {
+    return !!(
+      el?.closest("[data-reka-popper-content-wrapper]") ||
+      el?.closest(".q-menu")
+    );
+  }
+
+  const handleFocusIn = (e: FocusEvent) => {
+    if (isPortalElement(e.target as Element | null)) {
+      e.stopPropagation();
+    }
+  };
+
+  // focusout fires when focus LEAVES an element; relatedTarget is where
+  // focus is moving TO.  If it's heading to a portal, stop propagation so
+  // FocusScope's handleFocusOut doesn't steal it back.
+  const handleFocusOut = (e: FocusEvent) => {
+    if (isPortalElement(e.relatedTarget as Element | null)) {
+      e.stopPropagation();
+    }
+  };
+
+  document.body.addEventListener("focusin", handleFocusIn);
+  document.body.addEventListener("focusout", handleFocusOut);
+  cleanup(() => {
+    document.body.removeEventListener("focusin", handleFocusIn);
+    document.body.removeEventListener("focusout", handleFocusOut);
+  });
+});
 
 // ── Scroll shadow ────────────────────────────────────────────────────────────
 const { canScrollUp, canScrollDown, update: updateShadow, attach: attachShadow, detach: detachShadow } = useScrollShadow(bodyRef);
