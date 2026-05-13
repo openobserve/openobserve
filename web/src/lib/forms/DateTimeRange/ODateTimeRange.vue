@@ -77,7 +77,11 @@ const customAmount = ref(String(Math.max(1, props.relativeAmount)));
 const customUnit = ref<RelativeUnit>(props.relativeUnit);
 
 watch(_popoverOpen, (open) => {
-  if (!open) return;
+  if (!open) {
+    tzOpen.value = false;
+    tzSearch.value = "";
+    return;
+  }
   activeTab.value = props.disableRelative ? "absolute" : props.mode;
   stagedRange.value = {
     start: props.startDate ? tryParseDate(props.startDate) : undefined,
@@ -152,6 +156,23 @@ const timezones = computed((): string[] => {
 
 function tzLabel(tz: string): string {
   return tz === "" ? "Browser Time" : tz;
+}
+
+const tzSearch = ref("");
+const tzOpen = ref(false);
+
+const filteredTimezones = computed((): string[] => {
+  const term = tzSearch.value.trim().toLowerCase();
+  if (!term) return timezones.value;
+  return timezones.value.filter((tz) =>
+    tzLabel(tz).toLowerCase().includes(term),
+  );
+});
+
+function selectTimezone(tz: string) {
+  stagedTimezone.value = tz;
+  tzSearch.value = "";
+  tzOpen.value = false;
 }
 
 // ── Trigger label ──────────────────────────────────────────────
@@ -444,23 +465,65 @@ const triggerClasses = computed(() => [
           <!-- Timezone row -->
           <div
             v-if="showTimezone"
-            class="tw:flex tw:items-center tw:gap-2 tw:pt-2 tw:border-t tw:border-datepicker-popup-border"
+            class="tw:flex tw:flex-col tw:gap-1 tw:pt-2 tw:border-t tw:border-datepicker-popup-border"
           >
             <span
-              class="tw:w-14 tw:text-xs tw:text-datepicker-relative-label tw:shrink-0"
+              class="tw:text-xs tw:text-datepicker-relative-label"
             >Timezone</span>
-            <select
-              v-model="stagedTimezone"
+            <button
+              type="button"
               :disabled="disabled"
-              class="tw:flex-1 tw:min-w-0 tw:h-7 tw:rounded tw:border tw:border-datepicker-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-xs tw:px-2 tw:outline-none tw:focus:border-datepicker-focus-border tw:disabled:opacity-50"
-              data-test="datetimerange-timezone"
+              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-7 tw:rounded tw:border tw:border-datepicker-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-xs tw:px-2 tw:outline-none tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              data-test="datetimerange-timezone-trigger"
+              @click="!disabled && (tzOpen = !tzOpen)"
             >
-              <option
-                v-for="tz in timezones"
-                :key="tz"
-                :value="tz"
-              >{{ tzLabel(tz) }}</option>
-            </select>
+              <span class="tw:truncate">{{ tzLabel(stagedTimezone) }}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                class="tw:size-3 tw:shrink-0 tw:text-datepicker-icon tw:transition-transform"
+                :class="tzOpen ? 'tw:rotate-180' : ''"
+                aria-hidden="true"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
+            <div
+              v-if="tzOpen && !disabled"
+              class="tw:rounded tw:border tw:border-datepicker-border tw:overflow-hidden"
+            >
+              <input
+                v-model="tzSearch"
+                type="text"
+                placeholder="Search timezone..."
+                autofocus
+                class="tw:w-full tw:h-7 tw:px-2 tw:text-xs tw:bg-datepicker-bg tw:text-datepicker-text tw:border-b tw:border-datepicker-border tw:outline-none tw:focus:border-datepicker-focus-border tw:placeholder:text-datepicker-placeholder"
+                data-test="datetimerange-timezone-search"
+              />
+              <div class="tw:overflow-y-auto tw:max-h-36 tw:bg-datepicker-bg">
+                <button
+                  v-for="tz in filteredTimezones"
+                  :key="tz"
+                  type="button"
+                  :class="[
+                    'tw:w-full tw:text-left tw:px-2 tw:py-1 tw:text-xs tw:transition-colors tw:outline-none',
+                    stagedTimezone === tz
+                      ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
+                      : 'tw:text-datepicker-text tw:hover:bg-datepicker-relative-btn-hover-bg',
+                  ]"
+                  @click="selectTimezone(tz)"
+                >{{ tzLabel(tz) }}</button>
+                <div
+                  v-if="filteredTimezones.length === 0"
+                  class="tw:px-2 tw:py-2 tw:text-xs tw:text-datepicker-weekday-text"
+                >No timezones found</div>
+              </div>
+            </div>
           </div>
 
           <!-- Apply -->
@@ -606,18 +669,60 @@ const triggerClasses = computed(() => [
           <!-- Timezone -->
           <div v-if="showTimezone" class="tw:flex tw:flex-col tw:gap-1">
             <span class="tw:text-xs tw:text-datepicker-label">Timezone</span>
-            <select
-              v-model="stagedTimezone"
+            <button
+              type="button"
               :disabled="disabled"
-              class="tw:w-full tw:h-9 tw:rounded-md tw:border tw:border-datepicker-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-sm tw:px-3 tw:outline-none tw:focus:border-datepicker-focus-border tw:disabled:opacity-50"
-              data-test="datetimerange-timezone"
+              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-9 tw:rounded-md tw:border tw:border-datepicker-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-sm tw:px-3 tw:outline-none tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              data-test="datetimerange-timezone-trigger"
+              @click="!disabled && (tzOpen = !tzOpen)"
             >
-              <option
-                v-for="tz in timezones"
-                :key="tz"
-                :value="tz"
-              >{{ tzLabel(tz) }}</option>
-            </select>
+              <span class="tw:truncate">{{ tzLabel(stagedTimezone) }}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 16 16"
+                fill="currentColor"
+                class="tw:size-4 tw:shrink-0 tw:text-datepicker-icon tw:transition-transform"
+                :class="tzOpen ? 'tw:rotate-180' : ''"
+                aria-hidden="true"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
+            <div
+              v-if="tzOpen && !disabled"
+              class="tw:rounded-md tw:border tw:border-datepicker-border tw:overflow-hidden"
+            >
+              <input
+                v-model="tzSearch"
+                type="text"
+                placeholder="Search timezone..."
+                autofocus
+                class="tw:w-full tw:h-9 tw:px-3 tw:text-sm tw:bg-datepicker-bg tw:text-datepicker-text tw:border-b tw:border-datepicker-border tw:outline-none tw:focus:border-datepicker-focus-border tw:placeholder:text-datepicker-placeholder"
+                data-test="datetimerange-timezone-search"
+              />
+              <div class="tw:overflow-y-auto tw:max-h-40 tw:bg-datepicker-bg">
+                <button
+                  v-for="tz in filteredTimezones"
+                  :key="tz"
+                  type="button"
+                  :class="[
+                    'tw:w-full tw:text-left tw:px-3 tw:py-1.5 tw:text-sm tw:transition-colors tw:outline-none',
+                    stagedTimezone === tz
+                      ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
+                      : 'tw:text-datepicker-text tw:hover:bg-datepicker-relative-btn-hover-bg',
+                  ]"
+                  @click="selectTimezone(tz)"
+                >{{ tzLabel(tz) }}</button>
+                <div
+                  v-if="filteredTimezones.length === 0"
+                  class="tw:px-3 tw:py-2 tw:text-sm tw:text-datepicker-weekday-text"
+                >No timezones found</div>
+              </div>
+            </div>
           </div>
 
           <!-- Apply -->
