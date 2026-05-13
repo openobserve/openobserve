@@ -9,11 +9,10 @@ export default class DashboardLegendsCopy {
     this.page = page;
 
     // ShowLegendsPopup selectors (VERIFIED from ShowLegendsPopup.vue)
-    // The dialog is wrapped in ODialog — close button is o-dialog-close-btn inside role="dialog"
     this.legendsPopup = page.locator('[data-test="dashboard-show-legends-popup"]');
     this.legendsCount = page.locator('[data-test="dashboard-show-legends-count"]');
     this.copyAllBtn = page.locator('[data-test="dashboard-show-legends-copy-all"]');
-    this.closeBtn = page.getByRole('dialog').locator('[data-test="o-dialog-close-btn"]');
+    this.closeBtn = page.locator('[data-test="dashboard-show-legends-dialog"] [data-test="o-dialog-close-btn"]');
 
     // Chart renderer selector (VERIFIED from ChartRenderer.vue - data-test="chart-renderer")
     this.chartRenderer = page.locator('[data-test="chart-renderer"]');
