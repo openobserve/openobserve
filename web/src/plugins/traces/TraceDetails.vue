@@ -378,7 +378,7 @@ size="sm">
             </div>
             <!-- Log Stream Selector (if enabled) -->
             <div
-              v-if="showLogStreamSelector"
+              v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
               class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
             >
               <q-select
@@ -387,7 +387,7 @@ size="sm">
                 :label="
                   searchObj.data.traceDetails.selectedLogStreams.length
                     ? ''
-                    : t('search.selectIndex')
+                    : t('search.selectLogStream')
                 "
                 :options="filteredStreamOptions"
                 data-cy="stream-selection"
@@ -1592,7 +1592,7 @@ export default defineComponent({
               searchObj.data.traceDetails.selectedLogStreams.push(
                 logStreamFromQuery,
               );
-            } else if (logStreams.value.length > 0) {
+            } else if (logStreams.value.length === 1) {
               // Default: select the first available log stream
               searchObj.data.traceDetails.selectedLogStreams.push(
                 logStreams.value[0],
