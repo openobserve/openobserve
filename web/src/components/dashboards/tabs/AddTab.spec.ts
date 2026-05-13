@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { Quasar } from "quasar";
 import AddTab from "./AddTab.vue";
 
@@ -475,11 +475,10 @@ describe("AddTab", () => {
 
   describe("Edit Tab Functionality", () => {
     it("should load dashboard data in edit mode", async () => {
-      wrapper = createWrapper({ editMode: true, tabId: "tab1" });
+      wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
 
-      // Wait for loadDashboardData to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       expect(mockGetDashboard).toHaveBeenCalledWith(
         mockStore,
@@ -489,13 +488,13 @@ describe("AddTab", () => {
     });
 
     it("should call editTab utility when submitting in edit mode", async () => {
-      wrapper = createWrapper({ editMode: true, tabId: "tab1" });
+      wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
 
-      // Wait for component to load dashboard data
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      // Trigger the open watcher so loadDashboardData runs and populates tabData
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
-      // Now update the name
+      // tabData is now { tabId: "tab1", name: "Tab 1", panels: [] } from the mock
       wrapper.vm.tabData.name = "Updated Tab";
 
       wrapper.vm.addTabForm = {
@@ -859,10 +858,11 @@ describe("AddTab", () => {
 
   describe("Component Lifecycle", () => {
     it("should load dashboard data on component creation in edit mode", async () => {
-      wrapper = createWrapper({ editMode: true, tabId: "tab1" });
+      wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
 
-      // Wait for async loadDashboardData to be called
-      await wrapper.vm.$nextTick();
+      // Trigger the open watcher to invoke loadDashboardData
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       expect(mockGetDashboard).toHaveBeenCalled();
     });
