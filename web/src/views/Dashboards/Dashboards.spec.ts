@@ -264,7 +264,7 @@ describe("Dashboards.vue", () => {
             },
           },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -315,7 +315,7 @@ describe("Dashboards.vue", () => {
             },
           },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -370,7 +370,7 @@ describe("Dashboards.vue", () => {
             },
           },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -432,7 +432,7 @@ describe("Dashboards.vue", () => {
             },
           },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -492,7 +492,7 @@ describe("Dashboards.vue", () => {
           },
           provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -546,7 +546,7 @@ describe("Dashboards.vue", () => {
           },
           provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -591,7 +591,7 @@ describe("Dashboards.vue", () => {
           },
           provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -638,7 +638,7 @@ describe("Dashboards.vue", () => {
           },
           provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -687,7 +687,7 @@ describe("Dashboards.vue", () => {
           },
           provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -730,7 +730,7 @@ describe("Dashboards.vue", () => {
           },
           provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,
@@ -782,7 +782,7 @@ describe("Dashboards.vue", () => {
           },
           provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
           stubs: {
-            "q-page": true,
+            "OPage": true,
             "q-input": true,
             "q-btn": true,
             "q-toggle": true,

@@ -168,8 +168,8 @@ describe("OrganizationManagement.vue", () => {
           }
         },
         stubs: {
-          'q-page': {
-            template: '<div class="q-page"><slot /></div>'
+          'OPage': {
+            template: '<div data-o2-page><slot /></div>'
           },
           'q-table': {
             template: `
