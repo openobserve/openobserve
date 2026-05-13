@@ -78,7 +78,7 @@ export class PipelinesPage {
         this.valueInput = page.locator('[data-test="alert-conditions-value-input"]');
         this.addConditionButton = page.locator('[data-test="alert-conditions-add-condition-btn"]');
         this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
-        this.fieldRequiredError = page.locator('[data-test="alert-conditions-select-column"]').getByText('Field is required!')
+        this.fieldRequiredError = page.locator('[data-test="associate-function-select-function-input"]').getByText('Field is required!')
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
