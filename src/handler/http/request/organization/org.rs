@@ -220,11 +220,9 @@ pub async fn all_organizations(
                 None
             }
         });
-        let org_storage_enabled =
-            crate::service::db::org_storage_providers::get_for_org(&org.identifier)
-                .await
-                .unwrap_or_default()
-                .is_some();
+        let settings = crate::service::db::organization::get_org_setting(&org.identifier)
+            .await
+            .unwrap_or_default();
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
@@ -240,7 +238,7 @@ pub async fn all_organizations(
             billing_provider: billing_info
                 .map(|(_, _, provider)| provider.clone())
                 .unwrap_or_default(),
-            org_storage_enabled,
+            org_storage_enabled: settings.org_storage_enabled,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());

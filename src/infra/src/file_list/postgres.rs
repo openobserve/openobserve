@@ -1772,6 +1772,7 @@ GROUP BY stream;
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
 
+    // TODO: optimize with date from org_storage_settings
     async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
         let sql = r#"SELECT 
 SUM(original_size)::BIGINT AS storage_size,
