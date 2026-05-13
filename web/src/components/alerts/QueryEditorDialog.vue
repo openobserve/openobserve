@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="full"
     :show-close="false"
   >
-    <div class="tw:flex tw:h-full tw:overflow-hidden editor-dialog-card">
+    <div class="tw:flex tw:h-screen tw:overflow-hidden editor-dialog-card">
       <div
         class="tw:h-full tw:flex tw:overflow-hidden tw:flex-1"
       >
