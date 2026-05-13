@@ -399,6 +399,18 @@ These `q-icon` usages are **inside Quasar component slots** (prepend/append of `
 | `Trash2` | `delete` | ✅ | many files — see 7b |
 | `TrendingUp` | `trending-up` | ⚠️ | `components/alerts/AlertList.vue`, `components/alerts/AddAlert.vue` |
 | `Type` (as `TypeIcon`) | `title` | ⚠️ | `components/alerts/steps/Advanced.vue` |
+
+---
+
+## Permanently kept as lucide-vue-next
+
+These 3 icons have **no suitable equivalent** in `material-symbols-light` and are intentionally left as lucide imports:
+
+| Lucide icon | Reason | Files |
+|---|---|---|
+| `BrainCircuit` | Stylized brain-with-circuit-board icon; no material symbols equivalent | `components/anomaly_detection/AnomalyDetectionList.vue` |
+| `Flame` | Flame/fire shape used for the Flame Graph tab; material symbols `local-fire-department` is a different semantic | `plugins/traces/TraceDetails.vue` |
+| `GitBranch` | Git branching diagram shape; material symbols has no git-specific fork icon | `components/alerts/FilterGroup.vue`, `components/rum/EventDetailDrawerContent.vue`, `components/rum/correlation/TraceCorrelationCard.vue`, `plugins/traces/SearchBar.vue` |
 | `Upload` | `upload` | ⚠️ | `components/settings/ImportRegexPattern.vue`, `components/common/BaseImport.vue`, `components/rum/errorTracking/view/PrettyStackTrace.vue`, `components/functions/EnrichmentTableList.vue` |
 | `UserCheck` | `verified-user` | ⚠️ | `components/logstream/schema.vue` |
 | `Users` | `group` | ⚠️ | `components/iam/groups/EditGroup.vue`, `components/iam/roles/EditRole.vue` |
