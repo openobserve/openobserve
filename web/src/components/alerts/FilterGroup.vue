@@ -102,7 +102,7 @@
             @click="addCondition(props.group.groupId)"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="tw:text-[12px] text-bold">Condition</span>
+            <span class="tw:text-[0.75rem] text-bold">Condition</span>
             <q-tooltip :delay="300">
               {{ t('alerts.conditions.addConditionTooltip') }}
             </q-tooltip>
@@ -116,7 +116,7 @@
             :disabled="depth >= 2"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="tw:text-[12px] text-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
+            <span class="tw:text-[0.75rem] text-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <q-tooltip v-if="depth < 2" :delay="300">
               {{ t('alerts.conditions.addConditionGroupTooltip') }}
             </q-tooltip>
@@ -132,7 +132,7 @@
             @click="reorderItems()"
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" name="swap_vert" />
-            <span class="tw:text-[12px] text-bold">Reorder</span>
+            <span class="tw:text-[0.75rem] text-bold">Reorder</span>
             <q-tooltip :delay="300">
               Reorder items: Conditions first, then Groups
             </q-tooltip>
