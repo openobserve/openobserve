@@ -193,8 +193,6 @@ import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
-import streamService from "@/services/stream";
-import billings from "@/services/billings";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
@@ -208,8 +206,7 @@ import {
   outlinedWindow,
   outlinedReportProblem,
   outlinedFilterAlt,
-  outlinedPerson,
-  outlinedFormatListBulleted,
+
   outlinedSettings,
   outlinedManageAccounts,
   outlinedDescription,
@@ -339,7 +336,6 @@ export default defineComponent({
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
-    const aiChatAutoSend = ref(false);
     const aiChatPayload = ref<{
       text: string;
       autoSend: boolean;
@@ -370,17 +366,6 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
-    const excludeParentRedirect = [
-      "pipeline",
-      "functionList",
-      "streamFunctions",
-      "enrichmentTables",
-      "alertList",
-      "alertDestinations",
-      "alertTemplates",
-      "/ingestion/",
-    ];
-
     const isActionsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -675,34 +660,6 @@ export default defineComponent({
       ) {
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
-      }
-    }
-
-    const triggerRefreshToken = () => {
-      const expirationTimeUnix = store.state.userInfo.exp;
-
-      // Convert the expiration time to milliseconds
-      const expirationTimeMilliseconds = expirationTimeUnix * 1000;
-
-      // Get the current time in milliseconds
-      const currentTimeMilliseconds = Date.now();
-
-      // Calculate the time difference
-      const timeUntilNextAPICall =
-        expirationTimeMilliseconds - currentTimeMilliseconds - 100;
-
-      // Convert the time difference from milliseconds to seconds
-      const timeUntilNextAPICallInSeconds = timeUntilNextAPICall / 1000;
-
-      // setTimeout(() => {
-      //   mainLayoutMixin.setup().getRefreshToken();
-      // }, timeUntilNextAPICallInSeconds);
-    };
-
-    //get refresh token for cloud environment
-    if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
-      if (config.isCloud == "true") {
-        triggerRefreshToken();
       }
     }
 
@@ -1213,7 +1170,6 @@ export default defineComponent({
       setSelectedOrganization,
       getOrganizationSettings,
       resetStreams,
-      triggerRefreshToken,
       prefetch,
       expandMenu,
       slackIcon: markRaw(SlackIcon),
@@ -1290,11 +1246,6 @@ export default defineComponent({
 
       if (matchingOrg) {
         this.selectedOrg = matchingOrg;
-      }
-    },
-    changeUserInfo(newVal) {
-      if (JSON.stringify(newVal) != "{}") {
-        this.triggerRefreshToken();
       }
     },
   },
