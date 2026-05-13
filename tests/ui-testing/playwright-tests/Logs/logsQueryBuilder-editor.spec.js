@@ -11,46 +11,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const logData = require('../../fixtures/log.json');
-const { ingestTestData } = require('../utils/data-ingestion.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
-// Utility Functions
-// ============================================================================
-
-async function applyQueryButton(pm) {
-    const searchPromise = pm.page.waitForResponse(
-        response => response.url().includes('/_search') && response.status() === 200,
-        { timeout: 60000 }
-    );
-
-    await pm.logsPage.clickRefreshButton();
-
-    try {
-        await searchPromise;
-        testLogger.info('Search query completed successfully');
-    } catch (error) {
-        testLogger.warn('Search response wait timed out, continuing test');
-        await pm.page.waitForLoadState('networkidle').catch(() => {});
-    }
-}
-
-/**
- * Helper: enable SQL mode, set query, run it, switch to Build tab.
- * Waits for Build tab async initialization to complete (chart/table rendered).
- */
-async function setupQueryAndSwitchToBuild(pm, page, query) {
-    await pm.logsPage.enableSqlModeIfNeeded();
-    await page.waitForLoadState('domcontentloaded');
-    await pm.logsPage.setQueryEditorContent(query);
-    await pm.logsPage.runQueryAndWaitForResults();
-    await pm.logsPage.clickBuildToggle();
-    await pm.logsPage.waitForBuildTabLoaded();
-}
-
-// ============================================================================
-// Test Suite: P1 - Builder Tab Improvement (PR #11586 new behaviors)
+// Test Suite: P1 - Builder Tab Improvement
 // ============================================================================
 
 test.describe("Logs Query Builder - Builder Tab Improvement", () => {
@@ -61,20 +25,12 @@ test.describe("Logs Query Builder - Builder Tab Improvement", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
-
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Builder Tab Improvement test setup completed');
     });
 
     test("SQL OFF + empty query → Build tab opens with default fields and bar chart", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Case 1: SQL OFF + empty → default histogram/count');
 
@@ -93,7 +49,7 @@ test.describe("Logs Query Builder - Builder Tab Improvement", () => {
     });
 
     test("SQL OFF + WHERE clause → Build tab parses filter into builder", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Case 2: SQL OFF + WHERE clause → filter parsed');
 
@@ -115,7 +71,7 @@ test.describe("Logs Query Builder - Builder Tab Improvement", () => {
     });
 
     test("SQL ON + empty query → Build tab opens with default fields and bar chart", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Case 3: SQL ON + empty → default histogram/count');
 
@@ -133,7 +89,7 @@ test.describe("Logs Query Builder - Builder Tab Improvement", () => {
     });
 
     test("Query mode toggle: Auto → Custom shows SQL editor", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing query mode toggle: Auto → Custom');
 
@@ -191,14 +147,7 @@ test.describe("Logs Query Builder - Edge Cases", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('Edge Cases test setup completed');
     });
@@ -272,20 +221,13 @@ test.describe("Logs Query Builder - Query Mode Toggle", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('Query Mode Toggle test setup completed');
     });
 
     test("SQL ON: Auto → Custom shows full generated SQL in editor", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Auto → Custom (SQL ON)');
 
@@ -304,7 +246,7 @@ test.describe("Logs Query Builder - Query Mode Toggle", () => {
     });
 
     test("SQL OFF: Auto → Custom shows WHERE clause in editor", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Auto → Custom (SQL OFF)');
 
@@ -337,20 +279,13 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('SQL Mode Toggle in Builder test setup completed');
     });
 
     test("SQL OFF → ON in builder: search bar shows full SQL", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL OFF → ON in builder');
 
@@ -369,7 +304,7 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
     });
 
     test("SQL ON → OFF in builder: search bar shows WHERE clause only", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL ON → OFF in builder');
 
@@ -398,20 +333,13 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('Search Bar Editor State test setup completed');
     });
 
     test("SQL OFF + Auto mode: editor disabled with WHERE clause", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL OFF + Auto: editor disabled');
 
@@ -421,8 +349,7 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
 
-        const editorArea = page.locator('[data-test="logs-search-bar-query-editor"] .monaco-editor').first();
-        await expect(editorArea).toBeVisible({ timeout: 10000 });
+        await pm.logsPage.expectMonacoEditorAreaVisible();
 
         await pm.logsPage.expectBuilderModeActive();
 
@@ -430,7 +357,7 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
     });
 
     test("SQL ON + Auto mode: editor disabled with full generated SQL", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL ON + Auto: editor disabled');
 
@@ -445,7 +372,7 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
     });
 
     test("SQL ON + Custom mode: editor editable with full SQL", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL ON + Custom: editor editable');
 
@@ -478,14 +405,7 @@ test.describe("Logs Query Builder — Bare Field Select defaults (Case 3a)", () 
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('Bare field select test setup completed');
     });
@@ -565,14 +485,7 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('FieldList button test setup completed');
     });
@@ -585,20 +498,15 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         await setupQueryAndSwitchToBuild(pm, page, 'SELECT * FROM "e2e_automate"');
         await pm.logsPage.expectBuilderModeActive();
 
-        const searchInput = page.locator('[data-test="index-field-search-input"]:visible').first();
-        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await searchInput.fill('kubernetes');
-        await page.waitForTimeout(500);
+        await pm.logsPage.searchFieldInBuilder('kubernetes');
 
-        const addXButtons = page.locator('[data-test="dashboard-add-x-data"]');
-        const visibleXCount = await addXButtons.count();
+        const visibleXCount = await pm.logsPage.getAddXButtonCount();
         expect(visibleXCount).toBeGreaterThan(0);
         testLogger.info(`After filter: ${visibleXCount} +X buttons visible`);
 
-        await searchInput.clear();
-        await page.waitForTimeout(500);
+        await pm.logsPage.searchFieldInBuilder('');
 
-        const afterClearCount = await page.locator('[data-test="dashboard-add-x-data"]').count();
+        const afterClearCount = await pm.logsPage.getAddXButtonCount();
         expect(afterClearCount).toBeGreaterThan(0);
         testLogger.info(`After clear: ${afterClearCount} +X buttons visible - PASSED`);
     });
@@ -612,13 +520,9 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         await pm.logsPage.clickCustomQueryType();
         await page.waitForTimeout(1000);
 
-        const searchInput = page.locator('[data-test="index-field-search-input"]:visible').first();
-        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await searchInput.fill('kubernetes');
-        await page.waitForTimeout(500);
+        await pm.logsPage.searchFieldInBuilder('kubernetes');
 
-        const addXButtons = page.locator('[data-test="dashboard-add-x-data"]');
-        const buttonCount = await addXButtons.count();
+        const buttonCount = await pm.logsPage.getAddXButtonCount();
         testLogger.info(`Custom mode + search: ${buttonCount} +X buttons`);
 
         expect(buttonCount).toBeGreaterThanOrEqual(0);

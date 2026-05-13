@@ -7089,9 +7089,30 @@ export class LogsPage {
      * @param {string} fieldName - The field name to search
      */
     async searchFieldInBuilder(fieldName) {
-        await this.page.locator(this.fieldListSearchInput).fill(fieldName);
+        const input = this.page.locator(this.fieldListSearchInput).first();
+        await input.waitFor({ state: 'visible', timeout: 10000 });
+        await input.fill(fieldName);
         await this.page.waitForTimeout(500);
         testLogger.info(`Searched for field: ${fieldName}`);
+    }
+
+    async getAddXButtonCount() {
+        return await this.page.locator(this.addToXAxis).count();
+    }
+
+    async expectFilterLayoutVisible(timeout = 10000) {
+        await expect(this.page.locator('[data-test="dashboard-filter-layout"]').last()).toBeVisible({ timeout });
+        testLogger.info('Filter layout visible');
+    }
+
+    async expectChartOrNoDataAttached(timeout = 30000) {
+        await expect(this.page.locator(`${this.chartRenderer}, ${this.noDataMessage}`).first()).toBeAttached({ timeout });
+        testLogger.info('Chart or no-data element attached');
+    }
+
+    async expectMonacoEditorAreaVisible(timeout = 10000) {
+        await expect(this.page.locator(`${this.logsSearchBarQueryEditor} .monaco-editor`).first()).toBeVisible({ timeout });
+        testLogger.info('Monaco editor area visible');
     }
 
     /**

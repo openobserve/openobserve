@@ -10,43 +10,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const logData = require('../../fixtures/log.json');
-const { ingestTestData } = require('../utils/data-ingestion.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-async function applyQueryButton(pm) {
-    const searchPromise = pm.page.waitForResponse(
-        response => response.url().includes('/_search') && response.status() === 200,
-        { timeout: 60000 }
-    );
-
-    await pm.logsPage.clickRefreshButton();
-
-    try {
-        await searchPromise;
-        testLogger.info('Search query completed successfully');
-    } catch (error) {
-        testLogger.warn('Search response wait timed out, continuing test');
-        await pm.page.waitForLoadState('networkidle').catch(() => {});
-    }
-}
-
-/**
- * Helper: enable SQL mode, set query, run it, switch to Build tab.
- * Waits for Build tab async initialization to complete (chart/table rendered).
- */
-async function setupQueryAndSwitchToBuild(pm, page, query) {
-    await pm.logsPage.enableSqlModeIfNeeded();
-    await page.waitForLoadState('domcontentloaded');
-    await pm.logsPage.setQueryEditorContent(query);
-    await pm.logsPage.runQueryAndWaitForResults();
-    await pm.logsPage.clickBuildToggle();
-    await pm.logsPage.waitForBuildTabLoaded();
-}
+const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
 // Test Suite: P0 - Critical Tests (Smoke)
@@ -60,15 +24,7 @@ test.describe("Logs Query Builder - P0 Critical Tests", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
-
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Query Builder test setup completed');
     });
 
@@ -113,7 +69,7 @@ test.describe("Logs Query Builder - P0 Critical Tests", () => {
     });
 
     test("SELECT star query opens with default histogram/count and bar chart", {
-        tag: ['@queryBuilder', '@smoke', '@P0', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@smoke', '@P0', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SELECT * → default histogram/count → bar chart');
 
@@ -130,7 +86,7 @@ test.describe("Logs Query Builder - P0 Critical Tests", () => {
     });
 
     test("SQL mode preserved when toggling to Build tab (not forced ON)", {
-        tag: ['@queryBuilder', '@smoke', '@P0', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@smoke', '@P0', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL mode preserved on Build tab switch');
 
@@ -160,15 +116,7 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
-
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Tab Navigation test setup completed');
     });
 
@@ -209,7 +157,7 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
     });
 
     test("SQL Mode auto-enables on Build tab", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL mode behavior on Build tab switch');
 
@@ -259,15 +207,7 @@ test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
-
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Chart Type on Tab Switch test setup completed');
     });
 
@@ -324,9 +264,9 @@ test.describe("Logs Query Builder - Chart Type on Tab Switch", () => {
     });
 
     test("SELECT star query selects bar chart type (default histogram/count)", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Testing SELECT * → bar chart (PR #11586: default histogram/count)');
+        testLogger.info('Testing SELECT * → bar chart (default histogram/count)');
 
         const selectAllQuery = 'SELECT * FROM "e2e_automate"';
         await setupQueryAndSwitchToBuild(pm, page, selectAllQuery);
@@ -369,20 +309,12 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
-
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Entry Conditions test setup completed');
     });
 
     test("Case 1: SQL OFF + Empty → auto mode, histogram/count, bar chart, auto-runs", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Case 1: SQL OFF + Empty');
 
@@ -401,7 +333,7 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
     });
 
     test("Case 2: SQL OFF + WHERE clause → auto mode, filter parsed from WHERE", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Case 2: SQL OFF + WHERE clause');
 
@@ -416,8 +348,7 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
         await pm.logsPage.expectYAxisLayoutVisible();
         await pm.logsPage.verifyChartTypeSelected('bar');
 
-        const filterLayout = page.locator('[data-test="dashboard-filter-layout"]').last();
-        await expect(filterLayout).toBeVisible({ timeout: 10000 });
+        await pm.logsPage.expectFilterLayoutVisible();
 
         const sqlModeOn = await pm.logsPage.isSqlModeOn();
         expect(sqlModeOn).toBe(false);
@@ -426,7 +357,7 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
     });
 
     test("Case 3: SQL ON + Empty → auto mode, default histogram/count, auto-runs", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Case 3: SQL ON + Empty');
 
@@ -440,8 +371,7 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
         await pm.logsPage.expectYAxisLayoutVisible();
         await pm.logsPage.verifyChartTypeSelected('bar');
 
-        const chartOrNoData = pm.page.locator('[data-test="chart-renderer"], [data-test="no-data"]');
-        await expect(chartOrNoData.first()).toBeAttached({ timeout: 30000 });
+        await pm.logsPage.expectChartOrNoDataAttached();
 
         testLogger.info('Case 3 - PASSED');
     });
@@ -501,7 +431,7 @@ test.describe("Logs Query Builder - Entry Conditions (Cases 1-9)", () => {
     });
 
     test("Case 8: SQL OFF + multi-stream → only first stream used in builder", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing Case 8: SQL OFF + multi-stream');
 
@@ -530,15 +460,7 @@ test.describe("Logs Query Builder - Chart Auto-Selection", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
-
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Chart Auto-Selection test setup completed');
     });
 

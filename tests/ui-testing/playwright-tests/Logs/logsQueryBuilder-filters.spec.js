@@ -10,43 +10,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const logData = require('../../fixtures/log.json');
-const { ingestTestData } = require('../utils/data-ingestion.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-async function applyQueryButton(pm) {
-    const searchPromise = pm.page.waitForResponse(
-        response => response.url().includes('/_search') && response.status() === 200,
-        { timeout: 60000 }
-    );
-
-    await pm.logsPage.clickRefreshButton();
-
-    try {
-        await searchPromise;
-        testLogger.info('Search query completed successfully');
-    } catch (error) {
-        testLogger.warn('Search response wait timed out, continuing test');
-        await pm.page.waitForLoadState('networkidle').catch(() => {});
-    }
-}
-
-/**
- * Helper: enable SQL mode, set query, run it, switch to Build tab.
- * Waits for Build tab async initialization to complete (chart/table rendered).
- */
-async function setupQueryAndSwitchToBuild(pm, page, query) {
-    await pm.logsPage.enableSqlModeIfNeeded();
-    await page.waitForLoadState('domcontentloaded');
-    await pm.logsPage.setQueryEditorContent(query);
-    await pm.logsPage.runQueryAndWaitForResults();
-    await pm.logsPage.clickBuildToggle();
-    await pm.logsPage.waitForBuildTabLoaded();
-}
+const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
 // Test Suite: Builder Filter Operators - All supported WHERE clause operators
@@ -61,21 +25,13 @@ test.describe("Logs Query Builder - Filter Operators", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        await page.waitForLoadState('domcontentloaded');
-        await ingestTestData(page);
-        await page.waitForLoadState('domcontentloaded');
-
-        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await pm.logsPage.selectStream("e2e_automate");
-        await applyQueryButton(pm);
-
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Filter Operators test setup completed');
     });
 
     // --- Equals (=) operator ---
     test("Filter: equals (=) parses into builder filter", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: = (equals)');
 
@@ -96,7 +52,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Not Equals (<>) operator ---
     test("Filter: not equals (<>) parses into builder filter", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: <> (not equals)');
 
@@ -117,7 +73,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Greater than (>) operator with numeric value ---
     test("Filter: greater than (>) with numeric value", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: > (greater than, numeric)');
 
@@ -139,7 +95,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Less than or equal (<=) operator ---
     test("Filter: less than or equal (<=) with numeric value", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: <= (less than or equal)');
 
@@ -160,7 +116,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Contains (LIKE '%value%') ---
     test("Filter: Contains (LIKE '%value%') parses correctly", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: Contains (LIKE %...%)');
 
@@ -184,7 +140,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Starts With (LIKE 'value%') ---
     test("Filter: Starts With (LIKE 'value%') parses correctly", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: Starts With (LIKE value%)');
 
@@ -207,7 +163,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Ends With (LIKE '%value') ---
     test("Filter: Ends With (LIKE '%value') parses correctly", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: Ends With (LIKE %value)');
 
@@ -229,7 +185,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Not Contains (NOT LIKE '%value%') ---
     test("Filter: Not Contains (NOT LIKE '%value%') parses correctly", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: Not Contains (NOT LIKE)');
 
@@ -250,7 +206,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- IN operator ---
     test("Filter: IN operator with multiple values", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: IN');
 
@@ -272,7 +228,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- NOT IN operator ---
     test("Filter: NOT IN operator with multiple values", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: NOT IN');
 
@@ -293,7 +249,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- IS NULL operator ---
     test("Filter: IS NULL operator", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: IS NULL');
 
@@ -315,7 +271,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- IS NOT NULL operator ---
     test("Filter: IS NOT NULL operator", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: IS NOT NULL');
 
@@ -337,7 +293,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- str_match function ---
     test("Filter: str_match function parses into builder filter", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: str_match');
 
@@ -359,7 +315,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- str_match_ignore_case function ---
     test("Filter: str_match_ignore_case function parses into builder filter", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: str_match_ignore_case');
 
@@ -380,7 +336,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- match_all function ---
     test("Filter: match_all function parses into builder filter", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: match_all');
 
@@ -401,7 +357,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- re_match (regex match) ---
     test("Filter: re_match regex pattern match", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: re_match');
 
@@ -422,7 +378,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- re_not_match (regex not match) ---
     test("Filter: re_not_match regex negative match", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operator: re_not_match');
 
@@ -443,7 +399,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Multiple AND conditions ---
     test("Filter: multiple AND conditions parse into separate filters", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing multiple AND filters');
 
@@ -466,7 +422,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- OR conditions ---
     test("Filter: OR conditions parse into builder filters", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing OR filter conditions');
 
@@ -484,7 +440,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Mixed operators in one query ---
     test("Filter: mixed operators (=, >, LIKE, IS NOT NULL) in one query", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing mixed filter operators in single query');
 
@@ -508,7 +464,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Grouped filter: (... OR ...) AND ... ---
     test("Filter: grouped conditions (A OR B) AND C with brackets", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing grouped filter: (OR group) AND condition');
 
@@ -530,7 +486,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- Deeply nested grouped filter: A AND (B OR (C AND D)) ---
     test("Filter: deeply nested groups A AND (B OR C) preserve structure", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing deeply nested grouped filters');
 
@@ -552,7 +508,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- (A AND B) OR (C AND D) complex grouping ---
     test("Filter: (A AND B) OR (C AND D) complex grouped filter", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing complex grouped filter: (A AND B) OR (C AND D)');
 
@@ -570,7 +526,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- SQL OFF mode: WHERE clause parsed into filter ---
     test("Filter: SQL OFF mode single WHERE condition parsed into builder filter", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL OFF + single WHERE condition → filter');
 
@@ -596,7 +552,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- SQL OFF mode: multiple AND conditions ---
     test("Filter: SQL OFF mode multiple AND conditions parsed into builder filters", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing SQL OFF + multiple AND → filters');
 
@@ -622,7 +578,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
 
     // --- >= and < operators ---
     test("Filter: >= and < comparison operators", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs', '@pr11586']
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
         testLogger.info('Testing filter operators: >= and <');
 
