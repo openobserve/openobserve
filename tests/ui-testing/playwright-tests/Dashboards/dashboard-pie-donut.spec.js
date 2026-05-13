@@ -297,7 +297,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
       testLogger.info("Legend items found in popup");
 
       // Close legend popup
-      await page.locator('[data-test="dashboard-show-legends-dialog"] [data-test="o-dialog-close-btn"]').click();
+      await page.getByRole('dialog').locator('[data-test="o-dialog-close-btn"]').click();
     } else {
       testLogger.info("Legend button not visible on panel — skipping popup check");
     }
@@ -452,7 +452,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
       expect(firstLegendText.trim().length).toBeGreaterThan(0);
       testLogger.info("First legend item has text", { text: firstLegendText.trim() });
 
-      await page.locator('[data-test="dashboard-show-legends-dialog"] [data-test="o-dialog-close-btn"]').click();
+      await page.getByRole('dialog').locator('[data-test="o-dialog-close-btn"]').click();
     } else {
       testLogger.info("Legend button not visible — skipping popup check");
     }

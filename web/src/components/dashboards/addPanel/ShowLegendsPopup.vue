@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="flex items-center">
-        <span class="legend-count q-mr-md" style="font-size: 14px">
+        <span class="legend-count q-mr-md" style="font-size: 14px" data-test="dashboard-show-legends-count">
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
         <OButton
