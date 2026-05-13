@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, useSlots, computed, nextTick, useAttrs } from "vue";
+import { ref, watch, watchEffect, useSlots, computed, nextTick, useAttrs } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 
@@ -226,6 +226,41 @@ function handleOpenAutoFocus(event: Event) {
     }
   });
 }
+
+// ── Focus-trap workaround for portaled elements ─────────────────────────────
+// Same workaround as ODrawer — see the comment block there for full rationale.
+// Intercepts both focusin and focusout on document.body so FocusScope's
+// document-level handlers never fire when focus moves to/from a portaled
+// Quasar element (q-menu, q-select dropdown, etc.).
+watchEffect((cleanup) => {
+  if (!internalOpen.value) return;
+
+  function isPortalElement(el: Element | null): boolean {
+    return !!(
+      el?.closest("[data-reka-popper-content-wrapper]") ||
+      el?.closest(".q-menu")
+    );
+  }
+
+  const handleFocusIn = (e: FocusEvent) => {
+    if (isPortalElement(e.target as Element | null)) {
+      e.stopPropagation();
+    }
+  };
+
+  const handleFocusOut = (e: FocusEvent) => {
+    if (isPortalElement(e.relatedTarget as Element | null)) {
+      e.stopPropagation();
+    }
+  };
+
+  document.body.addEventListener("focusin", handleFocusIn);
+  document.body.addEventListener("focusout", handleFocusOut);
+  cleanup(() => {
+    document.body.removeEventListener("focusin", handleFocusIn);
+    document.body.removeEventListener("focusout", handleFocusOut);
+  });
+});
 
 // ── Scroll shadow ────────────────────────────────────────────────────────────
 const { canScrollUp, canScrollDown, update: updateShadow, attach: attachShadow, detach: detachShadow } = useScrollShadow(bodyRef);
