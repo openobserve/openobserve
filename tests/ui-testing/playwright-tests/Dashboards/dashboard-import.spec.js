@@ -12,7 +12,7 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard Import testcases", () => {
   test.beforeEach(async ({ page }) => {
-    console.log("running before each");
+    testLogger.info("running before each");
     await navigateToBase(page);
     await ingestion(page);
 
