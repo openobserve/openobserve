@@ -165,7 +165,7 @@ describe("UpdateRole Component", () => {
       const drawer = findDrawer(wrapper);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
-      expect(drawer.props("size")).toBe("lg");
+      expect(drawer.props("width")).toBe(30);
       expect(drawer.props("title")).toBe("user.editUser");
       expect(drawer.props("persistent")).toBe(true);
     });
