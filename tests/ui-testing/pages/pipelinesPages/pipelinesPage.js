@@ -686,6 +686,11 @@ export class PipelinesPage {
         await this.fieldRequiredError.click();
     }
 
+    async verifyConditionRequiredError() {
+        const error = this.page.locator('[data-test="alert-conditions-select-column"]').getByText('Field is required!');
+        await error.waitFor({ state: 'visible' });
+    }
+
     async navigateToAddEnrichmentTable() {
         await this.page.locator(this.pipelineMenu).click();
         await this.page.click(this.enrichmentTableTab, { force: true });
