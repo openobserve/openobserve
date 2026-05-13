@@ -16,52 +16,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OLayout
-    :class="[store.state.printMode === true ? 'printMode' : '', 'oo_app', 'tw:min-h-screen']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen']"
   >
-    <header class="oo_header tw:shrink-0">
+    <header class="o2-app-header tw:shrink-0">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
-        class="oo_banner tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
+        class="tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
       >
         <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
-      <div class="oo_topbar">
-        <Header
-          :store="store"
-          :router="router"
-          :config="config"
-          :user="user"
-          :slack-icon="slackIcon"
-          :zo-backend-url="zoBackendUrl"
-          :lang-list="langList"
-          :selected-language="selectedLanguage"
-          :selected-org="selectedOrg"
-          :user-clicked-org="userClickedOrg"
-          :filtered-organizations="filteredOrganizations"
-          :search-query="searchQuery"
-          :rows-per-page="rowsPerPage"
-          :is-hovered="isHovered"
-          :get-btn-logo="getBtnLogo"
-          @update:selected-org="selectedOrg = $event"
-          @update:search-query="searchQuery = $event"
-          @update:is-hovered="isHovered = $event"
-          @update-organization="updateOrganization"
-          @go-to-home="goToHome"
-          @go-to-about="goToAbout"
-          @toggleAIChat="toggleAIChat"
-          @open-slack="openSlack"
-          @navigateToOpenAPI="navigateToOpenAPI"
-          @navigate-to-docs="navigateToDocs"
-          @change-language="changeLanguage"
-          @open-predefined-themes="openPredefinedThemes"
-          @signout="signout"
-        />
-      </div>
+      <Header
+        :store="store"
+        :router="router"
+        :config="config"
+        :user="user"
+        :slack-icon="slackIcon"
+        :zo-backend-url="zoBackendUrl"
+        :lang-list="langList"
+        :selected-language="selectedLanguage"
+        :selected-org="selectedOrg"
+        :user-clicked-org="userClickedOrg"
+        :filtered-organizations="filteredOrganizations"
+        :search-query="searchQuery"
+        :rows-per-page="rowsPerPage"
+        :is-hovered="isHovered"
+        :get-btn-logo="getBtnLogo"
+        @update:selected-org="selectedOrg = $event"
+        @update:search-query="searchQuery = $event"
+        @update:is-hovered="isHovered = $event"
+        @update-organization="updateOrganization"
+        @go-to-home="goToHome"
+        @go-to-about="goToAbout"
+        @toggleAIChat="toggleAIChat"
+        @open-slack="openSlack"
+        @navigateToOpenAPI="navigateToOpenAPI"
+        @navigate-to-docs="navigateToDocs"
+        @change-language="changeLanguage"
+        @open-predefined-themes="openPredefinedThemes"
+        @signout="signout"
+      />
     </header>
 
-    <div class="oo_body tw:flex-1 tw:flex tw:min-h-0">
+    <div class="o2-app-body tw:flex-1 tw:flex tw:min-h-0">
       <ONavbar
         :links-list="linksList"
         :mini-mode="miniMode"
@@ -69,10 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
-      <OPageContainer class="oo_content-wrapper tw:flex-1 tw:min-w-0 tw:flex">
+      <OPageContainer class="tw:flex-1 tw:min-w-0 tw:flex">
         <!-- Main Panel -->
         <main
-          class="oo_main tw:flex tw:flex-col tw:min-h-0"
+          class="tw:flex tw:flex-col tw:min-h-0"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -80,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <div class="oo_content-scroll tw:flex-1 tw:overflow-y-auto">
+          <div class="o2-content-scroll tw:flex-1 tw:overflow-y-auto">
             <div
               v-show="isLoading"
               :key="store.state.selectedOrganization?.identifier"
@@ -95,16 +93,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="oo_sidebar oo_right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,36px)] tw:self-start tw:shrink-0"
+          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,2.25rem)] tw:self-start tw:shrink-0"
           :class="[
             store.state.theme == 'dark'
               ? 'dark-mode-chat-container'
               : 'light-mode-chat-container',
-            { 'oo_sidebar--expanded': store.state.isAiChatExpanded },
+            { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
           ]"
           :style="[
             {
-              height: 'calc(100vh - var(--navbar-height, 36px))',
+              height: 'calc(100vh - var(--navbar-height, 2.25rem))',
             },
             store.state.isAiChatExpanded
               ? {
@@ -113,14 +111,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   right: 0,
                   width: '50%',
                   maxWidth: '100%',
-                  minWidth: '300px',
+                  minWidth: '18.75rem',
                   height: '100vh',
                   zIndex: 200,
                 }
               : {
                   width: '25%',
                   maxWidth: '100%',
-                  minWidth: '75px',
+                  minWidth: '4.688rem',
                 },
           ]"
         >
@@ -556,7 +554,7 @@ export default defineComponent({
     watch(
       () => store.state.isWebinarBannerVisible,
       (visible) => {
-        const navbarHeight = visible ? "calc(36px + 27px)" : "36px";
+        const navbarHeight = visible ? "calc(2.25rem + 1.688rem)" : "2.25rem";
         document.documentElement.style.setProperty(
           "--navbar-height",
           navbarHeight,
@@ -1314,7 +1312,7 @@ export default defineComponent({
     overflow: auto !important;
   }
 
-  .oo_header {
+  .o2-app-header {
     display: none;
   }
 
@@ -1322,7 +1320,7 @@ export default defineComponent({
     display: none;
   }
 
-  .oo_body {
+  .o2-app-body {
     padding-left: 0;
   }
 }
@@ -1335,7 +1333,7 @@ export default defineComponent({
   }
 }
 
-.oo_header {
+.o2-app-header {
   color: unset;
 }
 
