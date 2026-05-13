@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, watch } from "vue";
 import AppTabs from "../common/AppTabs.vue";
-import { Navigation, Tag } from "lucide-vue-next";
+
 import { useI18n } from "vue-i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 
@@ -172,7 +172,7 @@ const tabs = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
-    icon: Navigation,
+    icon: "navigation",
     style: {
       width: "fit-content",
       padding: "0.5rem 0.625rem",
@@ -182,7 +182,7 @@ const tabs = [
   {
     label: t("rum.tags"),
     value: "tags",
-    icon: Tag,
+    icon: "label",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },
 ];

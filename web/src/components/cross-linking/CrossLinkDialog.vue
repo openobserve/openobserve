@@ -104,12 +104,11 @@
               <OButton
                 variant="ghost"
                 size="icon-sm"
+                icon-left="add"
                 @click="addField"
                 :disabled="!newFieldName && !fieldInputValue"
                 data-test="cross-link-add-field-btn"
-              >
-                <Plus class="tw:size-4" />
-              </OButton>
+              />
             </div>
           </div>
         </q-form>
@@ -123,7 +122,7 @@ import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { Plus } from 'lucide-vue-next';
+
 
 export interface CrossLink {
   name: string;

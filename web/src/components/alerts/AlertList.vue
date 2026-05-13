@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
             >
               <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left><LayoutList class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                 {{ t("alerts.all") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled" icon-left="schedule">
@@ -874,7 +874,6 @@ import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { LayoutList, CalendarClock, Zap, TrendingUp } from "lucide-vue-next";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
@@ -899,10 +898,6 @@ export default defineComponent({
     MoveAcrossFolders,
     OToggleGroup,
     OToggleGroupItem,
-    LayoutList,
-    CalendarClock,
-    Zap,
-    TrendingUp,
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,

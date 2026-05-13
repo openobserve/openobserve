@@ -255,9 +255,8 @@ size="14px"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
-                  ><AlignLeft class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="align-left" size="xs" class="tw:shrink-0"
                 /></template>
-                Waterfall
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
                 <template #icon-left
@@ -267,7 +266,7 @@ size="14px"
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
-                  ><Network class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
                 /></template>
                 Trace Graph
               </OToggleGroupItem>
@@ -294,7 +293,7 @@ size="sm">
                 data-test="trace-details-thread-tab"
               >
                 <template #icon-left
-                  ><MessageSquare class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="chat" size="xs" class="tw:shrink-0"
                 /></template>
                 Thread
               </OToggleGroupItem>
@@ -304,7 +303,7 @@ size="sm">
                 size="sm"
               >
                 <template #icon-left
-                  ><ClipboardCheck class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="assignment-turned-in" size="xs" class="tw:shrink-0"
                 /></template>
                 Evaluations
               </OToggleGroupItem>
@@ -931,13 +930,10 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import {
-  AlignLeft,
   Flame,
-  Network,
   GitBranch,
-  ClipboardCheck,
-  MessageSquare,
 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import pipelineService from "@/services/pipelines";
 
 // Import FlameGraphView
@@ -1038,12 +1034,9 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     ODrawer,
-    AlignLeft,
+    OIcon,
     Flame,
-    Network,
     GitBranch,
-    ClipboardCheck,
-    MessageSquare,
     ThreadView,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),

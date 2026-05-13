@@ -141,22 +141,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:justify-center actions-container">
                 <OButton
                   :data-test="`eval-template-list-${props.row.name}-edit-btn`"
+                  icon-left="edit"
                   variant="ghost"
                   size="icon-sm"
                   :title="t('common.edit')"
                   @click="goToEdit(props.row)"
-                >
-                  <Pencil class="tw:size-4" />
-                </OButton>
+                />
                 <OButton
                   :data-test="`eval-template-list-${props.row.name}-delete-btn`"
+                  icon-left="delete"
                   variant="ghost-destructive"
                   size="icon-sm"
                   :title="t('common.delete')"
                   @click="confirmDelete(props.row)"
-                >
-                  <Trash2 class="tw:size-4" />
-                </OButton>
+                />
               </div>
             </q-td>
           </template>
@@ -192,11 +190,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="selectedItems.length > 0"
                   data-test="eval-template-list-bulk-delete-btn"
+                  icon-left="delete"
                   variant="outline"
                   size="sm-action"
                   @click="openBulkDeleteDialog"
                 >
-                  <Trash2 class="tw:size-4 tw:mr-1" />
                   {{ t("common.delete") }}
                 </OButton>
               </div>
@@ -245,7 +243,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+
 
 interface Template {
   id: string;

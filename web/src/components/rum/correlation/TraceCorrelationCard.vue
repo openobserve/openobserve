@@ -40,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="col-9 row items-center no-wrap">
             <code class="trace-id-text">{{ formatTraceId(traceId) }}</code>
             <OButton
+              icon-left="content-copy"
               variant="ghost"
               size="icon-sm"
               class="q-ml-xs"
               @click="copyTraceId"
             >
-              <Copy class="tw:size-4" />
               <q-tooltip>Copy Trace ID</q-tooltip>
             </OButton>
           </div>
@@ -170,11 +170,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </OButton>
           <OButton
+            icon-left="refresh"
             variant="ghost"
             size="sm-action"
             @click="refreshTraceData"
           >
-            <RefreshCw class="tw:size-4 tw:mr-1" />
             Refresh
           </OButton>
         </div>
@@ -203,7 +203,7 @@ import { useQuasar, copyToClipboard } from "quasar";
 import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Copy, GitBranch, RefreshCw } from 'lucide-vue-next';
+import { GitBranch } from 'lucide-vue-next';
 
 const props = defineProps({
   traceId: {

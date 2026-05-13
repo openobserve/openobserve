@@ -57,13 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="col-auto">
                 <OButton
+                  icon-left="close"
                   variant="ghost"
                   size="icon-sm"
                   data-test="close-drawer-btn"
-                @click="emit('update:open', false)"
-                >
-                  <X class="tw:size-4" />
-                </OButton>
+                  @click="emit('update:open', false)"
+                />
               </div>
             </div>
             <div
@@ -487,13 +486,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabPanel name="attributes" padding="sm" data-test="attributes-tab">
         <div class="tw:flex tw:justify-start">
           <OButton
+            icon-left="content-copy"
             variant="outline"
             size="sm-action"
             class="q-px-sm"
             data-test="attributes-copy-btn"
             @click="copyAttributesToClipboard"
           >
-            <Copy class="tw:size-4 tw:mr-1" />
             {{ t('common.copyToClipboard') }}
           </OButton>
         </div>
@@ -547,7 +546,7 @@ import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
-import { X, GitBranch, Copy } from 'lucide-vue-next';
+import { GitBranch } from 'lucide-vue-next';
 
 const props = defineProps({
   open: {

@@ -38,10 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm-action"
         @click="loadServices"
+        icon-left="refresh"
       >
-        <template #icon-left
-          ><RefreshCw class="tw:size-3.5 tw:shrink-0"
-        /></template>
         {{ t("settings.correlation.retry") }}
       </OButton>
     </div>
@@ -62,10 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="refreshing"
         class="tw:mt-3"
         @click="loadServices(true)"
+        icon-left="refresh"
       >
-        <template #icon-left
-          ><RefreshCw class="tw:size-3.5 tw:shrink-0"
-        /></template>
         {{ t("common.refresh") }}
       </OButton>
     </div>
@@ -596,7 +592,6 @@ import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { RefreshCw } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 

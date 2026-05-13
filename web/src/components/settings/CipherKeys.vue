@@ -74,9 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-ml-xs"
               :title="t('common.edit')"
               @click="editCipherKey(props.row)"
-            >
-              <Pencil class="tw:size-4" />
-            </OButton>
+              icon-left="edit"
+            />
             <OButton
               :data-test="`cipherkey-list-${props.row.name}-delete`"
               variant="ghost-destructive"
@@ -84,9 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-ml-xs"
               :title="t('common.delete')"
               @click="confirmDeleteCipherKey(props.row)"
-            >
-              <Trash2 class="tw:size-4" />
-            </OButton>
+              icon-left="delete"
+            />
           </q-td>
         </template>
         <template #bottom="scope">
@@ -101,8 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm-action"
               class="q-mr-sm"
               @click="openBulkDeleteDialog"
+              icon-left="delete"
             >
-              <template #icon-left><Trash2 class="tw:size-4 tw:shrink-0" /></template>
               Delete
             </OButton>
             <QTablePagination
@@ -179,7 +177,6 @@ import CipherKeysService from "@/services/cipher_keys";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Pencil, Trash2 } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -189,8 +186,6 @@ export default defineComponent({
     AddCipherKey,
     ConfirmDialog,
     OButton,
-    Pencil,
-    Trash2,
   },
   setup() {
     const store = useStore();

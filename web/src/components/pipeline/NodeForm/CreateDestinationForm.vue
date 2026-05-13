@@ -486,11 +486,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   :title="t('alert_templates.edit')"
                   @click="deleteApiHeader(header)"
-                >
-                  <template #icon-left>
-                    <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                  </template>
-                </OButton>
+                  icon-left="delete"
+                />
                 <OButton
                   data-test="add-destination-add-header-btn"
                   v-if="index === apiHeaders.length - 1"
@@ -498,11 +495,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   :title="t('alert_templates.edit')"
                   @click="addApiHeader()"
-                >
-                  <template #icon-left>
-                    <Plus class="tw:size-3.5 tw:shrink-0" />
-                  </template>
-                </OButton>
+                  icon-left="add"
+                />
               </div>
             </div>
           </div>

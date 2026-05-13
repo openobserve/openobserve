@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="loadDashboard"
               :loading="loading"
             >
-              <RefreshCw :size="14" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="tw:mr-1" />
               {{ t('common.refresh') }}
             </OButton>
           </div>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="splitterModel"
             class="tw:flex-1 full-height full-width"
           >
-            <!-- ── Left sidebar ── -->
+            <!-- -- Left sidebar -- -->
             <template #before>
               <div
                 class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
@@ -298,12 +298,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <!-- ── Separator ── -->
+            <!-- -- Separator -- -->
             <template #separator>
               <div class="metric-splitter-separator" />
             </template>
 
-            <!-- ── Right area: group tabs + dashboard ── -->
+            <!-- -- Right area: group tabs + dashboard -- -->
             <template #after>
               <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
                 <!-- Group tabs -->
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm-action"
                       @click="loadDashboard"
                     >
-                      <RefreshCw :size="14" class="tw:mr-1" />
+                      <OIcon name="refresh" size="xs" class="tw:mr-1" />
                       {{ t('correlation.retryButton') }}
                     </OButton>
                   </div>
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm-action"
               @click="loadCorrelatedTraces"
             >
-              <RefreshCw :size="14" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="tw:mr-1" />
               {{ t('correlation.retryButton') }}
             </OButton>
           </div>
@@ -508,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="correlation-view-traces-page"
                     class="tw:text-xs"
                   >
-                    <ExternalLink :size="12" class="tw:mr-1" />
+                    <OIcon name="open-in-new" size="xs" class="tw:mr-1" />
                     {{ t('correlation.viewInTraces') }}
                     <q-tooltip>
                       {{ t("correlation.viewInTraces") }}
@@ -602,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="loadDashboard"
               :loading="loading"
             >
-              <RefreshCw :size="14" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="tw:mr-1" />
               {{ t('common.refresh') }}
             </OButton>
           </div>
@@ -653,7 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="splitterModel"
           class="tw:flex-1 full-height full-width"
         >
-          <!-- ── Left sidebar ── -->
+          <!-- -- Left sidebar -- -->
           <template #before>
             <div
               class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
@@ -792,12 +792,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <!-- ── Separator ── -->
+          <!-- -- Separator -- -->
           <template #separator>
             <div class="metric-splitter-separator" />
           </template>
 
-          <!-- ── Right area: group tabs + dashboard ── -->
+          <!-- -- Right area: group tabs + dashboard -- -->
           <template #after>
             <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
               <!-- Group tabs -->
@@ -875,7 +875,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm-action"
                     @click="loadDashboard"
                   >
-                    <RefreshCw :size="14" class="tw:mr-1" />
+                    <OIcon name="refresh" size="xs" class="tw:mr-1" />
                     {{ t('correlation.retryButton') }}
                   </OButton>
                 </div>
@@ -938,7 +938,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mt-4"
             @click="loadCorrelatedTraces"
           >
-            <RefreshCw :size="14" class="tw:mr-1" />
+            <OIcon name="refresh" size="xs" class="tw:mr-1" />
             {{ t('correlation.retryButton') }}
           </OButton>
         </div>
@@ -1006,7 +1006,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="correlation-view-traces-page"
                   class="tw:text-xs"
                 >
-                  <ExternalLink :size="12" class="tw:mr-1" />
+                  <OIcon name="open-in-new" size="xs" class="tw:mr-1" />
                   {{ t('correlation.viewInTraces') }}
                   <q-tooltip>
                     {{ t("correlation.viewInTraces") }}
@@ -1215,7 +1215,8 @@ import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResu
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1570,7 +1571,7 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(sortedMetricStreams.value);
 });
 
-// Selected metric streams — prefer curated defaults from group definitions,
+// Selected metric streams � prefer curated defaults from group definitions,
 // fall back to first 6 unique streams for non-OTel deployments.
 // Apply SELECT_ALL_VALUE defaults for unstable dimensions.
 const selectedMetricStreams = ref<StreamInfo[]>(
@@ -1604,7 +1605,7 @@ const groupedFilteredMetricStreams = computed(() =>
   groupMetricsByCategory(filteredMetricStreams.value, groupDefs.value),
 );
 
-// Group ALL available unique metric streams — drives which tabs are visible
+// Group ALL available unique metric streams � drives which tabs are visible
 const groupedUniqueMetricStreams = computed(() =>
   groupMetricsByCategory(uniqueMetricStreams.value, groupDefs.value),
 );
@@ -1639,7 +1640,7 @@ const nonEmptyGroupTabs = computed(() =>
 /**
  * (Re)generate per-group dashboards from the currently selected streams.
  * Sidebar checkboxes control which metrics are selected and thus shown per group.
- * Pure computation — no API calls. Schemas are already cached in the store.
+ * Pure computation � no API calls. Schemas are already cached in the store.
  */
 const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
   const grouped = groupMetricsByCategory(

@@ -145,7 +145,7 @@ import { ref, computed, watch, nextTick } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { X } from "lucide-vue-next";
+
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 

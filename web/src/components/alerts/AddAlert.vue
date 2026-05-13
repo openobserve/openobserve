@@ -215,10 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <Shield v-if="tab.key === 'condition'" class="tw:size-3.5 tw:shrink-0" />
-              <SlidersHorizontal v-else-if="tab.key === 'advanced'" class="tw:size-3.5 tw:shrink-0" />
-              <TrendingUp v-else-if="tab.key === 'anomaly-config'" class="tw:size-3.5 tw:shrink-0" />
-              <Bell v-else-if="tab.key === 'anomaly-alerting'" class="tw:size-3.5 tw:shrink-0" />
+              <OIcon v-if="tab.key === 'condition'" name="shield" size="sm" />
+              <OIcon v-else-if="tab.key === 'advanced'" name="tune" size="sm" />
+              <OIcon v-else-if="tab.key === 'anomaly-config'" name="trending-up" size="sm" />
+              <OIcon v-else-if="tab.key === 'anomaly-alerting'" name="notifications" size="sm" />
             </template>
             {{ tab.label }}{{ tab.required ? ' *' : '' }}
           </OToggleGroupItem>
@@ -468,7 +468,7 @@ import { defineComponent, computed, watch } from "vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import { Shield, SlidersHorizontal, TrendingUp, Bell } from 'lucide-vue-next';
+import OIcon from '@/lib/core/Icon/OIcon.vue';
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -530,10 +530,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
-    Shield,
-    SlidersHorizontal,
-    TrendingUp,
-    Bell,
+    OIcon,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);

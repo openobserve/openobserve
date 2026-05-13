@@ -80,7 +80,6 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import BillingService from "@/services/billings";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Download } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "InvoiceHistory",

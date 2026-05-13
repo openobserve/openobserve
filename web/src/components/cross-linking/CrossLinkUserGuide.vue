@@ -88,7 +88,6 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { HelpCircle } from 'lucide-vue-next';
 
 export default {
   name: "CrossLinkUserGuide",

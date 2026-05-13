@@ -315,7 +315,7 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Upload, Link } from "lucide-vue-next";
+
 import OButton from "@/lib/core/Button/OButton.vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(
@@ -349,12 +349,12 @@ export default defineComponent({
       {
         label: "File Upload / JSON",
         value: "import_json_file",
-        icon: Upload,
+        icon: "upload",
       },
       {
         label: "URL Import",
         value: "import_json_url",
-        icon: Link,
+        icon: "link",
       },
     ]);
     const activeTab = ref("import_json_file");

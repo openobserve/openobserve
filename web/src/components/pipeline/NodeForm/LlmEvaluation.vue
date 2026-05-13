@@ -114,9 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('common.refresh')"
             data-test="llm-evaluation-template-refresh-btn"
             class="q-mt-md"
-          >
-            <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-          </OButton>
+            icon-left="refresh"
+          />
         </div>
 
         <!-- Enable Sampling Toggle -->

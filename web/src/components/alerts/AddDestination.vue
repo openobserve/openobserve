@@ -609,7 +609,6 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Webhook, Mail, Zap } from "lucide-vue-next";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -709,25 +708,25 @@ const tabs = computed(() => {
 
     // Only return the tab matching the current destination type
     if (currentType === "http") {
-      return [{ label: t("alerts.webhook"), value: "http", icon: Webhook }];
+      return [{ label: t("alerts.webhook"), value: "http", icon: "webhook" }];
     } else if (currentType === "email") {
-      return [{ label: t("alerts.email"), value: "email", icon: Mail }];
+      return [{ label: t("alerts.email"), value: "email", icon: "mail" }];
     } else if (currentType === "action") {
-      return [{ label: t("alerts.action"), value: "action", icon: Zap }];
+      return [{ label: t("alerts.action"), value: "action", icon: "bolt" }];
     }
   }
 
   // In create mode, show all tabs
   const tabs = [
-    { label: t("alerts.webhook"), value: "http", icon: Webhook },
-    { label: t("alerts.email"), value: "email", icon: Mail },
+    { label: t("alerts.webhook"), value: "http", icon: "webhook" },
+    { label: t("alerts.email"), value: "email", icon: "mail" },
   ];
 
   if (
     (config.isEnterprise == "true" || config.isCloud == "true") &&
     store.state.zoConfig.actions_enabled
   ) {
-    tabs.push({ label: t("alerts.action"), value: "action", icon: Zap });
+    tabs.push({ label: t("alerts.action"), value: "action", icon: "bolt" });
   }
 
   return tabs;

@@ -484,8 +484,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm"
                     @click="addingToEnv = envKey"
+                    icon-left="add"
                   >
-                    <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                     {{ t("settings.correlation.addField") }}
                     <q-tooltip
                       anchor="top middle"
@@ -583,8 +583,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   @click="addingToEnv = generateGroupId()"
+                  icon-left="add"
                 >
-                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                   {{ t("settings.correlation.addGroup") }}
                   <q-tooltip
                     anchor="top middle"
@@ -754,8 +754,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   @click="addingTrackedAlias = true"
+                  icon-left="add"
                 >
-                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                   Add field
                 </OButton>
               </div>
@@ -1591,7 +1591,6 @@ import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { Plus } from "lucide-vue-next";
 import type {
   ServiceIdentityConfig,
   IdentitySet,

@@ -141,9 +141,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-ml-xs"
               :title="t('alerts.alertSettings.refreshDestinations')"
               @click="$emit('refresh:destinations')"
-            >
-              <RefreshCw class="tw:size-4" />
-            </OButton>
+              icon-left="refresh"
+            />
             <OButton
               variant="outline"
               size="sm-action"
@@ -186,11 +185,10 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { RefreshCw } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, RefreshCw },
+  components: { OButton },
 
   props: {
     config: {

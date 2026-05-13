@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Layers class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="layers" size="xs" class="tw:shrink-0"
             /></template>
             Spans
           </OToggleGroupItem>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Network class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
             /></template>
             Service Graph
           </OToggleGroupItem>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><BookOpen class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="menu-book" size="xs" class="tw:shrink-0"
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Sparkles class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="auto-awesome" size="xs" class="tw:shrink-0"
             /></template>
             LLM Insights
           </OToggleGroupItem>
@@ -472,7 +472,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
+import { GitBranch } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -501,12 +502,7 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
-    Layers,
-    Network,
     GitBranch,
-    Share2,
-    BookOpen,
-    Sparkles,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

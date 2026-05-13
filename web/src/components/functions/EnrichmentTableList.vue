@@ -170,9 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="exploreEnrichmentTable(props)"
-                  >
-                    <Search :size="14" />
-                  </OButton>
+                    icon-left="search"
+                  />
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
                   <OButton
@@ -181,9 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="listSchema(props)"
-                  >
-                    <List :size="14" />
-                  </OButton>
+                    icon-left="format-list-bulleted"
+                  />
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
                   <OButton
@@ -192,9 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="showAddUpdateFn(props)"
-                  >
-                    <Pencil :size="14" />
-                  </OButton>
+                    icon-left="edit"
+                  />
 
                   <!-- Delete button - always visible -->
                   <OButton
@@ -202,9 +199,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost-destructive"
                     size="icon-sm"
                     @click="showDeleteDialogFn(props)"
-                  >
-                    <Trash2 :size="14" />
-                  </OButton>
+                    icon-left="delete"
+                  />
                 </q-td>
               </template>
 
@@ -231,9 +227,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="outline"
                       size="sm-action"
                       class="q-mr-sm"
-                      @click="openBulkDeleteDialog"
+                      icon-left="delete"
                     >
-                      <Trash2 :size="14" class="tw:mr-1" />
                       Delete
                     </OButton>
                   </div>
@@ -369,7 +364,6 @@ import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { Search, List, Pencil, Trash2, X, LayoutList, Upload, Link } from "lucide-vue-next";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -382,11 +376,6 @@ export default defineComponent({
     AppTabs,
     OButton,
     ODrawer,
-    Search,
-    List,
-    Pencil,
-    Trash2,
-    X,
   },
   emits: [
     "updated:fields",
@@ -645,17 +634,17 @@ export default defineComponent({
       {
         label: t("function.filterAll"),
         value: "all",
-        icon: LayoutList,
+        icon: "format-list-bulleted",
       },
       {
         label: t("function.filterFile"),
         value: "uploaded",
-        icon: Upload,
+        icon: "upload",
       },
       {
         label: t("function.filterUrl"),
         value: "file_url",
-        icon: Link,
+        icon: "link",
       },
     ]);
 

@@ -289,11 +289,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             value="schemaFields"
                             size="sm"
                           >
-                            <template #icon-left><UserCheck class="tw:size-3.5 tw:shrink-0" /></template>
+                            <template #icon-left><OIcon name="verified-user" size="sm" /></template>
                             User Defined Schema ({{ indexData.defined_schema_fields.length }})
                           </OToggleGroupItem>
                           <OToggleGroupItem value="allFields" size="sm">
-                            <template #icon-left><LayoutList class="tw:size-3.5 tw:shrink-0" /></template>
+                            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                             {{ computedSchemaFieldsName }} ({{ indexData.schema.length }})
                           </OToggleGroupItem>
                         </OToggleGroup>
@@ -339,9 +339,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-my-sm"
                       @click.stop="openDialog"
                       title="Add Field(s)"
-                    >
-                      <Plus :size="14" />
-                    </OButton>
+                      icon-left="add"
+                    />
                   </div>
                 </div>
 
@@ -360,9 +359,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="ghost"
                           size="icon-sm"
                           @click="closeDialog"
-                        >
-                          <X :size="14" />
-                        </OButton>
+                          icon-left="close"
+                        />
                       </div>
                     </div>
                   </q-card-section>
@@ -974,11 +972,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     @click="updateDefinedSchemaFields"
                   >
-                    <span
-                      class="flex items-center justify-start tw:gap-1 tw:mr-1"
-                    >
-                      <UserCheck :size="13" />
-                      <LayoutList :size="13" />
+                      <span class="flex items-center justify-start tw:gap-1 tw:mr-1">
+                      <OIcon name="verified-user" size="sm" />
+                      <OIcon name="format-list-bulleted" size="sm" />
                     </span>
                     {{
                       activeTab === "schemaFields"
@@ -1005,8 +1001,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? (confirmQueryModeChangeDialog = true)
                         : (confirmDeleteDatesDialog = true)
                     "
+                    icon-left="delete"
                   >
-                    <Trash2 :size="14" class="tw:mr-1" />
                     {{ t("logStream.delete") }}
                   </OButton>
                 </div>
@@ -1100,9 +1096,7 @@ import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { UserCheck, LayoutList } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Plus, Trash2 } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1144,8 +1138,6 @@ export default defineComponent({
     StreamFieldsInputs,
     OToggleGroup,
     OToggleGroupItem,
-    UserCheck,
-    LayoutList,
     QTablePagination,
     DateTime,
     AssociatedRegexPatterns,
@@ -1155,9 +1147,6 @@ export default defineComponent({
     CrossLinkManager,
     OButton,
     OIcon,
-    X,
-    Plus,
-    Trash2,
   },
   setup({ modelValue }) {
     type PatternAssociation = {

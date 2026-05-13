@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OToggleGroupItem data-test="logs-logs-toggle" value="logs" size="sm">
             <template #icon-left>
-              <ScanSearch class="tw:size-3.5 tw:shrink-0" />
+              <OIcon name="manage-search" size="xs" class="tw:shrink-0" />
             </template>
             {{ t("common.search") }}
           </OToggleGroupItem>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <ChartLine class="tw:size-3.5 tw:shrink-0" />
+              <OIcon name="show-chart" size="xs" class="tw:shrink-0" />
             </template>
             {{ t("search.visualize") }}
             <q-tooltip v-if="isVisualizeDisabled">
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <Wrench class="tw:size-3.5 tw:shrink-0" />
+              <OIcon name="build" size="xs" class="tw:shrink-0" />
             </template>
             {{ t("search.buildQuery") }}
           </OToggleGroupItem>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <Layers class="tw:size-3.5 tw:shrink-0" />
+              <OIcon name="layers" size="xs" class="tw:shrink-0" />
             </template>
             {{ t("search.showPatternsLabel") }}
           </OToggleGroupItem>
@@ -428,10 +428,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-utilities-menu-btn"
           class="group-menu-btn element-box-shadow"
+          icon-left="more-horiz"
           variant="outline"
           size="xs"
         >
-          <Ellipsis class="tw:size-3.5 tw:shrink-0" />
           More
           <q-menu anchor="bottom left" self="top left">
             <q-list>
@@ -1543,6 +1543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
       <OButton
+        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
         data-test="logs-query-editor-full_screen-btn"
         :title="isFocused ? t('search.collapse') : t('search.expand')"
         variant="ghost"
@@ -1565,10 +1566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? '1.6rem'
               : '4rem',
         }"
-      >
-        <Maximize size="0.8rem" v-if="!isFocused" />
-        <Minimize size="0.8rem" v-else />
-      </OButton>
+      />
     </div>
 
     <ODialog data-test="search-bar-confirm-dialog"
@@ -2200,20 +2198,7 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import {
-  Bookmark,
-  ChartLine,
-  ChartNoAxesColumn,
-  RefreshCcw,
-  ScanSearch,
-  Share,
-  Ellipsis,
-  Maximize,
-  Minimize,
-  Wrench,
-  Code2,
-  Layers,
-} from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -2302,18 +2287,7 @@ export default defineComponent({
     CodeQueryEditor,
     UnifiedQueryEditor,
     QueryPlanDialog,
-    ScanSearch,
-    ChartLine,
-    ChartNoAxesColumn,
-    RefreshCcw,
-    Bookmark,
-    Share,
-    Ellipsis,
-    Maximize,
-    Minimize,
-    Wrench,
-    Code2,
-    Layers,
+    OIcon,
     OToggleGroup,
     OToggleGroupItem,
   },

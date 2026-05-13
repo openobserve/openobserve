@@ -305,11 +305,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="q-mb-sm q-ml-xs q-mr-sm"
                               :title="t('alert_templates.delete')"
                               @click="deleteGroupByColumn(index)"
-                            >
-                              <template #icon-left>
-                                <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                              </template>
-                            </OButton>
+                              icon-left="delete"
+                            />
                           </div>
                         </template>
                         <OButton
@@ -319,11 +316,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="q-mb-sm q-ml-xs q-mr-sm"
                           :title="t('common.add')"
                           @click="addGroupByColumn()"
-                        >
-                          <template #icon-left>
-                            <Plus class="tw:size-3.5 tw:shrink-0" />
-                          </template>
-                        </OButton>
+                          icon-left="add"
+                        />
                       </div>
                     </div>
                     <div
@@ -993,17 +987,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('search.openFields')
               "
               @click="collapseFieldList"
-            >
-              <template #icon-left>
-                  <q-icon
-                  :name="
-                    collapseFields
-                      ? 'chevron_right'
-                      : 'chevron_left'
-                  "
-                />
-              </template>
-            </OButton>
+              :icon-left="collapseFields ? 'chevron-right' : 'chevron-left'"
+            />
           </template>
           <template #after>
             <div class="full-width tw:flex tw:flex-col" style="height: 100%">
@@ -1133,10 +1118,8 @@ size="md" />
                     size="sm-action"
                     @mousedown.prevent
                     @click="$emit('delete:node')"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-4 tw:shrink-0" />
-                    </template>
                     {{ t("pipeline.deleteNode") }}
                   </OButton>
 
@@ -1236,7 +1219,6 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Maximize2, Minimize2, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-vue-next";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1245,7 +1227,6 @@ import useLogs from "@/composables/useLogs";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Code2, BarChart2 } from "lucide-vue-next";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
@@ -1414,12 +1395,12 @@ const tabOptions = computed(() => [
   {
     label: t("alerts.sql"),
     value: "sql",
-    icon: Code2,
+    icon: "code",
   },
   {
     label: t("alerts.promql"),
     value: "promql",
-    icon: BarChart2,
+    icon: "bar-chart",
     disabled: selectedStreamType.value !== "metrics",
     tooltipLabel:
       selectedStreamType.value !== "metrics"

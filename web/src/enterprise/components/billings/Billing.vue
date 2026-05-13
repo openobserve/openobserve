@@ -137,7 +137,7 @@ import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { HardDrive, Database } from "lucide-vue-next";
+
 import BillingService from "@/services/billings";
 
 export default defineComponent({
@@ -259,12 +259,12 @@ export default defineComponent({
     {
         label: 'Gb',
         value: "gb",
-        icon: HardDrive,
+        icon: "storage",
       },
       {
         label: 'Mb',
         value: "mb",
-        icon: Database,
+        icon: "database",
       }
     ]
 

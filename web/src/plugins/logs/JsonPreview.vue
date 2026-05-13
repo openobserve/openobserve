@@ -324,7 +324,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { AlignLeft, FileJson } from "lucide-vue-next";
+
 
 export default {
   name: "JsonPreview",
@@ -429,12 +429,12 @@ export default {
       {
         value: "flattened",
         label: t("search.flattened"),
-        icon: AlignLeft,
+        icon: "align-left",
       },
       {
         value: "unflattened",
         label: t("search.original"),
-        icon: FileJson,
+        icon: "description",
       },
     ];
 

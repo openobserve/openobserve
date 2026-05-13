@@ -98,18 +98,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               :title="t('common.edit')"
               @click="editToolset(props.row)"
-            >
-              <template #icon-left><Pencil class="tw:size-3.5 tw:shrink-0" /></template>
-            </OButton>
+              icon-left="edit"
+            />
             <OButton
               :data-test="`ai-toolset-${props.row.name}-delete`"
               variant="ghost-destructive"
               size="icon-xs-sq"
               :title="t('common.delete')"
               @click="confirmDeleteToolset(props.row)"
-            >
-              <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
-            </OButton>
+              icon-left="delete"
+            />
           </q-td>
         </template>
 
@@ -163,7 +161,6 @@ import { useQuasar, QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Pencil, Trash2 } from "lucide-vue-next";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -186,8 +183,6 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
-    Pencil,
-    Trash2,
   },
   setup() {
     const store = useStore();

@@ -125,7 +125,6 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { HelpCircle } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "SyntaxGuideMetrics",

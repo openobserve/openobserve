@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop
                 class="expand-toggle-btn-wrapper"
               >
-                <template #icon-left><ChevronsUpDown class="tw:size-3.5 tw:shrink-0" /></template>
-              </OButton>
+                icon-left="unfold-more"
+              />
             </div>
             <div v-show="showAdvanced" class="section-content">
               <div class="tw:space-y-4">
@@ -244,7 +244,6 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { X, ChevronsUpDown } from "lucide-vue-next";
 import backfillService from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 

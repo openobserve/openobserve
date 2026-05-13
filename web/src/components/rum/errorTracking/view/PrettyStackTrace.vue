@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm-action"
+        icon-left="upload"
         class="tw:my-2"
         @click="navigateToUpload"
       >
-        <Upload class="tw:size-4 tw:mr-1" />
         Upload Source Maps
       </OButton>
     </div>
@@ -243,7 +243,7 @@ import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Upload } from 'lucide-vue-next';
+
 import {
   generateCacheKey,
   getCachedTranslation,

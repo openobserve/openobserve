@@ -893,7 +893,6 @@ import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { LayoutList, Sliders, Building2 } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
@@ -936,9 +935,9 @@ const selectedIds = ref<string[]>([]);
 const selectedTab = ref("all");
 
 const tabOptions = computed(() => [
-  { label: t("modelPricing.tabAll"), value: "all", icon: LayoutList },
-  { label: t("modelPricing.tabCustom"), value: "org", icon: Sliders },
-  { label: t("modelPricing.tabSystem"), value: "inherited", icon: Building2 },
+  { label: t("modelPricing.tabAll"), value: "all", icon: "format-list-bulleted" },
+  { label: t("modelPricing.tabCustom"), value: "org", icon: "tune" },
+  { label: t("modelPricing.tabSystem"), value: "inherited", icon: "business" },
 ]);
 
 function onTabChange() {

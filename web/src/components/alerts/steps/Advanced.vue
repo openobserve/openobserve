@@ -200,11 +200,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="emitUpdate"
               >
                 <OToggleGroupItem value="String" size="sm">
-                  <template #icon-left><TypeIcon class="tw:size-3.5 tw:shrink-0" /></template>
+                  <template #icon-left><OIcon name="title" size="sm" /></template>
                   String
                 </OToggleGroupItem>
                 <OToggleGroupItem value="Json" size="sm">
-                  <template #icon-left><Braces class="tw:size-3.5 tw:shrink-0" /></template>
+                  <template #icon-left><OIcon name="data-object" size="sm" /></template>
                   JSON
                 </OToggleGroupItem>
               </OToggleGroup>
@@ -243,7 +243,7 @@ import { getUUID } from "@/utils/zincutils";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Type as TypeIcon, Braces } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface Variable {
   id: string;
@@ -253,7 +253,7 @@ export interface Variable {
 
 export default defineComponent({
   name: "Step6Advanced",
-  components: { OToggleGroup, OToggleGroupItem, OButton, TypeIcon, Braces },
+  components: { OToggleGroup, OToggleGroupItem, OButton, OIcon },
   props: {
     template: {
       type: String,

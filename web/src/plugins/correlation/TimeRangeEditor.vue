@@ -155,7 +155,6 @@ import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { date } from 'quasar';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import { X, RotateCcw } from 'lucide-vue-next';
 
 interface Props {
   modelValue: boolean;

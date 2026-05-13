@@ -94,12 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="col-auto">
               <OButton
+                icon-left="close"
                 variant="ghost"
                 size="icon"
                 @click="showVrlInfo = false"
-              >
-                <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-              </OButton>
+              />
             </div>
           </div>
 
@@ -124,12 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
                 <div class="col-auto">
                   <OButton
+                    icon-left="refresh"
                     variant="ghost-muted"
                     size="icon-xs-sq"
                     @click="loadRecentErrors"
                     :loading="loadingErrors"
                   >
-                    <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
                     <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
                   </OButton>
                 </div>
@@ -162,12 +161,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Show More Button -->
                 <div class="q-mt-sm text-center">
                   <OButton
+                    icon-right="open-in-new"
                     variant="ghost-primary"
                     size="sm"
                     @click="viewAllErrors"
                   >
                     {{ t('common.showMore') }}
-                    <template #icon-right><ExternalLink class="tw:size-3.5 tw:shrink-0" /></template>
                   </OButton>
                 </div>
               </div>
@@ -234,13 +233,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="domain-header row items-center justify-between q-px-md q-py-sm">
           <div class="text-body1 text-bold">{{ domain.name }}</div>
           <OButton
+            icon-left="close"
             variant="ghost-destructive"
             size="icon-xs-sq"
             @click="removeDomain(index)"
             :title="t('common.delete')"
-          >
-            <template #icon-left><X class="tw:size-3.5 tw:shrink-0" /></template>
-          </OButton>
+          />
         </div>
 
         <div class="q-pa-md">
@@ -308,13 +306,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="text-body2">{{ email }}</div>
                 <OButton
+                  icon-left="close"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   @click="removeEmail(domain, emailIndex)"
                   :title="t('common.delete')"
-                >
-                  <template #icon-left><X class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                />
               </div>
             </div>
           </div>
@@ -349,7 +346,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
+
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
 import { add, formatDistanceToNow } from "date-fns";

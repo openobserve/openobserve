@@ -19,14 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Toolbar: search + refresh -->
     <div class="tw:flex tw:items-center tw:justify-end tw:px-2 tw:py-2 tw:gap-2">
       <OButton
+        icon-left="refresh"
         variant="ghost"
         size="icon-sm"
         :loading="loading"
         title="Refresh"
         @click="loadConfigs"
-      >
-        <RefreshCw class="tw:size-4" />
-      </OButton>
+      />
     </div>
 
     <q-table
@@ -108,35 +107,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-td :props="props" class="tw:text-center">
           <!-- Edit -->
           <OButton
-            variant="ghost"
-            size="icon-sm"
-            :title="t('alerts.edit')"
-            @click="editConfig(props.row)"
-          >
-            <Pencil class="tw:size-4" />
-          </OButton>
+          icon-left="edit"
+          variant="ghost"
+          size="icon-sm"
+          :title="t('alerts.edit')"
+          @click="editConfig(props.row)"
+          />
           <!-- Pause / Resume — hidden while training or failed -->
           <OButton
             v-if="props.row.status !== 'training' && props.row.status !== 'failed'"
-            variant="ghost"
-            size="icon-sm"
-            :title="props.row.enabled ? 'Pause' : 'Resume'"
-            @click="toggleEnabled(props.row)"
-          >
-            <Pause v-if="props.row.enabled" class="tw:size-4" />
-            <Play v-else class="tw:size-4" />
-          </OButton>
+          :icon-left="props.row.enabled ? 'pause' : 'play-arrow'"
+          variant="ghost"
+          size="icon-sm"
+          :title="props.row.enabled ? 'Pause' : 'Resume'"
+          @click="toggleEnabled(props.row)"
+          />
           <!-- Stop Training — only shown while training -->
           <OButton
             v-if="props.row.status === 'training'"
-            variant="ghost-warning"
-            size="icon-sm"
-            title="Stop Training"
-            :loading="cancellingId === props.row.anomaly_id"
-            @click="confirmCancelTraining(props.row)"
-          >
-            <StopCircle class="tw:size-4" />
-          </OButton>
+          icon-left="stop-circle"
+          variant="ghost-warning"
+          size="icon-sm"
+          title="Stop Training"
+          :loading="cancellingId === props.row.anomaly_id"
+          @click="confirmCancelTraining(props.row)"
+          />
           <!-- Retrain / Retry -->
           <OButton
             v-if="props.row.is_trained || props.row.status === 'failed'"
@@ -150,13 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <!-- Delete -->
           <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            :title="t('alerts.delete')"
-            @click="confirmDelete(props.row)"
-          >
-            <Trash2 class="tw:size-4" />
-          </OButton>
+          icon-left="delete"
+          variant="ghost-destructive"
+          size="icon-sm"
+          :title="t('alerts.delete')"
+          @click="confirmDelete(props.row)"
+          />
         </q-td>
       </template>
 
@@ -257,11 +251,11 @@ import anomalyDetectionService from "@/services/anomaly_detection";
 import { date } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import { RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 } from 'lucide-vue-next';
+import { BrainCircuit } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OButton, ODialog, RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 },
+  components: { OButton, ODialog, BrainCircuit },
 
   props: {
     org_identifier: {

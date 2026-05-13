@@ -220,7 +220,6 @@ import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Webhook, Mail } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
 import {
   validateTemplateBody,
@@ -283,13 +282,13 @@ const tabs = computed(() => [
     label: "Web Hook",
     value: "http",
     style: {},
-    icon: Webhook,
+    icon: "webhook",
   },
   {
     label: "Email",
     value: "email",
     style: {},
-    icon: Mail,
+    icon: "mail",
   },
 ]);
 

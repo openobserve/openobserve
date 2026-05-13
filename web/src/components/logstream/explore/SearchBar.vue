@@ -28,9 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :title="t('search.exportLogs')"
           @click="downloadLogs"
-        >
-          <Download class="tw:size-4" />
-        </OButton>
+          icon-left="download"
+        />
         <div
           class="float-left"
           v-show="queryData.streamType !== 'enrichment_tables'"
@@ -84,7 +83,6 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Download } from 'lucide-vue-next';
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
 
@@ -114,7 +112,6 @@ export default defineComponent({
   components: {
     DateTime,
     OButton,
-    Download,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

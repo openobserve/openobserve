@@ -77,18 +77,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('function.updateTitle')"
                     data-test="function-list-edit-function-btn"
                     @click="showAddUpdateFn(props)"
-                  >
-                    <Pencil :size="14" />
-                  </OButton>
+                    icon-left="edit"
+                  />
                   <OButton
                     variant="ghost-destructive"
                     size="icon-sm"
                     :title="t('function.delete')"
                     data-test="function-list-delete-function-btn"
                     @click="showDeleteDialogFn(props)"
-                  >
-                    <Trash2 :size="14" />
-                  </OButton>
+                    icon-left="delete"
+                  />
                   <OButton
                     variant="ghost"
                     size="icon-sm"
@@ -127,10 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     class="tw:mr-2"
                     @click="openBulkDeleteDialog"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-4 tw:shrink-0" />
-                    </template>
                     Delete
                   </OButton>
                   <QTablePagination
@@ -256,7 +252,6 @@ import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
   name: "functionList",
@@ -268,8 +263,6 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
-    Pencil,
-    Trash2,
   },
   emits: [
     "updated:fields",

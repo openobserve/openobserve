@@ -21,9 +21,8 @@
             @click="$emit('closeDialog')"
             variant="ghost"
             size="icon-sm"
-          >
-            <X :size="14" />
-          </OButton>
+            icon-left="close"
+          />
         </div>
       </div>
       <q-separator />
@@ -342,8 +341,8 @@
                   size="sm-action"
                   class="q-mr-md"
                   @click="handleAddOrRemovePattern"
+                  :icon-left="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'"
                 >
-                  <component :is="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? Trash2 : Plus" :size="14" class="tw:mr-1" />
                   {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
                 </OButton>
                </div>
@@ -415,7 +414,6 @@ import FullViewContainer from '../functions/FullViewContainer.vue';
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from '../ConfirmDialog.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X, Plus, Trash2 } from 'lucide-vue-next';
 
 export interface PatternAssociation {
     field: string;
@@ -430,9 +428,6 @@ export default defineComponent({
         FullViewContainer,
         ConfirmDialog,
         OButton,
-        X,
-        Plus,
-        Trash2,
     },
     props: {
         data: {

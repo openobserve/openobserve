@@ -114,6 +114,8 @@ import { onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
@@ -191,6 +193,19 @@ const formattedReports = ref<ScheduledDashboardReport[]>([]);
 const scheduledDashboardTableRef = ref<InstanceType<typeof QTable> | null>();
 
 const store = useStore();
+
+const reportTypeTabs = reactive([
+  {
+    label: t("reports.cached"),
+    value: "cached",
+    icon: "database",
+  },
+  {
+    label: t("reports.scheduled"),
+    value: "shared",
+    icon: "schedule",
+  },
+]);
 
 watch(
   () => props.reports,

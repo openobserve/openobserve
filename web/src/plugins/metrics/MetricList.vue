@@ -125,14 +125,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="field_overlay">
                           <OButton
+                            icon-left="add"
                             :data-test="`metrics-list-add-${props.row.name}-label-btn`"
                             variant="ghost"
                             size="icon-xs"
                             class="q-mr-none"
                             @click.stop="addValueToEditor(props.row.name, '', '=')"
-                          >
-                            <Plus class="tw:size-3" />
-                          </OButton>
+                          />
                         </div>
                       </div>
                     </template>
@@ -294,12 +293,12 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Plus } from 'lucide-vue-next';
+
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon, OButton, Plus },
+  components: { EqualIcon, NotEqualIcon, OButton },
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();

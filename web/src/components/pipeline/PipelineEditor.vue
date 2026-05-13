@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="hideOnPrintMode"
             data-test="pipeline-json-edit-btn"
             @click="openJsonEditor"
+            icon-left="code"
           >
-            <template #icon-left><Code2 class="tw:size-4 tw:shrink-0" /></template>
             <q-tooltip>{{ t('pipeline.editPipelineJson') }}</q-tooltip>
           </OButton>
           <OButton

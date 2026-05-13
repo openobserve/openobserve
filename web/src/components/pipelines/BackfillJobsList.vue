@@ -28,11 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               @click="goBack"
               data-test="backfill-jobs-back-btn"
-            >
-              <template #icon-left>
-                <ChevronLeft class="tw:size-3.5 tw:shrink-0" />
-              </template>
-            </OButton>
+              icon-left="chevron-left"
+            />
             <div class="q-table__title tw:font-[600] q-ml-sm">
               Backfill Jobs
             </div>
@@ -93,10 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshJobs"
               :disabled="loading"
               data-test="refresh-btn"
+              icon-left="refresh"
             >
-              <template #icon-left>
-                <RefreshCw class="tw:size-3.5 tw:shrink-0" />
-              </template>
               <q-tooltip>Refresh</q-tooltip>
             </OButton>
           </div>
@@ -211,10 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="confirmPauseJob(props.row)"
                     data-test="pause-job-btn"
+                    icon-left="pause"
                   >
-                    <template #icon-left>
-                      <Pause class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Pause Job</q-tooltip>
                   </OButton>
                   <OButton
@@ -223,10 +216,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="confirmResumeJob(props.row)"
                     data-test="resume-job-btn"
+                    icon-left="play-arrow"
                   >
-                    <template #icon-left>
-                      <Play class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Resume Job</q-tooltip>
                   </OButton>
                   <OButton
@@ -235,10 +226,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="editJob(props.row)"
                     data-test="edit-job-btn"
+                    icon-left="edit"
                   >
-                    <template #icon-left>
-                      <Pencil class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Edit Job</q-tooltip>
                   </OButton>
                   <OButton
@@ -246,10 +235,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="viewJob(props.row)"
                     data-test="view-job-btn"
+                    icon-left="visibility"
                   >
-                    <template #icon-left>
-                      <Eye class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>View Details</q-tooltip>
                   </OButton>
                   <OButton
@@ -258,10 +245,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="confirmDeleteJob(props.row)"
                     data-test="delete-job-btn"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Delete Job</q-tooltip>
                   </OButton>
                   <OButton
@@ -270,10 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="showErrorDialog(props.row)"
                     data-test="error-indicator-btn"
+                    icon-left="error"
                   >
-                    <template #icon-left>
-                      <AlertCircle class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
                   </OButton>
                 </div>

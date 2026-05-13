@@ -568,7 +568,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Gauge, Shield, Timer, Clock, Hourglass, Table2, Braces } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
@@ -629,12 +628,12 @@ export default defineComponent({
       {
         label: "API Limits",
         value: "api-limits",
-        icon: Gauge,
+        icon: "speed",
       },
       {
         label: "Role Limits",
         value: "role-limits",
-        icon: Shield,
+        icon: "shield",
       },
     ]);
 
@@ -642,17 +641,17 @@ export default defineComponent({
       {
         label: "Per Second",
         value: "second",
-        icon: Timer,
+        icon: "timer",
       },
       {
         label: "Per Minute",
         value: "minute",
-        icon: Clock,
+        icon: "access-time",
       },
       {
         label: "Per Hour",
         value: "hour",
-        icon: Hourglass,
+        icon: "hourglass-empty",
       },
     ]);
 
@@ -660,12 +659,12 @@ export default defineComponent({
       {
         label: "Table",
         value: "table",
-        icon: Table2,
+        icon: "table-chart",
       },
       {
         label: "JSON",
         value: "json",
-        icon: Braces,
+        icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);

@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-history-tab-history"
               >
                 <template #icon-left>
-                  <History class="tw:size-3.5 tw:shrink-0" />
+                  <OIcon name="history" size="sm" />
                 </template>
                 History
               </OToggleGroupItem>
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-history-tab-condition"
               >
                 <template #icon-left>
-                  <Code2 class="tw:size-3.5 tw:shrink-0" />
+                  <OIcon name="code" size="sm" />
                 </template>
                 Condition
               </OToggleGroupItem>
@@ -517,7 +517,7 @@ import { useQuasar, date } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { History, Code2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";

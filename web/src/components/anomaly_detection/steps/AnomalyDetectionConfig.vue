@@ -108,9 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 @click="removeFilter(idx)"
-              >
-                <X class="tw:size-4" />
-              </OButton>
+                icon-left="close"
+              />
             </div>
             <OButton
               variant="outline"
@@ -765,7 +764,6 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { X } from "lucide-vue-next";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
@@ -776,7 +774,6 @@ export default defineComponent({
     OButton,
     OToggleGroup,
     OToggleGroupItem,
-    X,
   },
 
   props: {

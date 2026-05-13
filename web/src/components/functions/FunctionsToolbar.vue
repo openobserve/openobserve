@@ -116,8 +116,8 @@
         variant="outline"
         size="sm-action"
         @click="handleFullScreen"
+        icon-left="fullscreen"
       >
-        <Maximize :size="14" class="tw:mr-1" />
         {{ t('common.fullscreen') }}
       </OButton>
       <OButton
@@ -125,8 +125,8 @@
         variant="outline"
         size="sm-action"
         @click="emit('test')"
+        icon-left="play-arrow"
       >
-        <Play :size="14" class="tw:mr-1" />
         {{ t('function.testFunction') }}
       </OButton>
       <OButton
@@ -162,7 +162,6 @@ import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Maximize, Play } from "lucide-vue-next";
 const { t } = useI18n();
 
 const q = useQuasar();

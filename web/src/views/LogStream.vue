@@ -38,25 +38,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
-                    ><ScrollText class="tw:size-3.5 tw:shrink-0"
+                    ><OIcon name="description" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metrics" size="sm">
                   <template #icon-left
-                    ><BarChart2 class="tw:size-3.5 tw:shrink-0"
+                    ><OIcon name="bar-chart" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelMetrics") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="traces" size="sm">
                   <template #icon-left
-                    ><GitFork class="tw:size-3.5 tw:shrink-0"
+                    ><OIcon name="fork-right" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelTraces") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
                   <template #icon-left
-                    ><Info class="tw:size-3.5 tw:shrink-0"
+                    ><OIcon name="info" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelMetadata") }}
                 </OToggleGroupItem>
@@ -150,31 +150,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #body-cell-actions="props">
               <q-td :props="props">
                 <OButton
+                  icon-left="search"
                   :title="t('logStream.explore')"
                   data-test="log-stream-explore-btn"
                   variant="ghost"
                   size="icon-sm"
                   @click="exploreStream(props)"
-                >
-                  <Search class="tw:size-4" />
-                </OButton>
+                />
                 <OButton
+                  icon-left="description"
                   :title="t('logStream.schemaHeader')"
                   data-test="log-stream-schema-btn"
                   variant="ghost"
                   size="icon-sm"
                   @click="listSchema(props)"
-                >
-                  <FileText class="tw:size-4" />
-                </OButton>
+                />
                 <OButton
+                  icon-left="delete"
                   :title="t('logStream.delete')"
                   variant="ghost-destructive"
                   size="icon-sm"
                   @click="confirmDeleteAction(props)"
-                >
-                  <Trash2 class="tw:size-4" />
-                </OButton>
+                />
               </q-td>
             </template>
             <template v-slot:pagination="scope">
@@ -183,21 +180,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="tw:flex tw:items-center q-ml-md">
                   <OButton
+                    icon-left="chevron-left"
                     variant="ghost"
                     size="icon-sm"
                     :disabled="scope.isFirstPage"
                     @click="scope.prevPage"
-                  >
-                    <ChevronLeft class="tw:size-4" />
-                  </OButton>
+                  />
                   <OButton
+                    icon-left="chevron-right"
                     variant="ghost"
                     size="icon-sm"
                     :disabled="scope.isLastPage"
                     @click="scope.nextPage"
-                  >
-                    <ChevronRight class="tw:size-4" />
-                  </OButton>
+                  />
                 </div>
               </div>
             </template>
@@ -241,15 +236,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ scope.pagination.rowsNumber }} Stream(s)
                   <OButton
                     v-if="selected.length > 0"
-                    variant="outline"
+                    icon-left="delete"
+                    variant="outline-destructive"
                     size="sm-action"
                     class="tw:ml-4"
                     :disabled="isDeleting"
                     @click="confirmBatchDeleteAction"
                   >
-                    <template #icon-left
-                      ><Trash2 class="tw:size-3.5 tw:shrink-0"
-                    /></template>
                     {{ isDeleting ? "Deleting..." : "Delete" }}
                   </OButton>
                 </div>
@@ -357,16 +350,9 @@ import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import {
-  Search,
-  FileText,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { ScrollText, BarChart2, GitFork, Info } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "PageLogStream",
@@ -377,17 +363,9 @@ export default defineComponent({
     AddStream,
     OButton,
     ODialog,
+    OIcon,
     OToggleGroup,
     OToggleGroupItem,
-    ScrollText,
-    BarChart2,
-    GitFork,
-    Info,
-    Search,
-    FileText,
-    Trash2,
-    ChevronLeft,
-    ChevronRight,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {

@@ -498,7 +498,6 @@ import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronRight, ChevronLeft } from "lucide-vue-next";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -512,8 +511,6 @@ export default defineComponent({
     SearchBar,
     IndexList,
     OButton,
-    ChevronRight,
-    ChevronLeft,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),

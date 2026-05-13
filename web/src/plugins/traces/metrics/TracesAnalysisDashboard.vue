@@ -89,8 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           @click="refreshAfterPercentileChange"
           data-test="percentile-refresh-button"
+          icon-left="refresh"
         >
-          <RefreshCw class="tw:size-3.5 tw:shrink-0" />
+        
           <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
         </OButton>
       </div>
@@ -221,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'Collapse Dimensions'
                   : 'Expand Dimensions'
               "
+              :icon-left="showDimensionSelector ? 'chevron-left' : 'chevron-right'"
               :class="
                 showDimensionSelector
                   ? 'splitter-icon-expand'
@@ -229,10 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="sidebar-button"
               size="sidebar-button"
               @click="toggleDimensionSelector"
-            >
-              <ChevronLeft v-if="showDimensionSelector" class="tw:size-3.5 tw:shrink-0" />
-              <ChevronRight v-else class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+            />
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -316,7 +315,6 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { RefreshCw, X, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";

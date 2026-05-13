@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="tw:ml-8">
                   <OButton
+                    icon-left="all-inclusive"
                     variant="ghost"
                     size="sm-action"
                     :class="pendingFilters[key] === SELECT_ALL_VALUE ? 'tw:text-green-600' : ''"
                     @click="toggleWildcard(key)"
                     :data-test="`toggle-wildcard-${key}`"
                   >
-                    <Infinity :size="14" class="tw:mr-1" />
                     {{
                       pendingFilters[key] === SELECT_ALL_VALUE
                         ? t('correlation.logs.filters.showingAll')
@@ -153,7 +153,7 @@ import { useI18n } from 'vue-i18n';
 import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import { X, Infinity, RotateCcw } from 'lucide-vue-next';
+
 
 interface Props {
   modelValue: boolean;

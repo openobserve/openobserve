@@ -37,8 +37,8 @@
               size="sm-action"
               type="submit"
               :disabled="!selectedStream.name || !inputQuery || loading.events"
-            >
-              <Search :size="14" class="tw:mr-1" />
+            icon-left="search"
+          >
               {{ t('search.runQuery') }}
             </OButton>
           </template>
@@ -333,7 +333,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Search, FileText, BarChart2, Activity } from "lucide-vue-next";
 
 const props = defineProps({
   vrlFunction: {
@@ -408,9 +407,9 @@ const { getStreams } = useStreams();
 const { buildQueryPayload } = useQuery();
 
 const streamTypes = [
-  { label: "Logs", value: "logs", icon: FileText },
-  { label: "Metrics", value: "metrics", icon: BarChart2 },
-  { label: "Traces", value: "traces", icon: Activity },
+  { label: "Logs", value: "logs", icon: "description" },
+  { label: "Metrics", value: "metrics", icon: "bar-chart" },
+  { label: "Traces", value: "traces", icon: "activity" },
 ];
 
 const isFetchingStreams = ref(false);

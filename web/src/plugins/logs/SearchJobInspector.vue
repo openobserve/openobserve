@@ -61,12 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw:flex tw:items-center">
             <OButton
+              icon-left="close"
               variant="ghost"
               size="icon-sm"
               @click="goBack"
               data-test="inspector-close-button"
             >
-              <X :size="16" />
               <q-tooltip>Close</q-tooltip>
             </OButton>
           </div>
@@ -408,7 +408,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { X, Copy, Check } from "lucide-vue-next";
+
 
 interface ProfileEvent {
   timestamp: string;
@@ -450,9 +450,6 @@ export default defineComponent({
     OButton,
     ODrawer,
     ODialog,
-    X,
-    Copy,
-    Check,
   },
   setup() {
     const router = useRouter();

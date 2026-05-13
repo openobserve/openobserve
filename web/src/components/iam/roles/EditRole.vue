@@ -309,9 +309,8 @@ import dashboardService from "@/services/dashboards";
 import serviceAccountService from "@/services/service_accounts";
 import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
-import AppTabs from "@/components/common/AppTabs.vue";
-import { Shield, Users, Bot, LayoutList, CheckSquare, Table2, Braces } from "lucide-vue-next";
 import GroupUsers from "../groups/GroupUsers.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
@@ -383,12 +382,12 @@ const tabs = [
   {
     value: "permissions",
     label: "Permissions",
-    icon: Shield,
+    icon: "shield",
   },
   {
     value: "users",
     label: "Users",
-    icon: Users,
+    icon: "group",
   },
 ];
 
@@ -396,7 +395,7 @@ if (store.state.zoConfig.service_account_enabled) {
   tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",
-    icon: Bot,
+    icon: "smart-toy",
   });
 }
 
@@ -404,12 +403,12 @@ const permissionDisplayOptions = [
   {
     label: "All",
     value: "all",
-    icon: LayoutList,
+    icon: "format-list-bulleted",
   },
   {
     label: "Selected",
     value: "selected",
-    icon: CheckSquare,
+    icon: "check-box",
   },
 ];
 
@@ -417,12 +416,12 @@ const permissionUiOptions = [
   {
     label: "Table",
     value: "table",
-    icon: Table2,
+    icon: "table-chart",
   },
   {
     label: "JSON",
     value: "json",
-    icon: Braces,
+    icon: "data-object",
   },
 ];
 

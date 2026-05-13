@@ -223,20 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="editingText = !editingText"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
-              <OButton
-                data-test="settings_ent_logo_custom_text_save_btn"
-                :loading="onSubmit.isLoading.value"
-                variant="primary"
-                size="icon-xs-sq"
-                class="q-mr-sm"
-                type="submit"
-                @click="updateCustomText"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="close"
+              />
             </div>
           </div>
           <div v-else class="flex items-center">
@@ -260,9 +248,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-ml-sm"
               type="submit"
               @click="editingText = !editingText"
-            >
-              <Pencil class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="edit"
+            />
           </div>
           <span class="individual-setting-description">
             {{ t("settings.customLogoTextDescription") }}
@@ -295,9 +282,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               class="q-mx-md"
               @click="confirmDeleteLogo('light')"
-            >
-              <Trash2 class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="delete"
+            />
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
@@ -323,9 +309,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="filesLight = null"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+              icon-left="close"
+            />
               <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
@@ -334,9 +319,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm"
                 type="submit"
                 @click="uploadImage(filesLight, 'light')"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="check"
+              />
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -374,9 +358,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               class="q-mx-md"
               @click="confirmDeleteLogo('dark')"
-            >
-              <Trash2 class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="delete"
+            />
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
@@ -402,9 +385,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="filesDark = null"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+              icon-left="close"
+            />
               <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
                 :loading="onSubmit.isLoading.value"
@@ -413,9 +395,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm"
                 type="submit"
                 @click="uploadImage(filesDark, 'dark')"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="check"
+              />
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -474,7 +455,6 @@ import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { X, Check, Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
   name: "PageGeneralSettings",

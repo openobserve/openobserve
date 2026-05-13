@@ -18,9 +18,8 @@
               size="icon-sm"
               data-test="queryList-cancel"
               @click="$emit('close')"
-            >
-              <X class="tw:size-4" />
-            </OButton>
+              icon-left="close"
+            />
           </div>
         </div>
       </q-card-section>
@@ -52,11 +51,10 @@ import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "QueryList",
-  components: { OButton, X },
+  components: { OButton },
   emits: ["save", "close"],
   props: {
     schemaData: Object,

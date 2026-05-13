@@ -23,13 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex justify-between items-center">
         <div class="text-bold text-h6">Resource Details</div>
         <OButton
+          icon-left="close"
           variant="ghost"
           size="icon-sm"
           data-test="close-drawer-btn"
           @click="closeDrawer"
-        >
-          <X class="tw:size-4" />
-        </OButton>
+        />
       </div>
     </div>
 
@@ -145,21 +144,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         <div class="row q-gutter-sm">
             <OButton
+              icon-left="play-circle"
               variant="outline"
               size="sm-action"
               data-test="view-session-replay-btn"
               @click="viewSessionReplay"
             >
-              <PlayCircle class="tw:size-4 tw:mr-1" />
               View Session Replay
             </OButton>
             <OButton
+              icon-left="format-list-bulleted"
               variant="ghost"
               size="sm-action"
               data-test="view-session-events-btn"
               @click="viewSessionEvents"
             >
-              <List class="tw:size-4 tw:mr-1" />
               View All Session Events
             </OButton>
           </div>
@@ -176,7 +175,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X, PlayCircle, List } from 'lucide-vue-next';
+
 
 const props = defineProps({
   modelValue: {

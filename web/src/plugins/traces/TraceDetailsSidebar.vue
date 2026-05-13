@@ -520,7 +520,7 @@ class="tw:h-full tw:overflow-y-auto">
 size="xs"
 class="tw:h-5! tw:text-[0.75rem]!">
                 <template #icon-left
-                  ><Braces class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="data-object" size="xs" class="tw:shrink-0"
                 /></template>
                 JSON
               </OToggleGroupItem>
@@ -528,7 +528,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
 size="xs"
 class="tw:h-5! tw:text-[0.75rem]!">
                 <template #icon-left
-                  ><Table2 class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="table-chart" size="xs" class="tw:shrink-0"
                 /></template>
                 Table
               </OToggleGroupItem>
@@ -908,7 +908,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Braces, Table2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { cloneDeep } from "lodash-es";
 import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
@@ -997,8 +997,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
-    Braces,
-    Table2,
+    OIcon,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,

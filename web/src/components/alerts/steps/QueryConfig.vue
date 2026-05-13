@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <Wrench v-if="tab.value === 'custom'" class="tw:size-3.5 tw:shrink-0" />
-              <Database v-else-if="tab.value === 'sql'" class="tw:size-3.5 tw:shrink-0" />
-              <ChartLine v-else-if="tab.value === 'promql'" class="tw:size-3.5 tw:shrink-0" />
+              <OIcon v-if="tab.value === 'custom'" name="build" size="sm" />
+              <OIcon v-else-if="tab.value === 'sql'" name="database" size="sm" />
+              <OIcon v-else-if="tab.value === 'promql'" name="show-chart" size="sm" />
             </template>
             {{ tab.label }}
           </OToggleGroupItem>
@@ -1048,7 +1048,7 @@ import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { Wrench, Database, ChartLine } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -1068,9 +1068,7 @@ export default defineComponent({
     OButton,
     OToggleGroup,
     OToggleGroupItem,
-    Wrench,
-    Database,
-    ChartLine,
+    OIcon,
   },
   props: {
     tab: {

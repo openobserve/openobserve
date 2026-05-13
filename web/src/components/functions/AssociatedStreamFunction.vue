@@ -49,13 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleStreamRow(props)"
         >
           <q-td auto-width>
-            <OButton
+              <OButton
               variant="ghost"
               size="icon-sm"
-            >
-              <ChevronDown v-if="expandedRow.name != props.row.name" :size="14" />
-              <ChevronUp v-else :size="14" />
-            </OButton>
+              :icon-left="expandedRow.name != props.row.name ? 'expand-more' : 'expand-less'"
+            />
           </q-td>
           <q-td v-for="col in props.cols" :key="col.name" :props="props">
             {{ col.value }}
@@ -132,10 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-ml-xs"
                         variant="ghost-destructive"
                         size="icon-sm"
-                        @click.stop="deleteFunctionFromStream(props.row.name)"
-                      >
-                        <Trash2 :size="14" />
-                      </OButton>
+                        icon-left="delete"
+                      />
                     </q-td>
                   </q-tr>
                 </template>
@@ -236,8 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm-action"
           @click="getLogStream"
+          icon-left="refresh"
         >
-          <RefreshCw :size="14" class="tw:mr-1" />
           {{ t(`logStream.refreshStats`) }}
         </OButton>
 
@@ -298,11 +294,11 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { Trash2, ChevronDown, ChevronUp, RefreshCw } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, OIcon },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

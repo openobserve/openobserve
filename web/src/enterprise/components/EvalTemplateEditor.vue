@@ -25,12 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[64px]">
         <OButton
           data-test="eval-template-editor-back-btn"
+          icon-left="chevron-left"
           variant="outline"
           size="icon-xs-sq"
           @click="cancel"
-        >
-          <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
-        </OButton>
+        />
         <span class="q-table__title tw:font-[600]" data-test="eval-template-editor-title">
           {{ isEdit ? t("evalTemplate.editTemplate") : t("evalTemplate.createTemplate") }}
         </span>
@@ -181,7 +180,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { ChevronLeft } from 'lucide-vue-next';
+
 
 const { t } = useI18n();
 const q = useQuasar();

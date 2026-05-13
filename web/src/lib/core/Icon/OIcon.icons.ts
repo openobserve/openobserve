@@ -79,6 +79,7 @@ import Language from "~icons/material-symbols-light/language";
 import Link from "~icons/material-symbols-light/link";
 import LocationOn from "~icons/material-symbols-light/location-on-outline";
 import MoreVert from "~icons/material-symbols-light/more-vert";
+import MenuIcon from "~icons/material-symbols-light/menu";
 import OpenInNew from "~icons/material-symbols-light/open-in-new";
 import Pause from "~icons/material-symbols-light/pause";
 import Person from "~icons/material-symbols-light/person-outline";
@@ -106,6 +107,51 @@ import Reorder from "~icons/material-symbols-light/reorder";
 import FirstPage from "~icons/material-symbols-light/first-page";
 import LastPage from "~icons/material-symbols-light/last-page";
 import Dashboard from "~icons/material-symbols-light/dashboard-outline";
+import AccessTime from "~icons/material-symbols-light/access-time-outline";
+import Activity from "~icons/material-symbols-light/vital-signs";
+import AlignLeft from "~icons/material-symbols-light/format-align-left";
+import AllInclusive from "~icons/material-symbols-light/all-inclusive";
+import AssignmentTurnedIn from "~icons/material-symbols-light/assignment-turned-in-outline";
+import AutoAwesome from "~icons/material-symbols-light/auto-awesome";
+import BarChart from "~icons/material-symbols-light/bar-chart-4-bars";
+import Bookmark from "~icons/material-symbols-light/bookmark-outline";
+import Build from "~icons/material-symbols-light/build-outline";
+import Business from "~icons/material-symbols-light/business";
+import Chat from "~icons/material-symbols-light/chat-outline";
+import CheckBoxIcon from "~icons/material-symbols-light/check-box-outline";
+import CloseFullscreen from "~icons/material-symbols-light/close-fullscreen";
+import DataObject from "~icons/material-symbols-light/data-object";
+import Database from "~icons/material-symbols-light/database-outline";
+import Description from "~icons/material-symbols-light/description-outline";
+import Dns from "~icons/material-symbols-light/dns";
+import ForkRight from "~icons/material-symbols-light/fork-right";
+import FullscreenExit from "~icons/material-symbols-light/fullscreen-exit";
+import Group from "~icons/material-symbols-light/group-outline";
+import HourglassEmpty from "~icons/material-symbols-light/hourglass-empty";
+import Label from "~icons/material-symbols-light/label-outline";
+import Layers from "~icons/material-symbols-light/layers-outline";
+import Mail from "~icons/material-symbols-light/mail-outline";
+import ManageSearch from "~icons/material-symbols-light/manage-search";
+import Merge from "~icons/material-symbols-light/merge";
+import MoreHoriz from "~icons/material-symbols-light/more-horiz";
+import NavigationIcon from "~icons/material-symbols-light/navigation-outline";
+import Notifications from "~icons/material-symbols-light/notifications-outline";
+import OpenInFull from "~icons/material-symbols-light/open-in-full";
+import PlayCircle from "~icons/material-symbols-light/play-circle-outline";
+import SmartToy from "~icons/material-symbols-light/smart-toy-outline";
+import Speed from "~icons/material-symbols-light/speed";
+import StopCircle from "~icons/material-symbols-light/stop-circle";
+import Storage from "~icons/material-symbols-light/storage";
+import TableChart from "~icons/material-symbols-light/table-chart-outline";
+import TimerIcon from "~icons/material-symbols-light/timer-outline";
+import Title from "~icons/material-symbols-light/title";
+import TrendingUp from "~icons/material-symbols-light/trending-up";
+import Undo from "~icons/material-symbols-light/undo";
+import UnfoldMore from "~icons/material-symbols-light/unfold-more";
+import Upload from "~icons/material-symbols-light/upload";
+import VerifiedUser from "~icons/material-symbols-light/verified-user-outline";
+import Webhook from "~icons/material-symbols-light/webhook";
+import MenuBook from "~icons/material-symbols-light/menu-book-outline";
 
 import type { Component } from "vue";
 
@@ -173,6 +219,7 @@ export const iconRegistry = {
   "link": Link,
   "location-on": LocationOn,
   "more-vert": MoreVert,
+  "menu": MenuIcon,
   "open-in-new": OpenInNew,
   "pause": Pause,
   "person": Person,
@@ -200,6 +247,51 @@ export const iconRegistry = {
   "first-page": FirstPage,
   "last-page": LastPage,
   "dashboard": Dashboard,
+  "access-time": AccessTime,
+  "activity": Activity,
+  "align-left": AlignLeft,
+  "all-inclusive": AllInclusive,
+  "assignment-turned-in": AssignmentTurnedIn,
+  "auto-awesome": AutoAwesome,
+  "bar-chart": BarChart,
+  "bookmark": Bookmark,
+  "build": Build,
+  "business": Business,
+  "chat": Chat,
+  "check-box": CheckBoxIcon,
+  "close-fullscreen": CloseFullscreen,
+  "data-object": DataObject,
+  "database": Database,
+  "description": Description,
+  "dns": Dns,
+  "fork-right": ForkRight,
+  "fullscreen-exit": FullscreenExit,
+  "group": Group,
+  "hourglass-empty": HourglassEmpty,
+  "label": Label,
+  "layers": Layers,
+  "mail": Mail,
+  "manage-search": ManageSearch,
+  "merge": Merge,
+  "more-horiz": MoreHoriz,
+  "navigation": NavigationIcon,
+  "notifications": Notifications,
+  "open-in-full": OpenInFull,
+  "play-circle": PlayCircle,
+  "smart-toy": SmartToy,
+  "speed": Speed,
+  "stop-circle": StopCircle,
+  "storage": Storage,
+  "table-chart": TableChart,
+  "timer": TimerIcon,
+  "title": Title,
+  "trending-up": TrendingUp,
+  "undo": Undo,
+  "unfold-more": UnfoldMore,
+  "upload": Upload,
+  "verified-user": VerifiedUser,
+  "webhook": Webhook,
+  "menu-book": MenuBook,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

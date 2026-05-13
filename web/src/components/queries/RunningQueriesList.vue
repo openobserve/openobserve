@@ -43,23 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props">
           <OButton
+            icon-left="format-list-bulleted"
             variant="ghost"
             size="icon-sm"
             :title="t('queries.queryList')"
             data-test="queryList-btn"
             @click="listSchema(props)"
-          >
-            <List class="tw:size-4" />
-          </OButton>
+          />
           <OButton
+            icon-left="close"
             variant="ghost-destructive"
             size="icon-sm"
             :title="t('queries.cancelQuery')"
             data-test="cancelQuery-btn"
             @click="confirmDeleteAction(props)"
-          >
-            <X class="tw:size-4" />
-          </OButton>
+          />
         </q-td>
       </template>
       <template #body-cell-duration="props">
@@ -120,14 +118,14 @@ import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
-import { List, X } from 'lucide-vue-next';
+
 import { getDuration, durationFormatter } from "@/utils/zincutils";
 
 // TODO OK : Define types and interfaces for data properties.
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData, OButton, List, X, ODrawer },
+  components: { QueryList, QTablePagination, NoData, OButton, ODrawer },
   props: {
     rows: {
       type: Array,
