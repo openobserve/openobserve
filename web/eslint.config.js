@@ -123,7 +123,19 @@ export default [
           element: 'q-btn-dropdown',
           message: 'Use <OButton> with <ODropdown> instead of <q-btn-dropdown>.'
         }
-      ]
+      ],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'quasar',
+              importNames: ['Notify'],
+              message: 'Use toast() from "@/lib/feedback/Toast/useToast" instead of Quasar Notify.',
+            },
+          ],
+        },
+      ],
     }
   },
   {
