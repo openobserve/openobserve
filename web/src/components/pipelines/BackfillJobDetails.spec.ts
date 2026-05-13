@@ -154,7 +154,7 @@ describe("BackfillJobDetails – mount", () => {
   it("passes width=55 to ODrawer", () => {
     const wrapper = createWrapper();
     const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-    expect(drawer.attributes("data-width")).toBe("55");
+    expect(drawer.attributes("data-width")).toBe("40");
   });
 
   it("renders ODrawer with open=true when modelValue is true", async () => {

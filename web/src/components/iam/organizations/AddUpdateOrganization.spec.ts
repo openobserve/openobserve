@@ -116,7 +116,7 @@ describe("AddUpdateOrganization", () => {
 
   it("cancel button emits update:open false (replaces router.replace cancel)", async () => {
     const wrapper = mountComp();
-    await wrapper.find('[data-test="cancel-organizations-modal"]').trigger("click");
+    await wrapper.findComponent({ name: "ODrawer" }).vm.$emit("click:secondary");
     expect(wrapper.emitted("update:open")).toBeTruthy();
     expect(wrapper.emitted("update:open")![0]).toEqual([false]);
   });
@@ -124,8 +124,9 @@ describe("AddUpdateOrganization", () => {
   it("disables save when name is empty (no proPlanRequired)", async () => {
     const wrapper = mountComp();
     await flushPromises();
-    const btn = wrapper.find('[data-test="add-org"]');
-    expect(btn.attributes("disabled")).toBeDefined();
+    expect(
+      wrapper.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled"),
+    ).toBe(true);
   });
 
   it("trims name on submit and calls organizations.create, success path resets form, emits updated and update:open false", async () => {
