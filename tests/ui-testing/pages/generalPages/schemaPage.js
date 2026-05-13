@@ -53,7 +53,7 @@ class SchemaPage {
             schemaDeleteButton: '[data-test="schema-delete-button"]',
             // ConfirmDialog migrated to ODialog — primary footer button
             // is now exposed via the common o-dialog-primary-btn slug.
-            confirmButton: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]'
+            confirmButton: '[data-test="o-dialog-primary-btn"]'
         };
     }
 
