@@ -15,7 +15,7 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px)" data-test="view-panel-screen">
+  <div style="height: calc(100vh - 57px); margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-5))" data-test="view-panel-screen">
     <div class="flex justify-between items-center q-pa-md">
       <div class="flex items-center q-table__title q-mr-md">
         <span data-test="dashboard-viewpanel-title">

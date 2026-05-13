@@ -1044,6 +1044,7 @@ export default defineComponent({
 .enterprise-dialog-v3 {
   overflow: hidden;
   position: relative;
+  margin: calc(-1 * var(--spacing-dialog-content-py, 1.25rem)) calc(-1 * var(--spacing-dialog-content-px, 1.25rem));
 }
 
 .close-btn-top-right {

@@ -562,7 +562,7 @@ describe("RenderDashboardCharts", () => {
       await nextTick();
       const dialog = wrapper.findComponent(ODialogStub);
       expect(dialog.exists()).toBe(true);
-      expect(dialog.props("size")).toBe("full");
+      expect(dialog.props("width")).toBe(98);
       expect(dialog.props("showClose")).toBe(false);
     });
 

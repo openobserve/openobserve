@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- view panel dialog -->
       <ODialog data-test="render-dashboard-charts-view-panel-dialog"
         v-model:open="showViewPanel"
-        size="full"
+        :width="98"
         :show-close="false"
       >
         <ViewPanel
