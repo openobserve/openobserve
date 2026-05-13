@@ -103,6 +103,10 @@ impl<D: Directory + Clone> RecordingDirectory<D> {
     pub fn drain_ops(&self) -> Vec<ReadOperation> {
         std::mem::take(&mut *self.ops.lock().unwrap())
     }
+
+    pub fn ops(&self) -> Vec<ReadOperation> {
+        self.ops.lock().unwrap().clone()
+    }
 }
 
 impl<D: Directory + Clone + 'static> Directory for RecordingDirectory<D> {
