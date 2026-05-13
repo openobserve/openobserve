@@ -51,7 +51,6 @@ watch(popoverOpen, (open) => {
   internalSecond.value = parts[2] ?? 0;
 });
 
-// Keep clock in sync when parent updates modelValue while popup is open
 watch(
   () => props.modelValue,
   (val) => {
@@ -87,8 +86,8 @@ interface ClockNum {
 const clockNumbers = computed((): ClockNum[] => {
   if (clockMode.value === "hour") {
     return Array.from({ length: 12 }, (_, i) => {
-      const h = i + 1; // 1-12
-      const index = h % 12; // 12→0, 1→1, …
+      const h = i + 1;
+      const index = h % 12;
       const pos = calcPos(index, 12, NUM_RADIUS);
       return { value: h, label: String(h), ...pos };
     });
@@ -102,7 +101,7 @@ const clockNumbers = computed((): ClockNum[] => {
 const handPos = computed(() => {
   let index: number;
   if (clockMode.value === "hour") {
-    index = internalHour.value % 12; // 0-11
+    index = internalHour.value % 12;
   } else {
     const val =
       clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
@@ -219,7 +218,6 @@ const fieldClasses = computed(() => [
     </label>
 
     <PopoverRoot v-model:open="popoverOpen">
-      <!-- Trigger: the visible field -->
       <PopoverTrigger
         as="div"
         :id="inputId"
@@ -231,7 +229,6 @@ const fieldClasses = computed(() => [
         @focus.capture="emit('focus', $event)"
         @blur.capture="emit('blur', $event)"
       >
-        <!-- Clock icon -->
         <span
           class="tw:flex tw:items-center tw:ps-3 tw:text-datepicker-icon tw:shrink-0 tw:select-none"
           aria-hidden="true"
@@ -242,16 +239,11 @@ const fieldClasses = computed(() => [
             fill="currentColor"
             class="tw:size-4"
           >
-            <path
-              d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 12a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11Z"
-            />
-            <path
-              d="M8 4a.5.5 0 0 1 .5.5V8H11a.5.5 0 0 1 0 1H7.5V4.5A.5.5 0 0 1 8 4Z"
-            />
+            <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 12a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11Z" />
+            <path d="M8 4a.5.5 0 0 1 .5.5V8H11a.5.5 0 0 1 0 1H7.5V4.5A.5.5 0 0 1 8 4Z" />
           </svg>
         </span>
 
-        <!-- Current value or placeholder -->
         <span
           :class="[
             'tw:flex-1 tw:min-w-0 tw:ps-2 tw:select-none',
@@ -264,7 +256,6 @@ const fieldClasses = computed(() => [
           {{ modelValue || (withSeconds ? "hh:mm:ss" : "hh:mm") }}
         </span>
 
-        <!-- Clear button -->
         <button
           v-if="clearable && modelValue"
           type="button"
@@ -280,68 +271,84 @@ const fieldClasses = computed(() => [
             class="tw:size-3.5"
             aria-hidden="true"
           >
-            <path
-              d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"
-            />
+            <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
           </svg>
         </button>
       </PopoverTrigger>
 
-      <!-- Analog clock popup -->
       <PopoverContent
         :side-offset="4"
         align="start"
-        class="tw:z-60 tw:rounded-lg tw:border tw:shadow-md tw:overflow-hidden tw:bg-datepicker-popup-bg tw:border-datepicker-popup-border tw:outline-none tw:w-55"
+        class="tw:z-60 tw:rounded-lg tw:border tw:shadow-md tw:overflow-hidden tw:bg-datepicker-popup-bg tw:border-datepicker-popup-border tw:outline-none tw:w-56"
         data-test="otime-popup"
       >
-        <!-- Header: digital time + AM/PM -->
-        <div
-          class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:bg-datepicker-clock-header-bg"
-        >
-          <div class="tw:flex tw:items-center tw:gap-0.5">
+        <!-- Time display + AM/PM pill (no heavy header band) -->
+        <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:pt-4 tw:pb-2">
+          <!-- Segmented time display -->
+          <div class="tw:flex tw:items-end tw:gap-0.5">
             <button
               type="button"
-              class="tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:outline-none tw:transition-opacity tw:text-datepicker-clock-header-text"
-              :class="clockMode === 'hour' ? 'tw:opacity-100' : 'tw:opacity-50'"
+              :class="[
+                'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:transition-colors tw:border-b-2',
+                clockMode === 'hour'
+                  ? 'tw:text-datepicker-day-selected-bg tw:border-datepicker-day-selected-bg'
+                  : 'tw:text-datepicker-heading-text tw:border-transparent tw:hover:text-datepicker-day-selected-bg',
+              ]"
               :aria-label="`Hour: ${displayHour}`"
               @click="clockMode = 'hour'"
             >{{ displayHour }}</button>
-            <span class="tw:text-2xl tw:font-semibold tw:text-datepicker-clock-header-text tw:opacity-70">:</span>
+            <span class="tw:text-2xl tw:font-semibold tw:text-datepicker-weekday-text tw:pb-0.5 tw:select-none">:</span>
             <button
               type="button"
-              class="tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:outline-none tw:transition-opacity tw:text-datepicker-clock-header-text"
-              :class="clockMode === 'minute' ? 'tw:opacity-100' : 'tw:opacity-50'"
+              :class="[
+                'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:transition-colors tw:border-b-2',
+                clockMode === 'minute'
+                  ? 'tw:text-datepicker-day-selected-bg tw:border-datepicker-day-selected-bg'
+                  : 'tw:text-datepicker-heading-text tw:border-transparent tw:hover:text-datepicker-day-selected-bg',
+              ]"
               :aria-label="`Minute: ${displayMinute}`"
               @click="clockMode = 'minute'"
             >{{ displayMinute }}</button>
             <template v-if="withSeconds">
-              <span class="tw:text-2xl tw:font-semibold tw:text-datepicker-clock-header-text tw:opacity-70">:</span>
+              <span class="tw:text-2xl tw:font-semibold tw:text-datepicker-weekday-text tw:pb-0.5 tw:select-none">:</span>
               <button
                 type="button"
-                class="tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:outline-none tw:transition-opacity tw:text-datepicker-clock-header-text"
-                :class="clockMode === 'second' ? 'tw:opacity-100' : 'tw:opacity-50'"
+                :class="[
+                  'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:transition-colors tw:border-b-2',
+                  clockMode === 'second'
+                    ? 'tw:text-datepicker-day-selected-bg tw:border-datepicker-day-selected-bg'
+                    : 'tw:text-datepicker-heading-text tw:border-transparent tw:hover:text-datepicker-day-selected-bg',
+                ]"
                 :aria-label="`Second: ${displaySecond}`"
                 @click="clockMode = 'second'"
               >{{ displaySecond }}</button>
             </template>
           </div>
-          <!-- AM / PM -->
-          <div class="tw:flex tw:flex-col tw:gap-0.5 tw:ms-2">
+
+          <!-- AM / PM horizontal pill -->
+          <div
+            class="tw:flex tw:rounded-md tw:border tw:border-datepicker-border tw:overflow-hidden tw:ms-3 tw:shrink-0"
+          >
             <button
               type="button"
-              class="tw:text-xs tw:px-2 tw:py-0.5 tw:rounded tw:outline-none tw:transition-colors tw:font-medium"
-              :class="isAM
-                ? 'tw:bg-datepicker-clock-selected-bg tw:text-datepicker-clock-selected-text'
-                : 'tw:text-datepicker-clock-header-text tw:opacity-50 tw:hover:opacity-80'"
+              :class="[
+                'tw:px-2.5 tw:py-1 tw:text-xs tw:font-medium tw:outline-none tw:transition-colors',
+                isAM
+                  ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
+                  : 'tw:text-datepicker-weekday-text tw:hover:bg-datepicker-clock-hover-bg',
+              ]"
               aria-label="AM"
               @click="setAM"
             >AM</button>
+            <div class="tw:w-px tw:bg-datepicker-border tw:shrink-0" aria-hidden="true" />
             <button
               type="button"
-              class="tw:text-xs tw:px-2 tw:py-0.5 tw:rounded tw:outline-none tw:transition-colors tw:font-medium"
-              :class="!isAM
-                ? 'tw:bg-datepicker-clock-selected-bg tw:text-datepicker-clock-selected-text'
-                : 'tw:text-datepicker-clock-header-text tw:opacity-50 tw:hover:opacity-80'"
+              :class="[
+                'tw:px-2.5 tw:py-1 tw:text-xs tw:font-medium tw:outline-none tw:transition-colors',
+                !isAM
+                  ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
+                  : 'tw:text-datepicker-weekday-text tw:hover:bg-datepicker-clock-hover-bg',
+              ]"
               aria-label="PM"
               @click="setPM"
             >PM</button>
@@ -349,16 +356,15 @@ const fieldClasses = computed(() => [
         </div>
 
         <!-- Clock face SVG -->
-        <div class="tw:p-3 tw:flex tw:justify-center">
+        <div class="tw:px-3 tw:pb-1 tw:flex tw:justify-center">
           <svg
             viewBox="0 0 220 220"
-            width="196"
-            height="196"
+            width="200"
+            height="200"
             role="img"
             :aria-label="`Select ${clockMode}`"
             data-test="otime-clock-face"
           >
-            <!-- Background circle -->
             <circle
               cx="110"
               cy="110"
@@ -366,8 +372,6 @@ const fieldClasses = computed(() => [
               class="tw:fill-datepicker-clock-face-bg tw:stroke-datepicker-popup-border"
               stroke-width="1"
             />
-
-            <!-- Hand line -->
             <line
               x1="110"
               y1="110"
@@ -377,17 +381,13 @@ const fieldClasses = computed(() => [
               stroke-width="2"
               stroke-linecap="round"
             />
-
-            <!-- Center dot -->
             <circle cx="110" cy="110" r="4" class="tw:fill-datepicker-clock-hand" />
-
-            <!-- Numbers (clickable) -->
             <g
               v-for="num in clockNumbers"
               :key="num.value"
               role="button"
               tabindex="0"
-              :aria-label="`${clockMode === 'hour' ? num.label : num.label} ${clockMode}`"
+              :aria-label="`${num.label} ${clockMode}`"
               :aria-pressed="isClockNumSelected(num)"
               class="tw:cursor-pointer tw:group"
               @click="onClockClick(num)"
@@ -407,7 +407,7 @@ const fieldClasses = computed(() => [
                 :y="num.y"
                 text-anchor="middle"
                 dominant-baseline="central"
-                font-size="12"
+                font-size="13"
                 class="tw:pointer-events-none tw:select-none"
                 :class="isClockNumSelected(num)
                   ? 'tw:fill-datepicker-clock-selected-text'
@@ -417,13 +417,44 @@ const fieldClasses = computed(() => [
           </svg>
         </div>
 
-        <!-- Footer: mode hint + Close -->
-        <div
-          class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:pb-3"
-        >
-          <span class="tw:text-xs tw:text-datepicker-weekday-text tw:capitalize">
-            Select {{ clockMode }}
-          </span>
+        <!-- Footer: step dots + Close -->
+        <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:pb-3">
+          <div class="tw:flex tw:items-center tw:gap-1.5" role="group" aria-label="Step">
+            <button
+              type="button"
+              :class="[
+                'tw:rounded-full tw:transition-all tw:outline-none',
+                clockMode === 'hour'
+                  ? 'tw:w-4 tw:h-2 tw:bg-datepicker-day-selected-bg'
+                  : 'tw:size-2 tw:bg-datepicker-border tw:hover:bg-datepicker-weekday-text',
+              ]"
+              aria-label="Hour"
+              @click="clockMode = 'hour'"
+            />
+            <button
+              type="button"
+              :class="[
+                'tw:rounded-full tw:transition-all tw:outline-none',
+                clockMode === 'minute'
+                  ? 'tw:w-4 tw:h-2 tw:bg-datepicker-day-selected-bg'
+                  : 'tw:size-2 tw:bg-datepicker-border tw:hover:bg-datepicker-weekday-text',
+              ]"
+              aria-label="Minute"
+              @click="clockMode = 'minute'"
+            />
+            <button
+              v-if="withSeconds"
+              type="button"
+              :class="[
+                'tw:rounded-full tw:transition-all tw:outline-none',
+                clockMode === 'second'
+                  ? 'tw:w-4 tw:h-2 tw:bg-datepicker-day-selected-bg'
+                  : 'tw:size-2 tw:bg-datepicker-border tw:hover:bg-datepicker-weekday-text',
+              ]"
+              aria-label="Second"
+              @click="clockMode = 'second'"
+            />
+          </div>
           <button
             type="button"
             class="tw:text-xs tw:font-medium tw:text-datepicker-day-selected-bg tw:outline-none tw:hover:opacity-80"
@@ -434,7 +465,6 @@ const fieldClasses = computed(() => [
       </PopoverContent>
     </PopoverRoot>
 
-    <!-- Error / help text -->
     <div
       v-if="effectiveError || helpText"
       class="tw:flex tw:items-center tw:gap-2"
