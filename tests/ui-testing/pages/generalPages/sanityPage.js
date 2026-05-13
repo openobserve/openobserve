@@ -45,7 +45,7 @@ export class SanityPage {
         // After ConfirmDialog migrated to ODialog, the OK button no longer
         // carries a "confirm-button" data-test. The ODialog primary footer
         // button surfaces as "o-dialog-primary-btn" inside the open dialog.
-        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.confirmButton = '[data-test="o-dialog-primary-btn"]';
         
         // Function locators
         this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
