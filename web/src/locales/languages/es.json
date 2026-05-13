@@ -395,7 +395,8 @@
     "selectStreamFirst": "Selecciona primero una transmisión",
     "traces": "Huellas",
     "switchToLogs": "haga clic para volver a Registros",
-    "patternNoValuesAvailable": "No hay valores disponibles"
+    "patternNoValuesAvailable": "No hay valores disponibles",
+    "selectLogStream": "Seleccione la secuencia de registros"
   },
   "menu": {
     "home": "Inicio",

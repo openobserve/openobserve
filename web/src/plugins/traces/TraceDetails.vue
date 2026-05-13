@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Log Stream Selector (if enabled) -->
             <div
-              v-if="showLogStreamSelector"
+              v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
               class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
             >
               <q-select
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="
                   searchObj.data.traceDetails.selectedLogStreams.length
                     ? ''
-                    : t('search.selectIndex')
+                    : t('search.selectLogStream')
                 "
                 :options="filteredStreamOptions"
                 data-cy="stream-selection"
@@ -482,6 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @select-span="updateSelectedSpan"
                         @update-current-index="handleIndexUpdate"
                         @search-result="handleSearchResult"
+                        @view-correlated-logs="handleTreeViewCorrelatedLogs"
                       />
                     </div>
                   </div>
@@ -701,7 +702,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("traces.traceFilters") }}
           </div>
-          <q-btn icon="close" flat round dense v-close-popup />
+          <q-btn icon="close"
+flat round
+dense v-close-popup />
         </q-card-section>
 
         <q-card-section class="tw:flex-1 tw:p-4 tw:flex tw:flex-col">
@@ -751,11 +754,11 @@ import {
   defineAsyncComponent,
   onBeforeMount,
   nextTick,
+  computed,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
-import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
@@ -791,6 +794,8 @@ import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import config from "@/aws-exports";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
@@ -908,7 +913,14 @@ export default defineComponent({
     const spanMap: any = ref({});
     const activeTab = ref("waterfall");
 
-    const { searchObj, getUrlQueryParams } = useTraces();
+    const {
+      searchObj,
+      getUrlQueryParams,
+      buildQueryDetails,
+      navigateToLogs,
+      navigateToCorrelatedLogs,
+    } = useTraces();
+
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -1398,7 +1410,7 @@ export default defineComponent({
               searchObj.data.traceDetails.selectedLogStreams.push(
                 logStreamFromQuery,
               );
-            } else if (logStreams.value.length > 0) {
+            } else if (logStreams.value.length === 1) {
               // Default: select the first available log stream
               searchObj.data.traceDetails.selectedLogStreams.push(
                 logStreams.value[0],
@@ -2357,7 +2369,9 @@ export default defineComponent({
       store.dispatch("logs/setIsInitialized", false);
 
       const stream: string =
-        searchObj.data.traceDetails.selectedLogStreams.join(",");
+        config.isEnterprise === "true"
+          ? logStreams.value.join(",")
+          : searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
         searchObj.data.traceDetails.selectedTrace?.trace_start_time - 60000000;
       const to =
@@ -2365,7 +2379,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
+        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${spanList.value[0]["trace_id"]}'`,
       );
 
       router.push({
@@ -2384,6 +2398,16 @@ export default defineComponent({
           quick_mode: "false",
         },
       });
+    };
+
+    const handleTreeViewCorrelatedLogs = (span: any) => {
+      const spanId = span.spanId || span.span_id;
+      updateSelectedSpan(spanId);
+
+      const correlationData = searchObj.data.traceDetails.correlationProps;
+      if (correlationData) {
+        navigateToCorrelatedLogs(correlationData);
+      }
     };
 
     const redirectToSessionReplay = () => {
@@ -2659,6 +2683,7 @@ export default defineComponent({
     };
 
     return {
+      config,
       router,
       t,
       activeTab,
@@ -2695,6 +2720,7 @@ export default defineComponent({
       outlinedInfo,
       outlinedPlayCircle,
       redirectToLogs,
+      handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
       hasRumSessionId,
       firstRumSessionData,

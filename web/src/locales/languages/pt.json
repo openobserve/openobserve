@@ -395,7 +395,8 @@
     "selectStreamFirst": "Selecione um stream primeiro",
     "traces": "Traços",
     "switchToLogs": "clique para voltar para Logs",
-    "patternNoValuesAvailable": "Não há valores disponíveis"
+    "patternNoValuesAvailable": "Não há valores disponíveis",
+    "selectLogStream": "Selecione o fluxo de registros"
   },
   "menu": {
     "home": "Início",

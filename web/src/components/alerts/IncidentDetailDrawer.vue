@@ -1038,7 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Logs Tab Content -->
-        <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
+        <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
             <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
@@ -1070,7 +1070,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Success State - CorrelatedLogsTable -->
-          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden">
+          <div v-else-if="hasCorrelatedData && correlationData" class="tw-flex-1 tw-overflow-hidden tw:h-full">
             <CorrelatedLogsTable
               :service-name="correlationData.serviceName"
               :matched-dimensions="actualMatchedDimensions"
