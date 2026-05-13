@@ -71,13 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleAIChat"
                 data-test="menu-link-ai-item"
                 variant="ghost"
-                size="icon-circle-sm"
+                size="icon-toolbar"
                 class="ai-hover-btn"
                 :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
                 @mouseenter="isHovered = true"
                 @mouseleave="isHovered = false"
               >
-                <img :src="getBtnLogo" style="width: 18px; height: 18px;" />
+                <img :src="getBtnLogo" class="ai-icon" style="width: 18px; height: 18px;" />
               </OButton>
             </div>
           </div>
@@ -1342,6 +1342,14 @@ const getBtnLogo = computed(() => {
   &:hover {
     background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
     box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+  }
+
+  .ai-icon {
+    transition: transform 0.6s ease;
+  }
+
+  &:hover .ai-icon {
+    transform: rotate(180deg);
   }
 }
 
