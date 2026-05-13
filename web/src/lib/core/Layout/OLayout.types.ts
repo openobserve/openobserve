@@ -7,6 +7,10 @@ export interface LayoutProps extends PrimitiveProps {
   as?: string;
 }
 
+export interface LayoutEmits {
+  // Reserved for future use
+}
+
 export interface LayoutSlots {
   default?: () => unknown;
 }

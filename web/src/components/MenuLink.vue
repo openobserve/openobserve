@@ -369,3 +369,75 @@ body.body--light {
 }
 
 </style>
+
+<!-- Unscoped: targets Quasar-rendered DOM inside .navbar-links container -->
+<style lang="scss">
+.navbar-links {
+  padding-top: 0.25rem;
+
+  .q-item {
+    margin: 0 0.156rem;
+    padding: 0.125rem;
+    border-radius: 0.313rem;
+    display: list-item;
+    text-align: center;
+    list-style: none;
+
+    &__section--avatar {
+      padding-right: 0;
+      min-width: 1.5rem;
+      display: list-item;
+      text-align: center;
+      list-style: none;
+    }
+
+    .q-icon {
+      height: 1.3rem;
+      width: 1.3rem;
+    }
+
+    .q-item__label {
+      padding-bottom: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--o2-text-secondary);
+    }
+
+    &.q-router-link--active {
+      color: var(--o2-menu-color);
+
+      .q-icon img {
+        filter: brightness(100);
+      }
+
+      .q-item__label {
+        color: var(--o2-menu-color);
+      }
+
+      body.body--light & {
+        color: var(--o2-menu-color) !important;
+
+        .q-icon {
+          color: #19191e !important;
+        }
+
+        .q-item__label {
+          color: #19191e !important;
+        }
+      }
+
+      body.body--dark & {
+        color: var(--o2-menu-color) !important;
+
+        .q-icon {
+          color: #ffffff !important;
+        }
+
+        .q-item__label {
+          color: #ffffff !important;
+        }
+      }
+    }
+  }
+}
+</style>

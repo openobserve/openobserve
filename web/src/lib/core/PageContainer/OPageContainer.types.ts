@@ -7,6 +7,10 @@ export interface PageContainerProps extends PrimitiveProps {
   as?: string;
 }
 
+export interface PageContainerEmits {
+  // Reserved for future use
+}
+
 export interface PageContainerSlots {
   default?: () => unknown;
 }
