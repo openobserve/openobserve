@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.llmEvaluation')"
-    size="md"
+    :width="30"
     :show-close="true"
     @keydown.stop
   >
