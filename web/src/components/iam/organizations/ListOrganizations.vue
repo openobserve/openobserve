@@ -116,7 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
       </div>
     <add-update-organization
-      v-model:open="showAddOrganizationDialog"
+      :open="showAddOrganizationDialog"
+      @update:open="onDrawerOpenChange"
       @updated="updateOrganizationList"
       :model-value="toBeUpdatedOrganization"
     />
@@ -389,6 +390,7 @@ export default defineComponent({
         name: "",
         identifier: "",
       };
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "add",
@@ -413,6 +415,11 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    };
+
+    const onDrawerOpenChange = (val: boolean) => {
+      showAddOrganizationDialog.value = val;
+      if (!val) hideAddOrgDialog();
     };
 
     const inviteTeam = (props: any) => {
@@ -497,6 +504,7 @@ export default defineComponent({
       filterQuery,
       filterData,
       hideAddOrgDialog,
+      onDrawerOpenChange,
       visibleRows,
       hasVisibleRows,
 

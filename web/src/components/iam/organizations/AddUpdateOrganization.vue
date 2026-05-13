@@ -19,6 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="lg"
     :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
+    :primaryButtonLabel="t('organization.save')"
+    :secondaryButtonLabel="t('organization.cancel')"
+    :primaryButtonDisabled="organizationData.name === '' && !proPlanRequired"
+    @click:primary="onSubmit"
+    @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4">
@@ -60,26 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Use alphanumeric characters, space and underscore only.
             </template>
           </q-input>
-
-          <div class="flex justify-start tw:mt-6 tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="$emit('update:open', false)"
-              data-test="cancel-organizations-modal"
-            >
-              {{ t('organization.cancel') }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              :disabled="organizationData.name === '' && !proPlanRequired"
-              data-test="add-org"
-            >
-              {{ t('organization.save') }}
-            </OButton>
-          </div>
 
           <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
             <OButton
