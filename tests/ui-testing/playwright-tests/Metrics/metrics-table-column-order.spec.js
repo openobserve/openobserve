@@ -245,7 +245,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     }
 
     // Verify the Column Order button is visible
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
 
     // Log what's visible in the config panel for debugging
     const visibleButtons = await page.locator('button').allTextContents();
@@ -277,13 +277,13 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Click the Column Order button
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
     testLogger.info('Clicked Column Order button');
 
     // Verify the popup/dialog opens
-    const columnOrderPopup = page.locator('[data-test="dashboard-column-order-popup"]');
+    const columnOrderPopup = pm.dashboardPanelConfigs.columnOrderDialog;
     await expect(columnOrderPopup).toBeVisible({ timeout: 5000 });
     testLogger.info('Column Order popup opened successfully');
 
@@ -307,8 +307,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info(`Column Order popup displays ${columnCount} columns`);
 
     // Close the popup
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   // P1 - Functional Tests
@@ -320,7 +319,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -355,9 +354,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column order changed successfully using move up button');
 
     // Cancel to close the popup
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   test("Verify columns can be reordered using move down button", {
@@ -368,7 +365,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -397,9 +394,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column order changed successfully using move down button');
 
     // Cancel to close the popup
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   test("Verify drag handles are present for each column", {
@@ -410,7 +405,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -427,9 +422,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Drag handles are visible and properly configured');
 
     // Close the popup
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   test("Verify column order can be saved and persists", {
@@ -451,7 +444,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     }
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -466,13 +459,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await page.waitForTimeout(500);
 
     // Save the new order
-    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
-    await saveButton.click();
-    await page.waitForTimeout(1000);
+    await pm.dashboardPanelConfigs.saveColumnOrder();
     testLogger.info('Saved column order');
 
     // Verify the popup closed
-    const columnOrderPopup = page.locator('[data-test="dashboard-column-order-popup"]');
+    const columnOrderPopup = pm.dashboardPanelConfigs.columnOrderDialog;
     await expect(columnOrderPopup).not.toBeVisible({ timeout: 3000 });
     testLogger.info('Column Order popup closed after save');
 
@@ -503,7 +494,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -523,14 +514,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     expect(changedFirstColumnName).not.toBe(initialFirstColumnName);
 
     // Click Cancel
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(500);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
     testLogger.info('Clicked cancel button');
 
-    // Verify the popup closed
-    const columnOrderPopup = page.locator('[data-test="dashboard-column-order-popup"]');
-    await expect(columnOrderPopup).not.toBeVisible({ timeout: 3000 });
+    // Verify the popup closed (cancelColumnOrder waits for hidden; this is an explicit assertion)
+    await expect(pm.dashboardPanelConfigs.columnOrderDialog).not.toBeVisible({ timeout: 3000 });
     testLogger.info('Column Order popup closed after cancel');
 
     // Re-open the popup to verify changes were discarded
@@ -544,8 +532,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column order was successfully discarded after cancel');
 
     // Close the popup
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   test("Verify close icon also cancels column order changes", {
@@ -556,7 +543,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -567,14 +554,14 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Made column order change');
 
     // Click the close (×) icon — ODialog renders it as o-dialog-close-btn
-    const closeIcon = page.locator('[data-test="dashboard-column-order-popup"] [data-test="o-dialog-close-btn"]');
+    const closeIcon = pm.dashboardPanelConfigs.columnOrderDialog.locator('[data-test="o-dialog-close-btn"]');
     await expect(closeIcon).toBeVisible();
     await closeIcon.click();
     await page.waitForTimeout(500);
     testLogger.info('Clicked close icon');
 
     // Verify the popup closed
-    const columnOrderPopup = page.locator('[data-test="dashboard-column-order-popup"]');
+    const columnOrderPopup = pm.dashboardPanelConfigs.columnOrderDialog;
     await expect(columnOrderPopup).not.toBeVisible({ timeout: 3000 });
     testLogger.info('Column Order popup closed via close icon');
   });
@@ -607,7 +594,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 2: Open Column Order popup and reorder
     testLogger.info('Opening Column Order popup');
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -624,13 +611,11 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 3: Save the column order
     testLogger.info('Saving column order');
-    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
-    await saveButton.click();
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelConfigs.saveColumnOrder();
     testLogger.info('Column order saved');
 
     // STEP 4: Verify the popup closed
-    const columnOrderPopup = page.locator('[data-test="dashboard-column-order-popup"]');
+    const columnOrderPopup = pm.dashboardPanelConfigs.columnOrderDialog;
     await expect(columnOrderPopup).not.toBeVisible({ timeout: 3000 });
     testLogger.info('Column Order popup closed after save');
 
@@ -672,7 +657,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 1: Set custom column order
     testLogger.info('Setting custom column order');
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -687,9 +672,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info(`Expected column after reorder: "${expectedColumnName}"`);
 
     // Save the column order
-    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
-    await saveButton.click();
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelConfigs.saveColumnOrder();
     testLogger.info('Column order saved');
 
     // STEP 2: Verify table shows reordered columns
@@ -738,7 +721,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 1: Set custom column order
     testLogger.info('Setting custom column order');
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -753,9 +736,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info(`Expected column: "${expectedColumnName}"`);
 
     // Save the column order
-    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
-    await saveButton.click();
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelConfigs.saveColumnOrder();
     testLogger.info('Column order saved');
 
     // STEP 2: Switch to a different chart type (e.g., line chart)
@@ -793,7 +774,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // STEP 1: Set custom column order for cpu_usage query
     testLogger.info('Setting custom column order for cpu_usage');
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -804,8 +785,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     if (initialColumnCount < 2) {
       testLogger.warn('Not enough columns to test');
-      const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-      await cancelButton.click();
+      await pm.dashboardPanelConfigs.cancelColumnOrder();
       return;
     }
 
@@ -820,9 +800,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info(`Expected column (should be 2nd in table): "${expectedColumnName}"`);
 
     // Save the column order
-    const saveButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]`);
-    await saveButton.click();
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelConfigs.saveColumnOrder();
     testLogger.info('Column order saved');
 
     // Close config sidebar
@@ -872,7 +850,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -886,9 +864,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Move up button is correctly disabled for first column');
 
     // Close the popup
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   test("Verify move down button is disabled for last column", {
@@ -899,7 +875,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -918,9 +894,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Move down button is correctly disabled for last column');
 
     // Close the popup
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   test("Verify Column Order button is NOT visible for Time series mode", {
@@ -935,7 +909,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await page.waitForTimeout(1500);
 
     // Verify the Column Order button is NOT visible
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     const isButtonVisible = await columnOrderButton.isVisible({ timeout: 3000 }).catch(() => false);
 
     expect(isButtonVisible).toBe(false);
@@ -953,7 +927,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await page.waitForTimeout(1500);
 
     // Verify the Column Order button is visible for Aggregate mode
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     const isButtonVisible = await columnOrderButton.isVisible({ timeout: 5000 }).catch(() => false);
 
     if (isButtonVisible) {
@@ -962,7 +936,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
       await page.waitForTimeout(500);
 
       // Verify the popup opens
-      const columnOrderPopup = page.locator('[data-test="dashboard-column-order-popup"]');
+      const columnOrderPopup = pm.dashboardPanelConfigs.columnOrderDialog;
       await expect(columnOrderPopup).toBeVisible({ timeout: 5000 });
       testLogger.info('Column Order popup opened for Aggregate mode');
 
@@ -973,7 +947,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
       testLogger.info(`Column Order popup displays ${columnCount} columns in Aggregate mode`);
 
       // Close the popup
-      const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
+      const cancelButton = pm.dashboardPanelConfigs.columnOrderDialog.locator('[data-test="o-dialog-secondary-btn"]');
       await cancelButton.click();
       await page.waitForTimeout(300);
     } else {
@@ -991,7 +965,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -1028,9 +1002,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     }
 
     // Close the popup
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   test("Verify column numbers update correctly after reordering", {
@@ -1041,7 +1013,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -1065,9 +1037,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column numbers update correctly and remain sequential');
 
     // Close the popup
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 
   test("Verify empty state is not shown when columns are available", {
@@ -1078,7 +1048,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     await setupTableChart(page, 'expanded_timeseries');
 
     // Open Column Order popup
-    const columnOrderButton = page.locator('[data-test="dashboard-config-column-order-button"]');
+    const columnOrderButton = pm.dashboardPanelConfigs.columnOrderBtn;
     await columnOrderButton.click();
     await page.waitForTimeout(500);
 
@@ -1094,8 +1064,6 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Empty state is correctly not shown when columns are available');
 
     // Close the popup
-    const cancelButton = page.locator(`[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]`);
-    await cancelButton.click();
-    await page.waitForTimeout(300);
+    await pm.dashboardPanelConfigs.cancelColumnOrder();
   });
 });

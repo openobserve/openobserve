@@ -598,4 +598,10 @@ export default class LogsVisualise {
     const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
     await queryInspectorCloseBtn.waitFor({ state: "visible", timeout: 10000 });
   }
+
+  async closeQueryInspector() {
+    const closeBtn = this.page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
+    await closeBtn.click();
+    await this.page.locator('[data-test="query-inspector-dialog"]').waitFor({ state: 'hidden', timeout: 5000 });
+  }
 }
