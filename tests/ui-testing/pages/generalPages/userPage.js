@@ -130,8 +130,8 @@ export class UserPage {
     }
 
     async verifyUserNotExists() {
-        
-        await expect(this.page.locator('[data-test="iam-page"]').getByRole('main')).toContainText('No data available');
+
+        await expect(this.page.locator('[data-test="iam-page"]')).toContainText('No data available');
 
     }
 

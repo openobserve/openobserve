@@ -104,7 +104,7 @@ export class CreateOrgPage {
     }
     
     async verifyOrgNotExists() {
-        const mainSection = this.page.locator('[data-test="iam-page"]').getByRole('main');
+        const mainSection = this.page.locator('[data-test="iam-page"]');
         const textContent = await mainSection.textContent();
         console.log('Main section text:', textContent); // Debugging line
         await expect(mainSection).toContainText('No data available');
