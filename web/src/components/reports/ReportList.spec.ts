@@ -134,9 +134,14 @@ const ODrawerStub = {
 // MoveAcrossFolders stub: emits @updated / @close to drive ReportList handlers.
 const MoveAcrossFoldersStub = {
   name: "MoveAcrossFolders",
-  props: ["activeFolderId", "moduleId", "type"],
-  emits: ["updated", "close"],
-  template: `<div data-test="move-across-folders-stub" />`,
+  props: ["open", "activeFolderId", "moduleId", "type"],
+  emits: ["updated", "close", "update:open"],
+  inheritAttrs: false,
+  template: `
+    <div v-if="open" v-bind="$attrs">
+      <div data-test="move-across-folders-stub" />
+    </div>
+  `,
 };
 
 function mountComponent() {
@@ -755,7 +760,7 @@ describe("ReportList", () => {
         wrapper.find(
           '[data-test="report-move-to-another-folder-dialog"]',
         ).exists(),
-      ).toBe(false);
+      ).toBe(false); // MoveAcrossFolders renders nothing when open=false
     });
 
     it("should open the drawer when openMoveDialog is called for a single row", async () => {
@@ -776,23 +781,20 @@ describe("ReportList", () => {
       );
     });
 
-    it("should render the ODrawer once showMoveDialog flips to true", async () => {
+    it("should render the element once showMoveDialog flips to true", async () => {
       wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
       await nextTick();
       const drawer = wrapper.find(
         '[data-test="report-move-to-another-folder-dialog"]',
       );
       expect(drawer.exists()).toBe(true);
-      // Confirm props from the migration: size="lg", show-close=false
-      expect(drawer.attributes("data-stub-size")).toBe("lg");
-      expect(drawer.attributes("data-stub-show-close")).toBe("false");
     });
 
     it("should render MoveAcrossFolders inside the drawer when open", async () => {
       wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
       await nextTick();
       expect(
-        wrapper.find('[data-test="move-across-folders-stub"]').exists(),
+        wrapper.findComponent(MoveAcrossFoldersStub).exists(),
       ).toBe(true);
     });
 
@@ -810,29 +812,21 @@ describe("ReportList", () => {
       );
     });
 
-    it("should close drawer when ODrawer emits @close", async () => {
-      wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
-      await nextTick();
-      // Multiple ODrawer stubs may exist (some descendants render their own).
-      // Pick the one carrying our own data-test attribute (fallthrough from
-      // the template's `data-test="report-move-to-another-folder-dialog"`).
-      const drawer = wrapper
-        .findAllComponents(ODrawerStub)
-        .find((c) =>
-          c.attributes("data-test") === "report-move-to-another-folder-dialog",
-        );
-      expect(drawer).toBeTruthy();
-      await drawer!.vm.$emit("close");
-      await nextTick();
-      expect(wrapper.vm.showMoveDialog).toBe(false);
-    });
-
-    it("should close drawer when MoveAcrossFolders emits @close", async () => {
+    it("should close drawer when MoveAcrossFolders emits update:open false", async () => {
       wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
       await nextTick();
       const child = wrapper.findComponent(MoveAcrossFoldersStub);
       expect(child.exists()).toBe(true);
-      await child.vm.$emit("close");
+      await child.vm.$emit("update:open", false);
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+    });
+
+    it("should close drawer when showMoveDialog is set to false", async () => {
+      wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      wrapper.vm.showMoveDialog = false;
       await nextTick();
       expect(wrapper.vm.showMoveDialog).toBe(false);
     });

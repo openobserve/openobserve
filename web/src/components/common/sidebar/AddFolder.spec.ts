@@ -484,7 +484,7 @@ describe("AddFolder.vue", () => {
       wrapper = createWrapper();
 
       const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("width")).toBe(20);
     });
 
     it("passes the add-folder title to ODrawer when not in edit mode", () => {

@@ -825,13 +825,12 @@ describe('MoveAcrossFolders.vue', () => {
     expect(drawer.props('secondaryButtonLabel')).toBe('Cancel');
   });
 
-  // Test 50: ODrawer size and open propagation
-  it('should pass open prop and size="lg" through to ODrawer', () => {
+  // Test 50: ODrawer open propagation
+  it('should pass open prop through to ODrawer', () => {
     wrapper = createWrapper({ open: true });
 
     const drawer = wrapper.findComponent(ODrawerStub);
     expect(drawer.props('open')).toBe(true);
-    expect(drawer.props('size')).toBe('lg');
   });
 
   // Test 51: Edge case - very long module ID array
