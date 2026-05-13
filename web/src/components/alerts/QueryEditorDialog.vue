@@ -21,67 +21,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="full"
     :show-close="false"
   >
+    <template #header-left>
+        <!-- Left: back + title + stream info -->
+        <div class="tw:flex tw:items-center tw:gap-2.5">
+          <div
+            data-test="add-alert-back-btn"
+            class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 tw:transition-opacity tw:flex-shrink-0"
+            style="border: 1.5px solid currentColor; border-radius: 50%; width: 20px; height: 20px;"
+            :title="t('common.goBack')"
+            @click="closeDialog"
+          >
+            <q-icon name="arrow_back_ios_new" size="9px" />
+          </div>
+          <span class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block">{{ t('alerts.addConditions') }}</span>
+
+          <!-- Separator -->
+          <div class="tw:w-px tw:h-4 tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:bg-gray-400' : 'tw:bg-gray-500'" />
+
+          <!-- Stream Type + Stream Name -->
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <div v-if="streamType" class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--type-dark' : 'topbar-info-chip--type-light'">
+              <span class="topbar-info-chip__label">Stream Type</span>
+              <span class="topbar-info-chip__sep">:</span>
+              <span class="topbar-info-chip__value">{{ streamType }}</span>
+            </div>
+            <span v-if="streamType && streamName" class="tw:opacity-20 tw:select-none">|</span>
+            <div class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--name-dark' : 'topbar-info-chip--name-light'">
+              <span class="topbar-info-chip__label">Stream Name</span>
+              <span class="topbar-info-chip__sep">:</span>
+              <span v-if="streamName" class="topbar-info-chip__value">{{ streamName }}</span>
+              <span v-else class="topbar-info-chip__value tw:opacity-40 tw:italic">none</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #header-right> 
+        <!-- Right: AI -->
+        <div class="tw:flex tw:items-center tw:gap-3">
+
+          <!-- AI button -->
+          <OButton
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
+            variant="ghost"
+            size="icon-toolbar"
+            class="ai-hover-btn"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
+          >
+            <img :src="getBtnLogo" class="ai-icon" style="width: 18px; height: 18px;" />
+          </OButton>
+        </div>
+      </template>
     <div class="tw:flex tw:h-screen tw:overflow-hidden editor-dialog-card">
       <div
         class="tw:h-full tw:flex tw:overflow-hidden tw:flex-1"
       >
         <div class="tw:h-full tw:w-full tw:flex tw:flex-col">
-          <!-- Header -->
-          <div class="dialog-topbar" :class="store.state.theme === 'dark' ? 'dialog-topbar--dark' : 'dialog-topbar--light'">
-            <!-- Left: back + title + stream info -->
-            <div class="tw:flex tw:items-center tw:gap-2.5">
-              <div
-                data-test="add-alert-back-btn"
-                class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 tw:transition-opacity tw:flex-shrink-0"
-                style="border: 1.5px solid currentColor; border-radius: 50%; width: 20px; height: 20px;"
-                :title="t('common.goBack')"
-                @click="closeDialog"
-              >
-                <q-icon name="arrow_back_ios_new" size="9px" />
-              </div>
-              <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ t('alerts.addConditions') }}</span>
-
-              <!-- Separator -->
-              <div class="tw:w-px tw:h-4 tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:bg-gray-400' : 'tw:bg-gray-500'" />
-
-              <!-- Stream Type + Stream Name -->
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <div v-if="streamType" class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--type-dark' : 'topbar-info-chip--type-light'">
-                  <span class="topbar-info-chip__label">Stream Type</span>
-                  <span class="topbar-info-chip__sep">:</span>
-                  <span class="topbar-info-chip__value">{{ streamType }}</span>
-                </div>
-                <span v-if="streamType && streamName" class="tw:opacity-20 tw:select-none">|</span>
-                <div class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--name-dark' : 'topbar-info-chip--name-light'">
-                  <span class="topbar-info-chip__label">Stream Name</span>
-                  <span class="topbar-info-chip__sep">:</span>
-                  <span v-if="streamName" class="topbar-info-chip__value">{{ streamName }}</span>
-                  <span v-else class="topbar-info-chip__value tw:opacity-40 tw:italic">none</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right: AI -->
-            <div class="tw:flex tw:items-center tw:gap-3">
-
-              <!-- AI button -->
-              <OButton
-                v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                :ripple="false"
-                @click="toggleAIChat"
-                data-test="menu-link-ai-item"
-                variant="ghost"
-                size="icon-toolbar"
-                class="ai-hover-btn"
-                :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-                @mouseenter="isHovered = true"
-                @mouseleave="isHovered = false"
-              >
-                <img :src="getBtnLogo" class="ai-icon" style="width: 18px; height: 18px;" />
-              </OButton>
-            </div>
-          </div>
-
           <!-- Main Content Grid: field browser | editors | output -->
           <div class="tw:grid tw:flex-1 tw:min-h-0 tw:w-full tw:grid-cols-[20fr_45fr_35fr] tw:gap-x-2 tw:px-2 tw:pr-2 tw:py-2 tw:overflow-hidden">
 
