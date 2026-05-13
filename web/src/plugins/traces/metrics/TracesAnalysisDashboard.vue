@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="tw:flex-1 tw:pt-2 tw:overflow-hidden">
+      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden">
         <q-splitter
           v-model="splitterModel"
           :limits="splitterLimits"
@@ -1186,15 +1186,16 @@ watch(
     }
   }
 
-  .analysis-content {
-    flex: 1;
-    overflow: hidden; // Changed to hidden - q-splitter handles overflow
-    min-height: 0;
-    background: #f5f5f5 !important;
-  }
   .q-card__section--vert {
     padding: 8px !important;
   }
+}
+
+.analysis-content {
+  flex: 1;
+  overflow: hidden; // Changed to hidden - q-splitter handles overflow
+  min-height: 0;
+  background: #f5f5f5 !important;
 }
 
 // Dimension sidebar (in splitter)
@@ -1241,9 +1242,10 @@ body.body--dark {
       background: #1e1e1e !important;
     }
 
-    .analysis-content {
-      background: #2a2a2a !important;
-    }
+  }
+
+  .analysis-content {
+    background: #2a2a2a !important;
   }
 
   .dimension-sidebar {
