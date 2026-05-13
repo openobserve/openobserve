@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="tw:flex-1 tw:p-0 tw:overflow-hidden">
+      <div class="tw:flex-1 tw:pt-2 tw:overflow-hidden">
         <q-splitter
           v-model="splitterModel"
           :limits="splitterLimits"
@@ -1114,6 +1114,21 @@ watch(
 );
 </script>
 
+<style lang="scss">
+// Non-scoped: ODrawer body for this drawer does not have flex:1 by default
+// (intentional for form drawers, but the Insights drawer needs a full-height
+// splitter layout). Override the body div — 4th child of the drawer panel after
+// the two sr-only elements (h2, p) and the header div.
+// Also adds the top gap (matching --spacing-dialog-content-py = 0.75rem)
+// that ODialog provides by default but ODrawer omits.
+[data-test="traces-analysis-dashboard-drawer"] > div:nth-child(4) {
+  flex: 1 1 0 !important;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+</style>
+
 <style lang="scss" scoped>
 .analysis-dashboard-card {
   display: flex;
@@ -1211,13 +1226,11 @@ watch(
 }
 
 // Splitter icon positioning (at top, like logs page)
-.analysis-splitter-icon-collapse {
-  min-height: 3em !important;
-  min-width: 0.3rem !important;
-  position: absolute !important;
-  top: 26px !important;
-  left: 15px !important;
+// Splitter separator bar — visible narrow divider with collapse button at top
+:deep(.analysis-splitter-smooth.q-splitter--vertical > .q-splitter__separator) {
+  width: 10px !important;
 }
+
 
 // Dark mode support
 body.body--dark {
