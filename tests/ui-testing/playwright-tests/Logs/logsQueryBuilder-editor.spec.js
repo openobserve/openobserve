@@ -518,14 +518,13 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
 
         await setupQueryAndSwitchToBuild(pm, page, 'SELECT * FROM "e2e_automate"');
         await pm.logsPage.clickCustomQueryType();
-        await page.waitForTimeout(1000);
 
         await pm.logsPage.searchFieldInBuilder('kubernetes');
 
         const buttonCount = await pm.logsPage.getAddXButtonCount();
         testLogger.info(`Custom mode + search: ${buttonCount} +X buttons`);
 
-        expect(buttonCount).toBeGreaterThanOrEqual(0);
+        expect(buttonCount).toBeGreaterThan(0);
 
         testLogger.info('Custom mode buttons with search - PASSED');
     });
