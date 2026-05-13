@@ -3,6 +3,10 @@
 <script setup lang="ts">
 import type { LayoutProps, LayoutSlots } from "./OLayout.types";
 import { Primitive } from "reka-ui";
+/**
+ * Root layout component. Provides Quasar-compatible layout injections (_q_pc_, _q_l_)
+ * so legacy Quasar child components continue to function during the transition.
+ */
 import { provide } from "vue";
 
 defineOptions({ inheritAttrs: false });
