@@ -1146,6 +1146,6 @@ watch(
 
 <style lang="scss">
 .logs-table-container .container {
-  height: calc(100vh - 115px) !important;
+  height: 100% !important;
 }
 </style>
