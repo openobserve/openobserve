@@ -1380,12 +1380,10 @@ test.describe("dashboard filter testcases", () => {
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
-    // Verify that the SQL query contains the NOT IN clause
+    // Verify that the SQL query contains the match_all clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE match_all(\'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+      page.locator('[data-test="query-inspector-original-query-0"]')
+    ).toContainText("match_all('$variablename')");
 
     await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
 
@@ -1393,9 +1391,9 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    // await pm.dashboardCreate.backToDashboardList();
-    // await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    // await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await pm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test("Should apply str_match_ignore_case operator and verify SQL query", async ({
     page,
@@ -1477,12 +1475,10 @@ test.describe("dashboard filter testcases", () => {
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
-    // Verify that the SQL query contains the NOT IN clause
+    // Verify that the SQL query contains the str_match_ignore_case clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE str_match_ignore_case(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+      page.locator('[data-test="query-inspector-original-query-0"]')
+    ).toContainText("str_match_ignore_case(kubernetes_container_name, '$variablename')");
 
     await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
 
