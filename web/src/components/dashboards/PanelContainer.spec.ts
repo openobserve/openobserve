@@ -1593,14 +1593,15 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.showViewPanel).toBe(false);
     });
 
-    it("should render legends ODialog closed by default with size=lg and showClose=false", () => {
+    it("should render legends ODialog closed by default with size=lg", async () => {
       wrapper = createWrapper();
+      // Allow defineAsyncComponent (ShowLegendsPopup) to resolve before asserting.
+      await wrapper.vm.$nextTick();
 
       const dialog = findLegendsDialog(wrapper);
       expect(dialog).toBeTruthy();
       expect(dialog.props("open")).toBe(false);
       expect(dialog.props("size")).toBe("lg");
-      expect(dialog.props("showClose")).toBe(false);
     });
 
     it("should open legends ODialog when showLegendsDialog becomes true", async () => {

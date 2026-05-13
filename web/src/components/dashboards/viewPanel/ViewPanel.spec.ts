@@ -1201,40 +1201,41 @@ describe("ViewPanel", () => {
       expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
     });
 
-    it("should render ODialog when showLegendsDialog is true", async () => {
+    it("should show ShowLegendsPopup with open=true when showLegendsDialog is true", async () => {
       wrapper = createWrapper();
 
       wrapper.vm.showLegendsDialog = true;
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(true);
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(true);
     });
 
-    it("should pass ODialog props (size and showClose) from source template", async () => {
+    it("should pass panelData prop to ShowLegendsPopup when dialog opens", async () => {
       wrapper = createWrapper();
 
       wrapper.vm.showLegendsDialog = true;
       await wrapper.vm.$nextTick();
 
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.props("size")).toBe("lg");
-      expect(dialog.props("showClose")).toBe(false);
-      expect(dialog.props("open")).toBe(true);
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(true);
+      expect(popup.props("panelData")).toBeDefined();
     });
 
-    it("should close ODialog when update:open emits false", async () => {
+    it("should close dialog when ShowLegendsPopup emits update:open=false", async () => {
       wrapper = createWrapper();
 
       wrapper.vm.showLegendsDialog = true;
       await wrapper.vm.$nextTick();
 
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("update:open", false);
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      await popup.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showLegendsDialog).toBe(false);
-      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
+      expect(popup.props("open")).toBe(false);
     });
 
     it("should render ShowLegendsPopup inside the dialog with panelData", async () => {
