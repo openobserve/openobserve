@@ -117,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
@@ -152,6 +152,13 @@ const usageStreamEnabled = ref(
 );
 const crossLinks = ref(
   store.state?.organizationData?.organizationSettings?.cross_links || [],
+);
+
+watch(
+  () => store.state?.organizationData?.organizationSettings?.cross_links,
+  (newVal) => {
+    crossLinks.value = newVal || [];
+  },
 );
 const formDirty = ref(false);
 
