@@ -793,7 +793,7 @@ describe("ServiceAccountsList Component", () => {
       await nextTick();
 
       const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
-      const refreshDialog = dialogs.find((d) => d.props('open') === true && d.props('size') === 'xs');
+      const refreshDialog = dialogs.find((d) => d.props('open') === true);
       expect(refreshDialog).toBeDefined();
 
       await refreshDialog.vm.$emit('click:secondary');
