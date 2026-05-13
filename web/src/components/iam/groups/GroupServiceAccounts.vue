@@ -106,7 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   <script setup lang="ts">
   import AppTable from "@/components/AppTable.vue";
-  import OButton from "@/lib/core/Button/OButton.vue";
   import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
   import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
   import usePermissions from "@/composables/iam/usePermissions";
