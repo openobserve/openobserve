@@ -241,8 +241,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     // ----- SERVICENOW -----
     testLogger.info('===== Testing ServiceNow Destination =====');
     const servicenowName = `auto_dest_servicenow_${sharedRandomValue}`;
-    const instanceUrl = 'https://dev12345.service-now.com/api/now/table/incident';
-    const instanceUrlUpdated = 'https://dev67890.service-now.com/api/now/table/incident';
+    const instanceUrl = 'https://example.com/api/now/table/incident';
+    const instanceUrlUpdated = 'https://www.example.com/api/now/table/incident';
     const username = 'test_user';
     const password = 'test_password';
 
@@ -270,8 +270,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     testLogger.info('===== P1 CUSTOM DESTINATION TEST =====');
 
     const destinationName = `auto_dest_custom_${sharedRandomValue}`;
-    const originalUrl = 'https://webhook.example.com/original';
-    const updatedUrl = 'https://webhook.example.com/updated';
+    const originalUrl = 'https://example.com/webhook/original';
+    const updatedUrl = 'https://example.com/webhook/updated';
 
     // ----- PART 1: Verify Custom option still works -----
     testLogger.info('Part 1: Verifying Custom destination option');
