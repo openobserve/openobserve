@@ -29,27 +29,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Show
             </span>
-            <div
+            <OToggleGroup
               class="q-ml-xs"
-              style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 0.3rem;
-              padding: 2px;
-            "
+              :model-value="usersDisplay"
+              @update:model-value="(v) => updateUserTable(v as string)"
             >
-              <template v-for="visual in usersDisplayOptions" :key="visual.value">
-                <OButton
-                  :data-test="`iam-service-accounts-selection-show-${visual.value}-btn`"
-                  variant="ghost"
-                  :active="visual.value === usersDisplay"
-                  size="xs"
-                  @click="updateUserTable(visual.value)"
-                >
-                  {{ visual.label }}
-                </OButton>
-              </template>
-            </div>
+              <OToggleGroupItem
+                v-for="visual in usersDisplayOptions"
+                :key="visual.value"
+                :value="visual.value"
+                size="sm"
+                :data-test="`iam-service-accounts-selection-show-${visual.value}-btn`"
+              >
+                {{ visual.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
           </div>
         </div>
         <div
@@ -113,6 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <script setup lang="ts">
   import AppTable from "@/components/AppTable.vue";
   import OButton from "@/lib/core/Button/OButton.vue";
+  import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+  import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
   import usePermissions from "@/composables/iam/usePermissions";
   import { cloneDeep } from "lodash-es";
   import { computed, watch } from "vue";
