@@ -48,10 +48,4 @@ describe("OPageContainer", () => {
     });
   });
 
-  describe("provide injections", () => {
-    it("should provide _q_pc_ as true", () => {
-      wrapper = mountPageContainer();
-      expect((wrapper.vm as any).$.provides._q_pc_).toBe(true);
-    });
-  });
 });

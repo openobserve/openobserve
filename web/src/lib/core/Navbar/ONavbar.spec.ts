@@ -27,10 +27,6 @@ describe("ONavbar", () => {
       },
       global: {
         stubs: {
-          "q-list": {
-            template: '<div class="q-list leftNavList" :data-test="$attrs[\'data-test\']"><slot /></div>',
-            inheritAttrs: false,
-          },
           "menu-link": {
             template:
               '<a class="q-item" :data-test="\'navbar-menu-link-\' + linkName" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
@@ -85,7 +81,6 @@ describe("ONavbar", () => {
     function createMenuLinkElements(count: number): HTMLElement[] {
       return Array.from({ length: count }, (_, i) => {
         const el = document.createElement("a");
-        el.classList.add("q-item");
         el.setAttribute("data-test", `navbar-menu-link-${mockLinks[i]?.name ?? i}`);
         return el;
       });

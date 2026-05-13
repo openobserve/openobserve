@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="o2-sidebar o2-sidebar-left left-drawer tw:flex tw:flex-col tw:bg-[var(--o2-card-bg)] tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:overflow-y-auto"
     @keydown="handleKeydown"
   >
-    <q-list class="leftNavList" data-test="navbar-link-list">
+    <div class="navbar-links" data-test="navbar-link-list">
       <menu-link
         v-for="(nav, index) in linksList"
         :key="nav.title"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-bind="{ ...nav, mini: miniMode }"
         @mouseenter="emit('menu-hover', nav.link)"
       />
-    </q-list>
+    </div>
   </nav>
 </template>
 
@@ -41,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * Left sidebar navigation bar. Renders a list of MenuLink items with keyboard
  * navigation (ArrowUp/ArrowDown) and Tab trapping to skip between header and content.
  */
-import { QList } from "quasar";
 import MenuLink from "@/components/MenuLink.vue";
 import type { NavbarProps, NavbarEmits } from "./ONavbar.types";
 
@@ -59,7 +58,7 @@ function handleKeydown(event: KeyboardEvent) {
 
   const nav = event.currentTarget as HTMLElement;
   const menuLinks = Array.from(
-    nav.querySelectorAll<HTMLElement>("a.q-item"),
+    nav.querySelectorAll<HTMLElement>("a[data-test^='menu-link-']"),
   );
 
   if (menuLinks.length === 0) return;
@@ -105,69 +104,70 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <style lang="scss">
-.q-list {
-  &.leftNavList {
-    padding: 0.25rem 0 0 0;
+.navbar-links {
+  padding-top: 0.25rem;
 
-    .q-item {
-      margin: 0 0.313rem;
+  .q-item {
+    margin: 0 0.156rem;
+    padding: 0.125rem;
+    border-radius: 0.313rem;
+    display: list-item;
+    text-align: center;
+    list-style: none;
+
+    &__section--avatar {
+      padding-right: 0;
+      min-width: 1.5rem;
       display: list-item;
       text-align: center;
       list-style: none;
-      padding: 0.125rem;
-      border-radius: 0.313rem;
+    }
 
-      .q-icon {
-        height: 1.3rem;
-        width: 1.3rem;
+    .q-icon {
+      height: 1.3rem;
+      width: 1.3rem;
+    }
+
+    .q-item__label {
+      padding-bottom: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--o2-text-secondary);
+    }
+
+    &.q-router-link--active {
+      color: var(--o2-menu-color);
+
+      .q-icon img {
+        filter: brightness(100);
       }
 
       .q-item__label {
-        padding-bottom: 0.25rem;
+        color: var(--o2-menu-color);
       }
 
-      &.q-router-link--active {
-        .q-icon img {
-          filter: brightness(100);
+      body.body--light & {
+        color: var(--o2-menu-color) !important;
+
+        .q-icon {
+          color: #19191e !important;
         }
 
         .q-item__label {
-          color: var(--o2-menu-color);
-
-          // Light mode: make text blue for readability
-          body.body--light & {
-            color: #19191e !important;
-          }
-          // Dark mode: make text blue for readability
-          body.body--dark & {
-            color: #ffffff !important;
-          }
-        }
-        color: var(--o2-menu-color);
-
-        // Light mode: make item text blue
-        body.body--light & {
-          color: var(--o2-menu-color) !important;
-
-          .q-icon {
-            color: #19191e !important;
-          }
-        }
-
-        // Dark mode: make item text blue
-        body.body--dark & {
-          color: var(--o2-menu-color) !important;
-
-          .q-icon {
-            color: #ffffff !important;
-          }
+          color: #19191e !important;
         }
       }
 
-      &__label {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: var(--o2-text-secondary);
+      body.body--dark & {
+        color: var(--o2-menu-color) !important;
+
+        .q-icon {
+          color: #ffffff !important;
+        }
+
+        .q-item__label {
+          color: #ffffff !important;
+        }
       }
     }
   }

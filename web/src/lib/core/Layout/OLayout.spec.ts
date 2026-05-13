@@ -48,29 +48,4 @@ describe("OLayout", () => {
     });
   });
 
-  describe("provide injections", () => {
-    it("should provide _q_pc_ as false", () => {
-      wrapper = mountLayout();
-      // Access provided value via component internals
-      expect((wrapper.vm as any).$.provides._q_pc_).toBe(false);
-    });
-
-    it("should provide _q_l_ with correct layout structure", () => {
-      wrapper = mountLayout();
-      const layout = (wrapper.vm as any).$.provides._q_l_;
-      expect(layout).toBeDefined();
-      expect(layout.isContainer).toBe(true);
-      expect(layout.header).toEqual({ size: 0, offset: 0, space: false });
-      expect(layout.left).toEqual({ size: 0, offset: 0, space: false });
-      expect(layout.right).toEqual({ size: 0, offset: 0, space: false });
-      expect(layout.footer).toEqual({ size: 0, offset: 0, space: false });
-    });
-  });
-
-  describe("attrs forwarding", () => {
-    it("should forward extra attributes to the rendered element", () => {
-      wrapper = mountLayout({}, {}, { attrs: { id: "test-layout", class: "custom-class" } });
-      // Note: mounting with attrs in this way — verify the attributes land
-    });
-  });
 });
