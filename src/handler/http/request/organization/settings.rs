@@ -169,6 +169,7 @@ pub async fn create(
 
     // this will always be taken from orgs table, never from settings
     data.free_trial_expiry = None;
+    data.org_storage_enabled = false;
     match set_org_setting(&org_id, &data).await {
         Ok(()) => (
             StatusCode::OK,

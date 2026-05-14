@@ -926,7 +926,8 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
             .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
-            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services));
+            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
+            .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
     }
 
     #[cfg(feature = "cloud")]
@@ -1006,6 +1007,10 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/azure-marketplace/link-subscription",
                 post(cloud::azure_marketplace::link_subscription),
+            )
+            .route(
+                "/{org_id}/enable_org_storage",
+                put(organization::org::enable_org_storage),
             );
     }
 

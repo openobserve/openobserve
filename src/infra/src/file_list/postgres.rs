@@ -1775,6 +1775,30 @@ GROUP BY stream;
             .observe(time);
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
+
+    // TODO: optimize with date from org_storage_settings
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+        let sql = r#"SELECT 
+SUM(original_size)::BIGINT AS storage_size,
+SUM(index_size)::BIGINT AS index_size
+FROM file_list
+WHERE org = $1 AND account = $2;"#;
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+        let ret: Option<(i64, i64)> = sqlx::query_as(sql)
+            .bind(org_id)
+            .bind(account)
+            .fetch_optional(&pool)
+            .await?;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .observe(time);
+        Ok(ret.unwrap_or_default())
+    }
 }
 
 impl PostgresFileList {
@@ -2241,7 +2265,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
 
     // 1. Ensure all columns exist
     sqlx::query(&format!(
-        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(32) DEFAULT '' NOT NULL"
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(128) DEFAULT '' NOT NULL"
     ))
     .execute(&mut *tx)
     .await?;
@@ -2646,7 +2670,7 @@ fn file_list_partition_ddl(table: &str) -> String {
         r#"
 CREATE TABLE {table} (
     id              BIGINT GENERATED ALWAYS AS IDENTITY,
-    account         VARCHAR(32) NOT NULL,
+    account         VARCHAR(128) NOT NULL,
     org             VARCHAR(100) NOT NULL,
     stream          VARCHAR(256) NOT NULL,
     date            VARCHAR(16) NOT NULL,
@@ -2736,7 +2760,7 @@ pub async fn create_table() -> Result<()> {
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    account    VARCHAR(32)  not null,
+    account    VARCHAR(128)  not null,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
@@ -2806,7 +2830,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column(
         "file_list_deleted",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column("file_list_jobs", "started_at", "BIGINT default 0 not null").await?;
@@ -2823,6 +2847,18 @@ CREATE TABLE IF NOT EXISTS stream_stats
     if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
         apply_column_width_compat(&pool).await?;
+    }
+
+    // after introducing org_storage, the account can have value of org_id:default,
+    // and we restrict org_id to 100 characters so here we change it to 256 from original 32
+    for table in &["file_list", "file_list_history", "file_list_deleted"] {
+        log::info!("[POSTGRES] updating account col to 128 for table {table}");
+        sqlx::query(&format!(
+            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(128);"
+        ))
+        .execute(&pool)
+        .await?;
+        log::info!("[POSTGRES] successfully updated account col to 128 for table {table}");
     }
 
     Ok(())
@@ -3207,7 +3243,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3231,7 +3267,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_history (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3255,7 +3291,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_deleted (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,

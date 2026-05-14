@@ -337,6 +337,7 @@ pub async fn publish_error(error_data: ErrorData) {
         config::meta::self_reporting::error::ErrorSource::Search => "Search",
         config::meta::self_reporting::error::ErrorSource::Other => "Other",
         config::meta::self_reporting::error::ErrorSource::SsoClaimParser(_) => "SsoClaimParser",
+        config::meta::self_reporting::error::ErrorSource::OrgStorage(_) => "OrgStorage",
     };
 
     log::debug!(

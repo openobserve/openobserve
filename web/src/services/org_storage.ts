@@ -12,10 +12,29 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-pub mod assume_service_account;
-pub mod es;
-pub mod org;
-pub mod settings;
-#[cfg(feature = "enterprise")]
-pub mod storage;
-pub mod system_settings;
+
+import http from "./http";
+import store from "@/stores";
+
+const orgStorage = {
+  get: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/storage`);
+  },
+
+  create: (org_identifier: string, data: any) => {
+    return http().post(`/api/${org_identifier}/storage`, data);
+  },
+
+  update: (org_identifier: string, data: any) => {
+    return http().put(`/api/${org_identifier}/storage`, data);
+  },
+
+  enable: (org_identifier: string) => {
+    const currentOrg = store.state.selectedOrganization.identifier;
+    return http().put(`/api/${currentOrg}/enable_org_storage`, {
+      org_id: org_identifier,
+    });
+  },
+};
+
+export default orgStorage;

@@ -820,7 +820,7 @@ async fn merge_files(
         log::debug!("merge_files {new_file_key} file_data::disk::set success");
     }
 
-    let account = storage::get_account(&new_file_key).unwrap_or_default();
+    let account = storage::get_account(&org_id, &new_file_key).unwrap_or_default();
     storage::put(&account, &new_file_key, buf.clone()).await?;
 
     // Enterprise: Extract service metadata during data processing
@@ -923,6 +923,7 @@ async fn merge_files(
     let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
+        &org_id,
         &new_file_key,
         &full_text_search_fields,
         &index_fields,
