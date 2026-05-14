@@ -426,6 +426,7 @@ size="20px" />
 import {
   defineComponent,
   ref,
+  reactive,
   onActivated,
   onDeactivated,
   computed,
@@ -458,7 +459,6 @@ import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { reactive, computed } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
 import {
