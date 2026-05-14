@@ -458,7 +458,7 @@ import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { reactive } from "vue";
+import { reactive, computed } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
 import {
@@ -540,7 +540,9 @@ export default defineComponent({
     searchData() {
       if (this.searchObj.loading == false) {
         this.searchObj.loading = true;
-        this.searchObj.runQuery = true;
+        if (this.store.state.savedViewFlag != true) {
+          this.runQueryFn();
+        }
       }
 
       if (config.isCloud == "true") {
@@ -727,8 +729,13 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const buildQueryPageRef = ref(null);
-    const showSearchHistory = ref(false);
-    const showSearchScheduler = ref(false);
+    const showSearchHistory = computed(
+      () => router.currentRoute.value.query?.action === "history",
+    );
+    const showSearchScheduler = computed(() => {
+      if (config.isEnterprise !== "true") return false;
+      return router.currentRoute.value.query?.action === "search_scheduler";
+    });
     const showJobScheduler = ref(false);
 
     const isLogsMounted = ref(false);
@@ -796,21 +803,13 @@ export default defineComponent({
     });
 
     onMounted(() => {
+      // Enterprise guard: redirect non-enterprise users away from search_scheduler
       if (
         router.currentRoute.value.query.hasOwnProperty("action") &&
-        router.currentRoute.value.query.action == "history"
+        router.currentRoute.value.query.action == "search_scheduler" &&
+        config.isEnterprise != "true"
       ) {
-        showSearchHistory.value = true;
-      }
-      if (
-        router.currentRoute.value.query.hasOwnProperty("action") &&
-        router.currentRoute.value.query.action == "search_scheduler"
-      ) {
-        if (config.isEnterprise == "true") {
-          showSearchScheduler.value = true;
-        } else {
-          router.back();
-        }
+        router.back();
       }
 
       registerAiContextHandler();
@@ -902,105 +901,67 @@ export default defineComponent({
         }
       },
     );
-    watch(
-      () => router.currentRoute.value.query,
-      () => {
-        if (!router.currentRoute.value.query.hasOwnProperty("action")) {
-          showSearchHistory.value = false;
-          showSearchScheduler.value = false;
-        }
+    // showSearchHistory and showSearchScheduler are now computed from route.query.action.
+    // The enterprise guard for search_scheduler lives in onMounted where router.back() is called.
+    // Merged watcher: handles search_history_re_apply, ai_chat_query, and search_scheduler route actions
+    const handleRouteTypeAction = async (type: any) => {
+      // Common setup for all redirect types
+      searchObj.organizationIdetifier =
+        router.currentRoute.value.query.org_identifier;
+      searchObj.data.stream.selectedStream.value =
+        router.currentRoute.value.query.stream;
+      searchObj.data.stream.streamType =
+        router.currentRoute.value.query.stream_type;
+      resetSearchObj();
+      searchObj.meta.searchApplied = false;
+      resetStreamData();
+
+      if (type === "search_history_re_apply" || type === "ai_chat_query") {
+        searchObj.meta.jobId = "";
+
         if (
-          router.currentRoute.value.query.hasOwnProperty("action") &&
-          router.currentRoute.value.query.action == "history"
+          type === "ai_chat_query" &&
+          router.currentRoute.value.query.from &&
+          router.currentRoute.value.query.to
         ) {
-          showSearchHistory.value = true;
-        }
-        if (
-          router.currentRoute.value.query.hasOwnProperty("action") &&
-          router.currentRoute.value.query.action == "search_scheduler"
-        ) {
-          if (config.isEnterprise == "true") {
-            showSearchScheduler.value = true;
-          } else {
-            router.back();
-          }
-        }
-      },
-      // (action) => {
-      //   if (action === "history") {
-      //     showSearchHistory.value = true;
-      //   }
-      // }
-    );
-    watch(
-      () => router.currentRoute.value.query.type,
-      async (type) => {
-        if (type == "search_history_re_apply" || type == "ai_chat_query") {
-          searchObj.meta.jobId = "";
-
-          searchObj.organizationIdetifier =
-            router.currentRoute.value.query.org_identifier;
-          searchObj.data.stream.selectedStream.value =
-            router.currentRoute.value.query.stream;
-          searchObj.data.stream.streamType =
-            router.currentRoute.value.query.stream_type;
-          resetSearchObj();
-
-          // Set time range based on source type
-          if (
-            type == "ai_chat_query" &&
-            router.currentRoute.value.query.from &&
-            router.currentRoute.value.query.to
-          ) {
-            searchBarRef.value.dateTimeRef.setAbsoluteTime(
-              router.currentRoute.value.query.from,
-              router.currentRoute.value.query.to,
-            );
-            searchObj.data.datetime.type = "absolute";
-          } else {
-            // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
-            searchBarRef.value.dateTimeRef.setRelativeTime(
-              router.currentRoute.value.query.period,
-            );
-            searchObj.data.datetime.type = "relative";
-          }
-
-          searchObj.data.queryResults.hits = [];
-          searchObj.meta.searchApplied = false;
-          resetStreamData();
-          restoreUrlQueryParams(dashboardPanelData);
-          // loadLogsData();
-          //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
-          //of functions of loadLogsData to stop run query whenever this gets redirecited
-          await getStreamList();
-          await getFunctions();
-          await extractFields();
-          refreshData();
-        }
-      },
-    );
-    watch(
-      () => router.currentRoute.value.query.type,
-      async (type) => {
-        if (type == "search_scheduler") {
-          searchObj.organizationIdetifier =
-            router.currentRoute.value.query.org_identifier;
-          searchObj.data.stream.selectedStream.value =
-            router.currentRoute.value.query.stream;
-          searchObj.data.stream.streamType =
-            router.currentRoute.value.query.stream_type;
-          resetSearchObj();
-
-          // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
           searchBarRef.value.dateTimeRef.setAbsoluteTime(
             router.currentRoute.value.query.from,
             router.currentRoute.value.query.to,
           );
           searchObj.data.datetime.type = "absolute";
-          searchObj.meta.searchApplied = false;
-          resetStreamData();
-          await restoreUrlQueryParams(dashboardPanelData);
-          await loadLogsData();
+        } else {
+          searchBarRef.value.dateTimeRef.setRelativeTime(
+            router.currentRoute.value.query.period,
+          );
+          searchObj.data.datetime.type = "relative";
+        }
+
+        searchObj.data.queryResults.hits = [];
+        restoreUrlQueryParams(dashboardPanelData);
+        await getStreamList();
+        await getFunctions();
+        await extractFields();
+        refreshData();
+      } else if (type === "search_scheduler") {
+        searchBarRef.value.dateTimeRef.setAbsoluteTime(
+          router.currentRoute.value.query.from,
+          router.currentRoute.value.query.to,
+        );
+        searchObj.data.datetime.type = "absolute";
+        await restoreUrlQueryParams(dashboardPanelData);
+        await loadLogsData();
+      }
+    };
+
+    watch(
+      () => router.currentRoute.value.query.type,
+      async (type) => {
+        if (
+          type === "search_history_re_apply" ||
+          type === "ai_chat_query" ||
+          type === "search_scheduler"
+        ) {
+          await handleRouteTypeAction(type);
         }
       },
     );
@@ -1087,20 +1048,6 @@ export default defineComponent({
         showErrorNotification("Error extracting patterns. Please try again.");
       }
     };
-
-    // // Watch for patterns mode switch - completely separate from logs flow
-    // watch(
-    //   () => searchObj.meta.logsVisualizeToggle,
-    //   async (newMode, oldMode) => {
-    //     if (newMode === "patterns") {
-    //       console.log("[Index] Switched to patterns mode - fetching patterns");
-    //       await extractPatternsForCurrentQuery();
-    //     } else if (oldMode === "patterns") {
-    //       console.log("[Index] Switched from patterns to", newMode);
-    //       // No need to clear patterns - they can be cached
-    //     }
-    //   },
-    // );
 
     // Main method for handling before mount logic
     async function handleBeforeMount() {
@@ -1559,7 +1506,6 @@ export default defineComponent({
           type: "search_history",
         },
       });
-      showSearchHistory.value = true;
     };
 
     const redirectBackToLogs = () => {
@@ -1740,20 +1686,20 @@ export default defineComponent({
 
     const closeSearchHistoryfn = () => {
       router.back();
-      showSearchHistory.value = false;
       refreshHistogramChart();
     };
     const closeSearchSchedulerFn = () => {
       router.back();
-      showSearchScheduler.value = false;
     };
 
     const searchResponseForVisualization = ref({});
 
     const shouldUseHistogramQuery = ref(false);
     const shouldRefreshWithoutCache = ref(false);
-    // Store the histogram query so it persists even after searchResponse is cleared
-    const storedHistogramQuery = ref("");
+    // Derived from queryResults — always reflects the current histogram query
+    const storedHistogramQuery = computed(
+      () => searchObj.data.queryResults?.converted_histogram_query || "",
+    );
 
     watch(
       () => searchObj.data.stream.selectedStream,
@@ -1781,16 +1727,16 @@ export default defineComponent({
       },
     );
 
-    // Watch for histogram query in search results and store it immediately
-    // This ensures the histogram query is saved before queryResults might be reset
+    // Minimal watcher for searchObj.runQuery flag set by SearchBar.
+    // Phase 2 (SearchBar refactor) replaces this with a direct event emitter.
     watch(
-      () => searchObj.data.queryResults?.converted_histogram_query,
-      (newHistogramQuery) => {
-        if (newHistogramQuery) {
-          storedHistogramQuery.value = newHistogramQuery;
+      () => searchObj.runQuery,
+      (shouldRun) => {
+        if (shouldRun && store.state.savedViewFlag !== true) {
+          searchObj.runQuery = false;
+          runQueryFn();
         }
       },
-      { immediate: true },
     );
 
     // Flag to prevent unnecessary chart type changes during URL restoration
@@ -2059,10 +2005,6 @@ export default defineComponent({
 
                   // assign converted_histogram_query to dashboardPanelData
                   if (searchObj.data.queryResults.converted_histogram_query) {
-                    // Store the histogram query so it persists for "Add to Dashboard"
-                    storedHistogramQuery.value =
-                      searchObj.data.queryResults.converted_histogram_query;
-
                     dashboardPanelData.data.queries[
                       dashboardPanelData.layout.currentQueryIndex
                     ].query =
@@ -2368,23 +2310,6 @@ export default defineComponent({
           ].query = newQuery;
         }
       },
-    );
-
-    watch(
-      () => [
-        searchObj.data.datetime.type,
-        searchObj.data.datetime,
-        searchObj.data.datetime.relativeTimePeriod,
-      ],
-      async () => {
-        const dateTime =
-          searchObj.data.datetime.type === "relative"
-            ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod,
-              )
-            : cloneDeep(searchObj.data.datetime);
-      },
-      { deep: true },
     );
 
     // Live mode: when auto_query_enabled is true in zoConfig, always sync from
@@ -3249,9 +3174,6 @@ export default defineComponent({
     moveSplitter() {
       return this.searchObj.config.splitterModel;
     },
-    // changeStream() {
-    //   return this.searchObj.data.stream.selectedStream;
-    // },
     changeRelativeDate() {
       return (
         this.searchObj.data.datetime.relative.value +
@@ -3260,9 +3182,6 @@ export default defineComponent({
     },
     updateSelectedColumns() {
       return this.searchObj.data.stream.selectedFields.length;
-    },
-    runQuery() {
-      return this.searchObj.runQuery;
     },
     changeRefreshInterval() {
       return this.searchObj.meta.refreshInterval;
@@ -3375,24 +3294,6 @@ export default defineComponent({
           this.searchObj.config.splitterModel > 0;
       }
     },
-    // changeStream: {
-    //   handler(stream, streamOld) {
-    //     if (
-    //       this.searchObj.data.stream.selectedStream.hasOwnProperty("value") &&
-    //       this.searchObj.data.stream.selectedStream.value != ""
-    //     ) {
-    //       this.searchObj.data.tempFunctionContent = "";
-    //       this.searchBarRef.resetFunctionContent();
-    //       if (streamOld.value) this.searchObj.data.query = "";
-    //       if (streamOld.value) this.setQuery(this.searchObj.meta.sqlMode);
-    //       this.searchObj.loading = true;
-    //       // setTimeout(() => {
-    //       //   this.runQueryFn();
-    //       // }, 500);
-    //     }
-    //   },
-    //   immediate: false,
-    // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       // Clear any existing timeout
@@ -3402,12 +3303,6 @@ export default defineComponent({
       this.updateColumnsTimeout = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
-    },
-    runQuery() {
-      if (this.store.state.savedViewFlag == true) return;
-      if (this.searchObj.runQuery == true) {
-        this.runQueryFn();
-      }
     },
     async fullSQLMode(newVal) {
       // Build mode handles SQL mode changes via its own watcher in setup()
