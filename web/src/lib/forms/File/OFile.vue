@@ -7,7 +7,11 @@ import type {
   FileSlots,
   FileValue,
 } from "./OFile.types";
-import { computed, ref, useId } from "vue";
+import { computed, ref, useAttrs, useId } from "vue";
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<FileProps>(), {
   multiple: false,
@@ -143,13 +147,20 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
     <label
-      v-if="$slots.label || label"
+      v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-file-label tw:leading-none"
+      class="tw:text-xs tw:font-medium tw:text-file-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       <slot name="label">{{ label }}</slot>
+      <q-icon
+        v-if="$slots.tooltip"
+        name="info"
+        size="16px"
+        :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
+        class="tw:cursor-help tw:text-file-label"
+      ><slot name="tooltip" /></q-icon>
     </label>
 
     <div

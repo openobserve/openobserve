@@ -50,4 +50,6 @@ export interface OptionGroupEmits {
 
 export interface OptionGroupSlots {
   label?: () => unknown;
+  /** Tooltip content — renders an info icon in the label row when provided */
+  tooltip?: () => unknown;
 }

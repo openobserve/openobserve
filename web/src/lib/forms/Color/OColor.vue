@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { ColorProps, ColorEmits, ColorSlots } from "./OColor.types";
-import { computed, ref, watch, useId } from "vue";
+import { computed, ref, useAttrs, useId, watch } from "vue";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -17,6 +17,10 @@ import {
   colorToHex,
 } from "reka-ui";
 import type { Color } from "reka-ui";
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<ColorProps>(), {
   size: "md",
@@ -121,13 +125,20 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
     <label
-      v-if="$slots.label || label"
+      v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-datepicker-label tw:leading-none"
+      class="tw:text-xs tw:font-medium tw:text-datepicker-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       <slot name="label">{{ label }}</slot>
+      <q-icon
+        v-if="$slots.tooltip"
+        name="info"
+        size="16px"
+        :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
+        class="tw:cursor-help tw:text-datepicker-label"
+      ><slot name="tooltip" /></q-icon>
     </label>
 
     <div :class="wrapperClasses">
