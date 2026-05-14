@@ -169,6 +169,24 @@ describe("getSuggestions — insertText quoting", () => {
     expect(item?.insertText).toBe("prod'");
   });
 
+  it("wraps in quotes for second condition when first condition's closing quote is in the query", async () => {
+    // Regression: http = 'te' and host = <cursor>
+    // The closing quote of 'te' must NOT be mistaken for an open quote for host.
+    const c = makeComposable({ storedValues: ["node-1"] });
+    const q = "http = 'te' and host = ";
+    const keywords = await run(c, q, q.length);
+    const item = keywords.find((k: any) => k.label === "node-1");
+    expect(item?.insertText).toBe("'node-1'");
+  });
+
+  it("closes only when second condition genuinely has an open quote", async () => {
+    const c = makeComposable({ storedValues: ["node-1"] });
+    const q = "http = 'te' and host = '";
+    const keywords = await run(c, q, q.length);
+    const item = keywords.find((k: any) => k.label === "node-1");
+    expect(item?.insertText).toBe("node-1'");
+  });
+
   it("inserts numeric values without quotes", async () => {
     const c = makeComposable({ storedValues: ["200", "404"] });
     const keywords = await run(c, "status = ");
@@ -303,5 +321,51 @@ describe("updateFieldKeywords", () => {
       (k: any) => k.kind === "Field",
     );
     expect(fieldItems.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ─── effectiveSuggestions: no functions when showing values ───────────────────
+
+describe("effectiveSuggestions — empty when value suggestions are shown", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("is empty when value context is active", async () => {
+    const c = makeComposable({ storedValues: ["200", "404"] });
+    await run(c, "status = ");
+    expect(c.effectiveSuggestions.value).toEqual([]);
+  });
+
+  it("effectiveKeywords has no Text-kind function items during value context", async () => {
+    const c = makeComposable({ storedValues: ["200"] });
+    await run(c, "status = ");
+    const functionItems = c.effectiveKeywords.value.filter(
+      (k: any) => k.kind === "Text",
+    );
+    expect(functionItems).toHaveLength(0);
+  });
+
+  it("only Value-kind items appear in effectiveKeywords during value context", async () => {
+    const c = makeComposable({ storedValues: ["200", "404"] });
+    await run(c, "status = ");
+    const kinds = c.effectiveKeywords.value.map((k: any) => k.kind);
+    expect(kinds.every((kind: string) => kind === "Value")).toBe(true);
+  });
+
+  it("is non-empty in normal (non-value) context", async () => {
+    const c = makeComposable({ storedValues: [] });
+    await run(c, "SELECT * FROM stream WHERE ");
+    expect(c.effectiveSuggestions.value.length).toBeGreaterThan(0);
+  });
+
+  it("transitions back to non-empty after value context clears", async () => {
+    const c = makeComposable({ storedValues: ["200"] });
+    // First enter value context
+    await run(c, "status = ");
+    expect(c.effectiveSuggestions.value).toEqual([]);
+    // Then move to a context with no operator match (no stored values for empty)
+    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue([]);
+    c.autoCompleteData.value.fieldValues = {};
+    await run(c, "SELECT * FROM stream WHERE ");
+    expect(c.effectiveSuggestions.value.length).toBeGreaterThan(0);
   });
 });
