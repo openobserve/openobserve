@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.query')"
-    :width="97"
+    :width="isFullscreenMode ? 100 : 97"
     :show-close="true"
     @keydown.stop
   >
@@ -703,12 +703,8 @@ const normalizeLimit = (sql: string, maxLimit = 100): string => {
 
 .stream-routing-section {
   min-height: 100%;
-  width: 97vw !important;
+  width: 100% !important;
   padding-left: 1rem;
-
-  &.fullscreen-mode {
-    width: 100vw !important;
-  }
 }
 
 /* ── AI button — mirrors MainLayout.vue ─────────────────────────── */

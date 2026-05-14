@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
   <ODrawer data-test="pipeline-editor-json-editor-drawer"
     v-model:open="showJsonEditorDialog"
-    size="lg"
+    :width="70"
     :title="t('pipeline.editPipelineJSON')"
     persistent
   >

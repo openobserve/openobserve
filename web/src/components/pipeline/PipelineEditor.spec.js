@@ -701,12 +701,12 @@ describe("PipelineEditor", () => {
       expect(drawers.length).toBe(1);
     });
 
-    it("JSON-editor ODrawer is closed by default and uses size lg, persistent=true", () => {
+    it("JSON-editor ODrawer is closed by default and uses width 70, persistent=true", () => {
       const drawers = wrapper.findAllComponents(ODrawerStub);
       const jsonDrawer = drawers[0];
 
       expect(jsonDrawer.props("open")).toBe(false);
-      expect(jsonDrawer.props("size")).toBe("lg");
+      expect(jsonDrawer.props("width")).toBe(70);
       expect(jsonDrawer.props("persistent")).toBe(true);
       // showClose is not explicitly set on the ODrawer, defaults to true
       expect(jsonDrawer.props("showClose")).toBe(true);
