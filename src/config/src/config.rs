@@ -3198,7 +3198,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.disk_cache.bucket_num == 0 {
         // because we validate cpu_num before this
-        // we can be sure here that that value is sane.
+        // we can be sure here that value is sane.
 
         // following numbers are imperically decided, users can set the value
         // directly if they know better, otherwise this was the best numbers
