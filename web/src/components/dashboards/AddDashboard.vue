@@ -15,33 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div v-if="beingUpdated" class="text-body1 text-bold">
-            {{ t("dashboard.updatedashboard") }}
-          </div>
-          <div v-else class="text-body1 text-bold">
-            {{ t("dashboard.createdashboard") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-circle"
-            data-test="dashboard-add-cancel"
-          >
-            <template #icon-left><q-icon name="cancel" /></template>
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-px-md q-py-sm add-dashboard-form-card-section">
-      <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
-        <q-input
+  <div class="q-px-md q-py-sm add-dashboard-form-card-section">
+      <OForm ref="addDashboardForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
+        <OInput
           v-if="beingUpdated"
           v-model="dashboardData.id"
           :readonly="beingUpdated"
@@ -49,27 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.id')"
           data-test="dashboard-id"
         />
-        <q-input
-          v-model="dashboardData.name"
+        <OFormInput
+          name="name"
           :label="t('dashboard.name') + ' *'"
-          class="showLabelOnTop"
           data-test="add-dashboard-name"
-          stack-label
-          hide-bottom-space
-          borderless
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-          :lazy-rules="true"
+          :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
         />
         <span>&nbsp;</span>
-        <q-input
-          v-model="dashboardData.description"
+        <OFormInput
+          name="description"
           :label="t('dashboard.typeDesc')"
-          borderless
-          hide-bottom-space
-          class="showLabelOnTop"
-          stack-label
-          dense
           data-test="add-dashboard-description"
         />
 
@@ -80,28 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :active-folder-id="selectedFolder.value"
           @folder-selected="selectedFolder = $event"
         />
-
-        <div class="flex justify-start q-mt-md tw:gap-3">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-add-cancel"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            data-test="dashboard-add-submit"
-            :disabled="dashboardData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            >{{ t("dashboard.save") }}</OButton
-          >
-        </div>
-      </q-form>
-    </q-card-section>
-  </q-card>
+        <span>&nbsp;</span> 
+      </OForm>
+  </div>
 </template>
 
 <script lang="ts">
@@ -118,6 +64,9 @@ import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const defaultValue = () => {
   return {
@@ -170,11 +119,15 @@ export default defineComponent({
     }
 
     const onSubmit = useLoading(async () => {
-      await addDashboardForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
+      const valid = await addDashboardForm.value.validate();
+      if (!valid) return;
 
+      // Sync OForm-owned values back to local state
+      const formVals = addDashboardForm.value.form.state.values as { name: string; description: string };
+      dashboardData.value.name = formVals.name ?? dashboardData.value.name;
+      dashboardData.value.description = formVals.description ?? dashboardData.value.description;
+
+      {
         const dashboardId = dashboardData.value.id;
         delete dashboardData.value.id;
 
@@ -238,7 +191,7 @@ export default defineComponent({
         } catch (err: any) {
           showErrorNotification(err?.message ?? "Dashboard creation failed.");
         }
-      });
+      }
     });
 
     return {
@@ -265,7 +218,7 @@ export default defineComponent({
       });
     },
   },
-  components: { SelectFolderDropdown, OButton },
+  components: { SelectFolderDropdown, OForm, OFormInput, OInput },
 });
 </script>
 <style lang="scss">

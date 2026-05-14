@@ -15,74 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md tw:h-[64px]">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div
-            v-if="editMode"
-            class="text-body1 text-bold"
-            data-test="dashboard-tab-edit"
-          >
-            Edit Tab
-          </div>
-          <div
-            v-else
-            class="text-body1 text-bold"
-            data-test="dashboard-tab-add"
-          >
-            Add Tab
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-circle"
-            data-test="dashboard-tab-cancel"
-          >
-            <template #icon-left><q-icon name="cancel" /></template>
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-w-md">
-      <q-form ref="addTabForm" @submit.stop="onSubmit.execute">
-        <q-input
-          v-model="tabData.name"
+  <ODrawer data-test="add-tab-dialog"
+    :open="open"
+    size="md"
+    :title="editMode ? 'Edit Tab' : 'Add Tab'"
+    secondary-button-label="Cancel"
+    primary-button-label="Save"
+    :primary-button-loading="onSubmit.isLoading.value"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="submit()"
+  >
+    <div class="tw:p-4">
+      <OForm ref="addTabForm" :default-values="{ name: '' }" @submit="onSubmit.execute">
+        <OFormInput
+          name="name"
           label="Name*"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          borderless
-          hide-bottom-space
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-          :lazy-rules="true"
+          :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
           data-test="dashboard-add-tab-name"
         />
-
-        <div class="flex justify-start tw:gap-2">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-add-cancel"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            :disabled="tabData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            data-test="dashboard-add-tab-submit"
-            >{{ t("dashboard.save") }}</OButton
-          >
-        </div>
-      </q-form>
-    </q-card-section>
-  </q-card>
+      </OForm>
+    </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -94,7 +48,9 @@ import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 
 const defaultValue = () => {
   return {
@@ -105,7 +61,7 @@ const defaultValue = () => {
 
 export default defineComponent({
   name: "AddTab",
-  components: { OButton },
+  components: { ODrawer, OForm, OFormInput },
   props: {
     tabId: {
       validator: (value) => {
@@ -161,15 +117,27 @@ export default defineComponent({
         );
       }
     };
-    loadDashboardData();
+    watch(
+      () => props.open,
+      (v) => {
+        if (v) loadDashboardData();
+        else tabData.value = defaultValue();
+      },
+    );
+
+    watch(
+      () => tabData.value.name,
+      (name) => {
+        addTabForm.value?.form.setFieldValue("name", name ?? "");
+      },
+    );
 
     const onSubmit = useLoading(async () => {
-      await addTabForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        try {
+      const valid = await addTabForm.value.validate();
+      if (!valid) return;
+      // Sync form values back to local state
+      tabData.value.name = (addTabForm.value.form.state.values.name as string) ?? tabData.value.name;
+      try {
           //if edit mode
           if (props.editMode) {
             // only allowed to edit name
@@ -209,7 +177,7 @@ export default defineComponent({
             panels: [],
           };
           await addTabForm.value?.resetValidation();
-        } catch (error: any) {
+      } catch (error: any) {
           if (error?.response?.status === 409) {
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
@@ -227,8 +195,9 @@ export default defineComponent({
           }
         } finally {
         }
-      });
     });
+
+    const submit = () => onSubmit.execute();
 
     return {
       t,
