@@ -696,6 +696,7 @@ import {
   buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
+import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import QueryEditor from "@/components/QueryEditor.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
@@ -986,11 +987,10 @@ export default defineComponent({
           const intervalValue = props.config.histogram_interval_value ?? 5;
           const intervalUnit = props.config.histogram_interval_unit ?? "m";
           const interval = `${intervalValue}${intervalUnit}`;
-          const fn =
-            props.config.detection_function === "count" ||
-            !props.config.detection_function
-              ? "count(*)"
-              : `${props.config.detection_function}(${props.config.detection_function_field || "*"})`;
+          const fn = toDetectionFunctionSql(
+            props.config.detection_function || "count",
+            props.config.detection_function_field || "*",
+          );
           const filterLines = (props.config.filters || [])
             .filter(
               (f: any) =>
