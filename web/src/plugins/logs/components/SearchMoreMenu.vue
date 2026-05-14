@@ -263,7 +263,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useLogs from "@/composables/useLogs";
 import downloadLogsUtil from "@/utils/logs/downloadLogs";
-import config from "@/config";
+import config from "@/aws-exports";
 
 const { t } = useI18n();
 const store = useStore();
