@@ -8,9 +8,19 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  useAttrs,
   useId,
   watch,
 } from "vue";
+
+// Forward the consumer's `data-test` from <OInput data-test="…"> onto the
+// root wrapper so E2E selectors can scope to the specific field instance
+// using the audit pattern: [data-test="<parent>"] [data-test="<parent>-info"].
+// (Without inheritAttrs:false the data-test would still land on the root, but
+// we need $attrs access to derive the tooltip icon's companion selector.)
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<InputProps>(), {
   type: "text",
@@ -197,7 +207,7 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
+  <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
       v-if="label || $slots.tooltip"
@@ -209,6 +219,7 @@ const wrapperClasses = computed(() => [
         v-if="$slots.tooltip"
         name="info"
         size="16px"
+        :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-input-label"
       ><slot name="tooltip" /></q-icon>
     </label>

@@ -45,4 +45,6 @@ export interface ColorEmits {
 
 export interface ColorSlots {
   label?: () => unknown;
+  /** Tooltip content — renders an info icon in the label row when provided */
+  tooltip?: () => unknown;
 }

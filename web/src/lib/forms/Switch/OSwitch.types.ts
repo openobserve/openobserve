@@ -39,4 +39,7 @@ export interface SwitchEmits {
 export interface SwitchSlots {
   /** Custom label content — overrides the `label` prop */
   label?: () => unknown;
+  /** Tooltip content — renders an info icon inline in the label when provided.
+   *  The icon gets `data-test="${parentDataTest}-info"` automatically. */
+  tooltip?: () => unknown;
 }

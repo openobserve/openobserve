@@ -48,4 +48,6 @@ export interface RangeEmits {
 export interface RangeSlots {
   /** Custom label content — overrides the `label` prop */
   label?: () => unknown;
+  /** Tooltip content — renders an info icon in the label row when provided */
+  tooltip?: () => unknown;
 }
