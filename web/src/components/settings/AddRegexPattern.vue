@@ -334,7 +334,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import {
   defineComponent,
-  onMounted,
   ref,
   watch,
   nextTick,
@@ -421,7 +420,7 @@ export default defineComponent({
       outputString: false,
     });
 
-    onMounted(() => {
+    const seedFromProps = () => {
       if (props.isEdit) {
         regexPatternInputs.value.name = props.data.name;
         regexPatternInputs.value.pattern = props.data.pattern;
@@ -442,7 +441,15 @@ export default defineComponent({
         inputContext.value = store.state.organizationData.regexPatternPrompt;
         testString.value = store.state.organizationData.regexPatternTestValue;
       }
-    });
+    };
+
+    watch(
+      () => props.open,
+      (v) => {
+        if (v) seedFromProps();
+      },
+      { immediate: true },
+    );
 
     // Form validation watcher
     watch(
