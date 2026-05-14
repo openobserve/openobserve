@@ -840,64 +840,23 @@ size="14px"
     </div>
 
     <!-- Filters Sidebar -->
-    <q-dialog
-      v-model="showFilterPopover"
-      position="right"
-      maximized
-      transition-show="slide-left"
-      transition-hide="slide-right"
+    <ODrawer data-test="trace-details-filter-popover-drawer"
+      v-model:open="showFilterPopover"
+      :width="30"
+      :title="t('traces.traceFilters')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="t('traces.showTraces')"
+      @click:secondary="showFilterPopover = false"
+      @click:primary="applyAndViewTraces"
     >
-      <q-card
-        class="tw:w-[30vw]! tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-surface)]"
-      >
-        <q-card-section
-          class="tw:flex tw:items-center tw:justify-between tw:border-b tw:border-[var(--o2-border)] tw:pb-2 tw:pt-3 tw:px-4"
-        >
-          <div
-            class="tw:text-lg tw:font-semibold tw:text-[var(--o2-text-primary)]"
-          >
-            {{ t("traces.traceFilters") }}
-          </div>
-          <OButton variant="ghost-muted"
-size="icon"
-v-close-popup>
-            <q-icon name="close" size="16px" />
-          </OButton>
-        </q-card-section>
-
-        <q-card-section class="tw:flex-1 tw:p-4 tw:flex tw:flex-col">
-          <div
-            class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded"
-          >
-            <CodeQueryEditor
-              v-model:query="localEditorValue"
-              language="sql"
-              class="tw:h-full tw:w-full"
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions
-          align="right"
-          class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
-        >
-          <div class="tw:flex tw:gap-2">
-            <OButton variant="outline"
-size="sm-action"
-v-close-popup>
-              {{ t("common.cancel") }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="applyAndViewTraces"
-            >
-              {{ t("traces.showTraces") }}
-            </OButton>
-          </div>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+      <div class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded">
+        <CodeQueryEditor
+          v-model:query="localEditorValue"
+          language="sql"
+          class="tw:h-full tw:w-full"
+        />
+      </div>
+    </ODrawer>
   </div>
 </template>
 
@@ -970,6 +929,7 @@ import {
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import {
   AlignLeft,
   Flame,
@@ -1077,6 +1037,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    ODrawer,
     AlignLeft,
     Flame,
     Network,

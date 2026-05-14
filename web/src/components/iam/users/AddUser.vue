@@ -15,28 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="o2-side-dialog column full-height ">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div v-if="beingUpdated" style="font-size: 18px">
-            {{ t("user.editUser") }}
-          </div>
-          <div v-else style="font-size: 18px">{{ t("user.add") }}</div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-user-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="$emit('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
-      <div>
+  <ODrawer data-test="add-user-dialog"
+    :open="open"
+    :width="30"
+    :title="beingUpdated ? t('user.editUser') : t('user.add')"
+    persistent
+    @update:open="$emit('update:open', $event)"
+  >
+    <div class="tw:p-4 tw:w-full">
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
           <!-- <p class="q-pt-sm tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
@@ -261,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              @click="$emit('cancel:hideform')"
+            @click="$emit('update:open', false)"
               data-test="cancel-user-button"
             >
               {{ t('user.cancel') }}
@@ -276,29 +262,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </q-form>
-      </div>
-    </q-card-section>
-  </q-card>
-  <q-dialog v-model="logout_confirm" persistent>
-    <q-card>
-      <q-card-section class="row items-center">
-        <q-avatar icon="info" color="primary" text-color="white" />
-        <span class="q-ml-sm"
-          >As you've chosen to change your password, you'll be automatically
-          logged out.</span
-        >
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <OButton variant="ghost-primary" @click="signout">Ok</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODrawer>
+  <ODialog data-test="add-user-logout-confirm-dialog"
+    v-model:open="logout_confirm"
+    persistent
+    size="xs"
+    title="Password Changed"
+    primary-button-label="Ok"
+    @click:primary="signout"
+  >
+    <div class="tw:flex tw:items-center tw:gap-3">
+      <q-avatar icon="info" color="primary" text-color="white" />
+      <span>As you've chosen to change your password, you'll be automatically
+        logged out.</span
+      >
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -316,7 +303,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
-    role: "admin",
+    role: "",
     first_name: "",
     last_name: "",
     email: "",
@@ -330,8 +317,12 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton },
+  components: { OButton, ODialog, ODrawer },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
@@ -358,7 +349,7 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["update:modelValue", "updated", "cancel:hideform"],
+  emits: ["update:modelValue", "updated", "update:open"],
   setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
@@ -388,6 +379,54 @@ export default defineComponent({
       () => store.state.organizations,
       () => setOrganizationOptions(),
       { deep: true },
+    );
+
+    // Reset form state only when the dialog transitions from closed → open.
+    // Previously this was a deep watch on modelValue, but parent-side mutations
+    // of selectedUser caused it to fire mid-flight and reset existingUser back
+    // to true, undoing the 422-catch transition from "add existing user" to
+    // "create new user" and hiding the password/name fields.
+    const resetFormFromModelValue = (newVal: any) => {
+      if (newVal && newVal.email != undefined && newVal.email != "") {
+        beingUpdated.value = true;
+        existingUser.value = false;
+        // Row data from the users list doesn't include `organization`; fall back
+        // to the active org so the subsequent PUT lands on the right endpoint.
+        formData.value = {
+          ...newVal,
+          organization:
+            newVal.organization || store.state.selectedOrganization.identifier,
+          change_password: false,
+          password: "",
+        };
+        if (config.isEnterprise == "true" || config.isCloud == true) {
+          const orgId = store.state.selectedOrganization.identifier;
+          userServiece
+            .getUserRoles(orgId, newVal.email)
+            .then((response: any) => {
+              formData.value.custom_role = response.data;
+            })
+            .catch((error: any) => {
+              console.error("Error fetching user roles:", error);
+            });
+        }
+      } else {
+        beingUpdated.value = props.isUpdated;
+        existingUser.value = true;
+        formData.value = defaultValue();
+        formData.value.organization =
+          store.state.selectedOrganization.identifier;
+      }
+    };
+
+    watch(
+      () => props.open,
+      (isOpen, wasOpen) => {
+        if (isOpen && !wasOpen) {
+          resetFormFromModelValue(props.modelValue);
+        }
+      },
+      { immediate: true },
     );
 
     const setOrganizationOptions = () => {
@@ -444,25 +483,6 @@ export default defineComponent({
       track,
     };
   },
-  created() {
-    this.formData = { ...defaultValue, ...this.modelValue };
-    this.beingUpdated = this.isUpdated;
-
-    if (
-      this.modelValue &&
-      this.modelValue.email != undefined &&
-      this.modelValue.email != ""
-    ) {
-      this.existingUser = false;
-      this.beingUpdated = true;
-      this.formData = { ...this.modelValue };
-      this.formData.change_password = false;
-      this.formData.password = "";
-      if (config.isEnterprise == "true" || config.isCloud == true) {
-        this.fetchUserRoles(this.modelValue.email);
-      }
-    }
-  },
   methods: {
     signout() {
       // Always call backend logout to clear auth cookies (#10900)
@@ -506,6 +526,7 @@ export default defineComponent({
               dismiss();
               this.formData.email = userEmail;
               this.$emit("updated", res.data, this.formData, "updated");
+              this.$emit("update:open", false);
             }
           })
           .catch((err: any) => {
@@ -539,6 +560,7 @@ export default defineComponent({
               this.formData.email = userEmail;
               this.existingUser = true;
               this.$emit("updated", res.data, this.formData, "created");
+              this.$emit("update:open", false);
               // }
             })
             .catch((err: any) => {
@@ -572,6 +594,7 @@ export default defineComponent({
             .then((res: any) => {
               dismiss();
               this.$emit("updated", res.data, this.formData, "created");
+              this.$emit("update:open", false);
             })
             .catch((err: any) => {
               this.q.notify({

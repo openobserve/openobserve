@@ -392,7 +392,7 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.selectAndDragCondition(); // Function drag;
     await page.waitForTimeout(1000);
     await pipelinePage.saveCondition();
-    await pipelinePage.verifyFieldRequiredError();
+    await pipelinePage.verifyConditionRequiredError();
   });
 
   test("should add source & destination node without connection and error to be displayed", async ({

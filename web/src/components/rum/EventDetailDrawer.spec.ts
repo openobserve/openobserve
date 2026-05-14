@@ -24,9 +24,10 @@ installQuasar();
 vi.mock("./EventDetailDrawerContent.vue", () => ({
   default: {
     name: "EventDetailDrawerContent",
-    template: '<div data-test="event-detail-drawer-content"><slot /></div>',
-    props: ["event", "rawEvent", "sessionId", "sessionDetails"],
-    emits: ["close", "resource-selected"],
+    template:
+      '<div data-test="event-detail-drawer-content"><slot /></div>',
+    props: ["open", "event", "rawEvent", "sessionId", "sessionDetails"],
+    emits: ["update:open", "resource-selected"],
   },
 }));
 
@@ -57,10 +58,11 @@ describe("EventDetailDrawer", () => {
   function mountComponent(propsOverrides = {}) {
     return mount(EventDetailDrawer, {
       props: { ...defaultProps, ...propsOverrides },
-      global: {
-        stubs: { "q-dialog": { template: '<div><slot /></div>', props: ["modelValue", "position", "fullHeight", "maximized"], emits: ["hide"] } },
-      },
     });
+  }
+
+  function getContent(w: VueWrapper) {
+    return w.findComponent({ name: "EventDetailDrawerContent" });
   }
 
   describe("initial render", () => {
@@ -69,90 +71,153 @@ describe("EventDetailDrawer", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render EventDetailDrawerContent inside q-dialog", () => {
+    it("should render EventDetailDrawerContent", () => {
       wrapper = mountComponent({ modelValue: true });
-      expect(wrapper.find('[data-test="event-detail-drawer-content"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="event-detail-drawer-content"]').exists(),
+      ).toBe(true);
     });
   });
 
-  describe("modelValue prop sync", () => {
-    it("should initialize isOpen with modelValue=false", async () => {
+  describe("open prop sync (modelValue -> EventDetailDrawerContent.open)", () => {
+    it("should pass open=false when modelValue is false", () => {
       wrapper = mountComponent({ modelValue: false });
-      expect(wrapper.vm.isOpen).toBe(false);
+      expect(getContent(wrapper).props("open")).toBe(false);
     });
 
-    it("should initialize isOpen with modelValue=true", () => {
+    it("should pass open=true when modelValue is true", () => {
       wrapper = mountComponent({ modelValue: true });
-      expect(wrapper.vm.isOpen).toBe(true);
+      expect(getContent(wrapper).props("open")).toBe(true);
     });
 
-    it("should update isOpen when modelValue prop changes to true", async () => {
+    it("should update open prop when modelValue prop changes to true", async () => {
       wrapper = mountComponent({ modelValue: false });
       await wrapper.setProps({ modelValue: true });
-      expect(wrapper.vm.isOpen).toBe(true);
+      expect(getContent(wrapper).props("open")).toBe(true);
     });
 
-    it("should update isOpen when modelValue prop changes to false", async () => {
+    it("should update open prop when modelValue prop changes to false", async () => {
       wrapper = mountComponent({ modelValue: true });
       await wrapper.setProps({ modelValue: false });
-      expect(wrapper.vm.isOpen).toBe(false);
-    });
-
-    it("should emit update:modelValue when isOpen changes", async () => {
-      wrapper = mountComponent({ modelValue: true });
-      wrapper.vm.isOpen = false;
-      await nextTick();
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
-    });
-
-    it("should emit update:modelValue=true when drawer opens", async () => {
-      wrapper = mountComponent({ modelValue: false });
-      wrapper.vm.isOpen = true;
-      await nextTick();
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")![0]).toEqual([true]);
+      expect(getContent(wrapper).props("open")).toBe(false);
     });
   });
 
-  describe("closeDrawer method", () => {
-    it("should set isOpen to false when closeDrawer is called", async () => {
+  describe("update:open -> update:modelValue forwarding", () => {
+    it("should emit update:modelValue=false when content emits update:open=false", async () => {
       wrapper = mountComponent({ modelValue: true });
-      expect(wrapper.vm.isOpen).toBe(true);
-      wrapper.vm.closeDrawer();
-      await nextTick();
-      expect(wrapper.vm.isOpen).toBe(false);
-    });
-
-    it("should emit update:modelValue=false when closeDrawer is called", async () => {
-      wrapper = mountComponent({ modelValue: true });
-      wrapper.vm.closeDrawer();
+      await getContent(wrapper).vm.$emit("update:open", false);
       await nextTick();
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1]).toEqual([false]);
     });
+
+    it("should emit update:modelValue=true when content emits update:open=true", async () => {
+      wrapper = mountComponent({ modelValue: false });
+      await getContent(wrapper).vm.$emit("update:open", true);
+      await nextTick();
+      const emitted = wrapper.emitted("update:modelValue");
+      expect(emitted).toBeTruthy();
+      expect(emitted![emitted!.length - 1]).toEqual([true]);
+    });
+
+    it("should not emit update:modelValue on mount", () => {
+      wrapper = mountComponent({ modelValue: true });
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    });
   });
 
   describe("props passing", () => {
     it("should pass event prop to EventDetailDrawerContent", () => {
-      wrapper = mountComponent({ modelValue: true, event: { type: "action" } });
-      expect(wrapper.find('[data-test="event-detail-drawer-content"]').exists()).toBe(true);
+      const event = { type: "action", message: "click" };
+      wrapper = mountComponent({ modelValue: true, event });
+      expect(getContent(wrapper).props("event")).toEqual(event);
+    });
+
+    it("should pass rawEvent prop to EventDetailDrawerContent", () => {
+      const rawEvent = { id: "raw-42", payload: { foo: "bar" } };
+      wrapper = mountComponent({ modelValue: true, rawEvent });
+      expect(getContent(wrapper).props("rawEvent")).toEqual(rawEvent);
+    });
+
+    it("should pass sessionId prop to EventDetailDrawerContent", () => {
+      wrapper = mountComponent({
+        modelValue: true,
+        sessionId: "session-abc",
+      });
+      expect(getContent(wrapper).props("sessionId")).toBe("session-abc");
+    });
+
+    it("should pass sessionDetails prop to EventDetailDrawerContent", () => {
+      wrapper = mountComponent({ modelValue: true });
+      expect(getContent(wrapper).props("sessionDetails")).toEqual(
+        defaultProps.sessionDetails,
+      );
     });
 
     it("should use default sessionDetails when not provided", () => {
-      wrapper = mountComponent({ modelValue: true, sessionDetails: undefined });
-      expect(wrapper.vm.isOpen).toBe(true);
+      wrapper = mountComponent({
+        modelValue: true,
+        sessionDetails: undefined,
+      });
+      expect(getContent(wrapper).props("sessionDetails")).toEqual({
+        user_email: "",
+        date: "",
+        browser: "",
+        os: "",
+        ip: "",
+        city: "",
+        country: "",
+      });
+    });
+
+    it("should use default event when not provided", () => {
+      wrapper = mountComponent({ modelValue: true, event: undefined });
+      expect(getContent(wrapper).props("event")).toEqual({});
+    });
+
+    it("should use default rawEvent when not provided", () => {
+      wrapper = mountComponent({ modelValue: true, rawEvent: undefined });
+      expect(getContent(wrapper).props("rawEvent")).toEqual({});
+    });
+
+    it("should use default sessionId when not provided", () => {
+      wrapper = mountComponent({ modelValue: true, sessionId: undefined });
+      expect(getContent(wrapper).props("sessionId")).toBe("");
+    });
+
+    it("should default modelValue to false when not provided", () => {
+      wrapper = mount(EventDetailDrawer, { props: {} });
+      expect(getContent(wrapper).props("open")).toBe(false);
     });
   });
 
   describe("resource-selected event", () => {
     it("should forward resource-selected event from drawer content", async () => {
       wrapper = mountComponent({ modelValue: true });
-      const content = wrapper.find('[data-test="event-detail-drawer-content"]');
-      await content.trigger("resource-selected", { resourceId: "res-1" });
-      // The component forwards $emit('resource-selected', $event)
-      expect(wrapper.exists()).toBe(true);
+      const payload = { resourceId: "res-1" };
+      await getContent(wrapper).vm.$emit("resource-selected", payload);
+      await nextTick();
+      const emitted = wrapper.emitted("resource-selected");
+      expect(emitted).toBeTruthy();
+      expect(emitted![0]).toEqual([payload]);
+    });
+
+    it("should forward multiple resource-selected events", async () => {
+      wrapper = mountComponent({ modelValue: true });
+      await getContent(wrapper).vm.$emit("resource-selected", { id: "a" });
+      await getContent(wrapper).vm.$emit("resource-selected", { id: "b" });
+      await nextTick();
+      const emitted = wrapper.emitted("resource-selected");
+      expect(emitted).toHaveLength(2);
+      expect(emitted![0]).toEqual([{ id: "a" }]);
+      expect(emitted![1]).toEqual([{ id: "b" }]);
+    });
+
+    it("should not emit resource-selected when content does not emit it", () => {
+      wrapper = mountComponent({ modelValue: true });
+      expect(wrapper.emitted("resource-selected")).toBeFalsy();
     });
   });
 });

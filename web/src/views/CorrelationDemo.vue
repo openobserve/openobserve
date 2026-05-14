@@ -117,33 +117,21 @@
     </div>
 
     <!-- Query Preview Dialog -->
-    <q-dialog v-model="showQueryDialog">
-      <q-card style="min-width: 600px">
-        <q-card-section class="row items-center">
-          <div class="text-h6">Generated Query</div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section>
-          <div class="text-caption text-grey-7 q-mb-sm">
-            This query would be executed to fetch related
-            {{ queryPreview.type }}:
-          </div>
-          <pre class="query-preview">{{ queryPreview.sql }}</pre>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="correlation-demo-query-dialog"
+      v-model:open="showQueryDialog"
+      size="md"
+      title="Generated Query"
+      primary-button-label="Close"
+      @click:primary="showQueryDialog = false"
+    >
+      <div>
+        <div class="text-caption text-grey-7 q-mb-sm">
+          This query would be executed to fetch related
+          {{ queryPreview.type }}:
+        </div>
+        <pre class="query-preview">{{ queryPreview.sql }}</pre>
+      </div>
+    </ODialog>
   </q-page>
 </template>
 
@@ -151,7 +139,7 @@
 import { ref } from "vue";
 import TelemetryCorrelationPanel from "@/components/TelemetryCorrelationPanel.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 // Demo state
 const showCorrelation = ref(false);

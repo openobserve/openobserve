@@ -51,17 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- add folder -->
-    <q-dialog
+    <AddFolder
       v-if="!disableDropdown"
-      v-model="showAddFolderDialog"
-      position="right"
-      full-height
-      maximized
-      
+      v-model:open="showAddFolderDialog"
       :data-test="`${type}-folder-move-dialog`"
-    >
-      <AddFolder style="width: 30vw;" :type="type" @update:modelValue="updateFolderList" :edit-mode="false" />
-    </q-dialog>
+      :type="type"
+      @update:modelValue="updateFolderList"
+      :edit-mode="false"
+    />
   </template>
 
   <script lang="ts">

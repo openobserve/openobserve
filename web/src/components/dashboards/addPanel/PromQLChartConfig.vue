@@ -495,17 +495,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <!-- Column Order Popup Dialog -->
-        <q-dialog
-          v-model="showColumnOrderPopup"
-          data-test="column-order-dialog"
-        >
-          <ColumnOrderPopUp
-            :column-order="columnOrder"
-            :available-columns="filteredAvailableColumns"
-            @cancel="closeColumnOrderPopup"
-            @save="saveColumnOrder"
-          />
-        </q-dialog>
+        <ColumnOrderPopUp
+          :open="showColumnOrderPopup"
+          :column-order="columnOrder"
+          :available-columns="filteredAvailableColumns"
+          @cancel="closeColumnOrderPopup"
+          @save="saveColumnOrder"
+        />
       </template>
     </div>
   </div>

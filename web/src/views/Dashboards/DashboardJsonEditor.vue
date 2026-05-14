@@ -1,27 +1,19 @@
 <template>
-  <q-card
-    class="dashboard-json-editor column full-height"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  <ODrawer data-test="dashboard-json-editor-drawer"
+    :open="open"
+    :width="70"
+    persistent
+    title="Edit Dashboard JSON"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('common.save')"
+    :primary-button-loading="saveJsonLoading"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="saveChanges()"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ t("dashboard.editJson") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <q-icon
-          v-close-popup
-          name="cancel"
-          class="cursor-pointer tw:mr-3"
-          size="20px"
-          data-test="json-editor-close"
-        />
-      </div>
-    </div>
-    <q-separator></q-separator>
-
-    <q-card-section class="col q-pa-none">
+  <div class="dashboard-json-editor tw:flex tw:flex-col tw:h-[calc(100vh-116px)]" :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'">
+    <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
+    <div class="tw:flex-1 tw:min-h-0">
       <query-editor
         data-test="dashboard-json-editor"
         ref="queryEditorRef"
@@ -32,10 +24,10 @@
         language="json"
         @update:query="handleEditorChange"
       />
-    </q-card-section>
+    </div>
 
     <!-- Display validation errors -->
-    <q-card-section
+    <div
       v-if="validationErrors.length > 0"
       class="q-pa-md text-negative validation-errors"
     >
@@ -45,31 +37,9 @@
           {{ error }}
         </li>
       </ul>
-    </q-card-section>
-
-    <q-space></q-space>
-
-    <q-card-actions align="right" class="q-pa-md tw:gap-2">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        v-close-popup
-        data-test="json-editor-cancel"
-        >{{ t("common.cancel") }}</OButton
-      >
-      <OButton
-        variant="primary"
-        size="sm-action"
-        :loading="saveJsonLoading"
-        :disabled="
-          !isValidJson || validationErrors.length > 0 || saveJsonLoading
-        "
-        @click="saveChanges"
-        data-test="json-editor-save"
-        >{{ t("common.save") }}</OButton
-      >
-    </q-card-actions>
-  </q-card>
+    </div>
+  </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -77,18 +47,17 @@ import { defineComponent, ref, onMounted, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { defineAsyncComponent } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
-import { getImageURL } from "@/utils/zincutils";
 import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
-import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardJsonEditor",
   components: {
     QueryEditor,
-    OButton,
+    ODrawer,
   },
   props: {
     dashboardData: {
@@ -99,8 +68,12 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["close"],
+  emits: ["close", "update:open"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -195,7 +168,6 @@ export default defineComponent({
       queryEditorRef,
       handleEditorChange,
       saveChanges,
-      getImageURL,
     };
   },
 });
@@ -213,11 +185,6 @@ export default defineComponent({
 
   :deep(.monaco-editor) {
     height: 100%;
-  }
-
-  :deep(.q-card__section) {
-    padding-left: 8px;
-    padding-right: 0;
   }
 
   .validation-errors {

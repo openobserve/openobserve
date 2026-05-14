@@ -71,6 +71,43 @@ const makeJob = (overrides: Partial<BackfillJob> = {}): BackfillJob => ({
   ...overrides,
 });
 
+// ODrawer stub: forwards data-test attr, exposes `open`/`title` via data
+// attributes, and renders the default slot inline so children remain queryable.
+// Emits update:open / click:primary|secondary|neutral to mirror real component.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "title",
+    "subTitle",
+    "primaryButtonLabel",
+    "primaryButtonLoading",
+    "primaryButtonDisabled",
+    "secondaryButtonLabel",
+    "secondaryButtonDisabled",
+    "neutralButtonLabel",
+    "showClose",
+    "persistent",
+    "size",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test-stub="o-drawer"
+      :data-test="$attrs['data-test']"
+      :data-open="open"
+      :data-title="title"
+      :data-width="width"
+    >
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+  inheritAttrs: false,
+};
+
 function createWrapper(props: Record<string, any> = {}) {
   return mount(BackfillJobDetails, {
     props: {
@@ -82,11 +119,7 @@ function createWrapper(props: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        QDialog: {
-          inheritAttrs: false,
-          template: '<div v-bind="$attrs"><slot /></div>',
-          props: ["modelValue"],
-        },
+        ODrawer: ODrawerStub,
         QTimeline: { template: "<div><slot /></div>" },
         QTimelineEntry: { template: "<div />" },
       },
@@ -105,21 +138,45 @@ describe("BackfillJobDetails – mount", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  it("renders the q-dialog with data-test='backfill-job-details-dialog'", () => {
+  it("renders the ODrawer with data-test='backfill-job-details-dialog'", () => {
     const wrapper = createWrapper();
     expect(
       wrapper.find('[data-test="backfill-job-details-dialog"]').exists()
     ).toBe(true);
   });
 
-  it("renders dialog-title element", () => {
+  it("passes title 'Backfill Job Details' to ODrawer", () => {
     const wrapper = createWrapper();
-    expect(wrapper.find('[data-test="dialog-title"]').exists()).toBe(true);
+    const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+    expect(drawer.attributes("data-title")).toBe("Backfill Job Details");
   });
 
-  it("renders close-dialog-btn element", () => {
+  it("passes width=55 to ODrawer", () => {
     const wrapper = createWrapper();
-    expect(wrapper.find('[data-test="close-dialog-btn"]').exists()).toBe(true);
+    const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+    expect(drawer.attributes("data-width")).toBe("40");
+  });
+
+  it("renders ODrawer with open=true when modelValue is true", async () => {
+    const wrapper = createWrapper({ modelValue: true });
+    await flushPromises();
+    const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+    expect(drawer.attributes("data-open")).toBe("true");
+  });
+
+  it("renders ODrawer with open=false when modelValue is false", () => {
+    const wrapper = createWrapper({ modelValue: false });
+    const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+    expect(drawer.attributes("data-open")).toBe("false");
+  });
+
+  it("emits update:modelValue when ODrawer emits update:open", async () => {
+    const wrapper = createWrapper({ modelValue: true });
+    await flushPromises();
+    const drawer = wrapper.findComponent(ODrawerStub);
+    await drawer.vm.$emit("update:open", false);
+    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+    expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
   });
 });
 

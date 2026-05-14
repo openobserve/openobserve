@@ -15,31 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div v-if="beingUpdated" class="text-body1 text-bold">
-            {{ t("dashboard.updatedashboard") }}
-          </div>
-          <div v-else class="text-body1 text-bold">
-            {{ t("dashboard.createdashboard") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-circle"
-            data-test="dashboard-add-cancel"
-          >
-            <template #icon-left><q-icon name="cancel" /></template>
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-px-md q-py-sm add-dashboard-form-card-section">
+  <div class="q-px-md q-py-sm add-dashboard-form-card-section">
       <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
         <q-input
           v-if="beingUpdated"
@@ -80,28 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :active-folder-id="selectedFolder.value"
           @folder-selected="selectedFolder = $event"
         />
-
-        <div class="flex justify-start q-mt-md tw:gap-3">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-add-cancel"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            data-test="dashboard-add-submit"
-            :disabled="dashboardData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            >{{ t("dashboard.save") }}</OButton
-          >
-        </div>
+        <span>&nbsp;</span> 
       </q-form>
-    </q-card-section>
-  </q-card>
+  </div>
 </template>
 
 <script lang="ts">
@@ -115,7 +72,6 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
 import { useQuasar } from "quasar";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 
@@ -143,7 +99,7 @@ export default defineComponent({
       default: true,
     },
   },
-  emits: ["updated"],
+  emits: ["updated", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const beingUpdated: any = ref(false);
@@ -255,6 +211,7 @@ export default defineComponent({
       getImageURL,
       selectedFolder,
       onSubmit,
+      submit: () => onSubmit.execute(),
     };
   },
   methods: {
@@ -265,7 +222,7 @@ export default defineComponent({
       });
     },
   },
-  components: { SelectFolderDropdown, OButton },
+  components: { SelectFolderDropdown },
 });
 </script>
 <style lang="scss">

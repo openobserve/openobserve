@@ -2868,4 +2868,164 @@ describe("AddAlert Component", () => {
     });
   });
 
+  // Coverage for the q-dialog -> ODrawer migration of the JSON editor dialog.
+  // Source change: <q-dialog v-model="showJsonEditorDialog" position="right" full-height maximized :persistent="true">
+  //          ->   <ODrawer v-model:open="showJsonEditorDialog" size="lg" persistent>
+  // These tests assert the v-model:open contract between AddAlert.vue and ODrawer,
+  // and that JsonEditor is slotted inside the drawer.
+  describe('ODrawer Migration', () => {
+    // Lightweight stub exposing the migrated prop surface and the update:open emit
+    // so we can assert the v-model:open binding without pulling in reka-ui portals.
+    const ODrawerStub = {
+      name: 'ODrawer',
+      props: {
+        open: { type: Boolean, default: false },
+        size: { type: String, default: undefined },
+        persistent: { type: Boolean, default: false },
+        showClose: { type: Boolean, default: true },
+      },
+      emits: ['update:open'],
+      template: `
+        <div
+          data-test="o-drawer-stub"
+          :data-open="String(open)"
+          :data-size="size"
+          :data-persistent="String(!!persistent)"
+        >
+          <slot name="header" />
+          <slot />
+          <slot name="footer" />
+          <button
+            data-test="o-drawer-stub-close"
+            @click="$emit('update:open', false)"
+          >close</button>
+        </div>
+      `,
+    };
+
+    const mountWithStub = () =>
+      mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: { ODrawer: ODrawerStub },
+        },
+        props: { title: 'Add Alert' },
+      });
+
+    // AddAlert renders several child components that also use ODrawer (e.g.
+    // QueryEditorDialog, AlertHistoryDrawer, SemanticFieldGroupsConfig). The
+    // global ODrawer stub matches all of them, so we narrow to the JSON-editor
+    // drawer using its unique prop signature: size="lg" + persistent=true.
+    const findJsonEditorDrawer = (wrap: any) =>
+      wrap
+        .findAllComponents(ODrawerStub)
+        .find(
+          (d: any) =>
+            d.props('size') === 'lg' && d.props('persistent') === true,
+        );
+
+    let w: any;
+
+    beforeEach(async () => {
+      w = mountWithStub();
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      w?.unmount();
+    });
+
+    it('renders the JSON editor ODrawer with size="lg" and persistent props', () => {
+      const drawer = findJsonEditorDrawer(w);
+      expect(drawer).toBeTruthy();
+      expect(drawer.props('size')).toBe('lg');
+      expect(drawer.props('persistent')).toBe(true);
+    });
+
+    it('keeps the JSON editor ODrawer closed by default (showJsonEditorDialog=false)', () => {
+      const drawer = findJsonEditorDrawer(w);
+      expect(w.vm.showJsonEditorDialog).toBe(false);
+      expect(drawer.props('open')).toBe(false);
+    });
+
+    it('forwards showJsonEditorDialog=true to the ODrawer open prop', async () => {
+      w.vm.showJsonEditorDialog = true;
+      await nextTick();
+
+      const drawer = findJsonEditorDrawer(w);
+      expect(drawer.props('open')).toBe(true);
+    });
+
+    it('opens the JSON editor ODrawer when openJsonEditor() is invoked', async () => {
+      w.vm.openJsonEditor();
+      await nextTick();
+
+      const drawer = findJsonEditorDrawer(w);
+      expect(w.vm.showJsonEditorDialog).toBe(true);
+      expect(drawer.props('open')).toBe(true);
+    });
+
+    it('sets showJsonEditorDialog=false when the ODrawer emits update:open=false', async () => {
+      // Pre-condition: open the drawer.
+      w.vm.showJsonEditorDialog = true;
+      await nextTick();
+      const drawer = findJsonEditorDrawer(w);
+      expect(drawer.props('open')).toBe(true);
+
+      // Act: drawer emits update:open(false) — v-model:open should write back.
+      await drawer.vm.$emit('update:open', false);
+      await nextTick();
+
+      expect(w.vm.showJsonEditorDialog).toBe(false);
+    });
+
+    it('sets showJsonEditorDialog=true when the ODrawer emits update:open=true', async () => {
+      // Sanity-check the v-model:open contract works in both directions.
+      expect(w.vm.showJsonEditorDialog).toBe(false);
+      const drawer = findJsonEditorDrawer(w);
+
+      await drawer.vm.$emit('update:open', true);
+      await nextTick();
+
+      expect(w.vm.showJsonEditorDialog).toBe(true);
+    });
+
+    it('renders the JsonEditor child inside the ODrawer when open', async () => {
+      w.vm.showJsonEditorDialog = true;
+      await nextTick();
+
+      const drawer = findJsonEditorDrawer(w);
+      const jsonEditor = drawer.findComponent({ name: 'JsonEditor' });
+      expect(jsonEditor.exists()).toBe(true);
+    });
+
+    it('passes formData and isEditing props to the slotted JsonEditor', async () => {
+      w.vm.showJsonEditorDialog = true;
+      await nextTick();
+
+      const drawer = findJsonEditorDrawer(w);
+      const jsonEditor = drawer.findComponent({ name: 'JsonEditor' });
+      expect(jsonEditor.exists()).toBe(true);
+      // Template binds :data="formData" and :isEditing="beingUpdated".
+      expect(jsonEditor.props('data')).toEqual(w.vm.formData);
+      expect(jsonEditor.props('isEditing')).toBe(w.vm.beingUpdated);
+    });
+
+    it('closes the ODrawer when the slotted JsonEditor emits @close', async () => {
+      // Template wires: @close="showJsonEditorDialog = false"
+      w.vm.showJsonEditorDialog = true;
+      await nextTick();
+
+      const drawer = findJsonEditorDrawer(w);
+      const jsonEditor = drawer.findComponent({ name: 'JsonEditor' });
+      expect(jsonEditor.exists()).toBe(true);
+
+      await jsonEditor.vm.$emit('close');
+      await nextTick();
+
+      expect(w.vm.showJsonEditorDialog).toBe(false);
+    });
+  });
+
 });

@@ -38,6 +38,34 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
+const ODialogStub = {
+  name: "ODialog",
+  template:
+    '<div class="o-dialog-stub" :data-open="open"><slot name="header-left" /><slot name="header-right" /><slot /><slot name="footer" /></div>',
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryVariant",
+    "secondaryVariant",
+    "neutralVariant",
+    "primaryDisabled",
+    "secondaryDisabled",
+    "neutralDisabled",
+    "primaryLoading",
+    "secondaryLoading",
+    "neutralLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+};
+
 describe("AlertHistory.vue", () => {
   let wrapper: VueWrapper<any>;
 
@@ -98,6 +126,9 @@ describe("AlertHistory.vue", () => {
       attachTo: node,
       global: {
         plugins: [i18n, store, router],
+        stubs: {
+          ODialog: ODialogStub,
+        },
       },
     });
     await flushPromises();
@@ -271,8 +302,94 @@ describe("AlertHistory.vue", () => {
       await viewDetailsBtn.trigger("click");
       await flushPromises();
 
-      // Check if dialog is shown (QDialog should be present)
-      expect(wrapper.findComponent({ name: "QDialog" }).exists()).toBe(true);
+      // Details ODialog should be open and bound to selectedRow data
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      const detailsDialog = dialogs.find(
+        (d: any) => d.props("title") === "Alert Execution Details",
+      );
+      expect(detailsDialog).toBeTruthy();
+      expect(detailsDialog!.props("open")).toBe(true);
+      expect(detailsDialog!.props("primaryButtonLabel")).toBe("Close");
+      expect((wrapper.vm as any).selectedRow).toBeTruthy();
+    });
+
+    it("should close details dialog when primary button emits click:primary", async () => {
+      await mountComponent();
+      await flushPromises();
+
+      const viewDetailsBtn = wrapper.find('[data-test="alert-history-view-details"]');
+      await viewDetailsBtn.trigger("click");
+      await flushPromises();
+
+      expect((wrapper.vm as any).detailsDialog).toBe(true);
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      const detailsDialog = dialogs.find(
+        (d: any) => d.props("title") === "Alert Execution Details",
+      );
+      await detailsDialog!.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect((wrapper.vm as any).detailsDialog).toBe(false);
+    });
+  });
+
+  describe("Error Dialog", () => {
+    it("should render error ODialog with correct props when error is shown", async () => {
+      await mountComponent();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.showErrorDialog({
+        alert_name: "Test Alert 1",
+        error: "Connection refused",
+        last_error_timestamp: 1699900000000000,
+      });
+      await flushPromises();
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      const errorDialog = dialogs.find(
+        (d: any) => d.props("title") === "Test Alert 1",
+      );
+      expect(errorDialog).toBeTruthy();
+      expect(errorDialog!.props("open")).toBe(true);
+      expect(errorDialog!.props("size")).toBe("md");
+      expect(errorDialog!.props("primaryButtonLabel")).toBe("Close");
+    });
+
+    it("should close error dialog when click:primary is emitted", async () => {
+      await mountComponent();
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.showErrorDialog({
+        alert_name: "Test Alert 1",
+        error: "Connection refused",
+        last_error_timestamp: 1699900000000000,
+      });
+      await flushPromises();
+
+      expect(vm.errorDialog).toBe(true);
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      const errorDialog = dialogs.find(
+        (d: any) => d.props("title") === "Test Alert 1",
+      );
+      await errorDialog!.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(vm.errorDialog).toBe(false);
+      expect(vm.errorMessage).toBeNull();
+    });
+
+    it("should keep dialogs closed on initial mount", async () => {
+      await mountComponent();
+
+      const dialogs = wrapper.findAllComponents(ODialogStub);
+      expect(dialogs.length).toBe(2);
+      dialogs.forEach((d: any) => {
+        expect(d.props("open")).toBe(false);
+      });
     });
   });
 
