@@ -18,6 +18,7 @@ async function ingestForQueryBuilderTest(request, streamName = "e2e_automate") {
         headers: headers,
         data: logsdata
     });
+    if (!response.ok()) throw new Error(`Ingestion failed: ${response.status()} ${await response.text()}`);
     const responseData = await response.json();
     testLogger.debug('Test data ingestion response', { response: responseData, streamName });
     return responseData;
