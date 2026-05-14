@@ -240,11 +240,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             }
         };
 
-        // Extract headers to pass through to the agent
-        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
-        // For now, use empty string (no passthrough) until config is updated
-        let passthrough_config = ""; // TODO: Replace with config.ai.passthrough_headers once field is added
-        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+        let passthrough_headers =
+            extract_passthrough_headers(&parts.headers, &o2_cfg.ai.passthrough_headers);
 
         // Transform PromptRequest -> QueryRequest
         // Extract the last user message as the query
@@ -545,13 +542,17 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         forward_headers.insert("user-agent".to_string(), val.to_string());
     }
 
+    // Add user_id to forwarded headers
+    if !user_id.is_empty() {
+        forward_headers.insert("user_id".to_string(), user_id.clone());
+    }
+
     // Extract and merge passthrough headers from config
     #[cfg(feature = "enterprise")]
     {
-        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
-        // For now, use empty string (no passthrough) until config is updated
-        let passthrough_config = ""; // TODO: Replace with _config.ai.passthrough_headers once field is added
-        let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
+        let o2_cfg = get_o2_config();
+        let passthrough_headers =
+            extract_passthrough_headers(&parts.headers, &o2_cfg.ai.passthrough_headers);
         // Merge passthrough headers, but don't override already-set headers (like session_id,
         // traceparent)
         for (key, value) in passthrough_headers {
