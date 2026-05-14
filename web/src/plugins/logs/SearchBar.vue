@@ -1622,81 +1622,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-dialog v-model="customDownloadDialog">
-      <q-card>
-        <q-card-section>
-          {{ t("search.customDownloadMessage") }}
-        </q-card-section>
-
-        <q-card-section>
-          <q-input
-            type="number"
-            data-test="custom-download-initial-number-input"
-            v-model="downloadCustomInitialNumber"
-            :label="t('search.initialNumber')"
-            default-value="1"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            tabindex="0"
-            min="1"
-          />
-          <q-select
-            data-test="custom-download-range-select"
-            v-model="downloadCustomRange"
-            :options="downloadCustomRangeOptions"
-            :label="t('search.range')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-          />
-          <div class="q-py-sm file-type">
-            <label class="q-pr-sm">{{ t("search.fileType") }}</label
-            ><br />
-            <OButtonGroup
-              data-test="custom-download-file-type-button-group"
-              class="file-type-button-group q-mt-xs"
-            >
-              <OButton
-                v-for="option in downloadCustomFileTypeOptions"
-                :key="option.value"
-                :data-test="`custom-download-file-type-${option.value}-btn`"
-                :active="downloadCustomFileType === option.value"
-                variant="outline"
-                size="sm"
-                @click="downloadCustomFileType = option.value"
-                >{{ option.label }}</OButton
-              >
-            </OButtonGroup>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            v-close-popup
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            data-test="logs-search-bar-confirm-dialog-ok-btn"
-            @click="downloadRangeData"
-            >{{ t("search.btnDownload") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <CustomDownloadDialog v-model="customDownloadDialog" />
     <q-dialog v-model="store.state.savedViewDialog">
       <q-card style="width: 700px; max-width: 80vw">
         <q-card-section>
@@ -1857,80 +1783,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-dialog v-model="searchSchedulerJob">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">{{ t("search.scheduleSearchJob") }}</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div>
-            <div class="text-left q-mb-xs">
-              {{ t("search.noOfRecords") }}:
-              <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("search.noOfRecordsTooltip")
-                  }}</span>
-                </q-tooltip>
-              </q-icon>
-            </div>
-            <q-input
-              type="number"
-              data-test="search-scheuduler-max-number-of-records-input"
-              v-model="searchObj.meta.jobRecords"
-              default-value="100"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              tabindex="0"
-              min="100"
-            />
-          </div>
-          <div class="text-left">
-            {{ t("search.maxEventsScheduleJob") }}
-          </div>
-          <div
-            style="opacity: 0.8"
-            class="text-left mapping-warning-msg q-mt-md"
-          >
-            <q-icon name="warning" color="red" class="q-mr-sm" />
-            <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            data-test="search-scheduler-max-records-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-            @click="
-              {
-                searchSchedulerJob = false;
-                searchObj.meta.showSearchScheduler = false;
-              }
-            "
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="search-scheduler-max-records-submit-btn"
-            variant="primary"
-            size="sm-action"
-            @click="addJobScheduler"
-            v-close-popup
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <SearchSchedulerDialog
+      v-model="searchSchedulerJob"
+      @submitted="getJobData()"
+    />
 
     <!-- Search Inspect Dialog -->
     <q-dialog v-model="searchInspectDialog">
@@ -2309,6 +2165,8 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
+import CustomDownloadDialog from "./components/CustomDownloadDialog.vue";
+import SearchSchedulerDialog from "./components/SearchSchedulerDialog.vue";
 import {
   mergeDeep,
   b64DecodeUnicode,
@@ -2452,6 +2310,8 @@ export default defineComponent({
     CodeQueryEditor,
     UnifiedQueryEditor,
     QueryPlanDialog,
+    CustomDownloadDialog,
+    SearchSchedulerDialog,
     ScanSearch,
     ChartLine,
     ChartNoAxesColumn,
@@ -2531,62 +2391,6 @@ export default defineComponent({
         this.updateViewObj.view_name,
       );
       return;
-    },
-    downloadRangeData() {
-      let initNumber = parseInt(this.downloadCustomInitialNumber);
-      if (initNumber < 0) {
-        this.$q.notify({
-          message: "Initial number must be positive number.",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-        return;
-      }
-      if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
-        this.$q.notify({
-          message: "Please run a query first before downloading.",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-        return;
-      }
-      // const queryReq = this.buildSearch();
-      this.searchObj.data.customDownloadQueryObj.query.from =
-        initNumber == 0 ? 0 : initNumber - 1;
-      this.searchObj.data.customDownloadQueryObj.query.size =
-        this.downloadCustomRange;
-      searchService
-        .search(
-          {
-            org_identifier: this.searchObj.organizationIdentifier,
-            query: this.searchObj.data.customDownloadQueryObj,
-            page_type: this.searchObj.data.stream.streamType,
-          },
-          "ui",
-        )
-        .then((res) => {
-          this.customDownloadDialog = false;
-          if (res.data.hits.length > 0) {
-            this.downloadLogs(res.data.hits, this.downloadCustomFileType);
-          } else {
-            this.$q.notify({
-              message: "No data found to download.",
-              color: "positive",
-              position: "bottom",
-              timeout: 2000,
-            });
-          }
-        })
-        .catch((err) => {
-          this.$q.notify({
-            message: err.message,
-            color: "negative",
-            position: "bottom",
-            timeout: 2000,
-          });
-        });
     },
     handleKeyDown(e) {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -4593,15 +4397,6 @@ export default defineComponent({
 
     const customDownloadDialog = ref(false);
     const showDownloadMenu = ref(false);
-    const downloadCustomInitialNumber = ref(1);
-    const downloadCustomRange = ref(100);
-    const downloadCustomRangeOptions = ref([100, 500, 1000, 5000, 10000]);
-    const downloadCustomFileName = ref("");
-    const downloadCustomFileType = ref("csv");
-    const downloadCustomFileTypeOptions = ref([
-      { label: "CSV", value: "csv" },
-      { label: "JSON", value: "json" },
-    ]);
 
     const loadSavedView = () => {
       if (searchObj.data.savedViews.length == 0) {
@@ -5043,58 +4838,6 @@ export default defineComponent({
         )
       );
     });
-    const addJobScheduler = async () => {
-      try {
-        // if(searchObj.meta.jobId != ""){
-        //   searchObj.meta.jobId = "";
-        // }
-        if (
-          !searchObj.data.stream.selectedStream ||
-          searchObj.data.stream.selectedStream.length === 0
-        ) {
-          $q.notify({
-            type: "negative",
-            message: "Please select a stream before scheduling a job",
-            timeout: 3000,
-          });
-          return;
-        }
-        if (searchObj.meta.jobId != "") {
-          $q.notify({
-            type: "negative",
-            message: t("search.jobAlreadyScheduled"),
-            timeout: 3000,
-          });
-          return;
-        }
-        if (
-          searchObj.meta.jobRecords > 100000 ||
-          searchObj.meta.jobRecords == 0 ||
-          searchObj.meta.jobRecords < 0
-        ) {
-          $q.notify({
-            type: "negative",
-            message: t("search.jobSchedulerRange"),
-            timeout: 3000,
-          });
-          return;
-        }
-
-        searchSchedulerJob.value = false;
-        searchObj.meta.showSearchScheduler = false;
-        await getJobData();
-      } catch (e) {
-        if (e.response.status != 403) {
-          $q.notify({
-            type: "negative",
-            message: t("search.errorAddingJob"),
-            timeout: 3000,
-          });
-          return;
-        }
-      }
-    };
-
     const createScheduleJob = () => {
       searchSchedulerJob.value = true;
       searchObj.meta.jobRecords = 100;
@@ -5296,9 +5039,6 @@ export default defineComponent({
       getImageURL,
       resetFilters,
       customDownloadDialog,
-      downloadCustomInitialNumber,
-      downloadCustomRange,
-      downloadCustomRangeOptions,
       buildSearch,
       confirmSavedViewDialogVisible,
       rowsPerPage,
@@ -5332,7 +5072,6 @@ export default defineComponent({
       functionToggleIcon,
       searchSchedulerJob,
       autoSearchSchedulerJob,
-      addJobScheduler,
       routeToSearchSchedule,
       createScheduleJob,
       searchInspectDialog,
@@ -5373,9 +5112,6 @@ export default defineComponent({
       getSearchObj,
       toggleHistogram,
       createSavedViews,
-      downloadCustomFileName,
-      downloadCustomFileType,
-      downloadCustomFileTypeOptions,
       showDownloadMenu,
       // Expose additional functions for testing
       updateAutoComplete,
