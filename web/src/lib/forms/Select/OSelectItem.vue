@@ -2,9 +2,9 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SelectItemProps, SelectItemSlots } from "./OSelect.types";
-import { SELECT_VALUE_MAP_KEY } from "./OSelect.types";
+import { SELECT_VALUE_MAP_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
 import { SelectItem, SelectItemText, SelectItemIndicator } from "reka-ui";
-import { inject, onMounted, onUnmounted } from "vue";
+import { computed, inject, onMounted, onUnmounted } from "vue";
 
 const props = withDefaults(defineProps<SelectItemProps>(), {
   disabled: false,
@@ -13,19 +13,25 @@ const props = withDefaults(defineProps<SelectItemProps>(), {
 defineSlots<SelectItemSlots>();
 
 // Register original value type into the parent OSelect's value map so that
-// numeric (or boolean) values are recovered when Reka UI returns a string.
+// numeric (or boolean or null) values are recovered when Reka UI returns a string.
 const valueMap = inject(SELECT_VALUE_MAP_KEY, null);
+
+/** Internal string Reka sees — null maps to the sentinel */
+const rekaValue = computed(() =>
+  props.value === null ? NULL_VALUE_SENTINEL : String(props.value),
+);
+
 onMounted(() => {
-  valueMap?.set(String(props.value), props.value);
+  valueMap?.set(rekaValue.value, props.value);
 });
 onUnmounted(() => {
-  valueMap?.delete(String(props.value));
+  valueMap?.delete(rekaValue.value);
 });
 </script>
 
 <template>
   <SelectItem
-    :value="String(props.value)"
+    :value="rekaValue"
     :disabled="props.disabled"
     :class="[
       'tw:relative tw:flex tw:items-center tw:w-full',

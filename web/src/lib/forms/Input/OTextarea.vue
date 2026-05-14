@@ -81,7 +81,7 @@ const wrapperClasses = computed(() => [
   "tw:focus-within:border-input-border-focus",
   "tw:focus-within:ring-2 tw:focus-within:ring-input-focus-ring",
   props.disabled
-    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:opacity-60"
+    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:cursor-not-allowed"
     : "",
 ]);
 </script>
@@ -90,11 +90,17 @@ const wrapperClasses = computed(() => [
   <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
-      v-if="label"
+      v-if="label || $slots.tooltip"
       :for="textareaId"
-      class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none"
+      class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
+      <q-icon
+        v-if="$slots.tooltip"
+        name="info"
+        size="16px"
+        class="tw:cursor-help tw:text-input-label"
+      ><slot name="tooltip" /></q-icon>
     </label>
 
     <!-- Textarea wrapper -->
@@ -117,6 +123,7 @@ const wrapperClasses = computed(() => [
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed',
           'tw:py-2 tw:px-3 tw:text-sm',
+          'tw:min-h-[80px]',
           autogrow ? 'tw:resize-none' : 'tw:resize-y',
         ]"
         @input="

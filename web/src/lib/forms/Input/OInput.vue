@@ -175,11 +175,10 @@ watch(
 );
 
 // ── Styles ─────────────────────────────────────────────────────────────────
-// md was h-10 (40px); reduced to h-9 (36px) for a more compact field that
-// matches typical SaaS UI density. sm stays at h-8 (32px) for tight rows.
+// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
   sm: "tw:h-8 tw:text-sm",
-  md: "tw:h-9 tw:text-sm",
+  md: "tw:h-8 tw:text-sm",
 };
 
 const wrapperClasses = computed(() => [
@@ -191,7 +190,7 @@ const wrapperClasses = computed(() => [
   "tw:focus-within:border-input-border-focus",
   "tw:focus-within:ring-2 tw:focus-within:ring-input-focus-ring",
   props.disabled
-    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:opacity-60"
+    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:cursor-not-allowed"
     : "",
   props.readonly ? "tw:border-input-border tw:bg-input-bg" : "",
 ]);
@@ -201,11 +200,17 @@ const wrapperClasses = computed(() => [
   <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
-      v-if="label"
+      v-if="label || $slots.tooltip"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none"
+      class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
+      <q-icon
+        v-if="$slots.tooltip"
+        name="info"
+        size="16px"
+        class="tw:cursor-help tw:text-input-label"
+      ><slot name="tooltip" /></q-icon>
     </label>
 
     <!-- Input row -->

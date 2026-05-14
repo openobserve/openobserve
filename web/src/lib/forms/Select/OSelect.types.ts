@@ -3,12 +3,19 @@
 import type { InjectionKey } from "vue";
 import type { FieldWidth } from "../Input/OInput.types";
 
-export type SelectValue = string | number | boolean;
+export type SelectValue = string | number | boolean | null;
 export type SelectModelValue = SelectValue | SelectValue[] | undefined;
 
 /** Injection key for the value map that preserves original value types across OSelect → OSelectItem */
 export const SELECT_VALUE_MAP_KEY: InjectionKey<Map<string, SelectValue>> =
   Symbol("SelectValueMap");
+
+/**
+ * Internal sentinel string that represents a `null` value.
+ * Reka UI primitives require string values; this lets us round-trip `null`
+ * through the component without corrupting the emitted model value.
+ */
+export const NULL_VALUE_SENTINEL = "__o2__null__";
 
 export type SelectSize = "sm" | "md";
 
@@ -123,6 +130,11 @@ export interface SelectSlots {
   prepend?: () => unknown;
   /** Append content inside the trigger (right) */
   append?: () => unknown;
+  /**
+   * Tooltip content rendered inside an info icon in the label area.
+   * Provide a `<q-tooltip>` element as the slot content.
+   */
+  tooltip?: () => unknown;
 }
 
 // ── Item ─────────────────────────────────────────────────────────────────
