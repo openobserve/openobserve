@@ -11,7 +11,12 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/queryBuilder-helpers.js');
+const {
+    ingestForQueryBuilderTest,
+    setupQueryAndSwitchToBuild,
+    initQueryBuilderTest,
+    initQueryBuilderTestLite,
+} = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
 // Test Suite: P1 - Builder Tab Improvement
@@ -20,6 +25,10 @@ const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/q
 test.describe("Logs Query Builder - Builder Tab Improvement", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -143,6 +152,10 @@ test.describe("Logs Query Builder - Edge Cases", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
@@ -217,6 +230,10 @@ test.describe("Logs Query Builder - Query Mode Toggle", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
@@ -275,6 +292,10 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
@@ -328,6 +349,10 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
 test.describe("Logs Query Builder - Search Bar Editor State", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -401,11 +426,15 @@ test.describe("Logs Query Builder — Bare Field Select defaults (Case 3a)", () 
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTest(page, pm);
+        await initQueryBuilderTestLite(page, pm);
 
         testLogger.info('Bare field select test setup completed');
     });
@@ -481,11 +510,15 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTest(page, pm);
+        await initQueryBuilderTestLite(page, pm);
 
         testLogger.info('FieldList button test setup completed');
     });
