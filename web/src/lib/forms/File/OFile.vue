@@ -117,12 +117,32 @@ function onDragLeave(event: DragEvent) {
   isDragging.value = false;
 }
 
+function filterByAccept(files: File[], accept: string): File[] {
+  const tokens = accept
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  return files.filter((file) => {
+    const mime = file.type.toLowerCase();
+    const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
+    return tokens.some((token) => {
+      if (token.startsWith(".")) return ext === token;
+      if (token.endsWith("/*")) return mime.startsWith(token.slice(0, -1));
+      return mime === token;
+    });
+  });
+}
+
 function onDrop(event: DragEvent) {
   if (props.disabled || !props.dropZone) return;
   event.preventDefault();
   isDragging.value = false;
   const dropped = event.dataTransfer?.files ?? null;
-  emitFiles(dropped);
+  if (dropped && props.accept) {
+    emitFiles(filterByAccept(Array.from(dropped), props.accept));
+  } else {
+    emitFiles(dropped);
+  }
 }
 
 function formatSize(bytes: number) {

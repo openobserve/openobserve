@@ -78,6 +78,8 @@ const charCount = computed(() => {
   return val !== undefined && val !== null ? String(val).length : 0;
 });
 
+// All masks are digit-extracting formatters: non-digit characters are stripped.
+// Only use `mask` on inputs that accept purely numeric content (times, dates).
 function applyMask(raw: string): string {
   if (!props.mask) return raw;
 
