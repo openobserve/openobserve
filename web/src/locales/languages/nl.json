@@ -2270,7 +2270,8 @@
       "addNewDestination": "Nieuwe bestemming toevoegen",
       "destinationRequired": "Er is minstens één bestemming vereist!",
       "disabledNotificationsInfo": "De detectie van afwijkingen wordt nog steeds uitgevoerd en de resultaten worden naar de _anomalieënstream geschreven. Schakel meldingen in om waarschuwingen te ontvangen wanneer er afwijkingen worden gedetecteerd."
-    }
+    },
+    "anomalyName": "Naam van de anomalie"
   },
   "alert_templates": {
     "header": "Sjablonen",

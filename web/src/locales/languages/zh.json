@@ -2272,7 +2272,8 @@
       "addNewDestination": "添加新目的地",
       "destinationRequired": "至少需要一个目的地！",
       "disabledNotificationsInfo": "异常检测仍将运行并将结果写入 _anomalies 流。启用通知以在检测到异常时接收警报。"
-    }
+    },
+    "anomalyName": "异常名称"
   },
   "alert_templates": {
     "header": "模板",
