@@ -1299,6 +1299,33 @@ pub static TANTIVY_RESULT_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// metrics for footer cache
+pub static FOOTER_CACHE_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "footer_cache_requests_total",
+            "Total number of requests to the footer cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static FOOTER_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "footer_cache_hits_total",
+            "Total number of hits in the footer cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -1968,6 +1995,14 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
 
+    // metrics for footer cache
+    registry
+        .register(Box::new(FOOTER_CACHE_REQUESTS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(FOOTER_CACHE_HITS_TOTAL.clone()))
+        .expect("Metric registered");
+
     // tokio runtime metrics
     registry
         .register(Box::new(TOKIO_RUNTIME_TASKS.clone()))
@@ -2316,6 +2351,8 @@ mod tests {
         let _ = TANTIVY_RESULT_CACHE_GC_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_REQUESTS_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_HITS_TOTAL.clone();
+        let _ = FOOTER_CACHE_REQUESTS_TOTAL.clone();
+        let _ = FOOTER_CACHE_HITS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_TASKS.clone();
         let _ = TOKIO_RUNTIME_TASKS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_WORKER_METRICS.clone();

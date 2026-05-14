@@ -763,8 +763,8 @@ async fn search_tantivy_index(
     .await?;
     let recording = Arc::new(RecordingDirectory::new(puffin));
     let puffin_dir: Arc<dyn Directory> = recording.clone();
-    let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
-    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+    let footer_cache = FooterCache::from_directory(&ttv_file_name, puffin_dir.clone()).await?;
+    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, footer_cache);
     let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
 
     let index = tantivy::Index::open(reader_directory)?;
