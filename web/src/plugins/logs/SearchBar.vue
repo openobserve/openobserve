@@ -1610,6 +1610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <QueryPlanDialog v-model="showExplainDialog" :searchObj="searchObj" />
 
     <!-- Saved Views List Dialog -->
+<<<<<<< HEAD
     <ODialog
       v-model:open="savedViewsListDialog"
       size="lg"
@@ -1855,6 +1856,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-list>
       </div>
     </ODialog>
+=======
+    <SavedViewsListDialog
+      v-model="savedViewsListDialog"
+      :local-saved-views="localSavedViews"
+      :favorite-views="favoriteViews"
+      :rows-per-page="rowsPerPage"
+      @apply-saved-view="applySavedView"
+      @favorite-saved-view="handleFavoriteSavedView"
+      @update-saved-view="handleUpdateSavedView"
+      @delete-saved-view="handleDeleteSavedView"
+    />
+>>>>>>> f8a9defe25 (refactor: extract SavedViewsListDialog from SearchBar (Phase 2))
   </div>
 </template>
 
@@ -1908,6 +1921,7 @@ import CustomDownloadDialog from "./components/CustomDownloadDialog.vue";
 import SearchSchedulerDialog from "./components/SearchSchedulerDialog.vue";
 import SearchInspectDialog from "./components/SearchInspectDialog.vue";
 import SearchMoreMenu from "./components/SearchMoreMenu.vue";
+import SavedViewsListDialog from "./components/SavedViewsListDialog.vue";
 import {
   mergeDeep,
   b64DecodeUnicode,
@@ -2056,6 +2070,7 @@ export default defineComponent({
     SearchSchedulerDialog,
     SearchInspectDialog,
     SearchMoreMenu,
+    SavedViewsListDialog,
     ScanSearch,
     ChartLine,
     ChartNoAxesColumn,
