@@ -190,10 +190,16 @@ export function useSessions() {
   }
 
   /**
-   * Fetch the summary row + per-turn trace list for a single session.
-   * Used by the Session Details page. Two parallel queries:
-   *   - one aggregate row over the whole session (KPIs)
-   *   - one row per trace_id in the session (the conversation turns)
+   * Fetch the per-turn trace list for a single session and derive the
+   * session-level rollup client-side.
+   *
+   * Single SQL call (GROUP BY trace_id). The session header KPIs —
+   * turns, duration, tokens, cost, error count — are reductions over
+   * the trace list, so issuing a second GROUP BY session_id query
+   * would just duplicate work the server already did. `user_id` and
+   * `service_name` are picked up per-trace and consolidated to the
+   * first non-null value (they're effectively constant within a
+   * session).
    */
   async function fetchSession(
     streamName: string,
@@ -207,28 +213,11 @@ export function useSessions() {
     // Escape single quotes so a malformed session id can't break the SQL.
     const safeId = sessionId.replace(/'/g, "''");
 
-    const detailSql = `
-      SELECT
-        gen_ai_conversation_id                                                   AS session_id,
-        MIN(_timestamp)                                                          AS first_seen,
-        MAX(end_time) - MIN(start_time)                                          AS duration_ns,
-        approx_distinct(trace_id)                                                AS turns,
-        COALESCE(SUM(gen_ai_usage_total_tokens), 0)                              AS tokens,
-        COALESCE(SUM(gen_ai_usage_cost), 0)                                      AS cost,
-        MAX(user_id)                                                             AS user_id,
-        MAX(service_name)                                                        AS service_name,
-        COUNT(*) FILTER (WHERE span_status = 'ERROR')                            AS error_count,
-        COUNT(*) FILTER (WHERE span_status = 'WARN' OR span_status = 'WARNING')  AS warn_count
-      FROM "${streamName}"
-      WHERE gen_ai_conversation_id = '${safeId}'
-      GROUP BY gen_ai_conversation_id
-      LIMIT 1
-    `;
-
     const tracesSql = `
       SELECT
         trace_id                                                                 AS trace_id,
         MIN(start_time)                                                          AS start_time,
+        MAX(end_time)                                                            AS end_time,
         MAX(end_time) - MIN(start_time)                                          AS duration_ns,
         COUNT(*)                                                                 AS span_count,
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL)                AS llm_call_count,
@@ -239,7 +228,9 @@ export function useSessions() {
         COALESCE(SUM(gen_ai_usage_cost), 0)                                      AS cost,
         COUNT(*) FILTER (WHERE span_status = 'ERROR')                            AS error_count,
         COUNT(*) FILTER (WHERE span_status = 'WARN' OR span_status = 'WARNING')  AS warn_count,
-        MAX(gen_ai_response_model)                                               AS model
+        MAX(gen_ai_response_model)                                               AS model,
+        MAX(user_id)                                                             AS user_id,
+        MAX(service_name)                                                        AS service_name
       FROM "${streamName}"
       WHERE gen_ai_conversation_id = '${safeId}'
       GROUP BY trace_id
@@ -247,37 +238,13 @@ export function useSessions() {
       LIMIT 1000
     `;
 
-    const [detailHits, traceHits] = await Promise.all([
-      executeQuery(detailSql, startTime, endTime),
-      executeQuery(tracesSql, startTime, endTime),
-    ]);
+    const traceHits = await executeQuery(tracesSql, startTime, endTime);
 
-    const detailRow = detailHits?.[0];
-    let detail: SessionDetail | null = null;
-    if (detailRow) {
-      const ec = Number(detailRow.error_count) || 0;
-      const wc = Number(detailRow.warn_count) || 0;
-      detail = {
-        sessionId: String(detailRow.session_id ?? sessionId),
-        userId: detailRow.user_id ? String(detailRow.user_id) : null,
-        serviceName: detailRow.service_name
-          ? String(detailRow.service_name)
-          : null,
-        firstSeenMicros: Number(detailRow.first_seen) || 0,
-        durationNanos: Number(detailRow.duration_ns) || 0,
-        turns: Number(detailRow.turns) || 0,
-        tokens: Number(detailRow.tokens) || 0,
-        cost: Number(detailRow.cost) || 0,
-        errorCount: ec,
-        warnCount: wc,
-        status: ec > 0 ? "error" : wc > 0 ? "warn" : "ok",
-      };
-    }
-
+    // Map per-trace rows first; we'll need to walk them once for the
+    // session-level rollup anyway.
     const traces: SessionTraceRow[] = (traceHits || []).map((r: any) => {
       const ec = Number(r.error_count) || 0;
       const wc = Number(r.warn_count) || 0;
-      // start_time on spans is microseconds (matches the rest of OO).
       return {
         traceId: String(r.trace_id ?? ""),
         startTimeMicros: Number(r.start_time) || 0,
@@ -294,6 +261,63 @@ export function useSessions() {
         model: r.model ? String(r.model) : null,
       };
     });
+
+    if (traces.length === 0) {
+      return { detail: null, traces: [] };
+    }
+
+    // Roll the per-trace rows up into the session-level detail. user_id
+    // / service_name are constant within a session, so first non-null
+    // wins — saves emitting a second GROUP BY session_id query that
+    // would produce the same numbers.
+    let firstSeenMicros = Infinity;
+    let lastSeenMicros = 0;
+    let totalTokens = 0;
+    let totalCost = 0;
+    let totalErrors = 0;
+    let totalWarns = 0;
+    let userId: string | null = null;
+    let serviceName: string | null = null;
+    for (let i = 0; i < (traceHits || []).length; i++) {
+      const r = traceHits[i];
+      const t = traces[i];
+      if (t.startTimeMicros && t.startTimeMicros < firstSeenMicros) {
+        firstSeenMicros = t.startTimeMicros;
+      }
+      const traceEnd = Number(r.end_time) || 0;
+      if (traceEnd > lastSeenMicros) lastSeenMicros = traceEnd;
+      totalTokens += t.tokens;
+      totalCost += t.cost;
+      totalErrors += t.errorCount;
+      // The trace row's `warn_count` isn't carried on SessionTraceRow,
+      // so read it directly off the raw row.
+      totalWarns += Number(r.warn_count) || 0;
+      if (!userId && r.user_id) userId = String(r.user_id);
+      if (!serviceName && r.service_name)
+        serviceName = String(r.service_name);
+    }
+    if (firstSeenMicros === Infinity) firstSeenMicros = 0;
+
+    const detail: SessionDetail = {
+      sessionId,
+      userId,
+      serviceName,
+      firstSeenMicros,
+      // SessionDetail's duration field is named `durationNanos` for
+      // historical reasons but the wire data is microseconds — we
+      // convert at the formatter level (same as SessionsList).
+      durationNanos:
+        lastSeenMicros > firstSeenMicros
+          ? lastSeenMicros - firstSeenMicros
+          : 0,
+      turns: traces.length,
+      tokens: totalTokens,
+      cost: totalCost,
+      errorCount: totalErrors,
+      warnCount: totalWarns,
+      status:
+        totalErrors > 0 ? "error" : totalWarns > 0 ? "warn" : "ok",
+    };
 
     return { detail, traces };
   }
@@ -353,18 +377,34 @@ export function useSessions() {
         if (m) model = m;
       }
       if (!userMessage) {
+        // `gen_ai.input.messages` carries the FULL prompt sent to the
+        // model — system + every prior turn + the current question. The
+        // first user-role entry is therefore turn 1's question, not the
+        // current turn's. Walk from the end to grab the actual question
+        // for *this* turn.
         const inputMsgs = messagesFromInput(span.gen_ai_input_messages);
-        const u = inputMsgs.find((m: any) => m.role === "user");
-        if (u && u.content) {
-          userMessage = { role: "user", content: u.content };
+        let u: any = null;
+        for (let i = inputMsgs.length - 1; i >= 0; i--) {
+          if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
+            u = inputMsgs[i];
+            break;
+          }
         }
+        if (u) userMessage = { role: "user", content: u.content };
       }
       if (!assistantMessage) {
+        // Output payloads typically carry just the model's reply for
+        // this turn, but defensively prefer the last assistant entry
+        // (Vertex / ADK responses occasionally bundle a system echo).
         const outputMsgs = messagesFromOutput(span.gen_ai_output_messages);
-        const a = outputMsgs.find((m: any) => m.role === "assistant");
-        if (a && a.content) {
-          assistantMessage = { role: "assistant", content: a.content };
+        let a: any = null;
+        for (let i = outputMsgs.length - 1; i >= 0; i--) {
+          if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
+            a = outputMsgs[i];
+            break;
+          }
         }
+        if (a) assistantMessage = { role: "assistant", content: a.content };
       }
       if (userMessage && assistantMessage && model) break;
     }
