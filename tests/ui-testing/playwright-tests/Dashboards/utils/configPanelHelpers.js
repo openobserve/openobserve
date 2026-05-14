@@ -239,7 +239,7 @@ export async function setupMetricPanelWithConfig(page, pm, dashboardName, panelN
  * @param {string} [options.panelName]
  * @param {string} [options.query]    - PromQL query string
  */
-async function buildPromQLPanel(page, pm, dashboardName, {
+export async function buildPromQLPanel(page, pm, dashboardName, {
   chartType,
   panelName = "Test Panel",
   query = "zo_node_memory_usage",
@@ -304,49 +304,6 @@ export async function setupPromQLDonutPanelWithConfig(page, pm, dashboardName, p
   await buildPromQLPanel(page, pm, dashboardName, { chartType: "donut", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL donut panel with config ready", { dashboardName, panelName });
-}
-
-/**
- * Builds a PromQL panel of any chart type without opening the config sidebar.
- * Caller must have called ensureMetricsIngested() in test.beforeAll.
- */
-export async function buildPromQLPanel(page, pm, dashboardName, {
-  chartType,
-  panelName = "Test Panel",
-  query = "zo_node_memory_usage",
-}) {
-  await setupTestDashboard(page, pm, dashboardName);
-  await pm.dashboardCreate.addPanel();
-  await pm.chartTypeSelector.selectChartType(chartType);
-  await pm.chartTypeSelector.selectStreamType("metrics");
-
-  // Switch to PromQL mode — button only visible after selecting metrics stream type
-  const promqlBtn = page.locator('[data-test="dashboard-promql-query-type"]');
-  await promqlBtn.waitFor({ state: "visible", timeout: 10000 });
-  await promqlBtn.click();
-
-  // Switch to Custom query mode to access Monaco editor
-  const customBtn = page.locator('[data-test="dashboard-custom-query-type"]');
-  await customBtn.waitFor({ state: "visible", timeout: 5000 });
-  await customBtn.click();
-
-  // Enter PromQL query in Monaco editor
-  const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
-  await queryEditor.waitFor({ state: "visible", timeout: 10000 });
-  const monacoEditor = queryEditor.getByRole('code');
-  await monacoEditor.click({ clickCount: 3 });
-  await page.keyboard.press('Backspace');
-  // Use insertText (paste-like) to avoid Monaco autocomplete interfering with
-  // character-by-character typing, which can truncate/mangle the query
-  await page.keyboard.insertText(query);
-  await page.keyboard.press('Escape'); // dismiss any autocomplete
-  // Wait for Monaco debounce to sync editor content to Vue data model
-  await page.waitForTimeout(3000);
-
-  await pm.dashboardPanelActions.addPanelName(panelName);
-  await pm.dashboardPanelActions.applyDashboardBtn();
-  await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
-  testLogger.info("PromQL panel built", { chartType, dashboardName, panelName });
 }
 
 /**
