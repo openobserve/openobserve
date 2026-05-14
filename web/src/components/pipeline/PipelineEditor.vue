@@ -138,9 +138,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer data-test="pipeline-editor-json-editor-drawer"
     v-model:open="showJsonEditorDialog"
     size="lg"
-    :show-close="false"
+    :title="t('pipeline.editPipelineJSON')"
     persistent
   >
+    <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled" #header-right>
+      <OButton
+        variant="ghost"
+        size="icon-toolbar"
+        @click="toggleJsonEditorAIChat"
+        data-test="menu-link-ai-item"
+        class="ai-hover-btn"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+        @mouseenter="isJsonEditorAiHovered = true"
+        @mouseleave="isJsonEditorAiHovered = false"
+      >
+        <img :src="jsonEditorAiBtnLogo" class="header-icon ai-icon" style="width:20px;height:20px;" />
+      </OButton>
+    </template>
     <JsonEditor
       :data="pipelineObj.currentSelectedPipeline"
       :title="t('pipeline.editPipelineJSON')"
@@ -423,6 +437,19 @@ const q = useQuasar();
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
+
+const isJsonEditorAiHovered = ref(false);
+const jsonEditorAiBtnLogo = computed(() => {
+  if (isJsonEditorAiHovered.value || store.state.isAiChatEnabled) {
+    return getImageURL('images/common/ai_icon_dark.svg');
+  }
+  return store.state.theme === 'dark'
+    ? getImageURL('images/common/ai_icon_dark.svg')
+    : getImageURL('images/common/ai_icon_gradient.svg');
+});
+const toggleJsonEditorAIChat = () => {
+  store.dispatch('setIsAiChatEnabled', !store.state.isAiChatEnabled);
+};
 
 const { t } = useI18n();
 

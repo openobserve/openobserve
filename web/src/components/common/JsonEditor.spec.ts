@@ -119,7 +119,8 @@ describe("JsonEditor", () => {
 
     it("renders the title", () => {
       wrapper = createWrapper({ title: "My JSON Editor" });
-      expect(wrapper.text()).toContain("My JSON Editor");
+      // Title is rendered via the parent ODrawer header, not inside JsonEditor directly
+      expect(wrapper.props("title")).toBe("My JSON Editor");
     });
   });
 
@@ -435,8 +436,9 @@ describe("JsonEditor", () => {
     it("renders AI toggle button when isEnterprise and ai_enabled", async () => {
       store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
       wrapper = createWrapper();
+      // AI toggle button has been moved to the parent ODrawer header slot, not inside JsonEditor
       const aiBtn = wrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiBtn.exists()).toBe(true);
+      expect(aiBtn.exists()).toBe(false);
     });
   });
 
@@ -489,7 +491,8 @@ describe("JsonEditor", () => {
       store.state.theme = "light";
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.html()).toContain("bg-white");
+      // Root element no longer uses bg-white; it's classless in light mode (dark-mode only applied in dark theme)
+      expect(wrapper.html()).not.toContain("dark-mode");
     });
   });
 
@@ -498,7 +501,8 @@ describe("JsonEditor", () => {
   describe("Close / Cancel controls", () => {
     it("renders close icon with data-test attribute", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="json-editor-close"]').exists()).toBe(true);
+      // Close icon has been moved to the parent ODrawer; JsonEditor no longer renders it
+      expect(wrapper.find('[data-test="json-editor-close"]').exists()).toBe(false);
     });
 
     it("renders cancel button with data-test attribute", () => {
@@ -506,9 +510,10 @@ describe("JsonEditor", () => {
       expect(wrapper.find('[data-test="json-editor-cancel"]').exists()).toBe(true);
     });
 
-    it("emits 'close' when the close icon is clicked", async () => {
+    it("emits 'close' when the cancel button is clicked (close icon removed)", async () => {
       wrapper = createWrapper();
-      await wrapper.find('[data-test="json-editor-close"]').trigger("click");
+      // The separate close icon has been removed; 'close' is emitted via the cancel button
+      await wrapper.find('[data-test="json-editor-cancel"]').trigger("click");
       expect(wrapper.emitted("close")).toBeTruthy();
       expect(wrapper.emitted("close")!.length).toBe(1);
     });

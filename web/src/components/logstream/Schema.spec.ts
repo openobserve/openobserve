@@ -1303,9 +1303,9 @@ describe("Schema Component Tests", async () => {
       expect(drawers[0].props("width")).toBe(60);
     });
 
-    it("should mount the pattern association ODrawer with size=lg and showClose=false", () => {
+    it("should mount the pattern association ODrawer with width=60 and showClose=false", () => {
       const drawers = w.findAllComponents(ODrawerStub);
-      expect(drawers[1].props("size")).toBe("lg");
+      expect(drawers[1].props("width")).toBe(60);
       expect(drawers[1].props("showClose")).toBe(false);
     });
 

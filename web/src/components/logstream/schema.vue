@@ -410,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-table o2-quasar-table o2-row-md o2-schema-table"
                   id="schemaFieldList"
                   :style="{
-                    height: `${indexData.defaultFts ? 'calc(100vh - 363px)' : 'calc(100vh - 330px)'}`,
+                    height: `${indexData.defaultFts ? 'calc(100vh - 403px)' : 'calc(100vh - 370px)'}`,
                     width: '100%'
                   }"
                   :rows-per-page-options="[]"
@@ -613,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             
             <!-- Configuration tab -->
             <div v-if="activeMainTab == 'configuration'">
-              <div class="tw:w-full tw:h-[calc(100vh-267px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4">
+              <div class="tw:w-full tw:h-[calc(100vh-307px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4">
                 <!-- Configuration Settings Card -->
                 <div 
                   :class="[
@@ -847,7 +847,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-table o2-quasar-table o2-row-md o2-schema-table"
                     id="schemaFieldList"
                     :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
-                    style="height: calc(100vh - 363px);"
+                    style="height: calc(100vh - 403px);"
                     :rows-per-page-options="[]"
                     dense
                   >
@@ -1041,7 +1041,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h5>Wait while loading...</h5>
     </div>
   </ODrawer>
-  <ODrawer data-test="schema-pattern-association-drawer" v-model:open="patternAssociationDialog.show" size="lg" :show-close="false">
+  <ODrawer data-test="schema-pattern-association-drawer" v-model:open="patternAssociationDialog.show" :width="60" :show-close="false">
     <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
   </ODrawer>
 
