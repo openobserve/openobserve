@@ -1065,7 +1065,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockApplyFilters).toHaveBeenCalledWith([
         "duration >= 100",
         "service_name = 'test'",
-      ]);
+      ], false); // liveMode is undefined, so skipSearch = false
     });
 
     it("should append error filter to applyFilters call when showErrorOnly is enabled", async () => {
@@ -1079,7 +1079,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockApplyFilters).toHaveBeenCalledWith([
         "duration >= 100",
         "span_status = 'ERROR'",
-      ]);
+      ], false); // liveMode is undefined, so skipSearch = false
     });
 
     it("should not duplicate error filter when it is already present in incoming filters", async () => {
@@ -1108,7 +1108,7 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.onErrorOnlyToggled(true);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"]);
+      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"], false); // liveMode is undefined, so skipSearch = false
     });
 
     it("should call removeFilterByField when error only toggle is turned off", async () => {
@@ -1119,6 +1119,68 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
+    });
+
+    it("should skip search when live mode is ON", async () => {
+      mockSearchObj.meta.liveMode = true;
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      const testFilters = ['duration > 100ms', 'service_name = "api"'];
+      wrapper.vm.onMetricsFiltersUpdated(testFilters);
+      await flushPromises();
+
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, true);
+    });
+
+    it("should not skip search when live mode is OFF", async () => {
+      mockSearchObj.meta.liveMode = false;
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      const testFilters = ['span_status = "ERROR"'];
+      wrapper.vm.onMetricsFiltersUpdated(testFilters);
+      await flushPromises();
+
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, false);
+    });
+
+    it("should handle undefined liveMode as false", async () => {
+      mockSearchObj.meta.liveMode = undefined;
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      const testFilters = ['http_method = "POST"'];
+      wrapper.vm.onMetricsFiltersUpdated(testFilters);
+      await flushPromises();
+
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, false);
+    });
+
+    it("should handle searchBarRef not available", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true, // No exposed methods
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      wrapper.vm.onMetricsFiltersUpdated(['test']);
+      await flushPromises();
+
+      expect(consoleSpy).toHaveBeenCalledWith("SearchBar not ready for filter application");
+      consoleSpy.mockRestore();
     });
   });
 
