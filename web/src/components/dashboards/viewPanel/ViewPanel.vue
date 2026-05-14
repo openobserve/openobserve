@@ -397,6 +397,9 @@ export default defineComponent({
     watch(
       () => histogramInterval.value,
       async () => {
+        // Capture the flag BEFORE any await — it may change while we're paused
+        const wasInitialSetup = isInitialHistogramSetup;
+
         // import sql parser if not imported
         if (!parser) {
           await importSqlParser();
@@ -417,7 +420,7 @@ export default defineComponent({
 
         // Mark as changed to signal refresh needed (unless this is initial setup)
         // Note: false means changes need to be applied (flag logic is inverted)
-        if (!isInitialHistogramSetup) {
+        if (!wasInitialSetup) {
           isVariablesChanged.value = false;
         }
       },
