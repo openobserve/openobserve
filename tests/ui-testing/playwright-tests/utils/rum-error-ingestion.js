@@ -73,31 +73,36 @@ async function ingestRumErrors(page, errorCount = 3) {
 async function fetchRumToken(page, baseUrl, orgId, email, password) {
   const basicAuth = Buffer.from(`${email}:${password}`).toString('base64');
 
-  const response = await page.evaluate(async ({ baseUrl, orgId, basicAuth }) => {
-    const response = await fetch(`${baseUrl}/api/${orgId}/rumtoken`, {
-      method: 'GET',
+  let fetchResponse;
+  try {
+    fetchResponse = await page.request.get(`${baseUrl}/api/${orgId}/rumtoken`, {
       headers: {
         'Authorization': `Basic ${basicAuth}`
       }
     });
-
-    if (!response.ok) {
-      return { success: false, status: response.status };
-    }
-
-    const data = await response.json();
-    return {
-      success: true,
-      token: data.data?.rum_token || data.rum_token
-    };
-  }, { baseUrl, orgId, basicAuth });
-
-  if (!response.success) {
-    testLogger.warn('Failed to fetch RUM token', { status: response.status });
+  } catch (requestError) {
+    testLogger.warn('RUM token fetch request failed', { error: requestError.message });
     return null;
   }
 
-  return response.token;
+  if (!fetchResponse.ok()) {
+    testLogger.warn('Failed to fetch RUM token', { status: fetchResponse.status() });
+    return null;
+  }
+
+  const data = await fetchResponse.json().catch(() => null);
+  if (!data) {
+    testLogger.warn('Failed to fetch RUM token - could not parse response body');
+    return null;
+  }
+
+  const token = data?.data?.rum_token || data?.rum_token;
+  if (!token) {
+    testLogger.warn('Failed to fetch RUM token - no token in response');
+    return null;
+  }
+
+  return token;
 }
 
 /**
@@ -187,30 +192,40 @@ function generateRumErrors(count) {
 async function ingestErrors(page, baseUrl, orgId, rumErrors, email, password) {
   const basicAuth = Buffer.from(`${email}:${password}`).toString('base64');
 
-  const response = await page.evaluate(async ({ baseUrl, orgId, rumErrors, basicAuth }) => {
-    const response = await fetch(`${baseUrl}/api/${orgId}/_rumdata/_json`, {
-      method: 'POST',
+  let fetchResponse;
+  try {
+    fetchResponse = await page.request.post(`${baseUrl}/api/${orgId}/_rumdata/_json`, {
       headers: {
         'Authorization': `Basic ${basicAuth}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(rumErrors)
+      data: rumErrors
     });
-
-    let data = null;
-    try {
-      const text = await response.text();
-      data = text ? JSON.parse(text) : null;
-    } catch (e) {
-      data = { error: 'Failed to parse response' };
-    }
-
+  } catch (requestError) {
     return {
-      status: response.status,
-      ok: response.ok,
-      data: data
+      success: false,
+      ingested: 0,
+      status: 'error',
+      error: requestError.message,
+      errors: [requestError.message]
     };
-  }, { baseUrl, orgId, rumErrors, basicAuth });
+  }
+
+  const responseStatus = fetchResponse.status();
+  const responseOk = fetchResponse.ok();
+  let responseData = null;
+  try {
+    const text = await fetchResponse.text();
+    responseData = text ? JSON.parse(text) : null;
+  } catch (e) {
+    responseData = { error: 'Failed to parse response' };
+  }
+
+  const response = {
+    status: responseStatus,
+    ok: responseOk,
+    data: responseData
+  };
 
   if (response.ok) {
     return {
