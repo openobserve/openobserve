@@ -33,10 +33,12 @@ const {
   mockLoadSemanticGroups,
   mockBuildQueryDetails,
   mockNavigateToLogs,
+  mockNavigateToCorrelatedLogs,
 } = vi.hoisted(() => ({
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
   mockNavigateToLogs: vi.fn(),
+  mockNavigateToCorrelatedLogs: vi.fn(),
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
@@ -50,6 +52,7 @@ vi.mock("@/composables/useTraces", () => ({
     searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
     buildQueryDetails: mockBuildQueryDetails,
     navigateToLogs: mockNavigateToLogs,
+    navigateToCorrelatedLogs: mockNavigateToCorrelatedLogs,
   }),
 }));
 
@@ -414,6 +417,33 @@ describe("TraceDetailsSidebar", async () => {
           .spyOn(mockStore, "dispatch")
           .mockResolvedValue(undefined);
         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
+
+        // Wire navigateToCorrelatedLogs to replicate the real composable behavior:
+        // call loadSemanticGroups, dispatch, and push to /logs.
+        mockNavigateToCorrelatedLogs.mockImplementation(
+          async (correlationProps: any) => {
+            await mockLoadSemanticGroups();
+            mockStore.dispatch("logs/setIsInitialized", false);
+            const streamNames = correlationProps.logStreams
+              .map((s: any) => s.stream_name)
+              .join(",");
+            router.push({
+              path: "/logs",
+              query: {
+                stream: streamNames,
+                sql_mode: "false",
+                query: "mock-encoded-query",
+                from: String(correlationProps.timeRange.startTime),
+                to: String(correlationProps.timeRange.endTime),
+                stream_type: "logs",
+                org_identifier: mockStore.state.selectedOrganization.identifier,
+                type: "trace_explorer",
+                quick_mode: "false",
+                show_histogram: "true",
+              },
+            });
+          },
+        );
       });
 
       it("should call loadSemanticGroups and navigate to /logs with query", async () => {

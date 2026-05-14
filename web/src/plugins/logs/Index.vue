@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="toggleErrorDetails"
                             variant="outline"
                             size="sm-action"
+                            style="font-size: 0.875rem"
                             data-test="logs-page-result-error-details-btn"
                             >{{ t("search.histogramErrorBtnLabel") }}</OButton
                           >
@@ -1991,67 +1992,89 @@ export default defineComponent({
               shouldUseHistogramQuery.value = false;
             }
 
-            // set logs page data to searchResponseForVisualization
-            if (shouldUseHistogramQuery.value === true) {
-              // only do it if is_histogram_eligible is true on logs page
-              // and showHistogram is true on logs page
-              if (
-                searchObj?.data?.queryResults?.is_histogram_eligible === true &&
-                searchObj?.meta?.showHistogram === true
-              ) {
-                // replace hits with histogram query data
-                // Override time_offset with the full query time range so that
-                // fillMissingValues uses the correct start time. The main search
-                // time_offset only covers the current page (last N rows), which
-                // would cause the chart to display partial data.
+            // Only reuse cached search results if the current query matches
+            // the query that produced those results. When the user modifies
+            // the query in Build/Patterns mode and switches to Visualize,
+            // stale results would cause a blank or incorrect chart.
+            const lastRunSql = searchObj.data.customDownloadQueryObj?.query?.sql;
+            const currentSql = logsPageQuery;
+            const normalizeSQL = (sql: any) => {
+              if (!sql) return "";
+              const s = Array.isArray(sql) ? sql.join(";") : String(sql);
+              return s.replace(/\s+/g, " ").trim().toLowerCase();
+            };
+            const queryMatchesResults =
+              !!lastRunSql && normalizeSQL(currentSql) === normalizeSQL(lastRunSql);
+
+            // Only reuse cached search results when the current query
+            // matches the query that produced them. When they differ (e.g.
+            // query was edited in Build mode), leave searchResponseForVisualization
+            // empty so the chart component makes a fresh API call.
+            if (queryMatchesResults) {
+              // set logs page data to searchResponseForVisualization
+              if (shouldUseHistogramQuery.value === true) {
+                // only do it if is_histogram_eligible is true on logs page
+                // and showHistogram is true on logs page
+                if (
+                  searchObj?.data?.queryResults?.is_histogram_eligible ===
+                    true &&
+                  searchObj?.meta?.showHistogram === true
+                ) {
+                  // replace hits with histogram query data
+                  // Override time_offset with the full query time range so that
+                  // fillMissingValues uses the correct start time. The main search
+                  // time_offset only covers the current page (last N rows), which
+                  // would cause the chart to display partial data.
+                  searchResponseForVisualization.value = {
+                    ...searchObj.data.queryResults,
+                    hits: searchObj.data.queryResults.aggs,
+                    histogram_interval:
+                      searchObj?.data?.queryResults
+                        ?.visualization_histogram_interval,
+                    time_offset: {
+                      start_time:
+                        searchObj?.data?.customDownloadQueryObj?.query
+                          ?.start_time,
+                      end_time:
+                        searchObj?.data?.customDownloadQueryObj?.query
+                          ?.end_time,
+                    },
+                  };
+
+                  // assign converted_histogram_query to dashboardPanelData
+                  if (searchObj.data.queryResults.converted_histogram_query) {
+                    // Store the histogram query so it persists for "Add to Dashboard"
+                    storedHistogramQuery.value =
+                      searchObj.data.queryResults.converted_histogram_query;
+
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].query =
+                      searchObj.data.queryResults.converted_histogram_query;
+
+                    // assign to visualizeChartData as well
+                    visualizeChartData.value.queries[0].query =
+                      dashboardPanelData.data.queries[0].query;
+                    visualizeChartData.value.queries[0].vrlFunctionQuery =
+                      dashboardPanelData.data.queries[0].vrlFunctionQuery;
+                  }
+                }
+              } else {
                 searchResponseForVisualization.value = {
                   ...searchObj.data.queryResults,
-                  hits: searchObj.data.queryResults.aggs,
                   histogram_interval:
                     searchObj?.data?.queryResults
                       ?.visualization_histogram_interval,
-                  time_offset: {
-                    start_time:
-                      searchObj?.data?.customDownloadQueryObj?.query
-                        ?.start_time,
-                    end_time:
-                      searchObj?.data?.customDownloadQueryObj?.query?.end_time,
-                  },
                 };
 
-                // assign converted_histogram_query to dashboardPanelData
-                if (searchObj.data.queryResults.converted_histogram_query) {
-                  // Store the histogram query so it persists for "Add to Dashboard"
-                  storedHistogramQuery.value =
-                    searchObj.data.queryResults.converted_histogram_query;
-
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].query =
-                    searchObj.data.queryResults.converted_histogram_query;
-
-                  // assign to visualizeChartData as well
-                  visualizeChartData.value.queries[0].query =
-                    dashboardPanelData.data.queries[0].query;
-                  visualizeChartData.value.queries[0].vrlFunctionQuery =
-                    dashboardPanelData.data.queries[0].vrlFunctionQuery;
+                // if hits is empty and filteredHit is present, then set hits to filteredHit
+                if (
+                  searchResponseForVisualization?.value?.hits?.length === 0 &&
+                  searchResponseForVisualization?.value?.filteredHit
+                ) {
+                  searchResponseForVisualization.value.hits =
+                    searchResponseForVisualization?.value?.filteredHit ?? [];
                 }
-              }
-            } else {
-              searchResponseForVisualization.value = {
-                ...searchObj.data.queryResults,
-                histogram_interval:
-                  searchObj?.data?.queryResults
-                    ?.visualization_histogram_interval,
-              };
-
-              // if hits is empty and filteredHit is present, then set hits to filteredHit
-              if (
-                searchResponseForVisualization?.value?.hits?.length === 0 &&
-                searchResponseForVisualization?.value?.filteredHit
-              ) {
-                searchResponseForVisualization.value.hits =
-                  searchResponseForVisualization?.value?.filteredHit ?? [];
               }
             }
 

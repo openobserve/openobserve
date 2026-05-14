@@ -526,6 +526,7 @@ size="14px"
                   >
                     <div class="position-relative">
                       <div
+                        data-test="trace-details-resizer"
                         :style="{
                           width: '1px',
                           left: `${leftWidth}px`,
@@ -568,6 +569,7 @@ size="14px"
                         @unhover-span="onUnhoverSpan"
                         @update-current-index="handleIndexUpdate"
                         @search-result="handleSearchResult"
+                        @view-correlated-logs="handleTreeViewCorrelatedLogs"
                       />
                     </div>
                   </div>
@@ -674,7 +676,18 @@ size="14px"
                 :spans="flatSpans"
                 :selected-span-id="selectedSpanId"
                 :trace-duration="traceMetadata?.duration_ms || 0"
-                @span-selected="updateSelectedSpan"
+                :span-map="spanMap"
+                :stream-name="currentTraceStreamName"
+                :search-query="searchQuery"
+                :parent-mode="mode"
+                :service-streams-enabled="serviceStreamsEnabled"
+                :base-trace-position="baseTracePosition"
+                @view-logs="redirectToLogs"
+                @close="closeSidebar"
+                @select-span="updateSelectedSpan"
+                @add-filter="addFilterFromSidebar"
+                @apply-filter-immediately="applyFilterImmediately"
+                @open-trace="openTraceLink"
               />
             </div>
 
@@ -892,7 +905,6 @@ v-close-popup>
 import {
   defineComponent,
   ref,
-  type Ref,
   type PropType,
   onMounted,
   onUnmounted,
@@ -900,11 +912,11 @@ import {
   defineAsyncComponent,
   onBeforeMount,
   nextTick,
+  computed,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useTraces from "@/composables/useTraces";
-import { computed } from "vue";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
@@ -932,7 +944,7 @@ import {
   SPAN_KIND_UNSPECIFIED,
   SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
-import { throttle } from "lodash-es";
+import useResizer from "@/composables/useResizer";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import {
@@ -944,6 +956,7 @@ import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import config from "@/aws-exports";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
@@ -1086,7 +1099,14 @@ export default defineComponent({
     const activeTab = ref("waterfall");
     const sidebarActiveTab = ref("attributes");
 
-    const { searchObj, getUrlQueryParams } = useTraces();
+    const {
+      searchObj,
+      getUrlQueryParams,
+      buildQueryDetails,
+      navigateToLogs,
+      navigateToCorrelatedLogs,
+    } = useTraces();
+
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -1218,17 +1238,29 @@ export default defineComponent({
 
     const ChartData: any = ref({});
 
-    const leftWidth: Ref<number> = ref(460);
-    const initialX: Ref<number> = ref(0);
-    const initialWidth: Ref<number> = ref(0);
-
-    const throttledResizing = ref<any>(null);
+    const {
+      value: leftWidth,
+      onMouseDown: startResize,
+    } = useResizer({
+      direction: "horizontal",
+      initialValue: 460,
+      unit: "px",
+      throttleMs: 50,
+    });
 
     // DAG panel resize state
-    const dagLeftWidth: Ref<number> = ref(50); // percentage
-    const dagInitialX: Ref<number> = ref(0);
-    const dagInitialWidth: Ref<number> = ref(0);
-    const throttledDagResizing = ref<any>(null);
+    const {
+      value: dagLeftWidth,
+      onMouseDown: startDagResize,
+    } = useResizer({
+      direction: "horizontal",
+      initialValue: 50,
+      minValue: 20,
+      maxValue: 80,
+      unit: "%",
+      containerRef: parentContainer,
+      throttleMs: 16,
+    });
 
     // Calculate sidebar width based on leftWidth
     // Sidebar should take ~84% of the remaining space after left panel
@@ -2469,56 +2501,7 @@ export default defineComponent({
       updateHeight();
     };
 
-    onMounted(() => {
-      throttledResizing.value = throttle(resizing, 50);
-    });
-
-    const startResize = (event: any) => {
-      initialX.value = event.clientX;
-      initialWidth.value = leftWidth.value;
-
-      window.addEventListener("mousemove", throttledResizing.value);
-      window.addEventListener("mouseup", stopResize);
-      document.body.classList.add("no-select");
-    };
-
-    const resizing = (event: any) => {
-      const deltaX = event.clientX - initialX.value;
-      leftWidth.value = initialWidth.value + deltaX;
-    };
-
-    const stopResize = () => {
-      window.removeEventListener("mousemove", throttledResizing.value);
-      window.removeEventListener("mouseup", stopResize);
-      document.body.classList.remove("no-select");
-    };
-
-    // DAG panel resize handlers
-    const startDagResize = (event: MouseEvent) => {
-      dagInitialX.value = event.clientX;
-      dagInitialWidth.value = dagLeftWidth.value;
-
-      throttledDagResizing.value = throttle(dagResizing, 16);
-      window.addEventListener("mousemove", throttledDagResizing.value);
-      window.addEventListener("mouseup", stopDagResize);
-      document.body.classList.add("no-select");
-    };
-
-    const dagResizing = (event: MouseEvent) => {
-      if (!parentContainer.value) return;
-      const containerWidth = parentContainer.value.clientWidth;
-      const deltaX = event.clientX - dagInitialX.value;
-      const deltaPercent = (deltaX / containerWidth) * 100;
-      const newWidth = dagInitialWidth.value + deltaPercent;
-      // Constrain between 20% and 80%
-      dagLeftWidth.value = Math.max(20, Math.min(80, newWidth));
-    };
-
-    const stopDagResize = () => {
-      window.removeEventListener("mousemove", throttledDagResizing.value);
-      window.removeEventListener("mouseup", stopDagResize);
-      document.body.classList.remove("no-select");
-    };
+    // Resizers are now handled by useResizer composable
 
     const toggleTimeline = () => {
       isTimelineExpanded.value = !isTimelineExpanded.value;
@@ -2584,7 +2567,9 @@ export default defineComponent({
       store.dispatch("logs/setIsInitialized", false);
 
       const stream: string =
-        searchObj.data.traceDetails.selectedLogStreams.join(",");
+        config.isEnterprise === "true"
+          ? logStreams.value.join(",")
+          : searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
         searchObj.data.traceDetails.selectedTrace?.trace_start_time - 60000000;
       const to =
@@ -2592,7 +2577,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${store.state.organizationData?.organizationSettings?.trace_id_field_name}='${spanList.value[0]["trace_id"]}'`,
+        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${spanList.value[0]["trace_id"]}'`,
       );
 
       router.push({
@@ -2611,6 +2596,16 @@ export default defineComponent({
           quick_mode: "false",
         },
       });
+    };
+
+    const handleTreeViewCorrelatedLogs = (span: any) => {
+      const spanId = span.spanId || span.span_id;
+      updateSelectedSpan(spanId);
+
+      const correlationData = searchObj.data.traceDetails.correlationProps;
+      if (correlationData) {
+        navigateToCorrelatedLogs(correlationData);
+      }
     };
 
     const redirectToSessionReplay = () => {
@@ -2934,6 +2929,7 @@ export default defineComponent({
       outlinedInfo,
       outlinedPlayCircle,
       redirectToLogs,
+      handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
       hasRumSessionId,
       firstRumSessionData,
