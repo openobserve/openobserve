@@ -1256,22 +1256,21 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         msg
     };
 
-    // Block SSRF: validate the destination URL before making any outbound request.
-    // The test_http_destination handler validates on save/test, but the URL could
-    // have been stored before the guard was introduced, or modified directly in DB.
-    if let Err(e) = SsrfGuard::validate_url_with_config(&endpoint.url) {
+    // Block SSRF: validate the destination URL (including DNS resolution) before
+    // making any outbound request. The client is built through `build_safe_client`
+    // so that redirect targets and per-connect DNS resolution are re-validated.
+    if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
         return Err(anyhow::anyhow!(
             "Destination URL blocked by SSRF guard: {e}"
         ));
     }
 
-    let client = if endpoint.skip_tls_verify {
-        reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?
+    let builder = if endpoint.skip_tls_verify {
+        reqwest::Client::builder().danger_accept_invalid_certs(true)
     } else {
-        reqwest::Client::new()
+        reqwest::Client::builder()
     };
+    let client = crate::common::utils::ssrf_guard::build_safe_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let mut req = match endpoint.method {
         HTTPType::POST => client.post(url),

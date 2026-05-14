@@ -168,8 +168,8 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         });
     }
 
-    // SSRF protection: Validate URL before making request
-    if let Err(error_msg) = SsrfGuard::validate_url_with_config(url) {
+    // SSRF protection: Validate URL (including DNS resolution) before making request.
+    if let Err(error_msg) = SsrfGuard::validate_url_with_config_async(url).await {
         return MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
@@ -178,14 +178,15 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         });
     }
 
-    // Build HTTP client
+    // Build HTTP client through the SSRF-aware factory so redirect targets
+    // and any DNS resolution that happens at connect time are re-validated.
     let mut client_builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
 
     if skip_tls_verify {
         client_builder = client_builder.danger_accept_invalid_certs(true);
     }
 
-    let client = match client_builder.build() {
+    let client = match crate::common::utils::ssrf_guard::build_safe_client(client_builder) {
         Ok(client) => client,
         Err(e) => {
             return MetaHttpResponse::json(TestDestinationResponse {

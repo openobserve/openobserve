@@ -89,11 +89,46 @@ impl Streams for StreamServiceImpl {
         &self,
         request: Request<StreamStatsRequest>,
     ) -> Result<Response<StreamStatsResponse>, Status> {
+        // SECURITY (GHSA-5x2v-jg9q-g8qc): user-credential callers must not be
+        // able to query other organizations by spoofing `req.org_id`.
+        //
+        // The gRPC auth interceptor (`src/handler/grpc/auth/mod.rs`) sets a
+        // `user_id` metadata entry only when the caller authenticated with a
+        // user credential — internal-token callers (super-cluster, intra-cluster
+        // RPCs) leave it absent. For user callers, the same interceptor requires
+        // an organization header to be present and uses it to look up the user;
+        // we rebind `req.org_id` to that authenticated org so any body-level
+        // value the client may have supplied is ignored.
+        let metadata = request.metadata();
+        let is_user_call = metadata.get("user_id").is_some();
+        let authenticated_org = if is_user_call {
+            let cfg = config::get_config();
+            metadata
+                .get(&cfg.grpc.org_header_key)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string)
+        } else {
+            None
+        };
+
         let req = request.into_inner();
 
-        let orgs = match req.org_id {
-            Some(org) => vec![org],
-            None => db::schema::list_organizations_from_cache().await,
+        let orgs = if is_user_call {
+            // User-credential caller: restrict to their authenticated org.
+            match authenticated_org {
+                Some(org) => vec![org],
+                None => {
+                    return Err(Status::unauthenticated(
+                        "missing organization header for user-authenticated request",
+                    ));
+                }
+            }
+        } else {
+            // Internal-token caller (cluster RPC): may specify an org or list all.
+            match req.org_id {
+                Some(org) => vec![org],
+                None => db::schema::list_organizations_from_cache().await,
+            }
         };
 
         let stream_type = req.stream_type.map(|s| s.into());

@@ -108,7 +108,7 @@ def test_e2e_createdestination(create_session, base_url):
     print(resp_create_destinations.content)
 
     payload = {
-        "url": "www",
+        "url": "https://example.com/webhook",
         "method": "post",
         "skip_tls_verify": skip_tls_verify_value,
         "template": template_name,

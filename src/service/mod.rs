@@ -39,6 +39,8 @@ pub mod logs;
 pub mod metadata;
 pub mod metrics;
 pub mod node;
+#[cfg(feature = "enterprise")]
+pub mod org_storage_providers;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
@@ -49,10 +51,6 @@ pub mod ratelimit;
 pub mod runtime_metrics;
 pub mod schema;
 pub mod search;
-pub mod tantivy;
-#[cfg(feature = "cloud")]
-pub mod trial_quota;
-
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;
@@ -60,8 +58,11 @@ pub mod session;
 pub mod short_url;
 pub mod sourcemaps;
 pub mod stream;
+pub mod tantivy;
 pub mod tls;
 pub mod traces;
+#[cfg(feature = "cloud")]
+pub mod trial_quota;
 pub mod users;
 
 // format stream name

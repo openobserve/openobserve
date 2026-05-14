@@ -32,6 +32,7 @@ pub struct Organization {
     #[serde(default)]
     pub identifier: String,
     /// Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed
+    #[serde(alias = "label")]
     pub name: String,
     #[serde(default)]
     pub org_type: String,
@@ -162,6 +163,7 @@ pub struct AllOrgListDetails {
     pub contract_end_date: Option<i64>,
     #[serde(default)]
     pub billing_provider: String,
+    pub org_storage_enabled: bool,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -193,6 +195,12 @@ pub struct CreateExternalContractRequest {
 pub struct ExtendExternalContractRequest {
     pub org_id: String,
     pub new_end_date: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct EnableOrgStorageRequest {
+    pub org_id: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -402,6 +410,8 @@ pub struct OrganizationSetting {
     pub claim_parser_function: String,
     #[serde(default)]
     pub cross_links: Vec<config::meta::stream::CrossLink>,
+    #[serde(default)]
+    pub org_storage_enabled: bool,
 }
 
 impl Default for OrganizationSetting {
@@ -434,6 +444,7 @@ impl Default for OrganizationSetting {
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
+            org_storage_enabled: false,
         }
     }
 }
@@ -703,6 +714,7 @@ mod tests {
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
+            org_storage_enabled: false,
         };
 
         assert_eq!(details.plan, 0);
@@ -751,6 +763,7 @@ mod tests {
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
+            org_storage_enabled: false,
         };
 
         let details2 = AllOrgListDetails {
@@ -764,6 +777,7 @@ mod tests {
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
+            org_storage_enabled: true,
         };
 
         let response = AllOrganizationResponse {
@@ -832,6 +846,7 @@ mod tests {
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
+            org_storage_enabled: true,
         };
 
         let v = serde_json::to_value(&with_contract).unwrap();
@@ -850,6 +865,7 @@ mod tests {
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
+            org_storage_enabled: true,
         };
 
         let v = serde_json::to_value(&without_contract).unwrap();
@@ -1273,6 +1289,7 @@ mod tests {
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
+            org_storage_enabled: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1300,6 +1317,7 @@ mod tests {
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
+            org_storage_enabled: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

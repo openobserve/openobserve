@@ -23,8 +23,13 @@ use config::meta::timed_annotations::{
 };
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards::timed_annotations,
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    service::{dashboards::timed_annotations, db::dashboards as dashboards_db},
 };
+
+async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
+    dashboards_db::dashboard_in_org(org_id, dashboard_id).await
+}
 
 /// Create Timed Annotations
 
@@ -59,9 +64,13 @@ use crate::{
     )
 )]
 pub async fn create_annotations(
-    Path((_org_id, dashboard_id)): Path<(String, String)>,
+    Path((org_id, dashboard_id)): Path<(String, String)>,
     axum::Json(req): axum::Json<TimedAnnotationReq>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("dashboard not found");
+    }
+
     if let Err(validation_err) = req.validate() {
         return MetaHttpResponse::bad_request(validation_err);
     }
@@ -107,9 +116,13 @@ pub async fn create_annotations(
     )
 )]
 pub async fn get_annotations(
-    Path((_org_id, dashboard_id)): Path<(String, String)>,
+    Path((org_id, dashboard_id)): Path<(String, String)>,
     query: Result<Query<ListTimedAnnotationsQuery>, axum::extract::rejection::QueryRejection>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("dashboard not found");
+    }
+
     let query = match query {
         Ok(Query(q)) => q,
         Err(_) => {
@@ -165,9 +178,13 @@ pub async fn get_annotations(
     )
 )]
 pub async fn delete_annotations(
-    Path((_org_id, dashboard_id)): Path<(String, String)>,
+    Path((org_id, dashboard_id)): Path<(String, String)>,
     axum::Json(req): axum::Json<TimedAnnotationDelete>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("dashboard not found");
+    }
+
     if let Err(validation_err) = req.validate() {
         return MetaHttpResponse::bad_request(validation_err);
     }
@@ -212,9 +229,13 @@ pub async fn delete_annotations(
     )
 )]
 pub async fn update_annotations(
-    Path((_org_id, dashboard_id, timed_annotation_id)): Path<(String, String, String)>,
+    Path((org_id, dashboard_id, timed_annotation_id)): Path<(String, String, String)>,
     axum::Json(mut req): axum::Json<TimedAnnotation>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("dashboard not found");
+    }
+
     // ensure the annotation id is always set for update
     req.annotation_id = Some(timed_annotation_id.clone());
     if let Err(validation_err) = req.validate() {
@@ -263,9 +284,13 @@ pub async fn update_annotations(
     )
 )]
 pub async fn delete_annotation_panels(
-    Path((_org_id, _dashboard_id, timed_annotation_id)): Path<(String, String, String)>,
+    Path((org_id, dashboard_id, timed_annotation_id)): Path<(String, String, String)>,
     axum::Json(panels): axum::Json<Vec<String>>,
 ) -> Response {
+    if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+        return MetaHttpResponse::not_found("dashboard not found");
+    }
+
     if panels.is_empty() {
         return MetaHttpResponse::bad_request("panels cannot be empty".to_string());
     }
