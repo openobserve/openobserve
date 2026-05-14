@@ -122,11 +122,8 @@ describe("Alert List", async () => {
           `[data-test="alert-template-list-${template_name}-delete-template"]`
         )
         .trigger("click");
-      await flushPromises();
       const mainWrapper = new DOMWrapper(document.body);
-      await mainWrapper
-        .find('[data-test="o-dialog-primary-btn"]')
-        .trigger("click");
+      await mainWrapper.find('[data-test="confirm-button"]').trigger("click");
       await flushPromises();
     });
 

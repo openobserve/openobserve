@@ -177,82 +177,11 @@ const createMockI18n = () => {
           created: "Created",
           actions: "Actions",
           folder: "Folder",
-          createdashboard: "Create Dashboard",
-          updateFolder: "Update Folder",
-          newFolder: "New Folder",
-          cancel: "Cancel",
-          save: "Save",
         },
       },
     },
   });
 };
-
-// Shared stub configuration used across the suite.
-// q-dialog is removed in favor of the migrated overlay primitives ODrawer/ODialog.
-const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any = { folder: "default" }) => ({
-  plugins: [store, router, i18n],
-  mocks: {
-    $route: { query: routeQuery },
-    $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
-  },
-  provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
-  stubs: {
-    "q-page": true,
-    "q-input": true,
-    "q-btn": true,
-    "q-toggle": true,
-    "q-tooltip": true,
-    // q-splitter must render both named slots so the drawers nested in
-    // <template v-slot:after> are present for assertions.
-    "q-splitter": {
-      name: "QSplitter",
-      template: '<div data-test-stub="q-splitter"><slot name="before" /><slot name="after" /></div>',
-    },
-    "q-tabs": true,
-    "q-tab": true,
-    "q-separator": true,
-    "q-menu": true,
-    "q-list": true,
-    "q-item": true,
-    "q-item-section": true,
-    "q-item-label": true,
-    "q-icon": true,
-    "q-table": true,
-    // Migrated overlay primitives — preserve props/emits for assertion
-    ODrawer: {
-      name: "ODrawer",
-      props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel", "primaryButtonVariant", "secondaryButtonVariant", "neutralButtonVariant", "primaryButtonDisabled", "secondaryButtonDisabled", "primaryButtonLoading"],
-      emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-      template: '<div data-test-stub="o-drawer" :data-open="open" :data-title="title"><slot /></div>',
-    },
-    ODialog: {
-      name: "ODialog",
-      props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel"],
-      emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-      template: '<div data-test-stub="o-dialog" :data-open="open" :data-title="title"><slot /></div>',
-    },
-    AddDashboard: {
-      name: "AddDashboard",
-      template: "<div data-test-stub=\"add-dashboard\"></div>",
-      methods: { submit: vi.fn() },
-    },
-    AddFolder: {
-      name: "AddFolder",
-      template: "<div data-test-stub=\"add-folder\"></div>",
-      methods: { submit: vi.fn() },
-    },
-    MoveDashboardToAnotherFolder: {
-      name: "MoveDashboardToAnotherFolder",
-      props: ["open", "dashboardIds", "activeFolderId"],
-      emits: ["update:open", "updated"],
-      template: '<div data-test-stub="move-dashboard"></div>',
-    },
-    ConfirmDialog: true,
-    QTablePagination: true,
-    NoData: true,
-  },
-});
 
 describe("Dashboards.vue", () => {
   let wrapper: any;
@@ -317,7 +246,49 @@ describe("Dashboards.vue", () => {
   describe("Component Initialization", () => {
     it("should mount successfully", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: {
+              query: { folder: "default" },
+            },
+            $q: {
+              notify: vi.fn(() => vi.fn()), // Mock notify function
+              dialog: vi.fn(),
+            },
+          },
+          provide: {
+            _q_: {
+              notify: vi.fn(() => vi.fn()),
+              dialog: vi.fn(),
+            },
+          },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -326,7 +297,49 @@ describe("Dashboards.vue", () => {
 
     it("should initialize with default folder when no route query parameter", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n, {}),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: {
+              query: {},
+            },
+            $q: {
+              notify: vi.fn(() => vi.fn()),
+              dialog: vi.fn(),
+            },
+          },
+          provide: {
+            _q_: {
+              notify: vi.fn(() => vi.fn()),
+              dialog: vi.fn(),
+            },
+          },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       // Wait for component initialization to complete
@@ -339,7 +352,49 @@ describe("Dashboards.vue", () => {
 
     it("should have reactive activeFolderId property", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: {
+              query: { folder: "default" },
+            },
+            $q: {
+              notify: vi.fn(() => vi.fn()),
+              dialog: vi.fn(),
+            },
+          },
+          provide: {
+            _q_: {
+              notify: vi.fn(() => vi.fn()),
+              dialog: vi.fn(),
+            },
+          },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       // Wait for component initialization to complete
@@ -348,33 +403,60 @@ describe("Dashboards.vue", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm.activeFolderId).toBeDefined();
-
+      
       // Test that updateActiveFolderId method works
       expect(wrapper.vm.updateActiveFolderId).toBeDefined();
       wrapper.vm.updateActiveFolderId("folder1");
       expect(wrapper.vm.activeFolderId).toBe("folder1");
-    });
-
-    it("should expose addDashboardRef and addFolderRef on the component surface", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      // The refs are exposed on the public surface so the drawer's
-      // @click:primary handler can invoke addDashboardRef?.submit().
-      // After mount, they are bound to the slotted child component instance.
-      expect("addDashboardRef" in wrapper.vm).toBe(true);
-      expect("addFolderRef" in wrapper.vm).toBe(true);
     });
   });
 
   describe("Computed Properties", () => {
     it("should define table columns correctly", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: {
+              query: { folder: "default" },
+            },
+            $q: {
+              notify: vi.fn(() => vi.fn()),
+              dialog: vi.fn(),
+            },
+          },
+          provide: {
+            _q_: {
+              notify: vi.fn(() => vi.fn()),
+              dialog: vi.fn(),
+            },
+          },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       await nextTick();
@@ -383,7 +465,7 @@ describe("Dashboards.vue", () => {
       expect(columns).toBeDefined();
       expect(Array.isArray(columns)).toBe(true);
       expect(columns.length).toBeGreaterThan(0);
-
+      
       // Check specific required columns
       const columnNames = columns.map((col: any) => col.name);
       expect(columnNames).toContain("#");
@@ -402,7 +484,39 @@ describe("Dashboards.vue", () => {
       };
 
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(testStore, router, i18n),
+        global: {
+          plugins: [testStore, router, i18n],
+          mocks: {
+            $route: { query: { folder: "default" } },
+            $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
+          },
+          provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       await nextTick();
@@ -424,7 +538,39 @@ describe("Dashboards.vue", () => {
       };
 
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(testStore, router, i18n),
+        global: {
+          plugins: [testStore, router, i18n],
+          mocks: {
+            $route: { query: { folder: "default" } },
+            $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
+          },
+          provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       await nextTick();
@@ -437,39 +583,135 @@ describe("Dashboards.vue", () => {
   describe("Methods", () => {
     it("should handle addDashboard method", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { folder: "default" } },
+            $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
+          },
+          provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       await nextTick();
 
       expect(wrapper.vm.showAddDashboardDialog).toBe(false);
-
+      
       // Call addDashboard method
       wrapper.vm.addDashboard();
-
+      
       expect(wrapper.vm.showAddDashboardDialog).toBe(true);
     });
 
     it("should handle addFolder method", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { folder: "default" } },
+            $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
+          },
+          provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       await nextTick();
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
       expect(wrapper.vm.isFolderEditMode).toBe(false);
-
+      
       // Call addFolder method
       wrapper.vm.addFolder();
-
+      
       expect(wrapper.vm.showAddFolderDialog).toBe(true);
       expect(wrapper.vm.isFolderEditMode).toBe(false);
     });
 
     it("should have showDeleteDialogFn method defined", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { folder: "default" } },
+            $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
+          },
+          provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       await nextTick();
@@ -480,19 +722,51 @@ describe("Dashboards.vue", () => {
 
     it("should handle editFolder method", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { folder: "default" } },
+            $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
+          },
+          provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       await nextTick();
 
       const testFolderId = "test-folder-id";
-
+      
       expect(wrapper.vm.selectedFolderToEdit).toBeFalsy();
       expect(wrapper.vm.isFolderEditMode).toBe(false);
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
-
+      
       wrapper.vm.editFolder(testFolderId);
-
+      
       expect(wrapper.vm.selectedFolderToEdit).toBe(testFolderId);
       expect(wrapper.vm.isFolderEditMode).toBe(true);
       expect(wrapper.vm.showAddFolderDialog).toBe(true);
@@ -500,7 +774,39 @@ describe("Dashboards.vue", () => {
 
     it("should handle clearSearchHistory method", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { folder: "default" } },
+            $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
+          },
+          provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
+          stubs: {
+            "q-page": true,
+            "q-input": true,
+            "q-btn": true,
+            "q-toggle": true,
+            "q-tooltip": true,
+            "q-splitter": true,
+            "q-tabs": true,
+            "q-tab": true,
+            "q-separator": true,
+            "q-menu": true,
+            "q-list": true,
+            "q-item": true,
+            "q-item-section": true,
+            "q-item-label": true,
+            "q-icon": true,
+            "q-table": true,
+            "q-dialog": true,
+            AddDashboard: true,
+            AddFolder: true,
+            MoveDashboardToAnotherFolder: true,
+            ConfirmDialog: true,
+            QTablePagination: true,
+            NoData: true,
+          },
+        },
       });
 
       await nextTick();
@@ -508,247 +814,14 @@ describe("Dashboards.vue", () => {
       // Set up some search data
       wrapper.vm.searchQuery = "test search";
       wrapper.vm.filteredResults = [{ id: 1, title: "Test Result" }];
-
+      
       expect(wrapper.vm.searchQuery).toBe("test search");
       expect(wrapper.vm.filteredResults).toHaveLength(1);
-
+      
       wrapper.vm.clearSearchHistory();
-
+      
       expect(wrapper.vm.searchQuery).toBe("");
       expect(wrapper.vm.filteredResults).toEqual([]);
-    });
-  });
-
-  // Helper: locate ODrawer instances by title prop.
-  // Each migrated drawer differs only by title, so this gives us a
-  // deterministic, attribute-free lookup against the global stub.
-  const findDrawerByTitle = (w: any, title: string) => {
-    const drawers = w.findAllComponents({ name: "ODrawer" });
-    return drawers.find((d: any) => d.props("title") === title);
-  };
-
-  describe("ODrawer migration: Add Dashboard drawer", () => {
-    it("should render ODrawer for add dashboard, closed by default, with correct props", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      expect(drawer).toBeTruthy();
-      expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("width")).toBe(30);
-      expect(drawer.props("primaryButtonLabel")).toBe("Save");
-      expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
-    });
-
-    it("should open the add dashboard drawer when addDashboard() is invoked", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.addDashboard();
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      expect(drawer.props("open")).toBe(true);
-    });
-
-    it("should close drawer when ODrawer emits click:secondary", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.showAddDashboardDialog = true;
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      await drawer.vm.$emit("click:secondary");
-      await nextTick();
-
-      expect(wrapper.vm.showAddDashboardDialog).toBe(false);
-    });
-
-    it("should invoke addDashboardRef.submit when ODrawer emits click:primary", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.showAddDashboardDialog = true;
-      await nextTick();
-
-      const submitSpy = vi.fn();
-      wrapper.vm.addDashboardRef = { submit: submitSpy };
-
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      await drawer.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it("should not throw when click:primary fires with null addDashboardRef", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      // Edge case: optional chaining guards against null refs
-      wrapper.vm.addDashboardRef = null;
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
-    });
-
-    it("should sync open state when ODrawer emits update:open", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.showAddDashboardDialog = true;
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      await drawer.vm.$emit("update:open", false);
-      await nextTick();
-
-      expect(wrapper.vm.showAddDashboardDialog).toBe(false);
-    });
-  });
-
-  describe("ODrawer migration: Add/Edit Folder drawer", () => {
-    it("should render the folder drawer closed with 'New Folder' title by default", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "New Folder");
-      expect(drawer).toBeTruthy();
-      expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("width")).toBe(30);
-    });
-
-    it("should switch drawer title to 'Update Folder' when in edit mode", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.editFolder("folder1");
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "Update Folder");
-      expect(drawer).toBeTruthy();
-      expect(drawer.props("open")).toBe(true);
-    });
-
-    it("should close the folder drawer on click:secondary", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.showAddFolderDialog = true;
-      await nextTick();
-
-      const drawer = findDrawerByTitle(wrapper, "New Folder");
-      await drawer.vm.$emit("click:secondary");
-      await nextTick();
-
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
-    });
-
-    it("should invoke addFolderRef.submit on click:primary", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.showAddFolderDialog = true;
-      await nextTick();
-
-      const submitSpy = vi.fn();
-      wrapper.vm.addFolderRef = { submit: submitSpy };
-
-      const drawer = findDrawerByTitle(wrapper, "New Folder");
-      await drawer.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it("should not throw when click:primary fires with null addFolderRef", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      wrapper.vm.addFolderRef = null;
-      const drawer = findDrawerByTitle(wrapper, "New Folder");
-      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
-    });
-  });
-
-  describe("Move Dashboard component (v-model:open contract)", () => {
-    it("should pass open state and dashboard ids to MoveDashboardToAnotherFolder", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      const move = wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" });
-      expect(move.exists()).toBe(true);
-      // Initially closed
-      expect(move.props("open")).toBe(false);
-    });
-
-    it("should sync close via update:open emit from MoveDashboardToAnotherFolder", async () => {
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
-      });
-
-      await nextTick();
-      await nextTick();
-
-      // Manually open
-      wrapper.vm.showMoveDashboardDialog = true;
-      await nextTick();
-
-      const move = wrapper.findComponent({ name: "MoveDashboardToAnotherFolder" });
-      expect(move.props("open")).toBe(true);
-
-      await move.vm.$emit("update:open", false);
-      await nextTick();
-
-      expect(wrapper.vm.showMoveDashboardDialog).toBe(false);
     });
   });
 });

@@ -15,22 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="predefined-themes-drawer"
-    v-model:open="dialogOpen"
-    size="sm"
+  <q-dialog
+    v-model="dialogOpen"
+    position="right"
+    maximized
     seamless
-    title="Predefined Themes"
+    transition-show="slide-left"
+    transition-hide="slide-right"
   >
-    <template #header-right>
-      <OButton
-        variant="ghost-destructive"
-        size="xs"
-        @click="resetToDefaultTheme"
-      >
-        <template #icon-left><q-icon name="refresh" size="14px" /></template>
-        Reset
-      </OButton>
-    </template>
+    <q-card class="predefined-theme-card" style="width: 400px; max-width: 90vw">
+      <q-card-section class="row items-center q-pb-none">
+        <div class="text-h6">Predefined Themes</div>
+        <q-space />
+        <OButton
+          variant="ghost-destructive"
+          size="xs"
+          class="q-mr-sm"
+          @click="resetToDefaultTheme"
+        >
+          <template #icon-left><q-icon name="refresh" size="14px" /></template>
+          Reset
+        </OButton>
+        <OButton variant="ghost" size="icon" v-close-popup data-test="predefined-themes-close-btn">
+          <q-icon name="close" size="14px" />
+        </OButton>
+      </q-card-section>
 
       <q-card-section class="q-pt-none">
         <OTabs v-model="activeTab" dense class="text-grey" align="justify">
@@ -206,21 +215,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
       </q-card-section>
+    </q-card>
 
     <!-- Color Picker Dialog -->
-    <ODialog data-test="predefined-themes-color-picker-dialog"
-      v-model:open="showColorPicker"
-      size="sm"
-      title="Pick Custom Color"
-      primary-button-label="Close"
-      @click:primary="showColorPicker = false"
-    >
-      <q-color
-        v-model="tempColor"
-        @update:model-value="updateCustomColor"
-      />
-    </ODialog>
-  </ODrawer>
+    <q-dialog v-model="showColorPicker">
+      <q-card style="min-width: 300px">
+        <q-card-section>
+          <div class="text-h6">Pick Custom Color</div>
+        </q-card-section>
+        <q-card-section>
+          <q-color
+            v-model="tempColor"
+            @update:model-value="updateCustomColor"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <OButton variant="outline" size="sm-action" v-close-popup data-test="color-picker-close-btn">
+            Close
+          </OButton>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+  </q-dialog>
 </template>
 
 <script setup lang="ts">
@@ -231,8 +247,6 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { hexToRgba, applyThemeColors } from "@/utils/theme";

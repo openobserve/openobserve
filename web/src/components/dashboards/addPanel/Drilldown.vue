@@ -59,13 +59,15 @@
     >
       + Add
     </OButton>
-    <DrilldownPopUp
-      :open="showDrilldownPopUp"
-      :drilldown-data-index="selectedDrilldownIndexToEdit"
-      :is-edit-mode="isDrilldownEditMode"
-      :variables-data="variablesData"
-      @close="saveDrilldownData"
-    />
+    <app-dialog v-model="showDrilldownPopUp">
+      <drilldown-pop-up
+        :drilldown-data-index="selectedDrilldownIndexToEdit"
+        :is-edit-mode="isDrilldownEditMode"
+        :variables-data="variablesData"
+        @close="saveDrilldownData"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+      />
+    </app-dialog>
   </div>
 </template>
 
@@ -76,11 +78,12 @@ import DrilldownPopUp from "./DrilldownPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import AppDialog from "../../common/AppDialog.vue";
 import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, OButton },
+  components: { DrilldownPopUp, AppDialog, OButton },
   props: ["variablesData"],
   setup() {
     const { t } = useI18n();

@@ -5,12 +5,30 @@ import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsRoot, TabsList } from 'reka-ui'
 
+// ── Focus ring tracking ────────────────────────────────────────────────────
+const focusedTabEl = ref<HTMLElement | null>(null)
 const scrollRef = ref<HTMLElement | null>(null)
 const tablistRef = ref<HTMLElement | null>(null)
+
+const focusRingStyle = computed<Record<string, string> | null>(() => {
+  const parent = scrollRef.value ?? tablistRef.value
+  if (!focusedTabEl.value || !parent) return null
+  const tabRect = focusedTabEl.value.getBoundingClientRect()
+  const parentRect = parent.getBoundingClientRect()
+  return {
+    left: `${tabRect.left - parentRect.left}px`,
+    top: `${tabRect.top - parentRect.top}px`,
+    width: `${tabRect.width}px`,
+    height: `${tabRect.height}px`,
+  }
+})
 
 function handleFocusin(event: FocusEvent): void {
   const target = event.target as HTMLElement
   if (target.getAttribute('role') !== 'tab') return
+  if (target.matches(':focus-visible')) {
+    focusedTabEl.value = target
+  }
   // Scroll into view: arrow keys move focus without activating, so modelValue watch doesn't fire
   const el = scrollRef.value
   if (!el) return
@@ -20,6 +38,13 @@ function handleFocusin(event: FocusEvent): void {
     el.scrollBy({ left: tabRect.left - containerRect.left - 8, behavior: 'smooth' })
   } else if (tabRect.right > containerRect.right) {
     el.scrollBy({ left: tabRect.right - containerRect.right + 8, behavior: 'smooth' })
+  }
+}
+
+function handleFocusout(event: FocusEvent): void {
+  const related = event.relatedTarget as HTMLElement | null
+  if (!tablistRef.value?.contains(related)) {
+    focusedTabEl.value = null
   }
 }
 
@@ -134,8 +159,16 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
       <div
         ref="tablistRef"
         :class="['o-tabs tw:flex tw:flex-col tw:gap-1 tw:relative tw:p-1', alignClasses[align], { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]"
+        @focusin="handleFocusin"
+        @focusout="handleFocusout"
       >
         <slot />
+        <div
+          v-if="focusRingStyle"
+          aria-hidden="true"
+          :style="focusRingStyle"
+          class="tw:absolute tw:pointer-events-none tw:rounded tw:ring-2 tw:ring-inset tw:ring-tabs-focus-ring tw:transition-all tw:duration-200 tw:ease-in-out"
+        />
       </div>
     </TabsList>
   </TabsRoot>
@@ -166,17 +199,25 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
       <!-- Overflow-hidden scroll container -->
       <div
         ref="scrollRef"
-        class="tw:flex-1 tw:overflow-x-hidden tw:relative tw:py-[3px]"
+        class="tw:flex-1 tw:overflow-x-hidden tw:relative"
       >
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
-            :class="['o-tabs tw:flex tw:flex-row tw:relative tw:px-[3px]', alignClasses[align]]"
+            :class="['o-tabs tw:flex tw:flex-row tw:relative', alignClasses[align]]"
             @focusin="handleFocusin"
+            @focusout="handleFocusout"
           >
             <slot />
           </div>
         </TabsList>
+        <!-- Focus ring positioned relative to scroll container -->
+        <div
+          v-if="focusRingStyle"
+          aria-hidden="true"
+          :style="focusRingStyle"
+          class="tw:absolute tw:pointer-events-none tw:rounded tw:ring-2 tw:ring-inset tw:ring-tabs-focus-ring tw:transition-all tw:duration-200 tw:ease-in-out"
+        />
       </div>
 
       <!-- Right arrow -->

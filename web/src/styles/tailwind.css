@@ -1,5 +1,4 @@
 @import "tailwindcss" prefix(tw);
-@import "tw-animate-css";
 @import "../lib/styles/tokens/base.css";
 @import "../lib/styles/tokens/semantic.css";
 @import "../lib/styles/tokens/component.css";
@@ -8,21 +7,6 @@
 @plugin "@tailwindcss/typography";
 
 @source "../**/*.{vue,js,ts}";
-
-/*
- * When reka-ui opens a modal dialog it sets `body { pointer-events: none }`
- * and re-enables events only on the DialogContent DismissableLayer node.
- * Any portaled floating element (dropdown, select, combobox, date-picker …)
- * that is teleported to <body> as a sibling would inherit `pointer-events: none`,
- * making items un-clickable and showing a disabled cursor.
- * Force pointer-events back to auto for all known portal wrappers so they
- * remain fully interactive while a modal is open.
- */
-[data-reka-popper-content-wrapper],
-.q-menu,
-.q-select__dropdown-icon {
-  pointer-events: auto !important;
-}
 
 @layer base {
   *, :before, :after {

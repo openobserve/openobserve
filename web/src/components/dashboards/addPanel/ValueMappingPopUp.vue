@@ -15,18 +15,28 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <ODialog
-    :open="open"
-    @update:open="(v) => { if (!v) cancelEdit() }"
-    :title="t('dashboard.valueMappingsTitle')"
-    :width="70"
-    :neutral-button-label="t('dashboard.valueMappingAddNew')"
-    neutral-button-variant="outline"
-    :primary-button-label="t('dashboard.valueMappingApply')"
-    @click:neutral="addValueMapping"
-    @click:primary="applyValueMapping"
+  <div
+    class="scroll"
     data-test="dashboard-value-mapping-popup"
+    style="padding: 0px 10px; min-width: min(1200px, 90vw)"
   >
+    <div
+      class="flex justify-between items-center q-pa-md header"
+      style="border-bottom: 2px solid gray; margin-bottom: 5px"
+    >
+      <div class="flex items-center q-table__title q-mr-md">
+        <span>{{ t("dashboard.valueMappingsTitle") }}</span>
+      </div>
+      <OButton
+        variant="ghost"
+        size="icon"
+        :title="t('dashboard.cancel')"
+        @click.stop="cancelEdit"
+        data-test="dashboard-tab-settings-tab-name-edit-cancel"
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
+    </div>
     <div class="tw:mb-4">
       <draggable
         v-model="editedValueMapping"
@@ -173,27 +183,38 @@
           </div>
         </div>
       </draggable>
+      <div class="flex justify-between">
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="addValueMapping"
+          data-test="dashboard-addpanel-config-value-mapping-add-btn"
+          >{{ t("dashboard.valueMappingAddNew") }}</OButton
+        >
+        <OButton
+          variant="primary"
+          size="sm"
+          @click="applyValueMapping"
+          data-test="dashboard-addpanel-config-value-mapping-apply-btn"
+          >{{ t("dashboard.valueMappingApply") }}</OButton
+        >
+      </div>
     </div>
-  </ODialog>
+  </div>
 </template>
 <script lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: { draggable: VueDraggableNext as any, OButton, ODialog },
+  components: { draggable: VueDraggableNext as any, OButton },
   props: {
-    open: {
-      type: Boolean,
-      required: true,
-    },
     valueMapping: {
       type: Array,
       default: () => [],
@@ -203,21 +224,7 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const { t } = useI18n();
 
-    // editedValueMapping is populated by the watch below (on every open)
-    const editedValueMapping = ref<any[]>([]);
-
-    // Deep-clone prop on every open so edits never leak back to the chart
-    watch(
-      () => props.open,
-      (isOpen) => {
-        if (isOpen) {
-          editedValueMapping.value = props.valueMapping?.length
-            ? JSON.parse(JSON.stringify(props.valueMapping))
-            : [{ type: "value", value: "", text: "", color: null }];
-        }
-      },
-      { immediate: true },
-    );
+    const editedValueMapping = ref(props.valueMapping);
 
     const dragOptions = ref({
       animation: 200,
@@ -270,20 +277,7 @@ export default defineComponent({
       emit("save", editedValueMapping.value);
     };
 
-    const resetValueMapping = () => {
-      if (props.valueMapping && props.valueMapping.length > 0) {
-        editedValueMapping.value = props.valueMapping.map((m: any) => ({ ...m }));
-      } else {
-        editedValueMapping.value = [];
-        addValueMapping();
-      }
-    };
-
     const cancelEdit = () => {
-      // Reset to last saved state so unsaved edits are discarded
-      editedValueMapping.value = props.valueMapping?.length
-        ? JSON.parse(JSON.stringify(props.valueMapping))
-        : [{ type: "value", value: "", text: "", color: null }];
       emit("close");
     };
 
@@ -311,10 +305,6 @@ export default defineComponent({
   justify-content: space-between;
   border-bottom: 1px solid #cccccc70;
   margin-bottom: 8px;
-
-  &:last-child {
-    border-bottom: none;
-  }
 }
 
 .draggable-handle {

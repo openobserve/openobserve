@@ -618,7 +618,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
           hasText: "kubernetes_container_name = 'ziox'",
         }).last()
       ).toBeVisible();
-      await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+      await page.locator('[data-test="query-inspector-close-btn"]').click();
 
       testLogger.info("Table filtered by variable", { unfilteredRowCount, filteredRowCount });
 

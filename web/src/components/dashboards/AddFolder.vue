@@ -15,7 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-sm">
+  <q-card class="column full-height">
+    <q-card-section class="q-px-md q-py-sm">
+      <div class="row items-center no-wrap">
+        <div class="col">
+          <div v-if="editMode" class="text-body1 text-bold">
+            {{ t("dashboard.updateFolder") }}
+          </div>
+          <div v-else class="text-body1 text-bold">
+            {{ t("dashboard.newFolder") }}
+          </div>
+        </div>
+        <div class="col-auto">
+          <OButton
+            v-close-popup="true"
+            variant="ghost"
+            size="icon-circle"
+            data-test="dashboard-folder-cancel"
+          >
+            <template #icon-left><q-icon name="cancel" /></template>
+          </OButton>
+        </div>
+      </div>
+    </q-card-section>
+    <q-separator />
+    <q-card-section>
       <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
         <q-input
           v-model="folderData.name"
@@ -43,9 +67,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
         />
 
-
+        <div class="flex justify-start q-mt-sm tw:gap-2">
+          <OButton
+            v-close-popup="true"
+            variant="outline"
+            size="sm-action"
+            data-test="dashboard-folder-add-cancel"
+            >{{ t("dashboard.cancel") }}</OButton
+          >
+          <OButton
+            data-test="dashboard-folder-add-save"
+            :disabled="folderData.name.trim() === ''"
+            :loading="onSubmit.isLoading.value"
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            >{{ t("dashboard.save") }}</OButton
+          >
+        </div>
       </q-form>
-  </div>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script lang="ts">
@@ -57,6 +99,7 @@ import { getImageURL } from "../../utils/zincutils";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import { useReo } from "@/services/reodotdev_analytics";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const defaultValue = () => {
   return {
@@ -68,7 +111,7 @@ const defaultValue = () => {
 
 export default defineComponent({
   name: "AddFolder",
-  components: {},
+  components: { OButton },
   props: {
     folderId: {
       type: String,
@@ -79,7 +122,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["update:modelValue", "close"],
+  emits: ["update:modelValue"],
   setup(props, { emit }) {
     const store: any = useStore();
     const addFolderForm: any = ref(null);
@@ -150,8 +193,6 @@ export default defineComponent({
       });
     });
 
-    const submit = () => onSubmit.execute();
-
     return {
       t,
       disableColor,
@@ -163,7 +204,6 @@ export default defineComponent({
       isValidIdentifier,
       getImageURL,
       onSubmit,
-      submit,
     };
   },
 });

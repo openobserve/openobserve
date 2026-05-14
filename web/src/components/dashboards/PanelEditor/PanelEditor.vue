@@ -536,12 +536,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             /></template>
                             Example Charts
                           </OButton>
-                          <ODialog data-test="panel-editor-custom-chart-type-selector-dialog" v-model:open="showCustomChartTypeSelector" :show-close="false" :width="95">
+                          <q-dialog v-model="showCustomChartTypeSelector">
                             <CustomChartTypeSelector
                               @select="handleChartTypeSelection"
                               @close="showCustomChartTypeSelector = false"
                             />
-                          </ODialog>
+                          </q-dialog>
                         </div>
                       </div>
                     </template>
@@ -646,11 +646,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Legends Dialog -->
-    <ShowLegendsPopup
-      v-model:open="showLegendsDialog"
-      :panelData="currentPanelData"
-      data-test="panel-editor-legends-dialog"
-    />
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -688,7 +689,6 @@ import DashboardErrorsComponent from "@/components/dashboards/addPanel/Dashboard
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(

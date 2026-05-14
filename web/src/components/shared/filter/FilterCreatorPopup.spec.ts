@@ -32,38 +32,7 @@ const mockI18n = createI18n({
 });
 
 const globalStubs = {
-  ODialog: {
-    name: "ODialog",
-    template:
-      '<div class="o-dialog"><slot name="header" /><slot /><slot name="footer" /></div>',
-    props: [
-      "open",
-      "size",
-      "title",
-      "subTitle",
-      "persistent",
-      "showClose",
-      "width",
-      "primaryButtonLabel",
-      "secondaryButtonLabel",
-      "neutralButtonLabel",
-      "primaryButtonVariant",
-      "secondaryButtonVariant",
-      "neutralButtonVariant",
-      "primaryButtonDisabled",
-      "secondaryButtonDisabled",
-      "neutralButtonDisabled",
-      "primaryButtonLoading",
-      "secondaryButtonLoading",
-      "neutralButtonLoading",
-    ],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  },
-  OButton: {
-    template: '<button class="o-btn" @click="$emit(\'click\')"><slot /></button>',
-    props: ["variant", "size"],
-    emits: ["click"],
-  },
+  "q-dialog": { template: '<div class="q-dialog"><slot /></div>' },
   "q-card": { template: '<div class="q-card"><slot /></div>' },
   "q-card-section": { template: '<div class="q-card-section"><slot /></div>' },
   "q-card-actions": {
@@ -107,6 +76,12 @@ const globalStubs = {
     attrs: { "v-close-popup": "" },
     emits: ["click"],
   },
+  OButton: {
+    template:
+      '<button class="q-btn" @click="$emit(\'click\')"><slot></slot></button>',
+    props: ["variant", "size"],
+    emits: ["click"],
+  },
 };
 
 function mountComponent(props: Record<string, any> = {}) {
@@ -146,8 +121,7 @@ describe("FilterCreatorPopup", () => {
 
     it("should display the field name as title", () => {
       wrapper = mountComponent({ fieldName: "custom_field" });
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("title")).toBe("custom_field");
+      expect(wrapper.text()).toContain("custom_field");
     });
 
     it("should render q-select for operator", () => {
@@ -162,9 +136,10 @@ describe("FilterCreatorPopup", () => {
 
     it("should render cancel and apply buttons", () => {
       wrapper = mountComponent();
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
-      expect(dialog.props("primaryButtonLabel")).toBe("Apply");
+      const buttons = wrapper.findAll(".q-btn");
+      expect(buttons.length).toBe(2);
+      expect(buttons[0].text()).toBe("Cancel");
+      expect(buttons[1].text()).toBe("Apply");
     });
   });
 
@@ -274,19 +249,9 @@ describe("FilterCreatorPopup", () => {
 
     it("should emit apply when Apply button is clicked", async () => {
       wrapper = mountComponent();
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:primary");
+      const applyBtn = wrapper.findAll(".q-btn")[1];
+      await applyBtn.trigger("click");
       expect(wrapper.emitted("apply")).toBeTruthy();
-    });
-
-    it("should close dialog when Cancel button is clicked", async () => {
-      wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.show).toBe(true);
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:secondary");
-      expect(vm.show).toBe(false);
-      expect(wrapper.emitted("apply")).toBeFalsy();
     });
 
     it("emitted filter object has correct shape", () => {
@@ -327,15 +292,15 @@ describe("FilterCreatorPopup", () => {
   });
 
   describe("component structure", () => {
-    it("should have an ODialog as root", () => {
+    it("should have a q-dialog as root", () => {
       wrapper = mountComponent();
-      expect(wrapper.find(".o-dialog").exists()).toBe(true);
+      expect(wrapper.find(".q-dialog").exists()).toBe(true);
     });
 
-    it("should have at least 2 q-card-section elements", () => {
+    it("should have at least 3 q-card-section elements", () => {
       wrapper = mountComponent();
       expect(wrapper.findAll(".q-card-section").length).toBeGreaterThanOrEqual(
-        2,
+        3,
       );
     });
 

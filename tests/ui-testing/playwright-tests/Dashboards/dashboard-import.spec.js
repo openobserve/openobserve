@@ -12,7 +12,7 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard Import testcases", () => {
   test.beforeEach(async ({ page }) => {
-    testLogger.info("running before each");
+    console.log("running before each");
     await navigateToBase(page);
     await ingestion(page);
 
@@ -261,11 +261,7 @@ test.describe("dashboard Import testcases", () => {
     await page
       .locator('[data-test="dashboard-folder-add-name"]')
       .fill(folderName);
-    await page
-      .locator(
-        '[data-test="dashboard-folder-move-dialog"] [data-test="o-drawer-primary-btn"]'
-      )
-      .click();
+    await page.locator('[data-test="dashboard-folder-add-save"]').click();
 
     await pm.dashboardImport.clickImportButton();
 
@@ -289,11 +285,7 @@ test.describe("dashboard Import testcases", () => {
     await page.locator('[data-test="dashboard-delete-folder-icon"]').click();
 
     // Step 8: Confirm deletion in modal
-    await page
-      .locator(
-        '[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]'
-      )
-      .click();
+    await page.locator('[data-test="confirm-button"]').click();
 
     //  Assert folder is deleted
     await expect(

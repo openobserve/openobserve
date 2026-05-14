@@ -86,26 +86,11 @@ describe("FunctionList", () => {
     },
   };
 
-  const ODialogStub = {
-    name: "ODialog",
-    props: ["open", "persistent", "size", "title"],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-    template:
-      '<div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-size="size" :data-persistent="persistent">' +
-      '<span data-test-stub="o-dialog-title">{{ title }}</span>' +
-      '<slot name="header"></slot>' +
-      '<slot></slot>' +
-      '<slot name="footer"></slot>' +
-      '<button data-test-stub="o-dialog-update-open" @click="$emit(\'update:open\', false)">close</button>' +
-      '</div>',
-  };
-
   const globalStubs = {
     QTablePagination: true,
     AddFunction: true,
     NoData: true,
     ConfirmDialog: true,
-    ODialog: ODialogStub,
   };
 
   beforeEach(() => {
@@ -806,118 +791,6 @@ describe("FunctionList", () => {
 
       expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
       expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual(["test AI value"]);
-    });
-  });
-
-  describe("Associated Pipelines ODialog (migrated)", () => {
-    it("should render ODialog stub for associated pipelines", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-      expect(wrapper.find('[data-test-stub="o-dialog"]').exists()).toBe(true);
-    });
-
-    it("should bind selectedDelete.name into ODialog title prop", async () => {
-      mockGetAssociatedPipelines.mockResolvedValue({
-        data: { list: [{ id: "p1", name: "Pipeline 1" }] },
-      });
-
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      vm.getAssociatedPipelines({ row: { name: "func1" } });
-      await flushPromises();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-title")).toBe(
-        "Pipelines Associated with func1"
-      );
-    });
-
-    it("should set ODialog size=md and persistent attributes", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-size")).toBe("md");
-      // boolean attribute with `true` renders as the empty string in DOM
-      expect(dialog.attributes("data-persistent")).toBe("");
-    });
-
-    it("should reflect confirmForceDelete=true on ODialog data-open", async () => {
-      mockGetAssociatedPipelines.mockResolvedValue({
-        data: { list: [{ id: "p1", name: "Pipeline 1" }] },
-      });
-
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      vm.getAssociatedPipelines({ row: { name: "func1" } });
-      await flushPromises();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-open")).toBe("true");
-    });
-
-    it("should close ODialog when it emits update:open=false", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      vm.confirmForceDelete = true;
-      await flushPromises();
-
-      await wrapper
-        .find('[data-test-stub="o-dialog-update-open"]')
-        .trigger("click");
-
-      expect(vm.confirmForceDelete).toBe(false);
-    });
-
-    it("should render 'No pipelines' fallback when transformedPipelineList is empty", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      vm.pipelineList = [];
-      vm.confirmForceDelete = true;
-      await flushPromises();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.text()).toContain("No pipelines associated with this function");
-    });
-
-    it("should render pipeline items inside ODialog when list is non-empty", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-      const vm = wrapper.vm as any;
-      vm.pipelineList = [
-        { id: "p1", name: "Pipeline 1" },
-        { id: "p2", name: "Pipeline 2" },
-      ];
-      vm.confirmForceDelete = true;
-      await flushPromises();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.text()).toContain("1. Pipeline 1");
-      expect(dialog.text()).toContain("2. Pipeline 2");
     });
   });
 

@@ -4,7 +4,6 @@
    ============================================================ */
 
 @import "tailwindcss" prefix(tw);
-@import "tw-animate-css";
 
 @import "./tokens/base.css";
 @import "./tokens/semantic.css";

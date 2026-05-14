@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="row items-center" style="width: 100%">
                   <div
-                    class="row no-wrap items-center tw:gap-x-3 tw:mb-4"
+                    class="row no-wrap items-center q-mb-xs"
                     style="width: 100%"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"

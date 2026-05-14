@@ -15,14 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="event-detail-drawer"
-    :open="open"
-    size="lg"
-    @update:open="emit('update:open', $event)"
-  >
-    <template #header>
-      <div class="tw:px-2 tw:py-[0.625rem] tw:w-full">
-        <div class="row items-center no-wrap">
+  <q-card class="column full-height no-wrap tw:w-[70vw]!">
+    <!-- Header -->
+    <q-card-section class="tw:px-2 tw:py-[0.625rem]!">
+      <div class="row items-center no-wrap">
         <div class="col">
           <!-- Event Header -->
           <div>
@@ -60,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   data-test="close-drawer-btn"
-                @click="emit('update:open', false)"
+                  @click="$emit('close')"
                 >
                   <X class="tw:size-4" />
                 </OButton>
@@ -101,10 +97,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      </div>
-    </template>
+    </q-card-section>
 
     <!-- Tabs Navigation -->
+    <q-separator />
     <div class="row q-pt-sm q-px-sm">
       <div class="col-12">
         <OTabs v-model="activeTab" align="left">
@@ -126,6 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
       </div>
     </div>
+
+    <q-separator />
 
     <!-- Tab Content -->
     <OTabPanels
@@ -521,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OTabPanel>
     </OTabPanels>
-  </ODrawer>
+  </q-card>
 </template>
 
 <script setup lang="ts">
@@ -546,14 +544,9 @@ import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { X, GitBranch, Copy } from 'lucide-vue-next';
 
 const props = defineProps({
-  open: {
-    type: Boolean,
-    default: false,
-  },
   event: {
     type: Object,
     default: () => ({}),
@@ -580,7 +573,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["update:open", "resource-selected"]);
+const emit = defineEmits(["close", "resource-selected"]);
 
 const store = useStore();
 const router = useRouter();

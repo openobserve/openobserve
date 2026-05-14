@@ -73,7 +73,7 @@ class UnflattenedPage {
     }
 
     get closeDialog() {
-        return this.page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
+        return this.page.locator('[data-test="close-dialog"]');
     }
 
     get indexFieldSearchInput() {

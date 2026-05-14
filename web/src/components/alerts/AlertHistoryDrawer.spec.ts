@@ -30,16 +30,6 @@ vi.mock("@/services/alerts", () => ({
   },
 }));
 
-vi.mock("@/services/anomaly_detection", () => ({
-  default: {
-    getConfig: vi.fn().mockResolvedValue({ data: {} }),
-  },
-}));
-
-vi.mock("@/utils/alerts/anomalySqlBuilder", () => ({
-  buildAnomalyPreviewSql: vi.fn(() => "SELECT * FROM anomalies"),
-}));
-
 import alertsService from "@/services/alerts";
 
 installQuasar({ plugins: [Notify] });
@@ -47,73 +37,6 @@ installQuasar({ plugins: [Notify] });
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-// Lightweight stubs for the in-house O* components. Each renders the slots
-// the component relies on so children remain queryable in tests, and re-emits
-// the events the test suite drives state through.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div data-test-stub="o-drawer" :data-open="open">
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-header-left"><slot name="header-left" /></div>
-      <div data-test-stub="o-drawer-header-right"><slot name="header-right" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
-    </div>
-  `,
-};
-
-const OButtonStub = {
-  name: "OButton",
-  props: ["variant", "size", "disabled", "loading"],
-  emits: ["click"],
-  template: `<button data-test-stub="o-button" :data-test="$attrs['data-test']" @click="$emit('click', $event)"><slot /></button>`,
-  inheritAttrs: false,
-};
-
-const OToggleGroupStub = {
-  name: "OToggleGroup",
-  props: ["modelValue"],
-  emits: ["update:modelValue"],
-  template: `<div data-test-stub="o-toggle-group"><slot /></div>`,
-};
-
-const OToggleGroupItemStub = {
-  name: "OToggleGroupItem",
-  props: ["value", "size"],
-  emits: ["click"],
-  template: `<button data-test-stub="o-toggle-group-item" :data-test="$attrs['data-test']" :data-value="value" @click="$parent.$emit('update:modelValue', value)"><slot name="icon-left" /><slot /></button>`,
-  inheritAttrs: false,
-};
-
-const OTabPanelsStub = {
-  name: "OTabPanels",
-  props: ["modelValue", "animated"],
-  emits: ["update:modelValue"],
-  template: `<div data-test-stub="o-tab-panels" :data-active="modelValue"><slot /></div>`,
-};
-
-const OTabPanelStub = {
-  name: "OTabPanel",
-  props: ["name"],
-  // Render only the active panel's slot — mirrors real behaviour and avoids
-  // mounting both tabs simultaneously (the SQL/PromQL labels otherwise duplicate).
-  template: `<div data-test-stub="o-tab-panel" :data-name="name" v-show="$parent.modelValue === name"><slot v-if="$parent.modelValue === name" /></div>`,
-};
-
-function buildStubs() {
-  return {
-    ODrawer: ODrawerStub,
-    OButton: OButtonStub,
-    OToggleGroup: OToggleGroupStub,
-    OToggleGroupItem: OToggleGroupItemStub,
-    OTabPanels: OTabPanelsStub,
-    OTabPanel: OTabPanelStub,
-  };
-}
 
 describe("AlertHistoryDrawer.vue", () => {
   let wrapper: VueWrapper<any>;
@@ -187,18 +110,16 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   const mountComponent = async (
-    propsData: { alertDetails?: any; alertId?: string; open?: boolean } = {},
+    propsData: { alertDetails?: any; alertId?: string } = {},
   ) => {
     wrapper = mount(AlertHistoryDrawer, {
       attachTo: node,
       props: {
         alertDetails: "alertDetails" in propsData ? propsData.alertDetails : mockAlertDetails,
         alertId: propsData.alertId ?? "alert-123",
-        open: propsData.open ?? true,
       },
       global: {
         plugins: [i18n, store, router],
-        stubs: buildStubs(),
       },
     });
     await flushPromises();
@@ -210,15 +131,13 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render the ODrawer wrapper", async () => {
-      await mountComponent();
-      expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
-    });
-
     it("should have correct data-test attributes", async () => {
       await mountComponent();
       expect(
         wrapper.find('[data-test="alert-details-title"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="alert-details-close-btn"]').exists(),
       ).toBe(true);
       expect(
         wrapper
@@ -237,18 +156,6 @@ describe("AlertHistoryDrawer.vue", () => {
           from: 0,
         }),
       );
-    });
-  });
-
-  describe("Close Button", () => {
-    it("should propagate ODrawer's update:open emit to the parent", async () => {
-      await mountComponent();
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      drawer.vm.$emit("update:open", false);
-      await flushPromises();
-      const events = wrapper.emitted("update:open");
-      expect(events).toBeTruthy();
-      expect(events![events!.length - 1]).toEqual([false]);
     });
   });
 
@@ -274,9 +181,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Query/Conditions Block", () => {
     const switchToConditionTab = async () => {
-      const conditionBtn = wrapper.find(
-        '[data-test="alert-history-tab-condition"]',
-      );
+      const conditionBtn = wrapper.find('[data-test="alert-history-tab-condition"]');
       await conditionBtn.trigger("click");
       await flushPromises();
     };
@@ -289,11 +194,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
     it("should display PromQL label for promql type alerts", async () => {
       await mountComponent({
-        alertDetails: {
-          ...mockAlertDetails,
-          type: "promql",
-          conditions: "rate(http_errors[5m])",
-        },
+        alertDetails: { ...mockAlertDetails, type: "promql", conditions: "rate(http_errors[5m])" },
         alertId: "alert-123",
       });
       await switchToConditionTab();
@@ -321,7 +222,9 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should display the description when provided", async () => {
       await mountComponent();
       await switchToConditionTab();
-      expect(wrapper.text()).toContain("Fires when CPU usage exceeds 80%");
+      expect(wrapper.text()).toContain(
+        "Fires when CPU usage exceeds 80%",
+      );
     });
 
     it("should hide the description section when not provided", async () => {
@@ -329,9 +232,9 @@ describe("AlertHistoryDrawer.vue", () => {
         alertDetails: { ...mockAlertDetails, description: "" },
         alertId: "alert-123",
       });
-      await flushPromises();
-      // Description text should not be present when description is empty
-      expect(wrapper.text()).not.toContain("Fires when CPU usage exceeds 80%");
+      // Description label should not be present when description is empty
+      const text = wrapper.text();
+      expect(text).not.toContain("Fires when CPU usage exceeds 80%");
     });
   });
 
@@ -349,10 +252,9 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.alertHistory.length).toBe(3);
     });
 
-    it("should display result total in component state", async () => {
+    it("should display result total", async () => {
       await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.resultTotal).toBe(3);
+      expect(wrapper.text()).toContain("3");
     });
   });
 
@@ -368,11 +270,9 @@ describe("AlertHistoryDrawer.vue", () => {
         props: {
           alertDetails: mockAlertDetails,
           alertId: "alert-123",
-          open: true,
         },
         global: {
           plugins: [i18n, store, router],
-          stubs: buildStubs(),
         },
       });
 
@@ -701,7 +601,9 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should have the correct columns defined", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      const columnNames = vm.historyTableColumns.map((col: any) => col.name);
+      const columnNames = vm.historyTableColumns.map(
+        (col: any) => col.name,
+      );
       expect(columnNames).toEqual([
         "#",
         "timestamp",

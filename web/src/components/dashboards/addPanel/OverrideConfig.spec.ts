@@ -113,10 +113,9 @@ describe("OverrideConfig", () => {
         },
         stubs: {
           OverrideConfigPopup: {
-            name: "OverrideConfigPopup",
             template: '<div data-test="override-config-popup"></div>',
             emits: ["close", "save"],
-            props: ["open", "columns", "overrideConfig"],
+            props: ["columns", "overrideConfig"],
           },
         },
         mocks: {
@@ -255,55 +254,6 @@ describe("OverrideConfig", () => {
       wrapper.vm.openOverrideConfigPopup();
       expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
     });
-
-    it("should forward open state to OverrideConfigPopup via :open prop", async () => {
-      // After the q-dialog -> ODialog migration the component no longer wraps
-      // the popup in a <q-dialog v-model>. The popup itself receives the open
-      // state via the `:open` prop instead.
-      wrapper = createWrapper();
-
-      const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
-      expect(popup.exists()).toBe(true);
-      expect(popup.props("open")).toBe(false);
-
-      wrapper.vm.openOverrideConfigPopup();
-      await wrapper.vm.$nextTick();
-
-      expect(popup.props("open")).toBe(true);
-    });
-
-    it("should close popup when OverrideConfigPopup emits close", async () => {
-      // Replaces the previous q-dialog v-model close behaviour: dismissal is
-      // now driven by the popup emitting `close`.
-      wrapper = createWrapper();
-
-      wrapper.vm.openOverrideConfigPopup();
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
-
-      const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
-      popup.vm.$emit("close");
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
-    });
-
-    it("should save when OverrideConfigPopup emits save", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.openOverrideConfigPopup();
-      await wrapper.vm.$nextTick();
-
-      const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
-      const newConfig = [{ count: "rps" }];
-      popup.vm.$emit("save", newConfig);
-      await wrapper.vm.$nextTick();
-
-      expect(mockDashboardPanelData.data.config.override_config).toEqual(
-        newConfig,
-      );
-      expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
-    });
   });
 
   describe("Override Config Saving", () => {
@@ -412,24 +362,17 @@ describe("OverrideConfig", () => {
       store.state.theme = "light";
       wrapper = createWrapper();
 
-      // store is no longer exposed on the component instance after the
-      // ODialog/ODrawer migration removed the theme-conditional wrapper class;
-      // theme state lives only in the vuex store now.
-      expect(store.state.theme).toBe("light");
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
     it("should handle dark theme", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
 
-      expect(store.state.theme).toBe("dark");
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.vm.store.state.theme).toBe("dark");
     });
 
-    it("should not pass theme-specific class to popup after migration", async () => {
-      // Migration: q-dialog wrapper + dark-mode/bg-white class binding removed.
-      // OverrideConfigPopup is rendered directly with no theme class.
+    it("should pass correct theme class to popup", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
 
@@ -437,9 +380,9 @@ describe("OverrideConfig", () => {
       await wrapper.vm.$nextTick();
 
       const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
-      expect(popup.exists()).toBe(true);
-      expect(popup.classes()).not.toContain("dark-mode");
-      expect(popup.classes()).not.toContain("bg-white");
+      if (popup.exists()) {
+        expect(popup.classes()).toContain("dark-mode");
+      }
     });
   });
 
@@ -507,15 +450,11 @@ describe("OverrideConfig", () => {
   });
 
   describe("Store Integration", () => {
-    it("should have access to store via plugin", () => {
-      // After the ODialog/ODrawer migration the component no longer pulls
-      // `useStore()` into its setup (no longer needed since the theme class
-      // binding on the dialog was removed). The vuex plugin is still installed
-      // globally so the store remains available outside the component instance.
+    it("should have access to store", () => {
       wrapper = createWrapper();
 
-      expect(store).toBeDefined();
-      expect(store.state).toBeDefined();
+      expect(wrapper.vm.store).toBeDefined();
+      expect(wrapper.vm.store.state).toBeDefined();
     });
   });
 
@@ -593,10 +532,8 @@ describe("OverrideConfig", () => {
     it("should have all required data properties", () => {
       wrapper = createWrapper();
 
-      // `store` was removed from the setup return after the migration; the
-      // remaining exposed reactive state is asserted here.
       expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(wrapper.vm.store).toBeUndefined();
+      expect(wrapper.vm.store).toBeDefined();
       expect(wrapper.vm.showOverrideConfigPopup).toBeDefined();
       expect(wrapper.vm.columns).toBeDefined();
       expect(wrapper.vm.overrideConfigs).toBeDefined();

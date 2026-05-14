@@ -63,15 +63,13 @@ export class ServicesCatalogPage {
   async waitForLoad() {
     // Wait for loading spinner to disappear
     await this.page.locator(this.loading)
-      .waitFor({ state: 'hidden', timeout: 15000 })
+      .waitFor({ state: 'hidden', timeout: 10000 })
       .catch(() => {});
-    // Wait for the data to be ready: either at least one row rendered, or the empty state.
-    // The table data-test renders even while loading with 0 rows — waiting on it alone races the data.
+    // Wait for either table or empty state
     await Promise.race([
-      this.page.locator('[data-test^="services-catalog-service-link-"]').first()
-        .waitFor({ state: 'attached', timeout: 30000 }),
-      this.page.locator(this.emptyState).waitFor({ state: 'visible', timeout: 30000 }),
-    ]).catch(() => {});
+      this.page.locator(this.table).waitFor({ state: 'visible', timeout: 10000 }),
+      this.page.locator(this.emptyState).waitFor({ state: 'visible', timeout: 10000 }),
+    ]);
   }
 
   // ===== TOOLBAR =====
@@ -174,11 +172,7 @@ export class ServicesCatalogPage {
   }
 
   async isStatusPillVisible() {
-    // Wait briefly for the pill to appear — it renders once services are loaded
-    return await this.page.locator(this.statusPill)
-      .waitFor({ state: 'visible', timeout: 8000 })
-      .then(() => true)
-      .catch(() => false);
+    return await this.page.locator(this.statusPill).isVisible().catch(() => false);
   }
 
   async isCriticalPillVisible() {
@@ -374,11 +368,7 @@ export class ServicesCatalogPage {
   // ===== EMPTY STATE =====
 
   async isTableVisible() {
-    // Wait briefly for the table to settle — after filter changes the DOM may flicker
-    return await this.page.locator(this.table)
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
+    return await this.page.locator(this.table).isVisible().catch(() => false);
   }
 
   async isEmptyStateVisible() {

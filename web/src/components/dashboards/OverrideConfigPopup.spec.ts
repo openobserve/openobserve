@@ -26,64 +26,6 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-// ── ODialog / OButton stubs ──────────────────────────────────────────────────
-// Stubs preserve the slot content (so child rendering can be asserted) and
-// re-emit the events that the component listens for: update:open, click:primary
-// and click:neutral.
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "width",
-    "title",
-    "subTitle",
-    "showClose",
-    "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test-stub="o-dialog"
-      :data-open="open"
-      :data-title="title"
-      :data-width="width"
-      :data-primary-label="primaryButtonLabel"
-      :data-neutral-label="neutralButtonLabel"
-      :data-neutral-variant="neutralButtonVariant"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-    </div>
-  `,
-};
-
-const OButtonStub = {
-  name: "OButton",
-  props: ["variant", "size", "disabled", "loading"],
-  emits: ["click"],
-  inheritAttrs: false,
-  template: `<button
-    data-test-stub="o-button"
-    :data-test="$attrs['data-test']"
-    :disabled="disabled"
-    @click="$emit('click', $event)"
-  ><slot name="icon-left" /><slot /></button>`,
-};
-
 describe("OverrideConfigPopup", () => {
   let wrapper: any;
 
@@ -95,12 +37,10 @@ describe("OverrideConfigPopup", () => {
   ];
 
   const defaultOverrideConfig = {
-    overrideConfigs: [
-      {
-        field: { matchBy: "name", value: "" },
-        config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
-      },
-    ],
+    overrideConfigs: [{
+      field: { matchBy: "name", value: "" },
+      config: [{ type: "unit", value: { unit: "", customUnit: "" } }]
+    }]
   };
 
   beforeEach(() => {
@@ -114,50 +54,23 @@ describe("OverrideConfigPopup", () => {
   });
 
   const createWrapper = async (props = {}) => {
-    const w = mount(OverrideConfigPopup, {
+    const wrapper = mount(OverrideConfigPopup, {
       props: {
-        open: true,
         columns: defaultColumns,
-        // Create a fresh deep copy so state isn't shared between tests
-        overrideConfig: JSON.parse(JSON.stringify(defaultOverrideConfig)),
-        ...props,
+        overrideConfig: JSON.parse(JSON.stringify(defaultOverrideConfig)), // Create a fresh copy
+        ...props
       },
       global: {
         plugins: [i18n, store],
-        stubs: {
-          ODialog: ODialogStub,
-          OButton: OButtonStub,
-          "q-select": {
-            template:
-              '<select :data-test="$attrs[\'data-test\']"><slot /></select>',
-            props: ["modelValue", "options"],
-            emits: ["update:modelValue"],
-          },
-          "q-input": {
-            template:
-              '<input :value="modelValue" :data-test="$attrs[\'data-test\']" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          "q-checkbox": {
-            template:
-              '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-            props: ["modelValue"],
-            emits: ["update:modelValue"],
-          },
-          "q-icon": {
-            template: '<span class="q-icon">{{ $attrs.name }}</span>',
-          },
-        },
         mocks: {
-          $t: (key: string) => key,
-        },
-      },
+          $t: (key: string) => key
+        }
+      }
     });
-
+    
     // Wait for the component to be fully mounted and onMounted hook to run
     await flushPromises();
-    return w;
+    return wrapper;
   };
 
   describe("Component Initialization", () => {
@@ -173,7 +86,6 @@ describe("OverrideConfigPopup", () => {
 
       expect(wrapper.vm.$props.columns).toEqual(defaultColumns);
       expect(wrapper.vm.$props.overrideConfig).toEqual(defaultOverrideConfig);
-      expect(wrapper.vm.$props.open).toBe(true);
     });
 
     it("should initialize reactive data", async () => {
@@ -187,26 +99,31 @@ describe("OverrideConfigPopup", () => {
   });
 
   describe("Template Rendering", () => {
-    it("should render ODialog with correct title and labels", async () => {
+    it("should render popup header", async () => {
       wrapper = await createWrapper();
 
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.props("title")).toBe("Override Config");
-      expect(dialog.props("primaryButtonLabel")).toBe("Save");
-      expect(dialog.props("neutralButtonLabel")).toBe("+ Add field override");
-      expect(dialog.props("neutralButtonVariant")).toBe("outline");
-      expect(dialog.props("width")).toBe(70);
+      expect(wrapper.text()).toContain("Override Config");
     });
 
-    it("should pass open prop to ODialog", async () => {
-      wrapper = await createWrapper({ open: true });
+    it("should render close button", async () => {
+      wrapper = await createWrapper();
 
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("open")).toBe(true);
+      expect(wrapper.html()).toContain('close');
     });
 
-    it("should render at least one override config row by default", async () => {
+    it("should render add field override button", async () => {
+      wrapper = await createWrapper();
+
+      expect(wrapper.text()).toContain("+ Add field override");
+    });
+
+    it("should render save button", async () => {
+      wrapper = await createWrapper();
+
+      expect(wrapper.text()).toContain("Save");
+    });
+
+    it("should render at least one override config by default", async () => {
       wrapper = await createWrapper();
 
       expect(wrapper.vm.overrideConfigs.length).toBeGreaterThanOrEqual(1);
@@ -253,33 +170,21 @@ describe("OverrideConfigPopup", () => {
 
       expect(wrapper.vm.unitOptions).toBeInstanceOf(Array);
       expect(wrapper.vm.unitOptions.length).toBeGreaterThan(0);
-      expect(wrapper.vm.unitOptions[0]).toHaveProperty("label");
-      expect(wrapper.vm.unitOptions[0]).toHaveProperty("value");
+      expect(wrapper.vm.unitOptions[0]).toHaveProperty('label');
+      expect(wrapper.vm.unitOptions[0]).toHaveProperty('value');
     });
 
     it("should include custom unit option", async () => {
       wrapper = await createWrapper();
 
-      const customOption = wrapper.vm.unitOptions.find(
-        (option: any) => option.value === "custom",
-      );
+      const customOption = wrapper.vm.unitOptions.find((option: any) => option.value === "custom");
       expect(customOption).toBeDefined();
       expect(customOption.label.toLowerCase()).toContain("custom");
     });
   });
 
   describe("Override Config Management", () => {
-    it("should add new override config when ODialog emits click:neutral", async () => {
-      wrapper = await createWrapper();
-
-      const initialLength = wrapper.vm.overrideConfigs.length;
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:neutral");
-
-      expect(wrapper.vm.overrideConfigs).toHaveLength(initialLength + 1);
-    });
-
-    it("should add new override config via exposed method", async () => {
+    it("should add new override config", async () => {
       wrapper = await createWrapper();
 
       const initialLength = wrapper.vm.overrideConfigs.length;
@@ -304,8 +209,7 @@ describe("OverrideConfigPopup", () => {
       wrapper = await createWrapper();
 
       await wrapper.vm.addOverrideConfig();
-      const newConfig =
-        wrapper.vm.overrideConfigs[wrapper.vm.overrideConfigs.length - 1];
+      const newConfig = wrapper.vm.overrideConfigs[wrapper.vm.overrideConfigs.length - 1];
 
       expect(newConfig.field.matchBy).toBe("name");
       expect(newConfig.field.value).toBe("");
@@ -355,44 +259,22 @@ describe("OverrideConfigPopup", () => {
     it("should return error message for non-existent field", async () => {
       wrapper = await createWrapper();
 
-      expect(wrapper.vm.getFieldDisplayValue("non_existent")).toBe(
-        "non_existent (Field not found)",
-      );
+      expect(wrapper.vm.getFieldDisplayValue("non_existent")).toBe("non_existent (Field not found)");
     });
   });
 
   describe("Save Functionality", () => {
-    it("should emit save event when ODialog emits click:primary", async () => {
+    it("should emit save event when saveOverrides is called", async () => {
       wrapper = await createWrapper();
 
       wrapper.vm.overrideConfigs[0].field.value = "field1";
       wrapper.vm.overrideConfigs[0].config[0].type = "unit";
-      wrapper.vm.overrideConfigs[0].config[0].value = {
-        unit: "bytes",
-        customUnit: "",
-      };
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:primary");
-
-      expect(wrapper.emitted("save")).toBeTruthy();
-      expect(wrapper.emitted("close")).toBeTruthy();
-    });
-
-    it("should emit save event when saveOverrides is called directly", async () => {
-      wrapper = await createWrapper();
-
-      wrapper.vm.overrideConfigs[0].field.value = "field1";
-      wrapper.vm.overrideConfigs[0].config[0].type = "unit";
-      wrapper.vm.overrideConfigs[0].config[0].value = {
-        unit: "bytes",
-        customUnit: "",
-      };
+      wrapper.vm.overrideConfigs[0].config[0].value = { unit: "bytes", customUnit: "" };
 
       wrapper.vm.saveOverrides();
 
-      expect(wrapper.emitted("save")).toBeTruthy();
-      expect(wrapper.emitted("close")).toBeTruthy();
+      expect(wrapper.emitted('save')).toBeTruthy();
+      expect(wrapper.emitted('close')).toBeTruthy();
     });
 
     it("should filter out configs without field values", async () => {
@@ -404,7 +286,7 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.saveOverrides();
 
-      const savedConfigs = wrapper.emitted("save")![0][0];
+      const savedConfigs = wrapper.emitted('save')[0][0];
       expect(savedConfigs).toHaveLength(1);
       expect(savedConfigs[0].field.value).toBe("field1");
     });
@@ -414,22 +296,17 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.overrideConfigs[0].field.value = "field1";
       wrapper.vm.overrideConfigs[0].config[0].type = "unit";
-      wrapper.vm.overrideConfigs[0].config[0].value = {
-        unit: "bytes",
-        customUnit: "",
-      };
+      wrapper.vm.overrideConfigs[0].config[0].value = { unit: "bytes", customUnit: "" };
 
       wrapper.vm.saveOverrides();
 
-      const savedConfigs = wrapper.emitted("save")![0][0];
+      const savedConfigs = wrapper.emitted('save')[0][0];
       expect(savedConfigs[0]).toEqual({
         field: { matchBy: "name", value: "field1" },
-        config: [
-          {
-            type: "unit",
-            value: { unit: "bytes", customUnit: "" },
-          },
-        ],
+        config: [{
+          type: "unit",
+          value: { unit: "bytes", customUnit: "" }
+        }]
       });
     });
 
@@ -442,15 +319,13 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.saveOverrides();
 
-      const savedConfigs = wrapper.emitted("save")![0][0];
+      const savedConfigs = wrapper.emitted('save')[0][0];
       expect(savedConfigs[0]).toEqual({
         field: { matchBy: "name", value: "field1" },
-        config: [
-          {
-            type: "unique_value_color",
-            autoColor: true,
-          },
-        ],
+        config: [{
+          type: "unique_value_color",
+          autoColor: true
+        }]
       });
     });
   });
@@ -461,37 +336,15 @@ describe("OverrideConfigPopup", () => {
 
       wrapper.vm.closePopup();
 
-      expect(wrapper.emitted("close")).toBeTruthy();
-    });
-
-    it("should emit close when ODialog emits update:open with false", async () => {
-      wrapper = await createWrapper();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("update:open", false);
-
-      expect(wrapper.emitted("close")).toBeTruthy();
-    });
-
-    it("should NOT emit close when ODialog emits update:open with true", async () => {
-      wrapper = await createWrapper();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("update:open", true);
-
-      expect(wrapper.emitted("close")).toBeFalsy();
+      expect(wrapper.emitted('close')).toBeTruthy();
     });
 
     it("should reset configs to original state when closing", async () => {
       const existingConfig = {
-        overrideConfigs: [
-          {
-            field: { matchBy: "name", value: "field1" },
-            config: [
-              { type: "unit", value: { unit: "bytes", customUnit: "" } },
-            ],
-          },
-        ],
+        overrideConfigs: [{
+          field: { matchBy: "name", value: "field1" },
+          config: [{ type: "unit", value: { unit: "bytes", customUnit: "" } }]
+        }]
       };
 
       wrapper = await createWrapper({ overrideConfig: existingConfig });
@@ -511,15 +364,15 @@ describe("OverrideConfigPopup", () => {
     it("should accept valid columns prop", async () => {
       const validColumns = [
         { label: "Field 1", alias: "field1" },
-        { label: "Field 2", alias: "field2" },
+        { label: "Field 2", alias: "field2" }
       ];
 
+      await expect(createWrapper({ columns: validColumns })).resolves.toBeDefined();
       wrapper = await createWrapper({ columns: validColumns });
-      expect(wrapper.vm.columnsOptions).toHaveLength(2);
     });
 
     it("should validate columns prop format", () => {
-      const validator = (OverrideConfigPopup as any).props.columns.validator;
+      const validator = OverrideConfigPopup.props.columns.validator;
 
       // Valid format
       expect(validator([{ label: "Field 1", alias: "field1" }])).toBe(true);
@@ -531,35 +384,30 @@ describe("OverrideConfigPopup", () => {
 
     it("should accept valid override config prop", async () => {
       const validConfig = {
-        overrideConfigs: [
-          {
-            field: { matchBy: "name", value: "field1" },
-            config: [
-              { type: "unit", value: { unit: "bytes", customUnit: "" } },
-            ],
-          },
-        ],
+        overrideConfigs: [{
+          field: { matchBy: "name", value: "field1" },
+          config: [{ type: "unit", value: { unit: "bytes", customUnit: "" } }]
+        }]
       };
 
+      await expect(createWrapper({ overrideConfig: validConfig })).resolves.toBeDefined();
       wrapper = await createWrapper({ overrideConfig: validConfig });
-      expect(wrapper.vm.overrideConfigs).toHaveLength(1);
     });
   });
 
   describe("Component Behavior", () => {
     it("should handle component mounting without errors", async () => {
+      await expect(createWrapper()).resolves.toBeDefined();
       wrapper = await createWrapper();
       expect(wrapper.vm.overrideConfigs.length).toBeGreaterThan(0);
     });
 
     it("should handle component unmounting without errors", async () => {
       wrapper = await createWrapper();
-
+      
       expect(() => {
         wrapper.unmount();
       }).not.toThrow();
-      // prevent afterEach double unmount
-      wrapper = null;
     });
 
     it("should maintain reactive state", async () => {
@@ -576,39 +424,33 @@ describe("OverrideConfigPopup", () => {
   describe("Edge Cases", () => {
     it("should handle undefined/null config values", async () => {
       const configWithNulls = {
-        overrideConfigs: [
-          {
-            field: { matchBy: "name", value: "" },
-            config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
-          },
-        ],
+        overrideConfigs: [{
+          field: { matchBy: "name", value: "" },
+          config: [{ type: "unit", value: { unit: "", customUnit: "" } }]
+        }]
       };
 
-      wrapper = await createWrapper({ overrideConfig: configWithNulls });
-      expect(wrapper.vm.overrideConfigs).toHaveLength(1);
+      await expect(createWrapper({ overrideConfig: configWithNulls })).resolves.toBeDefined();
     });
 
-    it("should handle empty overrideConfigs by creating a default row", async () => {
+    it("should handle empty overrideConfigs", async () => {
       const emptyConfig = { overrideConfigs: [] };
 
       wrapper = await createWrapper({ overrideConfig: emptyConfig });
-
+      
       // Should create default config
       expect(wrapper.vm.overrideConfigs.length).toBeGreaterThanOrEqual(1);
     });
 
     it("should handle malformed config structure", async () => {
       const malformedConfig = {
-        overrideConfigs: [
-          {
-            field: { matchBy: "name", value: "" },
-            config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
-          },
-        ],
+        overrideConfigs: [{
+          field: { matchBy: "name", value: "" },
+          config: [{ type: "unit", value: { unit: "", customUnit: "" } }]
+        }]
       };
 
-      wrapper = await createWrapper({ overrideConfig: malformedConfig });
-      expect(wrapper.vm.overrideConfigs).toHaveLength(1);
+      await expect(createWrapper({ overrideConfig: malformedConfig })).resolves.toBeDefined();
     });
   });
 
@@ -632,10 +474,7 @@ describe("OverrideConfigPopup", () => {
       wrapper.vm.overrideConfigs[0].field.value = "field1";
       wrapper.vm.overrideConfigs[0].config[0].type = "unit";
       // Ensure the value object is properly initialized
-      wrapper.vm.overrideConfigs[0].config[0].value = {
-        unit: "bytes",
-        customUnit: "",
-      };
+      wrapper.vm.overrideConfigs[0].config[0].value = { unit: "bytes", customUnit: "" };
 
       wrapper.vm.addOverrideConfig();
 
@@ -646,7 +485,7 @@ describe("OverrideConfigPopup", () => {
   });
 
   describe("Internationalization", () => {
-    it("should expose translation function", async () => {
+    it("should use translation function", async () => {
       wrapper = await createWrapper();
 
       expect(wrapper.vm.t).toBeTypeOf("function");
@@ -657,23 +496,17 @@ describe("OverrideConfigPopup", () => {
 
       const unitOptions = wrapper.vm.unitOptions;
       expect(unitOptions.length).toBeGreaterThan(0);
-      expect(
-        unitOptions.every((option: any) => typeof option.label === "string"),
-      ).toBe(true);
+      expect(unitOptions.every((option: any) => typeof option.label === 'string')).toBe(true);
     });
   });
 
   describe("Data Normalization", () => {
     it("should initialize with existing configs", async () => {
       const existingConfig = {
-        overrideConfigs: [
-          {
-            field: { matchBy: "name", value: "field1" },
-            config: [
-              { type: "unit", value: { unit: "bytes", customUnit: "" } },
-            ],
-          },
-        ],
+        overrideConfigs: [{
+          field: { matchBy: "name", value: "field1" },
+          config: [{ type: "unit", value: { unit: "bytes", customUnit: "" } }]
+        }]
       };
 
       wrapper = await createWrapper({ overrideConfig: existingConfig });
@@ -685,19 +518,15 @@ describe("OverrideConfigPopup", () => {
 
     it("should normalize unique_value_color configs", async () => {
       const existingConfig = {
-        overrideConfigs: [
-          {
-            field: { matchBy: "name", value: "field1" },
-            config: [{ type: "unique_value_color", autoColor: true }],
-          },
-        ],
+        overrideConfigs: [{
+          field: { matchBy: "name", value: "field1" },
+          config: [{ type: "unique_value_color", autoColor: true }]
+        }]
       };
 
       wrapper = await createWrapper({ overrideConfig: existingConfig });
 
-      expect(wrapper.vm.overrideConfigs[0].config[0].type).toBe(
-        "unique_value_color",
-      );
+      expect(wrapper.vm.overrideConfigs[0].config[0].type).toBe("unique_value_color");
       expect(wrapper.vm.overrideConfigs[0].config[0].autoColor).toBe(true);
     });
   });

@@ -160,49 +160,6 @@ const mockSearchResponse = {
 // Mount factory
 // ---------------------------------------------------------------------------
 
-// ODrawer stub — renders slots inline so internal data-test selectors are
-// queryable (real ODrawer teleports its content to <body> via DialogPortal,
-// which puts it outside the test wrapper's element tree).
-const ODrawerStub = {
-  name: "ODrawer",
-  inheritAttrs: false,
-  props: [
-    "open",
-    "width",
-    "seamless",
-    "portalTarget",
-    "title",
-    "subTitle",
-    "size",
-    "showClose",
-    "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      v-if="open"
-      :data-test="$attrs['data-test'] || 'o-drawer-stub'"
-      :data-title="title"
-    >
-      <div class="o-drawer-stub-header">
-        <slot name="header" />
-        <slot name="header-left" />
-        <slot name="header-right" />
-        <button
-          type="button"
-          data-test="o-drawer-close-btn"
-          @click="$emit('update:open', false)"
-        >Close</button>
-      </div>
-      <div class="o-drawer-stub-body"><slot /></div>
-      <div class="o-drawer-stub-footer"><slot name="footer" /></div>
-    </div>
-  `,
-};
-
 function createWrapper(props: Record<string, unknown> = {}) {
   return mount(ServiceGraphSidePanel, {
     props: {
@@ -219,7 +176,6 @@ function createWrapper(props: Record<string, unknown> = {}) {
         RenderDashboardCharts: { template: "<div />" },
         TenstackTable: { template: "<div />" },
         TelemetryCorrelationDashboard: { template: "<div />" },
-        ODrawer: ODrawerStub,
       },
     },
   });
@@ -265,16 +221,28 @@ describe("ServiceGraphSidePanel.vue", () => {
       ).toBe(false);
     });
 
-    it("should pass the service name as the drawer title", () => {
+    it("should display panel header", () => {
       wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("title")).toBe("Service A");
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel-header"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should display service name", () => {
+      wrapper = createWrapper();
+      const nameEl = wrapper.find(
+        '[data-test="service-graph-side-panel-service-name"]',
+      );
+      expect(nameEl.exists()).toBe(true);
+      expect(nameEl.text()).toContain("Service A");
     });
 
     it("should display close button", () => {
       wrapper = createWrapper();
       expect(
-        wrapper.find('[data-test="o-drawer-close-btn"]').exists(),
+        wrapper
+          .find('[data-test="service-graph-side-panel-close-btn"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -472,7 +440,7 @@ describe("ServiceGraphSidePanel.vue", () => {
     it("should emit close event when close button is clicked", async () => {
       wrapper = createWrapper();
       await wrapper
-        .find('[data-test="o-drawer-close-btn"]')
+        .find('[data-test="service-graph-side-panel-close-btn"]')
         .trigger("click");
       expect(wrapper.emitted("close")).toBeTruthy();
       expect(wrapper.emitted("close")).toHaveLength(1);
@@ -745,8 +713,10 @@ describe("ServiceGraphSidePanel.vue", () => {
       wrapper = createWrapper({
         selectedNode: { id: "test-service" },
       });
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("title")).toBe("test-service");
+      const serviceName = wrapper.find(
+        '[data-test="service-graph-side-panel-service-name"]',
+      );
+      expect(serviceName.text()).toContain("test-service");
     });
 
     it("should handle visible prop toggle — show then hide panel", async () => {
@@ -798,7 +768,17 @@ describe("ServiceGraphSidePanel.vue", () => {
         wrapper.find('[data-test="service-graph-side-panel"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="o-drawer-close-btn"]').exists(),
+        wrapper.find('[data-test="service-graph-side-panel-header"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-service-name"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-close-btn"]')
+          .exists(),
       ).toBe(true);
       expect(
         wrapper

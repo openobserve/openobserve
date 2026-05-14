@@ -240,9 +240,7 @@ export class ReportsPage {
     await this.page
       .locator(`[data-test="report-list-${reportName}-delete-report"]`)
       .click({ force: true });
-    const confirmBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-    await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await confirmBtn.click();
+    await this.page.locator('[data-test="confirm-button"]', 'visible').click();
   }
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds

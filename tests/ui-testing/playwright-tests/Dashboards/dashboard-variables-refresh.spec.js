@@ -437,11 +437,8 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     await dialogContent.waitFor({ state: "visible", timeout: 5000 });
     const queryInspectorBeforeRefresh = await dialogContent.textContent();
 
-    // Close Query Inspector dialog — Escape can be swallowed by the dialog's
-    // internal search input (it just blurs the field), so click the ODialog's
-    // built-in close button instead so the dialog (and its overlay) actually
-    // unmount before the next interaction.
-    await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+    // Close Query Inspector dialog
+    await page.keyboard.press('Escape');
     await safeWaitForHidden(page, '[data-test="query-inspector-dialog"]', { timeout: 5000 });
 
     // Change variable
@@ -474,11 +471,8 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", { tag: 
     // Get all text from Query Inspector dialog (includes query, time, variables)
     const queryInspectorAfterRefresh = await dialogContent.textContent();
 
-    // Close Query Inspector dialog — Escape can be swallowed by the dialog's
-    // internal search input (it just blurs the field), so click the ODialog's
-    // built-in close button instead so the dialog (and its overlay) actually
-    // unmount before the next interaction.
-    await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+    // Close Query Inspector dialog
+    await page.keyboard.press('Escape');
     await safeWaitForHidden(page, '[data-test="query-inspector-dialog"]', { timeout: 5000 });
 
     // Verify query inspector content is different - both variable value and time range should have changed

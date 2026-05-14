@@ -1,11 +1,47 @@
 <template>
-  <div :class="store.state.theme === 'dark' ? 'dark-mode' : ''">
+  <q-card
+    class=" "
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  >
+    <div class="row items-center no-wrap">
+      <div class="col">
+        <div class="q-mx-md q-my-md text-h6">
+          {{ title }}
+        </div>
+      </div>
+      <div class="tw:flex tw:items-center">
+        <div>
+          <OButton
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          variant="ghost"
+          size="icon-toolbar"
+          @click="toggleAIChat"
+          data-test="menu-link-ai-item"
+          class="ai-hover-btn"
+          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+          @mouseenter="isHovered = true"
+          @mouseleave="isHovered = false"
+        >
+          <div class="row items-center no-wrap tw:gap-2">
+            <img  :src="getBtnLogo" class="header-icon ai-icon" />
+          </div>
+        </OButton>
+        </div>
+        <q-icon
+          v-close-popup
+          name="cancel"
+          class="cursor-pointer tw:mr-3 tw:ml-2"
+          size="20px"
+          data-test="json-editor-close"
+        />
+      </div>
+    </div>
+    <q-separator></q-separator>
     <div class="tw:h-[calc(100vh-65px)] tw:flex">
       <div class="row common-json-editor column tw:h-[calc(100vh-65px)]"
       :class="store.state.isAiChatEnabled ? 'tw:w-[64.5vw]' : 'tw:w-[90vw]'"
       >
-
-      <div class="col q-pa-none">
+      <q-card-section class="col q-pa-none">
       <query-editor
         data-test="common-json-editor"
         ref="queryEditorRef"
@@ -16,10 +52,10 @@
         language="json"
         @update:query="handleEditorChange"
       />
-    </div>
+    </q-card-section>
 
     <!-- Display validation errors -->
-    <div
+    <q-card-section
       v-if="validationErrors.length > 0"
       class="q-pa-md text-negative validation-errors"
     >
@@ -29,15 +65,15 @@
           {{ error }}
         </li>
       </ul>
-    </div>
+    </q-card-section>
 
     <q-space></q-space>
 
-    <div class="tw:flex tw:justify-end tw:gap-2 q-pa-md">
+    <q-card-actions align="right" class="q-pa-md tw:gap-2">
       <OButton
         variant="outline"
         size="sm-action"
-        @click="$emit('close')"
+        v-close-popup
         data-test="json-editor-cancel"
       >{{ t('common.cancel') }}</OButton>
       <OButton
@@ -46,7 +82,7 @@
         @click="saveChanges"
         data-test="json-editor-save"
       >{{ t('common.save') }}</OButton>
-    </div>
+    </q-card-actions>
     </div>
     <!-- o2aichat enableddd -->
 
@@ -55,7 +91,7 @@
           </div>
     </div>
 
-  </div>
+  </q-card>
 </template>
 
 <script lang="ts">

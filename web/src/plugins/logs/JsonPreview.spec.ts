@@ -8,56 +8,6 @@ import { nextTick } from "vue";
 
 installQuasar();
 
-// Stub ODialog so tests are deterministic (no Portal/Reka teleport)
-// and so we can drive primary/secondary actions via emits.
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test="o-dialog-stub"
-      :data-open="String(open)"
-      :data-size="size"
-      :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-      <button
-        data-test="o-dialog-stub-primary"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-secondary"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-    </div>
-  `,
-};
-
 // Mock services
 vi.mock("@/services/search", () => ({
   default: {
@@ -231,7 +181,6 @@ describe("JsonPreview Component", () => {
               formatDocument: vi.fn()
             }
           },
-          ODialog: ODialogStub,
           'q-btn': true,
           'q-btn-dropdown': true,
           'q-list': true,
@@ -242,6 +191,7 @@ describe("JsonPreview Component", () => {
           'q-icon': true,
           'q-img': true,
           'q-input': true,
+          'q-dialog': true,
           'q-card': true,
           'q-card-section': true,
           'q-card-actions': true,
@@ -286,7 +236,6 @@ describe("JsonPreview Component", () => {
           stubs: {
             'app-tabs': true,
             'code-query-editor': true,
-            ODialog: ODialogStub,
             'q-btn': true,
             'q-btn-dropdown': true,
             'q-list': true,
@@ -297,6 +246,7 @@ describe("JsonPreview Component", () => {
             'q-icon': true,
             'q-img': true,
             'q-input': true,
+            'q-dialog': true,
             'q-card': true,
             'q-card-section': true,
             'q-card-actions': true,
@@ -306,7 +256,7 @@ describe("JsonPreview Component", () => {
           }
         },
       });
-
+      
       expect(testWrapper.props('showCopyButton')).toBe(true);
       expect(testWrapper.props('mode')).toBe("sidebar");
       expect(testWrapper.props('streamName')).toBe("");
@@ -767,7 +717,6 @@ describe("JsonPreview Component", () => {
           stubs: {
             'app-tabs': true,
             'code-query-editor': true,
-            ODialog: ODialogStub,
             'q-btn': true,
             'q-btn-dropdown': true,
             'q-list': true,
@@ -778,6 +727,7 @@ describe("JsonPreview Component", () => {
             'q-icon': true,
             'q-img': true,
             'q-input': true,
+            'q-dialog': true,
             'q-card': true,
             'q-card-section': true,
             'q-card-actions': true,
@@ -964,85 +914,6 @@ describe("JsonPreview Component", () => {
       await nextTick();
       
       expect(wrapper.vm.activeTab).toBe("unflattened");
-    });
-  });
-
-  describe("Regex Pattern ODialog", () => {
-    it("renders ODialog when enterprise is enabled", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.exists()).toBe(true);
-    });
-
-    it("forwards size 'lg' to ODialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("size")).toBe("lg");
-    });
-
-    it("forwards the title prop to ODialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe(
-        "What is the type of regex pattern you want to create?",
-      );
-    });
-
-    it("forwards localized primary and secondary button labels to ODialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBeTruthy();
-      expect(dialog.props("secondaryButtonLabel")).toBeTruthy();
-    });
-
-    it("forwards typeOfRegexPattern false to the open prop initially", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(false);
-    });
-
-    it("forwards typeOfRegexPattern true to the open prop after toggle", async () => {
-      wrapper.vm.typeOfRegexPattern = true;
-      await nextTick();
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("closes the dialog on click:secondary", async () => {
-      wrapper.vm.typeOfRegexPattern = true;
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:secondary");
-      await nextTick();
-
-      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
-    });
-
-    it("invokes confirmRegexPatternType on click:primary", async () => {
-      wrapper.vm.typeOfRegexPattern = true;
-      wrapper.vm.selectedText = "user@example.com";
-      wrapper.vm.regexPatternType = "email";
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
-      expect(wrapper.emitted("closeTable")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/settings/regex_patterns",
-        query: {
-          org_identifier: "test-org",
-          from: "logs",
-        },
-      });
-    });
-
-    it("opens the regex dialog after handleCreateRegex via context menu", async () => {
-      wrapper.vm.handleCreateRegex();
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(true);
-      expect(wrapper.vm.showMenu).toBe(false);
     });
   });
 

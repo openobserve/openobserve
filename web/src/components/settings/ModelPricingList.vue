@@ -781,109 +781,138 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
-    <ODrawer data-test="model-pricing-list-pricing-drawer" v-model:open="showPricingDialog" :width="30" title="Hello">
-      <!-- #header-left: source icon is conditional (3 variants) with tooltips — cannot be expressed as a simple prop -->
-      <template #header-left>
-        <span
-            v-if="getSource(pricingDialogRow) === 'built_in'"
-            class="tw:shrink-0 tw:cursor-default tw:inline-flex"
-          >
-            <img
-              :src="ooLogo"
-              class="tw:w-[18px] tw:h-[18px]"
-              alt="OpenObserve"
-            />
-            <q-tooltip
-              :delay="500"
-              anchor="top middle"
-              self="bottom middle"
-              >{{ t("modelPricing.sourceBuiltIn") }}</q-tooltip
+    <q-dialog v-model="showPricingDialog" position="right" maximized>
+      <div
+        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        class="pricing-dialog-panel"
+      >
+        <div class="add-stream-header row items-center no-wrap q-px-md">
+          <div class="col tw:flex tw:items-center tw:gap-2 tw:min-w-0">
+            <!-- Source icon -->
+            <span
+              v-if="getSource(pricingDialogRow) === 'built_in'"
+              class="tw:shrink-0 tw:cursor-default tw:inline-flex"
             >
-          </span>
-          <q-icon
-            v-else-if="
-              pricingDialogRow &&
-              (getSource(pricingDialogRow) === 'meta_org' ||
-                (getSource(pricingDialogRow) === 'org' &&
-                  pricingDialogRow.org_id !== orgIdentifier))
-            "
-            name="corporate_fare"
-            size="18px"
-            class="tw:shrink-0 tw:cursor-default source-icon"
-          >
-             <q-tooltip
-              :delay="500"
-              anchor="top middle"
-              self="bottom middle"
-              >{{ t("modelPricing.sourceInherited") }}</q-tooltip
-            >
-          </q-icon>
-          <q-icon
-            v-else
-            name="person"
-            size="18px"
-            class="tw:shrink-0 tw:cursor-default source-icon"
-          >
-            <q-tooltip
-              :delay="500"
-              anchor="top middle"
-              self="bottom middle"
-              >{{ t("modelPricing.sourceCustom") }}</q-tooltip
-            >
-          </q-icon>
-      </template>
-
-      <div class="q-pa-md pricing-dialog-body">
-        <div v-if="pricingDialogRow">
-          <!-- Pattern section -->
-          <div class="tw:mb-4">
-            <div class="pricing-section-label">
-              {{ t("modelPricing.colPattern") }}
-            </div>
-            <code class="text-caption pattern-code pattern-code-panel">{{
-              pricingDialogRow.match_pattern
-            }}</code>
-          </div>
-          <q-separator class="tw:mb-4" />
-
-          <!-- Pricing per 1M tokens section -->
-          <div>
-            <div class="pricing-section-label tw:mt-2">
-              {{ t("modelPricing.colPricing") }}
-            </div>
-            <div
-              v-if="
-                sortedPriceEntries(
-                  getDefaultTier(pricingDialogRow)?.prices || {},
-                ).length
+              <img
+                :src="ooLogo"
+                class="tw:w-[18px] tw:h-[18px]"
+                alt="OpenObserve"
+              />
+              <q-tooltip
+                :delay="500"
+                anchor="top middle"
+                self="bottom middle"
+                >{{ t("modelPricing.sourceBuiltIn") }}</q-tooltip
+              >
+            </span>
+            <q-icon
+              v-else-if="
+                pricingDialogRow &&
+                (getSource(pricingDialogRow) === 'meta_org' ||
+                  (getSource(pricingDialogRow) === 'org' &&
+                    pricingDialogRow.org_id !== orgIdentifier))
               "
-              class="pricing-panel-table-wrap"
+              name="corporate_fare"
+              size="18px"
+              class="tw:shrink-0 tw:cursor-default source-icon"
             >
-              <table class="pricing-panel-table">
-                <thead>
-                  <tr>
-                    <th>{{ t("modelPricing.usageType") }}</th>
-                    <th>{{ t("modelPricing.colPricing") }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="[key, price] in sortedPriceEntries(
-                      getDefaultTier(pricingDialogRow)?.prices || {},
-                    )"
-                    :key="key"
-                  >
-                    <td>{{ formatPriceKey(key) }}</td>
-                    <td>{{ formatPerMillion(price) }}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <q-tooltip
+                :delay="500"
+                anchor="top middle"
+                self="bottom middle"
+                >{{ t("modelPricing.sourceInherited") }}</q-tooltip
+              >
+            </q-icon>
+            <q-icon
+              v-else
+              name="person"
+              size="18px"
+              class="tw:shrink-0 tw:cursor-default source-icon"
+            >
+              <q-tooltip
+                :delay="500"
+                anchor="top middle"
+                self="bottom middle"
+                >{{ t("modelPricing.sourceCustom") }}</q-tooltip
+              >
+            </q-icon>
+            <div style="font-size: 18px" class="tw:truncate">
+              {{ pricingDialogRow?.name }}
+              <q-tooltip
+                v-if="
+                  pricingDialogRow?.name && pricingDialogRow.name.length > 20
+                "
+                :delay="300"
+                anchor="bottom middle"
+                self="top middle"
+                style="
+                  max-width: none;
+                  white-space: normal;
+                  word-break: break-all;
+                "
+                >{{ pricingDialogRow.name }}</q-tooltip
+              >
             </div>
-            <span v-else class="text-grey-5">—</span>
+          </div>
+          <div class="col-auto">
+            <OButton variant="ghost" size="icon" v-close-popup>
+              <q-icon name="cancel" size="14px" />
+            </OButton>
+          </div>
+        </div>
+        <q-separator />
+        <div class="q-pa-md pricing-dialog-body">
+          <div v-if="pricingDialogRow">
+            <!-- Pattern section -->
+            <div class="tw:mb-4">
+              <div class="pricing-section-label">
+                {{ t("modelPricing.colPattern") }}
+              </div>
+              <code class="text-caption pattern-code pattern-code-panel">{{
+                pricingDialogRow.match_pattern
+              }}</code>
+            </div>
+            <q-separator class="tw:mb-4" />
+
+            <!-- Pricing per 1M tokens section -->
+            <div>
+              <div class="pricing-section-label tw:mt-2">
+                {{ t("modelPricing.colPricing") }}
+              </div>
+              <div
+                v-if="
+                  sortedPriceEntries(
+                    getDefaultTier(pricingDialogRow)?.prices || {},
+                  ).length
+                "
+                class="pricing-panel-table-wrap"
+              >
+                <table class="pricing-panel-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t("modelPricing.usageType") }}</th>
+                      <th>{{ t("modelPricing.colPricing") }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="[key, price] in sortedPriceEntries(
+                        getDefaultTier(pricingDialogRow)?.prices || {},
+                      )"
+                      :key="key"
+                    >
+                      <td>{{ formatPriceKey(key) }}</td>
+                      <td>{{ formatPerMillion(price) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <span v-else class="text-grey-5">—</span>
+            </div>
           </div>
         </div>
       </div>
-    </ODrawer>
+    </q-dialog>
 
     <confirm-dialog
       v-model="confirmDialogMeta.show"
@@ -915,7 +944,6 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 const { t } = useI18n();
 const store = useStore();

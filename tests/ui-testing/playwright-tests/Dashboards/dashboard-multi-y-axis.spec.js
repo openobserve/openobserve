@@ -79,7 +79,7 @@ test.describe("dashboard multi y axis testcases", () => {
     ).toBeVisible();
 
     // Close the query inspector
-    await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Add the panel name and save the panel
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -141,7 +141,7 @@ test.describe("dashboard multi y axis testcases", () => {
     ).toBeVisible();
 
     // Close the query inspector
-    await page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]').click();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Edit the panel to add another field to Y-axis
     await pm.dashboardPanelActions.addPanelName(panelName);

@@ -15,46 +15,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
-    :open="visible"
-    :width="60"
-    :seamless="true"
-    :portal-target="containerEl"
-    :title="selectedNode?.name || selectedNode?.label || selectedNode?.id"
-    data-test="service-graph-side-panel"
-    @update:open="(v) => { if (!v) handleClose() }"
-  >
-    <template #header-right>
-      <div class="tw:flex tw:items-center tw:gap-2">
-        <span class="health-badge" :class="serviceHealth.status">
-          {{ serviceHealth.text }}
-        </span>
-        <ODropdown side="bottom" align="start">
-          <template #trigger>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="service-graph-node-panel-view-related-btn"
+  <transition name="slide">
+    <div
+      v-if="visible"
+      class="service-graph-side-panel"
+      data-test="service-graph-side-panel"
+    >
+      <!-- Header Section (compact with inline health badge) -->
+      <div
+        class="panel-header tw:py-[0.375rem] tw:px-[0.625rem]"
+        data-test="service-graph-side-panel-header"
+      >
+        <div class="panel-title">
+          <h2
+            class="service-name"
+            data-test="service-graph-side-panel-service-name"
+          >
+            {{ selectedNode?.name || selectedNode?.label || selectedNode?.id }}
+            <span class="health-badge" :class="serviceHealth.status">
+              {{ serviceHealth.text }}
+            </span>
+          </h2>
+        </div>
+        <div class="panel-header-actions tw:flex tw:items-center tw:gap-2">
+          <ODropdown side="bottom" align="start">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="service-graph-node-panel-view-related-btn"
+              >
+                View Related
+                <q-icon name="arrow_drop_down" size="1rem" />
+              </OButton>
+            </template>
+            <ODropdownItem
+              @select="viewRelatedLogs"
+              data-test="service-graph-node-panel-view-related-logs-btn"
+              >Logs</ODropdownItem
             >
-              View Related
-              <q-icon name="arrow_drop_down" size="1rem" />
-            </OButton>
-          </template>
-          <ODropdownItem
-            @select="viewRelatedLogs"
-            data-test="service-graph-node-panel-view-related-logs-btn"
-            >Logs</ODropdownItem
+            <ODropdownItem
+              @select="viewRelatedTraces"
+              data-test="service-graph-node-panel-view-related-traces-btn"
+              >Traces</ODropdownItem
+            >
+          </ODropdown>
+          <OButton
+            variant="ghost"
+            size="icon"
+            data-test="service-graph-side-panel-close-btn"
+            @click="handleClose"
           >
-          <ODropdownItem
-            @select="viewRelatedTraces"
-            data-test="service-graph-node-panel-view-related-traces-btn"
-            >Traces</ODropdownItem
-          >
-        </ODropdown>
+            <q-icon name="cancel" size="1rem" />
+          </OButton>
+        </div>
       </div>
-    </template>
 
-    <!-- Content Scrollable Area -->
+      <!-- Content Scrollable Area -->
       <div class="panel-content">
         <!-- RED Charts Section -->
         <div
@@ -558,7 +575,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabPanels>
         </template>
       </div>
-  </ODrawer>
+    </div>
+  </transition>
 
   <!-- Telemetry Correlation Dialog (reuses the same component as "show related" on logs page) -->
   <TelemetryCorrelationDashboard
@@ -584,7 +602,6 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import {
   defineComponent,
   computed,
@@ -719,7 +736,6 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
-    ODrawer,
     TelemetryCorrelationDashboard,
     TenstackTable,
     RenderDashboardCharts,
@@ -744,10 +760,6 @@ export default defineComponent({
     streamFilter: {
       type: String,
       required: true,
-    },
-    containerEl: {
-      type: Object as PropType<HTMLElement | null>,
-      default: null,
     },
   },
   emits: ["close", "view-traces"],
@@ -2107,61 +2119,172 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.health-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
+.service-graph-side-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  min-width: 600px;
+  width: 60%;
+  height: 100%;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: #1a1f2e;
+  border-left: 1px solid #2d3548;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+}
 
-  &::before {
-    content: "●";
-    font-size: 10px;
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
   }
-
-  &.healthy {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-  }
-
-  &.degraded {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
-  }
-
-  &.critical {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-  }
-
-  &.warning {
-    background: rgba(249, 115, 22, 0.15);
-    color: #f97316;
+  to {
+    transform: translateX(0);
   }
 }
 
-.body--light .health-badge {
-  &.healthy {
-    background: rgba(16, 185, 129, 0.08);
-    color: #059669;
+// Light mode support
+.body--light .service-graph-side-panel {
+  background: #ffffff;
+  border-left: 1px solid #e0e0e0;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+// Slide animation
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(100%);
+}
+
+.slide-enter-to,
+.slide-leave-from {
+  transform: translateX(0);
+}
+
+// Header (compact with inline health badge)
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #2d3548;
+  background: #1a1f2e;
+  flex-shrink: 0;
+
+  .panel-title {
+    flex: 1;
+
+    .service-name {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+      line-height: 1.2; // Reduce line height for compactness
+      color: #e4e7eb;
+      letter-spacing: normal;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      .health-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px; // Reduced from 6px
+        padding: 2px 8px; // Reduced from 4px 10px for more compact badge
+        border-radius: 10px; // Slightly reduced from 12px
+        font-size: 11px; // Reduced from 12px
+        font-weight: 600;
+        line-height: 1;
+
+        // Add dot indicator
+        &::before {
+          content: "●";
+          font-size: 10px; // Reduced from 12px
+        }
+
+        &.healthy {
+          background: rgba(16, 185, 129, 0.15);
+          color: #10b981;
+        }
+
+        &.degraded {
+          background: rgba(251, 191, 36, 0.15);
+          color: #fbbf24;
+        }
+
+        &.critical {
+          background: rgba(239, 68, 68, 0.15);
+          color: #ef4444;
+        }
+
+        &.warning {
+          background: rgba(249, 115, 22, 0.15);
+          color: #f97316;
+        }
+      }
+    }
   }
 
-  &.degraded {
-    background: rgba(251, 191, 36, 0.08);
-    color: #d97706;
+  .panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
-  &.critical {
-    background: rgba(239, 68, 68, 0.08);
-    color: #dc2626;
-  }
+  .telemetry-btn {
+    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+    color: #fff !important;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: all 0.2s;
 
-  &.warning {
-    background: rgba(249, 115, 22, 0.08);
-    color: #ea580c;
+    &:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    }
+  }
+}
+
+.body--light .panel-header {
+  border-bottom: 1px solid #e0e0e0;
+  background: #f5f5f5;
+
+  .panel-title {
+    .service-name {
+      color: #202124;
+      line-height: 1.2;
+
+      .health-badge {
+        &.healthy {
+          background: rgba(16, 185, 129, 0.08);
+          color: #059669;
+        }
+
+        &.degraded {
+          background: rgba(251, 191, 36, 0.08);
+          color: #d97706;
+        }
+
+        &.critical {
+          background: rgba(239, 68, 68, 0.08);
+          color: #dc2626;
+        }
+
+        &.warning {
+          background: rgba(249, 115, 22, 0.08);
+          color: #ea580c;
+        }
+      }
+    }
   }
 }
 
@@ -2825,5 +2948,33 @@ export default defineComponent({
   .metrics-correlation-dashboard .q-splitter--vertical > .q-splitter__separator
 ) {
   height: 100% !important;
+}
+</style>
+
+<style lang="scss">
+// Dark mode - consistent background
+.body--dark {
+  .service-graph-side-panel {
+    background: #1a1f2e; // Consistent panel background
+    color: #e4e7eb;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+}
+
+// Light mode
+.body--light {
+  .service-graph-side-panel {
+    background: #ffffff;
+    color: #333333;
+    border-left: 1px solid #e0e0e0;
+
+    .metric-card {
+      background: #f9f9f9;
+    }
+  }
 }
 </style>

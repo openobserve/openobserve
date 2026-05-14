@@ -34,20 +34,15 @@ export class MetricsBuilderPage {
         this.runQueryButton = '[data-test="metrics-apply"]';
 
         // Add to Dashboard dialog selectors
-        // AddToDashboard.vue is now an ODrawer with parent slug `add-to-dashboard-dialog`.
-        // Cancel/Add are the ODrawer footer secondary/primary buttons, not the old
-        // metrics-schema-* buttons.
         this.addToDashboardButton = '[data-test="panel-editor-add-to-dashboard-btn"], button:has-text("Add To Dashboard"), button:has-text("Add to Dashboard")';
-        this.dashboardDialogTitle = '[data-test="add-to-dashboard-dialog"]';
+        this.dashboardDialogTitle = '[data-test="schema-title-text"]';
         this.dashboardPanelTitleInput = '[data-test="metrics-new-dashboard-panel-title"]';
-        this.dashboardCancelButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-secondary-btn"]';
-        this.dashboardAddButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]';
+        this.dashboardCancelButton = '[data-test="metrics-schema-cancel-button"]';
+        this.dashboardAddButton = '[data-test="metrics-schema-update-settings-button"]';
 
-        // Confirm dialog for mode switching — ConfirmDialog.vue wraps ODialog with
-        // hardcoded data-test="confirm-dialog"; the OK action is the ODialog primary
-        // footer button after the dialog migration.
-        this.confirmDialogOk = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
-        this.confirmDialogCancel = '[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]';
+        // Confirm dialog for mode switching
+        this.confirmDialogOk = '.q-dialog button:has-text("OK"), .q-dialog button:has-text("Confirm")';
+        this.confirmDialogCancel = '.q-dialog button:has-text("Cancel")';
     }
 
     // ===== Query Mode Switching =====
@@ -367,11 +362,7 @@ export class MetricsBuilderPage {
     async clickAddOperation() {
         const addBtn = this.page.locator(this.addOperationButton);
         await addBtn.click();
-        // Operation selector is now an ODialog (see OperationsList.vue) — wait on the
-        // parent slug rather than the legacy `.q-dialog` wrapper.
-        await this.page
-            .locator('[data-test="operations-list-operation-selector-dialog"]')
-            .waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('.q-dialog').waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -380,7 +371,7 @@ export class MetricsBuilderPage {
      */
     async selectOperation(operationName) {
         // Wait for dialog to appear and fully render (expansion items are default-opened)
-        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
+        const dialog = this.page.locator('.q-dialog');
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
         await this.page.waitForTimeout(300);
 
@@ -742,7 +733,7 @@ export class MetricsBuilderPage {
      * Get operation dialog categories (expansion panel labels)
      */
     async getOperationCategories() {
-        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
+        const dialog = this.page.locator('.q-dialog');
         if (!await dialog.isVisible({ timeout: 3000 }).catch(() => false)) return [];
 
         const headers = dialog.locator('.q-expansion-item .q-item__label');
@@ -759,9 +750,8 @@ export class MetricsBuilderPage {
      * Close operation selector dialog
      */
     async closeOperationDialog() {
-        // OperationsList dialog now uses ODialog with primary button label "Close".
-        const dialog = this.page.locator('[data-test="operations-list-operation-selector-dialog"]');
-        const closeBtn = dialog.locator('[data-test="o-dialog-primary-btn"]');
+        const dialog = this.page.locator('.q-dialog');
+        const closeBtn = dialog.locator('button:has-text("Close")');
         if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await closeBtn.click();
             await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
@@ -774,10 +764,7 @@ export class MetricsBuilderPage {
      * Check if operation selector dialog is visible
      */
     async isOperationDialogVisible() {
-        return await this.page
-            .locator('[data-test="operations-list-operation-selector-dialog"]')
-            .isVisible({ timeout: 2000 })
-            .catch(() => false);
+        return await this.page.locator('.q-dialog').isVisible({ timeout: 2000 }).catch(() => false);
     }
 
     /**
@@ -1048,15 +1035,12 @@ export class MetricsBuilderPage {
         // Wait for the tab list to auto-load and auto-select (SelectTabDropdown onMounted async fetch)
         await this.page.waitForTimeout(2000);
 
-        // Click an empty area of the Add-to-Dashboard ODrawer panel to dismiss any
-        // open Quasar menu from prior dropdowns (folder/dashboard). The previous
-        // `schema-title-text` element was removed when AddToDashboard migrated to
-        // ODrawer — the drawer's `data-test="add-to-dashboard-dialog"` slug is
-        // safe to click because it's inside the drawer (so it doesn't trigger
-        // interact-outside) but outside teleported q-menus.
-        const drawerPanel = this.page.locator('[data-test="add-to-dashboard-dialog"]');
-        if (await drawerPanel.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await drawerPanel.click({ position: { x: 5, y: 5 }, force: true }).catch(() => {});
+        // Click the dialog title (a neutral element) to close any open dropdown menus.
+        // Quasar dropdowns close when clicking outside them, so even if the title click
+        // is intercepted by an open menu, that menu will close.
+        const dialogTitle = this.page.locator('[data-test="schema-title-text"]');
+        if (await dialogTitle.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await dialogTitle.click({ force: true });
             await this.page.waitForTimeout(300);
         }
 
@@ -1131,22 +1115,13 @@ export class MetricsBuilderPage {
         await dashNameInput.click();
         await dashNameInput.fill(dashboardName);
 
-        // Submit dashboard creation — SelectDashboardDropdown wraps AddDashboard in an
-        // ODrawer with `data-test="dashboard-dashboard-add-dialog"`, and the legacy
-        // `dashboard-add-submit` button was removed in favour of the ODrawer footer
-        // primary action (Save) which calls `addDashboardRef?.submit()`.
-        const submitBtn = this.page.locator(
-            '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
-        );
+        // Submit dashboard creation
+        const submitBtn = this.page.locator('[data-test="dashboard-add-submit"]');
         await submitBtn.waitFor({ state: 'visible', timeout: 5000 });
         await submitBtn.click();
 
-        // Wait for the inner "New dashboard" drawer to close (parent "Add to Dashboard"
-        // drawer stays open and auto-selects the newly created dashboard).
-        await this.page
-            .locator('[data-test="dashboard-dashboard-add-dialog"]')
-            .waitFor({ state: 'hidden', timeout: 10000 })
-            .catch(() => {});
+        // Wait for the dialog to close and dashboard to be auto-selected
+        await this.page.locator('[data-test="add-dashboard-name"]').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(3000);
     }
 

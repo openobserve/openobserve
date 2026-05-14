@@ -117,65 +117,14 @@ const mockI18n = createI18n({
   },
 });
 
-// Stub ODialog so tests are deterministic (no Portal/Reka teleport)
-// and so we can assert on the props the component forwards and emit
-// the click events the component listens to.
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test="o-dialog-stub"
-      :data-open="String(open)"
-      :data-size="size"
-      :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-      <button
-        data-test="o-dialog-stub-primary"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-secondary"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-    </div>
-  `,
-};
-
 function mountComponent() {
   return mount(BuiltInPatternsTab, {
     global: {
       plugins: [mockI18n],
       provide: { store: mockStore },
       stubs: {
-        ODialog: ODialogStub,
         "q-spinner-hourglass": true,
+        "q-dialog": { template: "<div><slot /></div>" },
         "q-chip": { template: "<span><slot /></span>", props: ["size", "color", "textColor", "dense"] },
         "q-list": { template: "<div><slot /></div>", props: ["bordered", "separator"] },
         "q-item": { template: "<div class='q-item'><slot /></div>", props: ["class"] },
@@ -183,6 +132,10 @@ function mountComponent() {
         "q-item-label": { template: "<div><slot /></div>", props: ["caption", "lines", "class"] },
         "q-checkbox": { template: "<input type='checkbox' />", props: ["modelValue"], emits: ["update:modelValue"] },
         "q-tooltip": { template: "<span><slot /></span>" },
+        "q-card": { template: "<div><slot /></div>" },
+        "q-card-section": { template: "<div><slot /></div>", props: ["class"] },
+        "q-card-actions": { template: "<div><slot /></div>", props: ["align"] },
+        "q-separator": true,
         "q-input": { template: "<input />", props: ["modelValue", "readonly", "outlined", "dense", "rows", "type"] },
       },
     },
@@ -419,80 +372,6 @@ describe("BuiltInPatternsTab", () => {
       await flushPromises();
       wrapper.vm.previewedPattern = null;
       wrapper.vm.importSinglePattern();
-      expect(wrapper.emitted("import-patterns")).toBeFalsy();
-    });
-  });
-
-  describe("ODialog preview dialog", () => {
-    // Note: the component sets data-test="pattern-preview-dialog" on the
-    // ODialog element. Vue's attribute fallthrough means that data-test
-    // takes precedence over the stub's own data-test, so we query by the
-    // component-provided selector.
-    const dialogSelector = '[data-test="pattern-preview-dialog"]';
-
-    it("should render ODialog stub with title from previewed pattern", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.previewPattern(wrapper.vm.patterns[0]);
-      await flushPromises();
-      const dialog = wrapper.find(dialogSelector);
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-title")).toBe("IPv4");
-      expect(dialog.attributes("data-size")).toBe("md");
-    });
-
-    it("should forward localized primary and secondary button labels to ODialog", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.previewPattern(wrapper.vm.patterns[0]);
-      await flushPromises();
-      const dialog = wrapper.find(dialogSelector);
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-primary-label")).toBe("Import");
-      expect(dialog.attributes("data-secondary-label")).toBe("Close");
-    });
-
-    it("should reflect showPreview state via data-open attribute", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const dialog = wrapper.find(dialogSelector);
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-open")).toBe("false");
-
-      wrapper.vm.previewPattern(wrapper.vm.patterns[1]);
-      await flushPromises();
-      expect(wrapper.find(dialogSelector).attributes("data-open")).toBe("true");
-    });
-
-    it("should import previewed pattern when ODialog emits click:primary", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      const pattern = wrapper.vm.patterns[0];
-      wrapper.vm.previewPattern(pattern);
-      await flushPromises();
-
-      await wrapper.find('[data-test="o-dialog-stub-primary"]').trigger("click");
-      await flushPromises();
-
-      expect(wrapper.vm.showPreview).toBe(false);
-      expect(pattern.selected).toBe(true);
-      const emitted = wrapper.emitted("import-patterns");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0][0]).toHaveLength(1);
-      expect(emitted![0][0][0].name).toBe("IPv4");
-    });
-
-    it("should close the dialog when ODialog emits click:secondary", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.previewPattern(wrapper.vm.patterns[0]);
-      await flushPromises();
-      expect(wrapper.vm.showPreview).toBe(true);
-
-      await wrapper.find('[data-test="o-dialog-stub-secondary"]').trigger("click");
-      await flushPromises();
-
-      expect(wrapper.vm.showPreview).toBe(false);
       expect(wrapper.emitted("import-patterns")).toBeFalsy();
     });
   });

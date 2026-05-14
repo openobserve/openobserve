@@ -16,18 +16,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Dialog Mode -->
-  <ODrawer data-test="telemetry-correlation-dashboard-drawer"
+  <q-dialog
     v-if="props.mode === 'dialog'"
-    v-model:open="isOpen"
-    side="right"
-    :width="90"
-    :title="`Correlated Streams - ${serviceName}`"
-    :sub-title="formatTimeRange(timeRange)"
-    @update:open="(v) => !v && onClose()"
+    v-model="isOpen"
+    position="right"
+    full-height
+    maximized
+    transition-show="slide-left"
+    transition-hide="slide-right"
+    @hide="onClose"
   >
-    <template #header-left>
-      <q-icon name="link" size="md" color="primary" />
-    </template>
+    <q-card class="correlation-dashboard-card">
+      <!-- Header -->
+      <q-card-section
+        v-if="!isEmbeddedTabs"
+        class="correlation-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      >
+        <div class="tw:flex tw:items-center tw:gap-3">
+          <q-icon name="link" size="md" color="primary" />
+          <div class="tw:flex tw:flex-col tw:gap-0">
+            <span class="tw:text-lg tw:font-semibold">
+              Correlated Streams - {{ serviceName }}
+            </span>
+            <span class="tw:text-xs tw:opacity-70">
+              {{ formatTimeRange(timeRange) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="tw:flex tw:items-center tw:gap-3">
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            @click="isOpen = false"
+            data-test="correlation-dashboard-close"
+          >
+            <X :size="14" />
+          </OButton>
+        </div>
+      </q-card-section>
 
       <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
       <div
@@ -563,7 +590,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
       </OTabPanels>
       </div>
-  </ODrawer>
+    </q-card>
+  </q-dialog>
 
   <!-- Embedded Tabs Mode -->
   <div v-else class="correlation-dashboard-embedded">
@@ -1068,105 +1096,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- Metric Stream Selector Dialog -->
-  <ODialog data-test="telemetry-correlation-dashboard-metric-selector-dialog" v-model:open="showMetricSelector" size="md" :title="t('correlation.selectMetrics')">
-    <!-- Search Input -->
-    <q-input
-      v-model="metricSearchText"
-      dense
-      outlined
-      :placeholder="t('search.searchField')"
-      clearable
-      class="tw:w-full tw:mb-3"
-    >
-      <template #prepend>
-        <q-icon name="search" />
-      </template>
-    </q-input>
+  <q-dialog v-model="showMetricSelector">
+    <q-card class="metric-selector-dialog">
+      <q-card-section class="tw:p-4 tw:border-b">
+        <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
+          <div class="tw:text-base tw:font-semibold">
+            {{ t("correlation.selectMetrics") }}
+          </div>
+          <OButton variant="ghost" size="icon-sm" v-close-popup>
+            <X :size="14" />
+          </OButton>
+        </div>
 
-    <div class="metric-list-container">
-      <template
-        v-if="
-          groupedFilteredMetricStreams.groups.some(
-            (g) => g.streams.length > 0,
-          )
-        "
-      >
-        <template
-          v-for="group in groupedFilteredMetricStreams.groups"
-          :key="group.id"
+        <!-- Search Input -->
+        <q-input
+          v-model="metricSearchText"
+          dense
+          outlined
+          :placeholder="t('search.searchField')"
+          clearable
+          class="tw:w-full"
         >
-          <!-- Group section — hidden when no streams match -->
-          <template v-if="group.streams.length > 0">
-            <!-- Group header -->
-            <div class="metric-group-header">
-              <div class="metric-group-label">
-                <q-icon
-                  v-if="typeof group.icon === 'string'"
-                  :name="group.icon"
-                  size="0.875rem"
-                />
-                <span>{{ group.label }}</span>
-                <q-badge
-                  color="grey-6"
-                  text-color="white"
-                  :label="group.streams.length"
-                  class="tw:ml-1"
-                />
-              </div>
-              <div class="metric-group-actions">
-                <OButton
-                  variant="ghost"
-                  size="icon-xs"
-                  @click="selectAllInGroup(group.id)"
-                  :disabled="getGroupSelectionState(group.id) === 'all'"
-                >
-                  All
-                </OButton>
-                <OButton
-                  variant="ghost"
-                  size="icon-xs"
-                  @click="deselectAllInGroup(group.id)"
-                  :disabled="getGroupSelectionState(group.id) === 'none'"
-                >
-                  None
-                </OButton>
-              </div>
-            </div>
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+      </q-card-section>
 
-            <!-- Metric items -->
-            <q-item
-              v-for="stream in group.streams"
-              :key="stream.stream_name"
-              dense
-              class="metric-list-item"
-            >
-              <q-item-section side>
-                <q-checkbox
-                  :model-value="
-                    selectedMetricStreams.some(
-                      (s) => s.stream_name === stream.stream_name,
-                    )
-                  "
-                  @update:model-value="toggleMetricStream(stream)"
-                  color="primary"
-                  size="xs"
-                  dense
-                />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="metric-label">{{ stream.stream_name }}</q-item-label>
-              </q-item-section>
-            </q-item>
+      <q-card-section class="tw:p-0 metric-list-container">
+        <template
+          v-if="
+            groupedFilteredMetricStreams.groups.some(
+              (g) => g.streams.length > 0,
+            )
+          "
+        >
+          <template
+            v-for="group in groupedFilteredMetricStreams.groups"
+            :key="group.id"
+          >
+            <!-- Group section — hidden when no streams match -->
+            <template v-if="group.streams.length > 0">
+              <!-- Group header -->
+              <div class="metric-group-header">
+                <div class="metric-group-label">
+                  <q-icon
+                    v-if="typeof group.icon === 'string'"
+                    :name="group.icon"
+                    size="0.875rem"
+                  />
+                  <span>{{ group.label }}</span>
+                  <q-badge
+                    color="grey-6"
+                    text-color="white"
+                    :label="group.streams.length"
+                    class="tw:ml-1"
+                  />
+                </div>
+                <div class="metric-group-actions">
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs"
+                    @click="selectAllInGroup(group.id)"
+                    :disabled="getGroupSelectionState(group.id) === 'all'"
+                  >
+                    All
+                  </OButton>
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs"
+                    @click="deselectAllInGroup(group.id)"
+                    :disabled="getGroupSelectionState(group.id) === 'none'"
+                  >
+                    None
+                  </OButton>
+                </div>
+              </div>
+
+              <!-- Metric items -->
+              <q-item
+                v-for="stream in group.streams"
+                :key="stream.stream_name"
+                dense
+                class="metric-list-item"
+              >
+                <q-item-section side>
+                  <q-checkbox
+                    :model-value="
+                      selectedMetricStreams.some(
+                        (s) => s.stream_name === stream.stream_name,
+                      )
+                    "
+                    @update:model-value="toggleMetricStream(stream)"
+                    color="primary"
+                    size="xs"
+                    dense
+                  />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label class="metric-label">{{
+                    stream.stream_name
+                  }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
           </template>
         </template>
-      </template>
 
-      <!-- No results message -->
-      <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
-        {{ t("search.noResult") }}
-      </div>
-    </div>
-  </ODialog>
+        <!-- No results message -->
+        <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
+          {{ t("search.noResult") }}
+        </div>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts" setup>
@@ -1213,8 +1256,6 @@ import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
 
 const RenderDashboardCharts = defineAsyncComponent(

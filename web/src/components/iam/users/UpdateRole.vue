@@ -15,14 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="update-role-dialog"
-    :open="open"
-    :width="30"
-    :title="t('user.editUser')"
-    persistent
-    @update:open="$emit('update:open', $event)"
-  >
-    <div class="tw:p-4">
+  <q-card class="column full-height">
+    <q-card-section class="q-px-md q-py-md">
+      <div class="row items-center no-wrap">
+        <div class="col">
+          <div class="text-body1 text-bold text-dark">
+            {{ t("user.editUser") }}
+          </div>
+          <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
+        </div>
+        <div class="col-auto">
+          <OButton v-close-popup="true" variant="ghost" size="icon-circle-sm">
+            <q-icon name="cancel" />
+          </OButton>
+        </div>
+      </div>
+    </q-card-section>
+    <q-separator />
+    <q-card-section class="q-w-md q-mx-lg">
       <q-form ref="updateUserForm" @submit.prevent="onSubmit">
         <q-input
           v-model="orgMemberData.first_name"
@@ -36,6 +46,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
         />
+
+        <!--
+        <q-input
+          v-model="orgMemberData.email"
+          :label="t('user.email')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          readonly
+          filled
+          dense
+        />
+        -->
 
         <q-select
           v-model="orgMemberData.role"
@@ -52,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex justify-center q-mt-lg tw:gap-2">
           <OButton
-            @click="$emit('update:open', false)"
+            v-close-popup="true"
             variant="outline"
             size="sm-action"
           >
@@ -67,14 +92,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </q-form>
-    </div>
-  </ODrawer>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -94,18 +118,14 @@ let callOrgMember: any;
 
 export default defineComponent({
   name: "ComponentUpdateUser",
-  components: { OButton, ODrawer },
+  components: { OButton },
   props: {
-    open: {
-      type: Boolean,
-      default: false,
-    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
     },
   },
-  emits: ["update:modelValue", "updated", "finish", "update:open"],
+  emits: ["update:modelValue", "updated", "finish"],
   setup() {
     const store: any = useStore();
     const { t } = useI18n();
@@ -173,7 +193,6 @@ export default defineComponent({
           }
 
           this.$emit("updated", res?.data);
-          this.$emit("update:open", false);
           this.updateUserForm.resetValidation();
           dismiss();
         });

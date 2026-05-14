@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col full-height" data-test="edit-role-page">
+  <div class="relative-position full-height" data-test="edit-role-page">
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      class="tw:pb-[0.625rem] tw:flex-shrink-0"
+      class="tw:pb-[0.625rem]"
     >
     <div class="card-container q-py-sm">
           <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div style="min-height: calc(100% - (39px + 55px + 49px))">
         <GroupUsers
           data-test="edit-role-users-section"
           v-show="activeTab === 'users'"
@@ -69,10 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container tw:flex tw:flex-col tw:h-full"
+          class="card-container tw:h-[calc(100vh-200px)]"
         >
           <div
-            class="flex justify-between items-center tw:flex-shrink-0"
+            class="flex justify-between items-center"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
           >
             <div
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
           </div>
 
-          <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
+          <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md">
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     language="json"
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
-                    style="height: calc(100vh - var(--navbar-height) - 295px)"
+                    style="height: calc(100vh - 295px)"
                   />
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
@@ -247,8 +247,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end tw:w-full tw:flex-shrink-0"
-        style="z-index: 2"
+        class="flex justify-end tw:w-full"
+        style="position: sticky; bottom: 0.45rem; z-index: 2"
       >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
         <OButton

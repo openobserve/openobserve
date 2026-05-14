@@ -32,16 +32,14 @@ vi.mock("@/utils/commons", () => ({
 }));
 
 // Mock notifications
-const showErrorNotificationMock = vi.fn();
-const showPositiveNotificationMock = vi.fn();
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
-    showErrorNotification: showErrorNotificationMock,
-    showPositiveNotification: showPositiveNotificationMock,
+    showErrorNotification: vi.fn(),
+    showPositiveNotification: vi.fn(),
   }),
 }));
 
-// Mock loading composable — preserve original behaviour (execute = the supplied fn)
+// Mock loading composable
 vi.mock("@/composables/useLoading", () => ({
   useLoading: vi.fn((fn) => ({
     execute: fn,
@@ -49,7 +47,7 @@ vi.mock("@/composables/useLoading", () => ({
   })),
 }));
 
-// Mock dashboard schema conversion (identity)
+// Mock dashboard schema conversion
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
@@ -68,22 +66,22 @@ describe("AddDashboard", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-
+    
     vi.mocked(dashboardService.create).mockResolvedValue({
       data: {
         id: "new-dashboard-1",
         version: 3,
-        v3: { dashboardId: "new-dashboard-1", title: "Test Dashboard" },
-      },
-    } as any);
+        "v3": { dashboardId: "new-dashboard-1", title: "Test Dashboard" }
+      }
+    });
 
     store.state.selectedOrganization = { identifier: "test-org" };
     store.state.userInfo = { name: "test-user" };
     store.state.organizationData = {
       folders: [
         { folderId: "default", name: "Default" },
-        { folderId: "folder-1", name: "Folder 1" },
-      ],
+        { folderId: "folder-1", name: "Folder 1" }
+      ]
     };
   });
 
@@ -98,42 +96,33 @@ describe("AddDashboard", () => {
       props: {
         showFolderSelection: true,
         activeFolderId: "default",
-        ...props,
+        ...props
       },
       global: {
         plugins: [i18n, store],
         stubs: {
-          SelectFolderDropdown: {
-            name: "SelectFolderDropdown",
+          'SelectFolderDropdown': {
             template: '<div data-test="folder-dropdown"></div>',
-            props: ["activeFolderId"],
-            emits: ["folder-selected"],
-          },
+            props: ['activeFolderId'],
+            emits: ['folder-selected']
+          }
         },
         mocks: {
-          $t: (key: string) => key,
-        },
-      },
+          $t: (key: string) => key
+        }
+      }
     });
   };
 
   describe("Component Rendering", () => {
-    it("should render the create dashboard form by default", () => {
+    it("should render create dashboard form by default", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.beingUpdated).toBe(false);
-      expect(
-        wrapper.find('[data-test="add-dashboard-name"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-dashboard-description"]').exists(),
-      ).toBe(true);
-    });
-
-    it("should not render the id input in create mode", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="dashboard-id"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-dashboard-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-dashboard-description"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-submit"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-add-cancel"]').exists()).toBe(true);
     });
 
     it("should show folder selection when showFolderSelection is true", () => {
@@ -145,63 +134,180 @@ describe("AddDashboard", () => {
     it("should hide folder selection when showFolderSelection is false", () => {
       wrapper = createWrapper({ showFolderSelection: false });
 
-      expect(wrapper.find('[data-test="folder-dropdown"]').exists()).toBe(
-        false,
+      expect(wrapper.find('[data-test="folder-dropdown"]').exists()).toBe(false);
+    });
+  });
+
+  describe("Form Validation", () => {
+    it("should require dashboard name", async () => {
+      wrapper = createWrapper();
+      
+      const submitBtn = wrapper.find('[data-test="dashboard-add-submit"]');
+      expect(submitBtn.element.disabled).toBe(true);
+    });
+
+    it("should enable submit button when name is provided", async () => {
+      wrapper = createWrapper();
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      await nameInput.setValue("Test Dashboard");
+      await wrapper.vm.$nextTick();
+
+      const submitBtn = wrapper.find('[data-test="dashboard-add-submit"]');
+      expect(submitBtn.element.disabled).toBe(false);
+    });
+
+    it("should validate required name field", async () => {
+      wrapper = createWrapper();
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      await nameInput.setValue("");
+      await nameInput.trigger('blur');
+      
+      expect(wrapper.vm.dashboardData.name.trim()).toBe("");
+    });
+
+    it("should trim whitespace from name validation", async () => {
+      wrapper = createWrapper();
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      await nameInput.setValue("   ");
+      await wrapper.vm.$nextTick();
+
+      const submitBtn = wrapper.find('[data-test="dashboard-add-submit"]');
+      expect(submitBtn.element.disabled).toBe(true);
+    });
+  });
+
+  describe("Form Submission", () => {
+    it("should create new dashboard when form is valid", async () => {
+      wrapper = createWrapper();
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      const descInput = wrapper.find('[data-test="add-dashboard-description"]');
+      
+      await nameInput.setValue("New Dashboard");
+      await descInput.setValue("Dashboard description");
+      
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(dashboardService.create).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        expect.objectContaining({
+          title: "New Dashboard",
+          description: "Dashboard description"
+        }),
+        expect.any(String)
       );
     });
-  });
 
-  describe("Setup & Exposed API", () => {
-    it("should expose submit() helper that delegates to onSubmit.execute", () => {
+    it("should show loading state during submission", async () => {
       wrapper = createWrapper();
-
-      expect(typeof wrapper.vm.submit).toBe("function");
-      expect(typeof wrapper.vm.onSubmit.execute).toBe("function");
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      await nameInput.setValue("Test Dashboard");
+      
+      // Mock slow API response
+      vi.mocked(dashboardService.create).mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve({ 
+          data: { 
+            id: "test", 
+            version: 3, 
+            "v3": { dashboardId: "test", title: "Test Dashboard" } 
+          } 
+        }), 100))
+      );
+      
+      const form = wrapper.find('form');
+      form.trigger('submit.prevent');
+      
+      await wrapper.vm.$nextTick();
+      
+      expect(wrapper.vm.onSubmit.isLoading.value).toBe(false); // Initial state
     });
 
-    it("should initialise selectedFolder from the active folder", () => {
+    it("should handle folder selection", async () => {
+      wrapper = createWrapper();
+      
+      const folderDropdown = wrapper.findComponent('[data-test="folder-dropdown"]');
+      await folderDropdown.vm.$emit('folder-selected', { value: 'folder-1', label: 'Folder 1' });
+
+      expect(wrapper.vm.selectedFolder.value).toBe('folder-1');
+    });
+  });
+
+  describe("Error Handling", () => {
+    it("should handle dashboard creation error", async () => {
+      vi.mocked(dashboardService.create).mockRejectedValue(new Error("Creation failed"));
+      
+      wrapper = createWrapper();
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      await nameInput.setValue("Test Dashboard");
+      
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(dashboardService.create).toHaveBeenCalled();
+    });
+  });
+
+  describe("User Interactions", () => {
+    it("should close dialog when cancel button is clicked", async () => {
+      wrapper = createWrapper();
+      
+      const cancelBtns = wrapper.findAll('[data-test="dashboard-add-cancel"]');
+      expect(cancelBtns.length).toBeGreaterThan(0);
+    });
+
+    it("should close dialog when X button is clicked", async () => {
+      wrapper = createWrapper();
+      
+      const closeBtn = wrapper.find('[data-test="dashboard-add-cancel"]');
+      expect(closeBtn.exists()).toBe(true);
+    });
+
+    it("should emit events after successful creation", async () => {
+      wrapper = createWrapper();
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      await nameInput.setValue("New Dashboard");
+      
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(wrapper.emitted('updated')).toBeTruthy();
+    });
+  });
+
+  describe("Props Handling", () => {
+    it("should handle activeFolderId prop", () => {
       wrapper = createWrapper({ activeFolderId: "folder-1" });
-
-      expect(wrapper.vm.selectedFolder).toEqual({
-        label: "Folder 1",
-        value: "folder-1",
-      });
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it("should default selectedFolder to the default folder", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.selectedFolder).toEqual({
-        label: "Default",
-        value: "default",
-      });
-    });
-
-    it("should produce a numeric random integer id", () => {
-      wrapper = createWrapper();
-
-      const id = wrapper.vm.getRandInteger();
-      expect(typeof id).toBe("number");
-      expect(id).toBeGreaterThanOrEqual(100);
-    });
-  });
-
-  describe("Form Inputs", () => {
-    it("should initialise dashboard data with empty strings", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.dashboardData.name).toBe("");
-      expect(wrapper.vm.dashboardData.description).toBe("");
-    });
-
-    it("should update dashboardData when inputs change", async () => {
+    it("should properly initialize dashboard data", async () => {
       wrapper = createWrapper();
 
       const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
-      const descInput = wrapper.find(
-        '[data-test="add-dashboard-description"]',
-      );
+      const descInput = wrapper.find('[data-test="add-dashboard-description"]');
 
+      expect(nameInput.element.value).toBe("");
+      expect(descInput.element.value).toBe("");
+    });
+  });
+
+  describe("Reactive Updates", () => {
+    it("should update form data when inputs change", async () => {
+      wrapper = createWrapper();
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      const descInput = wrapper.find('[data-test="add-dashboard-description"]');
+      
       await nameInput.setValue("New Name");
       await descInput.setValue("New Description");
 
@@ -210,173 +316,23 @@ describe("AddDashboard", () => {
     });
   });
 
-  describe("Folder Selection", () => {
-    it("should update selectedFolder when SelectFolderDropdown emits folder-selected", async () => {
+  describe("Form Reset", () => {
+    it("should reset form after successful submission", async () => {
       wrapper = createWrapper();
-
-      const folderDropdown = wrapper.findComponent({
-        name: "SelectFolderDropdown",
-      });
-      await folderDropdown.vm.$emit("folder-selected", {
-        value: "folder-1",
-        label: "Folder 1",
-      });
-
-      expect(wrapper.vm.selectedFolder).toEqual({
-        value: "folder-1",
-        label: "Folder 1",
-      });
-    });
-  });
-
-  describe("Form Submission", () => {
-    it("should create a new dashboard when submit is called with a valid name", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.dashboardData.name = "New Dashboard";
-      wrapper.vm.dashboardData.description = "Dashboard description";
-      await wrapper.vm.$nextTick();
-
-      await wrapper.vm.submit();
+      
+      const nameInput = wrapper.find('[data-test="add-dashboard-name"]');
+      const descInput = wrapper.find('[data-test="add-dashboard-description"]');
+      
+      await nameInput.setValue("Test Dashboard");
+      await descInput.setValue("Test Description");
+      
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
       await flushPromises();
 
-      expect(dashboardService.create).toHaveBeenCalledWith(
-        "test-org",
-        expect.objectContaining({
-          title: "New Dashboard",
-          description: "Dashboard description",
-          owner: "test-user",
-          version: 3,
-        }),
-        "default",
-      );
-    });
-
-    it("should emit 'updated' after a successful submission", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.dashboardData.name = "New Dashboard";
-      await wrapper.vm.submit();
-      await flushPromises();
-
-      expect(wrapper.emitted("updated")).toBeTruthy();
-      const payload = wrapper.emitted("updated")![0];
-      expect(payload).toEqual(["new-dashboard-1", "default"]);
-    });
-
-    it("should reset dashboardData after successful submission", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.dashboardData.name = "Test Dashboard";
-      wrapper.vm.dashboardData.description = "Test Description";
-      await wrapper.vm.submit();
-      await flushPromises();
-
-      expect(wrapper.vm.dashboardData).toEqual({
-        id: "",
-        name: "",
-        description: "",
-      });
-    });
-
-    it("should show a positive notification on success", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.dashboardData.name = "Test Dashboard";
-      await wrapper.vm.submit();
-      await flushPromises();
-
-      expect(showPositiveNotificationMock).toHaveBeenCalledWith(
-        "Dashboard added successfully.",
-      );
-    });
-
-    it("should pass the currently selected folder id to the service", async () => {
-      wrapper = createWrapper();
-
-      const folderDropdown = wrapper.findComponent({
-        name: "SelectFolderDropdown",
-      });
-      await folderDropdown.vm.$emit("folder-selected", {
-        value: "folder-1",
-        label: "Folder 1",
-      });
-
-      wrapper.vm.dashboardData.name = "Folder Dashboard";
-      await wrapper.vm.submit();
-      await flushPromises();
-
-      expect(dashboardService.create).toHaveBeenCalledWith(
-        "test-org",
-        expect.any(Object),
-        "folder-1",
-      );
-    });
-
-    it("should short-circuit when form validation fails", async () => {
-      wrapper = createWrapper();
-
-      // Stub the form ref so validate() resolves false.
-      wrapper.vm.addDashboardForm = {
-        validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn(),
-      };
-
-      wrapper.vm.dashboardData.name = "Anything";
-      await wrapper.vm.submit();
-      await flushPromises();
-
-      expect(dashboardService.create).not.toHaveBeenCalled();
-      expect(wrapper.emitted("updated")).toBeFalsy();
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("should show an error notification when dashboard creation rejects with a message", async () => {
-      vi.mocked(dashboardService.create).mockRejectedValueOnce(
-        new Error("Creation failed"),
-      );
-
-      wrapper = createWrapper();
-      wrapper.vm.dashboardData.name = "Test Dashboard";
-      await wrapper.vm.submit();
-      await flushPromises();
-
-      expect(showErrorNotificationMock).toHaveBeenCalledWith("Creation failed");
-      expect(wrapper.emitted("updated")).toBeFalsy();
-    });
-
-    it("should show a fallback error notification when the rejection has no message", async () => {
-      vi.mocked(dashboardService.create).mockRejectedValueOnce({});
-
-      wrapper = createWrapper();
-      wrapper.vm.dashboardData.name = "Test Dashboard";
-      await wrapper.vm.submit();
-      await flushPromises();
-
-      expect(showErrorNotificationMock).toHaveBeenCalledWith(
-        "Dashboard creation failed.",
-      );
-    });
-  });
-
-  describe("Props Handling", () => {
-    it("should accept a custom activeFolderId prop", () => {
-      wrapper = createWrapper({ activeFolderId: "folder-1" });
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.selectedFolder.value).toBe("folder-1");
-    });
-
-    it("should accept a null activeFolderId via the validator and fall back to default folder lookup", () => {
-      // When null is passed, the lookup will fail to find a matching folder,
-      // so we provide a matching null-id folder for safety.
-      store.state.organizationData.folders.push({
-        folderId: null,
-        name: "Null Folder",
-      } as any);
-
-      wrapper = createWrapper({ activeFolderId: null });
-      expect(wrapper.exists()).toBe(true);
+      // Form should be reset after successful creation
+      expect(wrapper.vm.dashboardData.name).toBe("");
+      expect(wrapper.vm.dashboardData.description).toBe("");
     });
   });
 });

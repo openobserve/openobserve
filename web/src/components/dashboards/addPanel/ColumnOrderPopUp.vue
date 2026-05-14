@@ -15,19 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog
-    :open="open"
-    @update:open="(v) => { if (!v) cancelEdit() }"
-    :title="t('dashboard.columnOrder')"
-    size="lg"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('common.save')"
-    @click:secondary="cancelEdit"
-    @click:primary="saveEdit"
+  <q-card
+    class="column-order-popup scroll"
     data-test="dashboard-column-order-popup"
+    style="padding: 0px 10px; min-width: min(700px, 90vw); max-height: 80vh"
   >
+    <!-- Header -->
+    <div
+      class="flex justify-between items-center q-pa-md header"
+      style="border-bottom: 2px solid gray; margin-bottom: 5px"
+    >
+      <div class="flex items-center q-table__title q-mr-md">
+        <span>{{ t("dashboard.columnOrder") }}</span>
+      </div>
+      <OButton
+        variant="ghost"
+        size="icon"
+        @click.stop="cancelEdit"
+        data-test="dashboard-column-order-cancel"
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
+    </div>
+
     <!-- Content -->
-    <div>
+    <div class="scrollable-content">
       <div class="text-caption text-grey-7 q-mb-md">
         {{ t("dashboard.columnOrderDescription") }}
       </div>
@@ -100,7 +112,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </draggable>
     </div>
-  </ODialog>
+
+    <!-- Footer -->
+    <div class="sticky-footer q-pa-md tw:flex tw:gap-2">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        @click.stop="cancelEdit"
+        data-test="dashboard-column-order-cancel-btn"
+        >{{ t("common.cancel") }}</OButton
+      >
+      <OButton
+        variant="primary"
+        size="sm-action"
+        @click.stop="saveEdit"
+        data-test="dashboard-column-order-save-btn"
+        >{{ t("common.save") }}</OButton
+      >
+    </div>
+  </q-card>
 </template>
 
 <script lang="ts">
@@ -108,20 +138,14 @@ import { defineComponent, ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ColumnOrderPopUp",
   components: {
     draggable: VueDraggableNext as any,
     OButton,
-    ODialog,
   },
   props: {
-    open: {
-      type: Boolean,
-      required: true,
-    },
     columnOrder: {
       type: Array as () => string[],
       default: () => [],
@@ -194,10 +218,6 @@ export default defineComponent({
     };
 
     const cancelEdit = () => {
-      // Reset in-progress edits so re-opening the popup starts from the persisted
-      // column order — the component stays mounted across open/close cycles, so
-      // onMounted/availableColumns-watch wouldn't otherwise re-initialise.
-      initializeColumnOrder();
       emit("cancel");
     };
 
@@ -219,65 +239,106 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.column-order-row {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid #cccccc70;
-  transition: background-color 0.2s;
+.column-order-popup {
+  .scrollable-content {
+    overflow-y: auto;
+    max-height: calc(80vh - 190px);
+    padding: 12px;
 
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.02);
+    &::-webkit-scrollbar {
+      width: 6px;
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+    }
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
   }
 
-  &:last-child {
-    border-bottom: none;
-  }
-
-  .drag-handle {
-    cursor: move;
-    padding: 2px 4px;
-    margin-right: 8px;
+  .column-order-row {
     display: flex;
     align-items: center;
-  }
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #cccccc70;
+    transition: background-color 0.2s;
 
-  .column-number {
-    min-width: 32px;
-    color: #666;
-    font-weight: 500;
-    font-size: 13px;
-  }
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.02);
+    }
 
-  .column-name {
-    flex: 1;
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-  }
+    &:last-child {
+      border-bottom: none;
+    }
 
-  .column-actions {
-    display: flex;
-    gap: 2px;
-    margin-left: 8px;
+    .drag-handle {
+      cursor: move;
+      padding: 2px 4px;
+      margin-right: 8px;
+      display: flex;
+      align-items: center;
+    }
+
+    .column-number {
+      min-width: 32px;
+      color: #666;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .column-name {
+      flex: 1;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .column-actions {
+      display: flex;
+      gap: 2px;
+      margin-left: 8px;
+    }
   }
+}
+
+.sticky-footer {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  z-index: 10;
+  border-top: 1px solid #eee;
+  box-shadow: rgb(240, 240, 240) 0px -4px 7px 0px;
+  background: white;
 }
 
 // Dark mode support
 .body--dark {
-  .column-order-row {
-    border-bottom-color: rgba(255, 255, 255, 0.12);
+  .column-order-popup {
+    .column-order-row {
+      border-bottom-color: rgba(255, 255, 255, 0.12);
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+      }
 
-    .column-number {
-      color: #aaa;
+      .column-number {
+        color: #aaa;
+      }
     }
+  }
+
+  .sticky-footer {
+    border-top-color: rgba(255, 255, 255, 0.28);
+    box-shadow: rgba(0, 0, 0, 0.3) 0px -4px 7px 0px;
+    background: var(--q-dark);
   }
 }
 </style>

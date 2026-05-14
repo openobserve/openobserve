@@ -54,34 +54,6 @@ vi.mock("@/services/segment_analytics", () => ({
   default: { track: vi.fn() },
 }));
 
-const ODrawerStub = {
-  name: "ODrawer",
-  template:
-    '<div class="o-drawer-stub" :data-open="open"><slot name="header" /><slot /><slot name="footer" /></div>',
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryVariant",
-    "secondaryVariant",
-    "neutralVariant",
-    "primaryDisabled",
-    "secondaryDisabled",
-    "neutralDisabled",
-    "primaryLoading",
-    "secondaryLoading",
-    "neutralLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-};
-
 const makeStore = (overrides = {}) =>
   createStore({
     state: {
@@ -100,7 +72,6 @@ describe("AddStream", () => {
 
   const globalStubs = {
     StreamFieldInputs: true,
-    ODrawer: ODrawerStub,
   };
 
   beforeEach(() => {
@@ -112,9 +83,9 @@ describe("AddStream", () => {
     mockSchemaStream.mockResolvedValue({ data: { name: "new-stream" } });
   });
 
-  const mountComp = (customStore?: any, extraProps: Record<string, any> = {}) =>
+  const mountComp = (customStore?: any) =>
     mount(AddStream, {
-      props: { isInPipeline: false, open: true, ...extraProps },
+      props: { isInPipeline: false },
       global: { plugins: [i18n, customStore ?? store], stubs: globalStubs },
     });
 
@@ -125,28 +96,10 @@ describe("AddStream", () => {
       await flushPromises();
     });
 
-    it("should render ODrawer with localized title and button labels", async () => {
+    it("should render the title", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.exists()).toBe(true);
-      expect(drawer.props("title")).toBeTruthy();
-      expect(drawer.props("primaryButtonLabel")).toBeTruthy();
-      expect(drawer.props("secondaryButtonLabel")).toBeTruthy();
-    });
-
-    it("should pass through the open prop to ODrawer", async () => {
-      const wrapper = mountComp(undefined, { open: true });
-      await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("open")).toBe(true);
-    });
-
-    it("should pass open=false to ODrawer when closed", async () => {
-      const wrapper = mountComp(undefined, { open: false });
-      await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("open")).toBe(false);
+      expect(wrapper.find('[data-test="add-stream-title"]').exists()).toBe(true);
     });
 
     it("should render the stream name input", async () => {
@@ -166,51 +119,23 @@ describe("AddStream", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="add-stream-data-retention-input"]').exists()).toBe(true);
     });
-  });
 
-  describe("Drawer event handling", () => {
-    it("should emit update:open=false when ODrawer emits click:secondary", async () => {
+    it("should render the cancel button", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("click:secondary");
-      expect(wrapper.emitted("update:open")).toBeTruthy();
-      expect(wrapper.emitted("update:open")!.at(-1)).toEqual([false]);
+      expect(wrapper.find('[data-test="add-stream-cancel-btn"]').exists()).toBe(true);
     });
 
-    it("should propagate ODrawer's update:open event to parent", async () => {
+    it("should render the save button", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("update:open", false);
-      expect(wrapper.emitted("update:open")).toBeTruthy();
-      expect(wrapper.emitted("update:open")!.at(-1)).toEqual([false]);
+      expect(wrapper.find('[data-test="save-stream-btn"]').exists()).toBe(true);
     });
 
-    it("should call submitForm (which submits the form) when ODrawer emits click:primary", async () => {
+    it("should render the close button", async () => {
       const wrapper = mountComp();
       await flushPromises();
-
-      const vm = wrapper.vm as any;
-      // Stub out the underlying form ref's submit method.
-      const submitSpy = vi.fn();
-      vm.addStreamFormRef = { submit: submitSpy };
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("click:primary");
-
-      expect(submitSpy).toHaveBeenCalled();
-    });
-
-    it("should not throw if click:primary fires while addStreamFormRef is null", async () => {
-      const wrapper = mountComp();
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      vm.addStreamFormRef = null;
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
+      expect(wrapper.find('[data-test="add-stream-close-btn"]').exists()).toBe(true);
     });
   });
 
@@ -517,6 +442,24 @@ describe("AddStream", () => {
 
       const payload = vm.getStreamPayload();
       expect(payload.settings.defined_schema_fields).toContain("my_field");
+    });
+  });
+
+  describe("Theme Styling", () => {
+    it("should apply bg-white in light theme", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+      const rootDiv = wrapper.find("div");
+      expect(rootDiv.classes()).toContain("bg-white");
+    });
+
+    it("should apply bg-dark in dark theme", async () => {
+      const darkStore = makeStore();
+      darkStore.state.theme = "dark";
+      const wrapper = mountComp(darkStore);
+      await flushPromises();
+      const rootDiv = wrapper.find("div");
+      expect(rootDiv.classes()).toContain("bg-dark");
     });
   });
 });

@@ -16,7 +16,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width scheduled-pipeline-container">
-    <!-- <q-separator /> -->
+    <div class="flex items-center justify-between q-pb-sm">
+      <div class="flex items-center">
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          class="q-pt-sm"
+          @click="$emit('cancel:form')"
+        >
+          <template #icon-left>
+            <X class="tw:size-3.5 tw:shrink-0" />
+          </template>
+        </OButton>
+        <div class="q-pb-sm stream-routing-title q-pl-xs">
+          {{ t("pipeline.query") }}
+        </div>
+      </div>
+
+      <div class="flex items-center">
+        <OButton
+          v-if="
+            config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+          "
+          variant="ghost"
+          size="icon-toolbar"
+          @click="toggleAIChat"
+          data-test="menu-link-ai-item"
+          class="ai-hover-btn q-mr-sm"
+          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+          @mouseenter="isHovered = true"
+          @mouseleave="isHovered = false"
+        >
+          <div class="row items-center no-wrap tw:gap-2">
+            <img :src="getBtnLogo" class="header-icon ai-icon" />
+          </div>
+        </OButton>
+        <div class="flex items-center app-tabs-container tw:h-[36px] q-mr-sm">
+          <AppTabs
+            data-test="scheduled-pipeline-tabs"
+            :tabs="tabOptions"
+            v-model:active-tab="tab"
+            class="tabs-selection-container"
+            @update:active-tab="updateTab"
+          />
+        </div>
+        <DateTime
+          style="height: 34px !important; border-radius: 3px"
+          @on:date-change="updateDateChange"
+          class="q-mr-sm"
+        />
+        <OButton
+          data-test="logs-search-bar-refresh-btn"
+          data-cy="search-bar-refresh-button"
+          variant="primary"
+          size="sm-action"
+          class="q-mr-sm"
+          :disabled="!selectedStreamName"
+          @click="
+            {
+              expandState.output = true;
+              expandState.query = false;
+              runQuery();
+            }
+          "
+        >
+          {{ t("search.runQuery") }}
+          <q-tooltip
+            v-if="!selectedStreamName"
+            anchor="bottom middle"
+            self="top middle"
+          >
+            {{ t("search.selectStreamFirst") }}
+          </q-tooltip>
+        </OButton>
+
+        <OButton
+          data-test="add-function-fullscreen-btn"
+          variant="ghost"
+          size="icon-xs-sq"
+          @click="handleFullScreen"
+        >
+          <template #icon-left>
+            <Maximize2 v-if="!isFullscreen" class="tw:size-3.5 tw:shrink-0" />
+            <Minimize2 v-else class="tw:size-3.5 tw:shrink-0" />
+          </template>
+        </OButton>
+      </div>
+    </div>
+    <q-separator />
 
     <div class="q-mb-sm stepper-header tw:w-full tw:flex tw:h-full">
       <div
@@ -712,7 +799,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                             <div
                               v-else
-                              class="tw:flex tw:items-center o2-input tw:gap-y-2"
+                              class="tw:flex tw:items-center o2-input"
                             >
                               <q-input
                                 data-test="scheduled-pipeline-cron-input-field"
@@ -792,7 +879,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                    <div class="flex items-center q-mr-sm tw:mt-8">
+                    <div class="flex items-center q-mr-sm q-mt-lg">
                       <div
                         data-test="scheduled-pipeline-period-title"
                         class="text-bold flex items-center q-pb-sm"
@@ -984,24 +1071,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #separator>
             <OButton
               data-test="logs-search-field-list-collapse-btn"
-              variant="sidebar-button"
-              size="sidebar-button"
-              :style="{ top: '14px', zIndex: 100 }"
+              variant="ghost"
+              size="icon-xs-sq"
               :title="
                 collapseFields
                   ? t('search.collapseFields')
                   : t('search.openFields')
               "
+              class="q-mr-xs field-list-collapse-btn"
+              style="
+                left: 10px;
+                position: absolute;
+                overflow: auto !important;
+                top: 0px;
+                z-index: 100 !important;
+              "
               @click="collapseFieldList"
             >
               <template #icon-left>
-                  <q-icon
-                  :name="
-                    collapseFields
-                      ? 'chevron_right'
-                      : 'chevron_left'
-                  "
-                />
+                <ChevronRight v-if="collapseFields" class="tw:size-3.5 tw:shrink-0" />
+                <ChevronLeft v-else class="tw:size-3.5 tw:shrink-0" />
               </template>
             </OButton>
           </template>
@@ -2418,7 +2507,6 @@ const sendToAiChat = (value: any, append: boolean = true) => {
 
 defineExpose({
   tab,
-  tabOptions,
   validateInputs,
   pipelineEditorRef,
   pipelineObj,
@@ -2437,8 +2525,6 @@ defineExpose({
   handleSidebarEvent,
   dateTime,
   updateDateChange,
-  updateTab,
-  runQuery,
   getColumns,
   rows,
   sideBarSplitterModel,
@@ -2453,8 +2539,6 @@ defineExpose({
   toggleAIChat,
   isHovered,
   getBtnLogo,
-  isFullscreen,
-  handleFullScreen,
   sendToAiChat,
   aiChatInputContext,
   aiChatAppendMode,

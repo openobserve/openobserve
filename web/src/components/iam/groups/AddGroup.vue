@@ -14,63 +14,77 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ODrawer data-test="add-group-dialog"
-    :open="open"
-    :width="30"
-    :title="t('iam.addGroup')"
-    @update:open="emits('update:open', $event)"
-  >
-    <div data-test="add-group-section" class="tw:p-4">
-      <q-input
-        v-model.trim="name"
-        :label="t('common.name') + ' *'"
-        class="showLabelOnTop tw:mt-2"
-        stack-label
-        hide-bottom-space
-        borderless
-        dense
-        :rules="[
-          (val: any, rules: any) =>
-            !!val
-              ? isValidGroupName ||
-                `Use alphanumeric and '_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-        maxlength="100"
-        data-test="add-group-groupname-input-btn"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '_' characters only, without spaces.
-        </template>
-      </q-input>
-
-      <div class="flex justify-start tw:mt-6 tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="emits('update:open', false)"
-          data-test="add-group-cancel-btn"
-        >
-          {{ t('alerts.cancel') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="!name || !isValidGroupName"
-          @click="saveGroup"
-          data-test="add-group-submit-btn"
-        >
-          {{ t('alerts.save') }}
-        </OButton>
+  <q-card class="o2-side-dialog column full-height">
+    <q-card-section class="q-py-md tw:w-full">
+      <div class="row items-center no-wrap q-py-sm">
+        <div class="col">
+          <div data-test="add-group-section-title" style="font-size: 18px">
+            {{ t("iam.addGroup") }}
+          </div>
+        </div>
+        <div class="col-auto">
+          <q-icon
+            data-test="add-group-close-dialog-btn"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
+            @click="emits('cancel:hideform')"
+          />
+        </div>
       </div>
-    </div>
-  </ODrawer>
+
+      <q-separator />
+      <div data-test="add-group-section">
+        <q-input
+          v-model.trim="name"
+          :label="t('common.name') + ' *'"
+          class="showLabelOnTop tw:mt-2"
+          stack-label
+          hide-bottom-space
+          borderless
+          dense
+          :rules="[
+            (val: any, rules: any) =>
+              !!val
+                ? isValidGroupName ||
+                  `Use alphanumeric and '_' characters only, without spaces.`
+                : t('common.nameRequired'),
+          ]"
+          maxlength="100"
+          data-test="add-group-groupname-input-btn"
+        >
+          <template v-slot:hint>
+            Use alphanumeric and '_' characters only, without spaces.
+          </template>
+        </q-input>
+
+        <div class="flex justify-start tw:mt-6 tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="$emit('cancel:hideform')"
+            data-test="add-group-cancel-btn"
+          >
+            {{ t('alerts.cancel') }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :disabled="!name || !isValidGroupName"
+            @click="saveGroup"
+            data-test="add-group-submit-btn"
+          >
+            {{ t('alerts.save') }}
+          </OButton>
+        </div>
+      </div>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script setup lang="ts">
 import { createGroup } from "@/services/iam";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -79,10 +93,6 @@ import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
 const props = defineProps({
-  open: {
-    type: Boolean,
-    default: false,
-  },
   group: {
     type: Object,
     default: () => null,
@@ -93,7 +103,7 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["update:open", "added:group"]);
+const emits = defineEmits(["cancel:hideform", "added:group"]);
 
 const name = ref(props.group?.name || "");
 
@@ -114,7 +124,7 @@ const saveGroup = () => {
   createGroup(name.value, store.state.selectedOrganization.identifier)
     .then((res) => {
       emits("added:group", res.data);
-      emits("update:open", false);
+      emits("cancel:hideform");
 
       q.notify({
         message: `User Group "${name.value}" Created Successfully!`,

@@ -1,15 +1,16 @@
 <template>
-  <ODialog data-test="cross-link-dialog" v-model:open="dialogVisible" persistent size="md" :show-close="false"
-    :title="isEditing ? t('crossLinks.editCrossLink') : t('crossLinks.addCrossLink')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
-    :primary-button-disabled="!form.name || !form.url"
-    @click:secondary="onCancel"
-    @click:primary="onSubmit"
-  >
-    <template #header-right>
-      <CrossLinkUserGuide />
-    </template>
+  <q-dialog v-model="dialogVisible" persistent>
+    <q-card style="min-width: 500px">
+      <q-card-section>
+        <div class="tw:flex tw:items-center tw:justify-between">
+          <div class="text-h6">
+            {{ isEditing ? t("crossLinks.editCrossLink") : t("crossLinks.addCrossLink") }}
+          </div>
+          <CrossLinkUserGuide />
+        </div>
+      </q-card-section>
+
+      <q-card-section>
         <q-form @submit.prevent="onSubmit">
           <!-- Name -->
           <div class="tw:mb-3">
@@ -113,7 +114,29 @@
             </div>
           </div>
         </q-form>
-  </ODialog>
+      </q-card-section>
+
+      <q-card-actions align="right" class="q-pa-md tw:gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="onCancel"
+          data-test="cross-link-cancel-btn"
+        >
+          {{ t('common.cancel') }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="!form.name || !form.url"
+          @click="onSubmit"
+          data-test="cross-link-save-btn"
+        >
+          {{ isEditing ? t('crossLinks.update') : t('crossLinks.add') }}
+        </OButton>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -122,7 +145,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { Plus } from 'lucide-vue-next';
 
 export interface CrossLink {
@@ -133,7 +155,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OButton, ODialog, Plus },
+  components: { CrossLinkUserGuide, OButton, Plus },
   props: {
     modelValue: {
       type: Boolean,

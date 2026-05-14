@@ -93,20 +93,6 @@
     /* RefreshButton — staleness dot (slightly muted in dark mode) */
     --color-refresh-dot-stale: var(--color-warning-500);
     --color-refresh-dot-critical: var(--color-error-400);
-
-    /* Dialog */
-    --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
-    --color-dialog-bg: var(--color-grey-900);
-    --color-dialog-border: var(--color-grey-700);
-    --color-dialog-header-bg: var(--color-grey-800);
-    --color-dialog-header-text: var(--color-grey-50);
-    --color-dialog-header-border: var(--color-grey-700);
-    --color-dialog-content-text: var(--color-grey-50);
-    --color-dialog-footer-bg: var(--color-grey-800);
-    --color-dialog-footer-border: var(--color-grey-700);
-    --color-dialog-close-text: var(--color-grey-400);
-    --color-dialog-close-hover-bg: var(--color-grey-700);
-    --color-dialog-close-active-bg: var(--color-grey-600);
 }
 
 /* ToggleGroup — primary variant dark overrides */

@@ -215,13 +215,6 @@ describe("VariableSettings", () => {
             props: ['modelValue'],
             emits: ['update:modelValue']
           },
-          ODialog: {
-            name: 'ODialog',
-            inheritAttrs: false,
-            template: '<div v-if="open" data-test="o-dialog-stub" class="o-dialog"><div data-test="o-dialog-title">{{ title }}</div><slot /></div>',
-            props: ['open', 'width', 'title', 'subTitle', 'persistent', 'size', 'showClose'],
-            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral']
-          },
           'q-card': {
             name: 'QCard',
             template: '<div class="q-card"><slot /></div>'
@@ -553,26 +546,8 @@ describe("VariableSettings", () => {
       const vm = wrapper.vm as any;
       vm.showVariablesDependenciesGraphPopUp = true;
       await nextTick();
-
-      const odialog = wrapper.find('[data-test="o-dialog-stub"]');
-      expect(odialog.exists()).toBe(true);
-      expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe(
-        "Variables Dependency Graph"
-      );
-    });
-
-    it("should close dependencies graph dialog when ODialog emits update:open false", async () => {
-      const vm = wrapper.vm as any;
-      vm.showVariablesDependenciesGraphPopUp = true;
-      await nextTick();
-
-      const odialog = wrapper.findComponent({ name: "ODialog" });
-      expect(odialog.exists()).toBe(true);
-
-      odialog.vm.$emit("update:open", false);
-      await nextTick();
-
-      expect(vm.showVariablesDependenciesGraphPopUp).toBe(false);
+      
+      expect(wrapper.html()).toContain("Variables Dependency Graph");
     });
 
     it("should close dependencies graph popup", async () => {

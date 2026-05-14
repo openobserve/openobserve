@@ -15,18 +15,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-tab-dialog"
-    :open="open"
-    size="md"
-    :title="editMode ? 'Edit Tab' : 'Add Tab'"
-    secondary-button-label="Cancel"
-    primary-button-label="Save"
-    :primary-button-loading="onSubmit.isLoading.value"
-    @update:open="$emit('update:open', $event)"
-    @click:secondary="$emit('update:open', false)"
-    @click:primary="submit()"
-  >
-    <div class="tw:p-4">
+  <q-card class="column full-height">
+    <q-card-section class="q-px-md q-py-md tw:h-[64px]">
+      <div class="row items-center no-wrap">
+        <div class="col">
+          <div
+            v-if="editMode"
+            class="text-body1 text-bold"
+            data-test="dashboard-tab-edit"
+          >
+            Edit Tab
+          </div>
+          <div
+            v-else
+            class="text-body1 text-bold"
+            data-test="dashboard-tab-add"
+          >
+            Add Tab
+          </div>
+        </div>
+        <div class="col-auto">
+          <OButton
+            v-close-popup="true"
+            variant="ghost"
+            size="icon-circle"
+            data-test="dashboard-tab-cancel"
+          >
+            <template #icon-left><q-icon name="cancel" /></template>
+          </OButton>
+        </div>
+      </div>
+    </q-card-section>
+    <q-separator />
+    <q-card-section class="q-w-md">
       <q-form ref="addTabForm" @submit.stop="onSubmit.execute">
         <q-input
           v-model="tabData.name"
@@ -40,13 +61,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :lazy-rules="true"
           data-test="dashboard-add-tab-name"
         />
+
+        <div class="flex justify-start tw:gap-2">
+          <OButton
+            v-close-popup="true"
+            variant="outline"
+            size="sm-action"
+            data-test="dashboard-add-cancel"
+            >{{ t("dashboard.cancel") }}</OButton
+          >
+          <OButton
+            :disabled="tabData.name.trim() === ''"
+            :loading="onSubmit.isLoading.value"
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            data-test="dashboard-add-tab-submit"
+            >{{ t("dashboard.save") }}</OButton
+          >
+        </div>
       </q-form>
-    </div>
-  </ODrawer>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
@@ -54,7 +94,7 @@ import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const defaultValue = () => {
   return {
@@ -65,12 +105,8 @@ const defaultValue = () => {
 
 export default defineComponent({
   name: "AddTab",
-  components: { ODrawer },
+  components: { OButton },
   props: {
-    open: {
-      type: Boolean,
-      default: false,
-    },
     tabId: {
       validator: (value) => {
         return typeof value === "string" || value === null;
@@ -94,7 +130,7 @@ export default defineComponent({
       },
     },
   },
-  emits: ["refresh", "update:open"],
+  emits: ["refresh"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
@@ -125,13 +161,7 @@ export default defineComponent({
         );
       }
     };
-    watch(
-      () => props.open,
-      (v) => {
-        if (v) loadDashboardData();
-        else tabData.value = defaultValue();
-      },
-    );
+    loadDashboardData();
 
     const onSubmit = useLoading(async () => {
       await addTabForm.value.validate().then(async (valid: any) => {
@@ -153,7 +183,6 @@ export default defineComponent({
 
             // emit refresh to rerender
             emit("refresh", updatedTab);
-            emit("update:open", false);
 
             showPositiveNotification("Tab updated successfully", {
               timeout: 2000,
@@ -170,7 +199,6 @@ export default defineComponent({
 
             // emit refresh to rerender
             emit("refresh", newTab);
-            emit("update:open", false);
 
             showPositiveNotification("Tab added successfully", {
               timeout: 2000,
@@ -202,8 +230,6 @@ export default defineComponent({
       });
     });
 
-    const submit = () => onSubmit.execute();
-
     return {
       t,
       tabData,
@@ -211,7 +237,6 @@ export default defineComponent({
       store,
       isValidIdentifier,
       onSubmit,
-      submit,
     };
   },
 });

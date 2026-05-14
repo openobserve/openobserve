@@ -15,19 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
-    :open="internalOpen"
-    @update:open="handleDrawerClose"
-    :title="t('pipeline.llmEvaluation')"
-    :width="30"
-    :show-close="true"
-    @keydown.stop
+  <div
+    data-test="llm-evaluation-node-section"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    style="width: 100%; height: 100%"
   >
     <div
-      data-test="llm-evaluation-node-section"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
     >
-
+      {{ t("pipeline.llmEvaluation") }}
+      <div>
+        <OButton variant="ghost" size="icon" v-close-popup>
+          <q-icon name="cancel" size="14px" />
+        </OButton>
+      </div>
+    </div>
+    <q-separator />
 
     <div class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md">
       <q-form @submit="saveLlmEvaluationNode">
@@ -175,8 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-    </div>
-  </ODrawer>
+  </div>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -187,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -195,33 +197,17 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { RefreshCw } from "lucide-vue-next";
 
 export default defineComponent({
   name: "LlmEvaluation",
-  components: { ConfirmDialog, OButton, ODrawer },
-  props: {
-    open: {
-      type: Boolean,
-      default: false,
-    },
-  },
+  components: { ConfirmDialog, OButton },
   emits: ["cancel:hideform"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const q = useQuasar();
     const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
-
-    const internalOpen = ref(!!props.open);
-    watch(() => props.open, (v: boolean) => { internalOpen.value = !!v; });
-    function handleDrawerClose(v: boolean) {
-      internalOpen.value = v;
-      if (!v) {
-        setTimeout(() => emit("cancel:hideform"), 300);
-      }
-    }
     const { getStream } = useStreams();
 
     const nodeName = ref("");
@@ -451,8 +437,6 @@ export default defineComponent({
       deleteNode,
       dialog,
       pipelineObj,
-      internalOpen,
-      handleDrawerClose,
     };
   },
 });

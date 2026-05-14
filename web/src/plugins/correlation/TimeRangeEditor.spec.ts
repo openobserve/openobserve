@@ -18,9 +18,15 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import {
   Quasar,
+  QDialog,
+  QCard,
+  QCardSection,
+  QCardActions,
+  QBtn,
   QInput,
   QRadio,
   QIcon,
+  QSeparator,
 } from "quasar";
 import TimeRangeEditor from "./TimeRangeEditor.vue";
 import store from "@/test/unit/helpers/store";
@@ -59,67 +65,6 @@ const i18n = createI18n({
   },
 });
 
-// ── Stub for migrated ODialog ──────────────────────────────────────────────
-// Mirrors the real ODialog contract: v-model:open, title, size, the labelled
-// primary/secondary/neutral button props (with disabled/loading/variant
-// variants), and the click:primary / click:secondary / click:neutral emits.
-// Driving buttons through emits keeps the test deterministic — no Portal /
-// Teleport rendering, no real Quasar QDialog timers.
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test="o-dialog-stub"
-      :data-open="String(open)"
-      :data-size="size"
-      :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-neutral-label="neutralButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-      <button
-        data-test="o-dialog-stub-primary"
-        :disabled="primaryButtonDisabled"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-secondary"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-neutral"
-        @click="$emit('click:neutral')"
-      >{{ neutralButtonLabel }}</button>
-    </div>
-  `,
-};
-
 // Source timestamp: Jan 1, 2024 12:00:00 UTC in microseconds
 const SOURCE_TIMESTAMP_US = 1704110400000000;
 // 5 minutes in microseconds
@@ -149,18 +94,21 @@ describe("TimeRangeEditor.vue", () => {
             Quasar,
             {
               components: {
+                QDialog,
+                QCard,
+                QCardSection,
+                QCardActions,
+                QBtn,
                 QInput,
                 QRadio,
                 QIcon,
+                QSeparator,
               },
             },
           ],
           i18n,
           store,
         ],
-        stubs: {
-          ODialog: ODialogStub,
-        },
       },
       attachTo: document.body,
     });
@@ -182,47 +130,16 @@ describe("TimeRangeEditor.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render ODialog component", () => {
+    it("should render dialog component", () => {
       wrapper = createWrapper({ modelValue: true });
-      const dialog = wrapper.findComponent(ODialogStub);
+      const dialog = wrapper.findComponent(QDialog);
       expect(dialog.exists()).toBe(true);
     });
 
-    it("should pass modelValue to ODialog as open prop", () => {
+    it("should pass modelValue to dialog", () => {
       wrapper = createWrapper({ modelValue: true });
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("should forward modelValue=false to ODialog as open=false", () => {
-      wrapper = createWrapper({ modelValue: false });
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(false);
-    });
-
-    it("should forward size 'sm' to ODialog", () => {
-      wrapper = createWrapper();
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("size")).toBe("sm");
-    });
-
-    it("should forward the localized title to ODialog", () => {
-      wrapper = createWrapper();
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Edit Time Range");
-    });
-
-    it("should forward localized primary/secondary/neutral button labels", () => {
-      wrapper = createWrapper();
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Apply");
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
-      expect(dialog.props("neutralButtonLabel")).toBe("Reset");
-    });
-
-    it("should keep the data-test selector for the dialog root", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="time-range-editor-dialog"]').exists()).toBe(true);
+      const dialog = wrapper.findComponent(QDialog);
+      expect(dialog.props("modelValue")).toBe(true);
     });
   });
 
@@ -500,27 +417,6 @@ describe("TimeRangeEditor.vue", () => {
 
       expect(wrapper.vm.isValid).toBeTruthy();
     });
-
-    it("should forward !isValid to ODialog's primaryButtonDisabled (invalid)", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.pendingStartTime = SOURCE_TIMESTAMP_US + FIVE_MIN_US;
-      wrapper.vm.pendingEndTime = SOURCE_TIMESTAMP_US - FIVE_MIN_US;
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
-    });
-
-    it("should forward !isValid to ODialog's primaryButtonDisabled (valid)", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.pendingStartTime = SOURCE_TIMESTAMP_US - FIVE_MIN_US;
-      wrapper.vm.pendingEndTime = SOURCE_TIMESTAMP_US + FIVE_MIN_US;
-      wrapper.vm.selectedWindow = "5min";
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(false);
-    });
   });
 
   describe("handleApply", () => {
@@ -580,25 +476,6 @@ describe("TimeRangeEditor.vue", () => {
 
       expect(wrapper.emitted("update:range")).toBeFalsy();
     });
-
-    it("should run handleApply when ODialog emits click:primary", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.selectedWindow = "5min";
-      wrapper.vm.pendingStartTime = SOURCE_TIMESTAMP_US - FIVE_MIN_US;
-      wrapper.vm.pendingEndTime = SOURCE_TIMESTAMP_US + FIVE_MIN_US;
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(wrapper.emitted("update:range")).toBeTruthy();
-      expect(wrapper.emitted("update:range")?.[0]).toEqual([
-        SOURCE_TIMESTAMP_US - FIVE_MIN_US,
-        SOURCE_TIMESTAMP_US + FIVE_MIN_US,
-      ]);
-      expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
-    });
   });
 
   describe("handleCancel", () => {
@@ -635,22 +512,6 @@ describe("TimeRangeEditor.vue", () => {
 
       expect(wrapper.emitted("close")).toBeTruthy();
     });
-
-    it("should run handleCancel when ODialog emits click:secondary", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.pendingStartTime = SOURCE_TIMESTAMP_US - 99999;
-      wrapper.vm.pendingEndTime = SOURCE_TIMESTAMP_US + 99999;
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:secondary");
-      await nextTick();
-
-      expect(wrapper.vm.pendingStartTime).toBe(defaultProps.currentRange.startTime);
-      expect(wrapper.vm.pendingEndTime).toBe(defaultProps.currentRange.endTime);
-      expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
-      expect(wrapper.emitted("close")).toBeTruthy();
-    });
   });
 
   describe("handleReset", () => {
@@ -672,22 +533,6 @@ describe("TimeRangeEditor.vue", () => {
       wrapper.vm.handleReset();
       await nextTick();
 
-      expect(wrapper.vm.pendingStartTime).toBe(SOURCE_TIMESTAMP_US - FIVE_MIN_US);
-      expect(wrapper.vm.pendingEndTime).toBe(SOURCE_TIMESTAMP_US + FIVE_MIN_US);
-    });
-
-    it("should run handleReset when ODialog emits click:neutral", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.selectedWindow = "1hour";
-      wrapper.vm.pendingStartTime = 0;
-      wrapper.vm.pendingEndTime = 0;
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:neutral");
-      await nextTick();
-
-      expect(wrapper.vm.selectedWindow).toBe("5min");
       expect(wrapper.vm.pendingStartTime).toBe(SOURCE_TIMESTAMP_US - FIVE_MIN_US);
       expect(wrapper.vm.pendingEndTime).toBe(SOURCE_TIMESTAMP_US + FIVE_MIN_US);
     });
@@ -716,38 +561,6 @@ describe("TimeRangeEditor.vue", () => {
       await nextTick();
 
       expect(wrapper.emitted("close")).toBeTruthy();
-    });
-
-    it("should forward ODialog update:open=false to update:modelValue and trigger close", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.pendingStartTime = 0;
-      wrapper.vm.pendingEndTime = 0;
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("update:open", false);
-      await nextTick();
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
-      // handleClose ran — pending times restored to currentRange
-      expect(wrapper.vm.pendingStartTime).toBe(defaultProps.currentRange.startTime);
-      expect(wrapper.vm.pendingEndTime).toBe(defaultProps.currentRange.endTime);
-      expect(wrapper.emitted("close")).toBeTruthy();
-    });
-
-    it("should forward ODialog update:open=true to update:modelValue without triggering close", async () => {
-      wrapper = createWrapper({ modelValue: false });
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("update:open", true);
-      await nextTick();
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([true]);
-      // close should NOT have been emitted
-      expect(wrapper.emitted("close")).toBeFalsy();
     });
   });
 
@@ -788,18 +601,6 @@ describe("TimeRangeEditor.vue", () => {
       // customStartTime and customEndTime should be initialized
       expect(typeof wrapper.vm.customStartTime).toBe("string");
       expect(typeof wrapper.vm.customEndTime).toBe("string");
-    });
-
-    it("should propagate modelValue change to ODialog open prop", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      let dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(true);
-
-      await wrapper.setProps({ modelValue: false });
-      await nextTick();
-
-      dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(false);
     });
   });
 

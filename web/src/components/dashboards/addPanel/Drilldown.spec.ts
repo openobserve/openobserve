@@ -84,11 +84,14 @@ describe("Drilldown", () => {
         },
         stubs: {
           DrilldownPopUp: {
-            name: "DrilldownPopUp",
-            template:
-              '<div data-test="drilldown-popup" :data-open="open"></div>',
-            props: ["open", "drilldownDataIndex", "isEditMode", "variablesData"],
+            template: '<div data-test="drilldown-popup"></div>',
             emits: ["close"],
+          },
+          AppDialog: {
+            template:
+              '<div v-if="modelValue" data-test="app-dialog"><slot /></div>',
+            props: ["modelValue"],
+            emits: ["update:modelValue"],
           },
         },
         mocks: {
@@ -403,19 +406,7 @@ describe("Drilldown", () => {
       wrapper.vm.showDrilldownPopUp = true;
       await wrapper.vm.$nextTick();
 
-      // After ODialog/ODrawer migration, the AppDialog wrapper was removed.
-      // DrilldownPopUp now owns its dialog and is controlled via the :open prop.
-      const popupEl = wrapper.find('[data-test="drilldown-popup"]');
-      expect(popupEl.exists()).toBe(true);
-      expect(popupEl.attributes("data-open")).toBe("true");
-    });
-
-    it("should pass open=false to DrilldownPopUp by default", () => {
-      wrapper = createWrapper();
-
-      const popupEl = wrapper.find('[data-test="drilldown-popup"]');
-      expect(popupEl.exists()).toBe(true);
-      expect(popupEl.attributes("data-open")).toBe("false");
+      expect(wrapper.find('[data-test="app-dialog"]').exists()).toBe(true);
     });
 
     it("should pass correct props to DrilldownPopUp", async () => {
@@ -426,14 +417,12 @@ describe("Drilldown", () => {
       wrapper.vm.showDrilldownPopUp = true;
       await wrapper.vm.$nextTick();
 
-      const popup = wrapper.findComponent(
-        '[data-test="drilldown-popup"]',
-      );
-      expect(popup.exists()).toBe(true);
-      expect(popup.props("open")).toBe(true);
-      expect(popup.props("drilldownDataIndex")).toBe(5);
-      expect(popup.props("isEditMode")).toBe(true);
-      expect(popup.props("variablesData")).toEqual(mockVariablesData);
+      const popup = wrapper.findComponent({ name: "DrilldownPopUp" });
+      if (popup.exists()) {
+        expect(popup.props("drilldownDataIndex")).toBe(5);
+        expect(popup.props("isEditMode")).toBe(true);
+        expect(popup.props("variablesData")).toEqual(mockVariablesData);
+      }
     });
 
     it("should close dialog when saveDrilldownData is called", () => {
@@ -454,26 +443,6 @@ describe("Drilldown", () => {
       wrapper = createWrapper();
 
       expect(typeof wrapper.vm.saveDrilldownData).toBe("function");
-    });
-
-    it("should close popup when DrilldownPopUp emits close", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.showDrilldownPopUp = true;
-      wrapper.vm.isDrilldownEditMode = true;
-      wrapper.vm.selectedDrilldownIndexToEdit = 1;
-      await wrapper.vm.$nextTick();
-
-      const popup = wrapper.findComponent(
-        '[data-test="drilldown-popup"]',
-      );
-      expect(popup.exists()).toBe(true);
-
-      await popup.vm.$emit("close");
-
-      expect(wrapper.vm.showDrilldownPopUp).toBe(false);
-      expect(wrapper.vm.isDrilldownEditMode).toBe(false);
-      expect(wrapper.vm.selectedDrilldownIndexToEdit).toBe(null);
     });
   });
 

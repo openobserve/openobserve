@@ -169,82 +169,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-table>
 
     <!-- Confirm delete dialog -->
-    <ODialog data-test="anomaly-detection-list-delete-dialog"
-      v-model:open="showDeleteDialog"
-      persistent
-      size="xs"
-      :title="t('alerts.delete')"
-      :secondary-button-label="t('alerts.cancel')"
-      :primary-button-label="t('alerts.delete')"
-      primary-button-variant="destructive"
-      :primary-button-loading="deleting"
-      @click:secondary="showDeleteDialog = false"
-      @click:primary="deleteConfig"
-    >
-      <p>
-        Are you sure you want to delete
-        <strong>{{ pendingDeleteRow?.name }}</strong>?
-        This will also delete the trained model.
-      </p>
-    </ODialog>
+    <q-dialog v-model="showDeleteDialog" persistent>
+      <q-card style="min-width: 350px">
+        <q-card-section>
+          <div class="text-h6">{{ t("alerts.delete") }}</div>
+        </q-card-section>
+        <q-card-section>
+          Are you sure you want to delete
+          <strong>{{ pendingDeleteRow?.name }}</strong>?
+          This will also delete the trained model.
+        </q-card-section>
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showDeleteDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            variant="destructive"
+            size="sm-action"
+            :loading="deleting"
+            @click="deleteConfig"
+          >
+            {{ t('alerts.delete') }}
+          </OButton>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <!-- Confirm cancel training dialog -->
-    <ODialog data-test="anomaly-detection-list-cancel-training-dialog"
-      v-model:open="showCancelTrainingDialog"
-      persistent
-      size="xs"
-      title="Stop Training"
-      :secondary-button-label="t('alerts.cancel')"
-      primary-button-label="Stop Training"
-      primary-button-variant="ghost-warning"
-      :primary-button-loading="cancellingId === pendingCancelRow?.anomaly_id"
-      @click:secondary="showCancelTrainingDialog = false"
-      @click:primary="cancelTraining"
-    >
-      <p>
-        Stop the ongoing training for <strong>{{ pendingCancelRow?.name }}</strong>?
-        The model will not be updated. You can retrigger training afterwards.
-      </p>
-    </ODialog>
+    <q-dialog v-model="showCancelTrainingDialog" persistent>
+      <q-card style="min-width: 350px">
+        <q-card-section>
+          <div class="text-h6">Stop Training</div>
+        </q-card-section>
+        <q-card-section>
+          Stop the ongoing training for <strong>{{ pendingCancelRow?.name }}</strong>?
+          The model will not be updated. You can retrigger training afterwards.
+        </q-card-section>
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showCancelTrainingDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            variant="ghost-warning"
+            size="sm-action"
+            :loading="cancellingId === pendingCancelRow?.anomaly_id"
+            @click="cancelTraining"
+          >
+            Stop Training
+          </OButton>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <!-- Confirm retrain dialog -->
-    <ODialog data-test="anomaly-detection-list-retrain-dialog"
-      v-model:open="showRetrainDialog"
-      persistent
-      size="sm"
-      :title="pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
-      :secondary-button-label="t('alerts.cancel')"
-      :primary-button-label="pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
-      :primary-button-variant="pendingRetrainRow?.status === 'failed' ? 'destructive' : 'primary'"
-      :primary-button-loading="retrainingId === pendingRetrainRow?.anomaly_id"
-      @click:secondary="showRetrainDialog = false"
-      @click:primary="retrain"
-    >
-      <!-- Error detail for failed state -->
-      <template v-if="pendingRetrainRow?.status === 'failed' && pendingRetrainRow?.last_error">
-        <div class="text-body2 q-mb-sm">
-          Training failed for <strong>{{ pendingRetrainRow?.name }}</strong> with the following error:
-        </div>
-        <pre
-          class="tw:text-xs tw:whitespace-pre-wrap tw:break-all tw:rounded tw:p-2 q-mb-sm"
-          style="background: rgba(0,0,0,0.06); max-height: 120px; overflow-y: auto"
-        >{{ pendingRetrainRow.last_error }}</pre>
-        <div class="text-body2">Fix the issue above, then retry training.</div>
-      </template>
-      <template v-else-if="pendingRetrainRow?.status === 'failed'">
-        <p>Training failed for <strong>{{ pendingRetrainRow?.name }}</strong>. Retry training now?</p>
-      </template>
-      <template v-else>
-        <p>
-          Trigger retraining for
-          <strong>{{ pendingRetrainRow?.name }}</strong>?
-          The existing model will be replaced once training completes.
-        </p>
-        <div v-if="pendingRetrainRow?.training_completed_at" class="text-caption text-grey-6">
-          Last trained: {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
-        </div>
-      </template>
-    </ODialog>
+    <q-dialog v-model="showRetrainDialog" persistent>
+      <q-card style="min-width: 380px; max-width: 480px">
+        <q-card-section>
+          <div class="text-h6">
+            {{ pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t("alerts.triggerTraining") }}
+          </div>
+        </q-card-section>
+        <q-card-section>
+          <!-- Error detail for failed state -->
+          <template v-if="pendingRetrainRow?.status === 'failed' && pendingRetrainRow?.last_error">
+            <div class="text-body2 q-mb-sm">
+              Training failed for <strong>{{ pendingRetrainRow?.name }}</strong> with the following error:
+            </div>
+            <pre
+              class="tw:text-xs tw:whitespace-pre-wrap tw:break-all tw:rounded tw:p-2 q-mb-sm"
+              style="background: rgba(0,0,0,0.06); max-height: 120px; overflow-y: auto"
+            >{{ pendingRetrainRow.last_error }}</pre>
+            <div class="text-body2">Fix the issue above, then retry training.</div>
+          </template>
+          <template v-else-if="pendingRetrainRow?.status === 'failed'">
+            Training failed for <strong>{{ pendingRetrainRow?.name }}</strong>. Retry training now?
+          </template>
+          <template v-else>
+            Trigger retraining for
+            <strong>{{ pendingRetrainRow?.name }}</strong>?
+            The existing model will be replaced once training completes.
+            <div v-if="pendingRetrainRow?.training_completed_at" class="text-caption text-grey-6 q-mt-xs">
+              Last trained: {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
+            </div>
+          </template>
+        </q-card-section>
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showRetrainDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            :variant="pendingRetrainRow?.status === 'failed' ? 'destructive' : 'primary'"
+            size="sm-action"
+            :loading="retrainingId === pendingRetrainRow?.anomaly_id"
+            @click="retrain"
+          >
+            {{ pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining') }}
+          </OButton>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -256,12 +273,11 @@ import { useQuasar } from "quasar";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { date } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OButton, ODialog, RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 },
+  components: { OButton, RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 },
 
   props: {
     org_identifier: {

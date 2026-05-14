@@ -26,7 +26,7 @@ export class PipelinesEP {
         this.pipelineImportErrorDestinationFunctionNameInput2 = '[data-test="pipeline-import-error-0-2"] [data-test="pipeline-import-destination-function-name-input"]';
         this.pipelineMoreOptionsButton = (name) => `[data-test="pipeline-list-${name}-more-options"]`;
         // Note: Export and Delete are now in the more options menu (three-dot menu)
-        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.confirmButton = '[data-test="confirm-button"]';
         this.fileInput = page.locator('input[type="file"]');
         this.sourceStreamNameInput = '[data-test="pipeline-import-source-stream-name-input"]';
         this.destinationFunctionNameInput = '[data-test="pipeline-import-destination-function-name-input"]';

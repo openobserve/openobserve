@@ -27,9 +27,6 @@
   /* Borders */
   --color-border-default: var(--color-grey-200);
   --color-border-strong:  var(--color-grey-400);
-
-  /* Overlay scrim — semi-transparent backdrop */
-  --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -50,9 +47,6 @@
   /* Borders */
   --color-border-default: var(--color-border-default);
   --color-border-strong:  var(--color-border-strong);
-
-  /* Overlay scrim */
-  --color-overlay-scrim: var(--color-overlay-scrim);
 
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);

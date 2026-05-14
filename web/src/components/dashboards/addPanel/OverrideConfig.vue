@@ -9,21 +9,24 @@
       {{ t("dashboard.addFieldOverride") }}
     </OButton>
 
-    <OverrideConfigPopup
-        :open="showOverrideConfigPopup"
+    <q-dialog v-model="showOverrideConfigPopup">
+      <OverrideConfigPopup
         :columns="columns"
         :override-config="{
           overrideConfigs: dashboardPanelData.data.config.override_config || [],
         }"
         @close="showOverrideConfigPopup = false"
         @save="saveOverrideConfigConfig"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
+    </q-dialog>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
@@ -49,6 +52,7 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
+    const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -177,6 +181,7 @@ export default defineComponent({
 
     return {
       t,
+      store,
       dashboardPanelData,
       showOverrideConfigPopup,
       openOverrideConfigPopup,

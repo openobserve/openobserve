@@ -165,77 +165,20 @@ const createWrapper = (props: Record<string, any> = {}) => {
         },
         AddToDashboard: {
           template:
-            "<div v-if='open' class='add-to-dashboard' @click='$emit(\"save\")'></div>",
-          props: ["open", "dashboardPanelData"],
-          emits: ["save", "update:open"],
-        },
-        ODialog: {
-          template:
-            "<div class='o-dialog' v-if='open'><slot name='header' /><slot /><slot name='footer' /></div>",
-          props: [
-            "open",
-            "persistent",
-            "size",
-            "title",
-            "subTitle",
-            "showClose",
-            "width",
-            "primaryButtonLabel",
-            "secondaryButtonLabel",
-            "neutralButtonLabel",
-            "primaryButtonVariant",
-            "secondaryButtonVariant",
-            "neutralButtonVariant",
-            "primaryButtonDisabled",
-            "secondaryButtonDisabled",
-            "neutralButtonDisabled",
-            "primaryButtonLoading",
-            "secondaryButtonLoading",
-            "neutralButtonLoading",
-          ],
-          emits: [
-            "update:open",
-            "click:primary",
-            "click:secondary",
-            "click:neutral",
-          ],
-        },
-        ODrawer: {
-          template:
-            "<div class='o-drawer' v-if='open'><slot name='header' /><slot /><slot name='footer' /></div>",
-          props: [
-            "open",
-            "persistent",
-            "size",
-            "title",
-            "subTitle",
-            "showClose",
-            "width",
-            "primaryButtonLabel",
-            "secondaryButtonLabel",
-            "neutralButtonLabel",
-            "primaryButtonVariant",
-            "secondaryButtonVariant",
-            "neutralButtonVariant",
-            "primaryButtonDisabled",
-            "secondaryButtonDisabled",
-            "neutralButtonDisabled",
-            "primaryButtonLoading",
-            "secondaryButtonLoading",
-            "neutralButtonLoading",
-          ],
-          emits: [
-            "update:open",
-            "click:primary",
-            "click:secondary",
-            "click:neutral",
-          ],
+            "<div class='add-to-dashboard' @click='$emit(\"save\")'></div>",
+          emits: ["save"],
         },
         AutoRefreshInterval: {
           template:
             "<div class='auto-refresh-interval' data-test='metrics-auto-refresh' @click='$emit(\"trigger\")'></div>",
           props: ["modelValue", "trigger", "minRefreshInterval"],
           emits: ["update:modelValue", "trigger"],
+        },
+        QDialog: {
+          template:
+            "<div class='q-dialog' v-if='modelValue'><slot /></div>",
+          props: ["modelValue", "position", "fullHeight", "maximized"],
+          emits: ["update:modelValue"],
         },
         QBtn: {
           template:

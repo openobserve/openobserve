@@ -28,14 +28,12 @@ installQuasar({
 
 // Mock useQuasar
 const mockNotify = vi.fn(() => vi.fn()); // notify returns dismiss function
-const mockDarkSet = vi.fn();
 vi.mock("quasar", async () => {
   const actual = await vi.importActual("quasar");
   return {
     ...actual,
     useQuasar: () => ({
       notify: mockNotify,
-      dark: { set: mockDarkSet, isActive: false },
     }),
   };
 });
@@ -263,62 +261,6 @@ const createWrapper = (props = {}, options = {}) => {
         QCardActions: {
           template: "<div data-test-stub='q-card-actions'><slot></slot></div>",
           props: ["align"],
-        },
-        QColor: {
-          template:
-            "<div data-test-stub='q-color' :data-value='modelValue'></div>",
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-        },
-        ODialog: {
-          name: "ODialog",
-          template: `<div
-              data-test-stub='o-dialog'
-              :data-open='String(open)'
-              :data-size='size'
-              :data-title='title'
-              :data-primary-label='primaryButtonLabel'
-              :data-secondary-label='secondaryButtonLabel'
-            >
-              <slot name='header' />
-              <slot />
-              <slot name='footer' />
-              <button
-                data-test-stub='o-dialog-primary'
-                @click='$emit(\"click:primary\")'
-              >{{ primaryButtonLabel }}</button>
-              <button
-                data-test-stub='o-dialog-secondary'
-                @click='$emit(\"click:secondary\")'
-              >{{ secondaryButtonLabel }}</button>
-            </div>`,
-          props: [
-            "open",
-            "size",
-            "title",
-            "subTitle",
-            "persistent",
-            "showClose",
-            "width",
-            "primaryButtonLabel",
-            "secondaryButtonLabel",
-            "neutralButtonLabel",
-            "primaryButtonVariant",
-            "secondaryButtonVariant",
-            "neutralButtonVariant",
-            "primaryButtonDisabled",
-            "secondaryButtonDisabled",
-            "neutralButtonDisabled",
-            "primaryButtonLoading",
-            "secondaryButtonLoading",
-            "neutralButtonLoading",
-          ],
-          emits: [
-            "update:open",
-            "click:primary",
-            "click:secondary",
-            "click:neutral",
-          ],
         },
       },
     },
@@ -749,118 +691,6 @@ describe("General", () => {
         message: "Something went wrong",
         timeout: 2000,
       });
-    });
-  });
-
-  describe("Delete confirmation ODialog", () => {
-    it("renders the delete confirmation ODialog stub", () => {
-      const wrapper = createWrapper();
-      // both ODialogs are always present (visibility driven by `open`)
-      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      expect(dialogs.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("opens the delete confirmation ODialog when confirmDeleteLogo is called", async () => {
-      const wrapper = createWrapper();
-      await wrapper.vm.confirmDeleteLogo("dark");
-      await nextTick();
-
-      expect(wrapper.vm.confirmDeleteImage).toBe(true);
-      expect(wrapper.vm.logoThemeToDelete).toBe("dark");
-    });
-
-    it("closes the delete ODialog when secondary (cancel) is emitted", async () => {
-      const wrapper = createWrapper();
-      // open the dialog first
-      await wrapper.vm.confirmDeleteLogo("light");
-      await nextTick();
-      expect(wrapper.vm.confirmDeleteImage).toBe(true);
-
-      // Simulate ODialog emitting click:secondary -> cancelConfirmDialog
-      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      // first ODialog corresponds to the delete-confirmation dialog
-      const cancelBtn = dialogs[0].find('[data-test-stub="o-dialog-secondary"]');
-      await cancelBtn.trigger("click");
-      await nextTick();
-
-      expect(wrapper.vm.confirmDeleteImage).toBe(false);
-      expect(mockSettingsService.deleteLogo).not.toHaveBeenCalled();
-    });
-
-    it("invokes deleteLogo when primary (ok) is emitted on delete ODialog", async () => {
-      const wrapper = createWrapper();
-      await wrapper.vm.confirmDeleteLogo("dark");
-      await nextTick();
-
-      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const okBtn = dialogs[0].find('[data-test-stub="o-dialog-primary"]');
-      await okBtn.trigger("click");
-      await nextTick();
-
-      expect(wrapper.vm.confirmDeleteImage).toBe(false);
-      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith(
-        "test-org",
-        "dark",
-      );
-    });
-  });
-
-  describe("Color picker ODialog", () => {
-    it("opens the color picker ODialog when a theme chip is clicked", async () => {
-      const wrapper = createWrapper();
-      await wrapper.vm.handleThemeChipClick("light");
-      await nextTick();
-
-      expect(wrapper.vm.showColorPicker).toBe(true);
-      expect(wrapper.vm.currentPickerMode).toBe("light");
-    });
-
-    it("opens the color picker for dark mode and seeds tempColor", async () => {
-      const wrapper = createWrapper();
-      // set a custom dark color so tempColor is seeded with it
-      wrapper.vm.customDarkColor = "#123456";
-      await wrapper.vm.handleThemeChipClick("dark");
-      await nextTick();
-
-      expect(wrapper.vm.showColorPicker).toBe(true);
-      expect(wrapper.vm.currentPickerMode).toBe("dark");
-      expect(wrapper.vm.tempColor).toBe("#123456");
-    });
-
-    it("closes the color picker when primary (close) is emitted", async () => {
-      const wrapper = createWrapper();
-      await wrapper.vm.handleThemeChipClick("light");
-      await nextTick();
-      expect(wrapper.vm.showColorPicker).toBe(true);
-
-      // second ODialog is the color picker
-      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const closeBtn = dialogs[dialogs.length - 1].find(
-        '[data-test-stub="o-dialog-primary"]',
-      );
-      await closeBtn.trigger("click");
-      await nextTick();
-
-      expect(wrapper.vm.showColorPicker).toBe(false);
-    });
-
-    it("forwards size and primary label to the delete confirmation ODialog", () => {
-      const wrapper = createWrapper();
-      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const deleteDialog = dialogs[0];
-      expect(deleteDialog.attributes("data-size")).toBe("xs");
-      expect(deleteDialog.attributes("data-primary-label")).toBe("OK");
-      expect(deleteDialog.attributes("data-secondary-label")).toBe("Cancel");
-    });
-
-    it("forwards title and size to the color picker ODialog", () => {
-      const wrapper = createWrapper();
-      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const colorDialog = dialogs[dialogs.length - 1];
-      expect(colorDialog.attributes("data-size")).toBe("xs");
-      // title comes from i18n: "Pick Custom Color"
-      expect(colorDialog.attributes("data-title")).toBe("Pick Custom Color");
-      expect(colorDialog.attributes("data-primary-label")).toBe("Close");
     });
   });
 

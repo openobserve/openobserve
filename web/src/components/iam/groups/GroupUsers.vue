@@ -15,10 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="col">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start q-px-md q-py-sm card-container tw:flex-shrink-0"
+      class="flex justify-start q-px-md q-py-sm card-container"
+      style="position: sticky; top: 0px; z-index: 2"
     >
       <div data-test="iam-users-selection-show-toggle" class="q-mr-md">
         <div class="flex items-center">
@@ -89,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto card-container">
+    <div data-test="iam-users-selection-table" style="height: calc(100vh - 250px);" class="card-container">
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
@@ -103,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :title="t('iam.users')"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :tableStyle="hasVisibleRows ? 'height: 100%; overflow-y: auto;' : ''"
+          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
         >

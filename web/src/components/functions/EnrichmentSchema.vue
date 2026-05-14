@@ -19,13 +19,29 @@
 
 
     <template>
-        <ODrawer data-test="enrichment-schema-drawer"
-        :open="open"
-        size="lg"
-        :title="t('logStream.schemaHeader')"
-        @update:open="$emit('update:open', $event)"
+        <q-card
+        style="width: 60vw"
+        class="column full-height no-wrap"
     >
-        <div>
+        <q-card-section class="q-ma-none">
+        <div class="row items-center no-wrap">
+            <div class="col">
+            <div
+                class="text-body1 tw:font-semibold tw:text-xl"
+                data-test="schema-title-text"
+            >
+                {{ t("logStream.schemaHeader") }}
+            </div>
+            </div>
+            <div class="col-auto">
+            <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+              <X :size="14" />
+            </OButton>
+            </div>
+        </div>
+        </q-card-section>
+        <q-separator />
+        <q-card-section class="q-ma-none q-pa-none">
         <div
           v-if="loadingState"
           class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
@@ -132,8 +148,8 @@
         </div>
 
       <br /><br /><br />
-        </div>
-    </ODrawer>
+    </q-card-section>
+    </q-card>
     </template>
 
     <script lang="ts">
@@ -141,7 +157,7 @@
     import {
     defineComponent,
     ref,
-    watch,
+    onMounted,
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
@@ -169,7 +185,7 @@
     } from "@quasar/extras/material-icons-outlined";
     import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
-    import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+    import { X } from "lucide-vue-next";
     const defaultStreamData = {
         name: '',
         schema: [],
@@ -184,10 +200,6 @@
     export default defineComponent({
     name: "SchemaEnrichment",
     props: {
-        open: {
-        type: Boolean,
-        default: false,
-        },
          
         selectedEnrichmentTable: {
         type: String,
@@ -199,10 +211,10 @@
         StreamFieldsInputs,
         AppTabs,
         QTablePagination,
-        ODrawer,
+        OButton,
+        X,
     },
-    emits: ['update:open'],
-    setup(props) {
+    setup({ selectedEnrichmentTable }) {
         const { t } = useI18n();
         const store = useStore();
         const q = useQuasar();
@@ -240,25 +252,19 @@
             { label: "50", value: 50 },
         ];
 
-        watch(
-            () => props.open,
-            async (isOpen) => {
-                if (isOpen) await getSchemaData();
-            },
-        );
+        onMounted(async () => {
+            await getSchemaData();
+        })
 
         const getSchemaData = async () => {
             try {
                 loadingState.value = true;
-                const streamData = await getStream(props.selectedEnrichmentTable, 'enrichment_tables', true);
-                if (streamData) {
-                    schemaData.value = streamData;
-                    resultTotal.value = streamData.schema.length;
-                }
+                const streamData = await getStream(selectedEnrichmentTable, 'enrichment_tables', true);
+                schemaData.value = streamData;
+                resultTotal.value = streamData.schema.length;
+                loadingState.value = false;
             } catch (error) {
                 console.error(error);
-                schemaData.value = { ...defaultStreamData, stats: { ...defaultStreamData.stats } };
-            } finally {
                 loadingState.value = false;
             }
         }
@@ -286,7 +292,7 @@
         schemaRows,
         loadingState,
         schemaData,
-        selectedEnrichmentTable: props.selectedEnrichmentTable,
+        selectedEnrichmentTable,
         getStream,
         formatSizeFromMB,
         isCloud,

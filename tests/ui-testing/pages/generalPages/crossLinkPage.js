@@ -16,17 +16,12 @@ export class CrossLinkPage {
         this.crossLinkEmpty = '[data-test="cross-link-empty"]';
 
         // CrossLinkDialog selectors (VERIFIED from CrossLinkDialog.vue)
-        // CrossLinkDialog is rendered via <ODialog data-test="cross-link-dialog" ...>.
-        // After the ODialog migration the in-dialog Save/Cancel buttons were
-        // removed and replaced by ODialog's built-in primary/secondary footer
-        // buttons. Scope by the parent data-test to avoid matching other dialogs.
-        this.crossLinkDialog = '[data-test="cross-link-dialog"]';
         this.crossLinkNameInput = '[data-test="cross-link-name-input"]';
         this.crossLinkUrlInput = '[data-test="cross-link-url-input"]';
         this.crossLinkFieldInput = '[data-test="cross-link-field-input"]';
         this.crossLinkAddFieldBtn = '[data-test="cross-link-add-field-btn"]';
-        this.crossLinkCancelBtn = '[data-test="cross-link-dialog"] [data-test="o-dialog-secondary-btn"]';
-        this.crossLinkSaveBtn = '[data-test="cross-link-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.crossLinkCancelBtn = '[data-test="cross-link-cancel-btn"]';
+        this.crossLinkSaveBtn = '[data-test="cross-link-save-btn"]';
         this.crossLinkHelpBtn = '[data-test="cross-link-help-btn"]';
 
         // Schema update button
@@ -230,7 +225,7 @@ export class CrossLinkPage {
 
     async expectDialogNotVisible() {
         testLogger.debug('Expecting dialog not visible');
-        await expect(this.page.locator(this.crossLinkDialog)).toBeHidden({ timeout: 5000 });
+        await expect(this.page.locator(this.crossLinkNameInput)).not.toBeVisible({ timeout: 5000 });
     }
 
     async clickUpdateSettings() {

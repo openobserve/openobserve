@@ -124,49 +124,6 @@ const baseTimeRange = {
   endTime: NOW,
 };
 
-// ODrawer stub — renders slots inline so internal data-test selectors are
-// queryable (real ODrawer teleports its content to <body> via DialogPortal,
-// which puts it outside the test wrapper's element tree).
-const ODrawerStub = {
-  name: "ODrawer",
-  inheritAttrs: false,
-  props: [
-    "open",
-    "width",
-    "seamless",
-    "portalTarget",
-    "title",
-    "subTitle",
-    "size",
-    "showClose",
-    "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      v-if="open"
-      :data-test="$attrs['data-test'] || 'o-drawer-stub'"
-      :data-title="title"
-    >
-      <div class="o-drawer-stub-header">
-        <slot name="header" />
-        <slot name="header-left" />
-        <slot name="header-right" />
-        <button
-          type="button"
-          data-test="o-drawer-close-btn"
-          @click="$emit('update:open', false)"
-        >Close</button>
-      </div>
-      <div class="o-drawer-stub-body"><slot /></div>
-      <div class="o-drawer-stub-footer"><slot name="footer" /></div>
-    </div>
-  `,
-};
-
 function mountPanel(
   props: Partial<InstanceType<typeof ServiceGraphNodeSidePanel>["$props"]> = {},
 ) {
@@ -179,7 +136,6 @@ function mountPanel(
         TelemetryCorrelationDashboard: {
           template: '<div data-test="stub-telemetry" />',
         },
-        ODrawer: ODrawerStub,
         // Render ODropdown content inline so data-test items are always queryable
         ODropdown: {
           name: "ODropdown",
@@ -279,9 +235,17 @@ describe("ServiceGraphNodeSidePanel", () => {
       ).toBe(false);
     });
 
+    it("should render the panel header", () => {
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel-header"]').exists(),
+      ).toBe(true);
+    });
+
     it("should render the close button", () => {
       expect(
-        wrapper.find('[data-test="o-drawer-close-btn"]').exists(),
+        wrapper
+          .find('[data-test="service-graph-side-panel-close-btn"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -292,12 +256,15 @@ describe("ServiceGraphNodeSidePanel", () => {
   // -------------------------------------------------------------------------
 
   describe("service name display", () => {
-    it("should pass the node name to the drawer title when name is set", () => {
+    it("should show the node name from the name property", () => {
       wrapper = mountPanel({
         selectedNode: { ...baseNode, name: "checkout-service" },
       });
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("title")).toBe("checkout-service");
+      const el = wrapper.find(
+        '[data-test="service-graph-side-panel-service-name"]',
+      );
+      expect(el.exists()).toBe(true);
+      expect(el.text()).toContain("checkout-service");
     });
 
     it("should fall back to label when name is absent", () => {
@@ -310,8 +277,10 @@ describe("ServiceGraphNodeSidePanel", () => {
           error_rate: 0,
         },
       });
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("title")).toBe("payment-svc");
+      const el = wrapper.find(
+        '[data-test="service-graph-side-panel-service-name"]',
+      );
+      expect(el.text()).toContain("payment-svc");
     });
 
     it("should fall back to id when name and label are absent", () => {
@@ -323,8 +292,10 @@ describe("ServiceGraphNodeSidePanel", () => {
           error_rate: 0,
         },
       });
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("title")).toBe("bare-id-service");
+      const el = wrapper.find(
+        '[data-test="service-graph-side-panel-service-name"]',
+      );
+      expect(el.text()).toContain("bare-id-service");
     });
   });
 
@@ -448,7 +419,9 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should emit close when the close button is clicked", async () => {
-      const closeBtn = wrapper.find('[data-test="o-drawer-close-btn"]');
+      const closeBtn = wrapper.find(
+        '[data-test="service-graph-side-panel-close-btn"]',
+      );
       expect(closeBtn.exists()).toBe(true);
       await closeBtn.trigger("click");
       expect(wrapper.emitted("close")).toBeTruthy();

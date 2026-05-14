@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    ref="catalogContainerRef"
-    class="services-catalog tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem] tw:relative tw:overflow-hidden"
+    class="services-catalog tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
   >
     <!-- Toolbar: stream selector + filter + chips + legend -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
@@ -413,7 +412,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :time-range="timeRange"
       :visible="showSidePanel"
       :stream-filter="streamFilter"
-      :container-el="catalogContainerRef"
       data-test="services-catalog-node-side-panel"
       @close="handleCloseSidePanel"
       @view-traces="viewTraces"
@@ -445,7 +443,6 @@ import { cloneDeep } from "lodash-es";
 
 const { t } = useI18n();
 const store = useStore();
-const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
 const { getStreams } = useStreams();
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =

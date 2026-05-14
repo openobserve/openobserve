@@ -15,18 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
-    v-model:open="show"
-    :width="40"
-    title="Backfill Job Details"
+  <q-dialog
+    v-model="show"
+    position="right"
+    full-height
+    maximized
     data-test="backfill-job-details-dialog"
   >
+    <q-card class="tw-w-full" style="width: 700px">
+      <q-card-section class="q-pa-md">
+        <div class="flex items-center justify-between">
+          <div class="text-h6" data-test="dialog-title">Backfill Job Details</div>
+          <OButton
+            variant="ghost"
+            size="icon"
+            v-close-popup
+            data-test="close-dialog-btn"
+          >
+            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
+          </OButton>
+        </div>
+      </q-card-section>
 
-    <div v-if="loading" class="flex justify-center q-pa-lg">
-      <q-spinner color="primary" size="50px" />
-    </div>
+      <q-separator />
 
-    <div v-else-if="job" class="tw:space-y-2 tw:mx-6 tw:my-4">
+      <q-card-section class="q-pa-md" style="max-height: calc(100vh - 100px); overflow-y: auto">
+        <div v-if="loading" class="flex justify-center q-pa-lg">
+          <q-spinner color="primary" size="50px" />
+        </div>
+
+        <div v-else-if="job" class="tw-space-y-6">
           <!-- Status and Actions -->
           <div class="flex items-center justify-between">
             <q-badge
@@ -201,11 +219,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-    <div v-else class="flex flex-column items-center justify-center q-pa-lg">
-      <q-icon name="error_outline" size="64px" color="grey-5" />
-      <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
-    </div>
-  </ODrawer>
+        <div v-else class="flex flex-column items-center justify-center q-pa-lg">
+          <q-icon name="error_outline" size="64px" color="grey-5" />
+          <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
+        </div>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup lang="ts">
@@ -213,7 +233,6 @@ import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { X } from "lucide-vue-next";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import { formatDistanceToNow } from "date-fns";

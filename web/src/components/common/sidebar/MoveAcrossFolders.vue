@@ -15,20 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="move-across-folders-dialog"
-    :open="open"
-    :width="30"
-    :title="`Move ${type.charAt(0).toUpperCase() + type.slice(1)} To Another Folder`"
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('common.move')"
-    :primary-button-loading="onSubmit.isLoading.value"
-    :primary-button-disabled="activeFolderId === selectedFolder.value"
-    @update:open="emit('update:open', $event)"
-    @click:secondary="emit('update:open', false)"
-    @click:primary="onSubmit.execute()"
-  >
+    <q-card class="column full-height">
       <q-card-section
-        class=""
+        class="q-px-md q-py-md"
+        :data-test="`${type}-folder-move-header`"
+      >
+        <div class="row items-center no-wrap">
+          <div class="col">
+            <div class="text-body1 text-bold">
+              Move <span class="text-capitalize">{{ type }}</span> To Another Folder
+            </div>
+          </div>
+          <div class="col-auto">
+            <OButton
+              v-close-popup="true"
+              variant="ghost"
+              size="icon"
+              :data-test="`${type}-folder-move-cancel`"
+            >
+              <q-icon name="cancel" size="16px" />
+            </OButton>
+          </div>
+        </div>
+      </q-card-section>
+      <q-separator />
+      <q-card-section
+        class="q-w-md q-mx-lg"
         :data-test="`${type}-folder-move-body`"
       >
         <q-form
@@ -37,11 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`${type}-folder-move-form`"
         >
           <q-input
-            :model-value="store.state.organizationData.foldersByType?.[type]?.find((item: any) => item.folderId === activeFolderId)?.name ?? ''"
+            v-model="store.state.organizationData.foldersByType[type].find((item: any) => item.folderId === activeFolderId).name"
             :label="t('dashboard.currentFolderLabel')"
             color="input-border"
             bg-color="input-bg"
-            class="showLabelOnTop"
+            class="q-py-md showLabelOnTop"
             stack-label
             outlined
             filled
@@ -53,9 +65,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- select folder or create new folder and select -->
           <SelectFolderDropDown :type="type" @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
+
+          <div class="flex justify-center q-mt-lg tw:gap-2">
+            <OButton
+              v-close-popup="true"
+              variant="outline"
+              size="sm-action"
+              :data-test="`${type}-folder-move-cancel`"
+            >{{ t('dashboard.cancel') }}</OButton>
+            <OButton
+              :data-test="`${type}-folder-move`"
+              :disabled="activeFolderId === selectedFolder.value"
+              :loading="onSubmit.isLoading.value"
+              variant="primary"
+              size="sm-action"
+              type="submit"
+            >{{ t('common.move') }}</OButton>
+          </div>
         </q-form>
       </q-card-section>
-  </ODrawer>
+    </q-card>
   </template>
 
   <script lang="ts">
@@ -67,11 +96,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useLoading } from "@/composables/useLoading";
   import useNotifications from "@/composables/useNotifications";
   import SelectFolderDropDown from "./SelectFolderDropDown.vue";
-  import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+  import OButton from "@/lib/core/Button/OButton.vue";
 
   export default defineComponent({
     name: "MoveAcrossFolders",
-    components: { SelectFolderDropDown, ODrawer },
+    components: { SelectFolderDropDown, OButton },
     props: {
       activeFolderId: {
         type: String,
@@ -89,21 +118,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type: String,
         default: "alerts",
       },
-      open: {
-        type: Boolean,
-        default: false,
-      },
     },
-    emits: ["updated", "close", "update:open"],
+    emits: ["updated"],
     setup(props, { emit }) {
       const store: any = useStore();
       const moveFolderForm: any = ref(null);
       //dropdown selected folder
       const selectedFolder = ref({
-        label:
-          store.state.organizationData.foldersByType?.[props.type]?.find(
-            (item: any) => item.folderId === props.activeFolderId,
-          )?.name ?? "",
+        label: store.state.organizationData.foldersByType[props.type].find(
+          (item: any) => item.folderId === props.activeFolderId
+        ).name,
         value: props.activeFolderId,
       });
       const { t } = useI18n();
@@ -167,7 +191,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         selectedFolder,
         onSubmit,
         getModuleName,
-        emit,
       };
     },
   });

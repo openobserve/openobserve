@@ -15,24 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="schema-drawer"
-    :open="open"
-    :width="60"
-    :title='t("logStream.schemaHeader")'
-    @update:open="$emit('update:open', $event)"
+  <q-card
+    style="width: 60vw"
+    class="column full-height no-wrap"
+    v-if="indexData.schema"
   >
-    <!-- #header override: complex stream header with name badge, timeline info,
-         and close button — cannot be expressed with title + sub-slots -->
-    <template #header-left>
+    <q-card-section class="q-ma-none">
       <div class="row items-center no-wrap">
         <div class="col">
           <div
             class="tw:text-[18px] tw:flex tw:items-center"
             data-test="schema-title-text"
           >
+            {{ t("logStream.schemaHeader") }}
             <!-- introduced name at the top  -->
             <span 
-            v-if="indexData.name"
               :class="[
                 'tw:font-bold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
                 store.state.theme === 'dark' 
@@ -41,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
             >
               {{ indexData.name }}
-              <q-tooltip v-if="indexData.name && indexData.name.length > 35" class="tw:text-xs">
+              <q-tooltip v-if="indexData.name.length > 35" class="tw:text-xs">
                 {{ indexData.name }}
               </q-tooltip>
             </span>
@@ -77,10 +74,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+        <div class="col-auto">
+          <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+            <X :size="14" />
+          </OButton>
+        </div>
       </div>
-    </template>
+    </q-card-section>
+    <q-separator />
 
-    <div v-if="indexData.schema">
     <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <!-- we will show loading state here -->
@@ -410,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-table o2-quasar-table o2-row-md o2-schema-table"
                   id="schemaFieldList"
                   :style="{
-                    height: `${indexData.defaultFts ? 'calc(100vh - 403px)' : 'calc(100vh - 370px)'}`,
+                    height: `${indexData.defaultFts ? 'calc(100vh - 363px)' : 'calc(100vh - 330px)'}`,
                     width: '100%'
                   }"
                   :rows-per-page-options="[]"
@@ -613,7 +615,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             
             <!-- Configuration tab -->
             <div v-if="activeMainTab == 'configuration'">
-              <div class="tw:w-full tw:h-[calc(100vh-307px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4">
+              <div class="tw:w-full tw:h-[calc(100vh-267px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4">
                 <!-- Configuration Settings Card -->
                 <div 
                   :class="[
@@ -847,7 +849,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-table o2-quasar-table o2-row-md o2-schema-table"
                     id="schemaFieldList"
                     :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
-                    style="height: calc(100vh - 403px);"
+                    style="height: calc(100vh - 363px);"
                     :rows-per-page-options="[]"
                     dense
                   >
@@ -963,20 +965,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     selected</span
                   >
                   <OButton
-                    v-if="
-                      isSchemaUDSEnabled && activeMainTab == 'schemaSettings'
-                    "
+                    v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                     data-test="schema-add-field-button"
                     variant="outline"
                     size="sm-action"
-                    :disabled="
-                      !selectedFields.length || hasUDSFieldInSelection
-                    "
+                    :disabled="!selectedFields.length || hasUDSFieldInSelection"
                     @click="updateDefinedSchemaFields"
                   >
-                    <span
-                      class="flex items-center justify-start tw:gap-1 tw:mr-1"
-                    >
+                    <span class="flex items-center justify-start tw:gap-1 tw:mr-1">
                       <UserCheck :size="13" />
                       <LayoutList :size="13" />
                     </span>
@@ -990,21 +986,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-tooltip>
                   </OButton>
                   <OButton
-                    v-if="
-                      activeMainTab != 'configuration' &&
-                      activeMainTab != 'crossLinking'
-                    "
-                    :disabled="
-                      !selectedFields.length && !selectedDateFields.length
-                    "
+                    v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
+                    :disabled="!selectedFields.length && !selectedDateFields.length"
                     data-test="schema-delete-button"
                     variant="outline"
                     size="sm-action"
-                    @click="
-                      activeMainTab == 'schemaSettings'
-                        ? (confirmQueryModeChangeDialog = true)
-                        : (confirmDeleteDatesDialog = true)
-                    "
+                    @click="activeMainTab == 'schemaSettings' ? (confirmQueryModeChangeDialog = true) : (confirmDeleteDatesDialog = true)"
                   >
                     <Trash2 :size="14" class="tw:mr-1" />
                     {{ t("logStream.delete") }}
@@ -1012,12 +999,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex justify-end tw:gap-2">
                   <OButton
+                    v-close-popup="true"
                     data-test="schema-cancel-button"
                     variant="outline"
                     size="sm-action"
-                    @click="$emit('close')"
                   >
-                    {{ t("logStream.cancel") }}
+                    {{ t('logStream.cancel') }}
                   </OButton>
                   <OButton
                     :disabled="!formDirtyFlag"
@@ -1026,7 +1013,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm-action"
                     type="submit"
                   >
-                    {{ t("logStream.updateSettings") }}
+                    {{ t('logStream.updateSettings') }}
                   </OButton>
                 </div>
               </div>
@@ -1036,14 +1023,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </q-card-section>
-    </div>
-    <div v-else class="q-pa-md">
-      <h5>Wait while loading...</h5>
-    </div>
-  </ODrawer>
-  <ODrawer data-test="schema-pattern-association-drawer" v-model:open="patternAssociationDialog.show" :width="60" :show-close="false">
+  </q-card>
+  <q-card v-else class="column q-pa-md full-height no-wrap">
+    <h5>Wait while loading...</h5>
+  </q-card>
+  <q-dialog v-model="patternAssociationDialog.show" position="right" full-height maximized>
     <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
-  </ODrawer>
+  </q-dialog>
 
   <ConfirmDialog
     title="Delete Action"
@@ -1114,7 +1100,6 @@ import {
 import DateTime from "@/components/DateTime.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 
@@ -1130,16 +1115,11 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SchemaIndex",
-  emits: ["close", "update:open"],
   props: {
      
     modelValue: {
       type: Object,
       default: () => defaultValue(),
-    },
-    open: {
-      type: Boolean,
-      default: false,
     },
   },
   components: {
@@ -1153,7 +1133,6 @@ export default defineComponent({
     QTablePagination,
     DateTime,
     AssociatedRegexPatterns,
-    ODrawer,
     PerformanceFieldsDialog,
     LlmEvaluationSettings,
     CrossLinkManager,
@@ -2663,7 +2642,7 @@ export default defineComponent({
 
       this.getSchema();
     } else {
-      this.loadingState.value= false;
+      this.loadingState.value = false;
     }
   },
 });

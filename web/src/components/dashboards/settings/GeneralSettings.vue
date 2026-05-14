@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="flex justify-center q-mt-lg tw:gap-2">
           <OButton
-            @click="$emit('close')"
+            v-close-popup="true"
             variant="outline"
             size="sm-action"
             data-test="dashboard-general-setting-cancel-btn"
@@ -115,7 +115,7 @@ export default defineComponent({
     DateTimePickerDashboard,
     OButton,
   },
-  emits: ["save", "close"],
+  emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();
     const { t } = useI18n();

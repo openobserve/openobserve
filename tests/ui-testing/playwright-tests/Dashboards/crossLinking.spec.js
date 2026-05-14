@@ -150,8 +150,8 @@ test.describe("Cross-Linking testcases", () => {
         await expect(page.locator('[data-test="cross-link-name-input"]')).toBeVisible();
         await expect(page.locator('[data-test="cross-link-url-input"]')).toBeVisible();
         await expect(page.locator('[data-test="cross-link-field-input"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-primary-btn"]')).toBeVisible();
-        await expect(page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-secondary-btn"]')).toBeVisible();
+        await expect(page.locator('[data-test="cross-link-save-btn"]')).toBeVisible();
+        await expect(page.locator('[data-test="cross-link-cancel-btn"]')).toBeVisible();
 
         testLogger.info('Test completed');
     });

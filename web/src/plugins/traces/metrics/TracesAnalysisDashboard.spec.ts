@@ -160,81 +160,6 @@ const defaultProps = {
 };
 
 // ---------------------------------------------------------------------------
-// Component stubs — declared at module scope so every mount uses the same
-// shape and tests can locate them via findComponent({ name })
-// ---------------------------------------------------------------------------
-
-// ODrawer stub: render slots inline (no portal) and forward open/update:open
-// so the host component's `@update:open` listener can be exercised by tests.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: [
-    "open",
-    "width",
-    "title",
-    "subTitle",
-    "showClose",
-    "persistent",
-    "size",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div data-test-stub="o-drawer" :data-open="open">
-      <div data-test-stub="o-drawer-title">{{ title }}</div>
-      <div data-test-stub="o-drawer-header-left"><slot name="header-left" /></div>
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
-    </div>
-  `,
-};
-
-// OButton stub: render a real <button> so @click bindings fire, and forward
-// the data-test attribute so component-level selectors keep working.
-const OButtonStub = {
-  name: "OButton",
-  props: ["variant", "size", "disabled", "loading", "title"],
-  inheritAttrs: false,
-  emits: ["click"],
-  template: `
-    <button
-      data-test-stub="o-button"
-      :data-test="$attrs['data-test']"
-      :disabled="disabled || null"
-      @click="$emit('click', $event)"
-    ><slot /></button>
-  `,
-};
-
-// OTabs / OTab stubs: render slot content so the surrounding DOM (search
-// input, sidebar) is reachable. The tabs themselves do not drive any of
-// the assertions in this file.
-const OTabsStub = {
-  name: "OTabs",
-  props: ["modelValue", "dense", "align"],
-  emits: ["update:modelValue"],
-  template: '<div data-test-stub="o-tabs"><slot /></div>',
-};
-
-const OTabStub = {
-  name: "OTab",
-  props: ["name", "label", "icon"],
-  template: '<div data-test-stub="o-tab" :data-name="name" />',
-};
-
-// ---------------------------------------------------------------------------
 // Mount factory
 // ---------------------------------------------------------------------------
 function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
@@ -243,11 +168,14 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
     global: {
       plugins: [mockStore, i18n],
       stubs: {
-        // Migrated drawer component — render slots inline, drive via emits
-        ODrawer: ODrawerStub,
-        OButton: OButtonStub,
-        OTabs: OTabsStub,
-        OTab: OTabStub,
+        // Quasar dialog wrapper — render children so inner DOM is testable
+        QDialog: {
+          template: '<div><slot /></div>',
+          props: ["modelValue"],
+          emits: ["hide", "update:modelValue"],
+        },
+        QCard: { template: "<div><slot /></div>" },
+        QCardSection: { template: "<div><slot /></div>" },
         QIcon: { template: "<span />" },
         QBtn: {
           template:
@@ -256,6 +184,16 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
           props: ["icon", "label", "color", "size", "dense", "round", "flat", "outline", "noCaps"],
         },
         QTooltip: { template: "<span />" },
+        QTabs: {
+          template:
+            '<div><slot /></div>',
+          props: ["modelValue"],
+          emits: ["update:modelValue"],
+        },
+        QTab: {
+          template: "<div />",
+          props: ["name", "label", "icon"],
+        },
         QSplitter: {
           template:
             '<div><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
@@ -324,31 +262,14 @@ describe("TracesAnalysisDashboard", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render the ODrawer wrapper", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.exists()).toBe(true);
+    it("should render the analysis header section", () => {
+      const header = wrapper.find(".analysis-header");
+      expect(header.exists()).toBe(true);
     });
 
-    it("should pass open=true to ODrawer on initial mount", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("open")).toBe(true);
-    });
-
-    it("should pass width=80 to ODrawer", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("width")).toBe(80);
-    });
-
-    it("should pass a non-empty title to ODrawer for the 'duration' analysisType", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("title")).toBeTruthy();
-    });
-
-    it("should render header-left slot content (timeline header chips area)", () => {
-      const headerLeft = wrapper.find(
-        '[data-test-stub="o-drawer-header-left"]',
-      );
-      expect(headerLeft.exists()).toBe(true);
+    it("should render the close button", () => {
+      const closeBtn = wrapper.find('[data-test="analysis-dashboard-close"]');
+      expect(closeBtn.exists()).toBe(true);
     });
 
     it("should render RenderDashboardCharts when dashboardData is populated", async () => {
@@ -427,21 +348,6 @@ describe("TracesAnalysisDashboard", () => {
       wrapper.vm.onClose();
       await flushPromises();
       expect(wrapper.emitted("close")!.length).toBe(2);
-    });
-
-    it("should emit 'close' when ODrawer emits update:open with false", async () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      drawer.vm.$emit("update:open", false);
-      await flushPromises();
-      expect(wrapper.emitted("close")).toBeTruthy();
-      expect(wrapper.emitted("close")!.length).toBe(1);
-    });
-
-    it("should NOT emit 'close' when ODrawer emits update:open with true", async () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      drawer.vm.$emit("update:open", true);
-      await flushPromises();
-      expect(wrapper.emitted("close")).toBeFalsy();
     });
   });
 

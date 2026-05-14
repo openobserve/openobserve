@@ -30,24 +30,20 @@ export default class DashboardSetting {
     this.editBtn = page.locator(
       '[data-test="dashboard-tab-settings-tab-edit-btn"]'
     );
-    this.deleteconfirmBtn = page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]');
+    this.deleteconfirmBtn = page.locator('[data-test="confirm-button"]');
     this.editName = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit"]'
     );
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.tabName = page.locator('[data-test="dashboard-add-tab-name"]');
-    this.saveTab = page.locator(
-      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-drawer-primary-btn"]'
-    );
+    this.saveTab = page.locator('[data-test="dashboard-add-tab-submit"]');
     this.closeSetting = page.locator(
-      '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
+      '[data-test="dashboard-settings-close-btn"]'
     );
     this.timeBtn = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
 
-    this.addTabCancel = page.locator(
-      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-drawer-secondary-btn"]'
-    );
+    this.addTabCancel = page.locator('[data-test="dashboard-add-cancel"]');
     this.EditSave = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
     );
@@ -61,24 +57,13 @@ export default class DashboardSetting {
 
   //Open Dashboard Setting//
   async openSetting() {
-    // Idempotent: if the settings ODrawer is already open, do nothing.
-    // The settings UI is rendered as an ODrawer with a backdrop overlay; clicking
-    // the dashboard-setting-btn while the drawer is open causes the overlay to
-    // intercept the pointer and dismiss the drawer (onInteractOutside), so blindly
-    // re-clicking after a save would close the drawer mid-test.
-    const generalTab = this.page.locator('[data-test="dashboard-settings-general-tab"]');
-    const alreadyOpen = await generalTab.isVisible().catch(() => false);
-    if (alreadyOpen) {
-      return;
-    }
-
     await this.page.waitForSelector('[data-test="dashboard-setting-btn"]', {
       state: "visible",
       timeout: 15000,
     });
     await this.setting.click();
     // Wait for settings dialog to open - use more specific selector
-    await generalTab.waitFor({ state: "visible", timeout: 10000 });
+    await this.page.locator('[data-test="dashboard-settings-general-tab"]').waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
 
     // Wait for all tabs to be rendered in the dialog
@@ -186,7 +171,7 @@ export default class DashboardSetting {
 
   //cancel changes
   async cancelTabwithoutSave() {
-    await this.addTabCancel.click();
+    await this.page.locator('[data-test="dashboard-add-cancel"]').click();
   }
 
   //Cancel edit tab name
@@ -449,11 +434,9 @@ export default class DashboardSetting {
 
   //close setting window
   async closeSettingWindow() {
-    // The settings UI is now an ODrawer, scoped by data-test="dashboard-settings-drawer"
-    const settingsDialog = this.page.locator('[data-test="dashboard-settings-drawer"]');
-    const closeBtn = this.page.locator(
-      '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
-    );
+    // Use multiple selectors to detect if settings dialog is open
+    const settingsDialog = this.page.locator('[data-test="dashboard-settings-dialog"]').or(this.page.locator('.q-dialog'));
+    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
 
     // First, check if the dialog exists and is visible
     const dialogExists = await settingsDialog.isVisible().catch(() => false);
@@ -559,8 +542,8 @@ export default class DashboardSetting {
 
     // Confirm deletion
     await page
-      .locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]')
+      .locator('[data-test="confirm-button"]')
       .waitFor({ state: "visible" });
-    await page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]').click();
+    await page.locator('[data-test="confirm-button"]').click();
   }
 }

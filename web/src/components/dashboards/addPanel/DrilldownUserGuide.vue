@@ -12,26 +12,23 @@
       </q-tooltip>
     </OButton>
   </div>
-  <Teleport to="body">
   <div
-    class="user-guide"
+    class="user-guide scroll o2-input"
     v-show="showUserGuide"
     style="
-      position: fixed;
-      z-index: 9999;
+      position: absolute;
+      z-index: 1;
       width: 500px;
       max-height: 300px;
-      overflow-y: auto;
       border: 1px solid gray;
       border-radius: 5px;
-      pointer-events: auto;
     "
+    @mouseleave="showUserGuide = false"
     :class="
       store.state.theme == 'dark'
         ? 'theme-dark bg-dark'
         : 'theme-light bg-white'
     "
-    @mouseleave="showUserGuide = false"
     ref="userGuideDivRef"
   >
     <p>
@@ -146,7 +143,6 @@
       </ul>
     </ul>
   </div>
-  </Teleport>
 </template>
 
 <script lang="ts">
@@ -189,21 +185,6 @@ export default {
 <style scoped lang="scss">
 .user-guide {
   padding: 10px;
-  overflow-y: auto;
-
-  /* Override global transparent-by-default scrollbar so it is always visible */
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.25);
-    border-radius: 3px;
-  }
-  &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-  }
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.25) rgba(0, 0, 0, 0.05);
 }
 .header {
   font-weight: bold;
