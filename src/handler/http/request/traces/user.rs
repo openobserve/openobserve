@@ -30,7 +30,7 @@ use crate::{
     handler::http::{
         extractors::Headers, request::search::error_utils::map_error_to_http_response,
     },
-    service::{search as SearchService, traces::otel::attributes::O2Attributes},
+    service::{search as SearchService, traces::otel::attributes::OtelAttributes},
 };
 
 /// GetLatestUsers
@@ -196,7 +196,7 @@ pub async fn get_latest_users(
     // _o2_llm_* fields may be on different spans than user_id.
     // So we must: get user→trace_id mapping first, then query by trace_id
     // (which captures ALL spans) to get accurate _o2_llm_* totals.
-    let user_id_col = O2Attributes::USER_ID;
+    let user_id_col = OtelAttributes::USER_ID;
     let stream_type = StreamType::Traces;
     let user_id_opt = Some(user_id.to_string());
 
