@@ -177,7 +177,20 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
-    const activeTab: any = ref("streamPipelines");
+    const routeToFunctionsTab: Record<string, string> = {
+      pipelines:        "streamPipelines",
+      pipelineEditor:   "streamPipelines",
+      createPipeline:   "streamPipelines",
+      importPipeline:   "streamPipelines",
+      pipelineHistory:  "streamPipelines",
+      pipelineBackfill: "streamPipelines",
+      functionList:     "functions",
+      enrichmentTables: "enrichmentTables",
+      evalTemplates:    "evalTemplates",
+    };
+    const activeTab: any = ref(
+      routeToFunctionsTab[router.currentRoute.value.name as string] ?? "streamPipelines"
+    );
     const templates = ref([]);
     const functionAssociatedStreams = ref([]);
     // Responsive sidebar: icon-only at narrow widths

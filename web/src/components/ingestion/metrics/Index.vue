@@ -107,15 +107,14 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "IngestMetrics",
   components: {
     OTabs, OTab, ORouteTab,},
   data() {
-    return {
-      ingestiontabs: "",
-    };
+    return {};
   },
   props: {
     currOrgIdentifier: {
@@ -130,6 +129,9 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const ingestiontabs = ref(
+      resolveTab("ingestMetrics", router.currentRoute.value.name as string, "prometheus")
+    );
 
     onBeforeMount(() => {
       const ingestRoutes = [
@@ -211,6 +213,7 @@ export default defineComponent({
       copyToClipboardFn,
       showUpdateDialogFn,
       confirmUpdate,
+      ingestiontabs,
       getImageURL,
       verifyOrganizationStatus,
     };

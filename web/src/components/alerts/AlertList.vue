@@ -42,15 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
             >
               <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left><List class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><LayoutList class="tw:size-3.5 tw:shrink-0" /></template>
                 {{ t("alerts.all") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                <template #icon-left><q-icon name="schedule" size="14px" /></template>
+                <template #icon-left><CalendarClock class="tw:size-3.5 tw:shrink-0" /></template>
                 {{ t("alerts.scheduled") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
-                <template #icon-left><q-icon name="bolt" size="14px" /></template>
+                <template #icon-left><Zap class="tw:size-3.5 tw:shrink-0" /></template>
                 {{ t("alerts.realTime") }}
               </OToggleGroupItem>
               <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
@@ -917,7 +917,7 @@ import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { List, CalendarClock, Zap, TrendingUp } from "lucide-vue-next";
+import { LayoutList, CalendarClock, Zap, TrendingUp } from "lucide-vue-next";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
@@ -941,7 +941,7 @@ export default defineComponent({
     MoveAcrossFolders,
     OToggleGroup,
     OToggleGroupItem,
-    List,
+    LayoutList,
     CalendarClock,
     Zap,
     TrendingUp,

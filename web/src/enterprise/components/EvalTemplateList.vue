@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Pagination footer -->
           <template #bottom="scope">
             <div
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
             >
               <div class="tw:flex tw:items-center tw:gap-2">
                 <div

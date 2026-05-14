@@ -112,7 +112,8 @@ describe("IngestLogs Index Component", () => {
     it("should initialize with correct default values", () => {
       expect(wrapper.vm.splitterModel).toBe(250);
       expect(wrapper.vm.confirmUpdate).toBe(false);
-      expect(wrapper.vm.ingestiontabs).toBe("");
+      // ingestiontabs is now initialized from the current route name instead of ""
+      expect(wrapper.vm.ingestiontabs).toBe("curl");
       expect(wrapper.vm.currentOrgIdentifier).toBe("default");
     });
 
@@ -508,12 +509,15 @@ describe("IngestLogs Index Component", () => {
     });
 
     it("should handle component updates", async () => {
-      const initialValue = wrapper.vm.ingestiontabs;
+      // Verify reactivity by performing two distinct mutations
+      wrapper.vm.ingestiontabs = "vector";
+      await nextTick();
+      expect(wrapper.vm.ingestiontabs).toBe("vector");
+
       wrapper.vm.ingestiontabs = "fluentbit";
       await nextTick();
-      
       expect(wrapper.vm.ingestiontabs).toBe("fluentbit");
-      expect(wrapper.vm.ingestiontabs).not.toBe(initialValue);
+      expect(wrapper.vm.ingestiontabs).not.toBe("vector");
     });
   });
 
