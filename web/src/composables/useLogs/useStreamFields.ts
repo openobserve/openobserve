@@ -68,7 +68,7 @@ export const useStreamFields = () => {
     schemaRequestToken,
   } = searchState();
 
-  const { fnParsedSQL, getColumnWidth } = logsUtils();
+  const { fnParsedSQL, getColumnWidth, hasAggregation } = logsUtils();
 
   const correlationFilters = useCorrelationFilters({
     orgId: () => store.state.selectedOrganization.identifier,
@@ -1161,6 +1161,7 @@ export const useStreamFields = () => {
           if (
             searchObj.meta.sqlMode == true &&
             parsedSQL.hasOwnProperty("columns") &&
+            hasAggregation(parsedSQL.columns) &&
             searchObj.data.queryResults?.hits?.length > 0
           ) {
             const hitKeys = Object.keys(
