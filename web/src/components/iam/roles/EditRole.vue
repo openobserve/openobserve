@@ -91,30 +91,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   Show
                 </span>
-                <div
+                <OToggleGroup
                   class="q-ml-xs"
-                   style="
-                  border: 1px solid var(--o2-border-color);
-                  width: fit-content;
-                  border-radius: 0.3rem;
-                  padding: 2px;
-                "
+                  :model-value="filter.permissions"
+                  @update:model-value="(v) => updateTableData(v as string)"
                 >
-                  <template
+                  <OToggleGroupItem
                     v-for="visual in permissionDisplayOptions"
                     :key="visual.value"
+                    :value="visual.value"
+                    size="sm"
+                    :data-test="`edit-role-permissions-show-${visual.value}-btn`"
                   >
-                    <OButton
-                      :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                      variant="ghost"
-                      :active="visual.value === filter.permissions"
-                      size="xs"
-                      @click="updateTableData(visual.value)"
-                    >
-                      {{ visual.label }}
-                    </OButton>
-                  </template>
-                </div>
+                    {{ visual.label }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
               </div>
               <div data-test="edit-role-permissions-search-input">
                 <q-input
@@ -155,31 +146,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div></div>
-            <div
+            <OToggleGroup
               data-test="edit-role-permissions-ui-type-toggle"
               class="q-mr-md q-my-xs"
-              style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 0.3rem;
-              padding: 2px;
-            "
+              :model-value="permissionsUiType"
+              @update:model-value="(v) => updatePermissionsUi(v as string)"
             >
-              <template
+              <OToggleGroupItem
                 v-for="visual in permissionUiOptions"
                 :key="visual.value"
+                :value="visual.value"
+                size="sm"
+                :data-test="`edit-role-permissions-show-${visual.value}-btn`"
               >
-                <OButton
-                  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                  variant="ghost"
-                  :active="visual.value === permissionsUiType"
-                  size="xs"
-                  @click="updatePermissionsUi(visual.value)"
-                >
-                  {{ visual.label }}
-                </OButton>
-              </template>
-            </div>
+                {{ visual.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
           </div>
 
           <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md">
@@ -296,6 +278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { cloneDeep } from "lodash-es";
 import { defineAsyncComponent, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18n } from "vue-i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
