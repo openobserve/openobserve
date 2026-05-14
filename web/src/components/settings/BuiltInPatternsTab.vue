@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Preview Dialog -->
     <q-dialog v-model="showPreview" data-test="pattern-preview-dialog">
-      <q-card style="min-width: 600px">
+      <q-card style="min-width: min(600px, 95vw)">
         <q-card-section>
           <div class="text-h6">{{ previewedPattern?.name }}</div>
         </q-card-section>

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-dialog v-model="show" position="right" full-height maximized>
-    <q-card style="width: 600px" class="flex column">
+    <q-card style="width: 600px; max-width: 95vw" class="flex column">
       <q-card-section class="q-px-md q-py-sm">
         <div class="row items-center no-wrap">
           <div class="col">

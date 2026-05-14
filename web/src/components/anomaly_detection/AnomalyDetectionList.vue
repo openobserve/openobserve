@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Confirm retrain dialog -->
     <q-dialog v-model="showRetrainDialog" persistent>
-      <q-card style="min-width: 380px; max-width: 480px">
+      <q-card style="min-width: min(380px, 95vw); max-width: min(480px, 95vw)">
         <q-card-section>
           <div class="text-h6">
             {{ pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t("alerts.triggerTraining") }}

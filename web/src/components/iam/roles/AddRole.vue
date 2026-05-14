@@ -42,6 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           stack-label
           borderless
           dense
+          autocomplete="off"
+          enterkeyhint="done"
           :rules="[
             (val: any, rules: any) =>
               !!val

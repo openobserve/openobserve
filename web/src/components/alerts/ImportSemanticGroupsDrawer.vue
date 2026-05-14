@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Group Details Dialog -->
   <q-dialog v-model="showGroupDialog">
-    <q-card style="min-width: 500px">
+    <q-card style="min-width: min(500px, 95vw)">
       <q-card-section>
         <div class="text-h6">{{ selectedGroup?.display }}</div>
         <div class="text-caption text-grey-7">ID: {{ selectedGroup?.id }}</div>
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Modification Comparison Dialog -->
   <q-dialog v-model="showModificationDialog">
-    <q-card style="min-width: 700px">
+    <q-card style="min-width: min(700px, 95vw)">
       <q-card-section>
         <div class="text-h6">{{ selectedModification?.proposed.display }}</div>
         <div class="text-caption text-grey-7">Compare Changes</div>

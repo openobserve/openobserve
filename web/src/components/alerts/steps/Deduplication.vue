@@ -101,6 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-input
               v-model.number="localDeduplication.time_window_minutes"
               type="number"
+              inputmode="numeric"
+              enterkeyhint="next"
               dense
               borderless
               min="1"

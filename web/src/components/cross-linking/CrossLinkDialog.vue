@@ -1,6 +1,6 @@
 <template>
   <q-dialog v-model="dialogVisible" persistent>
-    <q-card style="min-width: 500px">
+    <q-card style="min-width: min(500px, 95vw)">
       <q-card-section>
         <div class="tw:flex tw:items-center tw:justify-between">
           <div class="text-h6">

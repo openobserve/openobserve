@@ -56,6 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   min="0"
                   class="alert-v3-input"
                   style="background: none"
+                  inputmode="numeric"
+                  enterkeyhint="next"
                   @update:model-value="$emit('update:trigger', formData.trigger_condition)"
                 />
               </div>
@@ -198,6 +200,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="alert-v3-input"
                   style="background: none"
                   debounce="300"
+                  inputmode="numeric"
+                  enterkeyhint="next"
                   @update:model-value="handlePeriodChange"
                 />
               </div>
@@ -250,6 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   min="0"
                   class="alert-v3-input"
                   debounce="300"
+                  inputmode="numeric"
+                  enterkeyhint="next"
                   @update:model-value="emitTriggerUpdate"
                 />
               </div>

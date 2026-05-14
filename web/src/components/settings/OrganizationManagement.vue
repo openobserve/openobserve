@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             filled
             dense
-            class="q-ml-auto q-mb-xs no-border col-3"
+            class="q-ml-auto q-mb-xs no-border col-12 col-sm-3 o2-mobile-full-input"
             :placeholder="t('settings.searchOrgs')"
           >
             <template #prepend>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Extend Trial Dialog -->
     <q-dialog v-model="extendTrialPrompt">
-      <q-card class="q-pa-sm" style="min-width: 450px">
+      <q-card class="q-pa-sm" style="min-width: min(450px, 95vw);">
         <q-toolbar>
           <q-toolbar-title>
             <span class="text-weight-bold" :title="extendTrialDataRow.name"

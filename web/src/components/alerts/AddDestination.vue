@@ -308,6 +308,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
               borderless
               dense
+              autocomplete="off"
+              enterkeyhint="next"
               :rules="[
                 (val: any) =>
                   !!val
@@ -418,6 +420,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     hide-bottom-space
                     :placeholder="t('alert_destinations.api_header')"
                     dense
+                    autocomplete="off"
+                    enterkeyhint="next"
                     tabindex="0"
                   />
                 </div>
@@ -430,6 +434,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     borderless
                     hide-bottom-space
                     dense
+                    autocomplete="off"
+                    enterkeyhint="next"
                     isUpdatingDestination
                     tabindex="0"
                   />

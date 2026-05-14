@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card
     class="show-legends-popup"
     data-test="dashboard-show-legends-popup"
-    style="min-width: 700px"
+    style="min-width: min(700px, 95vw)"
   >
     <q-card-section>
       <!-- Header -->

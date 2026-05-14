@@ -120,6 +120,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </ODropdownItem>
           </ODropdown>
+          <!-- Mobile: folder trigger -->
+          <OButton
+            v-if="isMobile"
+            class="q-ml-sm tw:h-9"
+            variant="outline"
+            size="sm"
+            @click="openMobileFolders"
+            data-test="dashboard-mobile-folders-btn"
+            aria-label="Open folders"
+          >
+            <q-icon name="folder" class="tw:mr-1" />
+            {{ activeFolderName }}
+          </OButton>
           <!-- new dashboard button -->
           <OButton
             class="q-ml-sm tw:h-9"
@@ -138,14 +151,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 116px)"
     >
       <q-splitter
-        v-model="splitterModel"
+        v-model="effectiveSplitterModel"
         unit="px"
-        :limits="[200, 500]"
+        :limits="isMobile ? [0, 0] : [200, 500]"
+        :class="{ 'dashboards-splitter-mobile': isMobile }"
         style="height: calc(100vh - 116px)"
         data-test="dashboard-splitter"
       >
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+          <div v-if="!isMobile" class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full">
               <div
                 class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]"
@@ -288,8 +302,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full card-container">
-              <!-- add dashboard table -->
+              <!-- Mobile: card list replaces 6-column table on <600px -->
+              <PullToRefreshWrapper
+                v-if="isMobile"
+                class="mobile-dashboard-list"
+                data-test="dashboard-list-mobile"
+                @refresh="onMobileRefresh"
+              >
+                <MobileCardSkeleton
+                  v-if="loading && !dashboards?.length"
+                  :count="5"
+                  data-test="dashboard-list-mobile-skeleton"
+                />
+                <div
+                  v-else-if="!dashboards?.length"
+                  class="mobile-dashboard-list__empty"
+                >
+                  <NoData />
+                </div>
+                <MobileDashboardCard
+                  v-for="row in dashboards"
+                  :key="row.id"
+                  :row="row"
+                  @click="(r) => routeToViewD(r)"
+                  @open="(r) => routeToViewD(r)"
+                  @clone="(r) => duplicateDashboard(r.id, r.folder_id)"
+                  @move="(r) => showMoveDashboardPanel(r)"
+                  @delete="(r) => showDeleteDialogFn({ row: r })"
+                />
+              </PullToRefreshWrapper>
+              <!-- Desktop: full data table -->
               <q-table
+                v-else
                 ref="qTable"
                 :rows="dashboards"
                 :columns="columns"
@@ -582,6 +626,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
+
+    <!-- Mobile: folders side-sheet -->
+    <q-dialog
+      v-if="isMobile"
+      v-model="showMobileFolders"
+      v-bind="folderSheetDialogProps"
+      aria-label="Folders"
+    >
+      <q-card
+        class="mobile-folder-sheet"
+        style="width: 85vw; max-width: 360px; height: 100%"
+      >
+        <div class="mobile-folder-sheet__body tw:h-full tw:flex tw:flex-col tw:p-[0.625rem]">
+          <div class="text-bold q-pa-sm tw:flex tw:items-center tw:justify-between">
+            <span>{{ t("dashboard.folderLabel") }}</span>
+            <q-btn
+              flat
+              dense
+              round
+              icon="add"
+              @click.stop="addFolder"
+              aria-label="Add folder"
+            />
+          </div>
+          <q-input
+            v-model="folderSearchQuery"
+            dense
+            outlined
+            placeholder="Search Folder"
+            clearable
+            class="tw:mb-2"
+          >
+            <template #prepend><q-icon name="search" /></template>
+          </q-input>
+          <div class="tw:flex-1 tw:overflow-y-auto">
+            <q-tabs
+              indicator-color="transparent"
+              inline-label
+              vertical
+              :model-value="activeFolderId"
+              @update:model-value="(v) => { activeFolderId = v; showMobileFolders = false; }"
+              data-test="dashboard-mobile-folder-tabs"
+            >
+              <q-tab
+                v-for="tab in filteredFolders"
+                :key="tab.folderId"
+                :name="tab.folderId"
+                :label="tab.name"
+                content-class="tab_content full-width"
+                class="individual-tab"
+              />
+            </q-tabs>
+          </div>
+        </div>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -607,6 +707,11 @@ import { useQuasar, date, debounce } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
+import MobileDashboardCard from "@/components/dashboards/MobileDashboardCard.vue";
+import PullToRefreshWrapper from "@/components/shared/PullToRefreshWrapper.vue";
+import MobileCardSkeleton from "@/components/shared/MobileCardSkeleton.vue";
+import { useScreen } from "@/composables/useScreen";
+import { useResponsiveDialog } from "@/composables/useResponsiveDialog";
 import QTablePagination from "../../components/shared/grid/Pagination.vue";
 import NoData from "../../components/shared/grid/NoData.vue";
 import { useRoute, useRouter } from "vue-router";
@@ -662,6 +767,9 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     AddFolder,
+    MobileDashboardCard,
+    PullToRefreshWrapper,
+    MobileCardSkeleton,
     MoveDashboardToAnotherFolder,
   },
   setup() {
@@ -680,6 +788,27 @@ export default defineComponent({
     const selectedDelete = ref(null);
     const splitterModel = ref(200);
     const activeFolderId = ref(null);
+    const { isMobile } = useScreen();
+    const { dialogProps: folderSheetDialogProps } = useResponsiveDialog({
+      mobileMode: "slide-left",
+    });
+    const showMobileFolders = ref(false);
+    const activeFolderName = computed(() => {
+      const folders = store.state.organizationData?.folders || [];
+      const match = folders.find(
+        (f: any) => f.folderId === activeFolderId.value,
+      );
+      return match?.name || activeFolderId.value || "";
+    });
+    const effectiveSplitterModel = computed({
+      get: () => (isMobile.value ? 0 : splitterModel.value),
+      set: (v: number) => {
+        if (!isMobile.value) splitterModel.value = v;
+      },
+    });
+    const openMobileFolders = () => {
+      showMobileFolders.value = true;
+    };
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
     const selectedFolderToEdit = ref(null);
@@ -1045,7 +1174,16 @@ export default defineComponent({
       });
     };
     const dashboardList = ref([]);
+    const loading = ref(false);
+    const onMobileRefresh = async (ack: () => void) => {
+      try {
+        await getDashboards();
+      } finally {
+        ack();
+      }
+    };
     const getDashboards = async () => {
+      loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading dashboards...",
@@ -1060,6 +1198,7 @@ export default defineComponent({
         showErrorNotification(err?.message || "Failed to load dashboards.");
       } finally {
         dismiss();
+        loading.value = false;
       }
     };
 
@@ -1429,7 +1568,7 @@ export default defineComponent({
       store,
       orgData,
       router,
-      loading: ref(false),
+      loading,
       dashboards,
       dashboard,
       columns,
@@ -1464,10 +1603,17 @@ export default defineComponent({
       deleteDashboard,
       duplicateDashboard,
       getDashboards,
+      onMobileRefresh,
       getImageURL,
       verifyOrganizationStatus,
       splitterModel,
       activeFolderId,
+      isMobile,
+      showMobileFolders,
+      folderSheetDialogProps,
+      activeFolderName,
+      effectiveSplitterModel,
+      openMobileFolders,
       addFolder,
       showAddFolderDialog,
       isFolderEditMode,
@@ -1620,5 +1766,35 @@ export default defineComponent({
   width: 100%;
   justify-content: space-between;
   align-items: center;
+}
+
+// Mobile: collapse the folders splitter pane. Folders are accessed via
+// the mobile header trigger + side-sheet dialog.
+// Fills the bounded splitter after-slot. Avoids magic viewport math that
+// would break when the header toolbar wraps to 2+ rows on narrow screens.
+.mobile-dashboard-list {
+  height: 100%;
+  padding: 8px;
+  overflow-y: auto;
+
+  &__loading,
+  &__empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+  }
+}
+
+.dashboards-splitter-mobile {
+  :deep(.q-splitter__before) {
+    display: none !important;
+  }
+  :deep(.q-splitter__separator) {
+    display: none !important;
+  }
+  :deep(.q-splitter__after) {
+    width: 100% !important;
+  }
 }
 </style>
