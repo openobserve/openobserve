@@ -15,81 +15,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="isOpen">
-    <q-card>
-      <q-card-section>
-        {{ t("search.customDownloadMessage") }}
-      </q-card-section>
-
-      <q-card-section>
-        <q-input
-          type="number"
-          data-test="logs-custom-download-initial-number-input"
-          v-model="downloadCustomInitialNumber"
-          :label="t('search.initialNumber')"
-          default-value="1"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          tabindex="0"
-          min="1"
-        />
-        <q-select
-          data-test="logs-custom-download-range-select"
-          v-model="downloadCustomRange"
-          :options="downloadCustomRangeOptions"
-          :label="t('search.range')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-        />
-        <div class="q-py-sm file-type">
-          <label class="q-pr-sm">{{ t("search.fileType") }}</label
-          ><br />
-          <OButtonGroup
-            data-test="logs-custom-download-file-type-button-group"
-            class="file-type-button-group q-mt-xs"
-          >
-            <OButton
-              v-for="option in downloadCustomFileTypeOptions"
-              :key="option.value"
-              :data-test="`logs-custom-download-file-type-${option.value}-btn`"
-              :active="downloadCustomFileType === option.value"
-              variant="outline"
-              size="sm"
-              @click="downloadCustomFileType = option.value"
-              >{{ option.label }}</OButton
-            >
-          </OButtonGroup>
-        </div>
-      </q-card-section>
-
-      <q-card-actions align="right" class="tw:gap-2">
+  <ODialog
+    data-test="search-bar-custom-download-dialog"
+    v-model:open="isOpen"
+    size="md"
+    title="Custom Download"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('search.btnDownload')"
+    @click:secondary="isOpen = false"
+    @click:primary="downloadRangeData"
+  >
+    <p>{{ t("search.customDownloadMessage") }}</p>
+    <q-input
+      type="number"
+      data-test="custom-download-initial-number-input"
+      v-model="downloadCustomInitialNumber"
+      :label="t('search.initialNumber')"
+      default-value="1"
+      color="input-border"
+      bg-color="input-bg"
+      class="showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      tabindex="0"
+      min="1"
+    />
+    <q-select
+      data-test="custom-download-range-select"
+      v-model="downloadCustomRange"
+      :options="downloadCustomRangeOptions"
+      :label="t('search.range')"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-sm showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+    />
+    <div class="q-py-sm file-type">
+      <label class="q-pr-sm">{{ t("search.fileType") }}</label><br />
+      <OButtonGroup
+        data-test="custom-download-file-type-button-group"
+        class="file-type-button-group q-mt-xs"
+      >
         <OButton
+          v-for="option in downloadCustomFileTypeOptions"
+          :key="option.value"
+          :data-test="`custom-download-file-type-${option.value}-btn`"
+          :active="downloadCustomFileType === option.value"
           variant="outline"
-          size="sm-action"
-          data-test="logs-custom-download-cancel-btn"
-          v-close-popup
-          >{{ t("confirmDialog.cancel") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          data-test="logs-custom-download-ok-btn"
-          @click="downloadRangeData"
-          >{{ t("search.btnDownload") }}</OButton
-        >
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+          size="sm"
+          @click="downloadCustomFileType = option.value"
+        >{{ option.label }}</OButton>
+      </OButtonGroup>
+    </div>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
@@ -98,6 +81,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import useLogs from "@/composables/useLogs";
 import searchService from "@/services/search";
 import downloadLogs from "@/utils/logs/downloadLogs";
