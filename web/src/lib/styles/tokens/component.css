@@ -127,6 +127,12 @@
   --color-dropdown-item-destructive-text: var(--color-error-600);
   --color-dropdown-item-destructive-hover-bg: var(--color-error-50);
 
+  /* Tooltip */
+  --color-tooltip-bg: var(--color-grey-900);
+  --color-tooltip-text: var(--color-white);
+  --color-tooltip-border: var(--color-grey-700);
+  --color-tooltip-arrow: var(--color-grey-900);
+
   /* Icon sizes */
   --text-icon-xs: var(--spacing-3);
   /* 12px */
@@ -321,6 +327,12 @@
   --color-dropdown-separator: var(--color-dropdown-separator);
   --color-dropdown-item-destructive-text: var(--color-dropdown-item-destructive-text);
   --color-dropdown-item-destructive-hover-bg: var(--color-dropdown-item-destructive-hover-bg);
+
+  /* Tooltip */
+  --color-tooltip-bg: var(--color-tooltip-bg);
+  --color-tooltip-text: var(--color-tooltip-text);
+  --color-tooltip-border: var(--color-tooltip-border);
+  --color-tooltip-arrow: var(--color-tooltip-arrow);
 
   /* Icon sizes */
   --text-icon-xs: var(--text-icon-xs);
