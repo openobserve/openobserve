@@ -91,7 +91,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.stepValue')"
           :placeholder="t('dashboard.intervalInputPlaceholder')"
           data-test="dashboard-config-step-value"
-        />
+        >
+          <template #tooltip>
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              <b>Step - </b>
+              {{ t("dashboard.stepValueTooltip") }}
+              <br />
+              {{ t("dashboard.stepValueExample") }}
+            </q-tooltip>
+          </template>
+        </OInput>
 
         <!-- Panel Default Time Configuration -->
         <div
@@ -532,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-decimals"
         />
 
-        <div
+        <OInput
           v-if="
             !promqlMode &&
             !dashboardPanelData.data.queries[
@@ -540,147 +554,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].customQuery
           "
           v-show="isConfigOptionVisible('data', 'limit')"
-        >
-          <OInput
-            v-model.number="
-              dashboardPanelData.data.queries[
+          v-model.number="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].config.limit
+          "
+          type="number"
+          :min="0"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].config.limit
-            "
-            type="number"
-            :min="0"
-            @update:model-value="
-              (value: any) =>
-                (dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].config.limit = value ? value : 0)
-            "
-            placeholder="0"
-            :label="t('dashboard.queryLimit')"
-            data-test="dashboard-config-limit"
-          >
-            <template #tooltip>
-              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-                {{ t("dashboard.limitForQueryResult") }}
-              </q-tooltip>
-            </template>
-          </OInput>
-        </div>
+              ].config.limit = value ? value : 0)
+          "
+          placeholder="0"
+          :label="t('dashboard.queryLimit')"
+          data-test="dashboard-config-limit"
+        >
+          <template #tooltip>
+            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+              {{ t("dashboard.limitForQueryResult") }}
+            </q-tooltip>
+          </template>
+        </OInput>
 
-        <div
+        <OInput
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'top-results')"
+          v-model.number="dashboardPanelData.data.config.top_results"
+          type="number"
+          :min="0"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.top_results = value
+                ? value
+                : null)
+          "
+          :placeholder="t('dashboard.placeholderAll')"
+          :disabled="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.breakdown?.length == 0
+          "
+          :label="t('dashboard.showTopNValues')"
+          data-test="dashboard-config-top_results"
         >
-          <OInput
-            v-model.number="dashboardPanelData.data.config.top_results"
-            type="number"
-            :min="0"
-            @update:model-value="
-              (value: any) =>
-                (dashboardPanelData.data.config.top_results = value
-                  ? value
-                  : null)
-            "
-            :placeholder="t('dashboard.placeholderAll')"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ]?.fields?.breakdown?.length == 0
-            "
-            :label="t('dashboard.showTopNValues')"
-            data-test="dashboard-config-top_results"
-          >
-            <template #tooltip>
-              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
-                <b>{{ t("dashboard.topNTooltipTitle") }}</b>
-                <br /><br />
-                {{ t("dashboard.topNTooltipDescription") }}
-              </q-tooltip>
-            </template>
-          </OInput>
-        </div>
+          <template #tooltip>
+            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
+              <b>{{ t("dashboard.topNTooltipTitle") }}</b>
+              <br /><br />
+              {{ t("dashboard.topNTooltipDescription") }}
+            </q-tooltip>
+          </template>
+        </OInput>
 
-        <div
-          class="row items-center"
+        <OSwitch
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'top-results-others')"
+          v-model="dashboardPanelData.data.config.top_results_others"
+          :label="t('dashboard.addOthersSeries')"
+          data-test="dashboard-config-top_results_others"
+          :disabled="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.breakdown?.length == 0
+          "
+          size="lg"
         >
-          <OSwitch
-            v-model="dashboardPanelData.data.config.top_results_others"
-            :label="t('dashboard.addOthersSeries')"
-            data-test="dashboard-config-top_results_others"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.breakdown?.length == 0
-            "
-            size="lg"
-          >
-            <template #label>
-              {{ t('dashboard.addOthersSeries') }}
-              <q-icon
-                class="q-ml-xs"
-                size="20px"
-                name="info"
-                data-test="dashboard-config-top_results-others-info"
-              >
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                  max-width="250px"
-                >
-                  {{ t("dashboard.addOthersSeriesTooltip") }}
-                </q-tooltip>
-              </q-icon>
-            </template>
-          </OSwitch>
-        </div>
+          <template #tooltip>
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              {{ t("dashboard.addOthersSeriesTooltip") }}
+            </q-tooltip>
+          </template>
+        </OSwitch>
 
         <OSwitch
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('data', 'connect-nulls')"
           v-model="dashboardPanelData.data.config.connect_nulls"
+          :label="t('dashboard.connectNullValues')"
           data-test="dashboard-config-connect-null-values"
           size="lg"
         >
-          <template #label>
-            {{ t('dashboard.connectNullValues') }}
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-connect-null-values-info"
+          <template #tooltip>
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
             >
-              <q-tooltip
-                class="bg-grey-8"
-                anchor="top middle"
-                self="bottom middle"
-                max-width="250px"
-              >
-                {{ t("dashboard.connectNullValuesTooltip") }}
-              </q-tooltip>
-            </q-icon>
+              {{ t("dashboard.connectNullValuesTooltip") }}
+            </q-tooltip>
           </template>
         </OSwitch>
 
-        <div
+        <OInput
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
+          v-model="dashboardPanelData.data.config.no_value_replacement"
+          placeholder="-"
+          :label="t('dashboard.noValueReplacement')"
+          data-test="dashboard-config-no-value-replacement"
         >
-          <OInput
-            v-model="dashboardPanelData.data.config.no_value_replacement"
-            placeholder="-"
-            :label="t('dashboard.noValueReplacement')"
-            data-test="dashboard-config-no-value-replacement"
-          >
-            <template #tooltip>
-              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-                {{ t("dashboard.noValueReplacementTooltip") }}
-              </q-tooltip>
-            </template>
-          </OInput>
-        </div>
+          <template #tooltip>
+            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+              {{ t("dashboard.noValueReplacementTooltip") }}
+            </q-tooltip>
+          </template>
+        </OInput>
       </div>
     </q-expansion-item>
 
@@ -870,7 +856,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (dashboardPanelData.data.config.axis_label_truncate_width =
                   value !== '' ? value : null)
             "
-            data-test="dashboard-config-axis-label-truncate-width"
+            data-test="dashboard-config-axis-label-truncate"
           >
             <template #tooltip>
               <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]" class="bg-grey-8">
@@ -998,37 +984,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         />
 
-        <div
+        <OInput
           v-if="dashboardPanelData.data.config.table_pagination"
           v-show="isConfigOptionVisible('table', 'rows-per-page')"
+          v-model.number="
+            dashboardPanelData.data.config.table_pagination_rows_per_page
+          "
+          type="number"
+          :placeholder="t('dashboard.auto')"
+          :min="1"
+          :label="t('dashboard.rowsPerPage')"
+          data-test="dashboard-config-rows-per-page"
         >
-          <div class="row items-center all-pointer-events tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-            {{ t("dashboard.rowsPerPage") }}
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-rows-per-page-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
+          <template #tooltip>
+            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
               {{ t("dashboard.rowsPerPageTooltip") }}
             </q-tooltip>
-          </div>
-          <OInput
-            v-model.number="
-              dashboardPanelData.data.config.table_pagination_rows_per_page
-            "
-            type="number"
-            :placeholder="t('dashboard.auto')"
-            :min="1"
-            data-test="dashboard-config-rows-per-page"
-          />
-        </div>
+          </template>
+        </OInput>
       </div>
     </q-expansion-item>
 
@@ -1568,17 +1541,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSwitch
             v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
+            :label="t('dashboard.groupMultiYAxisTrellis')"
             data-test="dashboard-config-trellis-group-by-y-axis"
             size="lg"
           >
-            <template #label>
-              {{ t('dashboard.groupMultiYAxisTrellis') }}
-              <q-icon
-                class="q-ml-xs"
-                size="20px"
-                name="info"
-                data-test="dashboard-config-trellis-group-by-y-axis-info"
-              />
+            <template #tooltip>
               <q-tooltip
                 class="bg-grey-8"
                 anchor="top middle"
