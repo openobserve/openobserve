@@ -29,6 +29,19 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
+// ── Stub for migrated ODrawer ───────────────────────────────────────────────
+// Mirrors the real ODrawer contract: v-model:open, width, show-close props
+// plus update:open / close events. The default slot renders the drawer body
+// (DetailTable) so tests can assert what's mounted inside.
+const oDrawerStub = {
+  template:
+    '<div data-test="o-drawer" v-if="open">' +
+    '<div data-test="o-drawer-body"><slot /></div>' +
+    "</div>",
+  props: ["open", "width", "showClose", "title", "subTitle", "size", "persistent"],
+  emits: ["update:open", "close"],
+};
+
 describe("SearchResult Component", () => {
   let wrapper: any;
 
@@ -77,6 +90,7 @@ describe("SearchResult Component", () => {
           TenstackTable: true,
           PatternDetailsDialog: true,
           TracesAnalysisDashboard: true,
+          ODrawer: oDrawerStub,
         },
       },
       props: {
@@ -708,6 +722,68 @@ describe("SearchResult Component", () => {
         start: 0,
         end: 0,
       });
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ODrawer migration coverage
+  //
+  // The Detail Tab was migrated from <q-dialog> to <ODrawer>. These tests
+  // pin the v-model:open binding to searchObj.meta.showDetailTab and the
+  // close behaviour (which must trigger reDrawChart).
+  // ───────────────────────────────────────────────────────────────────────────
+  describe("Detail Tab — ODrawer migration", () => {
+    it("does not render the Detail ODrawer by default (showDetailTab=false)", () => {
+      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
+      expect(
+        wrapper.find('[data-test="logs-search-result-detail-dialog"]').exists(),
+      ).toBe(false);
+    });
+
+    it("renders the Detail ODrawer once showDetailTab flips true", async () => {
+      wrapper.vm.searchObj.meta.showDetailTab = true;
+      await flushPromises();
+
+      const drawer = wrapper.findComponent(oDrawerStub);
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.props("open")).toBe(true);
+      expect(drawer.props("width")).toBe(85);
+    });
+
+    it("closes the Detail ODrawer when update:open=false (v-model:open contract) and calls reDrawChart", async () => {
+      wrapper.vm.searchObj.meta.showDetailTab = true;
+      await flushPromises();
+
+      const reDrawSpy = vi.spyOn(wrapper.vm, "reDrawChart");
+      const drawer = wrapper.findComponent(oDrawerStub);
+      drawer.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
+      expect(reDrawSpy).toHaveBeenCalled();
+    });
+
+    it("does NOT call reDrawChart when update:open=true is emitted (only on close)", async () => {
+      wrapper.vm.searchObj.meta.showDetailTab = true;
+      await flushPromises();
+
+      const reDrawSpy = vi.spyOn(wrapper.vm, "reDrawChart");
+      const drawer = wrapper.findComponent(oDrawerStub);
+      drawer.vm.$emit("update:open", true);
+      await flushPromises();
+
+      expect(reDrawSpy).not.toHaveBeenCalled();
+    });
+
+    it("closes the Detail ODrawer when update:open=false is emitted a second time", async () => {
+      wrapper.vm.searchObj.meta.showDetailTab = true;
+      await flushPromises();
+
+      const drawer = wrapper.findComponent(oDrawerStub);
+      drawer.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
     });
   });
 });

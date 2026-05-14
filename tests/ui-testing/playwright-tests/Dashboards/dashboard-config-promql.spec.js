@@ -435,12 +435,14 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Column order button clicked");
 
     // Dialog should open
-    const dialog = page.locator('[data-test="column-order-dialog"]');
+    const dialog = page.locator('[data-test="dashboard-column-order-popup"]');
     await expect(dialog).toBeVisible({ timeout: 5000 });
     testLogger.info("Column order dialog opened");
 
-    // Cancel closes the dialog (ColumnOrderPopUp uses dashboard-column-order-cancel-btn)
-    await page.locator('[data-test="dashboard-column-order-cancel-btn"]').click();
+    // Cancel closes the dialog (ODialog secondary button inside the scoped panel)
+    await page
+      .locator('[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]')
+      .click();
     await expect(dialog).not.toBeVisible({ timeout: 5000 });
     testLogger.info("Column order dialog closed via Cancel");
 

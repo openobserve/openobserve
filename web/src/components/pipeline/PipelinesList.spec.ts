@@ -88,6 +88,78 @@ document.createElement = (tag: string) => {
 
 installQuasar({ plugins: [Dialog, Notify] });
 
+// Stubs for migrated ODialog (Pipeline Error Dialog) and ODrawer (Create Pipeline Drawer)
+// These replace the old q-dialog usages and allow us to assert prop forwarding
+// and drive button clicks via emits instead of relying on Quasar internals.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-sub-title="subTitle"
+      :data-primary-label="primaryButtonLabel"
+    >
+      <slot name="header-left" />
+      <slot />
+      <button
+        data-test="o-dialog-stub-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+    </div>
+  `,
+};
+
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-drawer-stub"
+      :data-open="String(open)"
+      :data-size="size"
+    >
+      <slot />
+    </div>
+  `,
+};
+
 describe("PipelinesList", () => {
   let wrapper: any = null;
   let store: any = null;
@@ -143,6 +215,10 @@ describe("PipelinesList", () => {
         mocks: {
           $router: mockRouter,
           $route: mockRouter.currentRoute.value,
+        },
+        stubs: {
+          ODialog: ODialogStub,
+          ODrawer: ODrawerStub,
         },
       },
     });
@@ -861,6 +937,126 @@ describe("PipelinesList", () => {
       expect(wrapper.vm.backfillDialog.pipelineId).toBe(
         mockScheduledPipeline.pipeline_id
       );
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("ODrawer (Create Pipeline) Migration", () => {
+    it("renders ODrawer stub for the create-pipeline drawer", () => {
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+    });
+
+    it("forwards showCreatePipeline=false to ODrawer open prop initially", () => {
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("open")).toBe(false);
+    });
+
+    it("passes size='lg' to the create-pipeline ODrawer", () => {
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("size")).toBe("lg");
+    });
+
+    it("forwards showCreatePipeline=true to ODrawer when drawer is opened", async () => {
+      wrapper.vm.showCreatePipeline = true;
+      await nextTick();
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("open")).toBe(true);
+    });
+
+    it("updates showCreatePipeline when ODrawer emits update:open", async () => {
+      wrapper.vm.showCreatePipeline = true;
+      await nextTick();
+      const drawer = wrapper.findComponent(ODrawerStub);
+      await drawer.vm.$emit("update:open", false);
+      await nextTick();
+      expect(wrapper.vm.showCreatePipeline).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("ODialog (Pipeline Error) Migration", () => {
+    const pipelineWithError = {
+      pipeline_id: "err-1",
+      name: "Errored Pipeline",
+      last_error: {
+        last_error_timestamp: 1700000000000,
+        error_summary: "Node failed",
+        node_errors: {},
+      },
+    };
+
+    it("renders ODialog stub for the error dialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.exists()).toBe(true);
+    });
+
+    it("ODialog is closed by default", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(false);
+    });
+
+    it("passes size='md' to ODialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("size")).toBe("md");
+    });
+
+    it("forwards errorDialog.show=true to ODialog open prop when opened", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("forwards pipeline name as title prop on ODialog", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("title")).toBe(pipelineWithError.name);
+    });
+
+    it("forwards the last-error timestamp as subTitle prop on ODialog", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      const subTitle = dialog.props("subTitle");
+      expect(subTitle).toBeTruthy();
+      expect(subTitle).toContain(":");
+    });
+
+    it("forwards primaryButtonLabel (close translation) to ODialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(typeof dialog.props("primaryButtonLabel")).toBe("string");
+      expect(dialog.props("primaryButtonLabel")?.length).toBeGreaterThan(0);
+    });
+
+    it("closes the error dialog when ODialog emits click:primary", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      await dialog.vm.$emit("click:primary");
+      await nextTick();
+      expect(wrapper.vm.errorDialog.show).toBe(false);
+      expect(wrapper.vm.errorDialog.data).toBeNull();
+    });
+
+    it("closes the error dialog when ODialog emits update:open=false", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      await dialog.vm.$emit("update:open", false);
+      await nextTick();
+      expect(wrapper.vm.errorDialog.show).toBe(false);
+    });
+
+    it("does not clear errorDialog state when ODialog emits update:open=true", async () => {
+      wrapper.vm.showErrorDialog(pipelineWithError);
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      await dialog.vm.$emit("update:open", true);
+      await nextTick();
+      // truthy `v` should NOT trigger closeErrorDialog()
+      expect(wrapper.vm.errorDialog.data).toStrictEqual(pipelineWithError);
     });
   });
 

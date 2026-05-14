@@ -351,3 +351,116 @@ describe('AppRoles - hasVisibleRows computed', () => {
     expect((wrapper.vm as any).hasVisibleRows).toBe(false);
   });
 });
+
+// 13. ODialog/ODrawer Migration
+// After migration the q-dialog wrapper around AddRole was removed; AddRole
+// now owns its own drawer/dialog and accepts v-model:open from the parent.
+// These tests verify the new contract.
+describe('AppRoles - ODialog/ODrawer Migration', () => {
+  // Custom mount that uses an AddRole stub declaring the new `open` prop and
+  // `update:open` / `added:role` emits so we can inspect props and emit
+  // events through the same v-model:open binding the production template uses.
+  async function mountAppRolesWithAddRoleStub() {
+    const wrapper = mount(AppRoles, {
+      attachTo: node,
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          AppTable: {
+            props: ['rows', 'columns', 'filter', 'selected', 'title'],
+            emits: ['update:selected'],
+            template: `<div data-test="iam-roles-table-section"><slot name="actions" v-bind="{column:{row:rows&&rows[0]?rows[0]:{role_name:'Admin'}}}"/><slot name="bottom-actions"/></div>`,
+          },
+          AddRole: {
+            name: 'AddRole',
+            props: ['open'],
+            emits: ['update:open', 'added:role'],
+            template: '<div data-test="add-role-stub" />',
+          },
+          ConfirmDialog: {
+            props: ['modelValue', 'title', 'message'],
+            emits: ['update:ok', 'update:cancel', 'update:modelValue'],
+            template: '<div data-test="confirm-dialog-stub"></div>',
+          },
+        },
+      },
+    });
+    await flushPromises();
+    return wrapper;
+  }
+
+  it('passes showAddGroup=false to AddRole as `open` prop by default', async () => {
+    const wrapper = await mountAppRolesWithAddRoleStub();
+    const addRole = wrapper.findComponent({ name: 'AddRole' });
+    expect(addRole.exists()).toBe(true);
+    expect(addRole.props('open')).toBe(false);
+  });
+
+  it('propagates showAddGroup=true to AddRole `open` prop when opened', async () => {
+    const wrapper = await mountAppRolesWithAddRoleStub();
+    (wrapper.vm as any).showAddGroup = true;
+    await flushPromises();
+
+    const addRole = wrapper.findComponent({ name: 'AddRole' });
+    expect(addRole.props('open')).toBe(true);
+  });
+
+  it('propagates showAddGroup=true to AddRole when addRole() handler is invoked', async () => {
+    const wrapper = await mountAppRolesWithAddRoleStub();
+    await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger('click');
+    await flushPromises();
+
+    const addRole = wrapper.findComponent({ name: 'AddRole' });
+    expect((wrapper.vm as any).showAddGroup).toBe(true);
+    expect(addRole.props('open')).toBe(true);
+  });
+
+  it('sets showAddGroup to false when AddRole emits update:open(false)', async () => {
+    const wrapper = await mountAppRolesWithAddRoleStub();
+    (wrapper.vm as any).showAddGroup = true;
+    await flushPromises();
+
+    const addRole = wrapper.findComponent({ name: 'AddRole' });
+    expect(addRole.props('open')).toBe(true);
+
+    await addRole.vm.$emit('update:open', false);
+    await flushPromises();
+
+    expect((wrapper.vm as any).showAddGroup).toBe(false);
+    expect(addRole.props('open')).toBe(false);
+  });
+
+  it('keeps showAddGroup true when AddRole emits update:open(true)', async () => {
+    const wrapper = await mountAppRolesWithAddRoleStub();
+    (wrapper.vm as any).showAddGroup = false;
+    await flushPromises();
+
+    const addRole = wrapper.findComponent({ name: 'AddRole' });
+    await addRole.vm.$emit('update:open', true);
+    await flushPromises();
+
+    expect((wrapper.vm as any).showAddGroup).toBe(true);
+    expect(addRole.props('open')).toBe(true);
+  });
+
+  it('invokes setupRoles (re-fetches roles) when AddRole emits added:role', async () => {
+    const wrapper = await mountAppRolesWithAddRoleStub();
+    // Initial mount already invoked getRoles once; clear to isolate the emit-driven call.
+    vi.mocked(getRoles).mockClear();
+
+    const addRole = wrapper.findComponent({ name: 'AddRole' });
+    await addRole.vm.$emit('added:role');
+    await flushPromises();
+
+    expect(getRoles).toHaveBeenCalledTimes(1);
+    expect(getRoles).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+  });
+
+  it('does not render AddRole inside a q-dialog wrapper (post-migration)', async () => {
+    const wrapper = await mountAppRolesWithAddRoleStub();
+    // The legacy template wrapped AddRole in <q-dialog>. After migration AddRole
+    // owns its own dialog, so no q-dialog wrapper should be rendered around it
+    // by the parent template.
+    expect(wrapper.find('.q-dialog').exists()).toBe(false);
+  });
+});

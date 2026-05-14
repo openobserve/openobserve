@@ -15,33 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <ODrawer data-test="panel-layout-settings-drawer"
+    :open="open"
+    size="sm"
+    :title="t('panel.layout')"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="submitForm()"
+  >
   <div
     class="q-pa-none tw:w-[300px]!"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ t("panel.layout") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <OButton variant="ghost" size="icon-circle" v-close-popup="true">
-          <template #icon-left
-            ><img
-              :src="getImageURL('images/common/close_icon.svg')"
-              style="width: 20px; height: 20px"
-          /></template>
-        </OButton>
-      </div>
-    </div>
-    <q-separator></q-separator>
-    <q-form @submit="savePanelLayout">
+    <q-form ref="panelFormRef" @submit="savePanelLayout">
       <div class="q-mx-md">
         <div
           data-test="panel-layout-settings-height"
-          class="o2-input tw:relative"
+          class="o2-input"
           style="padding-top: 12px"
         >
           <q-input
@@ -67,45 +60,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="panel-layout-settings-height-input"
           />
 
-          <div class="tw:text-[12px]">
-            Approximately
-            <span class="tw:font-bold">{{ getRowCount }}</span> table rows will
-            be displayed
+          <div class="tw:text-[12px] tw:flex tw:items-center tw:gap-1 tw:mt-1">
+            <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
+            <q-icon
+              name="info_outline"
+              class="cursor-pointer tw:shrink-0"
+              size="14px"
+            >
+              <q-tooltip
+                anchor="center end"
+                self="center left"
+                class="tw:text-[12px]"
+              >
+                1 unit = 30px
+              </q-tooltip>
+            </q-icon>
           </div>
 
-          <q-icon
-            name="info_outline"
-            class="cursor-pointer q-ml-sm tw:absolute tw:top-[14px] tw:left-[94px]"
-            size="16px"
-          >
-            <q-tooltip
-              anchor="center end"
-              self="center left"
-              class="tw:text-[12px]"
-            >
-              1 unit = 30px
-            </q-tooltip>
-          </q-icon>
+       
         </div>
-      </div>
-      <div class="flex justify-center q-mt-lg tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          v-close-popup="true"
-          data-test="panel-layout-settings-cancel"
-          >{{ t("dashboard.cancel") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          type="submit"
-          data-test="panel-layout-settings-save"
-          >{{ t("dashboard.save") }}</OButton
-        >
       </div>
     </q-form>
   </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -114,27 +91,35 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
-import OButton from "@/lib/core/Button/OButton.vue";
-
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { OButton },
+  components: { ODrawer },
   props: {
     layout: {
       type: Object,
       required: true,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["save:layout"],
+  emits: ["save:layout", "close", "update:open"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
 
+    const panelFormRef = ref(null);
     const updatedLayout = ref({ ...props.layout });
 
     const savePanelLayout = () => {
       emit("save:layout", { ...updatedLayout.value });
+    };
+
+    const submitForm = () => {
+      panelFormRef.value?.submit();
     };
 
     const getRowCount = computed(() => {
@@ -153,8 +138,10 @@ export default defineComponent({
       router,
       getImageURL,
       savePanelLayout,
+      submitForm,
       getRowCount,
       updatedLayout,
+      panelFormRef,
     };
   },
 });

@@ -15,28 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="show" position="right" full-height maximized>
-    <q-card style="width: 600px" class="flex column">
-      <q-card-section class="q-px-md q-py-sm">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <div class="text-body1 text-bold">Add Dashboard from Gallery</div>
-          </div>
-          <div class="col-auto">
-            <OButton
-              v-close-popup
-              variant="ghost"
-              size="icon"
-              data-test="add-dashboard-github-close"
-            >
-              <template #icon-left><q-icon name="cancel" /></template>
-            </OButton>
-          </div>
-        </div>
-      </q-card-section>
-      <q-separator />
-
-      <q-card-section class="q-pt-md dashboard-content-section">
+  <ODrawer data-test="add-dashboard-from-github-drawer"
+    v-model:open="show"
+    side="right"
+    size="lg"
+    title="Add Dashboard from Gallery"
+    secondary-button-label="Cancel"
+    :primary-button-label="`Next (${selectedDashboards.length})`"
+    :primary-button-disabled="selectedDashboards.length === 0"
+    @click:secondary="show = false"
+    @click:primary="handleNext"
+  >
         <!-- Loading State -->
         <div
           v-if="loading"
@@ -67,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Dashboard List -->
-        <div v-else class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
+        <div v-else class="tw:flex tw:flex-col tw:mx-2 tw:my-2">
           <q-input
             v-model="searchQuery"
             placeholder="Search dashboards..."
@@ -88,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-list
             :bordered="filteredDashboards.length > 0"
             dense
-            class="rounded-borders dashboard-list"
+            class="rounded-borders dashboard-list tw:my-2"
           >
             <q-item
               v-for="dashboard in filteredDashboards"
@@ -128,100 +117,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
           </q-list>
         </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section class="q-py-sm dashboard-footer-section">
-        <div class="flex justify-end q-gutter-x-sm">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-            data-test="add-dashboard-github-cancel"
-            >Cancel</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="selectedDashboards.length === 0"
-            @click="handleNext"
-            data-test="add-dashboard-github-next"
-            >Next ({{ selectedDashboards.length }})</OButton
-          >
-        </div>
-      </q-card-section>
-    </q-card>
 
     <!-- Folder Selection Dialog -->
-    <q-dialog v-model="showFolderSelection" persistent>
-      <q-card style="min-width: 500px; max-width: 600px" class="tw:rounded-xl">
-        <q-card-section class="q-py-md">
-          <div class="text-h6 tw:font-bold">Select Destination Folder</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-select
-              v-model="selectedFolderObj"
-              :options="folderOptions"
-              label="Folder"
-              outlined
-              dense
-              class="tw:grow o2-custom-select-dashboard"
-              data-test="add-dashboard-github-folder-select"
-            >
-              <template v-slot:selected>
-                <span v-if="selectedFolderObj">{{
-                  selectedFolderObj.label
-                }}</span>
-              </template>
-            </q-select>
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="showAddFolderDialog = true"
-              data-test="add-dashboard-github-add-folder"
-              title="Add New Folder"
-            >
-              <template #icon-left><q-icon name="add" /></template>
-            </OButton>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="showFolderSelection = false"
-            >Back</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!selectedFolderObj"
-            :loading="importing"
-            @click="confirmAdd"
-            data-test="add-dashboard-github-confirm"
-            >Add Dashboard</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="add-dashboard-from-github-folder-selection-dialog"
+      v-model:open="showFolderSelection"
+      persistent
+      size="sm"
+      title="Select Destination Folder"
+      secondary-button-label="Back"
+      primary-button-label="Add Dashboard"
+      :primary-button-disabled="!selectedFolderObj"
+      :primary-button-loading="importing"
+      @click:secondary="showFolderSelection = false"
+      @click:primary="confirmAdd"
+    >
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <q-select
+          v-model="selectedFolderObj"
+          :options="folderOptions"
+          label="Folder"
+          outlined
+          dense
+          class="tw:grow o2-custom-select-dashboard"
+          data-test="add-dashboard-github-folder-select"
+        >
+          <template v-slot:selected>
+            <span v-if="selectedFolderObj">{{ selectedFolderObj.label }}</span>
+          </template>
+        </q-select>
+        <OButton
+          variant="ghost"
+          size="icon"
+          @click="showAddFolderDialog = true"
+          data-test="add-dashboard-github-add-folder"
+          title="Add New Folder"
+        >
+          <template #icon-left><q-icon name="add" /></template>
+        </OButton>
+      </div>
+    </ODialog>
 
     <!-- Add Folder Dialog -->
-    <q-dialog
-      v-model="showAddFolderDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="showAddFolderDialog"
+      size="lg"
+      title="Add New Folder"
+      primary-button-label="Save"
+      secondary-button-label="Cancel"
+      :primary-button-disabled="isAddingFolder"
+      :primary-button-loading="isAddingFolder"
+      @click:primary="handleAddFolder"
+      @click:secondary="showAddFolderDialog = false"
       data-test="add-dashboard-github-add-folder-dialog"
     >
-      <div style="width: 600px" class="full-height">
-        <AddFolder @update:modelValue="updateFolderList" :edit-mode="false" />
-      </div>
-    </q-dialog>
-  </q-dialog>
+      <AddFolder
+        ref="addFolderRef"
+        @update:modelValue="updateFolderList"
+        @close="showAddFolderDialog = false"
+        :edit-mode="false"
+      />
+    </ODrawer>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -231,6 +187,8 @@ import { useQuasar } from "quasar";
 import dashboardsService from "@/services/dashboards";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 interface GitHubDashboard {
   name: string;
@@ -242,7 +200,7 @@ interface GitHubDashboard {
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
-  components: { AddFolder, OButton },
+  components: { AddFolder, OButton, ODialog, ODrawer },
   props: {
     modelValue: {
       type: Boolean,
@@ -271,6 +229,18 @@ export default defineComponent({
     const folderOptions = ref<{ label: string; value: string }[]>([]);
     const importing = ref(false);
     const showAddFolderDialog = ref(false);
+    const addFolderRef = ref<InstanceType<typeof AddFolder> | null>(null);
+    const isAddingFolder = ref(false);
+
+    const handleAddFolder = async () => {
+      if (!addFolderRef.value || isAddingFolder.value) return;
+      isAddingFolder.value = true;
+      try {
+        await addFolderRef.value.submit();
+      } finally {
+        isAddingFolder.value = false;
+      }
+    };
 
     const filteredDashboards = computed(() => {
       if (!searchQuery.value) return dashboards.value;
@@ -598,6 +568,9 @@ export default defineComponent({
       folderOptions,
       importing,
       showAddFolderDialog,
+      addFolderRef,
+      isAddingFolder,
+      handleAddFolder,
       isSelected,
       toggleDashboard,
       loadDashboards,
@@ -610,19 +583,8 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.dashboard-content-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.dashboard-footer-section {
-  flex-shrink: 0;
-}
-
 .dashboard-list {
-  flex: 0 1 auto;
+  max-height: calc(100dvh - 230px);
   overflow-y: auto;
 
   .selected-item {

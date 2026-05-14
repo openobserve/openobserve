@@ -368,3 +368,179 @@ describe("QueryEditorDialog - onBlurFunctionEditor", () => {
     expect((w.vm as any).functionEditorPlaceholderFlag).toBe(false);
   });
 });
+
+// Coverage for the q-dialog → ODrawer migration. The template now renders
+// <ODrawer v-model:open="isOpen" size="full" :show-close="false"> where
+// isOpen is a computed get/set bound to the modelValue prop.
+describe("QueryEditorDialog - ODrawer Migration", () => {
+  // Lightweight stub mirroring ODrawer's migrated prop surface so we can
+  // assert the open/size/showClose contract without pulling in reka-ui.
+  const ODrawerStub = {
+    name: "ODrawer",
+    props: {
+      open: { type: Boolean, default: false },
+      size: { type: String, default: undefined },
+      showClose: { type: Boolean, default: true },
+      title: { type: String, default: undefined },
+      persistent: { type: Boolean, default: false },
+      width: { type: [String, Number], default: undefined },
+    },
+    emits: ["update:open"],
+    template: `
+      <div
+        data-test="o-drawer-stub"
+        :data-open="String(open)"
+        :data-size="size"
+        :data-show-close="String(!!showClose)"
+      >
+        <slot name="header" />
+        <slot name="header-left" />
+        <slot name="header-right" />
+        <slot />
+        <slot name="footer" />
+        <button
+          data-test="o-drawer-stub-close"
+          @click="$emit('update:open', false)"
+        >close</button>
+      </div>
+    `,
+  };
+
+  async function mountWithDrawerStub(props: Record<string, any> = {}) {
+    return mount(QueryEditorDialog, {
+      props: {
+        modelValue: true,
+        tab: "sql",
+        sqlQuery: "",
+        promqlQuery: "",
+        vrlFunction: "",
+        streamName: "my-stream",
+        streamType: "logs",
+        columns: [],
+        period: 10,
+        multiTimeRange: [],
+        savedFunctions: [],
+        sqlQueryErrorMsg: "",
+        ...props,
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ODrawer: ODrawerStub,
+          CodeQueryEditor: childEditorStub,
+          QueryEditor: childEditorStub,
+          UnifiedQueryEditor: unifiedEditorStub,
+          FullViewContainer: {
+            template: '<div><slot /><slot name="right" /></div>',
+            props: ["name", "label", "isExpanded"],
+            emits: ["update:isExpanded"],
+          },
+          O2AIChat: {
+            template: '<div class="stub-ai-chat"></div>',
+            props: ["headerHeight", "isOpen"],
+            emits: ["close"],
+          },
+        },
+      },
+    });
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders exactly one ODrawer at the root of the template", async () => {
+    const w = await mountWithDrawerStub();
+    await flushPromises();
+    const drawers = w.findAllComponents(ODrawerStub);
+    expect(drawers.length).toBe(1);
+  });
+
+  it("forwards modelValue=true to ODrawer's open prop", async () => {
+    const w = await mountWithDrawerStub({ modelValue: true });
+    await flushPromises();
+    const drawer = w.findComponent(ODrawerStub);
+    expect(drawer.props("open")).toBe(true);
+  });
+
+  it("forwards modelValue=false to ODrawer's open prop", async () => {
+    const w = await mountWithDrawerStub({ modelValue: false });
+    await flushPromises();
+    const drawer = w.findComponent(ODrawerStub);
+    expect(drawer.props("open")).toBe(false);
+  });
+
+  it("reflects modelValue prop changes onto ODrawer's open prop", async () => {
+    const w = await mountWithDrawerStub({ modelValue: true });
+    await flushPromises();
+    let drawer = w.findComponent(ODrawerStub);
+    expect(drawer.props("open")).toBe(true);
+
+    await w.setProps({ modelValue: false });
+    await flushPromises();
+    drawer = w.findComponent(ODrawerStub);
+    expect(drawer.props("open")).toBe(false);
+  });
+
+  it('renders ODrawer with size="full"', async () => {
+    const w = await mountWithDrawerStub();
+    await flushPromises();
+    const drawer = w.findComponent(ODrawerStub);
+    expect(drawer.props("size")).toBe("full");
+  });
+
+  it("renders ODrawer with :show-close=\"false\"", async () => {
+    const w = await mountWithDrawerStub();
+    await flushPromises();
+    const drawer = w.findComponent(ODrawerStub);
+    expect(drawer.props("showClose")).toBe(false);
+  });
+
+  it("emits update:modelValue=false when ODrawer emits update:open=false", async () => {
+    const w = await mountWithDrawerStub({ modelValue: true });
+    await flushPromises();
+    const drawer = w.findComponent(ODrawerStub);
+    await drawer.vm.$emit("update:open", false);
+    await flushPromises();
+    const emitted = w.emitted("update:modelValue");
+    expect(emitted).toBeTruthy();
+    expect(emitted![emitted!.length - 1]).toEqual([false]);
+  });
+
+  it("emits update:modelValue=true when ODrawer emits update:open=true", async () => {
+    const w = await mountWithDrawerStub({ modelValue: false });
+    await flushPromises();
+    const drawer = w.findComponent(ODrawerStub);
+    await drawer.vm.$emit("update:open", true);
+    await flushPromises();
+    const emitted = w.emitted("update:modelValue");
+    expect(emitted).toBeTruthy();
+    expect(emitted![emitted!.length - 1]).toEqual([true]);
+  });
+
+  it("emits update:modelValue=false when the back button inside the drawer is clicked (closeDialog path)", async () => {
+    const w = await mountWithDrawerStub({ modelValue: true });
+    await flushPromises();
+    const backBtn = w.find('[data-test="add-alert-back-btn"]');
+    expect(backBtn.exists()).toBe(true);
+    await backBtn.trigger("click");
+    await flushPromises();
+    const emitted = w.emitted("update:modelValue");
+    expect(emitted).toBeTruthy();
+    expect(emitted![emitted!.length - 1]).toEqual([false]);
+  });
+
+  it("renders the dialog body content (drawer default slot) inside the ODrawer", async () => {
+    const w = await mountWithDrawerStub();
+    await flushPromises();
+    const drawer = w.findComponent(ODrawerStub);
+    // editor-dialog-card lives inside the drawer's default slot
+    expect(drawer.find(".editor-dialog-card").exists()).toBe(true);
+  });
+
+  it("no longer renders any q-dialog wrapper (migration completed)", async () => {
+    const w = await mountWithDrawerStub();
+    await flushPromises();
+    // q-dialog renders as .q-dialog in DOM; ODrawer replaces it entirely.
+    expect(w.find(".q-dialog").exists()).toBe(false);
+    expect(w.findComponent(ODrawerStub).exists()).toBe(true);
+  });
+});

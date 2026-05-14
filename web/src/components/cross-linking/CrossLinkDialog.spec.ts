@@ -31,19 +31,37 @@ describe("CrossLinkDialog Component", () => {
         plugins: [i18n],
         provide: { store },
         stubs: {
-          "q-dialog": {
+          ODialog: {
+            name: "ODialog",
             template:
-              '<div class="q-dialog"><slot /></div>',
-            props: ["modelValue"],
-          },
-          "q-card": {
-            template: '<div class="q-card"><slot /></div>',
-          },
-          "q-card-section": {
-            template: '<div class="q-card-section"><slot /></div>',
-          },
-          "q-card-actions": {
-            template: '<div class="q-card-actions"><slot /></div>',
+              "<div class='o-dialog' v-if='open'><slot name='header-right' /><slot /><slot name='footer' /></div>",
+            props: [
+              "open",
+              "persistent",
+              "size",
+              "title",
+              "subTitle",
+              "showClose",
+              "width",
+              "primaryButtonLabel",
+              "secondaryButtonLabel",
+              "neutralButtonLabel",
+              "primaryButtonVariant",
+              "secondaryButtonVariant",
+              "neutralButtonVariant",
+              "primaryButtonDisabled",
+              "secondaryButtonDisabled",
+              "neutralButtonDisabled",
+              "primaryButtonLoading",
+              "secondaryButtonLoading",
+              "neutralButtonLoading",
+            ],
+            emits: [
+              "update:open",
+              "click:primary",
+              "click:secondary",
+              "click:neutral",
+            ],
           },
           "q-form": {
             template: '<form @submit.prevent><slot /></form>',
@@ -413,6 +431,66 @@ describe("CrossLinkDialog Component", () => {
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(false);
+    });
+  });
+
+  describe("ODialog Integration", () => {
+    it("should render ODialog with editing title when link has name", () => {
+      wrapper = createWrapper({ link: existingLink });
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("title")).toBe("Edit Cross-Link");
+    });
+
+    it("should render ODialog with add title when link is null", () => {
+      wrapper = createWrapper({ link: null });
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("title")).toBe("Add Cross-Link");
+    });
+
+    it("should pass primaryButtonDisabled true when form invalid", () => {
+      wrapper = createWrapper();
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("primaryButtonDisabled")).toBe(true);
+    });
+
+    it("should pass primaryButtonDisabled false when form is valid", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.form.name = "My Link";
+      wrapper.vm.form.url = "https://example.com";
+      await nextTick();
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("primaryButtonDisabled")).toBe(false);
+    });
+
+    it("should call onSubmit when ODialog emits click:primary", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.form.name = "My Link";
+      wrapper.vm.form.url = "https://example.com";
+      await nextTick();
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      await dialog.vm.$emit("click:primary");
+      expect(wrapper.emitted("save")).toBeTruthy();
+      expect(wrapper.emitted("save")[0][0]).toEqual({
+        name: "My Link",
+        url: "https://example.com",
+        fields: [],
+      });
+    });
+
+    it("should call onCancel when ODialog emits click:secondary", async () => {
+      wrapper = createWrapper();
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      await dialog.vm.$emit("click:secondary");
+      expect(wrapper.emitted("cancel")).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")[0][0]).toBe(false);
+    });
+
+    it("should sync open prop with modelValue", () => {
+      wrapper = createWrapper({ modelValue: true });
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("open")).toBe(true);
     });
   });
 

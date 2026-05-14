@@ -126,7 +126,14 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     const fieldSelect = page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0"]');
     await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
     await expect(fieldSelect).not.toContainText("Field");
-    await page.keyboard.press("Escape");
+    // Close via the ODialog × button; Escape doesn't reliably bubble to reka-ui's
+    // DialogContent when q-select pickers steal focus.
+    await page
+      .locator('[data-test="override-config-popup-dialog"] [data-test="o-dialog-close-btn"]')
+      .click();
+    await page
+      .locator('[data-test="override-config-popup-dialog"]')
+      .waitFor({ state: "hidden", timeout: 5000 });
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

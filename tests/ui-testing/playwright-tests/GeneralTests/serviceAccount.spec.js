@@ -10,10 +10,10 @@ test.describe("Service Account for API access", () => {
     test.skip(isCloudEnvironment(), 'Service accounts tab not available on cloud UI');
     let pageManager;
 
-    // Helper to wait for page to load and handle any existing SRE Agent accounts
+    // Helper to wait for page to load and handle any existing SRE Agent accounts.
+    // Avoid waitForLoadState('networkidle') — deployed envs continuously poll RUM/
+    // analytics endpoints so the network never idles.
     async function waitForServiceAccountsPage(page) {
-        await page.waitForLoadState('networkidle');
-        // Wait for the service accounts table to be populated
         await page.waitForSelector('[data-test="iam-service-accounts-tab"]', { timeout: 10000 });
         await page.waitForTimeout(1000); // Brief pause to allow any system accounts to load
     }

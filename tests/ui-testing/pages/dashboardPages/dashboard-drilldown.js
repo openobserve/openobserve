@@ -17,7 +17,9 @@ export default class DashboardDrilldownPage {
     this.folderSelect = page.locator('[data-test="dashboard-drilldown-folder-select"]');
     this.dashboardSelect = page.locator('[data-test="dashboard-drilldown-dashboard-select"]');
     this.tabSelect = page.locator('[data-test="dashboard-drilldown-tab-select"]');
-    this.confirmButton = page.locator('[data-test="confirm-button"]');
+    this.confirmButton = page.locator(
+      '[data-test="dashboard-drilldown-popup"] [data-test="o-dialog-primary-btn"]'
+    );
 
     // Dashboard view — drilldown trigger overlay
     this.drilldownMenu = page.locator('[data-test="drilldown-menu"]');

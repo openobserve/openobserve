@@ -167,9 +167,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Query Inspector Dialog -->
-    <q-dialog v-model="showViewPanel" data-test="query-inspector-dialog">
-      <QueryInspector :metaData="metaData" :data="panelTitle"></QueryInspector>
-    </q-dialog>
+    <QueryInspector
+      v-model:open="showViewPanel"
+      :metaData="metaData"
+      :data="panelTitle"
+      data-test="query-inspector-dialog"
+    />
 
     <!-- Add Variable Drawer -->
     <div
